@@ -1,330 +1,218 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  CheckCircle, 
-  AlertCircle, 
-  Search, 
-  Eye, 
-  ArrowRight,
-  ExternalLink,
-  Loader2,
-  Filter
-} from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { supabase } from '@/lib/supabase';
+import { CheckCircle, XCircle, Loader2, Info } from 'lucide-react';
 
-function cn(...inputs: any[]) {
-  return twMerge(clsx(inputs));
-}
-
-// Sheets Interface
-interface ExtendedTransaction {
-  ID?: string;
-  Tanggal?: string;
-  Akun?: string;
-  'Dibelanjakan oleh'?: string;
-  'Toko/Penerimaa Uang'?: string;
-  Uraian?: string;
-  'Uang Masuk'?: number | string;
-  'Uang Keluar'?: number | string;
-  Link_Foto_Nota?: string;
-  Link_Foto_Barang?: string;
-  Link_Foto_Kegiatan?: string;
-  link_bukti_transfer?: string;
-  Disetujui?: string;
-  Catatan?: string;
-}
-
-export default function Home() {
-  const [data, setData] = useState<ExtendedTransaction[]>([]);
+export default function VerificationPage() {
+  const [pendingTrx, setPendingTrx] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingRow, setEditingRow] = useState<ExtendedTransaction | null>(null);
-  const [formData, setFormData] = useState<ExtendedTransaction>({});
+  const [processingId, setProcessingId] = useState<number | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ src: string, original: string } | null>(null);
+  const [catatan, setCatatan] = useState<{ [id: number]: string }>({});
+
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_NEW_SHEETS_URL;
-        if (!apiUrl) {
-           console.warn("Harap set NEXT_PUBLIC_NEW_SHEETS_URL di .env!");
-           setLoading(false);
-           return;
-        }
-        const res = await fetch(`${apiUrl}?action=getTransaksi`, { cache: 'no-store' });
-        const json = await res.json();
-        
-        if (json.status === 'success' && Array.isArray(json.data)) {
-            const unapproved = json.data.filter((row: ExtendedTransaction) => {
-               const strDisetujui = String(row.Disetujui || '').trim();
-               return strDisetujui === '' || strDisetujui === 'Perbaiki' || strDisetujui === 'undefined';
-            });
-            setData(unapproved);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+     fetchPending();
   }, []);
 
-  const handleEditClick = (row: ExtendedTransaction) => {
-    setEditingRow(row);
-    setFormData({ ...row });
+  const fetchPending = async () => {
+     setLoading(true);
+     try {
+        const { data, error } = await supabase
+           .from('transactions')
+           .select('*, ref_akun(nama_akun), ref_personel(nama_orang)')
+           .eq('disetujui', 'Menunggu')
+           .order('tanggal', { ascending: false });
+
+        if (error) throw error;
+        setPendingTrx(data || []);
+     } catch (err) {
+        console.error(err);
+     } finally {
+        setLoading(false);
+     }
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const verifikasiTransaksi = async (id: number, status: string) => {
+     setProcessingId(id);
+     try {
+        const payload: any = { 
+            disetujui: status, 
+            tanggal_disetujui: new Date().toISOString().split('T')[0]
+        };
+        
+        // Jika status Revisi atau Ditolak, sertakan catatan
+        if (status === 'Revisi' || status === 'Ditolak') {
+            if (!catatan[id] || catatan[id].trim() === '') {
+                alert("Mohon isi Catatan Alasan (di kotak bawah) untuk staf agar mereka tahu apa yang salah!");
+                setProcessingId(null);
+                return;
+            }
+            payload.catatan_verifikasi = catatan[id];
+        } else {
+            payload.catatan_verifikasi = null; // Bersihkan catatan jika diterima
+        }
+
+        const { error } = await supabase
+           .from('transactions')
+           .update(payload)
+           .eq('id', id);
+
+        if (error) throw error;
+        // Hapus dari list
+        setPendingTrx(prev => prev.filter(t => t.id !== id));
+        
+        // Bersihkan state catatan
+        setCatatan(prev => {
+           const newC = { ...prev };
+           delete newC[id];
+           return newC;
+        });
+
+     } catch (err: any) {
+        alert("Gagal memverifikasi: " + err.message);
+     } finally {
+        setProcessingId(null);
+     }
   };
 
-  const handleSave = async () => {
-    try {
-      const res = await fetch('/api/sheets-update', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify(formData)
-      });
-      const result = await res.json();
-      if(result.status === 'success') {
-         alert('Data berhasil disimpan ke Google Sheets!');
-         setData(prev => prev.filter(r => r.ID !== formData.ID));
-         setEditingRow(null);
-      } else {
-         alert('Gagal menyimpan data.');
-      }
-    } catch {
-      alert('Terjadi kesalahan koneksi.');
-    }
+  const renderFoto = (label: string, teks: string | null) => {
+     if (!teks) return null; // Sembunyikan jika kosong
+     const links = teks.split(',').map(s => s.trim()).filter(Boolean);
+     
+     return (
+        <div className="mb-4">
+           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">{label}</h4>
+           <div className="flex flex-col gap-3">
+              {links.map((lnk, idx) => {
+                  let imgSrc = lnk;
+                  const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+                  if (gdriveMatch && gdriveMatch[1]) {
+                     imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
+                  }
+
+                  return (
+                     <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm">
+                        <img src={imgSrc} alt="Lampiran" className="w-full h-auto max-h-64 object-contain" onError={(e) => {
+                           (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                           (e.target as any).className = 'w-16 h-16 object-contain opacity-50 m-6';
+                        }} />
+                        <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                           <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Klik Perbesar</span>
+                        </div>
+                     </div>
+                  );
+              })}
+           </div>
+        </div>
+     );
   };
 
-  const renderPhotos = (linkString?: string) => {
-    if (!linkString) return null;
-    const links = linkString.split(',').map(s => s.trim()).filter(Boolean);
-    if (links.length === 0) return null;
-    return (
-      <div className="flex gap-3 flex-wrap">
-        {links.map((link, idx) => {
-          const previewLink = link.replace('/view', '/preview');
-          return (
-            <a key={idx} href={link} target="_blank" rel="noreferrer" className="block relative group overflow-hidden rounded-2xl border-4 border-white shadow-md hover:shadow-xl transition-all aspect-square w-32">
-               <img src={previewLink} alt="Bukti" className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500" />
-               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <ExternalLink size={20} className="text-white" />
-               </div>
-            </a>
-          );
-        })}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
-      {/* Stats Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-indigo-600 text-white p-6 rounded-3xl shadow-xl shadow-indigo-100 flex justify-between items-center overflow-hidden relative">
-            <div className="z-10">
-               <p className="text-indigo-100 text-sm font-medium">Pending Verifikasi</p>
-               <h3 className="text-4xl font-black mt-1 leading-none">{data.length}</h3>
-            </div>
-            <div className="bg-white/10 p-4 rounded-2xl z-10">
-               <AlertCircle size={32} />
-            </div>
-            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full" />
+      <div className="bg-indigo-600 rounded-3xl p-8 flex items-center justify-between text-white shadow-xl shadow-indigo-200">
+         <div>
+            <h2 className="text-3xl font-black mb-2">Verifikasi Transaksi</h2>
+            <p className="text-indigo-100 font-medium">Bantu periksa bukti foto dan sahkan transaksi yang masuk agar tampil di Laporan Utama.</p>
          </div>
-
-         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center group hover:border-indigo-200 transition-colors">
-            <div>
-               <p className="text-gray-500 text-sm font-medium">Total Anggaran</p>
-               <h3 className="text-2xl font-bold mt-1 text-gray-900 group-hover:text-indigo-600 transition-colors">Rp 0</h3>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl text-gray-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
-               <CheckCircle size={32} />
-            </div>
-         </div>
-         
-         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex justify-between items-center group hover:border-indigo-200 transition-colors">
-            <div>
-               <p className="text-gray-500 text-sm font-medium">Laporan Aktif</p>
-               <h3 className="text-2xl font-bold mt-1 text-gray-900">0</h3>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-2xl text-gray-400">
-               <Eye size={32} />
-            </div>
+         <div className="hidden md:flex bg-white/20 p-4 rounded-2xl items-center justify-center font-black text-4xl shadow-inner">
+            {pendingTrx.length}
          </div>
       </div>
 
-      {/* Main Table */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-           <div className="flex items-center gap-3">
-              <h2 className="font-bold text-gray-900 text-lg">Daftar Transaksi Baru</h2>
-              <span className="bg-gray-100 text-gray-500 text-xs px-2.5 py-1 rounded-full font-bold">LIVE</span>
-           </div>
-           <button className="text-gray-400 hover:text-indigo-600 transition-colors p-2 hover:bg-indigo-50 rounded-xl">
-              <Filter size={20} />
-           </button>
-        </div>
+      {loading ? (
+         <div className="flex justify-center h-40 items-center"><Loader2 size={40} className="animate-spin text-indigo-500"/></div>
+      ) : pendingTrx.length === 0 ? (
+         <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-400">
+            <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
+            <h3 className="text-xl font-bold text-gray-700">Tidak ada tanggungan!</h3>
+            <p>Semua transaksi masuk sudah selesai diperiksa dan bersih.</p>
+         </div>
+      ) : (
+         <div className="grid gap-4">
+            {pendingTrx.map(trx => {
+               const isPemasukan = Number(trx.uang_masuk) > 0;
+               const nominal = isPemasukan ? trx.uang_masuk : trx.uang_keluar;
+               
+               return (
+                  <div key={trx.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 relative overflow-hidden group hover:border-indigo-200 transition-all">
+                     <div className={`absolute top-0 left-0 w-2 h-full ${isPemasukan ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
+                     
+                     
+                     <div className="flex-1 flex flex-col xl:flex-row gap-6">
+                        <div className="flex-1 space-y-4">
+                           <div className="flex justify-between items-start bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50">
+                              <div>
+                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{trx.tanggal}</p>
+                                 <h3 className="text-xl font-black text-gray-900 leading-tight">{trx.uraian}</h3>
+                                 <p className="text-sm font-bold text-gray-500 mt-2">🧑 {trx.ref_personel?.nama_orang || '?'} &nbsp;•&nbsp; 🛒 {trx.toko || '-'}</p>
+                              </div>
+                              <div className="text-right shrink-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">TOTAL NOMINAL</p>
+                                 <p className={`text-xl font-black ${isPemasukan ? 'text-emerald-600' : 'text-red-600'}`}>Rp {Number(nominal).toLocaleString('id-ID')}</p>
+                              </div>
+                           </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead className="bg-gray-50/50">
-              <tr>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identitas / Tgl</th>
-                <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Uraian Transaksi</th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nominal</th>
-                <th className="px-6 py-4 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading && (
-                <tr>
-                   <td colSpan={4} className="py-20 text-center">
-                      <div className="flex flex-col items-center gap-3 text-gray-400">
-                         <Loader2 className="animate-spin text-indigo-500" size={32} />
-                         <span className="font-medium">Sinkronisasi dengan Google Sheets...</span>
-                      </div>
-                   </td>
-                </tr>
-              )}
-              {!loading && data.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-20 text-gray-500">Semua data sudah terverifikasi. Sempurna! ✨</td></tr>
-              )}
-              {data.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50/70 transition-colors group">
-                  <td className="px-6 py-6">
-                    <div className="font-bold text-gray-900 tracking-tight leading-none mb-1">{row.ID || '-'}</div>
-                    <div className="text-gray-400 text-xs font-medium">{row.Tanggal || '-'}</div>
-                  </td>
-                  <td className="px-6 py-6">
-                     <p className="text-gray-600 text-sm max-w-md line-clamp-2 leading-relaxed">{row.Uraian}</p>
-                     <div className="flex gap-2 mt-2">
-                        {row.Akun && <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-md uppercase">{row.Akun}</span>}
+                           {/* Catatan Area */}
+                           <div className="mt-4">
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Tulis Catatan / Alasan (Jika Revisi/Ditolak):</label>
+                              <textarea 
+                                 className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-medium text-gray-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all placeholder:text-gray-300 min-h-[80px]" 
+                                 placeholder="Tulis alasan jika Anda meminta staf memperbaikinya..."
+                                 value={catatan[trx.id] || ''}
+                                 onChange={(e) => setCatatan({...catatan, [trx.id]: e.target.value})}
+                              />
+                           </div>
+                        </div>
+
+                        {/* Foto Section Vertikal */}
+                        <div className="flex-1 bg-white rounded-2xl p-5 border border-gray-200 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] min-w-[300px]">
+                           <div className="flex items-center gap-2 mb-4 text-indigo-700 font-black">
+                              <Info size={18}/> <span>GALERI LAMPIRAN</span>
+                           </div>
+                           <div className="space-y-4">
+                              {renderFoto("📸 Bukti Nota", trx.foto_nota)}
+                              {renderFoto("📸 Bukti Kegiatan", trx.foto_kegiatan)}
+                              {renderFoto("📸 Bukti Barang", trx.foto_barang)}
+                              {renderFoto("💸 Bukti Transfer", trx.foto_bukti_transfer)}
+                              
+                              {!(trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && (
+                                 <div className="text-center py-8 text-gray-400 font-bold bg-gray-50 rounded-xl border border-dashed border-gray-200">Tidak ada lampiran yang disertakan staf.</div>
+                              )}
+                           </div>
+                        </div>
                      </div>
-                  </td>
-                  <td className="px-6 py-6 text-center">
-                    {Number(row['Uang Masuk'] || 0) > 0 && <span className="text-emerald-600 font-black text-sm">+{Number(row['Uang Masuk']).toLocaleString('id-ID')}</span>}
-                    {Number(row['Uang Keluar'] || 0) > 0 && <span className="text-red-600 font-black text-sm">-{Number(row['Uang Keluar']).toLocaleString('id-ID')}</span>}
-                  </td>
-                  <td className="px-6 py-6 text-center">
-                    <button 
-                      onClick={() => handleEditClick(row)}
-                      className="bg-white border border-gray-200 text-gray-900 px-5 py-2.5 rounded-2xl hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all font-bold text-sm inline-flex items-center gap-2 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 group-hover:shadow-indigo-100 group-hover:shadow-lg"
-                    >
-                      Buka Review
-                      <ArrowRight size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
-      {/* Enhanced Modal */}
-      {editingRow && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[9999] animate-in fade-in transition-opacity duration-300">
-           <div className="bg-white rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
-              {/* Modal Header */}
-              <div className="p-8 border-b border-gray-50 flex justify-between items-start bg-gray-50/50">
-                 <div>
-                    <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest mb-2">
-                       <CheckCircle size={14} />
-                       Verifikasi Transaksi
-                    </div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">ID Transaksi: {editingRow.ID}</h2>
-                 </div>
-                 <button onClick={() => setEditingRow(null)} className="p-2 hover:bg-white rounded-2xl text-gray-400 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200">
-                    <AlertCircle size={24} className="rotate-45" />
-                 </button>
-              </div>
+                     <div className="flex flex-col gap-3 justify-center shrink-0 border-t xl:border-t-0 xl:border-l border-gray-100 pt-6 xl:pt-0 xl:pl-6 min-w-[200px]">
+                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-50">
+                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle size={20}/>} TERIMA (SAH)
+                        </button>
+                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} className="w-full flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-500 hover:text-white font-black py-3 px-6 rounded-xl transition-all disabled:opacity-50">
+                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <Info size={18}/>} KEMBALIKAN (REVISI)
+                        </button>
+                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50 mt-4">
+                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <XCircle size={18}/>} TOLAK MENTAH
+                        </button>
+                     </div>
+                  </div>
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-8 lg:p-10">
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    {/* Left: Metadata */}
-                    <div className="space-y-6">
-                       <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l-2 border-indigo-500 pl-3">Informasi Utama</label>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div>
-                                <p className="text-xs text-gray-400 mb-1">Tanggal</p>
-                                <input type="text" name="Tanggal" value={formData.Tanggal || ''} onChange={handleFormChange} className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all" />
-                             </div>
-                             <div>
-                                <p className="text-xs text-gray-400 mb-1">Kategori Akun</p>
-                                <input type="text" name="Akun" value={formData.Akun || ''} onChange={handleFormChange} className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all" />
-                             </div>
-                          </div>
-                          <div>
-                             <p className="text-xs text-gray-400 mb-1">Uraian / Deskripsi Lengkap</p>
-                             <textarea name="Uraian" value={formData.Uraian || ''} onChange={handleFormChange} rows={3} className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all resize-none" />
-                          </div>
-                       </div>
+               );
+            })}
+         </div>
+      )}
 
-                       <div className="space-y-4 pt-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l-2 border-emerald-500 pl-3">Nominal Transaksi</label>
-                          <div className="grid grid-cols-2 gap-4">
-                             <div className="bg-emerald-50 rounded-3xl p-4">
-                                <p className="text-[10px] text-emerald-600 font-bold mb-1 uppercase">Pemasukan (+)</p>
-                                <input type="number" name="Uang Masuk" value={formData['Uang Masuk'] || ''} onChange={handleFormChange} className="w-full bg-transparent border-none p-0 text-xl font-black text-emerald-700 placeholder-emerald-200 focus:ring-0" placeholder="0" />
-                             </div>
-                             <div className="bg-red-50 rounded-3xl p-4">
-                                <p className="text-[10px] text-red-600 font-bold mb-1 uppercase">Pengeluaran (-)</p>
-                                <input type="number" name="Uang Keluar" value={formData['Uang Keluar'] || ''} onChange={handleFormChange} className="w-full bg-transparent border-none p-0 text-xl font-black text-red-700 placeholder-red-200 focus:ring-0" placeholder="0" />
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-
-                    {/* Right: Pictures & Decision */}
-                    <div className="space-y-8">
-                       <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l-2 border-amber-500 pl-3">Bukti Fisik & Nota</label>
-                          <div className="bg-gray-50 rounded-3xl p-6 min-h-[160px] flex items-center justify-center">
-                             {(formData.Link_Foto_Nota || formData.Link_Foto_Barang || formData.Link_Foto_Kegiatan || formData.link_bukti_transfer) ? (
-                               <div className="flex flex-wrap gap-4 justify-center">
-                                  {renderPhotos(formData.Link_Foto_Nota)}
-                                  {renderPhotos(formData.Link_Foto_Barang)}
-                                  {renderPhotos(formData.Link_Foto_Kegiatan)}
-                                  {renderPhotos(formData.link_bukti_transfer)}
-                               </div>
-                             ) : (
-                               <div className="text-center">
-                                  <Eye size={32} className="mx-auto text-gray-300 mb-2" />
-                                  <p className="text-xs text-gray-400 italic">Tidak ada lampiran gambar.</p>
-                               </div>
-                             )}
-                          </div>
-                       </div>
-
-                       <div className="space-y-4 pt-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-l-2 border-indigo-600 pl-3">Keputusan Akhir</label>
-                          <div className="space-y-3">
-                             <select name="Disetujui" value={formData.Disetujui || ''} onChange={handleFormChange} className="w-full bg-indigo-600 text-white border-none rounded-2xl p-4 text-sm font-bold focus:ring-4 focus:ring-indigo-100 transition-all appearance-none cursor-pointer">
-                                <option value="">⏳ BELUM DIPUTUSKAN</option>
-                                <option value="ok">✅ SETUJU / TERVERIFIKASI</option>
-                                <option value="Perbaiki">❌ TOLAK / PERBAIKI</option>
-                             </select>
-                             <input type="text" name="Catatan" value={formData.Catatan || ''} onChange={handleFormChange} className="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Tambahkan catatan jika perlu..." />
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-8 bg-gray-50 flex justify-end gap-4 border-t border-gray-100">
-                 <button onClick={() => setEditingRow(null)} className="px-8 py-4 rounded-2xl text-gray-500 font-bold hover:bg-white transition-all">Batal</button>
-                 <button onClick={handleSave} className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:-translate-y-1 transition-all">SIMPAN KEPUTUSAN</button>
-              </div>
-           </div>
-        </div>
+      {/* Modal Preview */}
+      {previewImage && (
+         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+            <img src={previewImage.src} alt="Preview Bukti" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => {
+               (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+            }} />
+            <a href={previewImage.original} target="_blank" rel="noreferrer" className="mt-6 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold" onClick={(e) => e.stopPropagation()}>
+               🔗 Buka Link Asli
+            </a>
+         </div>
       )}
     </div>
   );

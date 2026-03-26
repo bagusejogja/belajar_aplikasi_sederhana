@@ -12,11 +12,17 @@ import {
   LogOut,
   ChevronRight,
   ShieldCheck,
-  X
+  X,
+  FileEdit,
+  PieChart,
+  Database
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { menuList } from '../lib/mock-db';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -28,7 +34,10 @@ const iconMap: Record<string, any> = {
   Building2,
   Menu: MenuIcon,
   CheckCircle,
-  ShieldCheck
+  ShieldCheck,
+  FileEdit,
+  PieChart,
+  Database
 };
 
 interface SidebarProps {
@@ -38,6 +47,45 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [userEmail, setUserEmail] = useState('');
+  const [userRole, setUserRole] = useState('Viewer'); // Default pengamat untuk keamanan
+  const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
+
+  useEffect(() => {
+     const getUserProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+           setUserEmail(user.email || '');
+           
+           // Ambil hak akses/role dari tabel app_users
+           const { data: roleData } = await supabase.from('app_users').select('role').eq('id', user.id).single();
+              
+           if (roleData) {
+              setUserRole(roleData.role);
+              
+              // Tarik Menu Path yang diizinkan untuk Role tersebut dari app_role_menus
+              const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
+              if (menuData && menuData.length > 0) {
+                 setAllowedPaths(menuData.map(m => m.path));
+              } else if (roleData.role === 'Admin') {
+                 // Fallback jika belum di-set, Admin punya akses semua
+                 setAllowedPaths(menuList.map(m => m.path));
+              }
+           }
+        }
+     };
+     getUserProfile();
+  }, []);
+
+
+  const handleLogout = async () => {
+
+     if (confirm("Ingin keluar dari sistem?")) {
+        await supabase.auth.signOut();
+        router.push('/login');
+     }
+  };
 
   return (
     <>
@@ -76,7 +124,13 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">
           {menuList.map((item) => {
+            // HAK AKSES MENU DINAMIS DARI DATABASE (Tabel app_role_menus)
+            if (userRole === 'Pending') return null; // Akun diblokir / belum disetujui tidak melihat menu apa-apa
+            if (!allowedPaths.includes(item.path) && userRole !== 'Admin') return null; 
+
             const Icon = iconMap[item.icon] || LayoutDashboard;
+
+
             const isActive = pathname === item.path;
 
             return (
@@ -108,19 +162,22 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
         {/* Profile / Bottom Action */}
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-           <div className="bg-white p-4 rounded-xl flex items-center justify-between border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">
-                  A
-                </div>
-                <div className="overflow-hidden">
-                   <p className="text-sm font-bold text-gray-900 truncate">Admin Masjid</p>
-                   <p className="text-[10px] text-gray-500 truncate uppercase tracking-wider font-semibold">Administrator</p>
-                </div>
+           <div className="bg-white p-4 rounded-xl flex items-start flex-col gap-2 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between w-full">
+                 <div className="flex items-center gap-3 overflow-hidden">
+                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0 uppercase">
+                     {userEmail ? userEmail.charAt(0) : 'U'}
+                   </div>
+                   <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-gray-900 truncate" title={userEmail}>{userEmail || 'Memuat...'}</p>
+                      <p className="text-[9px] text-gray-500 truncate uppercase tracking-wider font-semibold">Terkoneksi • {userRole}</p>
+                   </div>
+
+                 </div>
+                 <button onClick={handleLogout} title="Logout" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                    <LogOut size={16} />
+                 </button>
               </div>
-              <button title="Logout" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                 <LogOut size={16} />
-              </button>
            </div>
         </div>
       </aside>

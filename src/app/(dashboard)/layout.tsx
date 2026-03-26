@@ -1,9 +1,10 @@
 'use client';
 
 import Sidebar from '@/components/Sidebar';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { Search, Bell, HelpCircle, Menu } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { Search, Bell, HelpCircle, Menu, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardLayout({
   children,
@@ -11,12 +12,39 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+     const checkAuth = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+           router.push('/login');
+        } else {
+           setIsAuthChecking(false);
+        }
+     };
+
+     checkAuth();
+
+     // Listener untuk perubahan login/logout
+     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!session) {
+           router.push('/login');
+        }
+     });
+
+     return () => subscription.unsubscribe();
+  }, [router]);
 
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
     switch (path) {
       case '/': return 'Verifikasi Transaksi';
+      case '/input': return 'Input Transaksi Baru';
+      case '/reports': return 'Laporan Keuangan';
+      case '/references': return 'Data Referensi';
       case '/users': return 'Manajemen User';
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
@@ -24,17 +52,24 @@ export default function DashboardLayout({
     }
   };
 
+  if (isAuthChecking) {
+     return <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50"><Loader2 size={48} className="animate-spin text-indigo-600 mb-4" /><p className="font-bold text-gray-500">Mengecek Kredensial Keamanan...</p></div>;
+  }
+
   return (
-    <div className="flex h-screen bg-gray-50/50 overflow-hidden font-sans">
-      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+    <div className="flex h-screen bg-gray-50/50 overflow-hidden font-sans print:overflow-visible print:bg-white">
+      <div className="print:hidden">
+         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      </div>
       
       {/* 
         Area Utama Content 
         - lg:ml-64 (Sidebar butuh 64 unit tempat di layar besar)
         - p-4 md:p-8 (Padding menyusut di layar HP)
+        - Saat mode Print (Cetak), lebar jadi 100% dan margin kiri hilang!
       */}
-      <div className="flex-1 flex flex-col lg:ml-64 w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 lg:px-10 lg:py-8 gap-4 bg-white/50 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 lg:border-none">
+      <div className="flex-1 flex flex-col lg:ml-64 w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible print:h-auto print:block">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 lg:px-10 lg:py-8 gap-4 bg-white/50 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 lg:border-none print:hidden">
            
            <div className="flex items-center gap-3 w-full md:w-auto">
               {/* Tombol Hamburger Untuk Mobile Saja */}
@@ -42,6 +77,7 @@ export default function DashboardLayout({
                  onClick={() => setIsSidebarOpen(true)}
                  className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
               >
+
                  <Menu size={24} />
               </button>
               
