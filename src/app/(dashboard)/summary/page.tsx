@@ -39,12 +39,12 @@ export default function SummaryPage() {
                
          if (errTrx) throw errTrx;
          
-         // Filter Tanggal dari Field "tanggal" (Tgl Transaksi / Laporan)
-         const blnStr = bulanPilih.toString().padStart(2, '0');
-         const thnStr = tahunPilih.toString();
-         const prefixTanggal = `${thnStr}-${blnStr}`;
-
-         const currentMonthData = (trxData || []).filter(t => t.tanggal && t.tanggal.startsWith(prefixTanggal));
+         // Filter Tanggal menggunakan JavaScript Date agar stabil dari format apapun
+         const currentMonthData = (trxData || []).filter(t => {
+            if (!t.tanggal) return false;
+            const dt = new Date(t.tanggal);
+            return dt.getFullYear() === tahunPilih && dt.getMonth() + 1 === bulanPilih;
+         });
 
          // Struktur Data:
          // 2-Digit Group => Sub-Group (Nomor Akun Lengkap) => Items

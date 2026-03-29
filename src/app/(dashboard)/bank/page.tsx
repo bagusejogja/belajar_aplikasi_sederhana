@@ -94,8 +94,7 @@ export default function BankTransaksiPage() {
          const payloadToInsert = parsedData.map(d => ({
             waktu_transaksi: d.waktu_transaksi,
             rekening_id: Number(d.rekening_id) || null,
-            coa_anak_id: Number(d.coa_anak_id) || null,
-            coa_nama: d.coa_nama || null,
+            akun_id: Number(d.coa_anak_id) || null,
             noref_bank: d.noref_bank || null,
             deskripsi: d.deskripsi || null,
             debet: d.debet,
@@ -182,7 +181,7 @@ export default function BankTransaksiPage() {
                            <th className="p-3 w-10 text-center">No</th>
                            <th className="p-3">Waktu Trx / Tgl</th>
                            <th className="p-3">ID Rek</th>
-                           <th className="p-3">COA Nama</th>
+                           <th className="p-3">ID Akun (COA)</th>
                            <th className="p-3">No Ref Bank</th>
                            <th className="p-3">Deskripsi / Uraian</th>
                            <th className="p-3 text-right text-emerald-600">Debet (+)</th>
@@ -197,7 +196,7 @@ export default function BankTransaksiPage() {
                               <td className="p-3 text-center text-gray-400 font-bold">{i+1}</td>
                               <td className="p-3 font-bold text-gray-800">{row.waktu_transaksi}</td>
                               <td className="p-3"><span className="bg-gray-100 px-2 py-0.5 rounded text-[10px] font-black">{row.rekening_id}</span></td>
-                              <td className="p-3 font-medium text-gray-700">{row.coa_nama}</td>
+                              <td className="p-3 font-medium text-gray-700"><span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black">{row.coa_anak_id}</span></td>
                               <td className="p-3 font-mono text-xs">{row.noref_bank}</td>
                               <td className="p-3 max-w-[250px] truncate" title={row.deskripsi}>{row.deskripsi}</td>
                               <td className="p-3 text-right font-black text-emerald-500">{row.debet > 0 ? `Rp ${row.debet.toLocaleString('id-ID')}` : '-'}</td>
