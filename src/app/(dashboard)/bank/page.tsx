@@ -45,13 +45,14 @@ export default function BankTransaksiPage() {
              return;
          }
 
-         // Ambil header array
-         const headerRaw = rows[0].split(';').map(h => h.trim().toLowerCase());
+         // Bersihkan header secara agresif agar rekening_id tidak terganggu BOM
+         const headerRaw = rows[0].split(';').map(h => h.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase());
          
          // Looping isi data
          const extracted = [];
          for (let i = 1; i < rows.length; i++) {
-             const rowStrs = rows[i].split(';').map(c => c.trim());
+             // Bersihkan strip kutipan
+             const rowStrs = rows[i].split(';').map(c => c.replace(/^['"]+|['"]+$/g, '').trim());
              // Abaikan baris kosong semu
              if (rowStrs.length < 3) continue;
 

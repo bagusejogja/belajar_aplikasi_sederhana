@@ -22,6 +22,7 @@ export const menuList: MenuItem[] = [
   { title: 'Laporan Ringkasan', path: '/summary', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { title: 'Impor Trx Bank', path: '/bank', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF'] },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'] },
+  { title: 'Tree Akun (Tes)', path: '/ref-tree', icon: 'Layers', roles: ['ADMIN'] },
   { title: 'Unit Kerja', path: '/units', icon: 'Building2', roles: ['ADMIN'] },
   { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'] },
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'] },
