@@ -114,6 +114,10 @@ export default function InputPage() {
 
      setIsSaving(true);
      try {
+        // Ambil UUID user yang sedang login secara otomatis (di belakang layar)
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentUserId = sessionData?.session?.user?.id || null;
+
         const selectedBelanja = listBelanja.find(b => b.id === formData.jenis_belanja_id.value);
         if (!selectedBelanja) throw new Error("Jenis Belanja tidak valid");
 
@@ -140,7 +144,8 @@ export default function InputPage() {
               foto_kegiatan: kegiatanUrl || null,
               foto_barang: barangUrl || null,
               foto_bukti_transfer: transferUrl || null,
-              disetujui: 'Menunggu'
+              disetujui: 'Menunggu',
+              created_by: currentUserId  // UUID user otomatis dicatat di sini
            }
         ]);
 
