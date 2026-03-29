@@ -16,6 +16,7 @@ export default function RevisiPage() {
   // State Modal Edit
   const [editingTrx, setEditingTrx] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // File Uploads Baru
   const [fileNota, setFileNota] = useState<File[]>([]);
@@ -260,7 +261,7 @@ export default function RevisiPage() {
                     <div className="bg-indigo-50/50 border border-indigo-100 p-6 rounded-2xl">
                        <h4 className="font-black text-indigo-900 mb-4 border-b border-indigo-100 pb-2 flex items-center gap-2"><UploadCloud size={18}/> Perbaikan Lampiran Foto</h4>
                        
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div className="flex flex-col gap-6">
                            {[
                               { label: 'Nota', key: 'foto_nota', state: fileNota, setter: setFileNota },
                               { label: 'Kegiatan', key: 'foto_kegiatan', state: fileKeg, setter: setFileKeg },
@@ -269,28 +270,28 @@ export default function RevisiPage() {
                            ].map((item, idx) => {
                                const oldLinks = (editingTrx[item.key] || "").split(',').map((s:string) => s.trim()).filter(Boolean);
                                return (
-                                  <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200">
-                                     <p className="text-xs font-black text-gray-500 uppercase mb-2">[{item.label}] LAMA</p>
-                                     <div className="flex gap-2 flex-wrap mb-3 min-h-[40px]">
-                                        {oldLinks.length === 0 ? <span className="text-[10px] text-gray-300 italic">Kosong</span> : oldLinks.map((lnk: string, il: number) => {
+                                  <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 w-full">
+                                     <p className="text-xs font-black text-gray-500 uppercase mb-2">[{item.label}] LAMPIRAN SAAT INI</p>
+                                     <div className="grid grid-cols-2 gap-4 mb-4">
+                                        {oldLinks.length === 0 ? <span className="text-[12px] text-gray-300 italic col-span-2">Kosong</span> : oldLinks.map((lnk: string, il: number) => {
                                             let imgSrc = lnk;
                                             const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
                                             if (gdriveMatch && gdriveMatch[1]) {
-                                               imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w400`;
+                                               imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
                                             }
                                             return (
-                                                <div key={il} className="relative group">
-                                                   <img src={imgSrc} className="w-12 h-12 object-cover rounded shadow-sm border" onError={(e) => (e.target as any).src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png'}/>
-                                                   <button onClick={() => removeOldPhoto(item.key, lnk)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md"><Trash2 size={10} /></button>
+                                                <div key={il} className="relative group overflow-hidden rounded-xl border shadow-sm aspect-[4/3] bg-gray-50">
+                                                   <img src={imgSrc} onClick={() => setPreviewImage(imgSrc)} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onError={(e) => (e.target as any).src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png'}/>
+                                                   <button onClick={() => removeOldPhoto(item.key, lnk)} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg scale-125"><Trash2 size={14} /></button>
                                                 </div>
                                             );
                                         })}
                                      </div>
-                                     <p className="text-xs font-black text-indigo-500 uppercase mb-2">[{item.label}] UPLOAD BARU</p>
+                                     <p className="text-xs font-black text-indigo-500 uppercase mb-2">[{item.label}] UPLOAD TAMBAHAN FOTO BARU</p>
                                      <input 
                                         type="file" multiple accept="image/*" 
                                         onChange={(e) => item.setter(Array.from(e.target.files || []))} 
-                                        className="text-[10px] text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 w-full"
+                                        className="text-[12px] text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 w-full bg-gray-50 p-2 rounded-xl"
                                      />
                                   </div>
                                )
@@ -308,6 +309,18 @@ export default function RevisiPage() {
                 </div>
              </div>
           </div>
+      )}
+
+      {/* Modal Pembesaran Gambar */}
+      {previewImage && (
+         <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+            <img src={previewImage} alt="Preview Bukti" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => {
+               (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+            }} />
+            <button className="mt-6 bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold transition-colors">
+               TUTUP
+            </button>
+         </div>
       )}
 
     </div>

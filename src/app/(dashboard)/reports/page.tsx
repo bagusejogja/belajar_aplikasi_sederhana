@@ -116,45 +116,44 @@ export default function ReportsPage() {
      }
   };
 
-  const renderLampiranLinks = (teks: string | null) => {
-      if (!teks) return <span className="text-gray-400 italic text-xs font-medium bg-gray-100/50 px-2 py-1 rounded">Tidak ada foto</span>;
+  const renderLampiranLinks = (label: string, teks: string | null) => {
+      if (!teks) return null;
       const links = teks.split(',').map(s => s.trim()).filter(s => s);
       
-      return links.map((lnk, idx) => {
-         // Deteksi Google Drive URL
-         let imgSrc = lnk;
-         let originalLink = lnk;
-         let isGDrive = false;
-         
-         const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-         if (gdriveMatch && gdriveMatch[1]) {
-             isGDrive = true;
-             // Menggunakan API Thumbnail Rahasia Google Drive (Lebih aman dari CORS dan limit ukuran)
-             imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
-         }
+      return (
+         <div className="w-full bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <p className="text-xs font-black text-gray-500 mb-4">{label}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {links.map((lnk, idx) => {
+                   let imgSrc = lnk;
+                   const isGDrive = lnk.match(/drive\.google\.com/);
+                   const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+                   
+                   if (gdriveMatch && gdriveMatch[1]) {
+                      imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
+                   }
 
-         return (
-            <div key={idx} className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-500 transition-all shadow-sm bg-gray-50 flex items-center justify-center p-1 w-full max-w-[200px]" style={{ aspectRatio: '3/2' }} onClick={() => setPreviewImage({ src: imgSrc, original: originalLink })}>
-               
-               {/* Gambar asli */}
-               <img src={imgSrc} alt="Bukti" className="w-full h-full object-contain rounded-lg" onError={(e) => { 
-                  // Jika gambar Google Drive gagal karena limitasi / private, tampilkan logo link
-                  (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                  (e.target as HTMLImageElement).className = 'w-10 h-10 object-contain mx-auto opacity-50';
-               }} />
+                   return (
+                      <div key={idx} className="relative group cursor-pointer overflow-hidden rounded-xl border border-gray-200 hover:border-indigo-500 transition-all shadow-sm bg-gray-50 flex items-center justify-center aspect-[4/3] w-full" onClick={() => setPreviewImage({ src: imgSrc, original: lnk })}>
+                         
+                         <img src={imgSrc} alt="Bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={(e) => { 
+                            (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                            (e.target as HTMLImageElement).className = 'w-16 h-16 object-contain mx-auto opacity-50';
+                         }} />
 
-               <div className="absolute inset-0 bg-indigo-900/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-white font-bold text-[10px] backdrop-blur-sm z-10 rounded-xl">
-                  <span className="bg-white/20 p-1.5 rounded-full mb-1">🔍</span>
-                  Perbesar
-               </div>
-               
-               {isGDrive && (
-                  <div className="absolute top-0 right-0 bg-blue-500 text-white text-[8px] px-2 font-bold rounded-bl-xl z-0 shadow-sm">GDRIVE</div>
-               )}
+                         <div className="absolute inset-0 bg-indigo-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm backdrop-blur-sm z-10">
+                            🔍 Perbesar
+                         </div>
+                         
+                         {isGDrive && (
+                            <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-3 py-1 font-black rounded-bl-xl z-0 shadow-sm">GDRIVE</div>
+                         )}
+                      </div>
+                   );
+               })}
             </div>
-         );
-      });
-
+         </div>
+      );
   };
 
 
@@ -278,24 +277,17 @@ export default function ReportsPage() {
                                  {isExpanded && (
                                     <tr className="bg-gray-50 border-t-0 shadow-inner print:hidden">
                                        <td colSpan={6} className="p-4">
-                                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-2 bg-white rounded-2xl border border-gray-200">
-
-                                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-3 border-b pb-2">Lampiran Nota</p>
-                                                <div className="flex flex-wrap gap-2">{renderLampiranLinks(trx.foto_nota)}</div>
+                                          <div className="col-span-12 bg-white/50 p-6 rounded-2xl border border-indigo-50 shadow-inner mt-4">
+                                             <h4 className="font-black text-indigo-900 mb-6 border-b border-indigo-100 pb-2 uppercase text-sm tracking-widest">📂 Lampiran Fisik Transaksi</h4>
+                                             <div className="flex flex-col gap-8">
+                                                {renderLampiranLinks("BUKTI NOTA / KWITANSI", trx.foto_nota)}
+                                                {renderLampiranLinks("DOKUMENTASI KEGIATAN", trx.foto_kegiatan)}
+                                                {renderLampiranLinks("FOTO BARANG / ASET", trx.foto_barang)}
+                                                {renderLampiranLinks("BUKTI TRANSFER", trx.foto_bukti_transfer)}
                                              </div>
-                                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-3 border-b pb-2">Lampiran Kegiatan</p>
-                                                <div className="flex flex-wrap gap-2">{renderLampiranLinks(trx.foto_kegiatan)}</div>
-                                             </div>
-                                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-3 border-b pb-2">Lampiran Barang</p>
-                                                <div className="flex flex-wrap gap-2">{renderLampiranLinks(trx.foto_barang)}</div>
-                                             </div>
-                                             <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-3 border-b pb-2">Bukti Transfer</p>
-                                                <div className="flex flex-wrap gap-2">{renderLampiranLinks(trx.foto_bukti_transfer)}</div>
-                                             </div>
+                                             {!(trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && (
+                                                <div className="text-center py-6 text-gray-400 font-bold italic text-sm">Tidak ada lampiran fisik.</div>
+                                             )}
                                           </div>
                                        </td>
                                     </tr>
