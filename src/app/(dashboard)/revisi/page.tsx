@@ -272,12 +272,19 @@ export default function RevisiPage() {
                                   <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200">
                                      <p className="text-xs font-black text-gray-500 uppercase mb-2">[{item.label}] LAMA</p>
                                      <div className="flex gap-2 flex-wrap mb-3 min-h-[40px]">
-                                        {oldLinks.length === 0 ? <span className="text-[10px] text-gray-300 italic">Kosong</span> : oldLinks.map((lnk: string, il: number) => (
-                                            <div key={il} className="relative group">
-                                               <img src={lnk} className="w-12 h-12 object-cover rounded shadow-sm border" onError={(e) => (e.target as any).src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png'}/>
-                                               <button onClick={() => removeOldPhoto(item.key, lnk)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md"><Trash2 size={10} /></button>
-                                            </div>
-                                        ))}
+                                        {oldLinks.length === 0 ? <span className="text-[10px] text-gray-300 italic">Kosong</span> : oldLinks.map((lnk: string, il: number) => {
+                                            let imgSrc = lnk;
+                                            const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+                                            if (gdriveMatch && gdriveMatch[1]) {
+                                               imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w400`;
+                                            }
+                                            return (
+                                                <div key={il} className="relative group">
+                                                   <img src={imgSrc} className="w-12 h-12 object-cover rounded shadow-sm border" onError={(e) => (e.target as any).src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png'}/>
+                                                   <button onClick={() => removeOldPhoto(item.key, lnk)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md"><Trash2 size={10} /></button>
+                                                </div>
+                                            );
+                                        })}
                                      </div>
                                      <p className="text-xs font-black text-indigo-500 uppercase mb-2">[{item.label}] UPLOAD BARU</p>
                                      <input 
