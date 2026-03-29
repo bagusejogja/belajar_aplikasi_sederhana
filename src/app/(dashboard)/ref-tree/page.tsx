@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save, Edit, Folder, Layers } from 'lucide-react';
+import { Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save, Edit, Folder, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefAkun, RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
@@ -12,6 +12,13 @@ export default function ReferencesPage() {
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
   const [listBelanja, setListBelanja] = useState<(RefJenisBelanja & { ref_akun: { nama_akun: string }})[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Tree Collapsible State
+  const [expandedInduk, setExpandedInduk] = useState<Record<string, boolean>>({});
+  const [expandedKel, setExpandedKel] = useState<Record<string, boolean>>({});
+
+  const toggleInduk = (id: string, e: any) => { e.stopPropagation(); setExpandedInduk(p => ({...p, [id]: !p[id]})); };
+  const toggleKel = (id: string, e: any) => { e.stopPropagation(); setExpandedKel(p => ({...p, [id]: !p[id]})); };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -197,8 +204,11 @@ export default function ReferencesPage() {
                            return (
                              <div key={induk.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
                                 {/* BARIS INDUK */}
-                                <div className="p-4 border-b flex justify-between items-center bg-gray-50/50">
+                                <div onClick={(e) => toggleInduk(induk.id, e)} className="p-4 border-b flex justify-between items-center bg-gray-50 hover:bg-indigo-50/50 transition-colors cursor-pointer">
                                    <div className="flex items-center gap-3">
+                                      <button className="text-gray-400 hover:text-indigo-600 transition-colors">
+                                         {expandedInduk[induk.id] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                      </button>
                                       <Folder className="text-blue-500" size={18} fill="currentColor"/>
                                       <span className="font-black text-blue-600">{induk.nomor_akun}</span>
                                       <span className="text-gray-400">—</span>
@@ -206,8 +216,7 @@ export default function ReferencesPage() {
                                       <span className="text-[10px] font-bold bg-gray-600 text-white px-2 py-0.5 rounded ml-2">{Object.keys(induk.kelompoks).length} kelompok</span>
                                       <span className="text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded">{totalAnak} anak</span>
                                    </div>
-                                   <div className="flex gap-2">
-                                      {/* <button onClick={() => openModal(induk)} className="bg-amber-400 hover:bg-amber-500 text-white p-1.5 rounded"><Edit size={14}/></button> */}
+                                   <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                                       <button onClick={() => openModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs font-bold rounded shadow-sm flex items-center gap-1">
                                          + Tambah Kelompok Baru
                                       </button>
@@ -215,7 +224,8 @@ export default function ReferencesPage() {
                                 </div>
 
                                 {/* LIST KELOMPOK DALAM INDUK */}
-                                <div className="p-4 space-y-3">
+                                {expandedInduk[induk.id] && (
+                                 <div className="p-4 space-y-3">
                                    <div className="flex justify-between items-center mb-2 px-2">
                                       <span className="text-xs font-bold text-gray-400 uppercase">Daftar Kelompok</span>
                                    </div>
@@ -223,15 +233,18 @@ export default function ReferencesPage() {
                                    {Object.values(induk.kelompoks).map((kel: any) => (
                                       <div key={kel.id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
                                          {/* BARIS KELOMPOK */}
-                                         <div className="p-3 bg-gray-50 flex justify-between items-center border-b border-gray-100">
+                                         <div onClick={(e) => toggleKel(kel.id, e)} className="p-3 bg-gray-50 flex justify-between items-center border-b border-gray-100 hover:bg-indigo-50/50 transition-colors cursor-pointer">
                                             <div className="flex items-center gap-3 pl-2">
+                                               <button className="text-gray-400 hover:text-indigo-600 transition-colors">
+                                                  {expandedKel[kel.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                               </button>
                                                <Layers className="text-blue-400" size={16} />
                                                <span className="font-black text-blue-600 text-sm">{kel.nomor_akun}</span>
                                                <span className="text-gray-400 text-sm">—</span>
                                                <span className="font-bold text-blue-500 text-sm">{kel.nama_akun}</span>
                                                <span className="text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded ml-2">{kel.anaks.length} anak</span>
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2" onClick={e => e.stopPropagation()}>
                                                <button onClick={() => openModal(kel)} className="bg-amber-400 hover:bg-amber-500 text-white px-3 py-1 text-xs font-bold rounded shadow-sm flex items-center gap-1">
                                                   <Edit size={12}/> Edit
                                                </button>
@@ -242,7 +255,7 @@ export default function ReferencesPage() {
                                          </div>
 
                                          {/* DATA ANAK */}
-                                         {kel.anaks.length > 0 && (
+                                         {expandedKel[kel.id] && kel.anaks.length > 0 && (
                                             <table className="w-full text-left text-sm">
                                                <thead className="border-b border-gray-100 text-gray-500 font-bold bg-white text-xs">
                                                   <tr>
@@ -268,8 +281,9 @@ export default function ReferencesPage() {
                                             </table>
                                          )}
                                       </div>
-                                   ))}
-                                </div>
+                                    ))}
+                                 </div>
+                                )}
                              </div>
                            )
                         })}
