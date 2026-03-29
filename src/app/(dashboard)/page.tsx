@@ -148,11 +148,11 @@ export default function VerificationPage() {
                const nominal = isPemasukan ? trx.uang_masuk : trx.uang_keluar;
                
                return (
-                  <div key={trx.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 relative overflow-hidden group hover:border-indigo-200 transition-all">
-                     <div className={`absolute top-0 left-0 w-2 h-full ${isPemasukan ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
+                  <div key={trx.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-6 relative overflow-hidden group hover:border-indigo-200 transition-all">
+                     <div className={`absolute top-0 left-0 w-full h-2 ${isPemasukan ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
                      
                      
-                     <div className="flex-1 flex flex-col xl:flex-row gap-6">
+                     <div className="flex flex-col gap-6 w-full pt-2">
                         <div className="flex-1 space-y-4">
                            <div className="flex justify-between items-start bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50">
                               <div>
@@ -166,7 +166,7 @@ export default function VerificationPage() {
                               </div>
                            </div>
 
-                           <div className="mt-4 p-4 border rounded-2xl bg-gray-50/50">
+                           <div className="mt-4 p-5 md:p-6 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50">
                               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Perbaikan Kategori Akun (Jika Keliru):</label>
                               <div className="relative z-50">
                                  <Select 
@@ -193,12 +193,12 @@ export default function VerificationPage() {
                            </div>
                         </div>
 
-                        {/* Foto Section Vertikal */}
-                        <div className="flex-1 bg-white rounded-2xl p-5 border border-gray-200 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] min-w-[300px]">
-                           <div className="flex items-center gap-2 mb-4 text-indigo-700 font-black">
-                              <Info size={18}/> <span>GALERI LAMPIRAN</span>
+                        {/* Foto Section Vertikal Memanjang */}
+                        <div className="w-full bg-white rounded-3xl p-5 md:p-6 border-2 border-indigo-50 shadow-[inset_0_2px_20px_rgba(79,70,229,0.03)]">
+                           <div className="flex items-center gap-2 mb-6 text-indigo-700 font-black border-b border-indigo-100/50 pb-3">
+                              <Info size={18}/> <span>GALERI LAMPIRAN FISIK</span>
                            </div>
-                           <div className="space-y-4">
+                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                               {renderFoto("📸 Bukti Nota", trx.foto_nota)}
                               {renderFoto("📸 Bukti Kegiatan", trx.foto_kegiatan)}
                               {renderFoto("📸 Bukti Barang", trx.foto_barang)}
@@ -211,16 +211,20 @@ export default function VerificationPage() {
                         </div>
                      </div>
 
-                     <div className="flex flex-col gap-3 justify-center shrink-0 border-t xl:border-t-0 xl:border-l border-gray-100 pt-6 xl:pt-0 xl:pl-6 min-w-[200px]">
-                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-6 rounded-xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-50">
-                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <CheckCircle size={20}/>} TERIMA (SAH)
-                        </button>
-                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} className="w-full flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-500 hover:text-white font-black py-3 px-6 rounded-xl transition-all disabled:opacity-50">
-                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <Info size={18}/>} KEMBALIKAN (REVISI)
-                        </button>
-                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white font-bold py-3 px-6 rounded-xl transition-all disabled:opacity-50 mt-4">
+                     {/* Tombol Aksi di Bawah Semua (Memanjang Horizontal) */}
+                     <div className="flex flex-col sm:flex-row gap-4 justify-between border-t-2 border-gray-100 pt-6 mt-2 w-full">
+                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white font-bold py-4 px-6 rounded-2xl transition-all disabled:opacity-50 border-2 border-red-100 hover:border-red-500">
                            {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <XCircle size={18}/>} TOLAK MENTAH
                         </button>
+                        
+                        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                           <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} className="flex-1 flex items-center justify-center gap-2 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white font-black py-4 px-8 rounded-2xl transition-all disabled:opacity-50 border-2 border-amber-200 hover:border-amber-500">
+                              {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <Info size={18}/>} KEMBALIKAN (REVISI)
+                           </button>
+                           <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-8 rounded-2xl transition-all shadow-xl shadow-emerald-200 disabled:opacity-50 min-w-[200px]">
+                              {processingId === trx.id ? <Loader2 size={24} className="animate-spin"/> : <CheckCircle size={24}/>} TERIMA (SAH)
+                           </button>
+                        </div>
                      </div>
                   </div>
 
