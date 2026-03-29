@@ -65,6 +65,8 @@ export default function BankTransaksiPage() {
 
              // Konversi Field Angka & Tanggal
              rowObj.waktu_transaksi = parseExcelDate(rowObj.waktu_transaksi || rowObj.tanggal || '');
+             rowObj.akun_id = rowObj.coa_anak_id || rowObj.akun_id || rowObj.id_akun || rowObj.id_coa || rowObj.coa_id || '';
+             rowObj.rekening_id = rowObj.rekening_id || rowObj.id_rekening || '1';
              rowObj.debet = Number(rowObj.debet) || 0;
              rowObj.kredit = Number(rowObj.kredit) || 0;
              rowObj.saldo_riil = Number(rowObj.saldo_riil) || 0;
@@ -95,7 +97,7 @@ export default function BankTransaksiPage() {
          const payloadToInsert = parsedData.map(d => ({
             waktu_transaksi: d.waktu_transaksi,
             rekening_id: Number(d.rekening_id) || null,
-            akun_id: Number(d.coa_anak_id) || null,
+            akun_id: Number(d.akun_id) || null,
             noref_bank: d.noref_bank || null,
             deskripsi: d.deskripsi || null,
             debet: d.debet,
@@ -129,7 +131,7 @@ export default function BankTransaksiPage() {
             <div>
                <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><FileSpreadsheet size={32}/> Impor Transaksi Bank (Multi/CSV)</h2>
                <p className="text-indigo-100 font-medium text-sm max-w-xl leading-relaxed">
-                  Unggah file berformat <strong>.CSV</strong> (Dipisah Tanda Titik Koma <code className="bg-black/20 px-1 rounded">;</code>). Kolom wajib: waktu_transaksi, rekening_id, coa_nama, noref_bank, deskripsi, debet, kredit, saldo_riil.
+                  Unggah file berformat <strong>.CSV</strong> (Dipisah Tanda Titik Koma <code className="bg-black/20 px-1 rounded">;</code>). Kolom wajib: waktu_transaksi, rekening_id, akun_id, noref_bank, deskripsi, debet, kredit, saldo_riil.
                </p>
             </div>
             
@@ -197,7 +199,7 @@ export default function BankTransaksiPage() {
                               <td className="p-3 text-center text-gray-400 font-bold">{i+1}</td>
                               <td className="p-3 font-bold text-gray-800">{row.waktu_transaksi}</td>
                               <td className="p-3"><span className="bg-gray-100 px-2 py-0.5 rounded text-[10px] font-black">{row.rekening_id}</span></td>
-                              <td className="p-3 font-medium text-gray-700"><span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black">{row.coa_anak_id}</span></td>
+                              <td className="p-3 font-medium text-gray-700"><span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-black">{row.akun_id}</span></td>
                               <td className="p-3 font-mono text-xs">{row.noref_bank}</td>
                               <td className="p-3 max-w-[250px] truncate" title={row.deskripsi}>{row.deskripsi}</td>
                               <td className="p-3 text-right font-black text-emerald-500">{row.debet > 0 ? `Rp ${row.debet.toLocaleString('id-ID')}` : '-'}</td>

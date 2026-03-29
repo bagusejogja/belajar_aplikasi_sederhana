@@ -35,7 +35,7 @@ export default function SummaryPage() {
          const { data: trxData, error: errTrx } = await supabase
                .from('transactions')
                .select('*, ref_akun(nomor_akun, nama_akun), ref_personel(nama_orang)')
-               .eq('disetujui', 'Disetujui');
+               .neq('disetujui', 'Ditolak');
                
          if (errTrx) throw errTrx;
          
