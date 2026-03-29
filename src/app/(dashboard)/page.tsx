@@ -3,13 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CheckCircle, XCircle, Loader2, Info } from 'lucide-react';
+import Select from 'react-select';
 
 export default function VerificationPage() {
   const [pendingTrx, setPendingTrx] = useState<any[]>([]);
+  const [listAkun, setListAkun] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<{ src: string, original: string } | null>(null);
   const [catatan, setCatatan] = useState<{ [id: number]: string }>({});
+  const [selectedAkun, setSelectedAkun] = useState<{ [id: number]: string }>({});
 
 
   useEffect(() => {
@@ -19,14 +22,17 @@ export default function VerificationPage() {
   const fetchPending = async () => {
      setLoading(true);
      try {
-        const { data, error } = await supabase
-           .from('transactions')
-           .select('*, ref_akun(nama_akun), ref_personel(nama_orang)')
-           .eq('disetujui', 'Menunggu')
-           .order('tanggal', { ascending: false });
+        const [trxRes, akunRes] = await Promise.all([
+           supabase.from('transactions')
+              .select('*, ref_akun(nama_akun, nomor_akun), ref_personel(nama_orang)')
+              .eq('disetujui', 'Menunggu')
+              .order('tanggal', { ascending: false }),
+           supabase.from('ref_akun').select('id, nomor_akun, nama_akun').order('nomor_akun')
+        ]);
 
-        if (error) throw error;
-        setPendingTrx(data || []);
+        if (trxRes.error) throw trxRes.error;
+        setPendingTrx(trxRes.data || []);
+        setListAkun(akunRes.data || []);
      } catch (err) {
         console.error(err);
      } finally {
@@ -52,6 +58,11 @@ export default function VerificationPage() {
             payload.catatan_verifikasi = catatan[id];
         } else {
             payload.catatan_verifikasi = null; // Bersihkan catatan jika diterima
+        }
+
+        // Kalau Admin mengubah Akunnya dari dropdown
+        if (selectedAkun[id]) {
+            payload.akun_id = selectedAkun[id];
         }
 
         const { error } = await supabase
@@ -155,9 +166,24 @@ export default function VerificationPage() {
                               </div>
                            </div>
 
-                           {/* Catatan Area */}
-                           <div className="mt-4">
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Tulis Catatan / Alasan (Jika Revisi/Ditolak):</label>
+                           <div className="mt-4 p-4 border rounded-2xl bg-gray-50/50">
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Perbaikan Kategori Akun (Jika Keliru):</label>
+                              <div className="relative z-50">
+                                 <Select 
+                                    options={listAkun.map(a => ({ value: a.id, label: `${a.nomor_akun} - ${a.nama_akun}` }))}
+                                    value={
+                                       selectedAkun[trx.id] 
+                                       ? { value: selectedAkun[trx.id], label: listAkun.find(a => a.id === selectedAkun[trx.id])?.nama_akun } 
+                                       : (trx.akun_id ? { value: trx.akun_id, label: trx.ref_akun ? `${trx.ref_akun.nomor_akun} - ${trx.ref_akun.nama_akun}` : 'Pilih Akun' } : null)
+                                    }
+                                    onChange={(val: any) => setSelectedAkun({...selectedAkun, [trx.id]: val?.value})}
+                                    placeholder="Ketik & Pilih Kategori Akun..."
+                                    styles={{ control: (b) => ({ ...b, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }) }}
+                                    menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+                                 />
+                              </div>
+
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mt-4 mb-2">Tulis Catatan / Alasan (Jika Revisi/Ditolak):</label>
                               <textarea 
                                  className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-medium text-gray-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all placeholder:text-gray-300 min-h-[80px]" 
                                  placeholder="Tulis alasan jika Anda meminta staf memperbaikinya..."

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefAkun, RefPersonel, RefJenisBelanja } from '@/types';
+import Select from 'react-select';
 
 export default function ReferencesPage() {
   const [activeTab, setActiveTab] = useState<'akun' | 'personel' | 'belanja'>('akun');
@@ -21,7 +22,7 @@ export default function ReferencesPage() {
      setLoading(true);
      try {
         const [akunRes, personelRes, belanjaRes] = await Promise.all([
-           supabase.from('ref_akun').select('*').order('id', { ascending: true }),
+           supabase.from('ref_akun').select('*').order('nomor_akun', { ascending: true }),
            supabase.from('ref_personel').select('*').order('id', { ascending: true }),
            supabase.from('ref_jenis_belanja').select('*, ref_akun(nama_akun)').order('id', { ascending: true })
         ]);
@@ -209,10 +210,15 @@ export default function ReferencesPage() {
                   {activeTab === 'belanja' && (
                      <>
                         <input type="text" placeholder="Nama Belanja/Barang (Misal: Pembelian Sabun)" value={formData.nama_belanja || ''} onChange={(e) => setFormData({...formData, nama_belanja: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500" />
-                        <select value={formData.akun_id || ''} onChange={(e) => setFormData({...formData, akun_id: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500">
-                           <option value="">-- Kaitkan ke Kategori Akun --</option>
-                           {listAkun.map(a => <option key={a.id} value={a.id}>{a.nomor_akun} - {a.nama_akun}</option>)}
-                        </select>
+                        <div className="relative z-50">
+                           <Select 
+                              options={listAkun.map(a => ({ value: a.id, label: `${a.nomor_akun} - ${a.nama_akun}` }))}
+                              value={formData.akun_id ? { value: formData.akun_id, label: listAkun.find(a => a.id === formData.akun_id)?.nama_akun } : null}
+                              onChange={(val: any) => setFormData({...formData, akun_id: val?.value})}
+                              placeholder="Ketik & Pilih Kategori Akun..."
+                              styles={{ control: (b) => ({ ...b, padding: '4px', borderRadius: '0.75rem' }) }}
+                           />
+                        </div>
                      </>
                   )}
                   {/* Status Dropdown untuk Semua Tab */}
