@@ -122,7 +122,6 @@ export default function RevisiPage() {
             tanggal: editingTrx.tanggal,
             uraian: editingTrx.uraian,
             ...nominalUpdate,
-            keterangan: editingTrx.keterangan || null,
             toko: editingTrx.toko || null,
             ref_akun_id: editingTrx.ref_akun_id,
             ref_personel_id: editingTrx.ref_personel_id,
