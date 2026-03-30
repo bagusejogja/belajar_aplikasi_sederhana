@@ -2,7 +2,11 @@ export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'GUEST';
 
 export interface Unit {
   id: string;
+  kode_unit: string;
   name: string;
+  group: string;
+  pic?: string;
+  is_active: number;
 }
 
 export interface User {
@@ -18,6 +22,7 @@ export interface MenuItem {
   path: string;
   icon: string;
   roles: Role[];
+  group?: string;
 }
 
 export interface RefAkun {
@@ -30,6 +35,7 @@ export interface RefAkun {
 export interface RefPersonel {
   id: string;
   nama_orang: string;
+  unit_id: string;
   status: string;
 }
 
