@@ -26,8 +26,12 @@ export const mockUsers: User[] = [
 export const menuList: MenuItem[] = [
   // --- MASJID ---
   { title: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Verifikasi Kas', path: '/', icon: 'CheckCircle', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
   { title: 'Input Kas Masjid', path: '/input', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
-  { title: 'Laporan Masjid', path: '/reports', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Perbaikan Input', path: '/revisi', icon: 'ShieldAlert', roles: ['STAFF'], group: 'Masjid' },
+  { title: 'Laporan Detail', path: '/reports', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Laporan Ringkasan', path: '/summary', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Cetak Bukti Foto', path: '/report-photo', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Impor Trx Bank', path: '/bank', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
   
   // --- DANA PEMERINTAH ---
