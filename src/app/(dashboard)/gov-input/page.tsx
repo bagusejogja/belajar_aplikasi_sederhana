@@ -51,7 +51,7 @@ export default function GovInputPage() {
       if (uData) setUnits(uData);
 
       // Fetch Accounts
-      const { data: aData } = await supabase.from('gov_accounts').select('*').order('nomor_akun');
+      const { data: aData } = await supabase.from('gov_accounts').select('*').order('account_code');
       if (aData) setAccounts(aData);
     };
     fetchData();
