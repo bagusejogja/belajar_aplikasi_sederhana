@@ -12,10 +12,14 @@ import {
   LogOut,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   X,
   FileEdit,
+  FileText,
+  FileSpreadsheet,
   PieChart,
-  Database
+  Database,
+  Layers
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -37,7 +41,11 @@ const iconMap: Record<string, any> = {
   ShieldCheck,
   FileEdit,
   PieChart,
-  Database
+  Database,
+  ShieldAlert,
+  FileText,
+  FileSpreadsheet,
+  Layers,
 };
 
 interface SidebarProps {

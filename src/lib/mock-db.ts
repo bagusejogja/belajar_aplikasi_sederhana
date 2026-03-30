@@ -14,6 +14,7 @@ export const mockUsers: User[] = [
 ];
 
 export const menuList: MenuItem[] = [
+  { title: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { title: 'Verifikasi', path: '/', icon: 'CheckCircle', roles: ['ADMIN', 'MANAGER'] },
   { title: 'Input Data', path: '/input', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'] },
   { title: 'Perbaikan Input', path: '/revisi', icon: 'ShieldAlert', roles: ['STAFF'] },
