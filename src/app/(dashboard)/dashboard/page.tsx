@@ -60,15 +60,30 @@ const parseAnyDate = (val: any): Date | null => {
   return null;
 };
 
-// ───── Summary Card ─────
-function SummaryCard({ label, value, icon, color }: any) {
+// ───── Summary Card Premium ─────
+function SummaryCard({ label, value, icon, color, subValue, subLabel }: any) {
   return (
-    <div className={`rounded-2xl p-6 text-white flex items-center justify-between shadow-lg ${color}`}>
-      <div>
-        <p className="text-sm font-semibold opacity-80">{label}</p>
-        <p className="text-3xl font-black mt-1 tracking-tight">{fmt(value)}</p>
+    <div className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-2xl transition-all hover:scale-[1.02] ${color}`}>
+      {/* Decorative Background Icon */}
+      <div className="absolute -right-4 -bottom-6 text-white/10 text-9xl transform -rotate-12 select-none pointer-events-none">
+        {icon}
       </div>
-      <div className="text-white/30 text-6xl">{icon}</div>
+      
+      <div className="relative z-10">
+        <p className="text-sm font-bold opacity-80 uppercase tracking-widest">{label}</p>
+        <div className="flex flex-wrap items-baseline gap-2 mt-2">
+          <span className="text-sm font-medium opacity-60">Rp</span>
+          <h4 className="text-2xl md:text-3xl font-black tracking-tighter break-all">
+            {fmt(value)}
+          </h4>
+        </div>
+        {subValue !== undefined && (
+          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
+            <span className="text-[10px] font-bold opacity-60 uppercase">{subLabel}</span>
+            <span className="text-sm font-mono font-bold">{fmt(subValue)}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -418,12 +433,47 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <SummaryCard label="Saldo Awal (awal tahun sebelumnya)" value={summary.saldoAwal} icon="🏦" color="bg-gray-700" />
-        <SummaryCard label="Uang Masuk (setahun)" value={summary.masuk} icon={<TrendingDown size={56} />} color="bg-emerald-600" />
-        <SummaryCard label="Uang Keluar (setahun)" value={summary.keluar} icon={<TrendingUp size={56} />} color="bg-amber-500" />
-        <SummaryCard label="Saldo Akhir Tahun" value={summary.saldoAkhir} icon={<PiggyBank size={56} />} color="bg-cyan-600" />
+      {/* SUMMARY CARDS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Kolom 1: Saldo Awal */}
+        <SummaryCard 
+          label="Saldo Awal" 
+          value={summary.saldoAwal} 
+          icon={<Wallet size={120} />} 
+          color="bg-slate-800" 
+          subLabel="Posisi 1 Jan"
+          subValue={summary.saldoAwal}
+        />
+
+        {/* Kolom 2: Masuk & Keluar Stacked */}
+        <div className="grid grid-cols-1 gap-6">
+          <SummaryCard 
+            label="Total Uang Masuk" 
+            value={summary.masuk} 
+            icon={<TrendingDown size={120} />} 
+            color="bg-emerald-600" 
+            subLabel="Penerimaan"
+            subValue={summary.masuk}
+          />
+          <SummaryCard 
+            label="Total Uang Keluar" 
+            value={summary.keluar} 
+            icon={<TrendingUp size={120} />} 
+            color="bg-rose-500" 
+            subLabel="Pengeluaran"
+            subValue={summary.keluar}
+          />
+        </div>
+
+        {/* Kolom 3: Saldo Akhir */}
+        <SummaryCard 
+          label="Saldo Akhir" 
+          value={summary.saldoAkhir} 
+          icon={<PiggyBank size={120} />} 
+          color="bg-cyan-600" 
+          subLabel="Milik Masjid"
+          subValue={summary.saldoAkhir}
+        />
       </div>
 
       {/* PER-REKENING TABLE */}
@@ -611,74 +661,99 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* COA MONTH TABLE */}
+      {/* COA MONTH TABLE - DYNAMIC ENHANCED */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Absolut per Bulan</h3>
-          <p className="text-xs text-gray-400 mt-1">Mutasi = ABS(Masuk) + ABS(Belanja, Keluar) = Total. Kolom ini hanya yang ada data. Scroll kanan utk ringkasan</p>
+        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+          <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Per Bulan</h3>
+          <p className="text-xs text-gray-500 mt-1 italic">Menyisipkan rincian Masuk & Keluar per bulan. Hanya menampilkan bulan yang memiliki transaksi.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="text-xs text-left min-w-[900px] w-full">
-            <thead className="bg-gray-800 text-white">
-              <tr>
-                <th className="p-3 w-16">Kode</th>
-                <th className="p-3 min-w-[180px]">Nama</th>
-                {BULAN.map((b, i) => (
-                  <th key={i} className="p-3 text-right">
-                    <div className="font-bold">{b}</div>
-                    <div className="text-gray-400 text-[10px]">Mutasi</div>
-                  </th>
-                ))}
-                <th className="p-3 text-right bg-gray-700">TOTAL<br /><span className="text-gray-400 text-[10px]">Mutasi</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* SALDO AWAL */}
-              <tr className="bg-gray-100 font-black text-gray-700 border-b-2 border-gray-300">
-                <td className="p-3 text-indigo-600">▶ Saldo Awal</td>
-                <td className="p-3 text-xs">Modal Awal & Kas</td>
-                {BULAN.map((_, i) => (
-                  <td key={i} className="p-3 text-right font-mono text-xs">{i === 0 ? fmt(summary.saldoAwal) : '-'}</td>
-                ))}
-                <td className="p-3 text-right font-mono text-indigo-700">{fmt(summary.saldoAwal)}</td>
-              </tr>
+          {(() => {
+            // Hitung bulan mana saja yang ada datanya secara global
+            const activeMonthIdx = BULAN.map((_, i) => i + 1).filter(m => {
+              return coaMonthTable.some(row => (row.monthTotals[m]?.masuk || 0) + (row.monthTotals[m]?.keluar || 0) > 0);
+            });
 
-              {coaMonthTable.map((induk: any, ri: number) => (
-                <tr key={ri} className={`border-b border-gray-100 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-indigo-50/30 transition-colors`}>
-                  <td className="p-3 font-black">
-                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px]">{induk.nomor_akun}</span>
-                  </td>
-                  <td className="p-3 font-bold text-gray-800">{induk.nama_akun}</td>
-                  {BULAN.map((_, i) => {
-                    const m = i + 1;
-                    const tot = (induk.monthTotals[m]?.masuk || 0) + (induk.monthTotals[m]?.keluar || 0);
+            if (activeMonthIdx.length === 0) {
+              return <div className="p-10 text-center text-gray-400 font-medium">Tidak ada data transaksi untuk tahun {tahun}</div>;
+            }
+
+            return (
+              <table className="text-[10px] text-left border-collapse min-w-full">
+                <thead>
+                  <tr className="bg-slate-900 text-white uppercase tracking-tighter">
+                    <th className="p-4 border-r border-slate-700 fixed-column bg-slate-900 sticky left-0 z-10" rowSpan={2}>Akun</th>
+                    <th className="p-4 border-r border-slate-700 text-center" rowSpan={2}>Saldo Awal</th>
+                    {activeMonthIdx.map(m => (
+                      <th key={m} className="p-2 border-b border-r border-slate-700 text-center bg-slate-800" colSpan={2}>
+                        {BULAN[m-1]}
+                      </th>
+                    ))}
+                    <th className="p-4 text-center bg-indigo-900" rowSpan={2}>Saldo Akhir</th>
+                  </tr>
+                  <tr className="bg-slate-800 text-[9px] text-gray-300">
+                    {activeMonthIdx.map(m => (
+                      <React.Fragment key={m}>
+                        <th className="p-1 text-center font-bold text-emerald-400 border-r border-slate-700">Masuk</th>
+                        <th className="p-1 text-center font-bold text-amber-400 border-r border-slate-700">Keluar</th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 italic md:not-italic">
+                  {/* DETAIL ROWS */}
+                  {coaMonthTable.map((induk: any, ri: number) => {
+                    let runningSaldo = 0; // Sebenarnya saldo awal induk? 
+                    // Kita asumsikan baris ini adalah mutasi. Saldo awal per baris sulit dihitung tanpa master.
+                    // Jadi kita hanya tampilkan Masuk/Keluar.
                     return (
-                      <td key={i} className="p-3 text-right font-mono text-gray-600">
-                        {tot > 0 ? fmt(tot) : <span className="text-gray-200">-</span>}
-                      </td>
+                      <tr key={ri} className="hover:bg-indigo-50/50 transition-colors">
+                        <td className="p-3 border-r font-bold bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] min-w-[150px]">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] text-indigo-500 font-black">{induk.nomor_akun}</span>
+                            <span className="truncate">{induk.nama_akun}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-right bg-gray-50 border-r text-gray-400">-</td>
+                        {activeMonthIdx.map(m => {
+                          const val = induk.monthTotals[m] || { masuk: 0, keluar: 0 };
+                          return (
+                            <React.Fragment key={m}>
+                              <td className="p-2 text-right border-r font-mono text-emerald-600 bg-emerald-50/20">
+                                {val.masuk > 0 ? fmt(val.masuk) : ''}
+                              </td>
+                              <td className="p-2 text-right border-r font-mono text-rose-600 bg-rose-50/20">
+                                {val.keluar > 0 ? fmt(val.keluar) : ''}
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
+                        <td className="p-3 text-right font-black bg-indigo-50 text-indigo-700">
+                          {fmt(induk.masuk - induk.keluar)}
+                        </td>
+                      </tr>
                     );
                   })}
-                  <td className="p-3 text-right font-black font-mono text-indigo-700">{fmt(induk.tot)}</td>
-                </tr>
-              ))}
-
-              {/* SALDO AKHIR */}
-              <tr className="bg-cyan-600 text-white font-black border-t-2 border-cyan-700">
-                <td className="p-3">▶ Saldo Akhir</td>
-                <td className="p-3 text-sm">Modal Akhir & Saldo</td>
-                {BULAN.map((_, i) => {
-                  const m = i + 1;
-                  const cd = chartData[i];
-                  return (
-                    <td key={i} className="p-3 text-right font-mono text-sm">
-                      {cd && (cd.masuk > 0 || cd.keluar > 0) ? fmt(cd.saldo) : <span className="opacity-30">-</span>}
-                    </td>
-                  );
-                })}
-                <td className="p-3 text-right font-mono bg-cyan-700">{fmt(summary.saldoAkhir)}</td>
-              </tr>
-            </tbody>
-          </table>
+                  
+                  {/* FOOTER TOTAL */}
+                  <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                    <td className="p-4 border-r sticky left-0 bg-slate-100 z-10">TOTAL KEUANGAN</td>
+                    <td className="p-4 text-right border-r font-mono text-blue-700">{fmt(summary.saldoAwal)}</td>
+                    {activeMonthIdx.map(m => {
+                      const cd = chartData[m-1] || { masuk: 0, keluar: 0 };
+                      return (
+                        <React.Fragment key={m}>
+                          <td className="p-2 text-right border-r font-mono text-emerald-700 bg-emerald-100/50">{fmt(cd.masuk)}</td>
+                          <td className="p-2 text-right border-r font-mono text-rose-700 bg-rose-100/50">{fmt(cd.keluar)}</td>
+                        </React.Fragment>
+                      );
+                    })}
+                    <td className="p-4 text-right font-mono bg-indigo-200 text-indigo-900">{fmt(summary.saldoAkhir)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       </div>
     </div>
