@@ -187,7 +187,7 @@ export default function DashboardPage() {
       if (!rekMap[rId]) {
         rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
       }
-      rekMap[rId].saldoAwal += cleanNum(b.debet) - cleanNum(b.kredit);
+      rekMap[rId].saldoAwal += cleanNum(b.kredit) - cleanNum(b.debet);
     });
 
     // MASUKKAN DATA BANK TAHUN INI (Mutasi)
@@ -196,8 +196,8 @@ export default function DashboardPage() {
       if (!rekMap[rId]) {
         rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
       }
-      rekMap[rId].masuk += cleanNum(b.debet);
-      rekMap[rId].keluar += cleanNum(b.kredit);
+      rekMap[rId].masuk += cleanNum(b.kredit);
+      rekMap[rId].keluar += cleanNum(b.debet);
     });
 
     // ── DATA KAS KECIL dari transactions ──
@@ -237,9 +237,9 @@ export default function DashboardPage() {
       const trxM = trxYear.filter(t => { const d = parseAnyDate(t.tanggal); return d && d.getMonth() + 1 === m; });
       const bankM = bankYear.filter(b => { const d = parseAnyDate(b.waktu_transaksi); return d && d.getMonth() + 1 === m; });
       const masuk = trxM.reduce((s, t) => s + (Number(t.uang_masuk) || 0), 0)
-        + bankM.reduce((s, b) => s + (Number(b.debet) || 0), 0);
+        + bankM.reduce((s, b) => s + cleanNum(b.kredit), 0);
       const keluar = trxM.reduce((s, t) => s + (Number(t.uang_keluar) || 0), 0)
-        + bankM.reduce((s, b) => s + (Number(b.kredit) || 0), 0);
+        + bankM.reduce((s, b) => s + cleanNum(b.debet), 0);
       const surplus = masuk - keluar;
       return { bln, masuk, keluar, surplus };
     });
@@ -295,8 +295,8 @@ export default function DashboardPage() {
       const aId = String(row.akun_id ?? '');
       if (!aId || aId === '' || aId === 'null' || aId === 'undefined') return;
       if (!trxAmt[aId]) trxAmt[aId] = { masuk: 0, keluar: 0, ct: 0 };
-      trxAmt[aId].masuk += cleanNum(row.uang_masuk ?? row.debet);
-      trxAmt[aId].keluar += cleanNum(row.uang_keluar ?? row.kredit);
+      trxAmt[aId].masuk += cleanNum(row.uang_masuk ?? row.kredit);
+      trxAmt[aId].keluar += cleanNum(row.uang_keluar ?? row.debet);
       trxAmt[aId].ct += 1;
     });
 
@@ -348,8 +348,8 @@ export default function DashboardPage() {
         const d = parseAnyDate(rawDate);
         if (!d || isNaN(d.getTime())) return;
         const m = d.getMonth() + 1;
-        monthTotals[m].masuk += cleanNum(row.uang_masuk ?? row.debet);
-        monthTotals[m].keluar += cleanNum(row.uang_keluar ?? row.kredit);
+        monthTotals[m].masuk += cleanNum(row.uang_masuk ?? row.kredit);
+        monthTotals[m].keluar += cleanNum(row.uang_keluar ?? row.debet);
       });
       const tot = months.reduce((s, m) => s + monthTotals[m].masuk + monthTotals[m].keluar, 0);
       return { ...induk, monthTotals, tot };
