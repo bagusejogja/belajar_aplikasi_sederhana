@@ -72,11 +72,23 @@ export default function GovInputPage() {
       const parts = row.split('\t').map(p => p.trim());
       let [tgl, aCode, nom, jns, nama] = parts;
 
-      if (parts.length < 5 && row.includes(' ')) {
-         // Fallback if copied from non-tab source
-         const fallbackParts = row.split(/\s+/);
-         [tgl, aCode, nom, jns] = fallbackParts;
-         nama = fallbackParts.slice(4).join(' ');
+      // Robust Parsing Fallback
+      if (parts.length < 5) {
+         // Try finding match for multi-word JENIS_PAGU
+         const foundJenis = JENIS_PAGU.find(v => row.toLowerCase().includes(v));
+         if (foundJenis) {
+            const [pre, post] = row.split(new RegExp(foundJenis, 'i'));
+            const preParts = pre.trim().split(/\s+/);
+            tgl = preParts[0];
+            aCode = preParts[1];
+            nom = preParts[2];
+            jns = foundJenis;
+            nama = post.trim();
+         } else {
+            const fallbackParts = row.split(/\s+/);
+            [tgl, aCode, nom, jns] = fallbackParts;
+            nama = fallbackParts.slice(4).join(' ');
+         }
       }
       
       // Standardize Date: DD/MM/YYYY -> YYYY-MM-DD
