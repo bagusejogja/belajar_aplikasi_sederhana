@@ -127,3 +127,19 @@ INSERT INTO public.gov_units (kode_unit, nama_unit, group_org, pic) VALUES
 ('400712', 'Pusat Studi (PS) Pariwisata', 'Pusat Studi', 'Bambang Indarto'),
 ('--', 'Masjid Kampus', 'Tempat Ibadah', '-')
 ON CONFLICT (kode_unit) DO NOTHING;
+
+-- 4. Mapping for Input Names to Unit ID (Dynamic Mapping)
+CREATE TABLE IF NOT EXISTS public.gov_name_mappings (
+    id SERIAL PRIMARY KEY,
+    input_name TEXT UNIQUE NOT NULL, -- Nama joni, jono, andi dll
+    unit_id INTEGER REFERENCES public.gov_units(id),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ───── DATA PRE-FILL (NAME MAPPINGS) ─────
+INSERT INTO public.gov_name_mappings (input_name, unit_id) VALUES
+('Joni', 1), -- MWA
+('Jono', 1), -- MWA
+('Andi', 1), -- MWA
+('Bagus', 1)  -- MWA
+ON CONFLICT (input_name) DO NOTHING;

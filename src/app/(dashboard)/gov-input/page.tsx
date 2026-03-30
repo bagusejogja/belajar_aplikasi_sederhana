@@ -5,6 +5,7 @@ import {
   Building2, Users, Layers, Search, Save, X, Plus, Loader2, ChevronRight, Check, FileSpreadsheet, Calendar, CreditCard, UserPlus
 } from 'lucide-react';
 import { mockUnits, mockGovAkun } from '@/lib/mock-db';
+import { supabase } from '@/lib/supabase';
 
 const JENIS_PAGU = [
   'pagu awal',
@@ -34,44 +35,121 @@ export default function GovInputPage() {
     personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
   );
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Mock Name Mappings for Demo
+  const mockMappings: Record<string, number> = {
+    'Joni': 1,
+    'Jono': 1,
+    'Andi': 1,
+    'Bagus': 1,
+    'Bambang': 2,
+    'Annas': 3,
+  };
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const rows = text.split('\n').filter(row => row.trim());
+  const handleExcelPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    const rows = text.split('\n').filter(row => row.trim());
+    
+    const parsed = rows.map((row, idx) => {
+      // Input Format: Tanggal | AccountCode | Nominal | Jenis | NamaInput
+      // Separated by Tab or Space
+      const parts = row.split(/\s+/);
+      const [tgl, aCode, nom, jns_word1, jns_word2, nm] = parts;
       
-      const parsed = rows.slice(1).map((row, idx) => {
-        // Format: Tanggal;UnitCode;AccountCode;Nominal;Jenis;NamaInput
-        const [tgl, uCode, aCode, nom, jns, nm] = row.split(';').map(s => s.trim());
-        
-        // Match Unit & Account
-        const matchedUnit = mockUnits.find(ux => ux.kode_unit === uCode);
-        const matchedAkun = mockGovAkun.find(ax => ax.nomor_akun === aCode);
+      const jns = `${jns_word1 || ''} ${jns_word2 || ''}`.trim();
+      const nama = nm || jns_word2 || jns_word1 || '-'; // Handle varying lengths
+      
+      // Match Mappings first, if not found, use official PIC match
+      const matchedUnitId = mockMappings[nama] || mockUnits.find(u => u.pic === nama)?.id || null;
+      const matchedUnit = mockUnits.find(ux => ux.id === matchedUnitId);
+      const matchedAkun = mockGovAkun.find(ax => ax.nomor_akun === aCode);
 
-        return {
-          id: idx,
-          tanggal: tgl,
-          unitCode: uCode,
-          unitId: matchedUnit?.id || null,
-          unitName: matchedUnit?.name || 'TIDAK DITEMUKAN',
-          akunCode: aCode,
-          akunId: matchedAkun?.id || null,
-          akunName: matchedAkun?.nama_akun || 'TIDAK DITEMUKAN',
-          nominal: parseFloat(nom) || 0,
-          jenis: jns || 'pagu awal',
-          nama: nm || '-',
-          isValid: !!matchedUnit && !!matchedAkun
-        };
-      });
+      return {
+        id: idx,
+        tanggal: tgl || new Date().toISOString().split('T')[0],
+        unitCode: matchedUnit?.kode_unit || '?',
+        unitId: matchedUnit?.id || null,
+        unitName: matchedUnit?.name || 'TIDAK DITEMUKAN',
+        akunCode: aCode || '?',
+        akunId: matchedAkun?.id || null,
+        akunName: matchedAkun?.nama_akun || 'Akun Salah',
+        nominal: parseFloat(nom?.replace(/,/g, '')) || 0,
+        jenis: jns || 'pagu awal',
+        nama: nama,
+        isValid: !!matchedUnit && !!matchedAkun
+      };
+    });
 
-      setBulkData(parsed);
-      setIsImportModalOpen(true);
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // Reset input
+  const [isSaving, setIsSaving] = useState(false);
+
+  const resetForm = () => {
+    setTanggal(new Date().toISOString().split('T')[0]);
+    setPersonSearch('');
+    setNamaInput('');
+    setUnitId('');
+    setAkunId('');
+    setNominal('');
+    setUraian('');
+    setJenis('pagu awal');
+  };
+
+  const handleSaveSingle = async () => {
+    if (!unitId || !akunId || !nominal) {
+      alert("Harap lengkapi Unit, Akun, dan Nominal!");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase.from('gov_transactions').insert([{
+        tanggal,
+        account_id: akunId,
+        unit_id: unitId,
+        nominal: parseFloat(nominal),
+        jenis,
+        nama_input: namaInput || mockUnits.find(u => u.id === unitId)?.pic || '-',
+        keterangan: uraian
+      }]);
+
+      if (error) throw error;
+      
+      alert("✅ Transaksi Berhasil Disimpan!");
+      resetForm();
+    } catch (err: any) {
+      console.error(err);
+      alert("❌ Gagal menyimpan: " + err.message + "\n(Pastikan Tabel gov_transactions sudah dibuat di Supabase)");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveBulk = async () => {
+    const validRows = bulkData.filter(d => d.isValid);
+    if (validRows.length === 0) return;
+
+    setIsSaving(true);
+    try {
+      const payload = validRows.map(row => ({
+        tanggal: row.tanggal,
+        account_id: row.akunId,
+        unit_id: row.unitId,
+        nominal: row.nominal,
+        jenis: row.jenis,
+        nama_input: row.nama,
+        keterangan: 'Impor Massal Excel/Paste'
+      }));
+
+      const { error } = await supabase.from('gov_transactions').insert(payload);
+      if (error) throw error;
+
+      alert(`✅ Berhasil Mengimpor ${validRows.length} baris data!`);
+      setBulkData([]);
+      setIsImportModalOpen(false);
+    } catch (err: any) {
+      alert("❌ Gagal Impor Massal: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -85,37 +163,40 @@ export default function GovInputPage() {
                  <FileSpreadsheet size={36} className="text-blue-300" />
               </div>
               <div>
-                 <h1 className="text-3xl font-black tracking-tight uppercase italic">Manajemen Pagu & Realisasi</h1>
-                 <p className="text-blue-200 mt-1 font-medium opacity-80 flex items-center gap-2 text-sm">
-                    <Check size={16} /> Update Anggaran Pemerintah (UGM) • Real-time Sync
+                 <h1 className="text-3xl font-black tracking-tight uppercase italic tracking-tighter">Manajemen Mutasi Pagu</h1>
+                 <p className="text-blue-200 mt-1 font-medium opacity-80 flex items-center gap-2 text-sm italic">
+                    <Check size={16} /> Fast-Sync Architecture (Excel Compatible)
                  </p>
               </div>
            </div>
-           {/* IMPORT EXCEL BUTTON (Wrapper for Hidden File Input) */}
-           <div className="flex flex-col items-end gap-2">
-              <label className="flex items-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-500/20 transition-all active:scale-95 group cursor-pointer">
-                 <FileSpreadsheet size={24} className="group-hover:rotate-12 transition-transform" />
-                 IMPOR DARI CSV (EXCEL)
-                 <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-              </label>
-              <button 
-                 onClick={() => {
-                   const blob = new Blob(["Tanggal;KodeUnit;KodeAkun;Nominal;Jenis;NamaInput\n2025-01-01;010101;511119;2871000;pagu awal;Joni"], { type: 'text/csv' });
-                   const url = window.URL.createObjectURL(blob);
-                   const a = document.createElement('a');
-                   a.setAttribute('hidden', '');
-                   a.setAttribute('href', url);
-                   a.setAttribute('download', 'template_pagu_ugm.csv');
-                   document.body.appendChild(a);
-                   a.click();
-                   document.body.removeChild(a);
-                 }}
-                 className="text-[10px] text-blue-300 hover:text-blue-100 font-bold tracking-widest uppercase flex items-center gap-2 underline underline-offset-4"
-              >
-                 <Plus size={10} /> Download Template Format
-              </button>
+           
+           <div className="flex flex-col items-end gap-3">
+              <div className="bg-white/5 border border-white/10 p-1 rounded-2xl flex backdrop-blur-md">
+                 <div className="px-4 py-2 bg-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                    <Users size={12} /> Auto-Mapping Active
+                 </div>
+              </div>
+              <p className="text-blue-300 text-[10px] uppercase font-bold tracking-widest text-right">Mapping: Joni/Jono/Andi ➜ MWA</p>
            </div>
         </div>
+      </div>
+
+      {/* QUICK PASTE ZONE */}
+      <div className="bg-white rounded-[3rem] p-8 shadow-xl shadow-indigo-100/50 border border-indigo-100 flex flex-col md:flex-row items-center gap-8 group">
+         <div className="min-w-[140px] flex flex-col items-center justify-center p-6 bg-indigo-50 rounded-[2rem] border-2 border-dashed border-indigo-200 group-hover:bg-indigo-600 group-hover:border-indigo-400 group-hover:text-white transition-all duration-500">
+            <FileSpreadsheet size={40} className="mb-2" />
+            <p className="text-[10px] font-black uppercase tracking-widest">Paste Zone</p>
+         </div>
+         <div className="flex-1 w-full relative">
+            <textarea 
+               onPaste={handleExcelPaste}
+               placeholder="COPY data dari EXCEL lalu PASTE di sini... (Format: Tgl Akun Nominal Jenis Nama)"
+               className="w-full bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-[1.5rem] py-6 px-8 outline-none transition-all font-black text-slate-800 text-lg placeholder:font-bold placeholder:text-slate-300 resize-none h-24"
+            />
+            <div className="absolute right-4 bottom-4 flex items-center gap-2 pointer-events-none">
+               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest opacity-40">Clipboard Detection Mode</span>
+            </div>
+         </div>
       </div>
 
       {bulkData.length > 0 && isImportModalOpen && (
@@ -169,7 +250,12 @@ export default function GovInputPage() {
                             </td>
                             <td className="p-4 italic font-bold text-slate-500">{row.nama}</td>
                             <td className="p-4">
-                               <button className="text-red-400 hover:text-red-600 transition-colors">Hapus</button>
+                               <button 
+                                 onClick={() => setBulkData(prev => prev.filter(p => p.id !== row.id))}
+                                 className="text-red-400 hover:text-red-600 transition-colors"
+                               >
+                                 Hapus
+                               </button>
                             </td>
                          </tr>
                        ))}
@@ -189,10 +275,12 @@ export default function GovInputPage() {
                  <div className="flex gap-4">
                     <button onClick={() => setBulkData([])} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-400 hover:text-slate-800 transition-all">BATAL SEMUA</button>
                     <button 
-                       disabled={bulkData.some(d => !d.isValid)}
+                       onClick={handleSaveBulk}
+                       disabled={bulkData.some(d => !d.isValid) || isSaving}
                        className="px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
                     >
-                       <Save size={24} /> SIMPAN KE DATABASE SEKARANG
+                       {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} 
+                       {isSaving ? 'SEDANG MENYIMPAN...' : 'SIMPAN KE DATABASE SEKARANG'}
                     </button>
                  </div>
               </div>
@@ -330,9 +418,14 @@ export default function GovInputPage() {
              </div>
 
              <div className="mt-12 flex flex-col sm:flex-row justify-end gap-6 border-t border-slate-100 pt-10">
-                <button className="px-10 py-5 bg-white border-2 border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-800 rounded-2xl font-black transition-all active:translate-y-1">BATAL / RESET</button>
-                <button className="px-12 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95 group">
-                   <Save size={24} className="group-hover:-translate-y-1 transition-transform" /> SIMPAN TRANSAKSI
+                <button onClick={resetForm} className="px-10 py-5 bg-white border-2 border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-800 rounded-2xl font-black transition-all active:translate-y-1">BATAL / RESET</button>
+                <button 
+                   onClick={handleSaveSingle}
+                   disabled={isSaving}
+                   className="px-12 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 active:scale-95 group disabled:opacity-50"
+                >
+                   {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} 
+                   {isSaving ? 'MENYIMPAN...' : 'SIMPAN TRANSAKSI'}
                 </button>
              </div>
           </div>
@@ -356,7 +449,7 @@ export default function GovInputPage() {
                       <p className="text-xs text-white/30 italic px-6 leading-relaxed">Pilih Unit Kerja untuk sinkronisasi histori Pagu & Realisasi secara otomatis di sini.</p>
                    </div>
                  ) : (() => {
-                    const u = mockUnits.find(ux => ux.id === unitId);
+                    const u = mockUnits.find(ux => ux.id === unitId || ux.id === Number(unitId));
                     return u ? (
                       <div className="space-y-6">
                          <div className="bg-white/5 p-6 rounded-[2rem] border border-white/10">
@@ -406,7 +499,7 @@ export default function GovInputPage() {
                  </div>
                  <div className="flex justify-between items-center text-[10px] font-bold">
                     <span className="text-slate-400">STATUS DATA</span>
-                    <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full tracking-widest">DRAFT</span>
+                    <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full tracking-widest">SIAP SIMPAN</span>
                  </div>
                  <p className="text-[9px] text-slate-400 leading-relaxed italic">Pastikan seluruh data sudah sesuai dengan Bukti Fisik sebelum menekan tombol Simpan. Data Pagu bersifat permanen.</p>
               </div>
