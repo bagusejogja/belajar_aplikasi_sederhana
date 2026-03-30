@@ -219,12 +219,15 @@ export default function GovInputPage() {
            </div>
            
            <div className="flex flex-col items-end gap-3">
-              <div className="bg-white/5 border border-white/10 p-1 rounded-2xl flex backdrop-blur-md">
+              <div className="bg-white/5 border border-white/10 p-1 rounded-2xl flex backdrop-blur-md gap-2">
                  <div className="px-4 py-2 bg-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                    <Users size={12} /> Auto-Mapping Active
+                    <Users size={12} /> {units.length} Units Active
+                 </div>
+                 <div className="px-4 py-2 bg-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                    <Layers size={12} /> {accounts.length} Akun Loaded
                  </div>
               </div>
-              <p className="text-blue-300 text-[10px] uppercase font-bold tracking-widest text-right">Mapping: Joni/Jono/Andi ➜ MWA</p>
+              <p className="text-blue-300 text-[10px] uppercase font-bold tracking-widest text-right">Master Data: Online & Synced</p>
            </div>
         </div>
       </div>
