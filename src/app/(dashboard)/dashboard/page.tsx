@@ -361,34 +361,56 @@ export default function DashboardPage() {
 
     setCoaTree(result);
 
-    const months = BULAN.map((_, idx) => idx + 1);
-    // Buat Set ID per induk (string agar cocok dengan trxAmt)
-    const coaRows = result.map((induk: any) => {
-      // Kumpulkan semua ID anak dari induk ini
-      const idSet = new Set<string>();
-      idSet.add(String(induk.id));
-      induk.kelompoks.forEach((k: any) => {
-        idSet.add(String(k.id));
-        k.anaks.forEach((a: any) => idSet.add(String(a.id)));
-      });
+    // Aggregate amounts per akun_id and MONTH for the year
+    const monthlyTrxAmt: Record<string, Record<number, { masuk: number; keluar: number }>> = {};
+    [...trxYear, ...bankYear].forEach((row: any) => {
+      const aId = String(row.akun_id ?? '');
+      if (!aId || aId === 'null') return;
+      const d = parseAnyDate(row.tanggal || row.waktu_transaksi);
+      if (!d) return;
+      const m = d.getMonth() + 1;
+      if (!monthlyTrxAmt[aId]) {
+        monthlyTrxAmt[aId] = {};
+        BULAN.forEach((_, i) => { monthlyTrxAmt[aId][i+1] = { masuk: 0, keluar: 0 }; });
+      }
+      monthlyTrxAmt[aId][m].masuk += cleanNum(row.uang_masuk ?? row.kredit);
+      monthlyTrxAmt[aId][m].keluar += cleanNum(row.uang_keluar ?? row.debet);
+    });
 
-      const monthTotals: Record<number, { masuk: number; keluar: number }> = {};
-      months.forEach(m => { monthTotals[m] = { masuk: 0, keluar: 0 }; });
-      [...trxYear, ...bankYear].forEach((row: any) => {
-        const aId = String(row.akun_id ?? '');
-        if (!idSet.has(aId)) return;
-        const rawDate = row.tanggal || row.waktu_transaksi;
-        const d = parseAnyDate(rawDate);
-        if (!d || isNaN(d.getTime())) return;
-        const m = d.getMonth() + 1;
-        monthTotals[m].masuk += cleanNum(row.uang_masuk ?? row.kredit);
-        monthTotals[m].keluar += cleanNum(row.uang_keluar ?? row.debet);
+    const getMonthTotals = (idSet: Set<string>) => {
+      const mt: Record<number, { masuk: number; keluar: number }> = {};
+      BULAN.forEach((_, i) => { mt[i+1] = { masuk: 0, keluar: 0 }; });
+      idSet.forEach(id => {
+        const amt = monthlyTrxAmt[id];
+        if (amt) {
+          BULAN.forEach((_, i) => {
+            mt[i+1].masuk += amt[i+1].masuk;
+            mt[i+1].keluar += amt[i+1].keluar;
+          });
+        }
       });
-      const tot = months.reduce((s, m) => s + monthTotals[m].masuk + monthTotals[m].keluar, 0);
-      return { ...induk, monthTotals, tot };
-    }).filter((r: any) => r.tot > 0);
+      return mt;
+    };
 
-    setCoaMonthTable(coaRows);
+    // Roll up tree with month totals
+    const finalTree = result.map((induk: any) => {
+      const indukIdSet = new Set<string>([String(induk.id)]);
+      const kels = induk.kelompoks.map((kel: any) => {
+        const kelIdSet = new Set<string>([String(kel.id)]);
+        const anaks = kel.anaks.map((anak: any) => {
+          const anakIdSet = new Set<string>([String(anak.id)]);
+          kelIdSet.add(String(anak.id));
+          indukIdSet.add(String(anak.id));
+          return { ...anak, monthTotals: getMonthTotals(anakIdSet) };
+        });
+        indukIdSet.add(String(kel.id));
+        return { ...kel, anaks, monthTotals: getMonthTotals(kelIdSet) };
+      });
+      return { ...induk, kelompoks: kels, monthTotals: getMonthTotals(indukIdSet) };
+    });
+
+    setCoaMonthTable(finalTree);
+    setCoaTree(finalTree);
   };
 
   const toggleCoa = (id: string) => setExpandedCoa(p => ({ ...p, [id]: !p[id] }));
@@ -546,15 +568,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* COA MONTH TABLE - DYNAMIC ENHANCED */}
+      {/* COA MONTH TABLE - DYNAMIC TREE ENHANCED */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-          <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Per Bulan</h3>
-          <p className="text-xs text-gray-500 mt-1 italic">Menyisipkan rincian Masuk & Keluar per bulan. Hanya menampilkan bulan yang memiliki transaksi.</p>
+        <div className="p-6 border-b border-gray-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Per Bulan</h3>
+            <p className="text-xs text-gray-500 mt-1 italic">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
+          </div>
+          <div className="flex gap-2">
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
+               <div className="w-2 h-2 rounded-full bg-emerald-600"></div> Surplus
+             </div>
+             <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full">
+               <div className="w-2 h-2 rounded-full bg-rose-600"></div> Defisit
+             </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           {(() => {
-            // Hitung bulan mana saja yang ada datanya secara global
             const activeMonthIdx = BULAN.map((_, i) => i + 1).filter(m => {
               return coaMonthTable.some(row => (row.monthTotals[m]?.masuk || 0) + (row.monthTotals[m]?.keluar || 0) > 0);
             });
@@ -563,77 +594,108 @@ export default function DashboardPage() {
               return <div className="p-10 text-center text-gray-400 font-medium">Tidak ada data transaksi untuk tahun {tahun}</div>;
             }
 
+            const TableRow = ({ row, depth = 0, type = 'induk' }: any) => {
+              const isInduk = type === 'induk';
+              const isKel = type === 'kel';
+              const id = `table-${row.id}`;
+              const expanded = isInduk ? expandedCoa[row.id] : isKel ? expandedKel[row.id] : false;
+              const toggle = isInduk ? () => toggleCoa(row.id) : isKel ? () => toggleKel(row.id) : null;
+              
+              const hasChildren = (isInduk && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
+
+              return (
+                <>
+                  <tr className={`hover:bg-indigo-50/30 transition-colors ${isInduk ? 'bg-gray-50/30 font-bold border-b border-gray-100' : ''}`}>
+                    <td 
+                      className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] cursor-pointer select-none"
+                      onClick={toggle || undefined}
+                      style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {hasChildren ? (
+                           expanded ? <ChevronDown size={14} className="text-indigo-500" /> : <ChevronRight size={14} className="text-gray-400" />
+                        ) : <div className="w-3.5" />}
+                        <div className="flex flex-col truncate">
+                          <span className="text-[8px] text-gray-400 leading-none">{row.nomor_akun}</span>
+                          <span className={`${isInduk ? 'text-xs' : 'text-[11px]'} text-gray-800`}>{row.nama_akun}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 text-right bg-gray-50/50 border-r text-[10px] font-mono text-gray-400 italic">
+                      {isInduk ? fmt(row.saldoAwal || 0) : ''}
+                    </td>
+                    {activeMonthIdx.map(m => {
+                      const val = row.monthTotals[m] || { masuk: 0, keluar: 0 };
+                      const diff = val.masuk - val.keluar;
+                      return (
+                        <td key={m} className={`p-2 text-right border-r font-mono font-bold ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-rose-600' : 'text-gray-200'}`}>
+                          {diff !== 0 ? fmt(Math.abs(diff)) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className={`p-3 text-right font-black bg-indigo-50/50 text-xs border-l border-indigo-100`}>
+                      {fmt(row.masuk - row.keluar)}
+                    </td>
+                  </tr>
+                  {expanded && isInduk && row.kelompoks.map((k: any) => <TableRow key={k.id} row={k} depth={1} type="kel" />)}
+                  {expanded && isKel && row.anaks.map((a: any) => <TableRow key={a.id} row={a} depth={2} type="anak" />)}
+                </>
+              );
+            };
+
             return (
               <table className="text-[10px] text-left border-collapse min-w-full">
                 <thead>
-                  <tr className="bg-slate-900 text-white uppercase tracking-tighter">
-                    <th className="p-4 border-r border-slate-700 fixed-column bg-slate-900 sticky left-0 z-10" rowSpan={2}>Akun</th>
-                    <th className="p-4 border-r border-slate-700 text-center" rowSpan={2}>Saldo Awal</th>
+                  <tr className="bg-slate-900 text-white uppercase tracking-tighter sticky top-0 z-20">
+                    <th className="p-4 border-r border-slate-700 bg-slate-900 sticky left-0 z-30 min-w-[220px]">Akun Hirarki</th>
+                    <th className="p-4 border-r border-slate-700 text-center">Saldo Awal</th>
                     {activeMonthIdx.map(m => (
-                      <th key={m} className="p-2 border-b border-r border-slate-700 text-center bg-slate-800" colSpan={2}>
+                      <th key={m} className="p-2 border-r border-slate-700 text-center bg-slate-800">
                         {BULAN[m-1]}
                       </th>
                     ))}
-                    <th className="p-4 text-center bg-indigo-900" rowSpan={2}>Saldo Akhir</th>
-                  </tr>
-                  <tr className="bg-slate-800 text-[9px] text-gray-300">
-                    {activeMonthIdx.map(m => (
-                      <React.Fragment key={m}>
-                        <th className="p-1 text-center font-bold text-emerald-400 border-r border-slate-700">Masuk</th>
-                        <th className="p-1 text-center font-bold text-amber-400 border-r border-slate-700">Keluar</th>
-                      </React.Fragment>
-                    ))}
+                    <th className="p-4 text-center bg-indigo-900 sticky right-0 z-10 border-l border-indigo-700">Saldo Akhir</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 italic md:not-italic">
-                  {/* DETAIL ROWS */}
-                  {coaMonthTable.map((induk: any, ri: number) => {
-                    let runningSaldo = 0; // Sebenarnya saldo awal induk? 
-                    // Kita asumsikan baris ini adalah mutasi. Saldo awal per baris sulit dihitung tanpa master.
-                    // Jadi kita hanya tampilkan Masuk/Keluar.
-                    return (
-                      <tr key={ri} className="hover:bg-indigo-50/50 transition-colors">
-                        <td className="p-3 border-r font-bold bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] min-w-[150px]">
-                          <div className="flex flex-col">
-                            <span className="text-[9px] text-indigo-500 font-black">{induk.nomor_akun}</span>
-                            <span className="truncate">{induk.nama_akun}</span>
-                          </div>
-                        </td>
-                        <td className="p-3 text-right bg-gray-50 border-r text-gray-400">-</td>
-                        {activeMonthIdx.map(m => {
-                          const val = induk.monthTotals[m] || { masuk: 0, keluar: 0 };
-                          return (
-                            <React.Fragment key={m}>
-                              <td className="p-2 text-right border-r font-mono text-emerald-600 bg-emerald-50/20">
-                                {val.masuk > 0 ? fmt(val.masuk) : ''}
-                              </td>
-                              <td className="p-2 text-right border-r font-mono text-rose-600 bg-rose-50/20">
-                                {val.keluar > 0 ? fmt(val.keluar) : ''}
-                              </td>
-                            </React.Fragment>
-                          );
-                        })}
-                        <td className="p-3 text-right font-black bg-indigo-50 text-indigo-700">
-                          {fmt(induk.masuk - induk.keluar)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y divide-gray-50">
+                   {/* ROW SALDO AWAL TAHUN */}
+                   <tr className="bg-slate-100 border-b-2 border-slate-200 font-black">
+                      <td className="p-3 sticky left-0 bg-slate-100 z-10 border-r">▶ POSISI AWAL KEUANGAN</td>
+                      <td className="p-3 text-right border-r text-indigo-700">{fmt(summary.saldoAwal)}</td>
+                      {activeMonthIdx.map(m => <td key={m} className="p-2 text-right border-r">-</td>)}
+                      <td className="p-3 text-right bg-indigo-100 text-indigo-900 font-black sticky right-0 z-10">{fmt(summary.saldoAwal)}</td>
+                   </tr>
+
+                   {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
                   
-                  {/* FOOTER TOTAL */}
-                  <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
-                    <td className="p-4 border-r sticky left-0 bg-slate-100 z-10">TOTAL KEUANGAN</td>
-                    <td className="p-4 text-right border-r font-mono text-blue-700">{fmt(summary.saldoAwal)}</td>
+                   {/* FOOTER TOTAL TAHUN */}
+                   <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-700">
+                    <td className="p-4 border-r sticky left-0 bg-slate-900 z-10">TOTAL MUTASI / SURPLUS</td>
+                    <td className="p-4 text-right border-r text-indigo-300">-</td>
                     {activeMonthIdx.map(m => {
                       const cd = chartData[m-1] || { masuk: 0, keluar: 0 };
+                      const diff = cd.masuk - cd.keluar;
                       return (
-                        <React.Fragment key={m}>
-                          <td className="p-2 text-right border-r font-mono text-emerald-700 bg-emerald-100/50">{fmt(cd.masuk)}</td>
-                          <td className="p-2 text-right border-r font-mono text-rose-700 bg-rose-100/50">{fmt(cd.keluar)}</td>
-                        </React.Fragment>
+                        <td key={m} className={`p-2 text-right border-r font-mono ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {fmt(Math.abs(diff))}
+                        </td>
                       );
                     })}
-                    <td className="p-4 text-right font-mono bg-indigo-200 text-indigo-900">{fmt(summary.saldoAkhir)}</td>
+                    <td className="p-4 text-right font-mono bg-cyan-700 sticky right-0 z-10">{fmt(summary.masuk - summary.keluar)}</td>
+                  </tr>
+
+                  <tr className="bg-cyan-600 text-white font-black text-xs">
+                    <td className="p-4 border-r sticky left-0 bg-cyan-600 z-10 uppercase">▶ SALDO AKHIR KEUANGAN</td>
+                    <td className="p-4 text-right border-r opacity-50">-</td>
+                    {activeMonthIdx.map(m => {
+                      const cd = chartData[m-1];
+                      return (
+                        <td key={m} className="p-2 text-right border-r font-mono">
+                          {cd ? fmt(cd.saldo) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className="p-4 text-right font-mono bg-cyan-800 sticky right-0 z-10">{fmt(summary.saldoAkhir)}</td>
                   </tr>
                 </tbody>
               </table>
