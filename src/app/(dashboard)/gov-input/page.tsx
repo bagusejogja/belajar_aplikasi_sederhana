@@ -35,15 +35,20 @@ export default function GovInputPage() {
     personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
   );
 
-  // Mock Name Mappings for Demo
-  const mockMappings: Record<string, number> = {
-    'Joni': 1,
-    'Jono': 1,
-    'Andi': 1,
-    'Bagus': 1,
-    'Bambang': 2,
-    'Annas': 3,
-  };
+  // Live Mappings State
+  const [liveMappings, setLiveMappings] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const fetchLiveMappings = async () => {
+      const { data } = await supabase.from('gov_name_mappings').select('input_name, unit_id');
+      if (data) {
+        const map: Record<string, number> = {};
+        data.forEach(m => { map[m.input_name] = m.unit_id; });
+        setLiveMappings(map);
+      }
+    };
+    fetchLiveMappings();
+  }, []);
 
   const handleExcelPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
@@ -52,16 +57,15 @@ export default function GovInputPage() {
     
     const parsed = rows.map((row, idx) => {
       // Input Format: Tanggal | AccountCode | Nominal | Jenis | NamaInput
-      // Separated by Tab or Space
       const parts = row.split(/\s+/);
       const [tgl, aCode, nom, jns_word1, jns_word2, nm] = parts;
       
       const jns = `${jns_word1 || ''} ${jns_word2 || ''}`.trim();
-      const nama = nm || jns_word2 || jns_word1 || '-'; // Handle varying lengths
+      const nama = nm || jns_word2 || jns_word1 || '-'; 
       
-      // Match Mappings first, if not found, use official PIC match
-      const matchedUnitId = mockMappings[nama] || mockUnits.find(u => u.pic === nama)?.id || null;
-      const matchedUnit = mockUnits.find(ux => ux.id === matchedUnitId);
+      // Match Mappings from DB first
+      const matchedUnitId = liveMappings[nama] || mockUnits.find(u => u.pic === nama)?.id || null;
+      const matchedUnit = mockUnits.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
       const matchedAkun = mockGovAkun.find(ax => ax.nomor_akun === aCode);
 
       return {
