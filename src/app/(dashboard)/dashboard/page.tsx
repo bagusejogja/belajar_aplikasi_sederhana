@@ -11,6 +11,55 @@ import {
 const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 2 });
 
+// Fungsi membersihkan angka dari string (handle titik/koma ribuan)
+const cleanNum = (val: any): number => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const s = String(val).trim();
+  // Jika ada titik ribuan dan koma desimal, bersihkan. 
+  // Tapi hati-hati dengan format DB yang mungkin sudah bersih.
+  // Strategi: Jika ada koma, asumsikan itu desimal ala Indo, ganti ke titik.
+  let cleaned = s;
+  if (s.includes(',') && s.includes('.')) {
+    // Format "1.000,00" -> "1000.00"
+    cleaned = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.includes(',')) {
+    // Format "1000,00" -> "1000.00"
+    cleaned = s.replace(',', '.');
+  }
+  const n = Number(cleaned);
+  return isNaN(n) ? 0 : n;
+};
+
+// Fungsi parse tanggal universal: sangat tangguh terhadap format apapun
+const parseAnyDate = (val: any): Date | null => {
+  if (val === undefined || val === null || val === '') return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  
+  const s = String(val).trim();
+  if (!s) return null;
+
+  // 1. Coba parse ISO atau format standar JS
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1900) return d;
+
+  // 2. Coba handle format Excel Serial (misal: "45300.5")
+  const num = Number(s.replace(',', '.'));
+  if (!isNaN(num) && num > 30000 && num < 60000) {
+     // 30rb ~ thn 1982, 60rb ~ thn 2064
+     const excelDate = new Date((num - 25569) * 86400 * 1000);
+     if (!isNaN(excelDate.getTime())) return excelDate;
+  }
+  
+  // 3. Fallback: coba paksa ganti '/' ke '-' jika ada
+  if (s.includes('/')) {
+    const d2 = new Date(s.replace(/\//g, '-'));
+    if (!isNaN(d2.getTime())) return d2;
+  }
+
+  return null;
+};
+
 // ───── Summary Card ─────
 function SummaryCard({ label, value, icon, color }: any) {
   return (
@@ -62,7 +111,7 @@ export default function DashboardPage() {
   const tahunList = [2023, 2024, 2025, 2026, 2027];
 
   // ────── FETCH dengan Pagination (atasi limit 1000 Supabase) ──────
-  const fetchAllPages = async (builder: any, pageSize = 5000) => {
+  const fetchAllPages = async (builder: any, pageSize = 1000) => {
     let allData: any[] = [];
     let from = 0;
     while (true) {
@@ -70,6 +119,7 @@ export default function DashboardPage() {
       if (error) throw error;
       if (!data || data.length === 0) break;
       allData = [...allData, ...data];
+      // Jika data yang didapat kurang dari yang diminta, berarti sudah habis
       if (data.length < pageSize) break;
       from += pageSize;
     }
@@ -103,54 +153,70 @@ export default function DashboardPage() {
 
   const filterByYear = (rows: any[], field: string) =>
     rows.filter(r => {
-      const d = new Date(r[field]);
-      return !isNaN(d.getTime()) && d.getFullYear() === tahun;
+      const d = parseAnyDate(r[field]);
+      return d !== null && d.getFullYear() === tahun;
+    });
+
+  const filterBeforeYear = (rows: any[], field: string) =>
+    rows.filter(r => {
+      const d = parseAnyDate(r[field]);
+      return d !== null && d.getFullYear() < tahun;
     });
 
   const compute = () => {
-    // ── BANK: saldo awal per rekening ──
-    const bankYear = filterByYear(allBank, 'waktu_transaksi');
-    const bankBefore = allBank.filter(r => {
-      const d = new Date(r.waktu_transaksi);
-      return !isNaN(d.getTime()) && d.getFullYear() < tahun;
-    });
+    // ── BANK per rekening ──  
+    const bankBefore = filterBeforeYear(allBank, 'waktu_transaksi');
+    const bankYear   = filterByYear(allBank, 'waktu_transaksi');
 
-    // Group bank per rekening
+    // Grouping Rekening dan Saldo
     const rekMap: Record<string, any> = {};
+    
+    // Inisialisasi dengan data Master Rekening
     allRekening.forEach(r => {
-      rekMap[r.id] = { id: r.id, nama: r.nama_rekening || r.nama || r.no_rekening || `Rek-${r.id}`, saldoAwal: 0, masuk: 0, keluar: 0 };
+      const idStr = String(r.id);
+      rekMap[idStr] = { 
+        id: r.id, 
+        nama: r.nama_rekening || r.nama || r.no_rekening || `Rek-${r.id}`, 
+        saldoAwal: 0, masuk: 0, keluar: 0 
+      };
     });
 
-    // Calculate saldo awal from bank transactions before year
+    // MASUKKAN DATA BANK SEBELUM TAHUN INI (Saldo Awal)
     bankBefore.forEach(b => {
-      const rId = String(b.rekening_id);
-      if (!rekMap[rId]) rekMap[rId] = { id: rId, nama: `Rek-${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
-      rekMap[rId].saldoAwal += (Number(b.debet) || 0) - (Number(b.kredit) || 0);
+      const rId = String(b.rekening_id || 'unknown');
+      if (!rekMap[rId]) {
+        rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
+      }
+      rekMap[rId].saldoAwal += cleanNum(b.debet) - cleanNum(b.kredit);
     });
 
-    // Saldo mutasi in-year from bank (for per-rekening)
+    // MASUKKAN DATA BANK TAHUN INI (Mutasi)
     bankYear.forEach(b => {
-      const rId = String(b.rekening_id);
-      if (!rekMap[rId]) rekMap[rId] = { id: rId, nama: `Rek-${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
-      rekMap[rId].masuk += Number(b.debet) || 0;
-      rekMap[rId].keluar += Number(b.kredit) || 0;
+      const rId = String(b.rekening_id || 'unknown');
+      if (!rekMap[rId]) {
+        rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
+      }
+      rekMap[rId].masuk += cleanNum(b.debet);
+      rekMap[rId].keluar += cleanNum(b.kredit);
     });
 
-    // Kas kecil from transactions (non-bank)
+    // ── DATA KAS KECIL dari transactions ──
     const trxYear = filterByYear(allTrx, 'tanggal');
-    const trxBefore = allTrx.filter(r => {
-      const d = new Date(r.tanggal);
-      return !isNaN(d.getTime()) && d.getFullYear() < tahun;
-    });
+    const trxBefore = filterBeforeYear(allTrx, 'tanggal');
 
-    const kasRek = { id: 'kas', nama: 'Kas Kecil - KK1 (Kas Kecil 1)', saldoAwal: 0, masuk: 0, keluar: 0 };
-    trxBefore.forEach(t => { kasRek.saldoAwal += (Number(t.uang_masuk) || 0) - (Number(t.uang_keluar) || 0); });
+    const kasRek = { id: 'kas', nama: 'Kas Kecil - KK1', saldoAwal: 0, masuk: 0, keluar: 0 };
+    trxBefore.forEach(t => { 
+      kasRek.saldoAwal += (Number(t.uang_masuk) || 0) - (Number(t.uang_keluar) || 0); 
+    });
     trxYear.forEach(t => {
       kasRek.masuk += Number(t.uang_masuk) || 0;
       kasRek.keluar += Number(t.uang_keluar) || 0;
     });
 
-    const rekList = [...Object.values(rekMap), kasRek].filter(r => r.saldoAwal !== 0 || r.masuk !== 0 || r.keluar !== 0);
+    // Gabungkan Semua ke List
+    const rekList = [...Object.values(rekMap), kasRek]
+      .filter(r => Math.abs(r.saldoAwal) > 0.1 || Math.abs(r.masuk) > 0.1 || Math.abs(r.keluar) > 0.1);
+
     const total = rekList.reduce((acc, r) => ({
       saldoAwal: acc.saldoAwal + r.saldoAwal,
       masuk: acc.masuk + r.masuk,
@@ -168,8 +234,8 @@ export default function DashboardPage() {
     // ── CHART BULANAN ──
     const monthlyData = BULAN.map((bln, idx) => {
       const m = idx + 1;
-      const trxM = trxYear.filter(t => new Date(t.tanggal).getMonth() + 1 === m);
-      const bankM = bankYear.filter(b => new Date(b.waktu_transaksi).getMonth() + 1 === m);
+      const trxM = trxYear.filter(t => { const d = parseAnyDate(t.tanggal); return d && d.getMonth() + 1 === m; });
+      const bankM = bankYear.filter(b => { const d = parseAnyDate(b.waktu_transaksi); return d && d.getMonth() + 1 === m; });
       const masuk = trxM.reduce((s, t) => s + (Number(t.uang_masuk) || 0), 0)
         + bankM.reduce((s, b) => s + (Number(b.debet) || 0), 0);
       const keluar = trxM.reduce((s, t) => s + (Number(t.uang_keluar) || 0), 0)
@@ -229,8 +295,8 @@ export default function DashboardPage() {
       const aId = String(row.akun_id ?? '');
       if (!aId || aId === '' || aId === 'null' || aId === 'undefined') return;
       if (!trxAmt[aId]) trxAmt[aId] = { masuk: 0, keluar: 0, ct: 0 };
-      trxAmt[aId].masuk += Number(row.uang_masuk ?? row.debet) || 0;
-      trxAmt[aId].keluar += Number(row.uang_keluar ?? row.kredit) || 0;
+      trxAmt[aId].masuk += cleanNum(row.uang_masuk ?? row.debet);
+      trxAmt[aId].keluar += cleanNum(row.uang_keluar ?? row.kredit);
       trxAmt[aId].ct += 1;
     });
 
@@ -279,11 +345,11 @@ export default function DashboardPage() {
         const aId = String(row.akun_id ?? '');
         if (!idSet.has(aId)) return;
         const rawDate = row.tanggal || row.waktu_transaksi;
-        const d = new Date(rawDate);
-        if (isNaN(d.getTime())) return;
+        const d = parseAnyDate(rawDate);
+        if (!d || isNaN(d.getTime())) return;
         const m = d.getMonth() + 1;
-        monthTotals[m].masuk += Number(row.uang_masuk ?? row.debet) || 0;
-        monthTotals[m].keluar += Number(row.uang_keluar ?? row.kredit) || 0;
+        monthTotals[m].masuk += cleanNum(row.uang_masuk ?? row.debet);
+        monthTotals[m].keluar += cleanNum(row.uang_keluar ?? row.kredit);
       });
       const tot = months.reduce((s, m) => s + monthTotals[m].masuk + monthTotals[m].keluar, 0);
       return { ...induk, monthTotals, tot };
