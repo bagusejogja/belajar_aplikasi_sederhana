@@ -80,6 +80,10 @@ export default function GovInputPage() {
       };
     });
 
+    setBulkData(parsed);
+    setIsImportModalOpen(true);
+  };
+
   const [isSaving, setIsSaving] = useState(false);
 
   const resetForm = () => {
