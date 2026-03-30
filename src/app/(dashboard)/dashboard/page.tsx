@@ -60,33 +60,36 @@ const parseAnyDate = (val: any): Date | null => {
   return null;
 };
 
-// ───── Summary Card Ultra Premium (Compact Version) ─────
+// ───── Summary Card Ultra Premium (Soft Bright) ─────
 function SummaryCard({ label, value, icon, color, subValue, subLabel }: any) {
   return (
-    <div className={`relative overflow-hidden rounded-[1.75rem] p-6 text-white shadow-xl transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group ${color}`}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-30 pointer-events-none"></div>
+    <div className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group border border-white/20 ${color}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-40 pointer-events-none"></div>
       
-      {/* Dynamic Background Pattern */}
-      <div className="absolute -right-4 -bottom-6 text-white/5 text-[8rem] transform -rotate-12 group-hover:rotate-0 transition-transform duration-500 select-none pointer-events-none">
+      {/* Decorative Icon Background */}
+      <div className="absolute -right-6 -bottom-8 text-white/10 text-[9rem] transform -rotate-12 group-hover:rotate-0 transition-transform duration-700 select-none pointer-events-none">
         {icon}
       </div>
       
-      <div className="relative z-10 flex flex-col justify-between h-full min-h-[120px]">
+      <div className="relative z-10 flex flex-col justify-between h-full min-h-[130px]">
         <div>
-          <p className="text-[10px] font-black opacity-60 uppercase tracking-[0.2em] mb-3">{label}</p>
+          <p className="text-[10px] font-black opacity-70 uppercase tracking-[0.2em] mb-3 drop-shadow-sm">{label}</p>
           <div className="flex flex-col">
-            <span className="text-xs font-bold opacity-30">IDR</span>
-            <h4 className="text-2xl md:text-3xl font-black tracking-tight drop-shadow-sm">
+            <span className="text-xs font-bold opacity-40">IDR</span>
+            <h4 className="text-3xl font-black tracking-tight drop-shadow-md">
                {fmt(value).split(',')[0]}<span className="text-sm opacity-60 font-medium">,{fmt(value).split(',')[1] || '00'}</span>
             </h4>
           </div>
         </div>
 
         {subValue !== undefined && (
-          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-end">
+          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-end transition-colors group-hover:border-white/30">
             <div className="flex flex-col">
-              <span className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{subLabel}</span>
-              <span className="text-xs font-mono font-black">{fmt(subValue)}</span>
+              <span className="text-[9px] font-bold opacity-50 uppercase tracking-widest">{subLabel}</span>
+              <span className="text-xs font-mono font-black text-white/90">{fmt(subValue)}</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md">
+               <TrendingUp size={12} className="text-white/60" />
             </div>
           </div>
         )}
@@ -458,13 +461,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SUMMARY CARDS GRID - COMPACT 4 COLS */}
+      {/* SUMMARY CARDS GRID - SOFT BRIGHT COLORS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <SummaryCard 
           label="Saldo Awal" 
           value={summary.saldoAwal} 
           icon={<Wallet size={80} />} 
-          color="bg-slate-800" 
+          color="bg-slate-500" 
           subLabel="1 Jan"
           subValue={summary.saldoAwal}
         />
@@ -472,24 +475,24 @@ export default function DashboardPage() {
           label="Uang Masuk" 
           value={summary.masuk} 
           icon={<TrendingDown size={80} />} 
-          color="bg-emerald-600" 
-          subLabel="Total Penerimaan"
+          color="bg-emerald-400" 
+          subLabel="Penerimaan"
           subValue={summary.masuk}
         />
         <SummaryCard 
           label="Uang Keluar" 
           value={summary.keluar} 
           icon={<TrendingUp size={80} />} 
-          color="bg-rose-500" 
-          subLabel="Total Pengeluaran"
+          color="bg-rose-400" 
+          subLabel="Pengeluaran"
           subValue={summary.keluar}
         />
         <SummaryCard 
           label="Saldo Akhir" 
           value={summary.saldoAkhir} 
           icon={<PiggyBank size={80} />} 
-          color="bg-cyan-600" 
-          subLabel="Sisa Saldo"
+          color="bg-sky-500" 
+          subLabel="Sisa Dana"
           subValue={summary.saldoAkhir}
         />
       </div>
@@ -521,15 +524,15 @@ export default function DashboardPage() {
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 12, fontWeight: 700, paddingBottom: 20 }} />
-              <Bar dataKey="masuk" name="Masuk" fill="#059669" radius={[6, 6, 0, 0]} barSize={24} />
-              <Bar dataKey="keluar" name="Keluar" fill="#f43f5e" radius={[6, 6, 0, 0]} barSize={24} />
+              <Bar dataKey="masuk" name="Masuk" fill="#34d399" radius={[6, 6, 0, 0]} barSize={24} />
+              <Bar dataKey="keluar" name="Keluar" fill="#f87171" radius={[6, 6, 0, 0]} barSize={24} />
               <Line 
                 type="monotone" 
                 dataKey="saldo" 
-                name="Saldo Akhir" 
+                name="Saldo Berjalan" 
                 stroke="#6366f1" 
-                strokeWidth={4} 
-                dot={{ r: 6, fill: '#6366f1', strokeWidth: 3, stroke: '#fff' }} 
+                strokeWidth={5} 
+                dot={{ r: 7, fill: '#6366f1', strokeWidth: 4, stroke: '#fff' }} 
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -563,35 +566,35 @@ export default function DashboardPage() {
 
               return (
                 <>
-                  <tr className={`hover:bg-indigo-50/30 transition-colors ${isInduk ? 'bg-gray-50/30 font-bold border-b border-gray-100' : ''}`}>
+                  <tr className={`hover:bg-slate-50 transition-colors ${isInduk ? 'bg-slate-50/50 font-bold' : ''}`}>
                     <td 
-                      className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)] cursor-pointer select-none"
+                      className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] cursor-pointer select-none"
                       onClick={toggle || undefined}
                       style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
                     >
                       <div className="flex items-center gap-2">
                         {hasChildren ? (
-                           expanded ? <ChevronDown size={14} className="text-indigo-500" /> : <ChevronRight size={14} className="text-gray-400" />
+                           expanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />
                         ) : <div className="w-3.5" />}
                         <div className="flex flex-col truncate">
                           <span className="text-[8px] text-gray-400 leading-none">{row.nomor_akun}</span>
-                          <span className={`${isInduk ? 'text-xs' : 'text-[11px]'} text-gray-800`}>{row.nama_akun}</span>
+                          <span className={`${isInduk ? 'text-[11px] font-black' : 'text-[11px] font-medium'} text-gray-700`}>{row.nama_akun}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="p-3 text-right bg-gray-50/50 border-r text-[10px] font-mono text-gray-400 italic">
+                    <td className="p-3 text-right bg-white border-r text-[10px] font-mono text-gray-400 italic">
                       {isInduk ? fmt(row.saldoAwal || 0) : ''}
                     </td>
                     {activeMonthIdx.map(m => {
                       const val = row.monthTotals[m] || { masuk: 0, keluar: 0 };
                       const diff = val.masuk - val.keluar;
                       return (
-                        <td key={m} className={`p-2 text-right border-r font-mono font-bold ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-rose-600' : 'text-gray-200'}`}>
+                        <td key={m} className={`p-2 text-right border-r font-mono font-bold ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-rose-500' : 'text-gray-200'}`}>
                           {diff !== 0 ? fmt(Math.abs(diff)) : '-'}
                         </td>
                       );
                     })}
-                    <td className={`p-3 text-right font-black bg-indigo-50/50 text-xs border-l border-indigo-100`}>
+                    <td className={`p-3 text-right font-black bg-slate-900 text-sky-300 text-[11px] border-l border-slate-700 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.1)]`}>
                       {fmt(row.masuk - row.keluar)}
                     </td>
                   </tr>
@@ -612,7 +615,7 @@ export default function DashboardPage() {
                         {BULAN[m-1]}
                       </th>
                     ))}
-                    <th className="p-4 text-center bg-indigo-900 sticky right-0 z-[70] border-l border-indigo-700 text-xs font-black">Saldo Akhir</th>
+                    <th className="p-4 text-center bg-slate-900 sticky right-0 z-[70] border-l border-slate-700 text-xs font-black shadow-[-4px_0_15px_rgba(0,0,0,0.3)]">Saldo Akhir</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -620,15 +623,15 @@ export default function DashboardPage() {
                    <tr className="bg-slate-800 text-white font-black cursor-pointer group sticky top-[52px] z-[50]" onClick={() => setExpandPosisiAwal(!expandPosisiAwal)}>
                       <td className="p-4 sticky left-0 bg-slate-800 z-[55] border-r border-slate-700 flex items-center gap-2 group-hover:bg-slate-700 transition-colors">
                         {expandPosisiAwal ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        <span className="text-indigo-400">▶</span> TOTAL POSISI AWAL
+                        <span className="text-sky-400">▶</span> TOTAL POSISI AWAL
                       </td>
-                      <td className="p-4 text-right border-r border-slate-700 text-indigo-100 bg-slate-800/80 font-mono text-xs">{fmt(summary.saldoAwal)}</td>
+                      <td className="p-4 text-right border-r border-slate-700 text-sky-100 bg-slate-800/80 font-mono text-xs">{fmt(summary.saldoAwal)}</td>
                       {activeMonthIdx.map(m => {
                         const prevM = m - 1;
                         const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
-                        return <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-indigo-400 bg-slate-800/50">{fmt(val)}</td>;
+                        return <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-400 bg-slate-800/50">{fmt(val)}</td>;
                       })}
-                      <td className="p-4 text-right bg-indigo-950 font-black sticky right-0 z-[55] border-l border-indigo-800 text-indigo-100 font-mono text-xs shadow-[inset_2px_0_10px_rgba(0,0,0,0.3)]">{fmt(summary.saldoAwal)}</td>
+                      <td className="p-4 text-right bg-slate-900 font-black sticky right-0 z-[55] border-l border-slate-700 text-sky-300 font-mono text-xs shadow-[-4px_0_15px_rgba(0,0,0,0.4)]">{fmt(summary.saldoAwal)}</td>
                    </tr>
 
                    {expandPosisiAwal && monthlyAccountSaldo.map((r, ri) => (
@@ -639,35 +642,35 @@ export default function DashboardPage() {
                           const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
                           return <td key={`awal-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-b">{fmt(val)}</td>;
                         })}
-                        <td className="p-3 text-right bg-indigo-50/30 border-l sticky right-0 z-[40] font-bold border-b">{fmt(r.saldoAwal)}</td>
+                        <td className="p-3 text-right bg-slate-900 text-sky-400/70 border-l border-slate-800 sticky right-0 z-[40] font-bold border-b shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">{fmt(r.saldoAwal)}</td>
                      </tr>
                    ))}
 
                    {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
                   
                    {/* ROW POSISI AKHIR KEUANGAN (Collapsible) */}
-                   <tr className="bg-blue-900 text-white font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-5px_15px_rgba(0,0,0,0.1)]" onClick={() => setExpandPosisiAkhir(!expandPosisiAkhir)}>
-                    <td className="p-4 border-r border-blue-950 sticky left-0 bg-blue-900 z-[65] flex items-center gap-2 uppercase text-xs group-hover:bg-blue-800 transition-colors">
+                   <tr className="bg-slate-900 text-white font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-8px_20px_rgba(0,0,0,0.2)]" onClick={() => setExpandPosisiAkhir(!expandPosisiAkhir)}>
+                    <td className="p-4 border-r border-slate-700 sticky left-0 bg-slate-900 z-[65] flex items-center gap-2 uppercase text-xs group-hover:bg-slate-800 transition-colors border-t border-slate-700">
                       {expandPosisiAkhir ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      <span className="text-blue-300">▶</span> TOTAL POSISI AKHIR
+                      <span className="text-sky-400">▶</span> TOTAL POSISI AKHIR
                     </td>
-                    <td className="p-4 text-right border-r border-blue-950 opacity-40 bg-blue-950/40">-</td>
+                    <td className="p-4 text-right border-r border-slate-700 opacity-40 bg-slate-900/60 border-t border-slate-700">-</td>
                     {activeMonthIdx.map(m => (
-                      <td key={m} className="p-2 text-right border-r border-blue-950 font-mono text-blue-200 text-xs">
+                      <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-200 text-xs bg-slate-900 border-t border-slate-700">
                         {fmt(chartData[m-1]?.saldo || 0)}
                       </td>
                     ))}
-                    <td className="p-4 text-right font-mono bg-blue-950 sticky right-0 z-[65] border-l border-blue-900 text-cyan-200 text-xs shadow-[inset_2px_0_10px_rgba(0,0,0,0.3)]">{fmt(summary.saldoAkhir)}</td>
+                    <td className="p-4 text-right font-mono bg-slate-950 sticky right-0 z-[65] border-l border-slate-700 text-cyan-200 text-xs shadow-[-4px_0_20px_rgba(0,0,0,0.5)] border-t border-slate-700">{fmt(summary.saldoAkhir)}</td>
                   </tr>
 
                    {expandPosisiAkhir && monthlyAccountSaldo.map((r, ri) => (
-                     <tr key={`akhir-${r.id}`} className="bg-blue-50/30 text-[10px] text-slate-500 italic">
-                        <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-t">{r.nama}</td>
-                        <td className="p-3 text-right border-r bg-blue-50/20 opacity-40 border-t">-</td>
+                     <tr key={`akhir-${r.id}`} className="bg-slate-900 text-[10px] text-slate-400 italic">
+                        <td className="p-3 pl-12 border-r sticky left-0 bg-slate-900 z-[40] truncate max-w-[200px] border-t border-slate-800">{r.nama}</td>
+                        <td className="p-3 text-right border-r bg-slate-900/80 opacity-40 border-t border-slate-800">-</td>
                         {activeMonthIdx.map(m => (
-                          <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-t">{fmt(r.monthlySaldo[m] || 0)}</td>
+                          <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-t border-slate-800">{fmt(r.monthlySaldo[m] || 0)}</td>
                         ))}
-                        <td className="p-3 text-right bg-blue-100/50 border-l sticky right-0 z-[40] font-black border-t text-blue-900">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}</td>
+                        <td className="p-3 text-right bg-slate-900 border-l border-slate-800 sticky right-0 z-[40] font-black border-t text-cyan-400 shadow-[-4px_0_10px_rgba(0,0,0,0.3)]">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}</td>
                      </tr>
                    ))}
                 </tbody>
