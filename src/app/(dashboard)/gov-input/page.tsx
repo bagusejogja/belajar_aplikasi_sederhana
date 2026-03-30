@@ -104,7 +104,9 @@ export default function GovInputPage() {
                             : units.find(u => u.pic?.toLowerCase() === searchNama)?.id || null;
 
       const matchedUnit = units.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
-      const matchedAkun = accounts.find(ax => ax.nomor_akun === aCode);
+      
+      const cleanACode = (aCode || '').trim();
+      const matchedAkun = accounts.find(ax => ax.nomor_akun?.toString().trim() === cleanACode);
 
       return {
         id: idx,
@@ -112,10 +114,10 @@ export default function GovInputPage() {
         unitCode: matchedUnit?.kode_unit || '?',
         unitId: matchedUnit?.id || null,
         unitName: matchedUnit?.nama_unit || 'TIDAK DITEMUKAN',
-        akunCode: aCode || '?',
+        akunCode: cleanACode || '?',
         akunId: matchedAkun?.id || null,
         akunName: matchedAkun?.nama_akun || 'Akun Salah',
-        nominal: parseFloat(nom?.replace(/\D/g, '')) || 0, // Clean non-numeric
+        nominal: parseFloat(nom?.toString().replace(/\D/g, '') || '0'), 
         jenis: jns || 'pagu awal',
         nama: nama,
         isValid: !!matchedUnit && !!matchedAkun
