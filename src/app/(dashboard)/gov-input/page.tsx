@@ -68,15 +68,29 @@ export default function GovInputPage() {
     const rows = text.split('\n').filter(row => row.trim());
     
     const parsed = rows.map((row, idx) => {
-      // Input Format: Tanggal | AccountCode | Nominal | Jenis | NamaInput
-      const parts = row.split(/\s+/);
-      const [tgl, aCode, nom, jns_word1, jns_word2, nm] = parts;
+      // Split by TAB for Excel robustness
+      const parts = row.split('\t').map(p => p.trim());
+      let [tgl, aCode, nom, jns, nama] = parts;
+
+      if (parts.length < 5 && row.includes(' ')) {
+         // Fallback if copied from non-tab source
+         const fallbackParts = row.split(/\s+/);
+         [tgl, aCode, nom, jns] = fallbackParts;
+         nama = fallbackParts.slice(4).join(' ');
+      }
       
-      const jns = `${jns_word1 || ''} ${jns_word2 || ''}`.trim();
-      const nama = nm || jns_word2 || jns_word1 || '-'; 
+      // Standardize Date: DD/MM/YYYY -> YYYY-MM-DD
+      if (tgl?.includes('/')) {
+        const [d, m, y] = tgl.split('/');
+        if (d && m && y) tgl = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
       
-      // Match Mappings from DB first
-      const matchedUnitId = liveMappings[nama] || units.find(u => u.pic === nama)?.id || null;
+      // Case-Insensitive mapping for Nama
+      const searchNama = (nama || '').toLowerCase();
+      const matchedUnitId = Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama) 
+                            ? liveMappings[Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama)!]
+                            : units.find(u => u.pic?.toLowerCase() === searchNama)?.id || null;
+
       const matchedUnit = units.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
       const matchedAkun = accounts.find(ax => ax.nomor_akun === aCode);
 
@@ -85,11 +99,11 @@ export default function GovInputPage() {
         tanggal: tgl || new Date().toISOString().split('T')[0],
         unitCode: matchedUnit?.kode_unit || '?',
         unitId: matchedUnit?.id || null,
-        unitName: matchedUnit?.name || 'TIDAK DITEMUKAN',
+        unitName: matchedUnit?.nama_unit || 'TIDAK DITEMUKAN',
         akunCode: aCode || '?',
         akunId: matchedAkun?.id || null,
         akunName: matchedAkun?.nama_akun || 'Akun Salah',
-        nominal: parseFloat(nom?.replace(/,/g, '')) || 0,
+        nominal: parseFloat(nom?.replace(/\D/g, '')) || 0, // Clean non-numeric
         jenis: jns || 'pagu awal',
         nama: nama,
         isValid: !!matchedUnit && !!matchedAkun
