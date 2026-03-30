@@ -106,7 +106,7 @@ export default function GovInputPage() {
       const matchedUnit = units.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
       
       const cleanACode = (aCode || '').trim();
-      const matchedAkun = accounts.find(ax => ax.nomor_akun?.toString().trim() === cleanACode);
+      const matchedAkun = accounts.find(ax => ax.account_code?.toString().trim() === cleanACode);
 
       return {
         id: idx,
@@ -116,7 +116,7 @@ export default function GovInputPage() {
         unitName: matchedUnit?.nama_unit || 'TIDAK DITEMUKAN',
         akunCode: cleanACode || '?',
         akunId: matchedAkun?.id || null,
-        akunName: matchedAkun?.nama_akun || 'Akun Salah',
+        akunName: matchedAkun?.account_name || 'Akun Salah',
         nominal: parseFloat(nom?.toString().replace(/\D/g, '') || '0'), 
         jenis: jns || 'pagu awal',
         nama: nama,
@@ -155,7 +155,7 @@ export default function GovInputPage() {
         unit_id: unitId,
         nominal: parseFloat(nominal),
         jenis,
-        nama_input: namaInput || mockUnits.find(u => u.id === unitId)?.pic || '-',
+        nama_input: namaInput || units.find(u => u.id === unitId || u.id === Number(unitId))?.pic || '-',
         keterangan: uraian
       }]);
 
@@ -258,7 +258,7 @@ export default function GovInputPage() {
                     <h3 className="text-2xl font-black text-slate-800 tracking-tighter">PREVIEW IMPOR MASSAL</h3>
                     <p className="text-slate-500 text-sm font-medium">Validasi {bulkData.length} baris data sebelum disimpan ke database.</p>
                  </div>
-                 <button onClick={() => setIsImportModalOpen(false)} className="p-3 bg-white border rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all shadow-sm">
+                 <button onClick={() => { setBulkData([]); setIsImportModalOpen(false); }} className="p-3 bg-white border rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all shadow-sm">
                     <X size={24} />
                  </button>
               </div>
@@ -324,7 +324,7 @@ export default function GovInputPage() {
                     </div>
                  </div>
                  <div className="flex gap-4">
-                    <button onClick={() => setBulkData([])} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-400 hover:text-slate-800 transition-all">BATAL SEMUA</button>
+                    <button onClick={() => { setBulkData([]); setIsImportModalOpen(false); }} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-400 hover:text-slate-800 transition-all">BATAL SEMUA</button>
                     <button 
                        onClick={handleSaveBulk}
                        disabled={bulkData.some(d => !d.isValid) || isSaving}
@@ -345,8 +345,8 @@ export default function GovInputPage() {
           <div className="bg-white rounded-[3rem] p-10 shadow-xl shadow-gray-100 border border-gray-100">
              <div className="flex items-center justify-between mb-10">
                 <div className="flex items-center gap-4">
-                  <div className="w-2 h-10 bg-indigo-600 rounded-full" />
-                  <h3 className="font-extrabold text-slate-800 text-xl uppercase tracking-tighter">Borang Transaksi Anggaran</h3>
+                   <div className="w-2 h-10 bg-indigo-600 rounded-full" />
+                   <h3 className="font-extrabold text-slate-800 text-xl uppercase tracking-tighter">Borang Transaksi Anggaran</h3>
                 </div>
                 <div className="bg-slate-100 px-4 py-2 rounded-xl text-[10px] font-black text-slate-400 tracking-widest uppercase">ID Gen: AUTO</div>
              </div>
@@ -421,7 +421,7 @@ export default function GovInputPage() {
                    >
                       <option value="">{personSearch ? '-- Pilih Unit Hasil Filter --' : 'Silakan Cari PIC Terlebih Dahulu'}</option>
                       {filteredUnits.map(u => (
-                        <option key={u.id} value={u.id}>[{u.kode_unit}] - {u.nama_unit} ({u.group})</option>
+                        <option key={u.id} value={u.id}>[{u.kode_unit}] - {u.nama_unit} ({u.group_org || u.group})</option>
                       ))}
                    </select>
                 </div>
@@ -436,7 +436,7 @@ export default function GovInputPage() {
                    >
                       <option value="">-- Pilih Akun Belanja --</option>
                       {accounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.nomor_akun} - {a.nama_akun}</option>
+                        <option key={a.id} value={a.id}>{a.account_code} - {a.account_name}</option>
                       ))}
                    </select>
                 </div>
