@@ -60,27 +60,39 @@ const parseAnyDate = (val: any): Date | null => {
   return null;
 };
 
-// ───── Summary Card Premium ─────
+// ───── Summary Card Ultra Premium ─────
 function SummaryCard({ label, value, icon, color, subValue, subLabel }: any) {
   return (
-    <div className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-2xl transition-all hover:scale-[1.02] ${color}`}>
-      {/* Decorative Background Icon */}
-      <div className="absolute -right-4 -bottom-6 text-white/10 text-9xl transform -rotate-12 select-none pointer-events-none">
+    <div className={`relative overflow-hidden rounded-[2rem] p-7 text-white shadow-2xl transition-all duration-500 hover:translate-y-[-5px] hover:shadow-indigo-500/20 group ${color}`}>
+      {/* Dynamic Background Pattern */}
+      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white via-transparent to-transparent pointer-events-none"></div>
+      <div className="absolute inset-0 opacity-5 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pointer-events-none"></div>
+      
+      {/* Floating Animated Icon */}
+      <div className="absolute -right-6 -bottom-8 text-white/5 text-[10rem] transform -rotate-12 transition-transform duration-700 group-hover:rotate-0 group-hover:scale-110 select-none pointer-events-none">
         {icon}
       </div>
       
-      <div className="relative z-10">
-        <p className="text-sm font-bold opacity-80 uppercase tracking-widest">{label}</p>
-        <div className="flex flex-wrap items-baseline gap-2 mt-2">
-          <span className="text-sm font-medium opacity-60">Rp</span>
-          <h4 className="text-2xl md:text-3xl font-black tracking-tighter break-all">
-            {fmt(value)}
-          </h4>
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div>
+          <p className="text-[11px] font-black opacity-60 uppercase tracking-[0.2em] mb-1">{label}</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-lg font-bold opacity-40">Rp</span>
+            <h4 className="text-3xl md:text-4xl font-black tracking-tighter drop-shadow-md">
+              {fmt(value).split(',')[0]}<span className="text-sm opacity-50 font-medium">,{fmt(value).split(',')[1] || '00'}</span>
+            </h4>
+          </div>
         </div>
+
         {subValue !== undefined && (
-          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-            <span className="text-[10px] font-bold opacity-60 uppercase">{subLabel}</span>
-            <span className="text-sm font-mono font-bold">{fmt(subValue)}</span>
+          <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center group-hover:border-white/20 transition-colors">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{subLabel}</span>
+              <span className="text-xs font-mono font-black text-white/90">{fmt(subValue)}</span>
+            </div>
+            <div className="p-2 rounded-xl bg-white/10 backdrop-blur-md group-hover:bg-white/20 transition-all">
+               <TrendingUp size={14} className={value >= 0 ? "text-emerald-300" : "text-rose-300"} />
+            </div>
           </div>
         )}
       </div>
@@ -118,10 +130,12 @@ export default function DashboardPage() {
   const [perRekening, setPerRekening] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [coaTree, setCoaTree] = useState<any[]>([]);
+  const [coaMonthTable, setCoaMonthTable] = useState<any[]>([]);
   const [expandedCoa, setExpandedCoa] = useState<Record<string, boolean>>({});
   const [expandedKel, setExpandedKel] = useState<Record<string, boolean>>({});
-  const [expandedAnak, setExpandedAnak] = useState<Record<string, boolean>>({});
-  const [coaMonthTable, setCoaMonthTable] = useState<any[]>([]);
+  const [expandPosisiAwal, setExpandPosisiAwal] = useState(false);
+  const [expandPosisiAkhir, setExpandPosisiAkhir] = useState(false);
+  const [monthlyAccountSaldo, setMonthlyAccountSaldo] = useState<any[]>([]);
 
   const tahunList = [2023, 2024, 2025, 2026, 2027];
 
@@ -188,8 +202,6 @@ export default function DashboardPage() {
 
   const compute = () => {
     // ── BANK per rekening ──  
-    // Deduplikasi Bank: Hindari upload ganda yang membuat data "meleset"
-    // Kunci unik: noref_bank + waktu + debet + kredit + rek
     const seen = new Set();
     const uniqueBank = allBank.filter(b => {
       const key = `${b.rekening_id}-${b.waktu_transaksi}-${b.noref_bank}-${b.debet}-${b.kredit}`;
@@ -201,10 +213,7 @@ export default function DashboardPage() {
     const bankBefore = filterBeforeYear(uniqueBank, 'waktu_transaksi');
     const bankYear   = filterByYear(uniqueBank, 'waktu_transaksi');
 
-    // Grouping Rekening dan Saldo
     const rekMap: Record<string, any> = {};
-    
-    // Inisialisasi dengan data Master Rekening
     allRekening.forEach(r => {
       const idStr = String(r.id);
       rekMap[idStr] = { 
@@ -214,7 +223,6 @@ export default function DashboardPage() {
       };
     });
 
-    // MASUKKAN DATA BANK SEBELUM TAHUN INI (Saldo Awal)
     bankBefore.forEach(b => {
       const rId = String(b.rekening_id || 'unknown');
       if (!rekMap[rId]) {
@@ -223,7 +231,6 @@ export default function DashboardPage() {
       rekMap[rId].saldoAwal += cleanNum(b.kredit) - cleanNum(b.debet);
     });
 
-    // MASUKKAN DATA BANK TAHUN INI (Mutasi)
     bankYear.forEach(b => {
       const rId = String(b.rekening_id || 'unknown');
       if (!rekMap[rId]) {
@@ -233,7 +240,6 @@ export default function DashboardPage() {
       rekMap[rId].keluar += cleanNum(b.debet);
     });
 
-    // ── DATA KAS KECIL dari transactions ──
     const trxYear = filterByYear(allTrx, 'tanggal');
     const trxBefore = filterBeforeYear(allTrx, 'tanggal');
 
@@ -246,7 +252,6 @@ export default function DashboardPage() {
       kasRek.keluar += Number(t.uang_keluar) || 0;
     });
 
-    // Gabungkan Semua ke List
     const rekList = [...Object.values(rekMap), kasRek]
       .filter(r => Math.abs(r.saldoAwal) > 0.1 || Math.abs(r.masuk) > 0.1 || Math.abs(r.keluar) > 0.1);
 
@@ -264,7 +269,6 @@ export default function DashboardPage() {
       saldoAkhir: total.saldoAwal + total.masuk - total.keluar,
     });
 
-    // ── CHART BULANAN ──
     const monthlyData = BULAN.map((bln, idx) => {
       const m = idx + 1;
       const trxM = trxYear.filter(t => { const d = parseAnyDate(t.tanggal); return d && d.getMonth() + 1 === m; });
@@ -276,7 +280,6 @@ export default function DashboardPage() {
       const surplus = masuk - keluar;
       return { bln, masuk, keluar, surplus };
     });
-    // running saldo
     let saldo = total.saldoAwal;
     const cd = monthlyData.map(m => {
       saldo += m.masuk - m.keluar;
@@ -284,8 +287,6 @@ export default function DashboardPage() {
     });
     setChartData(cd);
 
-    // ── COA TREE ──
-    // Build tree: Induk (ends 0000) → Kelompok (no dot, no 0000) → Anak (has dot)
     const akunMap: Record<string, any> = {};
     allAkun.forEach(a => { akunMap[a.id] = a; });
 
@@ -316,13 +317,6 @@ export default function DashboardPage() {
       }
     });
 
-    // Aggregate amounts per akun_id for the year.
-    // PENTING: bank_transactions.akun_id = integer (contoh: 51)
-    //          ref_akun.id bisa UUID atau integer - normalisasi sebagai String!
-    // Buat lookup: String(ref_akun.id) → ref_akun
-    const akunByStrId: Record<string, any> = {};
-    allAkun.forEach(a => { akunByStrId[String(a.id)] = a; });
-
     const trxAmt: Record<string, { masuk: number; keluar: number; ct: number }> = {};
     [...trxYear, ...bankYear].forEach((row: any) => {
       const aId = String(row.akun_id ?? '');
@@ -333,7 +327,6 @@ export default function DashboardPage() {
       trxAmt[aId].ct += 1;
     });
 
-    // Roll up ke kelompok dan induk (pakai String(id) agar cocok dengan trxAmt key)
     const result = Object.values(indukMap).map((induk: any) => {
       const kels = Object.values(induk.kelompoks).map((kel: any) => {
         const anaks = kel.anaks.map((anak: any) => {
@@ -359,9 +352,6 @@ export default function DashboardPage() {
       };
     }).filter((i: any) => i.masuk + i.keluar > 0 || i.ct > 0);
 
-    setCoaTree(result);
-
-    // Aggregate amounts per akun_id and MONTH for the year
     const monthlyTrxAmt: Record<string, Record<number, { masuk: number; keluar: number }>> = {};
     [...trxYear, ...bankYear].forEach((row: any) => {
       const aId = String(row.akun_id ?? '');
@@ -392,7 +382,6 @@ export default function DashboardPage() {
       return mt;
     };
 
-    // Roll up tree with month totals
     const finalTree = result.map((induk: any) => {
       const indukIdSet = new Set<string>([String(induk.id)]);
       const kels = induk.kelompoks.map((kel: any) => {
@@ -409,6 +398,28 @@ export default function DashboardPage() {
       return { ...induk, kelompoks: kels, monthTotals: getMonthTotals(indukIdSet) };
     });
 
+    const accRunning: any[] = rekList.map(r => {
+      const perMonth: Record<number, number> = {};
+      let cur = r.saldoAwal;
+      BULAN.forEach((_, i) => {
+        const m = i + 1;
+        let mIn = 0, mOut = 0;
+        if (r.id === 'kas') {
+          const mTrx = trxYear.filter(t => { const d = parseAnyDate(t.tanggal); return d && d.getMonth() + 1 === m; });
+          mIn = mTrx.reduce((s, t) => s + (Number(t.uang_masuk) || 0), 0);
+          mOut = mTrx.reduce((s, t) => s + (Number(t.uang_keluar) || 0), 0);
+        } else {
+          const mBank = bankYear.filter(b => String(b.rekening_id) === String(r.id) && parseAnyDate(b.waktu_transaksi)?.getMonth() + 1 === m);
+          mIn = mBank.reduce((s, b) => s + cleanNum(b.kredit), 0);
+          mOut = mBank.reduce((s, b) => s + cleanNum(b.debet), 0);
+        }
+        cur += mIn - mOut;
+        perMonth[m] = cur;
+      });
+      return { ...r, monthlySaldo: perMonth };
+    });
+
+    setMonthlyAccountSaldo(accRunning);
     setCoaMonthTable(finalTree);
     setCoaTree(finalTree);
   };
@@ -427,9 +438,6 @@ export default function DashboardPage() {
       <Loader2 size={48} className="animate-spin text-indigo-500" />
     </div>
   );
-
-  const masukInduk = coaTree.filter(i => Number(i.nomor_akun?.[0]) <= 2 || i.masuk > i.keluar);
-  const keluarInduk = coaTree.filter(i => Number(i.nomor_akun?.[0]) >= 5);
 
   return (
     <div className="space-y-8">
@@ -457,7 +465,6 @@ export default function DashboardPage() {
 
       {/* SUMMARY CARDS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Kolom 1: Saldo Awal */}
         <SummaryCard 
           label="Saldo Awal" 
           value={summary.saldoAwal} 
@@ -466,8 +473,6 @@ export default function DashboardPage() {
           subLabel="Posisi 1 Jan"
           subValue={summary.saldoAwal}
         />
-
-        {/* Kolom 2: Masuk & Keluar Stacked */}
         <div className="grid grid-cols-1 gap-6">
           <SummaryCard 
             label="Total Uang Masuk" 
@@ -486,8 +491,6 @@ export default function DashboardPage() {
             subValue={summary.keluar}
           />
         </div>
-
-        {/* Kolom 3: Saldo Akhir */}
         <SummaryCard 
           label="Saldo Akhir" 
           value={summary.saldoAkhir} 
@@ -497,47 +500,6 @@ export default function DashboardPage() {
           subValue={summary.saldoAkhir}
         />
       </div>
-
-      {/* PER-REKENING TABLE */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-black text-gray-800 text-lg">Ringkasan per Rekening</h3>
-          <span className="text-xs text-gray-400 font-medium">Saldo Awal + Masuk − Keluar = Saldo Akhir</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-bold">
-              <tr>
-                <th className="p-4">Rekening</th>
-                <th className="p-4 text-right">Saldo Awal</th>
-                <th className="p-4 text-right text-emerald-600">Uang Masuk</th>
-                <th className="p-4 text-right text-amber-600">Uang Keluar</th>
-                <th className="p-4 text-right text-cyan-600">Saldo Akhir</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {perRekening.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-semibold text-gray-800">{r.nama}</td>
-                  <td className="p-4 text-right font-mono text-gray-600">{fmt(r.saldoAwal)}</td>
-                  <td className="p-4 text-right font-mono text-emerald-600 font-bold">{fmt(r.masuk)}</td>
-                  <td className="p-4 text-right font-mono text-amber-600 font-bold">{fmt(r.keluar)}</td>
-                  <td className="p-4 text-right font-mono text-cyan-700 font-black">{fmt(r.saldoAwal + r.masuk - r.keluar)}</td>
-                </tr>
-              ))}
-              <tr className="bg-gray-100 font-black text-gray-900">
-                <td className="p-4 uppercase text-xs tracking-wider">TOTAL</td>
-                <td className="p-4 text-right font-mono">{fmt(summary.saldoAwal)}</td>
-                <td className="p-4 text-right font-mono text-emerald-700">{fmt(summary.masuk)}</td>
-                <td className="p-4 text-right font-mono text-amber-700">{fmt(summary.keluar)}</td>
-                <td className="p-4 text-right font-mono text-cyan-700">{fmt(summary.saldoAkhir)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-
 
       {/* CHART BULANAN */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
@@ -575,14 +537,6 @@ export default function DashboardPage() {
             <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Per Bulan</h3>
             <p className="text-xs text-gray-500 mt-1 italic">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
           </div>
-          <div className="flex gap-2">
-             <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">
-               <div className="w-2 h-2 rounded-full bg-emerald-600"></div> Surplus
-             </div>
-             <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full">
-               <div className="w-2 h-2 rounded-full bg-rose-600"></div> Defisit
-             </div>
-          </div>
         </div>
         <div className="overflow-x-auto">
           {(() => {
@@ -597,10 +551,8 @@ export default function DashboardPage() {
             const TableRow = ({ row, depth = 0, type = 'induk' }: any) => {
               const isInduk = type === 'induk';
               const isKel = type === 'kel';
-              const id = `table-${row.id}`;
               const expanded = isInduk ? expandedCoa[row.id] : isKel ? expandedKel[row.id] : false;
               const toggle = isInduk ? () => toggleCoa(row.id) : isKel ? () => toggleKel(row.id) : null;
-              
               const hasChildren = (isInduk && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
 
               return (
@@ -658,44 +610,75 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                   {/* ROW SALDO AWAL TAHUN */}
-                   <tr className="bg-slate-100 border-b-2 border-slate-200 font-black">
-                      <td className="p-3 sticky left-0 bg-slate-100 z-10 border-r">▶ POSISI AWAL KEUANGAN</td>
-                      <td className="p-3 text-right border-r text-indigo-700">{fmt(summary.saldoAwal)}</td>
-                      {activeMonthIdx.map(m => <td key={m} className="p-2 text-right border-r">-</td>)}
-                      <td className="p-3 text-right bg-indigo-100 text-indigo-900 font-black sticky right-0 z-10">{fmt(summary.saldoAwal)}</td>
+                   {/* ROW POSISI AWAL KEUANGAN (Collapsible) */}
+                   <tr className="bg-slate-800 text-white font-black cursor-pointer group" onClick={() => setExpandPosisiAwal(!expandPosisiAwal)}>
+                      <td className="p-4 sticky left-0 bg-slate-800 z-10 border-r border-slate-700 flex items-center gap-2">
+                        {expandPosisiAwal ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        <span className="text-indigo-300">▶</span> POSISI AWAL KEUANGAN
+                      </td>
+                      <td className="p-4 text-right border-r border-slate-700 text-indigo-200 bg-slate-800/50">{fmt(summary.saldoAwal)}</td>
+                      {activeMonthIdx.map(m => {
+                        const prevM = m - 1;
+                        const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
+                        return <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-indigo-300">{fmt(val)}</td>;
+                      })}
+                      <td className="p-4 text-right bg-indigo-950 font-black sticky right-0 z-10 border-l border-indigo-800 text-indigo-200">{fmt(summary.saldoAwal)}</td>
                    </tr>
+
+                   {expandPosisiAwal && monthlyAccountSaldo.map((r, ri) => (
+                     <tr key={`awal-${r.id}`} className="bg-slate-700/30 text-[9px] text-gray-500 italic">
+                        <td className="p-2 pl-10 border-r sticky left-0 bg-white z-10 truncate max-w-[150px]">{r.nama}</td>
+                        <td className="p-2 text-right border-r bg-gray-50">{fmt(r.saldoAwal)}</td>
+                        {activeMonthIdx.map(m => {
+                          const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
+                          return <td key={`awal-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60">{fmt(val)}</td>;
+                        })}
+                        <td className="p-2 text-right bg-indigo-50 border-l sticky right-0 z-10 font-bold">{fmt(r.saldoAwal)}</td>
+                     </tr>
+                   ))}
 
                    {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
                   
-                   {/* FOOTER TOTAL TAHUN */}
-                   <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-700">
-                    <td className="p-4 border-r sticky left-0 bg-slate-900 z-10">TOTAL MUTASI / SURPLUS</td>
-                    <td className="p-4 text-right border-r text-indigo-300">-</td>
+                   {/* ROW POSISI AKHIR KEUANGAN (Collapsible) */}
+                   <tr className="bg-cyan-700 text-white font-black cursor-pointer group" onClick={() => setExpandPosisiAkhir(!expandPosisiAkhir)}>
+                    <td className="p-4 border-r border-cyan-800 sticky left-0 bg-cyan-700 z-10 flex items-center gap-2 uppercase">
+                      {expandPosisiAkhir ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span className="text-cyan-200">▶</span> POSISI AKHIR KEUANGAN
+                    </td>
+                    <td className="p-4 text-right border-r border-cyan-800 opacity-50 bg-cyan-800/20">-</td>
+                    {activeMonthIdx.map(m => (
+                      <td key={m} className="p-2 text-right border-r border-cyan-800 font-mono text-cyan-100">
+                        {fmt(chartData[m-1]?.saldo || 0)}
+                      </td>
+                    ))}
+                    <td className="p-4 text-right font-mono bg-cyan-900 sticky right-0 z-10 border-l border-cyan-800 text-cyan-200">{fmt(summary.saldoAkhir)}</td>
+                  </tr>
+
+                   {expandPosisiAkhir && monthlyAccountSaldo.map((r, ri) => (
+                     <tr key={`akhir-${r.id}`} className="bg-cyan-50/50 text-[9px] text-gray-500 italic">
+                        <td className="p-2 pl-10 border-r sticky left-0 bg-white z-10 truncate max-w-[150px]">{r.nama}</td>
+                        <td className="p-2 text-right border-r bg-gray-50 opacity-40">-</td>
+                        {activeMonthIdx.map(m => (
+                          <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60">{fmt(r.monthlySaldo[m] || 0)}</td>
+                        ))}
+                        <td className="p-2 text-right bg-cyan-50 border-l sticky right-0 z-10 font-bold">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1]] || 0)}</td>
+                     </tr>
+                   ))}
+
+                   {/* FOOTER SURPLUS */}
+                   <tr className="bg-slate-900 text-white text-[9px]">
+                    <td className="p-2 border-r sticky left-0 bg-slate-900 z-10 opacity-50 pl-10">Surplus / (Defisit) Bulanan</td>
+                    <td className="p-2 text-right border-r opacity-30">-</td>
                     {activeMonthIdx.map(m => {
                       const cd = chartData[m-1] || { masuk: 0, keluar: 0 };
                       const diff = cd.masuk - cd.keluar;
                       return (
-                        <td key={m} className={`p-2 text-right border-r font-mono ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {fmt(Math.abs(diff))}
+                        <td key={m} className={`p-1 text-right border-r font-mono ${diff >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {fmt(diff)}
                         </td>
                       );
                     })}
-                    <td className="p-4 text-right font-mono bg-cyan-700 sticky right-0 z-10">{fmt(summary.masuk - summary.keluar)}</td>
-                  </tr>
-
-                  <tr className="bg-cyan-600 text-white font-black text-xs">
-                    <td className="p-4 border-r sticky left-0 bg-cyan-600 z-10 uppercase">▶ SALDO AKHIR KEUANGAN</td>
-                    <td className="p-4 text-right border-r opacity-50">-</td>
-                    {activeMonthIdx.map(m => {
-                      const cd = chartData[m-1];
-                      return (
-                        <td key={m} className="p-2 text-right border-r font-mono">
-                          {cd ? fmt(cd.saldo) : '-'}
-                        </td>
-                      );
-                    })}
-                    <td className="p-4 text-right font-mono bg-cyan-800 sticky right-0 z-10">{fmt(summary.saldoAkhir)}</td>
+                    <td className="p-2 text-right font-mono bg-indigo-900 sticky right-0 z-10 opacity-50">{fmt(summary.masuk - summary.keluar)}</td>
                   </tr>
                 </tbody>
               </table>
