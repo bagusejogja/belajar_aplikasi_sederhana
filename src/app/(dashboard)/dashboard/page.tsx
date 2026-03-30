@@ -61,20 +61,34 @@ export default function DashboardPage() {
 
   const tahunList = [2023, 2024, 2025, 2026, 2027];
 
-  // ────── FETCH ──────
+  // ────── FETCH dengan Pagination (atasi limit 1000 Supabase) ──────
+  const fetchAllPages = async (builder: any, pageSize = 5000) => {
+    let allData: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await builder.range(from, from + pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allData = [...allData, ...data];
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    return allData;
+  };
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [trxRes, bankRes, akunRes, rekRes] = await Promise.all([
-        supabase.from('transactions').select('*, ref_akun(nomor_akun, nama_akun)').neq('disetujui', 'Ditolak'),
-        supabase.from('bank_transactions').select('*'),
-        supabase.from('ref_akun').select('*').order('nomor_akun', { ascending: true }),
-        supabase.from('ref_rekening').select('*'),
+      const [trxData, bankData, akunData, rekData] = await Promise.all([
+        fetchAllPages(supabase.from('transactions').select('*, ref_akun(nomor_akun, nama_akun)').neq('disetujui', 'Ditolak').order('tanggal', { ascending: true })),
+        fetchAllPages(supabase.from('bank_transactions').select('*').order('waktu_transaksi', { ascending: true })),
+        fetchAllPages(supabase.from('ref_akun').select('*').order('nomor_akun', { ascending: true })),
+        fetchAllPages(supabase.from('ref_rekening').select('*')),
       ]);
-      setAllTrx(trxRes.data || []);
-      setAllBank(bankRes.data || []);
-      setAllAkun(akunRes.data || []);
-      setAllRekening(rekRes.data || []);
+      setAllTrx(trxData);
+      setAllBank(bankData);
+      setAllAkun(akunData);
+      setAllRekening(rekData);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
@@ -203,27 +217,32 @@ export default function DashboardPage() {
       }
     });
 
-    // Aggregate amounts per akun_id for the year
+    // Aggregate amounts per akun_id for the year.
+    // PENTING: bank_transactions.akun_id = integer (contoh: 51)
+    //          ref_akun.id bisa UUID atau integer - normalisasi sebagai String!
+    // Buat lookup: String(ref_akun.id) → ref_akun
+    const akunByStrId: Record<string, any> = {};
+    allAkun.forEach(a => { akunByStrId[String(a.id)] = a; });
+
     const trxAmt: Record<string, { masuk: number; keluar: number; ct: number }> = {};
     [...trxYear, ...bankYear].forEach((row: any) => {
-      const aId = String(row.akun_id || '');
-      if (!aId) return;
+      const aId = String(row.akun_id ?? '');
+      if (!aId || aId === '' || aId === 'null' || aId === 'undefined') return;
       if (!trxAmt[aId]) trxAmt[aId] = { masuk: 0, keluar: 0, ct: 0 };
-      trxAmt[aId].masuk += Number(row.uang_masuk || row.debet) || 0;
-      trxAmt[aId].keluar += Number(row.uang_keluar || row.kredit) || 0;
+      trxAmt[aId].masuk += Number(row.uang_masuk ?? row.debet) || 0;
+      trxAmt[aId].keluar += Number(row.uang_keluar ?? row.kredit) || 0;
       trxAmt[aId].ct += 1;
     });
 
-    // Roll up to kelompok and induk
+    // Roll up ke kelompok dan induk (pakai String(id) agar cocok dengan trxAmt key)
     const result = Object.values(indukMap).map((induk: any) => {
       const kels = Object.values(induk.kelompoks).map((kel: any) => {
         const anaks = kel.anaks.map((anak: any) => {
-          const amt = trxAmt[anak.id] || { masuk: 0, keluar: 0, ct: 0 };
+          const amt = trxAmt[String(anak.id)] || { masuk: 0, keluar: 0, ct: 0 };
           return { ...anak, masuk: amt.masuk, keluar: amt.keluar, ct: amt.ct };
         });
         const kelTot = anaks.reduce((acc: any, a: any) => ({ masuk: acc.masuk + a.masuk, keluar: acc.keluar + a.keluar, ct: acc.ct + a.ct }), { masuk: 0, keluar: 0, ct: 0 });
-        // Also direct kelompok trx
-        const kelDirect = trxAmt[kel.id] || { masuk: 0, keluar: 0, ct: 0 };
+        const kelDirect = trxAmt[String(kel.id)] || { masuk: 0, keluar: 0, ct: 0 };
         return {
           ...kel, anaks,
           masuk: kelTot.masuk + kelDirect.masuk,
@@ -232,7 +251,7 @@ export default function DashboardPage() {
         };
       });
       const indukTot = kels.reduce((acc: any, k: any) => ({ masuk: acc.masuk + k.masuk, keluar: acc.keluar + k.keluar, ct: acc.ct + k.ct }), { masuk: 0, keluar: 0, ct: 0 });
-      const indukDirect = trxAmt[induk.id] || { masuk: 0, keluar: 0, ct: 0 };
+      const indukDirect = trxAmt[String(induk.id)] || { masuk: 0, keluar: 0, ct: 0 };
       return {
         ...induk, kelompoks: kels,
         masuk: indukTot.masuk + indukDirect.masuk,
@@ -243,19 +262,28 @@ export default function DashboardPage() {
 
     setCoaTree(result);
 
-    // ── COA MONTH TABLE ──
     const months = BULAN.map((_, idx) => idx + 1);
+    // Buat Set ID per induk (string agar cocok dengan trxAmt)
     const coaRows = result.map((induk: any) => {
+      // Kumpulkan semua ID anak dari induk ini
+      const idSet = new Set<string>();
+      idSet.add(String(induk.id));
+      induk.kelompoks.forEach((k: any) => {
+        idSet.add(String(k.id));
+        k.anaks.forEach((a: any) => idSet.add(String(a.id)));
+      });
+
       const monthTotals: Record<number, { masuk: number; keluar: number }> = {};
       months.forEach(m => { monthTotals[m] = { masuk: 0, keluar: 0 }; });
       [...trxYear, ...bankYear].forEach((row: any) => {
-        const aId = String(row.akun_id || '');
-        // find if aId belongs to this induk
-        const isInInduk = induk.kelompoks.some((k: any) => k.id === aId || k.anaks.some((a: any) => a.id === aId)) || induk.id === aId;
-        if (!isInInduk) return;
-        const m = new Date(row.tanggal || row.waktu_transaksi).getMonth() + 1;
-        monthTotals[m].masuk += Number(row.uang_masuk || row.debet) || 0;
-        monthTotals[m].keluar += Number(row.uang_keluar || row.kredit) || 0;
+        const aId = String(row.akun_id ?? '');
+        if (!idSet.has(aId)) return;
+        const rawDate = row.tanggal || row.waktu_transaksi;
+        const d = new Date(rawDate);
+        if (isNaN(d.getTime())) return;
+        const m = d.getMonth() + 1;
+        monthTotals[m].masuk += Number(row.uang_masuk ?? row.debet) || 0;
+        monthTotals[m].keluar += Number(row.uang_keluar ?? row.kredit) || 0;
       });
       const tot = months.reduce((s, m) => s + monthTotals[m].masuk + monthTotals[m].keluar, 0);
       return { ...induk, monthTotals, tot };
