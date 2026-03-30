@@ -1,20 +1,20 @@
 import { User, Unit, Role, MenuItem } from '../types';
 
 export const mockUnits: Unit[] = [
-  { id: '1', kode_unit: '010101', name: 'Majelis Wali Amanat', group: 'KPTU', pic: 'Bagus Sri Widodo', is_active: 1 },
-  { id: '2', kode_unit: '010201', name: 'Dewan Guru Besar', group: 'KPTU', pic: 'Bambang Indarto', is_active: 1 },
-  { id: '25', kode_unit: '010801', name: 'Direktorat Perencanaan', group: 'KPTU', pic: 'Bambang Indarto', is_active: 1 },
-  { id: '26', kode_unit: '010802', name: 'Direktorat Keuangan', group: 'KPTU', pic: 'Muslifah Iswandari', is_active: 1 },
-  { id: '43', kode_unit: '02000010', name: 'Fakultas Biologi', group: 'Fakultas', pic: 'Bagus Sri Widodo', is_active: 1 },
-  { id: '44', kode_unit: '03000010', name: 'Fakultas Ekonomika dan Bisnis', group: 'Fakultas', pic: 'Bambang Indarto', is_active: 1 },
-  { id: '85', kode_unit: '--', name: 'Masjid Kampus', group: 'Tempat Ibadah', pic: '-', is_active: 1 },
+  { id: 1, kode_unit: '010101', name: 'Majelis Wali Amanat', group: 'KPTU', pic: 'Bagus Sri Widodo', is_active: 1 },
+  { id: 2, kode_unit: '010201', name: 'Dewan Guru Besar', group: 'KPTU', pic: 'Bambang Indarto', is_active: 1 },
+  { id: 25, kode_unit: '010801', name: 'Direktorat Perencanaan', group: 'KPTU', pic: 'Bambang Indarto', is_active: 1 },
+  { id: 26, kode_unit: '010802', name: 'Direktorat Keuangan', group: 'KPTU', pic: 'Muslifah Iswandari', is_active: 1 },
+  { id: 43, kode_unit: '02000010', name: 'Fakultas Biologi', group: 'Fakultas', pic: 'Bagus Sri Widodo', is_active: 1 },
+  { id: 44, kode_unit: '03000010', name: 'Fakultas Ekonomika dan Bisnis', group: 'Fakultas', pic: 'Bambang Indarto', is_active: 1 },
+  { id: 85, kode_unit: '--', name: 'Masjid Kampus', group: 'Tempat Ibadah', pic: '-', is_active: 1 },
 ];
 
 export const mockGovAkun = [
-  { id: '1', nomor_akun: '511111', nama_akun: 'Belanja Gaji Pokok PNS', is_active: 1 },
-  { id: '2', nomor_akun: '511119', nama_akun: 'Belanja Pembulatan Gaji PNS', is_active: 1 },
-  { id: '9', nomor_akun: '511129', nama_akun: 'Belanja Uang Makan PNS', is_active: 1 },
-  { id: '14', nomor_akun: '511611', nama_akun: 'Belanja Gaji Pokok PPPK', is_active: 1 },
+  { id: 1, nomor_akun: '511111', nama_akun: 'Belanja Gaji Pokok PNS', is_active: 1 },
+  { id: 2, nomor_akun: '511119', nama_akun: 'Belanja Pembulatan Gaji PNS', is_active: 1 },
+  { id: 9, nomor_akun: '511129', nama_akun: 'Belanja Uang Makan PNS', is_active: 1 },
+  { id: 14, nomor_akun: '511611', nama_akun: 'Belanja Gaji Pokok PPPK', is_active: 1 },
 ];
 
 export const mockUsers: User[] = [

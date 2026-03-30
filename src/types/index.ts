@@ -1,7 +1,7 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'GUEST';
 
 export interface Unit {
-  id: string;
+  id: string | number;
   kode_unit: string;
   name: string;
   group: string;
@@ -14,7 +14,7 @@ export interface User {
   name: string;
   email: string;
   role: Role;
-  unitId: string;
+  unitId: string | number;
 }
 
 export interface MenuItem {
@@ -26,23 +26,23 @@ export interface MenuItem {
 }
 
 export interface RefAkun {
-  id: string;
+  id: string | number;
   nomor_akun: string;
   nama_akun: string;
   status: string;
 }
 
 export interface RefPersonel {
-  id: string;
+  id: string | number;
   nama_orang: string;
-  unit_id: string;
+  unit_id: string | number;
   status: string;
 }
 
 export interface RefJenisBelanja {
-  id: string;
+  id: string | number;
   nama_belanja: string;
-  akun_id: string;
+  akun_id: string | number;
   status: string;
 }
 
