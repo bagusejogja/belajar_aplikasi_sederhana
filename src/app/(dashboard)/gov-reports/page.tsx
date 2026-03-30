@@ -15,7 +15,7 @@ export default function GovReportsPage() {
     setLoading(true);
     try {
       // Fetch Units
-      const { data: units } = await supabase.from('gov_units').select('id, nama_unit, kode_unit, group').order('nama_unit');
+      const { data: units } = await supabase.from('gov_units').select('id, nama_unit, kode_unit, group_org').order('nama_unit');
       // Fetch Transactions
       const { data: trxs } = await supabase.from('gov_transactions').select('unit_id, nominal, jenis');
 
@@ -25,10 +25,10 @@ export default function GovReportsPage() {
           
           // Logic Pagu vs Realisasi
           const pagu = unitTrxs.filter(t => 
-             t.jenis === 'pagu awal' || t.jenis === 'tambah pagu' || t.jenis === 'realocasi tambah'
+             t.jenis === 'pagu awal' || t.jenis === 'tambah pagu' || t.jenis === 'realokasi tambah'
           ).reduce((sum, t) => sum + Number(t.nominal), 0) - 
           unitTrxs.filter(t => 
-             t.jenis === 'pengurangan pagu' || t.jenis === 'realocasi kurang'
+             t.jenis === 'pengurangan pagu' || t.jenis === 'realokasi kurang'
           ).reduce((sum, t) => sum + Number(t.nominal), 0);
 
           const spent = unitTrxs.filter(t => t.jenis === 'realisasi').reduce((sum, t) => sum + Number(t.nominal), 0);
@@ -167,7 +167,7 @@ export default function GovReportsPage() {
                                  </div>
                                  <div className="flex flex-col">
                                     <span className="font-black text-slate-800 tracking-tight leading-tight mb-1">{row.nama_unit}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{row.kode_unit} • {row.group}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{row.kode_unit} • {row.group_org}</span>
                                  </div>
                               </div>
                            </td>

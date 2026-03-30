@@ -22,9 +22,14 @@ export default function GovDashboardPage() {
       const { data: trxs } = await supabase.from('gov_transactions').select('*');
 
       if (units && trxs) {
-        // Calculate Totals
-        const totalPagu = trxs.filter(t => t.jenis.includes('pagu') || t.jenis === 'pagu awal')
-                           .reduce((s, t) => s + Number(t.nominal), 0);
+          // Calculate Totals
+        const totalPagu = trxs.filter(t => 
+          t.jenis === 'pagu awal' || t.jenis === 'tambah pagu' || t.jenis === 'realokasi tambah'
+        ).reduce((s, t) => s + Number(t.nominal), 0) -
+        trxs.filter(t => 
+          t.jenis === 'pengurangan pagu' || t.jenis === 'realokasi kurang'
+        ).reduce((s, t) => s + Number(t.nominal), 0);
+        
         const totalSpent = trxs.filter(t => t.jenis === 'realisasi')
                             .reduce((s, t) => s + Number(t.nominal), 0);
         
