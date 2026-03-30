@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function GovMappingPage() {
   const [mappings, setMappings] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [selectedUnit, setSelectedUnit] = useState('');
@@ -14,15 +15,20 @@ export default function GovMappingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const fetchMappings = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Fetch Units
+      const { data: uData } = await supabase.from('gov_units').select('*').order('nama_unit');
+      if (uData) setUnits(uData);
+
+      // Fetch Mappings
+      const { data: mData, error } = await supabase
         .from('gov_name_mappings')
         .select('id, input_name, unit_id, gov_units(nama_unit)');
       
       if (error) throw error;
-      setMappings(data.map(m => ({
+      setMappings(mData.map(m => ({
         id: m.id,
         name: m.input_name,
         unitId: m.unit_id,
@@ -36,7 +42,7 @@ export default function GovMappingPage() {
   };
 
   useEffect(() => {
-    fetchMappings();
+    fetchData();
   }, []);
 
   const handleSaveMapping = async () => {
@@ -67,7 +73,7 @@ export default function GovMappingPage() {
       }
 
       alert(editingId ? "Pemetaan Diperbarui!" : "Pemetaan Ditambahkan!");
-      await fetchMappings();
+      await fetchData();
       setIsModalOpen(false);
       resetModal();
     } catch (err: any) {
@@ -89,7 +95,7 @@ export default function GovMappingPage() {
     try {
       const { error } = await supabase.from('gov_name_mappings').delete().eq('id', id);
       if (error) throw error;
-      await fetchMappings();
+      await fetchData();
     } catch (err: any) {
       alert("Gagal hapus: " + err.message);
     }
@@ -204,10 +210,10 @@ export default function GovMappingPage() {
                      <select 
                         value={selectedUnit}
                         onChange={e => setSelectedUnit(e.target.value)}
-                        className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl py-4 px-6 outline-none font-black"
+                        className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl py-4 px-6 outline-none font-black text-sm"
                      >
                         <option value="">-- Pilih Unit --</option>
-                        {mockUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        {units.map(u => <option key={u.id} value={u.id}>{u.nama_unit}</option>)}
                      </select>
                   </div>
                </div>

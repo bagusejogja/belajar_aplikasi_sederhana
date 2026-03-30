@@ -31,24 +31,36 @@ export default function GovInputPage() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Filtering Logic
-  const filteredUnits = mockUnits.filter(u => 
-    personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
-  );
-
-  // Live Mappings State
+  // Live Data State
   const [liveMappings, setLiveMappings] = useState<Record<string, number>>({});
+  const [units, setUnits] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchLiveMappings = async () => {
-      const { data } = await supabase.from('gov_name_mappings').select('input_name, unit_id');
-      if (data) {
+    const fetchData = async () => {
+      // Fetch Mappings
+      const { data: mMap } = await supabase.from('gov_name_mappings').select('input_name, unit_id');
+      if (mMap) {
         const map: Record<string, number> = {};
-        data.forEach(m => { map[m.input_name] = m.unit_id; });
+        mMap.forEach(m => { map[m.input_name] = m.unit_id; });
         setLiveMappings(map);
       }
+
+      // Fetch Units
+      const { data: uData } = await supabase.from('gov_units').select('*').order('nama_unit');
+      if (uData) setUnits(uData);
+
+      // Fetch Accounts
+      const { data: aData } = await supabase.from('gov_accounts').select('*').order('nomor_akun');
+      if (aData) setAccounts(aData);
     };
-    fetchLiveMappings();
+    fetchData();
   }, []);
+
+  // Filtering Logic
+  const filteredUnits = units.filter(u => 
+    personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
+  );
 
   const handleExcelPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
@@ -64,9 +76,9 @@ export default function GovInputPage() {
       const nama = nm || jns_word2 || jns_word1 || '-'; 
       
       // Match Mappings from DB first
-      const matchedUnitId = liveMappings[nama] || mockUnits.find(u => u.pic === nama)?.id || null;
-      const matchedUnit = mockUnits.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
-      const matchedAkun = mockGovAkun.find(ax => ax.nomor_akun === aCode);
+      const matchedUnitId = liveMappings[nama] || units.find(u => u.pic === nama)?.id || null;
+      const matchedUnit = units.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
+      const matchedAkun = accounts.find(ax => ax.nomor_akun === aCode);
 
       return {
         id: idx,
@@ -378,7 +390,7 @@ export default function GovInputPage() {
                    >
                       <option value="">{personSearch ? '-- Pilih Unit Hasil Filter --' : 'Silakan Cari PIC Terlebih Dahulu'}</option>
                       {filteredUnits.map(u => (
-                        <option key={u.id} value={u.id}>[{u.kode_unit}] - {u.name} ({u.group})</option>
+                        <option key={u.id} value={u.id}>[{u.kode_unit}] - {u.nama_unit} ({u.group})</option>
                       ))}
                    </select>
                 </div>
@@ -392,7 +404,7 @@ export default function GovInputPage() {
                       className="w-full bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-[1.25rem] py-4 px-6 outline-none transition-all font-black text-blue-900 shadow-inner"
                    >
                       <option value="">-- Pilih Akun Belanja --</option>
-                      {mockGovAkun.map(a => (
+                      {accounts.map(a => (
                         <option key={a.id} value={a.id}>{a.nomor_akun} - {a.nama_akun}</option>
                       ))}
                    </select>
