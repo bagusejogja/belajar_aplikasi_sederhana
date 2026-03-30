@@ -151,22 +151,40 @@ export default function DashboardPage() {
     compute();
   }, [loading, tahun, allTrx, allBank, allAkun, allRekening]);
 
-  const filterByYear = (rows: any[], field: string) =>
-    rows.filter(r => {
+  const filterByYear = (rows: any[], field: string) => {
+    const start = new Date(tahun, 0, 1, 0, 0, 0, 0).getTime();
+    const end = new Date(tahun, 11, 31, 23, 59, 59, 999).getTime();
+    return rows.filter(r => {
       const d = parseAnyDate(r[field]);
-      return d !== null && d.getFullYear() === tahun;
+      if (!d) return false;
+      const t = d.getTime();
+      return t >= start && t <= end;
     });
+  };
 
-  const filterBeforeYear = (rows: any[], field: string) =>
-    rows.filter(r => {
+  const filterBeforeYear = (rows: any[], field: string) => {
+    const start = new Date(tahun, 0, 1, 0, 0, 0, 0).getTime();
+    return rows.filter(r => {
       const d = parseAnyDate(r[field]);
-      return d !== null && d.getFullYear() < tahun;
+      if (!d) return false;
+      return d.getTime() < start;
     });
+  };
 
   const compute = () => {
     // ── BANK per rekening ──  
-    const bankBefore = filterBeforeYear(allBank, 'waktu_transaksi');
-    const bankYear   = filterByYear(allBank, 'waktu_transaksi');
+    // Deduplikasi Bank: Hindari upload ganda yang membuat data "meleset"
+    // Kunci unik: noref_bank + waktu + debet + kredit + rek
+    const seen = new Set();
+    const uniqueBank = allBank.filter(b => {
+      const key = `${b.rekening_id}-${b.waktu_transaksi}-${b.noref_bank}-${b.debet}-${b.kredit}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const bankBefore = filterBeforeYear(uniqueBank, 'waktu_transaksi');
+    const bankYear   = filterByYear(uniqueBank, 'waktu_transaksi');
 
     // Grouping Rekening dan Saldo
     const rekMap: Record<string, any> = {};
