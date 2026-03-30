@@ -17,18 +17,62 @@ const JENIS_PAGU = [
 
 export default function GovInputPage() {
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
-  const [personSearch, setPersonSearch] = useState(''); // Untuk filter unit via PIC
-  const [namaInput, setNamaInput] = useState(''); // Nama orang yang input (bisa beda)
-  const [unitId, setUnitId] = useState('');
-  const [akunId, setAkunId] = useState('');
+  const [personSearch, setPersonSearch] = useState(''); 
+  const [namaInput, setNamaInput] = useState(''); 
+  const [unitId, setUnitId] = useState<string | number>('');
+  const [akunId, setAkunId] = useState<string | number>('');
   const [jenis, setJenis] = useState('pagu awal');
   const [nominal, setNominal] = useState('');
   const [uraian, setUraian] = useState('');
+
+  // Bulk Import State
+  const [bulkData, setBulkData] = useState<any[]>([]);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Filtering Logic
   const filteredUnits = mockUnits.filter(u => 
     personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
   );
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const rows = text.split('\n').filter(row => row.trim());
+      
+      const parsed = rows.slice(1).map((row, idx) => {
+        // Format: Tanggal;UnitCode;AccountCode;Nominal;Jenis;NamaInput
+        const [tgl, uCode, aCode, nom, jns, nm] = row.split(';').map(s => s.trim());
+        
+        // Match Unit & Account
+        const matchedUnit = mockUnits.find(ux => ux.kode_unit === uCode);
+        const matchedAkun = mockGovAkun.find(ax => ax.nomor_akun === aCode);
+
+        return {
+          id: idx,
+          tanggal: tgl,
+          unitCode: uCode,
+          unitId: matchedUnit?.id || null,
+          unitName: matchedUnit?.name || 'TIDAK DITEMUKAN',
+          akunCode: aCode,
+          akunId: matchedAkun?.id || null,
+          akunName: matchedAkun?.nama_akun || 'TIDAK DITEMUKAN',
+          nominal: parseFloat(nom) || 0,
+          jenis: jns || 'pagu awal',
+          nama: nm || '-',
+          isValid: !!matchedUnit && !!matchedAkun
+        };
+      });
+
+      setBulkData(parsed);
+      setIsImportModalOpen(true);
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in transition-all duration-700 pb-20">
@@ -47,13 +91,114 @@ export default function GovInputPage() {
                  </p>
               </div>
            </div>
-           {/* IMPORT EXCEL BUTTON */}
-           <button className="flex items-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-500/20 transition-all active:scale-95 group">
-              <FileSpreadsheet size={24} className="group-hover:rotate-12 transition-transform" />
-              IMPOR DARI EXCEL
-           </button>
+           {/* IMPORT EXCEL BUTTON (Wrapper for Hidden File Input) */}
+           <div className="flex flex-col items-end gap-2">
+              <label className="flex items-center gap-3 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-500/20 transition-all active:scale-95 group cursor-pointer">
+                 <FileSpreadsheet size={24} className="group-hover:rotate-12 transition-transform" />
+                 IMPOR DARI CSV (EXCEL)
+                 <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
+              </label>
+              <button 
+                 onClick={() => {
+                   const blob = new Blob(["Tanggal;KodeUnit;KodeAkun;Nominal;Jenis;NamaInput\n2025-01-01;010101;511119;2871000;pagu awal;Joni"], { type: 'text/csv' });
+                   const url = window.URL.createObjectURL(blob);
+                   const a = document.createElement('a');
+                   a.setAttribute('hidden', '');
+                   a.setAttribute('href', url);
+                   a.setAttribute('download', 'template_pagu_ugm.csv');
+                   document.body.appendChild(a);
+                   a.click();
+                   document.body.removeChild(a);
+                 }}
+                 className="text-[10px] text-blue-300 hover:text-blue-100 font-bold tracking-widest uppercase flex items-center gap-2 underline underline-offset-4"
+              >
+                 <Plus size={10} /> Download Template Format
+              </button>
+           </div>
         </div>
       </div>
+
+      {bulkData.length > 0 && isImportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[1000] flex items-center justify-center p-6 animate-in zoom-in duration-300">
+           <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden border border-white/20">
+              <div className="p-8 bg-slate-50 border-b flex justify-between items-center">
+                 <div>
+                    <h3 className="text-2xl font-black text-slate-800 tracking-tighter">PREVIEW IMPOR MASSAL</h3>
+                    <p className="text-slate-500 text-sm font-medium">Validasi {bulkData.length} baris data sebelum disimpan ke database.</p>
+                 </div>
+                 <button onClick={() => setIsImportModalOpen(false)} className="p-3 bg-white border rounded-2xl hover:bg-red-50 hover:text-red-600 transition-all shadow-sm">
+                    <X size={24} />
+                 </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                 <table className="w-full text-left border-separate border-spacing-0">
+                    <thead className="sticky top-0 bg-slate-900 text-white z-10 text-[10px] uppercase font-black tracking-widest">
+                       <tr>
+                          <th className="p-4 rounded-tl-2xl">Status</th>
+                          <th className="p-4">Tanggal</th>
+                          <th className="p-4">Unit</th>
+                          <th className="p-4">Akun</th>
+                          <th className="p-4">Nominal</th>
+                          <th className="p-4">Jenis</th>
+                          <th className="p-4 font-black">Nama Input (Excel)</th>
+                          <th className="p-4 rounded-tr-2xl">Aksi</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                       {bulkData.map((row) => (
+                         <tr key={row.id} className={row.isValid ? "hover:bg-slate-50 transition-colors" : "bg-red-50"}>
+                            <td className="p-4">
+                               {row.isValid ? <Check className="text-emerald-500" size={18} /> : <X className="text-red-500" size={18} />}
+                            </td>
+                            <td className="p-4 font-mono font-bold text-slate-400">{row.tanggal}</td>
+                            <td className="p-4">
+                               <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700">{row.unitName}</span>
+                                  <span className="text-[10px] font-bold text-slate-300">Code: {row.unitCode}</span>
+                               </div>
+                            </td>
+                            <td className="p-4">
+                               <div className="flex flex-col">
+                                  <span className="font-bold text-slate-700">{row.akunName}</span>
+                                  <span className="text-[10px] font-bold text-slate-300">Code: {row.akunCode}</span>
+                               </div>
+                            </td>
+                            <td className="p-4 font-black text-indigo-600">IDR {row.nominal.toLocaleString('id-ID')}</td>
+                            <td className="p-4">
+                               <span className="px-3 py-1 bg-slate-200 rounded-lg font-black text-[9px] uppercase">{row.jenis}</span>
+                            </td>
+                            <td className="p-4 italic font-bold text-slate-500">{row.nama}</td>
+                            <td className="p-4">
+                               <button className="text-red-400 hover:text-red-600 transition-colors">Hapus</button>
+                            </td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+              <div className="p-10 bg-slate-50 border-t flex flex-col md:flex-row justify-between items-center gap-6">
+                 <div className="flex items-center gap-4">
+                    <div className="p-4 bg-emerald-100 text-emerald-600 rounded-2xl">
+                       <FileSpreadsheet size={24} />
+                    </div>
+                    <div>
+                       <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Validitas Data</p>
+                       <p className="text-lg font-black text-slate-800">{bulkData.filter(d => d.isValid).length} / {bulkData.length} Baris Siap Impor</p>
+                    </div>
+                 </div>
+                 <div className="flex gap-4">
+                    <button onClick={() => setBulkData([])} className="px-8 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-400 hover:text-slate-800 transition-all">BATAL SEMUA</button>
+                    <button 
+                       disabled={bulkData.some(d => !d.isValid)}
+                       className="px-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
+                    >
+                       <Save size={24} /> SIMPAN KE DATABASE SEKARANG
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         {/* INPUT FORM */}
