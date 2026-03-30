@@ -12,6 +12,7 @@ import {
 export default function GovDashboardPage() {
   const [stats, setStats] = useState({ totalPagu: 0, totalSpent: 0, count: 0 });
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(2025);
   const [chartData, setChartData] = useState<any[]>([]);
   const [topUnits, setTopUnits] = useState<any[]>([]);
 
@@ -19,7 +20,11 @@ export default function GovDashboardPage() {
     setLoading(true);
     try {
       const { data: units } = await supabase.from('gov_units').select('id, nama_unit');
-      const { data: trxs } = await supabase.from('gov_transactions').select('*');
+      const { data: trxs } = await supabase
+        .from('gov_transactions')
+        .select('*')
+        .gte('tanggal', `${selectedYear}-01-01`)
+        .lte('tanggal', `${selectedYear}-12-31`);
 
       if (units && trxs) {
           // Calculate Totals
@@ -58,7 +63,7 @@ export default function GovDashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [selectedYear]);
 
   if (loading) return (
     <div className="p-40 flex flex-col items-center justify-center gap-4">
@@ -79,7 +84,18 @@ export default function GovDashboardPage() {
               </div>
               <div>
                  <h1 className="text-5xl font-black italic tracking-tighter uppercase mb-2">Workspace <span className="text-indigo-400">Governance</span></h1>
-                 <p className="text-white/40 font-black uppercase tracking-widest text-[10px]">Pusat Analisis & Strategi Anggaran • TA 2025</p>
+                 <div className="flex items-center gap-4">
+                    <p className="text-white/40 font-black uppercase tracking-widest text-[10px]">Pusat Analisis & Strategi Anggaran • </p>
+                    <select 
+                       value={selectedYear}
+                       onChange={e => setSelectedYear(Number(e.target.value))}
+                       className="bg-white/10 border border-white/20 rounded-lg px-3 py-1 text-[10px] font-black uppercase outline-none cursor-pointer hover:bg-white/20 transition-all"
+                    >
+                       <option value={2024} className="text-slate-900">TA 2024</option>
+                       <option value={2025} className="text-slate-900">TA 2025</option>
+                       <option value={2026} className="text-slate-900">TA 2026</option>
+                    </select>
+                 </div>
               </div>
            </div>
            

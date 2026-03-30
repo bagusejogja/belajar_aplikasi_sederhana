@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 export default function GovReportsPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(2025);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchReport = async () => {
@@ -16,8 +17,12 @@ export default function GovReportsPage() {
     try {
       // Fetch Units
       const { data: units } = await supabase.from('gov_units').select('id, nama_unit, kode_unit, group_org').order('nama_unit');
-      // Fetch Transactions
-      const { data: trxs } = await supabase.from('gov_transactions').select('unit_id, nominal, jenis');
+      // Fetch Transactions for specific year
+      const { data: trxs } = await supabase
+        .from('gov_transactions')
+        .select('unit_id, nominal, jenis')
+        .gte('tanggal', `${selectedYear}-01-01`)
+        .lte('tanggal', `${selectedYear}-12-31`);
 
       if (units && trxs) {
         const report = units.map(unit => {
@@ -52,7 +57,7 @@ export default function GovReportsPage() {
 
   useEffect(() => {
     fetchReport();
-  }, []);
+  }, [selectedYear]);
 
   const filteredData = data.filter(d => 
     d.nama_unit.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -75,9 +80,19 @@ export default function GovReportsPage() {
                  </div>
                  <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">Pagu & Realisasi</h1>
               </div>
-              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
-                 Monitoring Anggaran Pemerintah (UGM) • <span className="text-emerald-500">Live Workspace</span>
-              </p>
+              <div className="flex items-center gap-2 text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                 Monitoring Anggaran Pemerintah (UGM) • 
+                 <select 
+                    value={selectedYear}
+                    onChange={e => setSelectedYear(Number(e.target.value))}
+                    className="bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-0.5 text-indigo-600 outline-none cursor-pointer hover:bg-indigo-100 transition-all font-black"
+                 >
+                    <option value={2024}>TA 2024</option>
+                    <option value={2025}>TA 2025</option>
+                    <option value={2026}>TA 2026</option>
+                 </select>
+                 • <span className="text-emerald-500">Live Workspace</span>
+              </div>
            </div>
 
            <div className="flex gap-4 w-full md:w-auto">
