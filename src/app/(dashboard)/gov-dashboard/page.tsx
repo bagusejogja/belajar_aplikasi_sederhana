@@ -360,44 +360,49 @@ export default function GovDashboardPage() {
             </div>
          </div>
 
-         {/* SUMMARY TILES FOR ANALYSIS */}
-         <div className="p-8 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-6 bg-slate-50/50 border-b">
+         {/* SUMMARY TILES FOR ANALYSIS (Optimized for space) */}
+         <div className="p-8 grid grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-50/50 border-b">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-               <div className="bg-slate-800 p-4 rounded-xl text-white"><PieChart size={24} /></div>
+               <div className="bg-slate-800 p-3 md:p-4 rounded-xl text-white"><PieChart size={24} /></div>
                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Jumlah Akun</p><h5 className="text-xl font-black">{pivotData.length}</h5></div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-               <div className="bg-blue-500 p-4 rounded-xl text-white"><Wallet size={24} /></div>
-               <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Pagu</p><h5 className="text-xl font-black">{stats.totalPagu.toLocaleString('id-ID')}</h5></div>
+               <div className="bg-blue-500 p-3 md:p-4 rounded-xl text-white"><Wallet size={24} /></div>
+               <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Pagu</p>
+               <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(stats.totalPagu)}</h5></div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-               <div className="bg-emerald-500 p-4 rounded-xl text-white"><TrendingUp size={24} /></div>
-               <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Realisasi</p><h5 className="text-xl font-black">{stats.totalSpent.toLocaleString('id-ID')}</h5></div>
+               <div className="bg-emerald-500 p-3 md:p-4 rounded-xl text-white"><TrendingUp size={24} /></div>
+               <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Realisasi</p>
+               <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(stats.totalSpent)}</h5></div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-               <div className="bg-amber-400 p-4 rounded-xl text-white"><Scale size={24} /></div>
-               <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Kurang / Sisa</p><h5 className="text-xl font-black">{stats.balance.toLocaleString('id-ID')}</h5></div>
+               <div className="bg-amber-400 p-3 md:p-4 rounded-xl text-white"><Scale size={24} /></div>
+               <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sisa Dana</p>
+               <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(stats.balance)}</h5></div>
             </div>
+
             {analysisMode === 'estimation' && (
                <>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                     <div className="bg-blue-600 p-4 rounded-xl text-white"><Activity size={24} /></div>
-                     <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">Realisasi {months[refMonth-1]} (Acuan)</p>
-                     <h5 className="text-xl font-black">{pivotData.reduce((s,d) => s+d.refRealization, 0).toLocaleString('id-ID')}</h5></div>
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-blue-600">
+                     <div className="bg-blue-600 p-3 md:p-4 rounded-xl text-white"><Activity size={24} /></div>
+                     <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic truncate">Realisasi {months[refMonth-1]} (Acuan)</p>
+                     <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(pivotData.reduce((s,d) => s+d.refRealization, 0))}</h5></div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                     <div className="bg-amber-500 p-4 rounded-xl text-white"><CreditCard size={24} /></div>
-                     <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Kebutuhan x ({12-refMonth} Bln)</p>
-                     <h5 className="text-xl font-black">{pivotData.reduce((s,d) => s+d.kebutuhan, 0).toLocaleString('id-ID')}</h5></div>
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-amber-500">
+                     <div className="bg-amber-500 p-3 md:p-4 rounded-xl text-white"><CreditCard size={24} /></div>
+                     <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Kebutuhan x ({12-refMonth} Bln)</p>
+                     <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(pivotData.reduce((s,d) => s+d.kebutuhan, 0))}</h5></div>
                   </div>
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-red-500">
-                     <div className="bg-red-500 p-4 rounded-xl text-white"><TrendingDown size={24} /></div>
-                     <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Perkiraan Posisi Akhir</p>
-                     <h5 className="text-xl font-black">{pivotData.reduce((s,d) => s+d.perkiraanPosisiAkhir, 0).toLocaleString('id-ID')}</h5></div>
+                     <div className="bg-red-500 p-3 md:p-4 rounded-xl text-white"><TrendingDown size={24} /></div>
+                     <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">Perkiraan Posisi Akhir</p>
+                     <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{formatIDR(pivotData.reduce((s,d) => s+d.perkiraanPosisiAkhir, 0))}</h5></div>
                   </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                     <div className="bg-slate-600 p-4 rounded-xl text-white"><Percent size={24} /></div>
-                     <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">% Realisasi</p><h5 className="text-xl font-black">{stats.percent.toFixed(2)}%</h5></div>
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-slate-700">
+                     <div className="bg-slate-700 p-3 md:p-4 rounded-xl text-white"><Percent size={24} /></div>
+                     <div className="min-w-0"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">% Penyerapan</p>
+                     <h5 className="text-base md:text-lg font-black break-all tracking-tighter leading-tight">{stats.percent.toFixed(2)}%</h5></div>
                   </div>
                </>
             )}
@@ -429,16 +434,16 @@ export default function GovDashboardPage() {
                         <td className="p-6">
                            <div className="flex flex-col"><span className="text-slate-900 font-black">[{d.account_code}]</span><span className="text-[9px] text-slate-400 font-bold uppercase">{d.account_name}</span></div>
                         </td>
-                        <td className="p-6 text-right">{d.totalPagu.toLocaleString('id-ID')}</td>
-                        <td className="p-6 text-right">{d.totalSpent.toLocaleString('id-ID')}</td>
+                        <td className="p-6 text-right">{formatIDR(d.totalPagu)}</td>
+                        <td className="p-6 text-right">{formatIDR(d.totalSpent)}</td>
                         <td className="p-6 text-center text-[10px]">{d.percent.toFixed(2)}%</td>
                         {analysisMode === 'budget' ? (
-                           <td className="p-6 text-right text-emerald-600 font-black">{d.balance.toLocaleString('id-ID')}</td>
+                           <td className="p-6 text-right text-emerald-600 font-black">{formatIDR(d.balance)}</td>
                         ) : (
                            <>
-                              <td className="p-6 text-right text-indigo-600">{d.refRealization.toLocaleString('id-ID')}</td>
-                              <td className="p-6 text-right">{d.kebutuhan.toLocaleString('id-ID')}</td>
-                              <td className={`p-6 text-right font-black ${d.perkiraanPosisiAkhir < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{d.perkiraanPosisiAkhir.toLocaleString('id-ID')}</td>
+                              <td className="p-6 text-right text-indigo-600">{formatIDR(d.refRealization)}</td>
+                              <td className="p-6 text-right">{formatIDR(d.kebutuhan)}</td>
+                              <td className={`p-6 text-right font-black ${d.perkiraanPosisiAkhir < 0 ? 'text-red-500' : 'text-emerald-600'}`}>{formatIDR(d.perkiraanPosisiAkhir)}</td>
                            </>
                         )}
                      </tr>
