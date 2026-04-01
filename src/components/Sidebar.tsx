@@ -19,7 +19,8 @@ import {
   FileSpreadsheet,
   PieChart,
   Database,
-  Layers
+  Layers,
+  MessageSquare
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -46,6 +47,7 @@ const iconMap: Record<string, any> = {
   FileText,
   FileSpreadsheet,
   Layers,
+  MessageSquare
 };
 
 interface SidebarProps {

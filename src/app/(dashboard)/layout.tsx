@@ -48,6 +48,7 @@ export default function DashboardLayout({
       case '/users': return 'Manajemen User';
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
+      case '/gov-narrative': return 'Narrative Generator';
       default: return 'Dashboard';
     }
   };
