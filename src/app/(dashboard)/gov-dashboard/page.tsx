@@ -64,20 +64,27 @@ export default function GovDashboardPage() {
           percent: totalPagu > 0 ? (totalSpent / totalPagu) * 100 : 0 
         });
 
-        // --- MONTHLY DATA (CHART) ---
+        // --- MONTHLY DATA (CHART & TABLE 1) ---
         let runningSpent = 0;
+        let runningPagu = 0;
         const monthAgg = months.map((m, idx) => {
            const mNum = idx + 1;
            const mTrxs = filteredTrxs.filter(t => new Date(t.tanggal).getMonth() + 1 === mNum);
+           
+           const mPaguAdd = mTrxs.filter(t => ['pagu awal', 'tambah pagu', 'realokasi tambah'].includes(t.jenis)).reduce((s, t) => s + Number(t.nominal), 0);
+           const mPaguSub = mTrxs.filter(t => ['pengurangan pagu', 'realokasi kurang'].includes(t.jenis)).reduce((s, t) => s + Number(t.nominal), 0);
            const spent = mTrxs.filter(t => t.jenis === 'realisasi').reduce((s, t) => s + Number(t.nominal), 0);
+           
+           runningPagu += (mPaguAdd - mPaguSub);
            runningSpent += spent;
+           
            return {
               name: m,
-              pagu: totalPagu,
+              pagu: runningPagu,
               spent: spent,
               cumulative: runningSpent,
-              balance: totalPagu - runningSpent,
-              percent: totalPagu > 0 ? (runningSpent / totalPagu) * 100 : 0
+              balance: runningPagu - runningSpent,
+              percent: runningPagu > 0 ? (runningSpent / runningPagu) * 100 : 0
            };
         });
         setMonthlyData(monthAgg);
@@ -134,7 +141,7 @@ export default function GovDashboardPage() {
   const handleExport = () => {
     const headers = ['Kode Akun', 'Nama Akun', 'Pagu Tahunan', 'Total Realisasi', 'Sisa Pagu', '%'];
     const rows = pivotData.map(d => [
-      d.account_code, d.account_name, d.totalPagu, d.totalSpent, d.balance, d.percent.toFixed(2) + '%'
+      `"${d.account_code}"`, `"${d.account_name}"`, d.totalPagu, d.totalSpent, d.balance, d.percent.toFixed(2) + '%'
     ]);
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -145,6 +152,8 @@ export default function GovDashboardPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const formatIDR = (val: number) => val.toLocaleString('id-ID');
 
   if (loading) return (
     <div className="p-40 flex flex-col items-center justify-center gap-6">
@@ -197,31 +206,33 @@ export default function GovDashboardPage() {
          </div>
       </div>
 
-      {/* 2. KPI SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-         <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div>
-               <p className="text-[12px] font-bold text-blue-200/60 uppercase tracking-widest mb-1">Pagu {selectedYear}</p>
-               <h4 className="text-4xl font-black tracking-tighter italic">IDR {stats.totalPagu.toLocaleString('id-ID')}</h4>
-               <p className="text-[10px] mt-2 opacity-40 font-bold uppercase tracking-widest">Aggregate Allocation</p>
+      {/* 2. KPI SUMMARY CARDS (Responsive Layout) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4 md:px-0">
+         <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between group">
+            <div className="min-w-0 flex-1">
+               <p className="text-[12px] font-bold text-blue-200/60 uppercase tracking-widest mb-1 truncate">Pagu {selectedYear}</p>
+               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalPagu)}</h4>
+               <p className="text-[10px] mt-2 opacity-40 font-bold uppercase tracking-widest truncate">Aggregate Allocation</p>
             </div>
-            <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20"><Wallet size={40} className="text-white/60" /></div>
+            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><Wallet size={32} className="text-white/60" /></div>
          </div>
+
          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div>
-               <p className="text-[12px] font-bold text-emerald-100/60 uppercase tracking-widest mb-1">Realisasi {selectedYear}</p>
-               <h4 className="text-4xl font-black tracking-tighter italic">IDR {stats.totalSpent.toLocaleString('id-ID')}</h4>
-               <p className="text-[10px] mt-2 bg-white/10 inline-block px-3 py-1 rounded-full font-bold uppercase tracking-widest">{stats.percent.toFixed(2)}% Terpakai</p>
+            <div className="min-w-0 flex-1">
+               <p className="text-[12px] font-bold text-emerald-100/60 uppercase tracking-widest mb-1 truncate">Realisasi {selectedYear}</p>
+               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalSpent)}</h4>
+               <p className="text-[10px] mt-2 bg-white/10 inline-block px-3 py-1 rounded-full font-bold uppercase tracking-widest truncate">{stats.percent.toFixed(2)}% Terpakai</p>
             </div>
-            <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20"><TrendingUp size={40} className="text-white/60" /></div>
+            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><TrendingUp size={32} className="text-white/60" /></div>
          </div>
+
          <div className="bg-gradient-to-br from-amber-400 to-amber-600 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div>
-               <p className="text-[12px] font-bold text-amber-50/60 uppercase tracking-widest mb-1">Sisa Pagu</p>
-               <h4 className="text-4xl font-black tracking-tighter italic">IDR {stats.balance.toLocaleString('id-ID')}</h4>
-               <p className="text-[10px] mt-2 opacity-60 font-bold uppercase tracking-widest">Kurang / Sisa</p>
+            <div className="min-w-0 flex-1">
+               <p className="text-[12px] font-bold text-amber-50/60 uppercase tracking-widest mb-1 truncate">Sisa Pagu</p>
+               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.balance)}</h4>
+               <p className="text-[10px] mt-2 opacity-60 font-bold uppercase tracking-widest truncate">Kurang / Sisa</p>
             </div>
-            <div className="bg-white/10 p-5 rounded-3xl backdrop-blur-xl border border-white/20"><Scale size={40} className="text-white/60" /></div>
+            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><Scale size={32} className="text-white/60" /></div>
          </div>
       </div>
 
@@ -230,13 +241,68 @@ export default function GovDashboardPage() {
          <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-10 flex items-center justify-between">
             <span>Komposisi Realisasi vs Pagu {selectedYear}</span>
             <div className="flex gap-4">
-               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-500 rounded-full" /> <span className="text-[9px]">Pagu Tahunan</span></div>
-               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-400 rounded-full" /> <span className="text-[9px]">Kumulatif</span></div>
-               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-amber-200 rounded-full" /> <span className="text-[9px]">Bulanan</span></div>
+               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-blue-500 rounded-full" /> <span className="text-[9px]">Pagu (Dinamis)</span></div>
+               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-400 rounded-full" /> <span className="text-[9px]">Realisasi Kumulatif</span></div>
+               <div className="flex items-center gap-2"><div className="w-3 h-3 bg-amber-200 rounded-full" /> <span className="text-[9px]">Realisasi Bulanan</span></div>
             </div>
          </h4>
          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%"><ComposedChart data={monthlyData}><XAxis dataKey="name" fontSize={10} fontWeight="black" axisLine={false} tickLine={false} /><YAxis fontSize={10} axisLine={false} tickLine={false} width={80} tickFormatter={(v) => `IDR ${(v/1000000000).toFixed(1)}M`} /><Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)' }} itemStyle={{ fontWeight: 'black', fontSize: '11px' }} /><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><Line type="monotone" dataKey="pagu" stroke="#3b82f6" strokeWidth={3} dot={false} strokeDasharray="10 5" /><Bar dataKey="spent" fill="#fde68a" radius={[12, 12, 0, 0]} barSize={25} /><Area type="monotone" dataKey="cumulative" fill="url(#colorSpent)" stroke="#f87171" strokeWidth={3} fillOpacity={0.1} /> <defs><linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/></linearGradient></defs></ComposedChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height="100%">
+               <ComposedChart data={monthlyData}>
+                  <XAxis dataKey="name" fontSize={10} fontWeight="black" axisLine={false} tickLine={false} />
+                  <YAxis fontSize={10} axisLine={false} tickLine={false} width={80} tickFormatter={(v) => `IDR ${(v/1000000000).toFixed(1)}M`} />
+                  <Tooltip 
+                     contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)' }}
+                     itemStyle={{ fontWeight: 'black', fontSize: '11px' }}
+                     formatter={(value: any) => formatIDR(value)}
+                  />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  
+                  <Line type="stepAfter" dataKey="pagu" stroke="#3b82f6" strokeWidth={3} dot={false} strokeDasharray="10 5" />
+                  <Bar dataKey="spent" fill="#fde68a" radius={[12, 12, 0, 0]} barSize={25} />
+                  <Area type="monotone" dataKey="cumulative" fill="url(#colorSpent)" stroke="#f87171" strokeWidth={3} fillOpacity={0.1} />
+                  <defs>
+                     <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f87171" stopOpacity={0.3}/><stop offset="95%" stopColor="#f87171" stopOpacity={0}/>
+                     </linearGradient>
+                  </defs>
+               </ComposedChart>
+            </ResponsiveContainer>
+         </div>
+      </div>
+
+      {/* 4. TABLE: RINGKASAN BULANAN (RESTORED) */}
+      <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
+         <div className="p-8 border-b bg-slate-50 italic">
+            <h4 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Ringkasan Serapan Bulanan</h4>
+         </div>
+         <div className="overflow-x-auto">
+            <table className="w-full text-left border-separate border-spacing-0 text-[11px]">
+               <thead>
+                  <tr className="bg-white text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">
+                     <th className="p-6 border-b">Bulan</th>
+                     <th className="p-6 border-b">Pagu Moving</th>
+                     <th className="p-6 border-b">Realisasi Bulanan</th>
+                     <th className="p-6 border-b">Realisasi Kumulatif</th>
+                     <th className="p-6 border-b">% Realisasi</th>
+                     <th className="p-6 border-b">Sisa Pagu</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                  {monthlyData.map((d, i) => (
+                     <tr key={i} className="hover:bg-slate-50 transition-all font-bold text-slate-600">
+                        <td className="p-6 font-black text-slate-800 italic uppercase">{d.name}</td>
+                        <td className="p-6 font-mono text-slate-900 tracking-tighter">IDR {formatIDR(d.pagu)}</td>
+                        <td className="p-6 text-amber-600 font-black font-mono">IDR {formatIDR(d.spent)}</td>
+                        <td className="p-6 text-red-500 font-mono">IDR {formatIDR(d.cumulative)}</td>
+                        <td className="p-6">
+                           <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-[10px] font-black">{d.percent.toFixed(2)}%</span>
+                        </td>
+                        <td className="p-6 font-black text-emerald-600 font-mono">IDR {formatIDR(d.balance)}</td>
+                     </tr>
+                  ))}
+               </tbody>
+            </table>
          </div>
       </div>
 
