@@ -36,14 +36,24 @@ export default function GovNarrativePage() {
     setPicOverride(option?.pic || '');
   };
 
+  const prefixName = (name: string) => {
+    if (!name) return '';
+    const n = name.toLowerCase();
+    if (n.includes('iswandari')) return `Mbak ${name}`;
+    if (n.includes('bambang') || n.includes('ridwan') || n.includes('bagus')) return `Mas ${name}`;
+    return name;
+  };
+
+  const getCleanLabel = (label: string) => {
+    return label.replace(/^Fakultas /i, '').replace(/^Pusat Studi \(PS\) /i, '').replace(/^Pusat Studi /i, '');
+  };
+
   const getNarrative = () => {
     if (!selectedUnit) return '...';
     
     const { group, label } = selectedUnit;
+    const cleanLabel = getCleanLabel(label);
     let mainText = '';
-    
-    // Clean label to avoid redundancy (e.g. if name already has "Fakultas")
-    let cleanLabel = label.replace(/^Fakultas /i, '').replace(/^Pusat Studi \(PS\) /i, '').replace(/^Pusat Studi /i, '');
 
     if (group === 'Fakultas') {
       mainText = `mohon dibukakan akses revisi/realokasi anggaran Fakultas ${cleanLabel} sesuai surat terlampir ngih.`;
@@ -57,14 +67,47 @@ export default function GovNarrativePage() {
       mainText = `mohon diproses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir ngih.`;
     }
 
+    const pic = prefixName(picOverride);
     return `Assalamualaikum warahmatullahi wabarakatuh,
-${picOverride || '[pic]'}, ${mainText} Setelah diproses, mohon sekalian diarsipkan ya, Mas.
+${pic || '[pic]'}, ${mainText}
 Terima kasih.`;
   };
 
   const getProcessedNote = () => {
+    if (!selectedUnit) return '...';
+    const { group, label } = selectedUnit;
+    const cleanLabel = getCleanLabel(label);
+    let note = '';
+
+    if (group === 'Fakultas') note = `akses revisi/realokasi anggaran Fakultas ${cleanLabel} sudah saya bukakan sesuai surat terlampir.`;
+    else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah saya bukakan sesuai surat terlampir ngih.`;
+    else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir ngih.`;
+    else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir ngih.`;
+    else note = `revisi/realokasi anggaran ${cleanLabel} sudah saya proses sesuai surat terlampir.`;
+
+    const pic = picOverride.toLowerCase().includes('ridwan') ? 'Mas Ridwan' : prefixName(picOverride);
+
     return `Assalamualaikum warahmatullahi wabarakatuh,
-${picOverride || 'Mas Ridwan Aditya Mahendra'}, mohon surat diarsipkan; akses sudah saya proses.
+${pic || 'Mas Ridwan'}, mohon surat diarsipkan; 
+${note}
+Terima kasih.`;
+  };
+
+  const getUnitNotification = () => {
+    if (!selectedUnit) return '...';
+    const { group, label } = selectedUnit;
+    const cleanLabel = getCleanLabel(label);
+    let note = '';
+
+    if (group === 'Fakultas') note = `akses revisi/realokasi anggaran Fakultas ${cleanLabel} sudah saya bukakan sesuai surat terlampir.`;
+    else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah saya bukakan sesuai surat terlampir ngih.`;
+    else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir ngih.`;
+    else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir ngih.`;
+    else note = `revisi/realokasi anggaran ${cleanLabel} sudah saya proses sesuai surat terlampir.`;
+
+    return `Assalamualaikum warahmatullahi wabarakatuh,
+Yth. Bapak/Ibu dari ${label},
+Terkait dengan surat diatas perihal ${note}
 Terima kasih.`;
   };
 
@@ -82,135 +125,82 @@ Terima kasih.`;
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
+    <div className="max-w-4xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
       {/* 1. HEADER SECTION */}
-      <div className="bg-gradient-to-r from-indigo-700 to-indigo-900 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-indigo-700 to-indigo-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
          <div className="relative z-10">
-            <h1 className="text-4xl font-black tracking-tighter italic uppercase flex items-center gap-4">
-               <MessageSquare size={40} className="text-indigo-300" /> Narrative Engine
+            <h1 className="text-3xl font-black tracking-tighter italic uppercase flex items-center gap-4">
+               <MessageSquare size={36} className="text-indigo-300" /> Narrative Engine
             </h1>
-            <p className="text-indigo-100/60 mt-2 font-bold tracking-widest text-xs uppercase">Budget Revision Communication Generator</p>
+            <p className="text-indigo-100/60 mt-1 font-bold tracking-widest text-[10px] uppercase">Official Budget Communication Generator</p>
          </div>
-         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
       </div>
 
       {/* 2. CONFIGURATION CARD */}
       <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-         <div className="p-10 border-b bg-slate-50/50 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-[0.2em] italic">Pengaturan Pesan</h3>
-            <div className="bg-indigo-100 text-indigo-700 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest leading-none">Drafting</div>
+         <div className="p-8 border-b bg-slate-50/50 flex items-center justify-between">
+            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] italic">Parameter Unit & PIC</h3>
          </div>
-         <div className="p-12 space-y-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-               <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <Building2 size={12} /> Pilih Unit Kerja
-                  </label>
-                  <Select 
-                     options={units}
-                     onChange={handleUnitChange}
-                     placeholder="Cari Nama Unit..."
-                     className="react-select-container"
-                     classNamePrefix="react-select"
-                     styles={{
-                        control: (base) => ({
-                           ...base,
-                           borderRadius: '1.25rem',
-                           padding: '6px',
-                           border: '2px solid #f1f5f9',
-                           boxShadow: 'none',
-                           '&:hover': { borderColor: '#3b82f6' }
-                        }),
-                        placeholder: (base) => ({ ...base, fontSize: '14px', fontWeight: 'bold', color: '#94a3b8' }),
-                        option: (base, state) => ({
-                           ...base,
-                           fontSize: '13px',
-                           fontWeight: state.isSelected ? '800' : '600',
-                           backgroundColor: state.isFocused ? '#f8fafc' : 'white',
-                           color: state.isSelected ? '#3730a3' : '#475569'
-                        })
-                     }}
-                  />
+         <div className="p-10 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">Pilih Unit Kerja</label>
+                  <Select options={units} onChange={handleUnitChange} placeholder="Cari Nama Unit..." className="react-select-container" classNamePrefix="react-select" />
                </div>
-               <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <Share size={12} /> Nama PIC / Tujuan
-                  </label>
-                  <input 
-                     type="text" 
-                     value={picOverride}
-                     onChange={e => setPicOverride(e.target.value)}
-                     className="w-full bg-slate-50 border-2 border-slate-100 rounded-[1.25rem] p-4 font-bold text-sm outline-none focus:border-indigo-500 transition-all placeholder:text-slate-300"
-                     placeholder="Contoh: Mas Ridwan Aditya Mahendra"
-                  />
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">Nama PIC Tujuan</label>
+                  <input type="text" value={picOverride} onChange={e => setPicOverride(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[1.2rem] p-4 font-black text-sm outline-none focus:border-indigo-500 transition-all shadow-inner" placeholder="Penerima Pesan..." />
                </div>
             </div>
-
-            <div className="flex items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 group transition-all hover:border-emerald-200">
-               <div className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                     type="checkbox" 
-                     checked={isProcessed}
-                     onChange={e => setIsProcessed(e.target.checked)}
-                     className="sr-only peer"
-                  />
-                  <div className="w-14 h-8 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
-               </div>
+            <div className="flex items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 transition-all hover:border-emerald-200">
+               <input type="checkbox" checked={isProcessed} onChange={e => setIsProcessed(e.target.checked)} className="w-12 h-6 appearance-none bg-slate-200 rounded-full checked:bg-emerald-500 relative transition-all cursor-pointer before:content-[''] before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:top-1 before:left-1 before:transition-all checked:before:translate-x-6 shadow-inner" />
                <div>
-                  <h4 className="text-sm font-black text-slate-700 uppercase tracking-tight italic">Sudah Selesai Diproses?</h4>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Aktifkan untuk memunculkan catatan pengarsipan</p>
+                  <h4 className="text-[11px] font-black text-slate-700 uppercase italic">Status: Sudah Selesai Diproses</h4>
+                  <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">Aktifkan untuk Konfirmasi Selesai & Notifikasi Unit</p>
                </div>
             </div>
          </div>
       </div>
 
       {/* 3. OUTPUT SECTION */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-         {/* Request Message */}
-         <div className="bg-white rounded-[3rem] p-10 shadow-xl border-4 border-indigo-50 relative group">
-            <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-6 flex items-center justify-between">
-               Pesan Permohonan Akses
-               <span className="bg-indigo-50 px-3 py-1 rounded-full">Phase 1</span>
+      <div className="space-y-8">
+         {/* BOX 1: REQUEST */}
+         <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-indigo-50 group hover:border-indigo-100 transition-all">
+            <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+               Pesan Permohonan (WA) <span className="bg-indigo-50 px-3 py-1 rounded-full">Phase 1</span>
             </h4>
-            <div className="bg-slate-50/50 p-8 rounded-[2rem] border-2 border-dashed border-slate-100 min-h-[160px] relative">
-               <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-sm italic">
-                  {selectedUnit ? getNarrative() : 'Harap pilih unit kerja untuk generate pesan...'}
-               </p>
+            <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100">
+               <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-sm italic">{selectedUnit ? getNarrative() : '...'}</p>
             </div>
-            <button 
-               disabled={!selectedUnit}
-               onClick={() => copyToClipboard(getNarrative(), 'req')}
-               className={`mt-8 w-full py-5 rounded-[1.5rem] font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-lg ${
-                  !selectedUnit ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-slate-900 active:scale-95 shadow-indigo-200'
-               }`}
-            >
-               {copied === 'req' ? <CheckCircle2 size={18} /> : <Copy size={18} />}
-               {copied === 'req' ? 'Tersalin' : 'Salin Pesan WA'}
+            <button disabled={!selectedUnit} onClick={() => copyToClipboard(getNarrative(), 'req')} className={`mt-6 w-full py-4 rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg ${!selectedUnit ? 'bg-slate-100 text-slate-300' : 'bg-indigo-600 text-white hover:bg-slate-900 shadow-indigo-100'}`}>
+               {copied === 'req' ? <CheckCircle2 size={16} /> : <Copy size={16} />} {copied === 'req' ? 'Tersalin' : 'Salin Pesan WA'}
             </button>
-            <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity"><Info size={20} className="text-indigo-100" /></div>
          </div>
 
-         {/* Archive Message (Visible only when checkbox checked) */}
-         <div className={`transition-all duration-700 transform ${isProcessed ? 'opacity-100 translate-y-0' : 'opacity-30 pointer-events-none scale-95 translate-y-10'}`}>
-            <div className="bg-white rounded-[3rem] p-10 shadow-xl border-4 border-emerald-50 h-full relative group">
-               <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-6 flex items-center justify-between">
-                  Pesan Konfirmasi Selesai
-                  <span className="bg-emerald-50 px-3 py-1 rounded-full">Phase 2</span>
-               </h4>
-               <div className="bg-slate-50/50 p-8 rounded-[2rem] border-2 border-dashed border-slate-100 min-h-[160px]">
-                  <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-sm italic">
-                     {getProcessedNote()}
-                  </p>
+         {/* BOX 2 & 3: PROCESSED & UNIT NOTIF */}
+         {isProcessed && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in zoom-in-95 duration-500">
+               <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-emerald-50 h-full flex flex-col group hover:border-emerald-100 transition-all">
+                  <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-4">Konfirmasi Selesai (Phase 2)</h4>
+                  <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
+                     <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getProcessedNote()}</p>
+                  </div>
+                  <button onClick={() => copyToClipboard(getProcessedNote(), 'proc')} className="mt-6 w-full py-4 bg-emerald-600 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-emerald-50 flex items-center justify-center gap-2">
+                     {copied === 'proc' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN CLOSING
+                  </button>
                </div>
-               <button 
-                  onClick={() => copyToClipboard(getProcessedNote(), 'proc')}
-                  className="mt-8 w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-widest hover:bg-slate-900 active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg shadow-emerald-200"
-               >
-                  {copied === 'proc' ? <CheckCircle2 size={18} /> : <Copy size={18} />}
-                  {copied === 'proc' ? 'Tersalin' : 'Salin Pesan Closing'}
-               </button>
+
+               <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-amber-50 h-full flex flex-col group hover:border-amber-100 transition-all">
+                  <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-4">Notifikasi Unit (Phase 3)</h4>
+                  <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
+                     <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getUnitNotification()}</p>
+                  </div>
+                  <button onClick={() => copyToClipboard(getUnitNotification(), 'unit')} className="mt-6 w-full py-4 bg-amber-500 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-amber-50 flex items-center justify-center gap-2">
+                     {copied === 'unit' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN NOTIF UNIT
+                  </button>
+               </div>
             </div>
-         </div>
+         )}
       </div>
 
       <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl flex flex-col md:flex-row items-center gap-10">
