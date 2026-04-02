@@ -30,7 +30,7 @@ export default function BankTransaksiPage() {
    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
    const [offset, setOffset] = useState(0); 
 
-   // FETCH HANDLER (Join dengan ref_akun untuk Transaksi MASJID)
+   // FETCH HANDLER (Join dengan ref_akun)
    const fetchHistory = useCallback(async (isReset = true) => {
       if (isReset) {
          setIsLoadingHistory(true);
@@ -44,9 +44,13 @@ export default function BankTransaksiPage() {
          const rangeFrom = currentOffset * 2000;
          const rangeTo = rangeFrom + 1999;
 
+         // Kita coba fetch dengan join ref_akun, tapi jika error relasi, fallback ke data mentah
          let query = supabase
             .from('bank_transactions')
-            .select('*, ref_akun(nama_akun, nomor_akun)', { count: 'exact' })
+            .select(`
+               *,
+               ref_akun (nama_akun, nomor_akun)
+            `, { count: 'exact' })
             .order('waktu_transaksi', { ascending: false });
 
          if (selectedMonth > 0) {
@@ -60,14 +64,30 @@ export default function BankTransaksiPage() {
          }
 
          const { data, error, count } = await query.range(rangeFrom, rangeTo);
-         if (error) throw error;
          
-         if (isReset) {
-            setDbTransactions(data || []);
-            setTotalInDb(count || 0);
+         if (error) {
+            console.warn("Relasi ref_akun mungkin belum ada, fallback ke select * :", error);
+            const fallback = await supabase
+               .from('bank_transactions')
+               .select('*', { count: 'exact' })
+               .order('waktu_transaksi', { ascending: false })
+               .range(rangeFrom, rangeTo);
+            
+            if (isReset) {
+               setDbTransactions(fallback.data || []);
+               setTotalInDb(fallback.count || 0);
+            } else {
+               setDbTransactions(prev => [...prev, ...(fallback.data || [])]);
+               setOffset(currentOffset);
+            }
          } else {
-            setDbTransactions(prev => [...prev, ...(data || [])]);
-            setOffset(currentOffset);
+            if (isReset) {
+               setDbTransactions(data || []);
+               setTotalInDb(count || 0);
+            } else {
+               setDbTransactions(prev => [...prev, ...(data || [])]);
+               setOffset(currentOffset);
+            }
          }
       } catch (err: any) {
          console.error("Gagal fetch history bank:", err);
@@ -91,45 +111,42 @@ export default function BankTransaksiPage() {
       return `${day} ${months[d.getMonth()]} ${d.getFullYear()} (${d.toTimeString().substring(0, 5)})`;
    };
 
-   // Helper: Clean Indonesian Numbers
+   // Helper: Clean Numbers (Handle decimal . or ,)
    const cleanNum = (str: string) => {
-      if (!str) return 0;
+      if (!str || str === '\\N') return 0;
       let val = str.trim().replace(/[^\d.,-]/g, '');
       if (val === '') return 0;
+      // Handle cases like 1.234,56 (Indo) or 1,234.56 (US)
       if (val.includes(',') && val.includes('.')) {
          if (val.lastIndexOf(',') > val.lastIndexOf('.')) val = val.replace(/\./g, '').replace(',', '.');
          else val = val.replace(/,/g, '');
       } else if (val.includes(',')) {
-         const parts = val.split(',');
-         if (parts[parts.length - 1].length === 3) val = val.replace(/,/g, '');
-         else val = val.replace(',', '.');
+         val = val.replace(',', '.');
       }
       return parseFloat(val) || 0;
    };
 
-   // Parser Tanggal Excel yang lebih bandel
-   const parseExcelDate = (excelDate: string) => {
-      const ts = excelDate.trim();
-      const numScore = Number(ts.replace(',', '.'));
-      if (isNaN(numScore)) {
-         // Format DD/MM/YYYY atau DD/MM/YY
-         if (ts.includes('/')) {
-            const parts = ts.split('/');
-            if (parts.length === 3) {
-               const [d, m, y] = parts;
-               const finalY = y.length === 2 ? '20' + y : y;
-               return `${finalY}-${m.padStart(2, '0')}-${d.padStart(2, '0')} 00:00:00`;
-            }
-         }
-         // Format YYYY-MM-DD
-         if (ts.includes('-') && ts.length >= 10) return ts;
-         return ts;
+   // Parser Tanggal (Fixing the 2023 issue)
+   const parseDate = (ts: string) => {
+      const val = ts.trim();
+      const num = Number(val.replace(',', '.'));
+      if (!isNaN(num) && num > 30000) { // Excel Serial detection
+         const dObj = new Date((num - 25569) * 86400 * 1000);
+         const pad = (n: number) => n.toString().padStart(2, '0');
+         return `${dObj.getFullYear()}-${pad(dObj.getMonth()+1)}-${pad(dObj.getDate())} 00:00:00`;
       }
-      const dateObj = new Date((numScore - 25569) * 86400 * 1000);
-      const pad = (n: number) => n.toString().padStart(2, '0');
-      return `${dateObj.getFullYear()}-${pad(dateObj.getMonth()+1)}-${pad(dateObj.getDate())} ${pad(dateObj.getHours())}:${pad(dateObj.getMinutes())}:${pad(dateObj.getSeconds())}`;
+      if (val.includes('/')) {
+         const p = val.split('/');
+         if (p.length === 3) {
+             const [d, m, y] = p;
+             const fy = y.length === 2 ? '20' + y : y;
+             return `${fy}-${m.padStart(2, '0')}-${d.padStart(2, '0')} 00:00:00`;
+         }
+      }
+      return val;
    };
 
+   // PASTE HANDLER (RESTORED TO 8 COLUMNS)
    const handlePasteData = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       e.preventDefault();
       const text = e.clipboardData.getData('text');
@@ -137,40 +154,34 @@ export default function BankTransaksiPage() {
       setIsParsing(true);
       const rows = text.split('\n').filter(r => r.trim() !== '');
       const extracted: any[] = [];
-      let colMap = { tgl: 0, desc: 1, out: 2, in: 3, bal: 4, akun: -1 }; 
-      const headerRow = rows[0].toLowerCase();
       
-      // Auto-Detection Headers
-      const heads = rows[0].split(/\t|;/).map(h => h.trim().toLowerCase());
-      heads.forEach((h, idx) => {
-         if (h.includes('waktu') || h.includes('tanggal')) colMap.tgl = idx;
-         if (h.includes('deskripsi') || h.includes('keterangan')) colMap.desc = idx;
-         if (h.includes('debit') || h.includes('debet') || h.includes('keluar')) colMap.out = idx;
-         if (h.includes('kredit') || h.includes('masuk')) colMap.in = idx;
-         if (h.includes('saldo')) colMap.bal = idx;
-         if (h.includes('akun') || h.includes('coa') || h.includes('kode')) colMap.akun = idx;
-      });
+      const headerRow = rows[0].toLowerCase();
+      const isHeader = headerRow.includes('tgl') || headerRow.includes('tanggal') || headerRow.includes('desk');
+      const startIdx = isHeader ? 1 : 0;
 
-      const startIdx = (headerRow.includes('waktu') || headerRow.includes('tanggal') || headerRow.includes('keterangan')) ? 1 : 0;
       for (let i = startIdx; i < rows.length; i++) {
          const parts = rows[i].split(/\t|;/).map(p => p.trim());
-         if (parts.length < 3) continue;
+         if (parts.length < 5) continue;
+
+         // FORMAT ASLI USER: Tgl;RekId;AkunId;NoRef;Deskripsi;Debet;Kredit;Saldo
+         // Index: 0; 1; 2; 3; 4; 5; 6; 7
          extracted.push({
-            waktu_transaksi: parseExcelDate(parts[colMap.tgl] || ''),
-            rekening_id: '1',
-            akun_id: colMap.akun !== -1 ? (Number(parts[colMap.akun]?.replace(/[^\d.]/g, '')) || null) : null,
-            noref_bank: '',
-            deskripsi: parts[colMap.desc] || '',
-            debet: cleanNum(parts[colMap.out] || ''),
-            kredit: cleanNum(parts[colMap.in] || ''),
-            saldo_riil: cleanNum(parts[colMap.bal] || ''),
+            waktu_transaksi: parseDate(parts[0] || ''),
+            rekening_id: Number(parts[1]) || null,
+            akun_id: parts[2] === '\\N' ? null : (Number(parts[2]) || null),
+            noref_bank: parts[3] === '\\N' ? null : (parts[3] || null),
+            deskripsi: parts[4] || '',
+            debet: cleanNum(parts[5]),
+            kredit: cleanNum(parts[6]),
+            saldo_riil: cleanNum(parts[7]),
          });
       }
+
       if (extracted.length > 0) {
          setParsedData(extracted);
-         setMessage({ type: 'success', text: `Berhasil memproses ${extracted.length} baris.` });
+         setMessage({ type: 'success', text: `Terdeteksi ${extracted.length} baris.` });
       } else {
-         setMessage({ type: 'error', text: 'Format tidak dikenal.' });
+         setMessage({ type: 'error', text: 'Gagal parse! Gunakan format: Tgl;RekId;AkunId;NoRef;Deskripsi;Debet;Kredit;Saldo' });
       }
       setIsParsing(false);
    };
@@ -182,12 +193,11 @@ export default function BankTransaksiPage() {
          const { error } = await supabase.from('bank_transactions').insert(parsedData);
          if (error) throw error;
          setParsedData([]);
-         setMessage({ type: 'success', text: '✅ Data Masjid Berhasil Disimpan!' });
+         setMessage({ type: 'success', text: '✅ Data Mutasi Masjid Berhasil Diimpor!' });
          fetchHistory(true);
       } catch (err: any) { setMessage({ type: 'error', text: err.message }); } finally { setIsSaving(false); }
    };
 
-   // Modal & Edit Action
    const [editingRow, setEditingRow] = useState<any | null>(null);
    const [isUpdating, setIsUpdating] = useState(false);
    const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -224,8 +234,7 @@ export default function BankTransaksiPage() {
          if (uploadFiles.length) {
             const upPromises = uploadFiles.map(async (file) => {
                const name = `bank_${Math.random().toString(36).substring(7)}_${Date.now()}.${file.name.split('.').pop()}`;
-               const { error: upError } = await supabase.storage.from('receipts').upload(name, file);
-               if (upError) throw upError;
+               await supabase.storage.from('receipts').upload(name, file);
                return supabase.storage.from('receipts').getPublicUrl(name).data.publicUrl;
             });
             finalUrls = [...finalUrls, ...await Promise.all(upPromises)];
@@ -237,7 +246,7 @@ export default function BankTransaksiPage() {
          }).eq('id', editingRow.id);
          setEditingRow(null);
          fetchHistory(false);
-         alert("✅ Berhasil diupdate!");
+         alert("✅ Berhasil menyimpan.");
       } catch (err: any) { alert(err.message); } finally { setIsUpdating(false); }
    };
 
@@ -254,32 +263,34 @@ export default function BankTransaksiPage() {
 
    return (
       <div className="space-y-10 max-w-7xl mx-auto pb-20">
-         {/* 1. PASTE ZONE (MASJID) */}
-         <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col gap-8">
-            <div className="flex-1">
-               <h2 className="text-4xl font-black mb-4 flex items-center gap-4 tracking-tighter uppercase italic"><ClipboardPaste size={40} className="text-emerald-400"/> Bank Mutasi Masjid</h2>
-               <p className="text-emerald-100/70 font-bold text-xs uppercase tracking-widest leading-relaxed">Impor data internal Masjid Kampus. Deteksi: <span className="text-white underline">Tgl, Deskripsi, Debet, Kredit, Saldo, AkunId</span>.</p>
-            </div>
-            <div className="bg-white/5 rounded-[2.5rem] p-6 border-2 border-dashed border-white/10 group hover:border-emerald-500 transition-all text-center space-y-4">
-               <textarea onPaste={handlePasteData} placeholder="PASTE DATA EXCEL DI SINI..." className="w-full bg-transparent border-none focus:ring-0 outline-none h-24 text-emerald-200 font-black text-xl placeholder:text-white/10 text-center uppercase" />
-               {message && (
-                  <div className={`p-4 rounded-xl font-bold flex items-center justify-center gap-3 animate-in fade-in zoom-in ${message.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20' : 'bg-red-500/20 text-red-300 border border-red-500/20'}`}>
-                     {message.type === 'success' ? <CheckCircle size={20}/> : <AlertTriangle size={20}/>} {message.text}
+         {/* PASTE ZONE (REVERTED TO 8 COLS) */}
+         <div className="bg-gradient-to-br from-emerald-950 to-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col gap-8">
+            <h2 className="text-4xl font-black mb-4 flex items-center gap-4 uppercase italic tracking-tighter"><ClipboardPaste className="text-emerald-400" size={40}/> Impor Bank Mutasi</h2>
+            <div className="flex flex-col md:flex-row gap-6">
+               <div className="bg-white/10 p-6 rounded-[2rem] border border-white/10 flex-1">
+                  <h4 className="text-xs font-black uppercase mb-3 tracking-widest text-emerald-400">Instruksi Format Excel:</h4>
+                  <div className="text-[11px] font-bold text-white/70 space-y-1 font-mono">
+                     <p>Pilih Kolom: Tgl; RekId; AkunId; NoRef; Deskripsi; Debet; Kredit; Saldo</p>
+                     <p className="text-white/30 italic">Pemisah: Titik-koma (;) atau TAB</p>
                   </div>
-               )}
+               </div>
+               <div className="flex-[2]">
+                  <textarea onPaste={handlePasteData} placeholder="PASTE DI SINI..." className="w-full bg-white/5 border-2 border-dashed border-white/20 rounded-[2.5rem] p-8 min-h-[140px] outline-none focus:border-emerald-500 font-bold text-lg uppercase transition-all" />
+               </div>
             </div>
+            {message && <div className={`p-4 rounded-xl text-center font-black uppercase text-xs animate-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{message.text}</div>}
          </div>
 
-         {/* SUMMARY CARDS */}
-         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex items-center gap-6 sm:col-span-2">
+         {/* SUMMARY & FILTERS */}
+         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex items-center gap-6 col-span-2">
                <div className="bg-emerald-50 p-4 rounded-3xl text-emerald-600"><Calendar size={32}/></div>
-               <div className="overflow-hidden flex-1">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Periode Laporan</h4>
-                  <div className="flex items-center gap-2 mt-1">
+               <div className="flex-1">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter Laporan</h4>
+                  <div className="flex gap-2">
                      <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="font-black text-slate-800 text-lg bg-transparent outline-none cursor-pointer flex-1">
                         <option value={0}>Semua Bulan</option>
-                        {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((m, i) => (<option key={i} value={i+1}>{m}</option>))}
+                        {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m, i) => (<option key={i} value={i+1}>{m}</option>))}
                      </select>
                      <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-black text-emerald-600 text-lg bg-transparent outline-none cursor-pointer">
                         <option value={0}>Tahun</option>
@@ -290,17 +301,17 @@ export default function BankTransaksiPage() {
             </div>
             <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex items-center gap-6">
                <div className="bg-emerald-50 p-4 rounded-3xl text-emerald-600"><Database size={32}/></div>
-               <div><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Transaksi</h4><p className="text-xl font-black text-slate-800 tracking-tighter">{totalInDb.toLocaleString()}</p></div>
+               <div><h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Baris</h4><p className="text-xl font-black text-slate-800 tracking-tighter">{totalInDb}</p></div>
             </div>
-            <div className="bg-emerald-600 rounded-[2.5rem] p-8 shadow-xl text-white flex items-center gap-4">
-               <div className="bg-white/10 p-3 rounded-2xl"><Filter size={24}/></div>
-               <div className="flex-1 overflow-hidden">
-                  <h4 className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">Kategori</h4>
-                  <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-transparent font-black tracking-tighter text-sm w-full outline-none cursor-pointer">
-                     <option value="all" className="text-slate-800">Semua Mutasi</option>
-                     <option value="out" className="text-slate-800">Pengeluaran (-)</option>
-                     <option value="in" className="text-slate-800">Pemasukan (+)</option>
-                     <option value="no-proof" className="text-slate-800">Butuh Nota</option>
+            <div className="bg-emerald-600 rounded-[2.5rem] p-8 shadow-xl text-white flex items-center gap-6">
+               <div className="bg-white/10 p-4 rounded-3xl"><Filter size={32}/></div>
+               <div>
+                  <h4 className="text-[10px] font-black text-white/50 uppercase tracking-widest">Filter</h4>
+                  <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="bg-transparent font-black tracking-tighter text-sm outline-none cursor-pointer">
+                     <option value="all" className="text-slate-800">Semua</option>
+                     <option value="out" className="text-slate-800">Keluar (-)</option>
+                     <option value="in" className="text-slate-800">Masuk (+)</option>
+                     <option value="no-proof" className="text-slate-800">Nota Kosong</option>
                   </select>
                </div>
             </div>
@@ -308,71 +319,68 @@ export default function BankTransaksiPage() {
 
          {/* PREVIEW IMPOR */}
          {parsedData.length > 0 && (
-            <div className="bg-white rounded-[3rem] shadow-2xl p-10 border-4 border-emerald-50 animate-in zoom-in-95 duration-500">
-               <div className="flex justify-between items-center mb-10 capitalize">
-                  <div className="flex items-center gap-4"><div className="bg-emerald-100 text-emerald-600 p-4 rounded-2xl"><FileSpreadsheet size={28}/></div><div><h3 className="text-2xl font-black tracking-tighter italic uppercase text-slate-800">Preview Impor Masjid</h3><p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pastikan nominal Debet/Kredit sudah benar.</p></div></div>
-                  <div className="flex gap-4"><button onClick={() => setParsedData([])} className="px-8 py-4 text-slate-400 font-black uppercase text-xs">Batalkan</button><button onClick={handleSimpanData} disabled={isSaving} className="bg-emerald-500 text-white px-10 py-5 rounded-[1.5rem] font-black shadow-2xl transition-all uppercase tracking-tighter text-xs">{isSaving ? <Loader2 className="animate-spin" size={20}/> : <Save size={20}/>} SIMPAN KE SERVER</button></div>
-               </div>
+            <div className="bg-white rounded-[3rem] shadow-2xl p-10 border border-emerald-100 italic animate-in slide-in-from-bottom-5">
+               <div className="flex justify-between items-center mb-8"><h3 className="text-2xl font-black italic">Preview Impor ({parsedData.length})</h3><div className="flex gap-4"><button onClick={() => setParsedData([])} className="text-slate-400 text-xs font-bold">Batal</button><button onClick={handleSimpanData} disabled={isSaving} className="bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-2">{isSaving ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} SIMPAN KE SERVER</button></div></div>
                <div className="overflow-x-auto rounded-[2rem] border-2 border-slate-100">
-                  <table className="w-full text-left text-[11px] whitespace-nowrap">
-                     <thead className="bg-slate-900 text-white font-black uppercase tracking-widest">
-                        <tr><th className="p-5">Waktu</th><th className="p-5">Akun ID</th><th className="p-5">Deskripsi</th><th className="p-5 text-right">Mutasi (-)</th><th className="p-5 text-right">Mutasi (+)</th></tr>
+                  <table className="w-full text-[11px] text-left whitespace-nowrap">
+                     <thead className="bg-slate-900 text-white font-black uppercase">
+                        <tr><th className="p-5">Waktu</th><th className="p-5">Akun</th><th className="p-5">Keterangan</th><th className="p-5 text-right">Debet</th><th className="p-5 text-right">Kredit</th><th className="p-5 text-right">Saldo</th></tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-100">
-                        {parsedData.slice(0, 10).map((row, i) => (<tr key={i} className="bg-white hover:bg-slate-50"><td className="p-5 font-black">{row.waktu_transaksi.split(' ')[0] || row.waktu_transaksi}</td><td className="p-5 font-bold text-emerald-600">{row.akun_id || '-'}</td><td className="p-5 font-bold text-slate-500 truncate max-w-[300px]">{row.deskripsi}</td><td className="p-5 text-right font-black text-red-500">{row.debet > 0 ? `- Rp ${row.debet.toLocaleString()}` : '-'}</td><td className="p-5 text-right font-black text-emerald-500">{row.kredit > 0 ? `+ Rp ${row.kredit.toLocaleString()}` : '-'}</td></tr>))}
+                     <tbody className="divide-y divide-slate-100">
+                        {parsedData.slice(0, 10).map((row, i) => (<tr key={i} className="hover:bg-slate-50"><td className="p-5 font-black">{row.waktu_transaksi.split(' ')[0]}</td><td className="p-5 font-bold text-emerald-600">{row.akun_id || '-'}</td><td className="p-5 font-bold truncate max-w-[200px]">{row.deskripsi}</td><td className="p-5 text-right font-black">- {row.debet.toLocaleString()}</td><td className="p-5 text-right font-black">+ {row.kredit.toLocaleString()}</td><td className="p-5 text-right font-bold text-slate-400">{row.saldo_riil.toLocaleString()}</td></tr>))}
                      </tbody>
                   </table>
                </div>
             </div>
          )}
 
-         {/* MAIN HISTORY TABLE */}
+         {/* HISTORY TABLE */}
          <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-10 border-b bg-gray-50/50 flex flex-col md:flex-row justify-between items-center gap-6">
-               <div className="flex items-center gap-4"><div className="bg-emerald-100 p-4 rounded-3xl text-emerald-600"><History size={32}/></div><div><h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase italic">Histori Mutasi Bank Masjid</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Menampilkan data internal Masjid Kampus.</p></div></div>
-               <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/><input type="text" placeholder="Cari..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-white border-2 border-slate-100 rounded-2xl py-3 pl-12 pr-6 text-sm font-bold w-64 outline-none focus:border-emerald-500 transition-all font-sans" /></div>
+            <div className="p-10 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-6">
+               <div className="flex items-center gap-4"><History size={32} className="text-emerald-600"/><h3 className="text-2xl font-black italic">Histori Mutasi Bank</h3></div>
+               <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18}/><input type="text" placeholder="Cari..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-white border-2 border-slate-50 rounded-2xl py-3 pl-12 pr-6 text-sm font-bold w-64 outline-none focus:border-emerald-500 transition-all font-sans" /></div>
             </div>
             <div className="overflow-x-auto min-h-[400px]">
                <table className="w-full text-left whitespace-nowrap">
                   <thead className="bg-white border-b-2 border-gray-50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                     <tr><th className="p-8">Waktu & Ref</th><th className="p-8">Kategori Akun</th><th className="p-8">Deskripsi</th><th className="p-8 text-right">Mutasi</th><th className="p-8 text-right">Saldo</th><th className="p-8 text-center">Aksi</th></tr>
+                     <tr><th className="p-8">Waktu & Ref</th><th className="p-8">Nama Akun</th><th className="p-8">Keterangan</th><th className="p-8 text-right">Mutasi</th><th className="p-8 text-right">Saldo</th><th className="p-8 text-center">Nota</th><th className="p-8 text-center">Aksi</th></tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {isLoadingHistory ? (<tr><td colSpan={6} className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-emerald-500" size={48}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={6} className="p-20 text-center italic text-gray-400 font-bold uppercase tracking-widest bg-slate-50 border-2 border-dashed border-gray-100 m-8 rounded-3xl">Data Masih Kosong atau Tidak Ditemukan.</td></tr>) : filteredHistory.map((row) => (
-                        <tr key={row.id} className="group hover:bg-emerald-50/20 transition-all border-b border-gray-50">
-                           <td className="p-8"><p className="text-xs font-black text-slate-800">{formatShowDate(row.waktu_transaksi)}</p><p className="text-[10px] font-bold text-slate-400 uppercase">Bank Ref: {row.noref_bank || '-'}</p></td>
+                     {isLoadingHistory ? (<tr><td colSpan={7} className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-emerald-600" size={48}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={7} className="p-20 text-center italic text-gray-400 uppercase font-black tracking-widest bg-gray-50/50 m-8 rounded-3xl border-2 border-dashed">Belum ada data untuk periode ini.</td></tr>) : filteredHistory.map((row) => (
+                        <tr key={row.id} className="group hover:bg-emerald-50 transition-all border-b border-gray-50">
+                           <td className="p-8"><p className="text-xs font-black">{formatShowDate(row.waktu_transaksi)}</p><p className="text-[10px] text-slate-400 uppercase">REF: {row.noref_bank || '-'}</p></td>
                            <td className="p-8">
                               <div className="flex flex-col">
-                                 <span className="font-black text-emerald-700 text-xs flex items-center gap-2"><BookOpen size={12}/> {row.ref_akun?.nomor_akun || row.akun_id || '-'}</span>
-                                 <span className="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[180px]">{row.ref_akun?.nama_akun || 'Tanpa Kategori'}</span>
+                                 <span className="font-black text-emerald-700 text-xs"><BookOpen size={12} className="inline mr-1"/>{row.ref_akun?.nomor_akun || row.akun_id || '-'}</span>
+                                 <span className="text-[10px] font-bold text-slate-400 truncate max-w-[150px]">{row.ref_akun?.nama_akun || 'Tanpa Keterangan Akun'}</span>
                               </div>
                            </td>
-                           <td className="p-8 font-bold text-xs truncate max-w-[250px]">{row.deskripsi}</td>
-                           <td className={`p-8 text-right font-black ${row.debet > 0 ? 'text-red-500' : 'text-emerald-500'}`}><span className="flex items-center justify-end gap-2 text-sm">{row.debet > 0 ? <ArrowUpRight size={14}/> : <ArrowDownLeft size={14}/>} Rp {(row.debet || row.kredit).toLocaleString('id-ID')}</span></td>
-                           <td className="p-8 text-right font-black text-slate-400 text-xs italic">Rp {row.saldo_riil?.toLocaleString('id-ID')}</td>
-                           <td className="p-8 text-center flex justify-center gap-2 pt-10">
-                              {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, idx: number) => (<a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white border border-slate-100 text-emerald-600 rounded-lg hover:shadow-md transition-all"><ExternalLink size={14}/></a>))}</div>}
-                              <button onClick={() => openEditModal(row)} className="p-3 bg-white border-2 border-slate-100 rounded-2xl text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><ImagePlus size={18}/></button>
+                           <td className="p-8 font-bold text-xs truncate max-w-[200px]">{row.deskripsi}</td>
+                           <td className={`p-8 text-right font-black ${row.debet > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{row.debet > 0 ? '-' : '+'} Rp {(row.debet || row.kredit).toLocaleString()}</td>
+                           <td className="p-8 text-right text-xs font-bold text-slate-400 italic">Rp {row.saldo_riil?.toLocaleString()}</td>
+                           <td className="p-8 text-center">
+                              {row.foto_bukti ? (<div className="flex justify-center gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, idx: number) => (<a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="p-2 bg-white border border-slate-200 text-emerald-600 rounded-lg hover:shadow-md transition-all"><ExternalLink size={14}/></a>))}</div>) : <span className="text-xs text-slate-200 uppercase font-black">N/A</span>}
                            </td>
+                           <td className="p-8 text-center pt-10"><button onClick={() => openEditModal(row)} className="p-3 bg-white border-2 border-slate-100 rounded-2xl text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><ImagePlus size={18}/></button></td>
                         </tr>
                      ))}
                   </tbody>
                </table>
             </div>
-            {dbTransactions.length < totalInDb && (<div className="p-10 bg-slate-50 flex justify-center"><button onClick={() => fetchHistory(false)} disabled={isLoadingMore} className="bg-white border-2 border-emerald-600 text-emerald-600 px-10 py-5 rounded-[1.5rem] font-black flex items-center gap-4 hover:shadow-xl hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50 uppercase tracking-widest text-xs">{isLoadingMore ? <Loader2 className="animate-spin" size={24}/> : <PlusCircle size={24}/>} Muat Lebih Banyak ({totalInDb - dbTransactions.length})</button></div>)}
+            {dbTransactions.length < totalInDb && (<div className="p-10 bg-slate-50 flex justify-center"><button onClick={() => fetchHistory(false)} disabled={isLoadingMore} className="bg-white border-2 border-emerald-600 text-emerald-600 px-10 py-5 rounded-[1.5rem] font-black flex items-center gap-4 hover:shadow-xl transition-all disabled:opacity-50 uppercase tracking-widest text-xs">{isLoadingMore ? <Loader2 className="animate-spin" size={24}/> : <PlusCircle size={24}/>} Muat Data Berikutnya ({totalInDb - dbTransactions.length})</button></div>)}
          </div>
 
-         {/* MODAL EDIT (MASJID VERSION) */}
+         {/* EDIT MODAL */}
          {editingRow && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-               <div className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh] animate-in zoom-in-95 duration-500 border border-white/20">
-                  <div className="p-10 border-b bg-slate-50/50 flex justify-between items-center shrink-0"><div><h4 className="text-xl font-black text-slate-800 tracking-tighter uppercase italic flex items-center gap-3"><ImagePlus size={24} className="text-emerald-600"/> Edit Data Masjid</h4><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Lengkapi kategori Akun atau Lampiran.</p></div><button onClick={() => setEditingRow(null)} className="p-3 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-colors"><X size={24}/></button></div>
-                  <div className="p-8 space-y-6 overflow-y-auto flex-1 scrollbar-hide">
-                     <div className={`p-6 rounded-[2.5rem] border-2 shadow-inner ${editingRow.debet > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}><p className="text-[10px] font-black text-slate-400 mb-2 uppercase">{formatShowDate(editingRow.waktu_transaksi)}</p><p className="text-sm font-bold text-slate-900 leading-tight mb-4">{editingRow.deskripsi}</p><p className={`text-2xl font-black tracking-tighter italic ${editingRow.debet > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{editingRow.debet > 0 ? '-' : '+'} Rp {(editingRow.kredit || editingRow.debet).toLocaleString('id-ID')}</p></div>
-                     <div className="space-y-2"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Hash size={12}/> Pilih atau Ketik Akun ID</label><input type="text" value={editAkunId} onChange={e => setEditAkunId(e.target.value)} placeholder="Contoh: 11110.01" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 font-black text-emerald-600 focus:border-emerald-500 outline-none transition-all" /></div>
-                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Koleksi Bukti Nota ({previewUrls.length})</label><div className="grid grid-cols-3 gap-4">{previewUrls.map((url, idx) => (<div key={idx} className="relative group aspect-square rounded-[1.5rem] overflow-hidden border-2 border-slate-100 bg-slate-50"><img src={url} className="w-full h-full object-cover" alt="Nota"/><button onClick={() => removePreview(idx)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><X size={10}/></button></div>))}<label className="aspect-square border-2 border-dashed border-emerald-200 rounded-[1.5rem] flex flex-col items-center justify-center text-center cursor-pointer hover:bg-emerald-50 transition-all"><Upload size={24} className="text-emerald-300 mb-2"/><p className="text-[9px] font-black text-emerald-400 uppercase">Tambah</p><input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} /></label></div></div>
+            <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+               <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 shadow-2xl">
+                  <div className="p-10 border-b flex justify-between items-center bg-emerald-50/50"><div><h4 className="text-xl font-black italic flex items-center gap-3 text-slate-800"><ImagePlus size={24} className="text-emerald-600"/> Arsip Bukti & Kategori</h4></div><button onClick={() => setEditingRow(null)} className="p-3 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"><X size={24}/></button></div>
+                  <div className="p-8 space-y-6 overflow-y-auto flex-1 italic font-bold">
+                     <div className={`p-6 rounded-[2.5rem] border-2 shadow-inner ${editingRow.debet > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}><p className="text-sm text-slate-900 mb-2">{editingRow.deskripsi}</p><p className={`text-2xl font-black ${editingRow.debet > 0 ? 'text-red-500' : 'text-emerald-500'}`}>Rp {(editingRow.kredit || editingRow.debet).toLocaleString()}</p></div>
+                     <div className="space-y-2"><label className="text-xs uppercase tracking-widest text-slate-400">Kode Akun</label><input type="text" value={editAkunId} onChange={e => setEditAkunId(e.target.value)} placeholder="Contoh: 11110.01" className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl p-4 font-black text-emerald-600 focus:border-emerald-500 outline-none" /></div>
+                     <div className="space-y-4"><label className="text-xs uppercase tracking-widest text-slate-400">Lampiran Nota ({previewUrls.length})</label><div className="grid grid-cols-3 gap-4">{previewUrls.map((url, idx) => (<div key={idx} className="relative aspect-square rounded-[1.5rem] overflow-hidden border-2 border-slate-100"><img src={url} className="w-full h-full object-cover"/><button onClick={() => removePreview(idx)} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><X size={10}/></button></div>))}<label className="aspect-square border-2 border-dashed border-emerald-200 rounded-[1.5rem] flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50 transition-all text-emerald-300 hover:text-emerald-600"><Upload size={24}/><input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} /></label></div></div>
                   </div>
-                  <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Batal</button><button onClick={handleUpdateProof} disabled={isUpdating} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-900 transition-all flex items-center justify-center gap-3">{isUpdating ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} SIMPAN PERUBAHAN</button></div>
+                  <div className="p-8 bg-slate-100 border-t flex gap-4"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-xs font-black uppercase tracking-widest text-slate-400">Batal</button><button onClick={handleUpdateProof} disabled={isUpdating} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:bg-slate-900 transition-all flex items-center justify-center gap-3">{isUpdating ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} SIMPAN PERUBAHAN</button></div>
                </div>
             </div>
          )}
