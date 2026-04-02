@@ -84,7 +84,7 @@ export default function DashboardLayout({
               
               <div>
                  <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">{getPageTitle(pathname)}</h1>
-                 <p className="text-gray-500 text-xs md:text-sm font-medium mt-1">Selamat datang, pastikan semua data valid.</p>
+                 <p className="text-gray-500 text-xs md:text-sm font-medium mt-1">Selamat datang - [SYNC_v4.5.18.5]</p>
               </div>
            </div>
            
