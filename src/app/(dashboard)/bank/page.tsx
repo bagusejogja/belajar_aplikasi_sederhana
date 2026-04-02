@@ -58,7 +58,7 @@ export default function BankTransaksiPage() {
    };
 
    const cleanNum = (str: string) => {
-      if (!str || str === '\\N') return v => 0;
+      if (!str || str === '\\N') return 0;
       let v = str.trim().replace(/[^\d.,-]/g, '');
       if (v === '') return 0;
       if (v.includes(',') && v.includes('.')) {
