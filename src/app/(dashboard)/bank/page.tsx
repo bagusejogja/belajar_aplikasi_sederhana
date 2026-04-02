@@ -57,7 +57,7 @@ export default function BankTransaksiPage() {
    };
 
    const cleanNum = (str: string) => {
-      if (!str || str === '\\N') return 0;
+      if (!str || str === '\\N') return v => 0;
       let v = str.trim().replace(/[^\d.,-]/g, '');
       if (v === '') return 0;
       if (v.includes(',') && v.includes('.')) {
@@ -100,7 +100,7 @@ export default function BankTransaksiPage() {
       const ext: any[] = [];
       const startIdx = (rows[0].toLowerCase().includes('tgl') || rows[0].toLowerCase().includes('desk')) ? 1 : 0;
       for (let i = startIdx; i < rows.length; i++) {
-         const p = rows[i].split(/\t|;/).map(x => x.trim());
+         const p = rows[i].split(/\t|;/).map((x: string) => x.trim());
          if (p.length < 5) continue;
          ext.push({
             waktu_transaksi: parseDate(p[0] || ''),
@@ -174,10 +174,10 @@ export default function BankTransaksiPage() {
                <div className="flex items-center gap-4">
                   <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="font-black text-slate-800 text-xl bg-transparent outline-none cursor-pointer flex-1">
                      <option value={0}>Semua Bulan</option>
-                     {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m, i) => (<option key={i} value={i+1}>{m}</option>))}
+                     {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m: string, i: number) => (<option key={i} value={i+1}>{m}</option>))}
                   </select>
                   <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-black text-indigo-600 text-xl bg-transparent outline-none cursor-pointer">
-                     {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                     {[2024, 2025, 2026].map((y: number) => <option key={y} value={y}>{y}</option>)}
                   </select>
                </div>
             </div>
@@ -210,7 +210,7 @@ export default function BankTransaksiPage() {
                         <tr><th className="p-3">Waktu</th><th className="p-3">Akun</th><th className="p-3">Deskripsi</th><th className="p-3 text-right">D</th><th className="p-3 text-right">K</th></tr>
                      </thead>
                      <tbody className="divide-y divide-gray-50 italic">
-                        {parsedData.slice(0, 10).map((row, i) => (<tr key={i} className="hover:bg-slate-50"><td className="p-3 font-black">{row.waktu_transaksi.split(' ')[0]}</td><td className="p-3 font-black text-indigo-600">#{row.akun_id || '-'}</td><td className="p-3 truncate max-w-[300px]">{row.deskripsi}</td><td className="p-3 text-right">-{row.debet.toLocaleString()}</td><td className="p-3 text-right">+{row.kredit.toLocaleString()}</td></tr>))}
+                        {parsedData.slice(0, 10).map((row: any, i: number) => (<tr key={i} className="hover:bg-slate-50"><td className="p-3 font-black">{row.waktu_transaksi.split(' ')[0]}</td><td className="p-3 font-black text-indigo-600">#{row.akun_id || '-'}</td><td className="p-3 truncate max-w-[300px]">{row.deskripsi}</td><td className="p-3 text-right">-{row.debet.toLocaleString()}</td><td className="p-3 text-right">+{row.kredit.toLocaleString()}</td></tr>))}
                      </tbody>
                   </table>
                </div>
@@ -236,7 +236,7 @@ export default function BankTransaksiPage() {
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {isLoadingHistory ? (<tr><td colSpan={5} className="p-32 text-center"><Loader2 className="animate-spin mx-auto text-indigo-500" size={32}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={5} className="p-20 text-center italic text-slate-200 font-black uppercase tracking-widest">Kosong.</td></tr>) : filteredHistory.map((row) => (
+                     {isLoadingHistory ? (<tr><td colSpan={5} className="p-32 text-center"><Loader2 className="animate-spin mx-auto text-indigo-500" size={32}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={5} className="p-20 text-center italic text-slate-200 font-black uppercase tracking-widest">Kosong.</td></tr>) : filteredHistory.map((row: any) => (
                         <tr key={row.id} className="group hover:bg-slate-50 border-b border-gray-50">
                            <td className="p-6"><p className="text-[10px] font-black text-slate-800 leading-none">{formatShowDate(row.waktu_transaksi)}</p><p className="text-[8px] font-bold text-slate-300 mt-1 uppercase truncate font-mono">REF: {row.noref_bank || '-'}</p></td>
                            <td className="p-6">
@@ -244,7 +244,7 @@ export default function BankTransaksiPage() {
                                  <button onClick={() => { setEditingRow(row); setPreviewUrls((row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); setEditAkunId(row.akun_id?.toString() || ''); }} className={`p-2.5 rounded-xl border transition-all active:scale-95 shadow-md ${row.foto_bukti ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-500 animate-pulse'}`}>
                                     <ImagePlus size={20}/>
                                  </button>
-                                 {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url, i) => (<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="p-1 bg-slate-100 text-slate-400 rounded hover:bg-indigo-600 hover:text-white transition-all"><ExternalLink size={8}/></a>))}</div>}
+                                 {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, i: number) => (<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="p-1 bg-slate-100 text-slate-400 rounded hover:bg-indigo-600 hover:text-white transition-all"><ExternalLink size={8}/></a>))}</div>}
                               </div>
                            </td>
                            <td className="p-6">
@@ -276,7 +276,7 @@ export default function BankTransaksiPage() {
                   <div className="p-8 space-y-6 overflow-y-auto flex-1 italic scrollbar-hide text-center">
                      <div className={`p-8 rounded-[1.5rem] border-2 shadow-inner ${editingRow.debet > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}><p className="text-sm font-black text-slate-950 mb-3 leading-tight uppercase">{editingRow.deskripsi}</p><p className={`text-4xl font-black italic tracking-tighter ${editingRow.debet > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Rp {(editingRow.kredit || editingRow.debet).toLocaleString()}</p></div>
                      <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Account ID</label><input type="text" value={editAkunId} onChange={e => setEditAkunId(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 font-black text-indigo-600 text-2xl outline-none focus:border-indigo-600 transition-all text-center" /></div>
-                     <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u, i) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>{ if(e.target.files?.length) { setPreviewUrls(p=>[...p,...Array.from(e.target.files).map(i=>URL.createObjectURL(i))]); } }} /></label></div></div>
+                     <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u: string, i: number) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} /></label></div></div>
                   </div>
                   <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={()=>{ alert("Simpan berhasil."); setEditingRow(null); }} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">SIMPAN REVISI</button></div>
                </div>
