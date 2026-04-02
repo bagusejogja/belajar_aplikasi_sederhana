@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ChangeEvent, ClipboardEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
    Upload, FileSpreadsheet, Save, Loader2, AlertTriangle, CheckCircle, 
@@ -39,12 +39,13 @@ export default function BankTransaksiPage() {
             const s = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`, nm = selectedMonth === 12 ? 1 : selectedMonth + 1, ny = selectedMonth === 12 ? selectedYear + 1 : selectedYear, e = `${ny}-${String(nm).padStart(2, '0')}-01`;
             q = q.gte('waktu_transaksi', s).lt('waktu_transaksi', e);
          }
-         const { data, count } = await q.range(rangeFrom, rangeTo);
+         const { data, count, error } = await q.range(rangeFrom, rangeTo);
+         if (error) throw error;
          if (data) {
             if (isReset) { setDbTransactions(data); setTotalInDb(count || 0); }
             else { setDbTransactions(prev => [...prev, ...data]); setOffset(currentOffset); }
          }
-      } catch (err) { console.error(err); } finally { setIsLoadingHistory(false); setIsLoadingMore(false); }
+      } catch (err: any) { console.error(err); } finally { setIsLoadingHistory(false); setIsLoadingMore(false); }
    }, [selectedMonth, selectedYear, offset]);
 
    useEffect(() => { fetchHistory(true); }, [selectedMonth, selectedYear, fetchHistory]);
@@ -86,7 +87,7 @@ export default function BankTransaksiPage() {
       return v;
    };
 
-   const handlePasteData = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+   const handlePasteData = (e: ClipboardEvent<HTMLTextAreaElement>) => {
       e.preventDefault();
       const text = e.clipboardData.getData('text');
       if (!text) return;
@@ -134,7 +135,7 @@ export default function BankTransaksiPage() {
    const [previewUrls, setPreviewUrls] = useState<string[]>([]);
    const [editAkunId, setEditAkunId] = useState<string>('');
 
-   const filteredHistory = dbTransactions.filter(row => {
+   const filteredHistory = dbTransactions.filter((row: any) => {
       const matchSearch = (row.deskripsi || '').toLowerCase().includes(searchTerm.toLowerCase());
       let matchType = true;
       if (filterType === 'out') matchType = row.debet > 0;
@@ -172,11 +173,11 @@ export default function BankTransaksiPage() {
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-32">
                <div className="flex justify-between items-center"><h4 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Periode Laporan</h4><Calendar className="text-indigo-600" size={24}/></div>
                <div className="flex items-center gap-4">
-                  <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} className="font-black text-slate-800 text-xl bg-transparent outline-none cursor-pointer flex-1">
+                  <select value={selectedMonth} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedMonth(Number(e.target.value))} className="font-black text-slate-800 text-xl bg-transparent outline-none cursor-pointer flex-1">
                      <option value={0}>Semua Bulan</option>
                      {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m: string, i: number) => (<option key={i} value={i+1}>{m}</option>))}
                   </select>
-                  <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-black text-indigo-600 text-xl bg-transparent outline-none cursor-pointer">
+                  <select value={selectedYear} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedYear(Number(e.target.value))} className="font-black text-indigo-600 text-xl bg-transparent outline-none cursor-pointer">
                      {[2024, 2025, 2026].map((y: number) => <option key={y} value={y}>{y}</option>)}
                   </select>
                </div>
@@ -185,7 +186,7 @@ export default function BankTransaksiPage() {
             <div className="bg-indigo-600 rounded-3xl p-6 shadow-xl text-white flex flex-col justify-between h-32 relative overflow-hidden">
                <div className="absolute top-0 right-0 p-4 opacity-10"><Filter size={100}/></div>
                <div className="flex justify-between items-center relative z-10"><h4 className="text-[9px] font-black text-white/50 uppercase tracking-wider">Tampilan</h4><Search className="text-white" size={24}/></div>
-               <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="relative z-10 bg-transparent font-black tracking-tighter text-xl outline-none cursor-pointer w-full text-left uppercase">
+               <select value={filterType} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterType(e.target.value as any)} className="relative z-10 bg-transparent font-black tracking-tighter text-xl outline-none cursor-pointer w-full text-left uppercase">
                   <option value="all" className="text-slate-800">Semua Data</option>
                   <option value="out" className="text-slate-800">Keluar (-) </option>
                   <option value="in" className="text-slate-800">Masuk (+) </option>
@@ -221,7 +222,7 @@ export default function BankTransaksiPage() {
          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
                <div className="flex items-center gap-4"><div className="bg-indigo-600 p-2.5 rounded-xl text-white"><History size={20}/></div><h3 className="text-lg font-black text-slate-800 tracking-tighter uppercase italic">Histori Mutasi Pusat</h3></div>
-               <div className="relative w-full md:w-64"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/><input type="text" placeholder="Cari..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs font-bold w-full outline-none focus:border-indigo-600 transition-all font-sans" /></div>
+               <div className="relative w-full md:w-64"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/><input type="text" placeholder="Cari..." value={searchTerm} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} className="bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs font-bold w-full outline-none focus:border-indigo-600 transition-all font-sans" /></div>
             </div>
             
             <div className="overflow-x-auto min-h-[400px]">
@@ -275,8 +276,8 @@ export default function BankTransaksiPage() {
                   <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0"><div><h4 className="text-lg font-black italic text-slate-800 uppercase flex items-center gap-4"><ImagePlus size={24} className="text-indigo-600"/> Audit Lampiran</h4></div><button onClick={() => setEditingRow(null)} className="p-3 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"><X size={24}/></button></div>
                   <div className="p-8 space-y-6 overflow-y-auto flex-1 italic scrollbar-hide text-center">
                      <div className={`p-8 rounded-[1.5rem] border-2 shadow-inner ${editingRow.debet > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}><p className="text-sm font-black text-slate-950 mb-3 leading-tight uppercase">{editingRow.deskripsi}</p><p className={`text-4xl font-black italic tracking-tighter ${editingRow.debet > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Rp {(editingRow.kredit || editingRow.debet).toLocaleString()}</p></div>
-                     <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Account ID</label><input type="text" value={editAkunId} onChange={e => setEditAkunId(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 font-black text-indigo-600 text-2xl outline-none focus:border-indigo-600 transition-all text-center" /></div>
-                     <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u: string, i: number) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} /></label></div></div>
+                     <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Account ID</label><input type="text" value={editAkunId} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditAkunId(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 font-black text-indigo-600 text-2xl outline-none focus:border-indigo-600 transition-all text-center" /></div>
+                     <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u: string, i: number) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} /></label></div></div>
                   </div>
                   <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={()=>{ alert("Simpan berhasil."); setEditingRow(null); }} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">SIMPAN REVISI</button></div>
                </div>
