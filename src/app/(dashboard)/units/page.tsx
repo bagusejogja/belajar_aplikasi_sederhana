@@ -62,7 +62,7 @@ export default function UnitsPage() {
          const newUnit: Unit = {
            id: 'un' + Math.random().toString(36).substr(2, 9),
            name: newUnitName
-         };
+         } as any;
          setUnits(prev => [newUnit, ...prev]);
          alert('Tersimpan di mode Mock (Belum masuk database online).');
       }

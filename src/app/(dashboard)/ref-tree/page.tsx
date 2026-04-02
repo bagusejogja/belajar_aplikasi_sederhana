@@ -92,7 +92,7 @@ export default function ReferencesPage() {
      }
   };
 
-  const handleDelete = async (id: string, table: string) => {
+  const handleDelete = async (id: string | number, table: string) => {
      if (!confirm("Yakin ingin menghapus referensi ini? Transaksi yang memakai ini mungkin error.")) return;
      await supabase.from(table).delete().eq('id', id);
      fetchData();

@@ -407,7 +407,7 @@ export default function DashboardPage() {
           mIn = mTrx.reduce((s, t) => s + (Number(t.uang_masuk) || 0), 0);
           mOut = mTrx.reduce((s, t) => s + (Number(t.uang_keluar) || 0), 0);
         } else {
-          const mBank = bankYear.filter(b => String(b.rekening_id) === String(r.id) && parseAnyDate(b.waktu_transaksi)?.getMonth() + 1 === m);
+          const mBank = bankYear.filter(b => { const d = parseAnyDate(b.waktu_transaksi); return String(b.rekening_id) === String(r.id) && d && d.getMonth() + 1 === m; });
           mIn = mBank.reduce((s, b) => s + cleanNum(b.kredit), 0);
           mOut = mBank.reduce((s, b) => s + cleanNum(b.debet), 0);
         }
