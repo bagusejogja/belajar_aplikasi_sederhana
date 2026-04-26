@@ -3,7 +3,7 @@
 import Sidebar from '@/components/Sidebar';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { Search, Bell, HelpCircle, Menu, Loader2 } from 'lucide-react';
+import { Search, Bell, HelpCircle, Menu, Loader2, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function DashboardLayout({
@@ -16,14 +16,47 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+
   useEffect(() => {
      const checkAuth = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
            router.push('/login');
-        } else {
-           setIsAuthChecking(false);
+           return;
         }
+
+        // --- AUTHORIZATION CHECK (Mencegah Akses URL Manual) ---
+        // Jika sedang di root '/' atau '/dashboard', biarkan lewat
+        if (pathname === '/' || pathname === '/dashboard') {
+           setIsAuthChecking(false);
+           return;
+        }
+
+        const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
+        if (roleData) {
+           if (roleData.role === 'Admin') {
+              setIsAuthChecking(false); // Admin selalu lolos
+              return;
+           }
+
+           const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
+           if (menuData) {
+              const allowedPaths = menuData.map((m: any) => m.path);
+              // Cek apakah pathname saat ini ada di daftar yang diizinkan
+              const isAllowed = allowedPaths.some((p: string) => pathname.startsWith(p));
+              
+              if (!isAllowed) {
+                 setIsUnauthorized(true);
+              }
+           } else {
+              setIsUnauthorized(true); // Jika tidak ada menu di-mapping, blokir
+           }
+        } else {
+           setIsUnauthorized(true); // User tidak punya role
+        }
+        
+        setIsAuthChecking(false);
      };
 
      checkAuth();
@@ -36,7 +69,7 @@ export default function DashboardLayout({
      });
 
      return () => subscription.unsubscribe();
-  }, [router]);
+  }, [router, pathname]);
 
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
@@ -55,6 +88,23 @@ export default function DashboardLayout({
 
   if (isAuthChecking) {
      return <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50"><Loader2 size={48} className="animate-spin text-indigo-600 mb-4" /><p className="font-bold text-gray-500">Mengecek Kredensial Keamanan...</p></div>;
+  }
+
+  if (isUnauthorized) {
+     return (
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+           <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-red-100 max-w-md">
+              <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                 <ShieldAlert size={40} className="text-red-600" />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-2">Akses Ditolak!</h2>
+              <p className="text-gray-500 font-medium mb-8">Maaf, peran Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi Administrator jika ini adalah sebuah kesalahan.</p>
+              <button onClick={() => router.push('/dashboard')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-200">
+                 KEMBALI KE DASHBOARD
+              </button>
+           </div>
+        </div>
+     );
   }
 
   return (

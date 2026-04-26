@@ -12,7 +12,7 @@ interface RoleMenu {
 }
 
 export default function MenusPage() {
-  const roles = ['Admin', 'Staff', 'Viewer'];
+  const roles = ['Admin', 'Staff', 'Viewer', 'Pemroses Anggaran'];
   const [roleMenus, setRoleMenus] = useState<RoleMenu[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,7 +34,7 @@ export default function MenusPage() {
       setRoleMenus(mappingTable);
       
       // Mengubah format array Supabase menjadi key-value local (role -> path[])
-      const mappedConfig: { [key: string]: string[] } = { 'Admin': [], 'Staff': [], 'Viewer': [] };
+      const mappedConfig: { [key: string]: string[] } = { 'Admin': [], 'Staff': [], 'Viewer': [], 'Pemroses Anggaran': [] };
       mappingTable.forEach((item) => {
          if (mappedConfig[item.role]) {
              mappedConfig[item.role].push(item.path);
