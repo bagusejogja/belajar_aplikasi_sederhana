@@ -120,6 +120,7 @@ export default function UsersPage() {
                                            'border-emerald-500 text-emerald-700 bg-emerald-50'}`}
                                    >
                                       <option value="Admin">👑 Administrator (Akses Penuh)</option>
+                                      <option value="Pemroses Anggaran">📊 Pemroses Anggaran</option>
                                       <option value="Staff">📝 Staff / Keuangan (Input & Laporan)</option>
                                       <option value="Viewer">👁️ Pengamat (Hanya Laporan)</option>
                                       <option value="Pending">🚫 Kunci / Blokir Akun</option>

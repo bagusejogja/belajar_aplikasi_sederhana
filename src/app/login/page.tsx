@@ -35,7 +35,14 @@ export default function LoginPage() {
            if (data.user?.identities?.length === 0) {
                alert("Email ini sudah terdaftar. Silakan login.");
                setIsRegistering(false);
-           } else {
+           } else if (data.user) {
+               // Masukkan ke app_users agar tampil di Manajemen Akses User
+               await supabase.from('app_users').insert([{
+                  id: data.user.id,
+                  email: data.user.email,
+                  role: 'Pending'
+               }]);
+
                alert("Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi, atau jika sistem Auto-Confirm aktif, langsung klik Login.");
                setIsRegistering(false);
            }
