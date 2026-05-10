@@ -38,12 +38,14 @@ export default function GovInputPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch Mappings
-      const { data: mMap } = await supabase.from('gov_name_mappings').select('input_name, unit_id');
+      // Fetch Mappings (Tabel Baru)
+      const { data: mMap, error: eMap } = await supabase.from('ref_mapping_unit').select('nama_sumber, unit_id');
+      if (eMap) console.error("Error loading ref_mapping_unit:", eMap);
       if (mMap) {
         const map: Record<string, number> = {};
-        mMap.forEach(m => { map[m.input_name] = m.unit_id; });
+        mMap.forEach(m => { map[m.nama_sumber] = m.unit_id; });
         setLiveMappings(map);
+        console.log("Loaded Mappings:", Object.keys(map).length);
       }
 
       // Fetch Units
@@ -97,16 +99,35 @@ export default function GovInputPage() {
         if (d && m && y) tgl = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
       }
       
-      // Case-Insensitive mapping for Nama
-      const searchNama = (nama || '').toLowerCase();
-      const matchedUnitId = Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama) 
-                            ? liveMappings[Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama)!]
-                            : units.find(u => u.pic?.toLowerCase() === searchNama)?.id || null;
+      // Case-Insensitive mapping for Nama (Mencari di ref_mapping_unit)
+      const searchNama = (nama || '').trim();
+      let matchedUnitId = null;
 
-      const matchedUnit = units.find(ux => ux.id === Number(matchedUnitId) || ux.id === matchedUnitId);
+      // 1. Coba cari di Live Mappings (Tabel ref_mapping_unit)
+      const exactMatchKey = Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama.toLowerCase());
+      if (exactMatchKey) {
+        matchedUnitId = liveMappings[exactMatchKey];
+      } else {
+        // 2. Fallback: Cari di PIC Unit (Jika tidak ada di mapping)
+        matchedUnitId = units.find(u => u.pic?.toLowerCase() === searchNama.toLowerCase())?.id || null;
+      }
+
+      const matchedUnit = units.find(ux => Number(ux.id) === Number(matchedUnitId));
       
       const cleanACode = (aCode || '').trim();
+      // Perbaikan: Pastikan pencarian akun lebih fleksibel (pakai toString)
       const matchedAkun = accounts.find(ax => ax.account_code?.toString().trim() === cleanACode);
+
+      // DEBUG LOG ke Konsol Browser (F12)
+      if (!matchedUnit || !matchedAkun) {
+        console.warn(`Row ${idx} Missing:`, { 
+           namaExcel: searchNama, 
+           matchedId: matchedUnitId, 
+           unitFound: !!matchedUnit, 
+           akunCode: cleanACode, 
+           akunFound: !!matchedAkun 
+        });
+      }
 
       return {
         id: idx,
@@ -241,7 +262,7 @@ export default function GovInputPage() {
          <div className="flex-1 w-full relative">
             <textarea 
                onPaste={handleExcelPaste}
-               placeholder="COPY data dari EXCEL lalu PASTE di sini... (Format: Tgl Akun Nominal Jenis Nama)"
+               placeholder="COPY data dari EXCEL lalu PASTE di sini... (Format: Tanggal [TAB] Akun [TAB] Nominal [TAB] Jenis [TAB] Nama (Mapping))"
                className="w-full bg-slate-50 border-2 border-slate-100 focus:border-indigo-500 focus:bg-white rounded-[1.5rem] py-6 px-8 outline-none transition-all font-black text-slate-800 text-lg placeholder:font-bold placeholder:text-slate-300 resize-none h-24"
             />
             <div className="absolute right-4 bottom-4 flex items-center gap-2 pointer-events-none">

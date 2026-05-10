@@ -87,22 +87,37 @@ export default function InputPage() {
      }));
   };
 
-  // Upload BANYAK FILE secara paralel dan kembalikan URL yang digabung koma
+  // Upload BANYAK FILE secara paralel melalui Server (Bypass CORS)
   const uploadMultipleFiles = async (files: File[]) => {
      if (files.length === 0) return '';
      
+     const { uploadFileToR2 } = await import('@/app/actions/r2-upload');
+     
      const uploadPromises = files.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${fileExt}`;
-        const { error } = await supabase.storage.from('receipts').upload(fileName, file);
-        if (error) throw error;
-        
-        const { data: pubData } = supabase.storage.from('receipts').getPublicUrl(fileName);
-        return pubData.publicUrl;
+        try {
+           console.log("Mengirim file ke server:", file.name);
+           
+           const formData = new FormData();
+           formData.append('file', file);
+
+           // Tentukan folder 'transaksi' di sini
+           const result = await uploadFileToR2(formData, 'transaksi');
+
+           if (!result.success) {
+              throw new Error(result.error);
+           }
+           
+           console.log("Server berhasil upload:", file.name);
+           return result.publicUrl;
+        } catch (err: any) {
+           console.error("Gagal Upload via Server:", err);
+           alert("GAGAL UPLOAD: " + err.message);
+           throw err;
+        }
      });
 
      const urls = await Promise.all(uploadPromises);
-     return urls.join(','); // Pisahkan URL gambar dengan koma
+     return urls.join(',');
   };
 
   const handleSave = async (e: React.FormEvent) => {

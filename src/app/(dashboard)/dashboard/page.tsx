@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, TrendingUp, TrendingDown, Wallet, PiggyBank, ChevronDown, ChevronRight, Filter, BarChart2 } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Wallet, PiggyBank, ChevronDown, ChevronRight, Filter, BarChart2, Printer } from 'lucide-react';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, Cell
@@ -61,9 +61,9 @@ const parseAnyDate = (val: any): Date | null => {
 };
 
 // ───── Summary Card Ultra Premium (Soft Bright) ─────
-function SummaryCard({ label, value, icon, color, subValue, subLabel }: any) {
+function SummaryCard({ label, value, icon, color, subValue, subLabel, hideOnPrint }: any) {
   return (
-    <div className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group border border-white/20 ${color}`}>
+    <div className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group border border-white/20 ${color} ${hideOnPrint ? 'print:hidden' : 'print-card'}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-40 pointer-events-none"></div>
       
       {/* Decorative Icon Background */}
@@ -157,8 +157,8 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const [trxData, bankData, akunData, rekData] = await Promise.all([
-        fetchAllPages(supabase.from('transactions').select('*, ref_akun(nomor_akun, nama_akun)').neq('disetujui', 'Ditolak').order('tanggal', { ascending: true })),
-        fetchAllPages(supabase.from('bank_transactions').select('*').order('waktu_transaksi', { ascending: true })),
+        fetchAllPages(supabase.from('transactions').select('*, ref_akun(nomor_akun, nama_akun)').neq('disetujui', 'Ditolak').order('tanggal', { ascending: true }).order('id', { ascending: true })),
+        fetchAllPages(supabase.from('bank_transactions').select('*').order('waktu_transaksi', { ascending: true }).order('id', { ascending: true })),
         fetchAllPages(supabase.from('ref_akun').select('*').order('nomor_akun', { ascending: true })),
         fetchAllPages(supabase.from('ref_rekening').select('*')),
       ]);
@@ -439,8 +439,127 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* FORCE LANDSCAPE & STYLING KHUSUS CETAK PDF */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page { size: landscape; margin: 10mm; }
+
+          /* PAKSA BROWSER MENCETAK WARNA BACKGROUND */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          
+          /* Kartu Summary Cetak (Ramping & Seragam) */
+          .print-card-container {
+             display: flex !important;
+             gap: 20px !important;
+             margin-bottom: 20px !important;
+          }
+          .print-card {
+             flex: 1;
+             border: 1px solid #64748b !important;
+             background-color: #ffffff !important;
+             padding: 8px 12px !important;
+             border-radius: 0 !important;
+             box-shadow: none !important;
+             color: #000000 !important;
+             min-height: auto !important;
+          }
+          .print-card * {
+             color: #000000 !important;
+             opacity: 1 !important;
+             text-shadow: none !important;
+             box-shadow: none !important;
+          }
+          .print-card .absolute { display: none !important; }
+          .print-card .text-[10px] { font-size: 11px !important; margin-bottom: 4px !important; }
+          .print-card h4 { font-size: 16px !important; font-weight: bold !important; margin-top: 0 !important; }
+          .print-card .mt-4 { display: none !important; }
+          
+          /* Sembunyikan kolom Saldo Awal (Kolom ke-2) */
+          table th:nth-child(2), table td:nth-child(2) {
+             display: none !important;
+          }
+          
+          /* Tema Kertas Resmi (Hilangkan efek gelap/Web, buat ringkas) */
+          table { width: 100%; border-collapse: collapse !important; }
+          table tr { background-color: transparent !important; }
+          th, td { 
+             border: 1px solid #64748b !important; /* Garis seragam abu-abu gelap agar jelas (slate-500) */
+             color: #000000 !important; 
+             background-color: #ffffff !important; 
+             box-shadow: none !important;
+             padding: 4px 6px !important; /* Sedikit dilonggarkan agar lebih cantik tapi tetap ringkas */
+             font-size: 10px !important;
+             line-height: 1.2 !important;
+             opacity: 1 !important; /* Menghilangkan efek transparan (opacity) dari class Tailwind web */
+          }
+          th { 
+             background-color: #e2e8f0 !important; /* Header abu-abu cantik (slate-200) */
+             font-weight: 900 !important; 
+             text-align: center !important;
+          }
+          
+          /* PENERIMAAN (4xxxx) */
+          tr.print-induk-masuk td {
+             background-color: #bbf7d0 !important; /* Hijau tua soft (green-200) */
+             font-weight: bold !important;
+             color: #000000 !important;
+          }
+          tr.print-kel-masuk td {
+             background-color: #dcfce7 !important; /* Hijau muda soft (green-100) */
+             font-weight: 600 !important;
+             color: #000000 !important;
+          }
+
+          /* PENGELUARAN (5xxxx) */
+          tr.print-induk-keluar td {
+             background-color: #fecaca !important; /* Merah tua soft (red-200) */
+             font-weight: bold !important;
+             color: #000000 !important;
+          }
+          tr.print-kel-keluar td {
+             background-color: #fee2e2 !important; /* Merah muda soft (red-100) */
+             font-weight: 600 !important;
+             color: #000000 !important;
+          }
+          
+          /* DEFAULT / LAINNYA */
+          tr.print-induk td {
+             background-color: #e2e8f0 !important; 
+             font-weight: bold !important;
+             color: #000000 !important;
+          }
+          tr.print-kel td {
+             background-color: #f1f5f9 !important; 
+             font-weight: 600 !important;
+             color: #000000 !important;
+          }
+          
+          /* Baris Anak/Detail dibiarkan putih polos */
+          tr.print-anak td {
+             background-color: #ffffff !important; 
+             font-weight: normal !important;
+          }
+          
+          /* Hilangkan elemen web yang tidak perlu di kertas */
+          svg.lucide-chevron-right, svg.lucide-chevron-down { display: none !important; }
+          .sticky { position: static !important; } /* Cegah bug print berantakan */
+          
+          /* Pastikan teks tidak putih jika sebelumnya putih */
+          .text-white, .text-sky-100, .text-sky-200, .text-sky-300, .text-sky-400, .text-cyan-200, .text-cyan-400 {
+             color: #000000 !important;
+          }
+          
+          /* Otomatis Buka Semua Rincian Saat Cetak */
+          .print-expand { display: table-row !important; }
+        }
+      `}} />
+
       {/* HEADER */}
-      <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-3xl p-8 text-white shadow-2xl">
+      <div className="print:hidden bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
@@ -457,12 +576,21 @@ export default function DashboardPage() {
             >
               {tahunList.map(y => <option key={y} value={y} className="text-gray-900">{y}</option>)}
             </select>
+            <button onClick={() => window.print()} className="ml-4 bg-white text-indigo-600 hover:bg-gray-100 px-6 py-2 rounded-xl font-black transition-transform hover:scale-105 flex items-center gap-2 shadow-md">
+               <Printer size={18} /> CETAK PDF
+            </button>
           </div>
         </div>
       </div>
 
+      {/* HEADER KHUSUS CETAK PDF */}
+      <div className="hidden print:block text-center mb-8 border-b-2 border-black pb-4">
+          <h1 className="text-3xl font-black tracking-widest uppercase">Laporan Dashboard Konsolidasi</h1>
+          <p className="font-bold text-gray-700 mt-2">Periode Data: Tahun {tahun}</p>
+      </div>
+
       {/* SUMMARY CARDS GRID - SOFT BRIGHT COLORS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 print:flex print-card-container">
         <SummaryCard 
           label="Saldo Awal" 
           value={summary.saldoAwal} 
@@ -478,6 +606,7 @@ export default function DashboardPage() {
           color="bg-emerald-400" 
           subLabel="Penerimaan"
           subValue={summary.masuk}
+          hideOnPrint={true}
         />
         <SummaryCard 
           label="Uang Keluar" 
@@ -486,6 +615,7 @@ export default function DashboardPage() {
           color="bg-rose-400" 
           subLabel="Pengeluaran"
           subValue={summary.keluar}
+          hideOnPrint={true}
         />
         <SummaryCard 
           label="Saldo Akhir" 
@@ -557,124 +687,152 @@ export default function DashboardPage() {
               return <div className="p-10 text-center text-gray-400 font-medium">Tidak ada data transaksi untuk tahun {tahun}</div>;
             }
 
-            const TableRow = ({ row, depth = 0, type = 'induk' }: any) => {
-              const isInduk = type === 'induk';
-              const isKel = type === 'kel';
-              const expanded = isInduk ? expandedCoa[row.id] : isKel ? expandedKel[row.id] : false;
-              const toggle = isInduk ? () => toggleCoa(row.id) : isKel ? () => toggleKel(row.id) : null;
-              const hasChildren = (isInduk && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
+            const renderTable = (mode: 'web' | 'print-summary' | 'print-detail') => {
+              const wrapperClass = mode === 'web' ? 'print:hidden' : mode === 'print-summary' ? 'hidden print:table mb-12' : 'hidden print:table';
+
+              const TableRow = ({ row, depth = 0, type = 'induk', isHiddenByParent = false }: any) => {
+                const isInduk = type === 'induk';
+                const isKel = type === 'kel';
+                // For web: use state. For print-summary: always false. For print-detail: always true (or use CSS)
+                const isExpanded = mode === 'web' ? (isInduk ? expandedCoa[row.id] : isKel ? expandedKel[row.id] : false) : mode === 'print-detail';
+                const toggle = mode === 'web' ? (isInduk ? () => toggleCoa(row.id) : isKel ? () => toggleKel(row.id) : null) : null;
+                const hasChildren = (isInduk && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
+
+                // If mode is print-summary, we NEVER render children.
+                const shouldRenderChildren = mode !== 'print-summary' && (mode === 'print-detail' || isExpanded);
+
+                if (row.masuk === 0 && row.keluar === 0) return null; // Sembunyikan jika tidak ada transaksi setahun
+
+                const isHiddenAccount = row.nama_akun?.toLowerCase().includes('kas & bank') || row.nama_akun?.toLowerCase().includes('koreksi bank') || row.nomor_akun?.startsWith('10') || row.nomor_akun?.startsWith('90');
+                if (mode !== 'web' && isHiddenAccount) return null;
+
+                const accPrefix = String(row.nomor_akun).charAt(0);
+                const isPengeluaran = accPrefix === '5';
+                const typeSuffix = accPrefix === '4' ? '-masuk' : isPengeluaran ? '-keluar' : '';
+                const printClass = mode !== 'web' ? (isInduk ? `print-induk${typeSuffix}` : isKel ? `print-kel${typeSuffix}` : 'print-anak') : '';
+
+                return (
+                  <>
+                    <tr className={`hover:bg-slate-50 transition-colors ${isInduk ? 'bg-slate-50/50 font-bold' : ''} ${isHiddenByParent ? (mode === 'print-detail' ? '' : 'hidden') : ''} ${printClass}`}>
+                      <td 
+                        className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] cursor-pointer select-none"
+                        onClick={toggle || undefined}
+                        style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {hasChildren ? (
+                             isExpanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />
+                          ) : <div className="w-3.5" />}
+                          <div className="flex flex-col truncate">
+                            <span className="text-[8px] text-gray-400 leading-none">{row.nomor_akun}</span>
+                            <span className={`${isInduk ? 'text-[11px] font-black' : 'text-[11px] font-medium'} text-gray-700`}>{row.nama_akun}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-right bg-white border-r text-[10px] font-mono text-gray-400 italic">
+                        {isInduk ? fmt(row.saldoAwal || 0) : ''}
+                      </td>
+                      {activeMonthIdx.map(m => {
+                        const val = row.monthTotals[m] || { masuk: 0, keluar: 0 };
+                        const diff = val.masuk - val.keluar;
+                        return (
+                          <td key={m} className={`p-2 text-right border-r font-mono font-bold ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-rose-500' : 'text-gray-200'}`}>
+                            {diff !== 0 ? fmt(Math.abs(diff)) : '-'}
+                          </td>
+                        );
+                      })}
+                      <td className={`p-3 text-right font-black bg-slate-900 text-sky-300 text-[11px] border-l border-slate-700 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.1)]`}>
+                        {fmt(isPengeluaran ? Math.abs(row.masuk - row.keluar) : (row.masuk - row.keluar))}
+                      </td>
+                    </tr>
+                    {shouldRenderChildren && isInduk && row.kelompoks.map((k: any) => <TableRow key={k.id} row={k} depth={1} type="kel" isHiddenByParent={isHiddenByParent} />)}
+                    {shouldRenderChildren && isKel && row.anaks.map((a: any) => <TableRow key={a.id} row={a} depth={2} type="anak" isHiddenByParent={isHiddenByParent} />)}
+                  </>
+                );
+              };
 
               return (
-                <>
-                  <tr className={`hover:bg-slate-50 transition-colors ${isInduk ? 'bg-slate-50/50 font-bold' : ''}`}>
-                    <td 
-                      className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] cursor-pointer select-none"
-                      onClick={toggle || undefined}
-                      style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
-                    >
-                      <div className="flex items-center gap-2">
-                        {hasChildren ? (
-                           expanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />
-                        ) : <div className="w-3.5" />}
-                        <div className="flex flex-col truncate">
-                          <span className="text-[8px] text-gray-400 leading-none">{row.nomor_akun}</span>
-                          <span className={`${isInduk ? 'text-[11px] font-black' : 'text-[11px] font-medium'} text-gray-700`}>{row.nama_akun}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3 text-right bg-white border-r text-[10px] font-mono text-gray-400 italic">
-                      {isInduk ? fmt(row.saldoAwal || 0) : ''}
-                    </td>
-                    {activeMonthIdx.map(m => {
-                      const val = row.monthTotals[m] || { masuk: 0, keluar: 0 };
-                      const diff = val.masuk - val.keluar;
-                      return (
-                        <td key={m} className={`p-2 text-right border-r font-mono font-bold ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-rose-500' : 'text-gray-200'}`}>
-                          {diff !== 0 ? fmt(Math.abs(diff)) : '-'}
+                <div className={mode !== 'web' ? wrapperClass : ''}>
+                  {mode === 'print-summary' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase">Ringkasan Mutasi (Induk)</h2>}
+                  {mode === 'print-detail' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase mt-8 border-t-2 border-black pt-8">Rincian Lengkap Mutasi (Detail)</h2>}
+                  <table className={`text-[11px] text-left border-separate border-spacing-0 min-w-full ${mode === 'web' ? wrapperClass : ''}`}>
+                    <thead>
+                      <tr className="bg-slate-900 text-white uppercase tracking-tighter sticky top-0 z-[60]">
+                        <th className="p-4 border-r border-slate-700 bg-slate-900 sticky left-0 z-[70] min-w-[250px] text-xs font-black">Akun Hirarki</th>
+                        <th className="p-4 border-r border-slate-700 text-center text-xs bg-slate-900">Saldo Awal</th>
+                        {activeMonthIdx.map(m => (
+                          <th key={m} className="p-2 border-r border-slate-700 text-center bg-slate-800 text-xs shadow-inner">
+                            {BULAN[m-1]}
+                          </th>
+                        ))}
+                        <th className="p-4 text-center bg-slate-900 sticky right-0 z-[70] border-l border-slate-700 text-xs font-black shadow-[-4px_0_15px_rgba(0,0,0,0.3)]">Saldo Akhir</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                       <tr className="bg-slate-800 text-white font-black cursor-pointer group sticky top-[52px] z-[50]" onClick={mode === 'web' ? () => setExpandPosisiAwal(!expandPosisiAwal) : undefined}>
+                          <td className="p-4 sticky left-0 bg-slate-800 z-[55] border-r border-slate-700 flex items-center gap-2 group-hover:bg-slate-700 transition-colors">
+                            {mode === 'web' ? (expandPosisiAwal ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : <div className="w-4"></div>}
+                            <span className="text-sky-400">▶</span> TOTAL POSISI AWAL
+                          </td>
+                          <td className="p-4 text-right border-r border-slate-700 text-sky-100 bg-slate-800/80 font-mono text-xs">{fmt(summary.saldoAwal)}</td>
+                          {activeMonthIdx.map(m => {
+                            const prevM = m - 1;
+                            const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
+                            return <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-400 bg-slate-800/50">{fmt(val)}</td>;
+                          })}
+                          <td className="p-4 text-right bg-slate-900 font-black sticky right-0 z-[55] border-l border-slate-700 text-sky-300 font-mono text-xs shadow-[-4px_0_15px_rgba(0,0,0,0.4)]">{fmt(summary.saldoAwal)}</td>
+                       </tr>
+
+                       {((mode === 'web' && expandPosisiAwal) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
+                         <tr key={`awal-${r.id}`} className="bg-slate-700/10 text-[10px] text-slate-500 italic">
+                            <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-b">{r.nama}</td>
+                            <td className="p-3 text-right border-r bg-slate-50/50 border-b">{fmt(r.saldoAwal)}</td>
+                            {activeMonthIdx.map(m => {
+                              const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
+                              return <td key={`awal-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-b">{fmt(val)}</td>;
+                            })}
+                            <td className="p-3 text-right bg-slate-900 text-sky-400/70 border-l border-slate-800 sticky right-0 z-[40] font-bold border-b shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">{fmt(r.saldoAwal)}</td>
+                         </tr>
+                       ))}
+
+                       {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
+                      
+                       <tr className="bg-slate-900 text-white font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-8px_20px_rgba(0,0,0,0.2)]" onClick={mode === 'web' ? () => setExpandPosisiAkhir(!expandPosisiAkhir) : undefined}>
+                        <td className="p-4 border-r border-slate-700 sticky left-0 bg-slate-900 z-[65] flex items-center gap-2 uppercase text-xs group-hover:bg-slate-800 transition-colors border-t border-slate-700">
+                          {mode === 'web' ? (expandPosisiAkhir ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : <div className="w-4"></div>}
+                          <span className="text-sky-400">▶</span> TOTAL POSISI AKHIR
                         </td>
-                      );
-                    })}
-                    <td className={`p-3 text-right font-black bg-slate-900 text-sky-300 text-[11px] border-l border-slate-700 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.1)]`}>
-                      {fmt(row.masuk - row.keluar)}
-                    </td>
-                  </tr>
-                  {expanded && isInduk && row.kelompoks.map((k: any) => <TableRow key={k.id} row={k} depth={1} type="kel" />)}
-                  {expanded && isKel && row.anaks.map((a: any) => <TableRow key={a.id} row={a} depth={2} type="anak" />)}
-                </>
+                        <td className="p-4 text-right border-r border-slate-700 opacity-40 bg-slate-900/60 border-t border-slate-700">-</td>
+                        {activeMonthIdx.map(m => (
+                          <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-200 text-xs bg-slate-900 border-t border-slate-700">
+                            {fmt(chartData[m-1]?.saldo || 0)}
+                          </td>
+                        ))}
+                        <td className="p-4 text-right font-mono bg-slate-950 sticky right-0 z-[65] border-l border-slate-700 text-cyan-200 text-xs shadow-[-4px_0_20px_rgba(0,0,0,0.5)] border-t border-slate-700">{fmt(summary.saldoAkhir)}</td>
+                      </tr>
+
+                       {((mode === 'web' && expandPosisiAkhir) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
+                         <tr key={`akhir-${r.id}`} className="bg-slate-900 text-[10px] text-slate-400 italic">
+                            <td className="p-3 pl-12 border-r sticky left-0 bg-slate-900 z-[40] truncate max-w-[200px] border-t border-slate-800">{r.nama}</td>
+                            <td className="p-3 text-right border-r bg-slate-900/80 opacity-40 border-t border-slate-800">-</td>
+                            {activeMonthIdx.map(m => (
+                              <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-t border-slate-800">{fmt(r.monthlySaldo[m] || 0)}</td>
+                            ))}
+                            <td className="p-3 text-right bg-slate-900 border-l border-slate-800 sticky right-0 z-[40] font-black border-t text-cyan-400 shadow-[-4px_0_10px_rgba(0,0,0,0.3)]">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}</td>
+                         </tr>
+                       ))}
+                    </tbody>
+                  </table>
+                </div>
               );
             };
 
             return (
-              <table className="text-[11px] text-left border-separate border-spacing-0 min-w-full">
-                <thead>
-                  <tr className="bg-slate-900 text-white uppercase tracking-tighter sticky top-0 z-[60]">
-                    <th className="p-4 border-r border-slate-700 bg-slate-900 sticky left-0 z-[70] min-w-[250px] text-xs font-black">Akun Hirarki</th>
-                    <th className="p-4 border-r border-slate-700 text-center text-xs bg-slate-900">Saldo Awal</th>
-                    {activeMonthIdx.map(m => (
-                      <th key={m} className="p-2 border-r border-slate-700 text-center bg-slate-800 text-xs shadow-inner">
-                        {BULAN[m-1]}
-                      </th>
-                    ))}
-                    <th className="p-4 text-center bg-slate-900 sticky right-0 z-[70] border-l border-slate-700 text-xs font-black shadow-[-4px_0_15px_rgba(0,0,0,0.3)]">Saldo Akhir</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                   {/* ROW POSISI AWAL KEUANGAN (Collapsible) */}
-                   <tr className="bg-slate-800 text-white font-black cursor-pointer group sticky top-[52px] z-[50]" onClick={() => setExpandPosisiAwal(!expandPosisiAwal)}>
-                      <td className="p-4 sticky left-0 bg-slate-800 z-[55] border-r border-slate-700 flex items-center gap-2 group-hover:bg-slate-700 transition-colors">
-                        {expandPosisiAwal ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        <span className="text-sky-400">▶</span> TOTAL POSISI AWAL
-                      </td>
-                      <td className="p-4 text-right border-r border-slate-700 text-sky-100 bg-slate-800/80 font-mono text-xs">{fmt(summary.saldoAwal)}</td>
-                      {activeMonthIdx.map(m => {
-                        const prevM = m - 1;
-                        const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
-                        return <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-400 bg-slate-800/50">{fmt(val)}</td>;
-                      })}
-                      <td className="p-4 text-right bg-slate-900 font-black sticky right-0 z-[55] border-l border-slate-700 text-sky-300 font-mono text-xs shadow-[-4px_0_15px_rgba(0,0,0,0.4)]">{fmt(summary.saldoAwal)}</td>
-                   </tr>
-
-                   {expandPosisiAwal && monthlyAccountSaldo.map((r, ri) => (
-                     <tr key={`awal-${r.id}`} className="bg-slate-700/10 text-[10px] text-slate-500 italic">
-                        <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-b">{r.nama}</td>
-                        <td className="p-3 text-right border-r bg-slate-50/50 border-b">{fmt(r.saldoAwal)}</td>
-                        {activeMonthIdx.map(m => {
-                          const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
-                          return <td key={`awal-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-b">{fmt(val)}</td>;
-                        })}
-                        <td className="p-3 text-right bg-slate-900 text-sky-400/70 border-l border-slate-800 sticky right-0 z-[40] font-bold border-b shadow-[-4px_0_10px_rgba(0,0,0,0.2)]">{fmt(r.saldoAwal)}</td>
-                     </tr>
-                   ))}
-
-                   {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
-                  
-                   {/* ROW POSISI AKHIR KEUANGAN (Collapsible) */}
-                   <tr className="bg-slate-900 text-white font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-8px_20px_rgba(0,0,0,0.2)]" onClick={() => setExpandPosisiAkhir(!expandPosisiAkhir)}>
-                    <td className="p-4 border-r border-slate-700 sticky left-0 bg-slate-900 z-[65] flex items-center gap-2 uppercase text-xs group-hover:bg-slate-800 transition-colors border-t border-slate-700">
-                      {expandPosisiAkhir ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      <span className="text-sky-400">▶</span> TOTAL POSISI AKHIR
-                    </td>
-                    <td className="p-4 text-right border-r border-slate-700 opacity-40 bg-slate-900/60 border-t border-slate-700">-</td>
-                    {activeMonthIdx.map(m => (
-                      <td key={m} className="p-2 text-right border-r border-slate-700 font-mono text-sky-200 text-xs bg-slate-900 border-t border-slate-700">
-                        {fmt(chartData[m-1]?.saldo || 0)}
-                      </td>
-                    ))}
-                    <td className="p-4 text-right font-mono bg-slate-950 sticky right-0 z-[65] border-l border-slate-700 text-cyan-200 text-xs shadow-[-4px_0_20px_rgba(0,0,0,0.5)] border-t border-slate-700">{fmt(summary.saldoAkhir)}</td>
-                  </tr>
-
-                   {expandPosisiAkhir && monthlyAccountSaldo.map((r, ri) => (
-                     <tr key={`akhir-${r.id}`} className="bg-slate-900 text-[10px] text-slate-400 italic">
-                        <td className="p-3 pl-12 border-r sticky left-0 bg-slate-900 z-[40] truncate max-w-[200px] border-t border-slate-800">{r.nama}</td>
-                        <td className="p-3 text-right border-r bg-slate-900/80 opacity-40 border-t border-slate-800">-</td>
-                        {activeMonthIdx.map(m => (
-                          <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-t border-slate-800">{fmt(r.monthlySaldo[m] || 0)}</td>
-                        ))}
-                        <td className="p-3 text-right bg-slate-900 border-l border-slate-800 sticky right-0 z-[40] font-black border-t text-cyan-400 shadow-[-4px_0_10px_rgba(0,0,0,0.3)]">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}</td>
-                     </tr>
-                   ))}
-                </tbody>
-              </table>
+              <>
+                {renderTable('web')}
+                {renderTable('print-summary')}
+                {renderTable('print-detail')}
+              </>
             );
           })()}
         </div>

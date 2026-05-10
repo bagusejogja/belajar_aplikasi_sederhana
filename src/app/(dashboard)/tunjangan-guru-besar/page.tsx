@@ -292,26 +292,29 @@ export default function TunjanganGuruBesarPage() {
 
       {!isLoading && (
         <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-8 rounded-[2.5rem] shadow-2xl text-white">
-            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Total Anggaran Tunjangan</span>
-            <div className="text-3xl font-black mt-2">{formatRupiah(stats.total).replace(',00', '')}</div>
-            <div className="mt-2 text-[9px] font-medium text-indigo-300 italic">* Termasuk Tunjangan 13 & 14</div>
-          </div>
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center justify-between">
-             <div>
-               <span className="text-[10px] font-black uppercase text-slate-400">PNS</span>
-               <div className="text-2xl font-black text-slate-800">{stats.countPNS} <span className="text-xs font-normal text-slate-400">Org</span></div>
-               <div className="text-sm font-bold text-indigo-600 mt-1">{formatRupiah(stats.totalPNS).replace(',00', '')}</div>
+          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-6 rounded-3xl shadow-lg text-white flex items-center justify-between min-w-0">
+             <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Total Keseluruhan</span>
+               <div className="text-2xl font-black text-white truncate">{filteredData.length} <span className="text-xs font-normal text-slate-400">Org</span></div>
+               <div className="text-sm font-bold text-emerald-400 mt-1 truncate" title={formatRupiah(stats.total)}>{formatRupiah(stats.total).replace(',00', '')}</div>
              </div>
-             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl">P</div>
+             <div className="w-12 h-12 flex-shrink-0 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-xl">Σ</div>
           </div>
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center justify-between">
-             <div>
-               <span className="text-[10px] font-black uppercase text-slate-400">Pegawai UGM</span>
-               <div className="text-2xl font-black text-slate-800">{stats.countUGM} <span className="text-xs font-normal text-slate-400">Org</span></div>
-               <div className="text-sm font-bold text-emerald-600 mt-1">{formatRupiah(stats.totalUGM).replace(',00', '')}</div>
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+             <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Kelompok PNS</span>
+               <div className="text-2xl font-black text-slate-800 truncate">{stats.countPNS} <span className="text-xs font-normal text-slate-400">Org</span></div>
+               <div className="text-sm font-bold text-indigo-600 mt-1 truncate" title={formatRupiah(stats.totalPNS)}>{formatRupiah(stats.totalPNS).replace(',00', '')}</div>
              </div>
-             <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 font-black text-xl">U</div>
+             <div className="w-12 h-12 flex-shrink-0 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl">P</div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+             <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Pegawai UGM</span>
+               <div className="text-2xl font-black text-slate-800 truncate">{stats.countUGM} <span className="text-xs font-normal text-slate-400">Org</span></div>
+               <div className="text-sm font-bold text-emerald-600 mt-1 truncate" title={formatRupiah(stats.totalUGM)}>{formatRupiah(stats.totalUGM).replace(',00', '')}</div>
+             </div>
+             <div className="w-12 h-12 flex-shrink-0 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 font-black text-xl">U</div>
           </div>
         </div>
       )}
@@ -327,42 +330,44 @@ export default function TunjanganGuruBesarPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-[10px] text-slate-400 uppercase bg-slate-50 font-black tracking-widest border-b">
               <tr>
-                <th className="px-8 py-6 text-center">No</th>
-                <th className="px-6 py-6">NIP</th>
-                <th className="px-6 py-6">Nama Guru Besar</th>
-                <th className="px-6 py-6 text-center">Status</th>
-                <th className="px-6 py-6 text-center">Gol</th>
-                <th className="px-6 py-6">Tgl Pensiun (70th)</th>
-                <th className="px-6 py-6">Unit Kerja</th>
-                <th className="px-6 py-6 text-center">Bln</th>
-                <th className="px-6 py-6 text-right">Tunj. Guru Besar</th>
-                <th className="px-8 py-6 text-right">Total Anggaran</th>
+                <th className="px-8 py-6 text-center w-16">No</th>
+                <th className="px-6 py-6">Profil Guru Besar</th>
+                <th className="px-6 py-6 text-center w-24">Bln</th>
+                <th className="px-6 py-6 text-right w-48">Tunj. Guru Besar</th>
+                <th className="px-8 py-6 text-right w-48">Total Anggaran</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={10} className="px-6 py-32 text-center text-slate-300 font-medium italic animate-pulse">Menghitung Anggaran Tunjangan...</td></tr>
+                <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-300 font-medium italic animate-pulse">Menghitung Anggaran Tunjangan...</td></tr>
               ) : currentItems.length === 0 ? (
-                <tr><td colSpan={10} className="px-6 py-32 text-center text-slate-400">Data tidak ditemukan.</td></tr>
+                <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-400">Data tidak ditemukan.</td></tr>
               ) : currentItems.map((item) => (
                 <tr key={item.id} className="border-b border-slate-50 hover:bg-indigo-50/20 transition-colors group">
-                  <td className="px-8 py-5 text-center text-slate-300 font-bold">{item.no}</td>
-                  <td className="px-6 py-5 font-mono text-xs text-slate-500">{item.nip}</td>
-                  <td className="px-6 py-5 font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{item.nama_pegawai}</td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${item.isPegawaiUGM ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}`}>
-                      {item.isPegawaiUGM ? 'UGM' : 'PNS'}
-                    </span>
+                  <td className="px-8 py-5 text-center text-slate-300 font-bold align-top">{item.no}</td>
+                  <td className="px-6 py-5 align-top">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="font-bold text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">{item.nama_pegawai}</div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                        <span className="font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{item.nip}</span>
+                        <span className="text-slate-500 truncate max-w-xs">{item.unit_kerja}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${item.isPegawaiUGM ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}`}>
+                          {item.isPegawaiUGM ? 'UGM' : 'PNS'}
+                        </span>
+                        {item.golongan && <span className="px-2 py-0.5 rounded-md text-[10px] font-black text-slate-500 bg-slate-100 border border-slate-200">{item.golongan}</span>}
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                          Pensiun (70th): {item.info.tglPensiun}
+                        </span>
+                        {item.info.isPensiun2026 && <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 text-[9px] rounded font-black uppercase tracking-tighter">Pensiun 2026</span>}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-6 py-5 text-center font-black text-slate-400">{item.golongan}</td>
-                  <td className="px-6 py-5 text-slate-500 text-xs">
-                    {item.info.tglPensiun}
-                    {item.info.isPensiun2026 && <span className="ml-2 px-1.5 py-0.5 bg-amber-500 text-white text-[8px] rounded-full font-black uppercase tracking-tighter">Pensiun 2026</span>}
-                  </td>
-                  <td className="px-6 py-5 text-slate-600 text-xs">{item.unit_kerja}</td>
-                  <td className="px-6 py-5 text-center font-bold text-indigo-900">{item.info.totalBulanBayar}</td>
-                  <td className="px-6 py-5 text-right font-medium text-slate-600">{formatRupiah(item.tunjGuruBesar)}</td>
-                  <td className="px-8 py-5 text-right font-black text-slate-900">{formatRupiah(item.total)}</td>
+                  <td className="px-6 py-5 text-center font-bold text-indigo-900 align-top">{item.info.totalBulanBayar}</td>
+                  <td className="px-6 py-5 text-right font-medium text-slate-600 align-top">{formatRupiah(item.tunjGuruBesar)}</td>
+                  <td className="px-8 py-5 text-right font-black text-slate-900 align-top">{formatRupiah(item.total)}</td>
                 </tr>
               ))}
             </tbody>

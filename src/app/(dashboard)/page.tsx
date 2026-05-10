@@ -2,8 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { CheckCircle, XCircle, Loader2, Info } from 'lucide-react';
+import { 
+  CheckCircle, XCircle, Loader2, Info, LayoutDashboard, 
+  Clock, AlertCircle, Eye, Sparkles, Building2, CreditCard 
+} from 'lucide-react';
 import Select from 'react-select';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function VerificationPage() {
   const [pendingTrx, setPendingTrx] = useState<any[]>([]);
@@ -122,14 +126,33 @@ export default function VerificationPage() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="bg-indigo-600 rounded-3xl p-8 flex items-center justify-between text-white shadow-xl shadow-indigo-200">
-         <div>
-            <h2 className="text-3xl font-black mb-2">Verifikasi Transaksi</h2>
-            <p className="text-indigo-100 font-medium">Bantu periksa bukti foto dan sahkan transaksi yang masuk agar tampil di Laporan Utama.</p>
-         </div>
-         <div className="hidden md:flex bg-white/20 p-4 rounded-2xl items-center justify-center font-black text-4xl shadow-inner">
-            {pendingTrx.length}
+    <div className="space-y-8 pb-20">
+      {/* Header Command Center */}
+      <div className="relative bg-slate-900 rounded-[3.5rem] p-10 overflow-hidden shadow-2xl border border-white/5">
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
+         <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2" />
+         
+         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
+            <div className="text-center lg:text-left">
+               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+                  <Sparkles size={12} /> AI Security Shield Active
+               </div>
+               <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter leading-tight italic uppercase">
+                  Verification <span className="text-indigo-400">Hub</span>
+               </h1>
+               <p className="text-slate-400 font-medium mt-3 max-w-lg">Pusat kendali validasi transaksi keuangan. Periksa bukti fisik dengan teliti untuk menjaga akuntabilitas.</p>
+            </div>
+            
+            <div className="flex gap-4">
+               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[140px] hover:bg-white/10 transition-colors">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pending</span>
+                  <span className="text-4xl font-black text-white">{pendingTrx.length}</span>
+               </div>
+               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[140px] hover:bg-white/10 transition-colors">
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Queue</span>
+                  <LayoutDashboard size={32} className="text-emerald-500 mt-1" />
+               </div>
+            </div>
          </div>
       </div>
 
@@ -147,28 +170,38 @@ export default function VerificationPage() {
                const isPemasukan = Number(trx.uang_masuk) > 0;
                const nominal = isPemasukan ? trx.uang_masuk : trx.uang_keluar;
                
-               return (
-                  <div key={trx.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-6 relative overflow-hidden group hover:border-indigo-200 transition-all">
-                     <div className={`absolute top-0 left-0 w-full h-2 ${isPemasukan ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
-                     
-                     
-                     <div className="flex flex-col gap-6 w-full pt-2">
-                        <div className="flex-1 space-y-4">
-                           <div className="flex justify-between items-start bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50">
-                              <div>
-                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">{trx.tanggal}</p>
-                                 <h3 className="text-xl font-black text-gray-900 leading-tight">{trx.uraian}</h3>
-                                 <p className="text-sm font-bold text-gray-500 mt-2">🧑 {trx.ref_personel?.nama_orang || '?'} &nbsp;•&nbsp; 🛒 {trx.toko || '-'}</p>
-                              </div>
-                              <div className="text-right shrink-0 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
-                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">TOTAL NOMINAL</p>
-                                 <p className={`text-xl font-black ${isPemasukan ? 'text-emerald-600' : 'text-red-600'}`}>Rp {Number(nominal).toLocaleString('id-ID')}</p>
+               return <div key={trx.id} className="bg-white/80 backdrop-blur-md p-8 rounded-[3.5rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 group relative overflow-hidden">
+                      <div className={`absolute top-0 left-0 w-2 h-full ${isPemasukan ? 'bg-emerald-500' : 'bg-rose-500'} opacity-20 group-hover:opacity-100 transition-all duration-500`}></div>
+                      
+                      <div className="flex flex-col lg:flex-row gap-10">
+                        {/* Data Column */}
+                        <div className="flex-1 space-y-8">
+                           <div className="flex flex-wrap items-center gap-4">
+                              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${isPemasukan ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
+                                 {isPemasukan ? '↑ Pemasukan' : '↓ Pengeluaran'}
+                              </span>
+                              <span className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                 <Clock size={12} /> {trx.tanggal}
+                              </span>
+                           </div>
+
+                           <div>
+                              <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">{trx.uraian}</h3>
+                              <div className="flex items-center gap-4 mt-4 text-sm font-bold text-slate-400">
+                                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                                    <Building2 size={14} className="text-slate-300" /> {trx.ref_personel?.nama_orang || 'Tanpa PIC'}
+                                 </div>
+                                 {trx.toko && (
+                                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                                       <CreditCard size={14} className="text-slate-300" /> {trx.toko}
+                                    </div>
+                                 )}
                               </div>
                            </div>
 
-                           <div className="mt-4 p-5 md:p-6 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50">
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Perbaikan Kategori Akun (Jika Keliru):</label>
-                              <div className="relative z-50">
+                           <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100/50 space-y-6">
+                              <div>
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block px-1">Klasifikasi Akun Anggaran</label>
                                  <Select 
                                     options={listAkun.map(a => ({ value: a.id, label: `${a.nomor_akun} - ${a.nama_akun}` }))}
                                     value={
@@ -177,58 +210,78 @@ export default function VerificationPage() {
                                        : (trx.akun_id ? { value: trx.akun_id, label: trx.ref_akun ? `${trx.ref_akun.nomor_akun} - ${trx.ref_akun.nama_akun}` : 'Pilih Akun' } : null)
                                     }
                                     onChange={(val: any) => setSelectedAkun({...selectedAkun, [trx.id]: val?.value})}
-                                    placeholder="Ketik & Pilih Kategori Akun..."
-                                    styles={{ control: (b) => ({ ...b, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }) }}
+                                    styles={{
+                                       control: (b) => ({ ...b, borderRadius: '1.25rem', border: 'none', backgroundColor: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', padding: '0.4rem' }),
+                                    }}
                                     menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
                                  />
                               </div>
 
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mt-4 mb-2">Tulis Catatan / Alasan (Jika Revisi/Ditolak):</label>
-                              <textarea 
-                                 className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm font-medium text-gray-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all placeholder:text-gray-300 min-h-[80px]" 
-                                 placeholder="Tulis alasan jika Anda meminta staf memperbaikinya..."
-                                 value={catatan[trx.id] || ''}
-                                 onChange={(e) => setCatatan({...catatan, [trx.id]: e.target.value})}
-                              />
+                              <div>
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block px-1">Feedback Verifikasi</label>
+                                 <textarea 
+                                    className="w-full bg-white border-none rounded-2xl p-4 text-sm font-medium text-slate-700 outline-none focus:ring-4 ring-indigo-50 transition-all placeholder:text-slate-300 min-h-[100px] shadow-sm shadow-indigo-100/20" 
+                                    placeholder="Berikan instruksi revisi atau alasan penolakan di sini..."
+                                    value={catatan[trx.id] || ''}
+                                    onChange={(e) => setCatatan({...catatan, [trx.id]: e.target.value})}
+                                 />
+                              </div>
                            </div>
                         </div>
 
-                        {/* Foto Section Vertikal Memanjang */}
-                        <div className="w-full bg-white rounded-3xl p-5 md:p-6 border-2 border-indigo-50 shadow-[inset_0_2px_20px_rgba(79,70,229,0.03)]">
-                           <div className="flex items-center gap-2 mb-6 text-indigo-700 font-black border-b border-indigo-100/50 pb-3">
-                              <Info size={18}/> <span>GALERI LAMPIRAN FISIK</span>
+                        {/* Visual Column */}
+                        <div className="lg:w-[400px] space-y-6">
+                           <div className={`p-8 rounded-[3rem] ${isPemasukan ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'} border-2 flex flex-col items-center justify-center text-center`}>
+                              <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-2 ${isPemasukan ? 'text-emerald-500' : 'text-rose-500'}`}>Total Amount</p>
+                              <p className={`text-3xl font-black font-mono ${isPemasukan ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                 Rp {Number(nominal).toLocaleString('id-ID')}
+                              </p>
                            </div>
-                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                              {renderFoto("📸 Bukti Nota", trx.foto_nota)}
-                              {renderFoto("📸 Bukti Kegiatan", trx.foto_kegiatan)}
-                              {renderFoto("📸 Bukti Barang", trx.foto_barang)}
-                              {renderFoto("💸 Bukti Transfer", trx.foto_bukti_transfer)}
-                              
+
+                           <div className="bg-white rounded-[3rem] p-6 border border-slate-100 shadow-sm">
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                 <Eye size={14} /> Attachment Gallery
+                              </p>
+                              <div className="grid grid-cols-2 gap-4">
+                                 {renderFoto("Nota", trx.foto_nota)}
+                                 {renderFoto("Kegiatan", trx.foto_kegiatan)}
+                                 {renderFoto("Barang", trx.foto_barang)}
+                                 {renderFoto("Transfer", trx.foto_bukti_transfer)}
+                              </div>
                               {!(trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && (
-                                 <div className="text-center py-8 text-gray-400 font-bold bg-gray-50 rounded-xl border border-dashed border-gray-200">Tidak ada lampiran yang disertakan staf.</div>
+                                 <div className="py-10 text-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    No Attachments
+                                 </div>
                               )}
                            </div>
                         </div>
-                     </div>
+                      </div>
 
-                     {/* Tombol Aksi di Bawah Semua (Memanjang Horizontal) */}
-                     <div className="flex flex-col sm:flex-row gap-4 justify-between border-t-2 border-gray-100 pt-6 mt-2 w-full">
-                        <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white font-bold py-4 px-6 rounded-2xl transition-all disabled:opacity-50 border-2 border-red-100 hover:border-red-500">
-                           {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <XCircle size={18}/>} TOLAK MENTAH
-                        </button>
-                        
-                        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                           <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} className="flex-1 flex items-center justify-center gap-2 bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white font-black py-4 px-8 rounded-2xl transition-all disabled:opacity-50 border-2 border-amber-200 hover:border-amber-500">
-                              {processingId === trx.id ? <Loader2 size={18} className="animate-spin"/> : <Info size={18}/>} KEMBALIKAN (REVISI)
-                           </button>
-                           <button disabled={processingId === trx.id} onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 px-8 rounded-2xl transition-all shadow-xl shadow-emerald-200 disabled:opacity-50 min-w-[200px]">
-                              {processingId === trx.id ? <Loader2 size={24} className="animate-spin"/> : <CheckCircle size={24}/>} TERIMA (SAH)
-                           </button>
-                        </div>
-                     </div>
-                  </div>
-
-               );
+                      {/* Floating Actions */}
+                      <div className="mt-10 flex flex-wrap gap-4 pt-8 border-t border-slate-100">
+                         <button 
+                           onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} 
+                           disabled={processingId === trx.id}
+                           className="flex-1 min-w-[180px] flex items-center justify-center gap-3 px-8 py-5 bg-white border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-50"
+                         >
+                            {processingId === trx.id ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={18} />} TOLAK
+                         </button>
+                         <button 
+                           onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} 
+                           disabled={processingId === trx.id}
+                           className="flex-1 min-w-[180px] flex items-center justify-center gap-3 px-8 py-5 bg-white border border-amber-100 text-amber-600 hover:bg-amber-500 hover:text-white rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-50"
+                         >
+                            {processingId === trx.id ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={18} />} REVISI
+                         </button>
+                         <button 
+                           onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} 
+                           disabled={processingId === trx.id}
+                           className="flex-[2] min-w-[250px] flex items-center justify-center gap-4 px-8 py-5 bg-slate-900 text-white hover:bg-black rounded-[2rem] font-black text-lg shadow-xl shadow-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                         >
+                            {processingId === trx.id ? <Loader2 size={24} className="animate-spin" /> : <CheckCircle size={24} className="text-emerald-400" />} SETUJUI TRANSAKSI
+                         </button>
+                      </div>
+                   </div>;
             })}
          </div>
       )}

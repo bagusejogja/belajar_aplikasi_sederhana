@@ -114,38 +114,32 @@ export default function GovReportsPage() {
       </div>
 
       {/* OVERALL STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-         <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-            <div className="absolute right-6 top-6 bg-white/10 p-3 rounded-2xl">
-               <Wallet size={24} className="text-blue-300" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+         <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-6 rounded-3xl shadow-lg text-white flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Total Alokasi Pagu</span>
+               <div className="text-xl font-black text-white truncate" title={`IDR ${totalPagu.toLocaleString('id-ID')}`}>IDR {totalPagu.toLocaleString('id-ID')}</div>
+               <div className="text-[10px] mt-1 text-slate-500 font-bold uppercase tracking-wider">Dana Aktif TA {selectedYear}</div>
             </div>
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">Total Alokasi Pagu</p>
-            <h4 className="text-3xl font-black tracking-tight">IDR {totalPagu.toLocaleString('id-ID')}</h4>
-            <div className="mt-6 flex items-center gap-2 text-[10px] font-bold text-blue-300/60 tracking-wider">
-               <ArrowUpRight size={14} /> DANA AKTIF TA 2025
-            </div>
+            <div className="w-12 h-12 flex-shrink-0 bg-white/10 rounded-2xl flex items-center justify-center"><Wallet size={22} className="text-blue-300" /></div>
          </div>
 
-         <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl relative overflow-hidden group">
-            <div className="absolute right-6 top-6 bg-red-50 p-3 rounded-2xl">
-               <TrendingDown size={24} className="text-red-500" />
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Total Realisasi</span>
+               <div className="text-xl font-black text-slate-800 truncate" title={`IDR ${totalSpent.toLocaleString('id-ID')}`}>IDR {totalSpent.toLocaleString('id-ID')}</div>
+               <div className="mt-1"><span className="bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-md text-[10px] font-black">{((totalSpent/totalPagu)*100).toFixed(2)}% Terpakai</span></div>
             </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Realisasi</p>
-            <h4 className="text-3xl font-black text-slate-900 tracking-tight">IDR {totalSpent.toLocaleString('id-ID')}</h4>
-            <div className="mt-6 flex items-center gap-2 text-[10px] font-black tracking-wider">
-               <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full">{((totalSpent/totalPagu)*100).toFixed(2)}% TERPAKAI</span>
-            </div>
+            <div className="w-12 h-12 flex-shrink-0 bg-red-50 rounded-2xl flex items-center justify-center"><TrendingDown size={22} className="text-red-500" /></div>
          </div>
 
-         <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-            <div className="absolute right-6 top-6 bg-white/20 p-3 rounded-2xl">
-               <TrendingUp size={24} className="text-white" />
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Sisa Anggaran</span>
+               <div className="text-xl font-black text-emerald-600 truncate" title={`IDR ${(totalPagu-totalSpent).toLocaleString('id-ID')}`}>IDR {(totalPagu - totalSpent).toLocaleString('id-ID')}</div>
+               <div className="text-[10px] mt-1 text-slate-400 font-bold uppercase tracking-wider">Siap Digunakan</div>
             </div>
-            <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-2">Sisa Anggaran</p>
-            <h4 className="text-3xl font-black tracking-tight">IDR {(totalPagu - totalSpent).toLocaleString('id-ID')}</h4>
-            <div className="mt-6 flex items-center gap-2 text-[10px] font-bold text-white/60 tracking-wider uppercase">
-               SIAP DIGUNAKAN
-            </div>
+            <div className="w-12 h-12 flex-shrink-0 bg-emerald-50 rounded-2xl flex items-center justify-center"><TrendingUp size={22} className="text-emerald-600" /></div>
          </div>
       </div>
 

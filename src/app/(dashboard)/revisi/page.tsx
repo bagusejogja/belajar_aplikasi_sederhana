@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldAlert, Loader2, Send, Info, Trash2, UploadCloud, X } from 'lucide-react';
+import { ShieldAlert, Loader2, Send, Info, Trash2, UploadCloud, X, Sparkles, TrendingDown, Clock, Building2, CreditCard } from 'lucide-react';
 
 export default function RevisiPage() {
   const [revisiTrx, setRevisiTrx] = useState<any[]>([]);
@@ -147,11 +147,34 @@ export default function RevisiPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-amber-500 rounded-3xl p-8 flex items-center justify-between text-white shadow-xl shadow-amber-200">
-         <div>
-            <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><ShieldAlert size={32}/> Perbaikan Input (Revisi Lengkap)</h2>
-            <p className="text-amber-50 font-medium">Klik pada transaksi yang ditolak untuk mengedit semua rinciannya (tanggal, uang, hingga Foto Lampiran).</p>
+    <div className="space-y-8 pb-20">
+      {/* Header Info Revisi */}
+      <div className="relative bg-amber-600 rounded-[3.5rem] p-10 overflow-hidden shadow-2xl border border-white/10">
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
+         
+         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8 text-white">
+            <div className="text-center lg:text-left">
+               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/20 border border-white/30 rounded-full text-amber-50 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
+                  <Sparkles size={12} /> Action Required
+               </div>
+               <h1 className="text-4xl lg:text-5xl font-black tracking-tighter leading-tight italic uppercase">
+                  Revision <span className="text-amber-200 text-shadow-sm">Center</span>
+               </h1>
+               <p className="text-amber-50 font-medium mt-3 max-w-lg opacity-80 italic">Perbaiki data transaksi yang dikembalikan oleh Admin/Pejabat agar laporan Anda tetap akurat.</p>
+            </div>
+            
+            <div className="flex gap-4">
+               <div className="bg-white/20 backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[160px]">
+                  <span className="text-[10px] font-black text-amber-100 uppercase tracking-widest mb-1">Total Surat</span>
+                  <span className="text-4xl font-black">{revisiTrx.length}</span>
+               </div>
+               <div className="bg-white/20 backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[200px]">
+                  <span className="text-[10px] font-black text-amber-100 uppercase tracking-widest mb-1">Total Nominal</span>
+                  <span className="text-2xl font-black truncate">
+                     Rp {revisiTrx.reduce((acc, curr) => acc + (Number(curr.uang_masuk) || Number(curr.uang_keluar) || 0), 0).toLocaleString('id-ID')}
+                  </span>
+               </div>
+            </div>
          </div>
       </div>
 

@@ -20,7 +20,8 @@ import {
   PieChart,
   Database,
   Layers,
-  MessageSquare
+  MessageSquare,
+  BookOpen
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -47,7 +48,8 @@ const iconMap: Record<string, any> = {
   FileText,
   FileSpreadsheet,
   Layers,
-  MessageSquare
+  MessageSquare,
+  BookOpen
 };
 
 interface SidebarProps {
@@ -119,7 +121,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 <ShieldCheck size={24} />
              </div>
              <div>
-                <h1 className="font-bold text-gray-900 leading-tight">Verifikasi<br/><span className="text-indigo-600">Online</span></h1>
+                <h1 className="font-bold text-gray-900 leading-tight">Apps<br/><span className="text-indigo-600">Bersama</span></h1>
              </div>
            </div>
            {/* Tombol Close untuk Mobile */}

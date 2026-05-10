@@ -33,6 +33,8 @@ export const menuList: MenuItem[] = [
   { title: 'Laporan Ringkasan', path: '/summary', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Cetak Bukti Foto', path: '/report-photo', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Impor Trx Bank', path: '/bank', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
+  { title: 'Buku Besar', path: '/buku-besar', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Laporan Gabungan', path: '/gabungan-reports', icon: 'Database', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   
   // --- DANA PEMERINTAH ---
   { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'Dana Pemerintah' },
@@ -44,6 +46,10 @@ export const menuList: MenuItem[] = [
   { title: 'Gaji PNS', path: '/gaji-pns', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+  
+  // --- PERSURATAN ---
+  { title: 'Daftar Arsip Surat', path: '/surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
+  { title: 'Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
   
   // --- MASTER & PENGATURAN ---
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },

@@ -74,7 +74,7 @@ export default function DashboardLayout({
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
     switch (path) {
-      case '/': return 'Verifikasi Transaksi';
+      case '/': return 'Dashboard Bersama';
       case '/input': return 'Input Transaksi Baru';
       case '/reports': return 'Laporan Keuangan';
       case '/references': return 'Data Referensi';

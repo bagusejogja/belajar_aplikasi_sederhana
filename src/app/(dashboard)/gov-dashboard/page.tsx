@@ -207,32 +207,32 @@ export default function GovDashboardPage() {
       </div>
 
       {/* 2. KPI SUMMARY CARDS (Responsive Layout) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4 md:px-0">
-         <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between group">
-            <div className="min-w-0 flex-1">
-               <p className="text-[12px] font-bold text-blue-200/60 uppercase tracking-widest mb-1 truncate">Pagu {selectedYear}</p>
-               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalPagu)}</h4>
-               <p className="text-[10px] mt-2 opacity-40 font-bold uppercase tracking-widest truncate">Aggregate Allocation</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4 md:px-0">
+         <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-6 rounded-3xl shadow-lg text-white flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Pagu {selectedYear}</span>
+               <div className="text-xl font-black text-white truncate" title={`IDR ${formatIDR(stats.totalPagu)}`}>IDR {formatIDR(stats.totalPagu)}</div>
+               <div className="text-[10px] mt-1 text-slate-500 font-bold uppercase tracking-wider">Aggregate Allocation</div>
             </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><Wallet size={32} className="text-white/60" /></div>
+            <div className="w-12 h-12 flex-shrink-0 bg-white/10 rounded-2xl flex items-center justify-center"><Wallet size={22} className="text-blue-300" /></div>
          </div>
 
-         <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-               <p className="text-[12px] font-bold text-emerald-100/60 uppercase tracking-widest mb-1 truncate">Realisasi {selectedYear}</p>
-               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalSpent)}</h4>
-               <p className="text-[10px] mt-2 bg-white/10 inline-block px-3 py-1 rounded-full font-bold uppercase tracking-widest truncate">{stats.percent.toFixed(2)}% Terpakai</p>
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Realisasi {selectedYear}</span>
+               <div className="text-xl font-black text-slate-800 truncate" title={`IDR ${formatIDR(stats.totalSpent)}`}>IDR {formatIDR(stats.totalSpent)}</div>
+               <div className="mt-1"><span className="bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-md text-[10px] font-black">{stats.percent.toFixed(2)}% Terpakai</span></div>
             </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><TrendingUp size={32} className="text-white/60" /></div>
+            <div className="w-12 h-12 flex-shrink-0 bg-emerald-50 rounded-2xl flex items-center justify-center"><TrendingUp size={22} className="text-emerald-600" /></div>
          </div>
 
-         <div className="bg-gradient-to-br from-amber-400 to-amber-600 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-               <p className="text-[12px] font-bold text-amber-50/60 uppercase tracking-widest mb-1 truncate">Sisa Pagu</p>
-               <h4 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.balance)}</h4>
-               <p className="text-[10px] mt-2 opacity-60 font-bold uppercase tracking-widest truncate">Kurang / Sisa</p>
+         <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
+            <div className="min-w-0 flex-1 pr-4">
+               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Sisa Pagu</span>
+               <div className="text-xl font-black text-emerald-600 truncate" title={`IDR ${formatIDR(stats.balance)}`}>IDR {formatIDR(stats.balance)}</div>
+               <div className="text-[10px] mt-1 text-slate-400 font-bold uppercase tracking-wider">Siap Digunakan</div>
             </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><Scale size={32} className="text-white/60" /></div>
+            <div className="w-12 h-12 flex-shrink-0 bg-amber-50 rounded-2xl flex items-center justify-center"><Scale size={22} className="text-amber-500" /></div>
          </div>
       </div>
 

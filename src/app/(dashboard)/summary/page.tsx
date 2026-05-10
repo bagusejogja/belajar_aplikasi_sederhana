@@ -30,17 +30,34 @@ export default function SummaryPage() {
       setLoading(true);
       setExpandedGroup2Digit(null);
       setExpandedGroupAkun(null);
-      
       try {
-         const { data: trxData, error: errTrx } = await supabase
-               .from('transactions')
-               .select('*, ref_akun(nomor_akun, nama_akun), ref_personel(nama_orang)')
-               .neq('disetujui', 'Ditolak');
-               
-         if (errTrx) throw errTrx;
+         let allTrx: any[] = [];
+         let isSelesai = false;
+         let ambilMulai = 0;
+         const batasAmbil = 1000;
+
+         while (!isSelesai) {
+             const { data, error } = await supabase
+                 .from('transactions')
+                 .select('*, ref_akun(nomor_akun, nama_akun), ref_personel(nama_orang)')
+                 .neq('disetujui', 'Ditolak')
+                 .order('tanggal', { ascending: true })
+                 .order('id', { ascending: true })
+                 .range(ambilMulai, ambilMulai + batasAmbil - 1);
+                 
+             if (error) throw error;
+             
+             if (data && data.length > 0) {
+                 allTrx = [...allTrx, ...data];
+                 if (data.length < batasAmbil) isSelesai = true;
+                 else ambilMulai += batasAmbil;
+             } else {
+                 isSelesai = true;
+             }
+         }
          
          // Filter Tanggal menggunakan JavaScript Date agar stabil dari format apapun
-         const currentMonthData = (trxData || []).filter(t => {
+         const currentMonthData = allTrx.filter(t => {
             if (!t.tanggal) return false;
             const dt = new Date(t.tanggal);
             return dt.getFullYear() === tahunPilih && dt.getMonth() + 1 === bulanPilih;
