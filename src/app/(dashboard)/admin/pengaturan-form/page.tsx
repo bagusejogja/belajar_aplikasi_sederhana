@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  Settings, Save, Loader2, Link2, Calendar, Hash, FileText
+  Settings, Save, Loader2, Link2, Calendar, Hash, FileText, Clock, FolderCloud
 } from 'lucide-react';
 
 export default function PengaturanFormPage() {
@@ -13,7 +13,10 @@ export default function PengaturanFormPage() {
   const [formData, setFormData] = useState({
     judul_form: '',
     tahun_aktif: '',
-    periode_aktif: ''
+    periode_aktif: '',
+    waktu_buka: '',
+    waktu_tutup: '',
+    r2_folder: ''
   });
 
   useEffect(() => {
@@ -42,7 +45,11 @@ export default function PengaturanFormPage() {
         setFormData({
           judul_form: data.judul_form || '',
           tahun_aktif: data.tahun_aktif ? String(data.tahun_aktif) : '',
-          periode_aktif: data.periode_aktif ? String(data.periode_aktif) : ''
+          periode_aktif: data.periode_aktif ? String(data.periode_aktif) : '',
+          // Potong timezone 'Z' dari ISO string agar pas dengan <input type="datetime-local">
+          waktu_buka: data.waktu_buka ? data.waktu_buka.slice(0, 16) : '',
+          waktu_tutup: data.waktu_tutup ? data.waktu_tutup.slice(0, 16) : '',
+          r2_folder: data.r2_folder || ''
         });
       }
     } catch (err: any) {
@@ -57,7 +64,10 @@ export default function PengaturanFormPage() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      // Upsert: update jika ada (id=1), insert jika belum ada
+      // Format datetime agar bisa ditangkap dengan baik oleh PostgreSQL (ISO 8601)
+      const formattedBuka = formData.waktu_buka ? new Date(formData.waktu_buka).toISOString() : null;
+      const formattedTutup = formData.waktu_tutup ? new Date(formData.waktu_tutup).toISOString() : null;
+
       const { error } = await supabase
         .from('app_settings')
         .upsert({
@@ -65,6 +75,9 @@ export default function PengaturanFormPage() {
           judul_form: formData.judul_form,
           tahun_aktif: formData.tahun_aktif ? parseInt(formData.tahun_aktif) : null,
           periode_aktif: formData.periode_aktif ? parseInt(formData.periode_aktif) : null,
+          waktu_buka: formattedBuka,
+          waktu_tutup: formattedTutup,
+          r2_folder: formData.r2_folder
         });
 
       if (error) throw error;
@@ -159,6 +172,55 @@ export default function PengaturanFormPage() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={14} className="text-emerald-500" />
+                  Waktu Buka
+                </label>
+                <input
+                  type="datetime-local"
+                  name="waktu_buka"
+                  value={formData.waktu_buka}
+                  onChange={handleChange}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-semibold text-gray-800 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={14} className="text-rose-500" />
+                  Waktu Tutup
+                </label>
+                <input
+                  type="datetime-local"
+                  name="waktu_tutup"
+                  value={formData.waktu_tutup}
+                  onChange={handleChange}
+                  className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-semibold text-gray-800 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 focus:bg-white outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                <FolderCloud size={14} className="text-sky-500" />
+                Folder Penyimpanan Cloudflare R2
+              </label>
+              <div className="relative">
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">/</span>
+                <input
+                  type="text"
+                  name="r2_folder"
+                  value={formData.r2_folder}
+                  onChange={handleChange}
+                  placeholder="Contoh: usulan_2026_smt2"
+                  className="w-full pl-10 pr-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-semibold text-gray-800 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 focus:bg-white outline-none transition-all"
+                />
+              </div>
+              <p className="text-[10px] font-medium text-gray-400 mt-1">Nama folder target di dalam Bucket Cloudflare R2 (https://dash.cloudflare.com/...). Kosongkan jika ingin menyimpan di root.</p>
             </div>
 
             <div className="pt-6 border-t border-gray-50">
