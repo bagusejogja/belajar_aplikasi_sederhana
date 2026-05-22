@@ -200,22 +200,18 @@ export default function UsulanAnggaranPage() {
     };
 
     return (
-      <div className="flex flex-col gap-2 min-w-[200px]">
+      <div className="flex flex-wrap items-center gap-1.5">
         {files.map((file, i) => (
           <button 
             key={i}
             onClick={() => handleDownloadCustomName(file.url, file.name)}
-            className="group flex items-center justify-between w-full max-w-xs px-3 py-2 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-all active:scale-[0.98]"
+            className="group flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
             title={`Download: ${file.name}`}
           >
-            <div className="flex items-center gap-2.5 overflow-hidden w-full">
-              <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm text-gray-400 group-hover:text-emerald-600 group-hover:border-emerald-200 group-hover:shadow-emerald-100 transition-all flex-shrink-0">
-                <Download size={14} strokeWidth={2.5} />
-              </div>
-              <span className="text-[11px] font-semibold text-gray-600 group-hover:text-emerald-700 truncate text-left w-full">
-                {file.name}
-              </span>
-            </div>
+            {files.length > 1 && (
+              <span className="text-[10px] font-black">{i + 1}</span>
+            )}
+            <Download size={12} strokeWidth={2.5} />
           </button>
         ))}
       </div>
