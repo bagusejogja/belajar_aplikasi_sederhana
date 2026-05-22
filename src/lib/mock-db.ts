@@ -25,8 +25,8 @@ export const mockUsers: User[] = [
 
 export const menuList: MenuItem[] = [
   // --- MASJID ---
-  { title: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
-  { title: 'Verifikasi Kas', path: '/', icon: 'CheckCircle', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
+  { title: 'Dashboard', path: '/', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Verifikasi Kas', path: '/verifikasi', icon: 'CheckCircle', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
   { title: 'Input Kas Masjid', path: '/input', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
   { title: 'Perbaikan Input', path: '/revisi', icon: 'ShieldAlert', roles: ['STAFF'], group: 'Masjid' },
   { title: 'Laporan Detail', path: '/reports', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
@@ -35,6 +35,7 @@ export const menuList: MenuItem[] = [
   { title: 'Impor Trx Bank', path: '/bank', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
   { title: 'Buku Besar', path: '/buku-besar', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Laporan Gabungan', path: '/gabungan-reports', icon: 'Database', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
+  { title: 'Analisis Pivot', path: '/pivot', icon: 'LayoutGrid', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
   
   // --- DANA PEMERINTAH ---
   { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'Dana Pemerintah' },
@@ -58,4 +59,8 @@ export const menuList: MenuItem[] = [
   { title: 'Unit Kerja (DB)', path: '/units', icon: 'Building2', roles: ['ADMIN'], group: 'Master' },
   { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'], group: 'Master' },
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
+  { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
+
+  // --- ANGGARAN ---
+  { title: 'Usulan Anggaran', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 ];

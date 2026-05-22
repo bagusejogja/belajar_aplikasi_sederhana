@@ -7,7 +7,13 @@ import { revalidatePath } from 'next/cache';
 export async function createSuratRevisi(formData: FormData) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Sesi berakhir, silakan login kembali.");
+    const userIdFallback = formData.get('user_id') as string;
+    
+    if (!user && !userIdFallback) {
+      throw new Error("Sesi berakhir, silakan login kembali.");
+    }
+    
+    const activeUserId = user?.id || userIdFallback;
 
     // 1. Handle File Upload ke R2 (jika ada file yang dipilih)
     let fileUrl = null;
@@ -27,40 +33,55 @@ export async function createSuratRevisi(formData: FormData) {
       }
     }
 
-    // 2. Siapkan data untuk Database
+    // 2. Siapkan data untuk Database (DENGAN PENGECEKAN KETAT)
+    const unitIdStr = formData.get('unit_id') as string;
+    const tahunStr = formData.get('tahun_anggaran') as string;
+    const nominalSemulaStr = formData.get('nominal_semula') as string;
+    const nominalMenjadiStr = formData.get('nominal_menjadi') as string;
+    
+    if (!unitIdStr || isNaN(parseInt(unitIdStr))) {
+      return { success: false, error: "Unit Kerja harus dipilih dengan benar!" };
+    }
+
     const data = {
-      unit_id: parseInt(formData.get('unit_id') as string), // Ubah ke Integer
-      tahun_anggaran: parseInt(formData.get('tahun_anggaran') as string),
-      no_surat: formData.get('no_surat'),
-      perihal_surat: formData.get('perihal_surat'),
-      tanggal_surat: formData.get('tanggal_surat'),
-      subyek_simaster: formData.get('subyek_simaster'),
+      unit_id: parseInt(unitIdStr),
+      tahun_anggaran: parseInt(tahunStr) || new Date().getFullYear(),
+      no_surat: formData.get('no_surat')?.toString() || '',
+      perihal_surat: formData.get('perihal_surat')?.toString() || '',
+      tanggal_surat: formData.get('tanggal_surat')?.toString() || null,
+      subyek_simaster: formData.get('subyek_simaster')?.toString() || '',
       jenis_json: JSON.parse(formData.get('jenis_json') as string || '[]'),
-      pic: formData.get('pic'),
-      tanggal_disposisi: formData.get('tanggal_disposisi') || null,
-      tanggal_selesai: formData.get('tanggal_selesai') || null,
-      baris_rkat_dirubah: formData.get('baris_rkat_dirubah'),
-      nominal_semula: formData.get('nominal_semula') ? parseFloat(formData.get('nominal_semula') as string) : null,
-      nominal_menjadi: formData.get('nominal_menjadi') ? parseFloat(formData.get('nominal_menjadi') as string) : null,
-      link_google_drive: formData.get('link_google_drive'),
+      pic: formData.get('pic')?.toString() || '',
+      tanggal_disposisi: formData.get('tanggal_disposisi')?.toString() || null,
+      tanggal_selesai: formData.get('tanggal_selesai')?.toString() || null,
+      baris_rkat_dirubah: formData.get('baris_rkat_dirubah')?.toString() || '',
+      nominal_semula: nominalSemulaStr ? parseFloat(nominalSemulaStr) : null,
+      nominal_menjadi: nominalMenjadiStr ? parseFloat(nominalMenjadiStr) : null,
+      link_google_drive: formData.get('link_google_drive')?.toString() || '',
       file_upload: fileUrl,
-      created_by: user.id,
+      created_by: activeUserId,
       is_active: 1
     };
 
-    // 3. Simpan ke Tabel surat_revisi
-    const { error } = await supabase.from('surat_revisi').insert(data);
+    console.log("[DEBUG] Memasuki tahap simpan ke DB...");
+    const { error: dbError } = await supabase.from('surat_revisi').insert(data);
     
-    if (error) {
-       console.error('Supabase Insert Error:', error);
-       throw new Error("Gagal menyimpan ke database: " + error.message);
+    if (dbError) {
+       console.error('SUPABASE_INSERT_FAILED:', dbError);
+       return { success: false, error: `Gagal Simpan Database: ${dbError.message} (Pstgrs: ${dbError.code})` };
     }
 
+    console.log("[DEBUG] Simpan Berhasil di sisi Server!");
     revalidatePath('/surat');
     return { success: true };
   } catch (error: any) {
-    console.error('Error in createSuratRevisi:', error);
-    return { success: false, error: error.message };
+    console.error('SERVER_ACTION_FATAL_CRASH:', error);
+    // Kita tangkap error mentahnya dan kembalikan sebagai string agar tidak "Unexpected Response"
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { 
+      success: false, 
+      error: `Server Error Detail: ${errorMessage}` 
+    };
   }
 }
 
@@ -78,11 +99,16 @@ export async function getSuratRevisi() {
    return data;
 }
 
-export async function updateSuratRevisi(id: string, payload: any) {
+export async function updateSuratRevisi(id: string, payload: any, userIdFallback?: string) {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const activeUserId = user?.id || userIdFallback;
+    
+    if (!activeUserId) throw new Error("Identitas user tidak ditemukan.");
+
     const { error } = await supabase
       .from('surat_revisi')
-      .update(payload)
+      .update({ ...payload, updated_by: activeUserId })
       .eq('id', id);
 
     if (error) throw error;
@@ -110,20 +136,21 @@ export async function getMyPermissions(path: string, token?: string, userId?: st
 
     let { data: { user } } = await supabase.auth.getUser();
     
-    // JIKA GAGAL DAPAT USER, TAPI KITA PUNYA TOKEN, KITA COBA DECODE TOKENNYA (opsional)
-    // ATAU: Kita beri pengecekan darurat jika memang ini adalah Anda (berdasarkan email/id yang dikirim client)
+    // FALLBACK STRATEGY: Jika auth.getUser gagal, gunakan ID/Email dari client (Bapak)
+    const effectiveUserId = user?.id || userId;
+    const effectiveUserEmail = user?.email || userEmail;
     
-    if (user?.id === hardcodedAdminId || user?.email === "bagusejogja@gmail.com") {
+    if (!effectiveUserId) return { can_view: false, can_create: false, debug: "No Auth User Found on Server & Client" };
+
+    if (effectiveUserId === hardcodedAdminId || effectiveUserEmail === "bagusejogja@gmail.com") {
       return { can_view: true, can_create: true, can_edit: true, can_delete: true, debug: "Super Admin Bypass Active" };
     }
 
-    if (!user) return { can_view: false, can_create: false, debug: "No Auth User Found on Server" };
-
-    // 2. Ambil role user dari DB
+    // 2. Ambil role user dari DB menggunakan ID yang tersedia
     const { data: userData, error: userError } = await supabase
       .from('app_users')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', effectiveUserId)
       .single();
       
     if (userError) return { can_view: false, can_create: false, debug: "DB Error: " + userError.message };
@@ -135,17 +162,17 @@ export async function getMyPermissions(path: string, token?: string, userId?: st
       return { can_view: true, can_create: true, can_edit: true, can_delete: true, debug: "Admin Role Bypass" };
     }
 
-    // 3. Ambil permission dari tabel app_role_menus
+    // 3. Ambil permission dari tabel app_role_menus (Gunakan ILIKE agar tidak sensitif huruf besar/kecil)
     const { data: permData, error: permError } = await supabase
       .from('app_role_menus')
       .select('*')
-      .eq('role', userData.role)
+      .ilike('role', userData.role)
       .eq('path', path)
-      .single();
+      .maybeSingle(); // Gunakan maybeSingle agar tidak error jika tidak ditemukan
 
     if (permError) return { can_view: false, can_create: false, debug: "Perm Error: " + permError.message };
 
-    return { ...permData, debug: "Permission Found" };
+    return { ...permData, userRole, debug: "Permission Found" };
   } catch (err: any) {
     return { can_view: false, can_create: false, debug: "System Error: " + err.message };
   }

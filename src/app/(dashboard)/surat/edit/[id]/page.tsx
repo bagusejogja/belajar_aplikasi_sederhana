@@ -88,7 +88,10 @@ export default function EditSuratPage() {
       delete payload.created_at;
       delete payload.gov_units;
 
-      const result = await updateSuratRevisi(params.id as string, payload);
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+
+      const result = await updateSuratRevisi(params.id as string, payload, userId);
       if (result.success) {
         alert("Arsip Surat Berhasil Diperbarui!");
         router.push('/surat');

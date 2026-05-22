@@ -35,7 +35,7 @@ export default function DashboardLayout({
 
         const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
         if (roleData) {
-           if (roleData.role === 'Admin') {
+           if (roleData.role.toLowerCase() === 'admin') {
               setIsAuthChecking(false); // Admin selalu lolos
               return;
            }
@@ -74,7 +74,7 @@ export default function DashboardLayout({
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
     switch (path) {
-      case '/': return 'Dashboard Bersama';
+      case '/': return 'Apps Bersama Dashboard';
       case '/input': return 'Input Transaksi Baru';
       case '/reports': return 'Laporan Keuangan';
       case '/references': return 'Data Referensi';
@@ -99,7 +99,7 @@ export default function DashboardLayout({
               </div>
               <h2 className="text-2xl font-black text-gray-900 mb-2">Akses Ditolak!</h2>
               <p className="text-gray-500 font-medium mb-8">Maaf, peran Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi Administrator jika ini adalah sebuah kesalahan.</p>
-              <button onClick={() => router.push('/dashboard')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-200">
+              <button onClick={() => router.push('/')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-200">
                  KEMBALI KE DASHBOARD
               </button>
            </div>

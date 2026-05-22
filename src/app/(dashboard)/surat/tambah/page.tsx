@@ -154,9 +154,21 @@ export default function TambahSuratPage() {
       return;
     }
 
+    // CEK UKURAN FILE (Vercel limit 4.5MB)
+    if (selectedFile && selectedFile.size > 4 * 1024 * 1024) {
+      alert("⚠️ Ukuran file terlalu besar! Maksimal adalah 4MB agar bisa tersimpan di server. Mohon kecilkan ukuran PDF/Gambar Anda.");
+      return;
+    }
+
     setIsSaving(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const data = new FormData();
+      
+      if (session?.user?.id) {
+        data.append('user_id', session.user.id);
+      }
+      
       data.append('unit_id', formData.unit_id.value);
       data.append('tahun_anggaran', formData.tahun_anggaran.toString());
       data.append('no_surat', formData.no_surat);
@@ -176,12 +188,19 @@ export default function TambahSuratPage() {
         data.append('file_upload', selectedFile);
       }
 
-      const result = await createSuratRevisi(data);
+      // Gunakan API Route agar lebih stabil di semua komputer
+      const response = await fetch('/api/surat/tambah', {
+        method: 'POST',
+        body: data,
+      });
+
+      const result = await response.json();
+      
       if (result.success) {
         alert("Arsip Surat Berhasil Disimpan!");
         router.push('/surat');
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Gagal menyimpan melalui API");
       }
     } catch (err: any) {
       alert("Error: " + err.message);

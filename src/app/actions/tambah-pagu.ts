@@ -65,15 +65,20 @@ export async function createTambahPagu(formData: FormData) {
 }
 
 export async function updateTambahPagu(id: string, formData: any) {
-  const { data, error } = await supabase
-    .from('tambah_pagu')
-    .update(formData)
-    .eq('id', id)
-    .select();
-    
-  if (error) throw error;
-  revalidatePath('/tambah-pagu');
-  return { success: true, data };
+  try {
+    const { data, error } = await supabase
+      .from('tambah_pagu')
+      .update(formData)
+      .eq('id', id)
+      .select();
+      
+    if (error) throw error;
+    revalidatePath('/tambah-pagu');
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Gagal update tambah pagu:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 export async function deleteTambahPagu(id: string) {

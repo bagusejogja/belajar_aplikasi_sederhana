@@ -1,4 +1,4 @@
-export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'GUEST';
+export type Role = 'ADMIN' | 'MANAGER' | 'STAFF' | 'GUEST' | 'Pemroses Anggaran';
 
 export interface Unit {
   id: string | number;

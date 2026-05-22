@@ -3,300 +3,174 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  CheckCircle, XCircle, Loader2, Info, LayoutDashboard, 
-  Clock, AlertCircle, Eye, Sparkles, Building2, CreditCard 
+  Sparkles, ShieldCheck, FileText, BarChart3, 
+  ArrowRight, Clock, Users, ArrowUpRight,
+  LayoutDashboard, TrendingUp, Search, Bell
 } from 'lucide-react';
-import Select from 'react-select';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
-export default function VerificationPage() {
-  const [pendingTrx, setPendingTrx] = useState<any[]>([]);
-  const [listAkun, setListAkun] = useState<any[]>([]);
+export default function PremiumDashboard() {
+  const [stats, setStats] = useState({
+    pending: 0,
+    totalNominal: 0,
+    totalSurat: 0,
+    totalUsers: 0
+  });
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null);
-  const [previewImage, setPreviewImage] = useState<{ src: string, original: string } | null>(null);
-  const [catatan, setCatatan] = useState<{ [id: number]: string }>({});
-  const [selectedAkun, setSelectedAkun] = useState<{ [id: number]: string }>({});
-
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-     fetchPending();
+    fetchStats();
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const fetchPending = async () => {
-     setLoading(true);
-     try {
-        const [trxRes, akunRes] = await Promise.all([
-           supabase.from('transactions')
-              .select('*, ref_akun(nama_akun, nomor_akun), ref_personel(nama_orang)')
-              .eq('disetujui', 'Menunggu')
-              .order('tanggal', { ascending: false }),
-           supabase.from('ref_akun').select('id, nomor_akun, nama_akun').order('nomor_akun')
-        ]);
+  const fetchStats = async () => {
+    try {
+      const [pendingRes, suratRes, userRes] = await Promise.all([
+        supabase.from('transactions').select('uang_masuk, uang_keluar').eq('disetujui', 'Menunggu'),
+        supabase.from('surat_revisi').select('id', { count: 'exact' }),
+        supabase.from('app_users').select('id', { count: 'exact' })
+      ]);
 
-        if (trxRes.error) throw trxRes.error;
-        setPendingTrx(trxRes.data || []);
-        setListAkun(akunRes.data || []);
-     } catch (err) {
-        console.error(err);
-     } finally {
-        setLoading(false);
-     }
+      const pendingData = pendingRes.data || [];
+      const totalNominal = pendingData.reduce((acc, curr) => acc + (Number(curr.uang_masuk) || Number(curr.uang_keluar) || 0), 0);
+
+      setStats({
+        pending: pendingData.length,
+        totalNominal: totalNominal,
+        totalSurat: suratRes.count || 0,
+        totalUsers: userRes.count || 0
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const verifikasiTransaksi = async (id: number, status: string) => {
-     setProcessingId(id);
-     try {
-        const payload: any = { 
-            disetujui: status, 
-            tanggal_disetujui: new Date().toISOString().split('T')[0]
-        };
-        
-        // Jika status Revisi atau Ditolak, sertakan catatan
-        if (status === 'Revisi' || status === 'Ditolak') {
-            if (!catatan[id] || catatan[id].trim() === '') {
-                alert("Mohon isi Catatan Alasan (di kotak bawah) untuk staf agar mereka tahu apa yang salah!");
-                setProcessingId(null);
-                return;
-            }
-            payload.catatan_verifikasi = catatan[id];
-        } else {
-            payload.catatan_verifikasi = null; // Bersihkan catatan jika diterima
-        }
-
-        // Kalau Admin mengubah Akunnya dari dropdown
-        if (selectedAkun[id]) {
-            payload.akun_id = selectedAkun[id];
-        }
-
-        const { error } = await supabase
-           .from('transactions')
-           .update(payload)
-           .eq('id', id);
-
-        if (error) throw error;
-        // Hapus dari list
-        setPendingTrx(prev => prev.filter(t => t.id !== id));
-        
-        // Bersihkan state catatan
-        setCatatan(prev => {
-           const newC = { ...prev };
-           delete newC[id];
-           return newC;
-        });
-
-     } catch (err: any) {
-        alert("Gagal memverifikasi: " + err.message);
-     } finally {
-        setProcessingId(null);
-     }
-  };
-
-  const renderFoto = (label: string, teks: string | null) => {
-     if (!teks) return null; // Sembunyikan jika kosong
-     const links = teks.split(',').map(s => s.trim()).filter(Boolean);
-     
-     return (
-        <div className="mb-4">
-           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">{label}</h4>
-           <div className="flex flex-col gap-3">
-              {links.map((lnk, idx) => {
-                  let imgSrc = lnk;
-                  const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-                  if (gdriveMatch && gdriveMatch[1]) {
-                     imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
-                  }
-
-                  return (
-                     <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm">
-                        <img src={imgSrc} alt="Lampiran" className="w-full h-auto max-h-64 object-contain" onError={(e) => {
-                           (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                           (e.target as any).className = 'w-16 h-16 object-contain opacity-50 m-6';
-                        }} />
-                        <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                           <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Klik Perbesar</span>
-                        </div>
-                     </div>
-                  );
-              })}
-           </div>
-        </div>
-     );
-  };
-
+  const menuCards = [
+    {
+      title: "Verifikasi Transaksi",
+      desc: "Periksa bukti fisik dan setujui usulan pengeluaran.",
+      icon: <ShieldCheck size={28} />,
+      link: "/verifikasi",
+      color: "bg-indigo-600",
+      stats: `${stats.pending} Pending`,
+      badge: "Priority"
+    },
+    {
+      title: "Arsip & Surat",
+      desc: "Manajemen dokumen revisi dan korespondensi.",
+      icon: <FileText size={28} />,
+      link: "/surat",
+      color: "bg-emerald-600",
+      stats: `${stats.totalSurat} Dokumen`,
+      badge: "Audit Ready"
+    },
+    {
+      title: "Laporan Visual",
+      desc: "Lihat ringkasan penggunaan kas dengan foto bukti.",
+      icon: <BarChart3 size={28} />,
+      link: "/report-photo",
+      color: "bg-amber-600",
+      stats: "Visualized",
+      badge: "Real-time"
+    },
+    {
+      title: "Manajemen User",
+      desc: "Kelola hak akses dan aktor sistem.",
+      icon: <Users size={28} />,
+      link: "/users",
+      color: "bg-rose-600",
+      stats: `${stats.totalUsers} Aktif`,
+      badge: "Secure"
+    }
+  ];
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* Header Command Center */}
-      <div className="relative bg-slate-900 rounded-[3.5rem] p-10 overflow-hidden shadow-2xl border border-white/5">
-         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
-         <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] translate-y-1/2 -translate-x-1/2" />
-         
-         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
-            <div className="text-center lg:text-left">
-               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mb-4">
-                  <Sparkles size={12} /> AI Security Shield Active
-               </div>
-               <h1 className="text-4xl lg:text-5xl font-black text-white tracking-tighter leading-tight italic uppercase">
-                  Verification <span className="text-indigo-400">Hub</span>
-               </h1>
-               <p className="text-slate-400 font-medium mt-3 max-w-lg">Pusat kendali validasi transaksi keuangan. Periksa bukti fisik dengan teliti untuk menjaga akuntabilitas.</p>
-            </div>
-            
-            <div className="flex gap-4">
-               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[140px] hover:bg-white/10 transition-colors">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pending</span>
-                  <span className="text-4xl font-black text-white">{pendingTrx.length}</span>
-               </div>
-               <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center min-w-[140px] hover:bg-white/10 transition-colors">
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Queue</span>
-                  <LayoutDashboard size={32} className="text-emerald-500 mt-1" />
-               </div>
-            </div>
-         </div>
+    <div className="min-h-screen pb-20">
+      {/* Top Banner / Time */}
+      <div className="flex justify-between items-center mb-10">
+        <div className="flex items-center gap-3">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+            <LayoutDashboard size={20} className="text-indigo-600" />
+          </div>
+          <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest">Command Center</h2>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="hidden md:flex flex-col items-end">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Current System Time</p>
+            <p className="text-sm font-bold text-gray-700">
+              {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} — {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
+          <button className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 text-gray-400 hover:text-indigo-600 transition-colors">
+            <Bell size={20} />
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-         <div className="flex justify-center h-40 items-center"><Loader2 size={40} className="animate-spin text-indigo-500"/></div>
-      ) : pendingTrx.length === 0 ? (
-         <div className="bg-white rounded-3xl border-2 border-dashed border-gray-200 p-12 text-center text-gray-400">
-            <CheckCircle size={48} className="mx-auto mb-4 text-emerald-400" />
-            <h3 className="text-xl font-bold text-gray-700">Tidak ada tanggungan!</h3>
-            <p>Semua transaksi masuk sudah selesai diperiksa dan bersih.</p>
-         </div>
-      ) : (
-         <div className="grid gap-4">
-            {pendingTrx.map(trx => {
-               const isPemasukan = Number(trx.uang_masuk) > 0;
-               const nominal = isPemasukan ? trx.uang_masuk : trx.uang_keluar;
-               
-               return <div key={trx.id} className="bg-white/80 backdrop-blur-md p-8 rounded-[3.5rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 group relative overflow-hidden">
-                      <div className={`absolute top-0 left-0 w-2 h-full ${isPemasukan ? 'bg-emerald-500' : 'bg-rose-500'} opacity-20 group-hover:opacity-100 transition-all duration-500`}></div>
-                      
-                      <div className="flex flex-col lg:flex-row gap-10">
-                        {/* Data Column */}
-                        <div className="flex-1 space-y-8">
-                           <div className="flex flex-wrap items-center gap-4">
-                              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${isPemasukan ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
-                                 {isPemasukan ? '↑ Pemasukan' : '↓ Pengeluaran'}
-                              </span>
-                              <span className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                 <Clock size={12} /> {trx.tanggal}
-                              </span>
-                           </div>
+      {/* Hero Welcome */}
+      <div className="relative bg-slate-900 rounded-[4rem] p-12 lg:p-20 overflow-hidden shadow-2xl mb-12 group">
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600/30 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3 animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] translate-y-1/3 -translate-x-1/3" />
+        
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div>
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="inline-flex items-center gap-2 px-5 py-2 bg-white/10 border border-white/20 rounded-full text-indigo-300 text-[11px] font-black uppercase tracking-[0.3em] mb-8 backdrop-blur-md"
+            >
+              <Sparkles size={14} className="text-amber-400" /> Executive Portal v2.0
+            </motion.div>
+            <motion.h1 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="text-5xl lg:text-7xl font-black text-white tracking-tighter leading-none mb-8"
+            >
+              Apps<span className="text-indigo-500"> Bersama</span> <br />
+              <span className="text-3xl lg:text-4xl font-light text-slate-400 italic">Financial Control Center</span>
+            </motion.h1>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-slate-400 text-lg font-medium max-w-md leading-relaxed mb-10"
+            >
+              Pusat kendali keuangan terpadu. Selamat bekerja dan pantau setiap transaksi dengan presisi tinggi melalui menu navigasi di samping.
+            </motion.p>
+          </div>
 
-                           <div>
-                              <h3 className="text-2xl font-black text-slate-900 leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">{trx.uraian}</h3>
-                              <div className="flex items-center gap-4 mt-4 text-sm font-bold text-slate-400">
-                                 <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                    <Building2 size={14} className="text-slate-300" /> {trx.ref_personel?.nama_orang || 'Tanpa PIC'}
-                                 </div>
-                                 {trx.toko && (
-                                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                                       <CreditCard size={14} className="text-slate-300" /> {trx.toko}
-                                    </div>
-                                 )}
-                              </div>
-                           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="bg-white/5 backdrop-blur-2xl border border-white/10 p-8 rounded-[3rem] group/card transition-all"
+            >
+              <TrendingUp className="text-emerald-400 mb-4" size={32} />
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Pending Volume</p>
+              <h3 className="text-3xl font-black text-white">Rp {stats.totalNominal.toLocaleString('id-ID')}</h3>
+              <p className="text-[10px] text-emerald-500 font-bold mt-2 flex items-center gap-1">
+                <ArrowUpRight size={12} /> {stats.pending} Transaksi
+              </p>
+            </motion.div>
+            <motion.div 
+              whileHover={{ y: -5 }}
+              className="bg-white/5 backdrop-blur-2xl border border-white/10 p-8 rounded-[3rem] mt-8 transition-all"
+            >
+              <Clock className="text-amber-400 mb-4" size={32} />
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">SLA Performance</p>
+              <h3 className="text-3xl font-black text-white">98.4%</h3>
+              <p className="text-[10px] text-amber-500 font-bold mt-2 uppercase tracking-widest">On Schedule</p>
+            </motion.div>
+          </div>
+        </div>
+      </div>
 
-                           <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100/50 space-y-6">
-                              <div>
-                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block px-1">Klasifikasi Akun Anggaran</label>
-                                 <Select 
-                                    options={listAkun.map(a => ({ value: a.id, label: `${a.nomor_akun} - ${a.nama_akun}` }))}
-                                    value={
-                                       selectedAkun[trx.id] 
-                                       ? { value: selectedAkun[trx.id], label: listAkun.find(a => a.id === selectedAkun[trx.id])?.nama_akun } 
-                                       : (trx.akun_id ? { value: trx.akun_id, label: trx.ref_akun ? `${trx.ref_akun.nomor_akun} - ${trx.ref_akun.nama_akun}` : 'Pilih Akun' } : null)
-                                    }
-                                    onChange={(val: any) => setSelectedAkun({...selectedAkun, [trx.id]: val?.value})}
-                                    styles={{
-                                       control: (b) => ({ ...b, borderRadius: '1.25rem', border: 'none', backgroundColor: 'white', boxShadow: '0 2px 10px rgba(0,0,0,0.02)', padding: '0.4rem' }),
-                                    }}
-                                    menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
-                                 />
-                              </div>
-
-                              <div>
-                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block px-1">Feedback Verifikasi</label>
-                                 <textarea 
-                                    className="w-full bg-white border-none rounded-2xl p-4 text-sm font-medium text-slate-700 outline-none focus:ring-4 ring-indigo-50 transition-all placeholder:text-slate-300 min-h-[100px] shadow-sm shadow-indigo-100/20" 
-                                    placeholder="Berikan instruksi revisi atau alasan penolakan di sini..."
-                                    value={catatan[trx.id] || ''}
-                                    onChange={(e) => setCatatan({...catatan, [trx.id]: e.target.value})}
-                                 />
-                              </div>
-                           </div>
-                        </div>
-
-                        {/* Visual Column */}
-                        <div className="lg:w-[400px] space-y-6">
-                           <div className={`p-8 rounded-[3rem] ${isPemasukan ? 'bg-emerald-50/50 border-emerald-100' : 'bg-rose-50/50 border-rose-100'} border-2 flex flex-col items-center justify-center text-center`}>
-                              <p className={`text-[10px] font-black uppercase tracking-[0.3em] mb-2 ${isPemasukan ? 'text-emerald-500' : 'text-rose-500'}`}>Total Amount</p>
-                              <p className={`text-3xl font-black font-mono ${isPemasukan ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                 Rp {Number(nominal).toLocaleString('id-ID')}
-                              </p>
-                           </div>
-
-                           <div className="bg-white rounded-[3rem] p-6 border border-slate-100 shadow-sm">
-                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                 <Eye size={14} /> Attachment Gallery
-                              </p>
-                              <div className="grid grid-cols-2 gap-4">
-                                 {renderFoto("Nota", trx.foto_nota)}
-                                 {renderFoto("Kegiatan", trx.foto_kegiatan)}
-                                 {renderFoto("Barang", trx.foto_barang)}
-                                 {renderFoto("Transfer", trx.foto_bukti_transfer)}
-                              </div>
-                              {!(trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && (
-                                 <div className="py-10 text-center bg-slate-50 rounded-[2rem] border-2 border-dashed border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                    No Attachments
-                                 </div>
-                              )}
-                           </div>
-                        </div>
-                      </div>
-
-                      {/* Floating Actions */}
-                      <div className="mt-10 flex flex-wrap gap-4 pt-8 border-t border-slate-100">
-                         <button 
-                           onClick={() => verifikasiTransaksi(trx.id, 'Ditolak')} 
-                           disabled={processingId === trx.id}
-                           className="flex-1 min-w-[180px] flex items-center justify-center gap-3 px-8 py-5 bg-white border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-50"
-                         >
-                            {processingId === trx.id ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={18} />} TOLAK
-                         </button>
-                         <button 
-                           onClick={() => verifikasiTransaksi(trx.id, 'Revisi')} 
-                           disabled={processingId === trx.id}
-                           className="flex-1 min-w-[180px] flex items-center justify-center gap-3 px-8 py-5 bg-white border border-amber-100 text-amber-600 hover:bg-amber-500 hover:text-white rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-50"
-                         >
-                            {processingId === trx.id ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={18} />} REVISI
-                         </button>
-                         <button 
-                           onClick={() => verifikasiTransaksi(trx.id, 'Disetujui')} 
-                           disabled={processingId === trx.id}
-                           className="flex-[2] min-w-[250px] flex items-center justify-center gap-4 px-8 py-5 bg-slate-900 text-white hover:bg-black rounded-[2rem] font-black text-lg shadow-xl shadow-slate-200 transition-all active:scale-95 disabled:opacity-50"
-                         >
-                            {processingId === trx.id ? <Loader2 size={24} className="animate-spin" /> : <CheckCircle size={24} className="text-emerald-400" />} SETUJUI TRANSAKSI
-                         </button>
-                      </div>
-                   </div>;
-            })}
-         </div>
-      )}
-
-      {/* Modal Preview */}
-      {previewImage && (
-         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
-            <img src={previewImage.src} alt="Preview Bukti" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => {
-               (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-            }} />
-            <a href={previewImage.original} target="_blank" rel="noreferrer" className="mt-6 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold" onClick={(e) => e.stopPropagation()}>
-               🔗 Buka Link Asli
-            </a>
-         </div>
-      )}
     </div>
   );
 }

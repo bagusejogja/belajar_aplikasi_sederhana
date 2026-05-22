@@ -104,12 +104,19 @@ export default function TambahPaguFormPage() {
       if (filePengajuan) data.append('file_surat_pengajuan', filePengajuan);
       if (fileTanggapan) data.append('file_surat_tanggapan', fileTanggapan);
 
-      const result = await createTambahPagu(data);
+      // Gunakan API Route (Lebih Stabil)
+      const response = await fetch('/api/tambah-pagu/tambah', {
+        method: 'POST',
+        body: data,
+      });
+
+      const result = await response.json();
+      
       if (result.success) {
         alert("Data Tambah Pagu Berhasil Disimpan!");
         router.push('/tambah-pagu');
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Gagal simpan via API");
       }
     } catch (err: any) {
       alert("Gagal menyimpan: " + err.message);

@@ -21,7 +21,8 @@ import {
   Database,
   Layers,
   MessageSquare,
-  BookOpen
+  BookOpen,
+  Settings
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -49,7 +50,8 @@ const iconMap: Record<string, any> = {
   FileSpreadsheet,
   Layers,
   MessageSquare,
-  BookOpen
+  BookOpen,
+  Settings
 };
 
 interface SidebarProps {
@@ -80,7 +82,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
               if (menuData && menuData.length > 0) {
                  setAllowedPaths(menuData.map(m => m.path));
-              } else if (roleData.role === 'Admin') {
+              } else if (roleData.role.toLowerCase() === 'admin') {
                  // Fallback jika belum di-set, Admin punya akses semua
                  setAllowedPaths(menuList.map(m => m.path));
               }
@@ -146,7 +148,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             // Filter items by role/access
             const visibleItems = items.filter(item => {
               if (userRole === 'Pending') return false;
-              return allowedPaths.includes(item.path) || userRole === 'Admin';
+              return allowedPaths.includes(item.path) || userRole.toLowerCase() === 'admin';
             });
 
             if (visibleItems.length === 0) return null;

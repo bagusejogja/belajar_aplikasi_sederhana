@@ -233,7 +233,7 @@ export default function DaftarSuratPage() {
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 10, fontBold: '900', fill: '#9ca3af' }} 
+                    tick={{ fontSize: 10, fontWeight: '900', fill: '#9ca3af' }} 
                   />
                   <YAxis 
                     axisLine={false} 

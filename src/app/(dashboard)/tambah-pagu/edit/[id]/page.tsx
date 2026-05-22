@@ -133,7 +133,7 @@ export default function EditPaguPage() {
         alert("Perubahan Berhasil Disimpan!");
         router.push('/tambah-pagu');
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Gagal melakukan pembaruan data.");
       }
     } catch (err: any) {
       alert("Gagal update: " + err.message);

@@ -16,12 +16,15 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
 
-  const roles = [
-    { value: 'Admin', label: '👑 Administrator', color: 'indigo' },
+  const defaultRoles = [
+    { value: 'ADMIN', label: '👑 Administrator', color: 'indigo' },
     { value: 'Pemroses Anggaran', label: '📊 Pemroses Anggaran', color: 'emerald' },
-    { value: 'Staff', label: '📝 Staff / Keuangan', color: 'blue' },
-    { value: 'Viewer', label: '👁️ Pengamat (View Only)', color: 'gray' },
+    { value: 'STAFF', label: '📝 Staff / Keuangan', color: 'blue' },
+    { value: 'MANAGER', label: '💼 Manager', color: 'amber' },
+    { value: 'VIEWER', label: '👁️ Pengamat (View Only)', color: 'gray' },
+    { value: 'GUEST', label: '👤 Tamu', color: 'slate' },
     { value: 'Pending', label: '🚫 Kunci / Blokir Akun', color: 'red' },
   ];
 
@@ -39,8 +42,38 @@ export default function UsersPage() {
 
       if (error) throw error;
       setUsers(data || []);
+
+      // 2. Ambil SEMUA role unik dari tabel Menu dan User (Tanpa kecuali)
+      const { data: menuRoles } = await supabase.from('app_role_menus').select('role');
+      
+      const rawDbRoles = [
+        ...(data?.map(u => u.role) || []),
+        ...(menuRoles?.map(r => r.role) || [])
+      ].filter(r => r && r !== 'Pending');
+
+      // 3. Gabungkan dan bersihkan (Hanya tampilkan yang ada di Menu Akses)
+      const finalRoles: any[] = [
+        { value: 'ADMIN', label: '👑 Administrator', color: 'indigo' }
+      ];
+      
+      // Ambil unik role dari DB (Menu Akses)
+      const uniqueMenuRoles = Array.from(new Set(menuRoles?.map(r => r.role) || []))
+        .filter(r => r && r.toUpperCase() !== 'ADMIN' && r !== 'Pending');
+
+      uniqueMenuRoles.forEach(role => {
+          finalRoles.push({ 
+            value: role, 
+            label: `👤 ${role}`, 
+            color: 'emerald' 
+          });
+      });
+
+      // Tambahkan pilihan Blokir di paling bawah
+      finalRoles.push({ value: 'Pending', label: '🚫 Kunci / Blokir Akun', color: 'red' });
+      
+      setAvailableRoles(finalRoles);
     } catch (err: any) {
-      console.error("Gagal menarik data user:", err.message);
+      console.error("DEBUG - Sync Error:", err.message);
     } finally {
       setLoading(false);
     }
@@ -102,9 +135,9 @@ export default function UsersPage() {
             <p className="text-gray-400 font-bold italic">User tidak ditemukan...</p>
           </div>
         ) : filteredUsers.map((u) => {
-          const currentRole = roles.find(r => r.value === u.role) || roles[3];
-          const isPending = u.role === 'Pending';
-          const isAdmin = u.role === 'Admin';
+          const currentRole = availableRoles.find(r => r.value.toUpperCase() === u.role?.toUpperCase()) || availableRoles[availableRoles.length - 1];
+          const isPending = u.role?.toUpperCase() === 'PENDING';
+          const isAdmin = u.role?.toUpperCase() === 'ADMIN';
 
           return (
             <div key={u.id} className={`bg-white p-6 rounded-[2rem] border transition-all hover:shadow-md flex flex-col md:flex-row items-center justify-between gap-6 ${isPending ? 'border-red-100 bg-red-50/10' : 'border-gray-50'}`}>
@@ -142,7 +175,7 @@ export default function UsersPage() {
                         isPending ? 'border-red-500 text-red-700 bg-red-50' : 
                         'border-emerald-500 text-emerald-700 bg-emerald-50'}`}
                   >
-                    {roles.map(r => (
+                    {availableRoles.map(r => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>

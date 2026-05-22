@@ -9,9 +9,9 @@ import {
 import { menuList } from '@/lib/mock-db';
 
 export default function MenusPage() {
-  const [roles, setRoles] = useState<string[]>(['Admin', 'Staff', 'Viewer', 'Pemroses Anggaran']);
+  const [roles, setRoles] = useState<string[]>(['ADMIN', 'STAFF', 'VIEWER', 'Pemroses Anggaran', 'MANAGER']);
   const [newRole, setNewRole] = useState('');
-  const [selectedRole, setSelectedRole] = useState('Admin');
+  const [selectedRole, setSelectedRole] = useState('ADMIN');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
@@ -38,14 +38,23 @@ export default function MenusPage() {
       const { data: userRoles } = await supabase.from('app_users').select('role');
       const { data: menuRoles } = await supabase.from('app_role_menus').select('role');
       
-      const allRoles = Array.from(new Set([
-        'Admin', 'Staff', 'Viewer', 'Pemroses Anggaran',
-        selectedRole, // Pastikan role yang sedang dipilih (termasuk yang baru ditambah) tidak hilang
+      const rawRoles = [
+        'ADMIN', 'STAFF', 'VIEWER', 'Pemroses Anggaran', 'MANAGER',
+        selectedRole,
         ...(userRoles?.map(r => r.role) || []),
         ...(menuRoles?.map(r => r.role) || [])
-      ])).filter(r => r !== 'Pending');
+      ].filter(r => r && r !== 'Pending');
 
-      setRoles(allRoles);
+      // Deduplikasi Case-Insensitive (Ambil yang Huruf Besar jika ada bentrok)
+      const roleMap = new Map();
+      rawRoles.forEach(r => {
+        const upper = r.toUpperCase();
+        if (!roleMap.has(upper) || r === upper) {
+          roleMap.set(upper, r);
+        }
+      });
+
+      setRoles(Array.from(roleMap.values()));
       
       // 2. Ambil permission untuk role yang sedang dipilih
       const { data, error } = await supabase

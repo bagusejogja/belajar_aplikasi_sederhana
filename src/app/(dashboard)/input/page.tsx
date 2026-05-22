@@ -87,38 +87,41 @@ export default function InputPage() {
      }));
   };
 
-  // Upload BANYAK FILE secara paralel melalui Server (Bypass CORS)
-  const uploadMultipleFiles = async (files: File[]) => {
-     if (files.length === 0) return '';
-     
-     const { uploadFileToR2 } = await import('@/app/actions/r2-upload');
-     
-     const uploadPromises = files.map(async (file) => {
-        try {
-           console.log("Mengirim file ke server:", file.name);
-           
-           const formData = new FormData();
-           formData.append('file', file);
+   // Upload BANYAK FILE secara paralel melalui API ROUTE (LEBIH STABIL)
+   const uploadMultipleFiles = async (files: File[]) => {
+      if (files.length === 0) return '';
+      
+      const uploadPromises = files.map(async (file) => {
+         try {
+            console.log("Mengirim file ke API:", file.name);
+            
+            const upData = new FormData();
+            upData.append('file', file);
+            upData.append('folder', 'transaksi');
 
-           // Tentukan folder 'transaksi' di sini
-           const result = await uploadFileToR2(formData, 'transaksi');
+            const response = await fetch('/api/upload', {
+               method: 'POST',
+               body: upData
+            });
 
-           if (!result.success) {
-              throw new Error(result.error);
-           }
-           
-           console.log("Server berhasil upload:", file.name);
-           return result.publicUrl;
-        } catch (err: any) {
-           console.error("Gagal Upload via Server:", err);
-           alert("GAGAL UPLOAD: " + err.message);
-           throw err;
-        }
-     });
+            const result = await response.json();
 
-     const urls = await Promise.all(uploadPromises);
-     return urls.join(',');
-  };
+            if (!result.success) {
+               throw new Error(result.error || "Gagal upload file");
+            }
+            
+            console.log("API berhasil upload:", file.name);
+            return result.publicUrl;
+         } catch (err: any) {
+            console.error("Gagal Upload via API:", err);
+            alert("GAGAL UPLOAD: " + err.message);
+            throw err;
+         }
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      return urls.join(',');
+   };
 
   const handleSave = async (e: React.FormEvent) => {
      e.preventDefault();

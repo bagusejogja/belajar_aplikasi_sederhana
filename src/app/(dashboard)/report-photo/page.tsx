@@ -64,24 +64,31 @@ export default function ReportPhotoPage() {
 
    const totalTrxAll = transactions.length;
 
-   const renderFotoKecil = (teks: string | null) => {
-      if (!teks) return null;
-      const links = teks.split(',').map(s => s.trim()).filter(Boolean);
-      return links.map((lnk, idx) => {
-          let imgSrc = lnk;
-          const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-          if (gdriveMatch && gdriveMatch[1]) {
-             imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w600`;
-          }
-          return (
-             <div key={idx} className="border border-gray-200 shadow-sm bg-white p-1 rounded inline-block mx-1 mb-2">
-                <img src={imgSrc} alt="Lampiran" className="h-40 w-auto object-contain max-w-full" onError={(e) => { 
-                   (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                }} />
-             </div>
-          );
-      });
-   };
+    const renderFotoKecil = (teks: string | null) => {
+       if (!teks) return null;
+       const links = teks.split(',').map(s => s.trim()).filter(Boolean);
+       return links.map((lnk, idx) => {
+           let imgSrc = lnk;
+           const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+           if (gdriveMatch && gdriveMatch[1]) {
+              // Optimasi: Gunakan sz=w400 untuk keseimbangan size & kualitas tajam
+              imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w400`;
+           }
+           return (
+              <div key={idx} className="border border-gray-200 shadow-sm bg-white p-1 rounded inline-block mx-1 mb-2 overflow-hidden">
+                 <img 
+                    src={imgSrc} 
+                    alt="Lampiran" 
+                    className="h-40 w-auto object-contain max-w-full print:max-h-48" 
+                    style={{ imageRendering: '-webkit-optimize-contrast' }}
+                    onError={(e) => { 
+                       (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                    }} 
+                 />
+              </div>
+           );
+       });
+    };
 
    return (
       <div className="space-y-6 max-w-5xl mx-auto">
