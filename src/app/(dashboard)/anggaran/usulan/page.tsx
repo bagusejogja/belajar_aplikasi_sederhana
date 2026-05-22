@@ -199,21 +199,41 @@ export default function UsulanAnggaranPage() {
       }
     };
 
+    if (files.length === 0) return <span>-</span>;
+
+    if (files.length === 1) {
+      return (
+        <button 
+          onClick={() => handleDownloadCustomName(files[0].url, files[0].name)}
+          className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
+          title={`Download: ${files[0].name}`}
+        >
+          <Download size={14} strokeWidth={2.5} />
+          <span className="text-[11px] font-black uppercase tracking-wider">Download</span>
+        </button>
+      );
+    }
+
     return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        {files.map((file, i) => (
-          <button 
-            key={i}
-            onClick={() => handleDownloadCustomName(file.url, file.name)}
-            className="group flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
-            title={`Download: ${file.name}`}
-          >
-            {files.length > 1 && (
-              <span className="text-[10px] font-black">{i + 1}</span>
-            )}
-            <Download size={12} strokeWidth={2.5} />
-          </button>
-        ))}
+      <div className="relative inline-block">
+        <select 
+          onChange={(e) => {
+            if(e.target.value !== "") {
+              const file = files[parseInt(e.target.value)];
+              handleDownloadCustomName(file.url, file.name);
+              e.target.value = ""; // Reset kembali ke pilihan awal
+            }
+          }}
+          className="appearance-none pr-8 pl-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] border border-indigo-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors w-36 shadow-sm truncate uppercase tracking-wider"
+        >
+          <option value="">{files.length} Lampiran</option>
+          {files.map((file, i) => (
+            <option key={i} value={i}>⬇ {file.name}</option>
+          ))}
+        </select>
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500">
+          <Download size={14} strokeWidth={2.5} />
+        </div>
       </div>
     );
   };
