@@ -200,26 +200,23 @@ export default function UsulanAnggaranPage() {
     };
 
     return (
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 min-w-[200px]">
         {files.map((file, i) => (
-          <div key={i} className="flex items-center gap-1 border border-gray-100 rounded-lg p-0.5 bg-white">
-            <a 
-              href={file.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors"
-              title="View File"
-            >
-              <Eye size={14} />
-            </a>
-            <button 
-              onClick={() => handleDownloadCustomName(file.url, file.name)}
-              className="p-1.5 bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100 transition-colors"
-              title={`Download: ${file.name}`}
-            >
-              <Download size={14} />
-            </button>
-          </div>
+          <button 
+            key={i}
+            onClick={() => handleDownloadCustomName(file.url, file.name)}
+            className="group flex items-center justify-between w-full max-w-xs px-3 py-2 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-xl transition-all active:scale-[0.98]"
+            title={`Download: ${file.name}`}
+          >
+            <div className="flex items-center gap-2.5 overflow-hidden w-full">
+              <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm text-gray-400 group-hover:text-emerald-600 group-hover:border-emerald-200 group-hover:shadow-emerald-100 transition-all flex-shrink-0">
+                <Download size={14} strokeWidth={2.5} />
+              </div>
+              <span className="text-[11px] font-semibold text-gray-600 group-hover:text-emerald-700 truncate text-left w-full">
+                {file.name}
+              </span>
+            </div>
+          </button>
         ))}
       </div>
     );
