@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  Settings, Save, Loader2, Link2, Calendar, Hash, FileText, Clock, FolderCloud
+  Settings, Save, Loader2, Link2, Calendar, Hash, FileText, Clock, Cloud
 } from 'lucide-react';
 
 export default function PengaturanFormPage() {
@@ -206,7 +206,7 @@ export default function PengaturanFormPage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                <FolderCloud size={14} className="text-sky-500" />
+                <Cloud size={14} className="text-sky-500" />
                 Folder Penyimpanan Cloudflare R2
               </label>
               <div className="relative">
