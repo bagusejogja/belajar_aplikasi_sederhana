@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { uploadFileToR2 } from './r2-upload';
 import { revalidatePath } from 'next/cache';
 
+// Bypasses generic Node.js SSL handshake failures in Vercel
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 export async function createSuratRevisi(formData: FormData) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
