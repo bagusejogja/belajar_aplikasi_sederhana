@@ -20,21 +20,26 @@ export async function POST(req: NextRequest) {
 
     // 1. Upload ke R2 jika ada file
     if (file && file.size > 0) {
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `surat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-      const key = `surat/${fileName}`;
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `surat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const key = `surat/${fileName}`;
 
-      await r2.send(new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type || 'application/octet-stream',
-      }));
+        await r2.send(new PutObjectCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: key,
+          Body: buffer,
+          ContentType: file.type || 'application/octet-stream',
+        }));
 
-      const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
-      fileUrl = `${domain}/${key}`;
+        const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
+        fileUrl = `${domain}/${key}`;
+      } catch (r2Error: any) {
+        console.error("R2 Upload Error:", r2Error);
+        return NextResponse.json({ success: false, error: `Error R2 Upload: ${r2Error.message}` }, { status: 500 });
+      }
     }
 
     // 2. Simpan ke Database
@@ -58,12 +63,17 @@ export async function POST(req: NextRequest) {
       is_active: 1
     };
 
-    const { error } = await supabase.from('surat_revisi').insert(data);
-    if (error) throw error;
+    try {
+      const { error } = await supabase.from('surat_revisi').insert(data);
+      if (error) throw error;
+    } catch (dbError: any) {
+      console.error("Supabase Insert Error:", dbError);
+      return NextResponse.json({ success: false, error: `Error Supabase Insert: ${dbError.message}` }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error("API Error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error("API Error General:", err);
+    return NextResponse.json({ success: false, error: `Error General: ${err.message}` }, { status: 500 });
   }
 }
