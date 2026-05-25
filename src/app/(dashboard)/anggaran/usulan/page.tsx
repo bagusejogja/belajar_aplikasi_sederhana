@@ -13,6 +13,8 @@ export default function UsulanAnggaranPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isDownloadingMulti, setIsDownloadingMulti] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -92,6 +94,11 @@ export default function UsulanAnggaranPage() {
     });
   }, [rawData, searchQuery, picFilter]);
 
+  // Reset selection when search/filter changes
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [searchQuery, picFilter]);
+
   const exportToCSV = () => {
     if (filteredData.length === 0) return;
     
@@ -128,13 +135,13 @@ export default function UsulanAnggaranPage() {
       return true;
     }
     if (Array.isArray(val) && val.length > 0) {
-      if (typeof val[0] === 'string' && val[0].startsWith('http')) return true;
+    if (typeof val[0] === 'string' && val[0].startsWith('http')) return true;
       if (typeof val[0] === 'object' && val[0] !== null && val[0].url && val[0].url.includes('http')) return true;
     }
     return false;
   };
 
-  const renderFileLinks = (val: any, unitVal: string) => {
+  const extractFilesFromValue = (val: any) => {
     let files: {url: string, name: string}[] = [];
 
     const extractFiles = (items: any[]) => {
@@ -164,47 +171,94 @@ export default function UsulanAnggaranPage() {
     } else if (typeof val === 'object' && val !== null && val.url) {
       files = [{ url: val.url, name: val.name || 'file' }];
     }
+    
+    return files;
+  };
 
-    const handleDownloadCustomName = async (url: string, originalName: string) => {
-      try {
-        const ext = originalName.split('.').pop() || 'file';
-        const now = new Date();
-        const timeStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-        
-        const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
-        const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
-        
-        // Fetch directly to bypass cross-origin naming limitation
-        const response = await fetch(url);
-        const blob = await response.blob();
-        
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = newFileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      } catch (err) {
-        console.error("Gagal download blob, fallback buka tab:", err);
-        // Fallback buka tab baru jika CORS memblokir
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = originalName;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-    };
+  const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string) => {
+    try {
+      const ext = originalName.split('.').pop() || 'file';
+      const now = new Date();
+      const timeStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+      
+      const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
+      const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
+      
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = newFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+      console.error("Gagal download blob, fallback buka tab:", err);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = originalName;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleMultiDownload = async () => {
+    if (selectedIds.length === 0) return;
+    setIsDownloadingMulti(true);
+    
+    const selectedRows = filteredData.filter(row => selectedIds.includes(row.id));
+    let allFiles: { url: string, name: string, unitVal: string }[] = [];
+    
+    selectedRows.forEach(row => {
+       const unitVal = row['unit'] || row['Unit'] || row['Unit Kerja'] || row['unit_kerja'] || '-';
+       Object.keys(row).forEach(key => {
+         if (isFileLink(row[key])) {
+            const files = extractFilesFromValue(row[key]);
+            files.forEach(f => {
+               allFiles.push({ ...f, unitVal });
+            });
+         }
+       });
+    });
+
+    if (allFiles.length === 0) {
+      alert("Tidak ada lampiran yang ditemukan pada baris yang dipilih.");
+      setIsDownloadingMulti(false);
+      return;
+    }
+
+    const confirmDownload = confirm(`Ditemukan ${allFiles.length} file untuk didownload.\nCatatan: Browser mungkin meminta izin untuk mengunduh banyak file sekaligus (Allow multiple downloads). Mohon izinkan jika ditanya.\nLanjutkan?`);
+    if (!confirmDownload) {
+      setIsDownloadingMulti(false);
+      return;
+    }
+
+    for (let i = 0; i < allFiles.length; i++) {
+       const file = allFiles[i];
+       await handleDownloadCustomName(file.url, file.name, file.unitVal);
+       // Delay 800ms agar browser tidak ngeblok multiple download
+       await new Promise(resolve => setTimeout(resolve, 800));
+    }
+    
+    setIsDownloadingMulti(false);
+  };
+
+  const renderFileLinks = (val: any, unitVal: string) => {
+    const files = extractFilesFromValue(val);
+
+
 
     if (files.length === 0) return <span>-</span>;
 
     if (files.length === 1) {
       return (
         <button 
-          onClick={() => handleDownloadCustomName(files[0].url, files[0].name)}
+          onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal)}
           className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
           title={`Download: ${files[0].name}`}
         >
@@ -220,7 +274,7 @@ export default function UsulanAnggaranPage() {
           onChange={(e) => {
             if(e.target.value !== "") {
               const file = files[parseInt(e.target.value)];
-              handleDownloadCustomName(file.url, file.name);
+              handleDownloadCustomName(file.url, file.name, unitVal);
               e.target.value = ""; // Reset kembali ke pilihan awal
             }
           }}
@@ -260,6 +314,16 @@ export default function UsulanAnggaranPage() {
           >
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} /> Refresh
           </button>
+          {selectedIds.length > 0 && (
+            <button 
+              onClick={handleMultiDownload}
+              disabled={isDownloadingMulti}
+              className="flex items-center gap-2 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-all disabled:opacity-50"
+            >
+              {isDownloadingMulti ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Download {selectedIds.length} Data
+            </button>
+          )}
           <button 
             onClick={exportToCSV}
             disabled={filteredData.length === 0}
@@ -310,6 +374,21 @@ export default function UsulanAnggaranPage() {
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-gray-900 shadow-md">
+                  {/* Checkbox Kolom */}
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={filteredData.length > 0 && selectedIds.length === filteredData.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(filteredData.map(r => r.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
                   {/* Kolom Khusus */}
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-16">NO</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">Pengirim (Email & Unit)</th>
@@ -334,7 +413,23 @@ export default function UsulanAnggaranPage() {
                   const periodeVal = row['periode'] || row['Periode'] || '-';
 
                   return (
-                  <tr key={idx} className="hover:bg-indigo-50/30 transition-colors group bg-white">
+                  <tr key={idx} className={`transition-colors group bg-white ${selectedIds.includes(row.id) ? 'bg-indigo-50/50' : 'hover:bg-indigo-50/30'}`}>
+                    {/* Checkbox Row */}
+                    <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.includes(row.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(prev => [...prev, row.id]);
+                          } else {
+                            setSelectedIds(prev => prev.filter(id => id !== row.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </td>
+                    
                     {/* NO */}
                     <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50">
                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs">{idx + 1}</span>
