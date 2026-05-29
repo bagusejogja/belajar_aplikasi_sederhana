@@ -36,7 +36,7 @@ export default function TambahSuratPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const jenisOptions = [
-    "Buka Akses", "Realokasi", "Revisi", "Pemindahan", "Penggunaan Luncuran"
+    "Buka Akses", "Realokasi", "Revisi", "Pemindahan", "Penggunaan Luncuran", "Efisiensi"
   ];
 
   useEffect(() => {

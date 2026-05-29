@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
-  CheckCircle, Clock
+  CheckCircle, Clock, UploadCloud
 } from 'lucide-react';
 
 export default function UsulanAnggaranPage() {
@@ -175,10 +175,10 @@ export default function UsulanAnggaranPage() {
     return files;
   };
 
-  const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string) => {
+  const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string, uploadTime: string) => {
     try {
       const ext = originalName.split('.').pop() || 'file';
-      const now = new Date();
+      const now = uploadTime ? new Date(uploadTime) : new Date();
       const timeStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
       
       const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
@@ -212,15 +212,16 @@ export default function UsulanAnggaranPage() {
     setIsDownloadingMulti(true);
     
     const selectedRows = filteredData.filter(row => selectedIds.includes(row.id));
-    let allFiles: { url: string, name: string, unitVal: string }[] = [];
+    let allFiles: { url: string, name: string, unitVal: string, uploadTime: string }[] = [];
     
     selectedRows.forEach(row => {
        const unitVal = row['unit'] || row['Unit'] || row['Unit Kerja'] || row['unit_kerja'] || '-';
+       const uploadTime = row['created_at'];
        Object.keys(row).forEach(key => {
          if (isFileLink(row[key])) {
             const files = extractFilesFromValue(row[key]);
             files.forEach(f => {
-               allFiles.push({ ...f, unitVal });
+               allFiles.push({ ...f, unitVal, uploadTime });
             });
          }
        });
@@ -240,7 +241,7 @@ export default function UsulanAnggaranPage() {
 
     for (let i = 0; i < allFiles.length; i++) {
        const file = allFiles[i];
-       await handleDownloadCustomName(file.url, file.name, file.unitVal);
+       await handleDownloadCustomName(file.url, file.name, file.unitVal, file.uploadTime);
        // Delay 800ms agar browser tidak ngeblok multiple download
        await new Promise(resolve => setTimeout(resolve, 800));
     }
@@ -248,7 +249,7 @@ export default function UsulanAnggaranPage() {
     setIsDownloadingMulti(false);
   };
 
-  const renderFileLinks = (val: any, unitVal: string) => {
+  const renderFileLinks = (val: any, unitVal: string, uploadTime: string) => {
     const files = extractFilesFromValue(val);
 
 
@@ -258,7 +259,7 @@ export default function UsulanAnggaranPage() {
     if (files.length === 1) {
       return (
         <button 
-          onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal)}
+          onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal, uploadTime)}
           className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
           title={`Download: ${files[0].name}`}
         >
@@ -274,7 +275,7 @@ export default function UsulanAnggaranPage() {
           onChange={(e) => {
             if(e.target.value !== "") {
               const file = files[parseInt(e.target.value)];
-              handleDownloadCustomName(file.url, file.name, unitVal);
+              handleDownloadCustomName(file.url, file.name, unitVal, uploadTime);
               e.target.value = ""; // Reset kembali ke pilihan awal
             }
           }}
@@ -451,6 +452,11 @@ export default function UsulanAnggaranPage() {
                       <div className="flex flex-col gap-2 items-start">
                         <span className="text-xs font-black text-indigo-700 uppercase tracking-wide">{picVal}</span>
                         
+                        <span className="text-[9px] text-gray-500 font-bold flex items-center gap-1" title="Waktu Upload">
+                          <UploadCloud size={10} className="text-indigo-400" />
+                          {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'} WIB
+                        </span>
+                        
                         {row.status === 'Sudah Diproses' ? (
                           <div className="flex flex-col gap-1 items-start">
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md font-black text-[9px] uppercase tracking-wider border border-emerald-200">
@@ -479,7 +485,7 @@ export default function UsulanAnggaranPage() {
                       .map((key) => (
                       <td key={key} className="px-6 py-4 text-xs font-semibold text-gray-700 border-r border-gray-50">
                         {isFileLink(row[key]) ? (
-                          renderFileLinks(row[key], unitVal)
+                          renderFileLinks(row[key], unitVal, row.created_at)
                         ) : typeof row[key] === 'object' && row[key] !== null ? (
                           JSON.stringify(row[key])
                         ) : (
