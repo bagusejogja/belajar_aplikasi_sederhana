@@ -42,13 +42,20 @@ export default function PengaturanFormPage() {
       }
 
       if (data) {
+        const toLocalDatetimeLocal = (utcString: string | null) => {
+          if (!utcString) return '';
+          const d = new Date(utcString);
+          if (isNaN(d.getTime())) return '';
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
         setFormData({
           judul_form: data.judul_form || '',
           tahun_aktif: data.tahun_aktif ? String(data.tahun_aktif) : '',
           periode_aktif: data.periode_aktif ? String(data.periode_aktif) : '',
-          // Potong timezone 'Z' dari ISO string agar pas dengan <input type="datetime-local">
-          waktu_buka: data.waktu_buka ? data.waktu_buka.slice(0, 16) : '',
-          waktu_tutup: data.waktu_tutup ? data.waktu_tutup.slice(0, 16) : '',
+          waktu_buka: toLocalDatetimeLocal(data.waktu_buka),
+          waktu_tutup: toLocalDatetimeLocal(data.waktu_tutup),
           r2_folder: data.r2_folder || ''
         });
       }
