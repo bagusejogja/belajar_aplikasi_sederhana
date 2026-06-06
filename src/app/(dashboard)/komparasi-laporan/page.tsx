@@ -168,24 +168,53 @@ export default function KomparasiLaporanPage() {
   };
   computeSums(roots);
 
-  // Kalkulasi Custom untuk SURPLUS / DEFISIT
-  const surplus1Label = 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA'; 
-  const surplus2Label = 'SURPLUS/(DEFISIT) ANGGARAN';
+  // Kalkulasi Custom untuk TOTAL & SURPLUS
   const sum1Label = 'JUMLAH PENERIMAAN';
   const sum2Label = 'JUMLAH PENGELUARAN';
+  const surplus1Label = 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA'; 
+  const surplus2Label = 'SURPLUS/(DEFISIT) ANGGARAN';
   const sisaLebihLabel = 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA';
+
+  const jpRow = flattenedRows.find(r => r.keterangan === sum1Label);
+  const jpPemerintah = flattenedRows.find(r => r.keterangan === 'Jumlah Penerimaan Dana Pemerintah');
+  const jpMasyarakat = flattenedRows.find(r => r.keterangan === 'Jumlah Penerimaan Dana Masyarakat');
+  
+  const jpengRow = flattenedRows.find(r => r.keterangan === sum2Label);
 
   const s1Row = flattenedRows.find(r => r.keterangan === surplus1Label);
   const s2Row = flattenedRows.find(r => r.keterangan === surplus2Label);
-  const jpRow = flattenedRows.find(r => r.keterangan === sum1Label);
-  const jpengRow = flattenedRows.find(r => r.keterangan === sum2Label);
   const sisaRow = flattenedRows.find(r => r.keterangan === sisaLebihLabel);
 
   selectedYearVals.forEach(y => {
+    // 1. JUMLAH PENERIMAAN (Pemerintah + Masyarakat)
+    if (jpRow && jpPemerintah && jpMasyarakat) {
+      matrix[jpRow.id][y].anggaran = matrix[jpPemerintah.id][y].anggaran + matrix[jpMasyarakat.id][y].anggaran;
+      matrix[jpRow.id][y].realisasi = matrix[jpPemerintah.id][y].realisasi + matrix[jpMasyarakat.id][y].realisasi;
+    }
+
+    // 2. JUMLAH PENGELUARAN (Semua Level 1 di bawah PENGELUARAN)
+    if (jpengRow) {
+      let sumAng = 0; let sumReal = 0;
+      let startCounting = false;
+      for (const r of flattenedRows) {
+        if (r.keterangan === 'PENGELUARAN') { startCounting = true; continue; }
+        if (r.keterangan === sum2Label) break;
+        if (startCounting && r.level === 1) {
+          sumAng += matrix[r.id][y].anggaran;
+          sumReal += matrix[r.id][y].realisasi;
+        }
+      }
+      matrix[jpengRow.id][y].anggaran = sumAng;
+      matrix[jpengRow.id][y].realisasi = sumReal;
+    }
+
+    // 3. SURPLUS 1 (Penerimaan - Pengeluaran)
     if (s1Row && jpRow && jpengRow) {
       matrix[s1Row.id][y].anggaran = matrix[jpRow.id][y].anggaran - matrix[jpengRow.id][y].anggaran;
       matrix[s1Row.id][y].realisasi = matrix[jpRow.id][y].realisasi - matrix[jpengRow.id][y].realisasi;
     }
+    
+    // 4. SURPLUS 2 (Surplus 1 + Sisa Lebih)
     if (s2Row && s1Row && sisaRow) {
       matrix[s2Row.id][y].anggaran = matrix[s1Row.id][y].anggaran + matrix[sisaRow.id][y].anggaran;
       matrix[s2Row.id][y].realisasi = matrix[s1Row.id][y].realisasi + matrix[sisaRow.id][y].realisasi;
