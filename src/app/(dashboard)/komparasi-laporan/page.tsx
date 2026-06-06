@@ -58,10 +58,19 @@ export default function KomparasiLaporanPage() {
   // --- HANDLERS ---
   const handleAkunSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (akunForm.id) await supabase.from('app_laporan_akun').update(akunForm).eq('id', akunForm.id);
-    else await supabase.from('app_laporan_akun').insert([akunForm]);
-    setIsAkunModalOpen(false);
-    fetchData();
+    try {
+      if (akunForm.id) {
+        await supabase.from('app_laporan_akun').update(akunForm).eq('id', akunForm.id);
+      } else {
+        const { id, ...payload } = akunForm; // hapus id (karena null) agar postgres auto-generate
+        const { error } = await supabase.from('app_laporan_akun').insert([payload]);
+        if (error) throw error;
+      }
+      setIsAkunModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      alert("Gagal menyimpan Akun: " + err.message);
+    }
   };
 
   const handleAkunDelete = async (id: number) => {
@@ -361,7 +370,7 @@ export default function KomparasiLaporanPage() {
         let selisih = d.realisasi - d.anggaran;
         let persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; 
         
-        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
         if (isZeroOverride) {
             selisih = 0;
             persen = 0;
@@ -416,7 +425,7 @@ export default function KomparasiLaporanPage() {
         let persen = d.anggaran !== 0 ? ((selisih / d.anggaran) * 100).toFixed(2) + '%' : '-';
         
         // Zero Override
-        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
         if (isZeroOverride) {
             selisih = 0;
             persen = '0,00%';
@@ -587,7 +596,7 @@ export default function KomparasiLaporanPage() {
                         let persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
                         
                         // Rule: SURPLUS sampai PENAMBAHAN DANA ABADI = 0
-                        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+                        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
                         if (isZeroOverride) {
                            selisih = 0;
                            persen = 0;
@@ -719,6 +728,8 @@ export default function KomparasiLaporanPage() {
                   const bptnbh = getA('Bantuan Pendanaan PTN Badan Hukum', yStr);
                   const pen = getA('Penelitian', yStr);
                   const bea = getA('Beasiswa dan Kontrak Kerjasama Pemerintah', yStr);
+                  const hibahSTP = getA('HIBAH SCIENCE TECHNO PARK -ADB', yStr);
+                  const hibahEq = getA('EQUITY', yStr);
                   
                   const pend = getA('Penerimaan Pendidikan', yStr);
                   const nonPend = getA('Penerimaan Non Pendidikan', yStr);
@@ -737,7 +748,7 @@ export default function KomparasiLaporanPage() {
                   const bPem = getA('Belanja Perbaikan dan Pemeliharaan', yStr);
                   const bPerj = getA('Belanja Perjalanan', yStr);
                   const bModal = getA('Belanja Modal', yStr);
-                  const bEquity = getA('Belanja EQUITY', yStr) || getA('EQUITY', yStr);
+                  const bEquity = getA('Belanja EQUITY', yStr);
                   const bSTP = getA('Belanja SCIENCE TECHNO PARK -ADB', yStr);
                   
                   const surplusY_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', yStr);
@@ -749,8 +760,8 @@ export default function KomparasiLaporanPage() {
                   const fPct = (v: number, d: number) => d ? `${(v/d*100).toFixed(2).replace('.',',')}%` : '0,00%';
                   const fP = (v: number) => `${v.toFixed(2).replace('.',',')}%`;
                   
-                  const t1 = `Estimasi penerimaan RKAT UGM ${y} sebesar ${fRp(pY)}, naik ${fRp(selP_A)} (${fP(pctP_A)}) dari anggaran penerimaan ${prev} atau naik ${fRp(selP_R)} (${fP(pctP_R)}) dari realisasi penerimaan ${prev}. Estimasi penerimaan ${y} bersumber dari penerimaan pemerintah (APBN) ${fRp(pPem)} (${fPct(pPem, pY)}) dan penerimaan dana masyarakat ${fRp(pMas)} (${fPct(pMas, pY)}). Penerimaan pemerintah meliputi Gaji dan Tunjangan PNS ${fRp(gaji)} (${fPct(gaji, pPem)}), BPPTN-BH ${fRp(bptnbh)} (${fPct(bptnbh, pPem)}), penelitian ${fRp(pen)} (${fPct(pen, pPem)}), dan beasiswa dan kerja sama pemerintah ${fRp(bea)} (${fPct(bea, pPem)}), sedangkan penerimaan dana masyarakat bersumber dari pendidikan ${fRp(pend)} (${fPct(pend, pMas)}) dan nonpendidikan ${fRp(nonPend)} (${fPct(nonPend, pMas)}).`;
-                  const t2 = `Estimasi pengeluaran RKAT ${y} berjumlah ${fRp(pengY)}, naik ${fRp(selPeng_A)} (${fP(pctPeng_A)}) dari anggaran pengeluaran ${prev} atau naik ${fRp(selPeng_R)} (${fP(pctPeng_R)}) dari realisasi pengeluaran ${prev}. Komposisi pengeluaran adalah belanja pegawai ${fRp(bPegawai)} (${fPct(bPegawai, pengY)}); belanja barang dan jasa ${fRp(bBarang)} (${fPct(bBarang, pengY)}); belanja perbaikan dan pemeliharaan ${fRp(bPem)} (${fPct(bPem, pengY)}); belanja perjalanan ${fRp(bPerj)} (${fPct(bPerj, pengY)}); belanja modal ${fRp(bModal)} (${fPct(bModal, pengY)}); belanja Program Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(bEquity)} (${fPct(bEquity, pengY)}); dan belanja Science Techno Park (Primestep) ${fRp(bSTP)}.`;
+                  const t1 = `Estimasi penerimaan RKAT UGM ${y} sebesar ${fRp(pY)}, yang terdiri atas penerimaan pemerintah (APBN) ${fRp(pPem)} (${fPct(pPem, pY)})—meliputi Gaji dan Tunjangan PNS ${fRp(gaji)} (${fPct(gaji, pY)}); BPPTN-BH ${fRp(bptnbh)} (${fPct(bptnbh, pY)}); penelitian ${fRp(pen)} (${fPct(pen, pY)}); beasiswa dan kerja sama pemerintah ${fRp(bea)} (${fPct(bea, pY)}); Hibah Science Techno Park – ADB ${fRp(hibahSTP)} (${fPct(hibahSTP, pY)}); Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(hibahEq)} (${fPct(hibahEq, pY)}); serta penerimaan dana masyarakat ${fRp(pMas)} (${fPct(pMas, pY)}), yang mencakup penerimaan pendidikan ${fRp(pend)} (${fPct(pend, pMas)}) dan nonpendidikan ${fRp(nonPend)} (${fPct(nonPend, pMas)}).`;
+                  const t2 = `Estimasi pengeluaran RKAT ${y} berjumlah ${fRp(pengY)}, dengan komposisi: belanja pegawai ${fRp(bPegawai)} (${fPct(bPegawai, pengY)}); belanja barang dan jasa ${fRp(bBarang)} (${fPct(bBarang, pengY)}); belanja perbaikan dan pemeliharaan ${fRp(bPem)} (${fPct(bPem, pengY)}); belanja perjalanan ${fRp(bPerj)} (${fPct(bPerj, pengY)}); belanja modal ${fRp(bModal)} (${fPct(bModal, pengY)}); belanja Science Techno Park (Primestep) ADB ${fRp(bSTP)} (${fPct(bSTP, pengY)}); belanja Program Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(bEquity)} (${fPct(bEquity, pengY)}).`;
                   const t3 = `Secara keseluruhan usulan RKAT ${y} diestimasikan menghasilkan surplus anggaran sebesar ${fRp(surplusY_A)} atau ${fPct(surplusY_A, pY)} dari usulan anggaran penerimaan ${y}. Surplus anggaran ${y} ini lebih besar dibandingkan dengan surplus anggaran ${prev} yang sebesar ${fRp(surplusY1_A)} (${fPct(surplusY1_A, pY1_A)} dari anggaran penerimaan ${prev}) atau realisasi surplus ${prev} yang sebesar ${fRp(surplusY1_R)} (${fPct(surplusY1_R, pY1_R)} dari realisasi penerimaan ${prev}). Namun demikian dari surplus anggaran ${prev} baru sebesar ${fRp(danaAbadi)} yang dapat dialokasikan ke dana abadi karena pertimbangan likuiditas.`;
                   
                   setNarasiText(`${t1}\n\n${t2}\n\n${t3}`);
