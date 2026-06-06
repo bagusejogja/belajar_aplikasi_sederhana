@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, Download, FileText, Settings } from 'lucide-react';
+import { BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, Download, FileText, Settings, Upload, FileUp } from 'lucide-react';
 import Select from 'react-select';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, TextRun, AlignmentType } from 'docx';
@@ -20,11 +20,16 @@ export default function KomparasiLaporanPage() {
   // Modals
   const [isAkunModalOpen, setIsAkunModalOpen] = useState(false);
   const [isNilaiModalOpen, setIsNilaiModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
   const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), anggaran: 0, realisasi: 0 });
   const [selectedAkunName, setSelectedAkunName] = useState('');
+
+  // Bulk Upload State
+  const [bulkTahun, setBulkTahun] = useState(new Date().getFullYear());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchData();
@@ -32,9 +37,7 @@ export default function KomparasiLaporanPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    // Fetch Akun (Master)
     const { data: akunData } = await supabase.from('app_laporan_akun').select('*').order('urutan', { ascending: true });
-    // Fetch Nilai
     const { data: nilaiData } = await supabase.from('app_laporan_statis').select('*');
     
     setAkunMaster(akunData || []);
@@ -67,7 +70,6 @@ export default function KomparasiLaporanPage() {
 
   const handleNilaiSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Gunakan upsert karena akun_id + tahun unik
     const payload = {
       akun_id: nilaiForm.akun_id,
       tahun: nilaiForm.tahun,
@@ -109,7 +111,6 @@ export default function KomparasiLaporanPage() {
   roots.sort((a, b) => a.urutan - b.urutan);
   childrenMap.forEach(arr => arr.sort((a, b) => a.urutan - b.urutan));
 
-  // Flatten tree untuk render tabel
   const flattenedRows: any[] = [];
   const flatten = (nodes: any[]) => {
     nodes.forEach(node => {
@@ -121,7 +122,6 @@ export default function KomparasiLaporanPage() {
   };
   flatten(roots);
 
-  // Siapkan matriks data: matrix[akunId][Tahun] = { anggaran, realisasi, id }
   const matrix: Record<number, Record<string, any>> = {};
   flattenedRows.forEach(akun => {
     matrix[akun.id] = {};
@@ -130,7 +130,6 @@ export default function KomparasiLaporanPage() {
     });
   });
 
-  // Isi data mentah dari DB (Hanya untuk yang bukan is_sum, atau is_sum kalau user memang input manual)
   dataNilai.forEach(d => {
     const y = String(d.tahun);
     if (matrix[d.akun_id] && matrix[d.akun_id][y]) {
@@ -169,12 +168,128 @@ export default function KomparasiLaporanPage() {
   };
   computeSums(roots);
 
+  // Kalkulasi Custom untuk SURPLUS / DEFISIT
+  const surplus1Label = 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA'; 
+  const surplus2Label = 'SURPLUS/(DEFISIT) ANGGARAN';
+  const sum1Label = 'JUMLAH PENERIMAAN';
+  const sum2Label = 'JUMLAH PENGELUARAN';
+  const sisaLebihLabel = 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA';
+
+  const s1Row = flattenedRows.find(r => r.keterangan === surplus1Label);
+  const s2Row = flattenedRows.find(r => r.keterangan === surplus2Label);
+  const jpRow = flattenedRows.find(r => r.keterangan === sum1Label);
+  const jpengRow = flattenedRows.find(r => r.keterangan === sum2Label);
+  const sisaRow = flattenedRows.find(r => r.keterangan === sisaLebihLabel);
+
+  selectedYearVals.forEach(y => {
+    if (s1Row && jpRow && jpengRow) {
+      matrix[s1Row.id][y].anggaran = matrix[jpRow.id][y].anggaran - matrix[jpengRow.id][y].anggaran;
+      matrix[s1Row.id][y].realisasi = matrix[jpRow.id][y].realisasi - matrix[jpengRow.id][y].realisasi;
+    }
+    if (s2Row && s1Row && sisaRow) {
+      matrix[s2Row.id][y].anggaran = matrix[s1Row.id][y].anggaran + matrix[sisaRow.id][y].anggaran;
+      matrix[s2Row.id][y].realisasi = matrix[s1Row.id][y].realisasi + matrix[sisaRow.id][y].realisasi;
+    }
+  });
+
+
+  // --- BULK TEMPLATE & IMPORT ---
+  const downloadBulkTemplate = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(`Template_${bulkTahun}`);
+
+    ws.columns = [
+      { header: 'ID_AKUN_JANGAN_DIUBAH', key: 'id', width: 10 },
+      { header: 'Keterangan Akun', key: 'ket', width: 50 },
+      { header: `Anggaran ${bulkTahun}`, key: 'anggaran', width: 25 },
+      { header: `Realisasi ${bulkTahun}`, key: 'realisasi', width: 25 },
+    ];
+
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Kuning
+
+    // Filter baris yang sifatnya BUKAN auto-sum / custom (karena yg auto-sum tidak perlu diisi user)
+    // Walaupun user bisa ubah yg auto sum? Lebih baik yg is_sum = true dikosongi / disabled
+    // Untuk simplifikasi, kita list semua, tapi yg is_sum kita beri hint.
+    flattenedRows.forEach(akun => {
+      // Kita export semua, user isi yg bukan is_sum
+      const isAuto = akun.is_sum || akun.keterangan.includes('SURPLUS');
+      const row = ws.addRow({
+        id: akun.id,
+        ket: `${'   '.repeat(akun.level)}${akun.keterangan}${isAuto ? ' [OTOMATIS - JANGAN DIISI]' : ''}`,
+        anggaran: '',
+        realisasi: ''
+      });
+      if (isAuto) {
+        row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+        row.getCell(4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+      }
+      if (akun.is_bold) {
+        row.getCell(2).font = { bold: true };
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    downloadFile(new Blob([buffer]), `Template_Input_Laporan_${bulkTahun}.xlsx`);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const buffer = await file.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer);
+      const ws = wb.worksheets[0];
+
+      const upserts: any[] = [];
+      ws.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Skip header
+        const akunId = row.getCell(1).value;
+        let anggaran = row.getCell(3).value;
+        let realisasi = row.getCell(4).value;
+
+        // Parse angka, if undefined or string empty, treat as 0 or skip
+        if (akunId && typeof akunId === 'number') {
+          // Cek apakah ini kolom otomatis (tidak diisi)
+          const ket = row.getCell(2).value?.toString() || '';
+          if (!ket.includes('[OTOMATIS')) {
+             upserts.push({
+               akun_id: akunId,
+               tahun: bulkTahun,
+               anggaran: Number(anggaran) || 0,
+               realisasi: Number(realisasi) || 0
+             });
+          }
+        }
+      });
+
+      if (upserts.length > 0) {
+        // Karena ada UNIQUE constraint (akun_id, tahun), kita bisa upsert
+        const { error } = await supabase.from('app_laporan_statis').upsert(upserts, { onConflict: 'akun_id, tahun' });
+        if (error) throw error;
+        alert(`Berhasil import ${upserts.length} data untuk tahun ${bulkTahun}!`);
+        setIsBulkModalOpen(false);
+        fetchData();
+      } else {
+        alert("Tidak ada data valid yang ditemukan.");
+      }
+    } catch (err: any) {
+      alert("Gagal import: " + err.message);
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset
+    }
+  };
+
+
   // --- EXCEL EXPORT (EXCELJS) ---
   const exportToExcel = async () => {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Komparasi');
 
-    // Headers
     const header1 = ['Keterangan'];
     const header2 = [''];
     selectedYearVals.forEach(y => {
@@ -185,7 +300,6 @@ export default function KomparasiLaporanPage() {
     ws.addRow(header1);
     ws.addRow(header2);
 
-    // Merge Cells untuk Tahun
     let colIdx = 2;
     selectedYearVals.forEach(() => {
       ws.mergeCells(1, colIdx, 1, colIdx + 3);
@@ -193,43 +307,43 @@ export default function KomparasiLaporanPage() {
       colIdx += 4;
     });
 
-    // Styling Headers
     [1, 2].forEach(rowIdx => {
       const row = ws.getRow(rowIdx);
       row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       row.eachCell(cell => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } }; // Teal
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } }; 
         cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
       });
     });
 
-    // Data Rows
     flattenedRows.forEach(akun => {
       const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
-      const rowData: any[] = [`${'   '.repeat(akun.level)}${akun.keterangan}`];
+      // Perbaikan nama tampilan untuk SURPLUS 1 agar lebih rapi di Excel jika diinginkan (opsional)
+      let displayLabel = akun.keterangan;
+      if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
+      
+      const rowData: any[] = [`${'   '.repeat(akun.level)}${displayLabel}`];
       
       selectedYearVals.forEach(y => {
         const d = matrix[akun.id][y];
         const selisih = d.realisasi - d.anggaran;
-        const persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; // Rumus Growth Excel
+        const persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; 
         rowData.push(d.anggaran, d.realisasi, selisih, persen);
       });
 
       const row = ws.addRow(rowData);
       if (isBold) row.font = { bold: true };
       
-      // Formatting
       let cIdx = 2;
       selectedYearVals.forEach(() => {
-        row.getCell(cIdx).numFmt = '#,##0'; // Anggaran
-        row.getCell(cIdx+1).numFmt = '#,##0'; // Realisasi
-        row.getCell(cIdx+2).numFmt = '#,##0'; // Selisih
-        row.getCell(cIdx+3).numFmt = '0.00%'; // %
+        row.getCell(cIdx).numFmt = '#,##0'; 
+        row.getCell(cIdx+1).numFmt = '#,##0'; 
+        row.getCell(cIdx+2).numFmt = '#,##0'; 
+        row.getCell(cIdx+3).numFmt = '0.00%'; 
         cIdx += 4;
       });
     });
 
-    // Auto-fit column widths
     ws.getColumn(1).width = 50;
     for (let i = 2; i <= (selectedYearVals.length * 4) + 1; i++) {
        ws.getColumn(i).width = 18;
@@ -241,13 +355,11 @@ export default function KomparasiLaporanPage() {
 
   // --- WORD EXPORT (DOCX) ---
   const exportToWord = async () => {
-    // Satu tabel per halaman (per tahun)
     const childrenDocs: any[] = [];
 
     selectedYearVals.forEach((y, idx) => {
       const tableRows: TableRow[] = [];
       
-      // Header Table Word
       tableRows.push(new TableRow({
         children: [
           new TableCell({ children: [new Paragraph({ text: "Keterangan", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } }),
@@ -258,16 +370,18 @@ export default function KomparasiLaporanPage() {
         ]
       }));
 
-      // Data Rows Word
       flattenedRows.forEach(akun => {
         const d = matrix[akun.id][y];
         const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
         const selisih = d.realisasi - d.anggaran;
         const persen = d.anggaran !== 0 ? ((selisih / d.anggaran) * 100).toFixed(2) + '%' : '-';
         
+        let displayLabel = akun.keterangan;
+        if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
+        
         tableRows.push(new TableRow({
           children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: akun.keterangan, bold: isBold })], indent: { left: akun.level * 300 } })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: displayLabel, bold: isBold })], indent: { left: akun.level * 300 } })] }),
             new TableCell({ children: [new Paragraph({ text: d.anggaran !== 0 ? fmt(d.anggaran) : '-', alignment: AlignmentType.RIGHT })] }),
             new TableCell({ children: [new Paragraph({ text: d.realisasi !== 0 ? fmt(d.realisasi) : '-', alignment: AlignmentType.RIGHT })] }),
             new TableCell({ children: [new Paragraph({ text: (d.anggaran!==0 || d.realisasi!==0) ? fmt(selisih) : '-', alignment: AlignmentType.RIGHT })] }),
@@ -289,12 +403,11 @@ export default function KomparasiLaporanPage() {
         }
       });
 
-      // Tambahkan Judul Tahun
       childrenDocs.push(new Paragraph({
         children: [new TextRun({ text: `Komparasi Laporan Tahun ${y}`, bold: true, size: 32 })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 400 },
-        pageBreakBefore: idx > 0 // Halaman baru untuk tahun berikutnya
+        pageBreakBefore: idx > 0
       }));
       
       childrenDocs.push(docTable);
@@ -317,9 +430,13 @@ export default function KomparasiLaporanPage() {
       <div className="bg-gradient-to-r from-teal-700 to-emerald-600 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
           <h1 className="text-3xl font-black flex items-center gap-3"><BarChart4 size={32} /> Komparasi Laporan Eksekutif</h1>
-          <p className="text-teal-100 font-medium mt-2 max-w-xl">Menggunakan Master Keterangan Akun Tersentralisasi. Rumus: Growth % (Selisih/Anggaran). Export Excel (Width & Bold otomatis) dan Word per Halaman.</p>
+          <p className="text-teal-100 font-medium mt-2 max-w-xl">Menggunakan Master Keterangan Akun Tersentralisasi. Kalkulasi Surplus Defisit Otomatis. Mendukung Input Massal (Bulk Upload Excel).</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-end">
+          <button onClick={() => setIsBulkModalOpen(true)} className="bg-white text-teal-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-teal-200">
+            <FileUp size={18} /> BULK IMPORT
+          </button>
+          <div className="w-px h-8 bg-teal-500 mx-2"></div>
           <button onClick={exportToExcel} className="bg-emerald-500 text-white hover:bg-emerald-400 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
             <Download size={18} /> EXCEL
           </button>
@@ -392,16 +509,20 @@ export default function KomparasiLaporanPage() {
               <tbody className="divide-y divide-gray-100">
                 {flattenedRows.map((akun, idx) => {
                   const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
+                  const isCustom = akun.keterangan.includes('SURPLUS');
+                  
+                  let displayLabel = akun.keterangan;
+                  if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
                   
                   return (
-                    <tr key={idx} className={`hover:bg-teal-50/50 transition-colors group ${akun.is_sum ? 'bg-slate-50' : ''}`}>
+                    <tr key={idx} className={`hover:bg-teal-50/50 transition-colors group ${(akun.is_sum || isCustom) ? 'bg-slate-50' : ''}`}>
                       <td 
-                        className={`p-3 sticky left-0 bg-white group-hover:bg-teal-50/50 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10 flex items-center justify-between ${akun.is_sum ? '!bg-slate-50' : ''}`}
+                        className={`p-3 sticky left-0 bg-white group-hover:bg-teal-50/50 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10 flex items-center justify-between ${(akun.is_sum || isCustom) ? '!bg-slate-50' : ''}`}
                       >
                         <div className="flex items-center gap-2" style={{ paddingLeft: `${akun.level * 2}rem` }}>
                           {akun.level > 0 && <CornerDownRight size={14} className="text-gray-300 shrink-0" />}
                           <span className={`${isBold ? 'font-black text-gray-800 text-[13px]' : 'font-semibold text-gray-600 text-[12px]'}`}>
-                            {akun.keterangan}
+                            {displayLabel}
                           </span>
                         </div>
                         <div className="opacity-0 group-hover:opacity-100 flex gap-1 bg-white p-1 rounded-lg shadow-sm border border-gray-100">
@@ -413,7 +534,7 @@ export default function KomparasiLaporanPage() {
                       {selectedYearVals.map(y => {
                         const d = matrix[akun.id][y];
                         const selisih = d.realisasi - d.anggaran;
-                        const persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; // Rumus: (Realisasi - Anggaran)/Anggaran * 100
+                        const persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
                         
                         return (
                           <React.Fragment key={`${akun.id}-${y}`}>
@@ -430,7 +551,7 @@ export default function KomparasiLaporanPage() {
                               {d.anggaran > 0 ? `${persen.toFixed(2).replace('.',',')}%` : '-'}
                             </td>
                             <td className="p-2 border-r border-gray-200 text-center">
-                              {akun.is_sum ? (
+                              {akun.is_sum || isCustom ? (
                                 <span className="text-[10px] text-gray-300 font-bold italic">Auto</span>
                               ) : (
                                 d.id ? (
@@ -463,6 +584,44 @@ export default function KomparasiLaporanPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Bulk Upload */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
+            <div className="bg-slate-50 p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-black text-gray-800">Bulk Input Excel</h2>
+              <button onClick={() => setIsBulkModalOpen(false)} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pilih Tahun Input *</label>
+                <input required type="number" value={bulkTahun} onChange={e => setBulkTahun(parseInt(e.target.value))} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-2xl text-center" />
+              </div>
+              
+              <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5">
+                <h3 className="font-bold text-sky-800 mb-2">Langkah 1: Download Template</h3>
+                <p className="text-sm text-sky-700 mb-4">Sistem akan men-generate Excel berisi seluruh struktur Keterangan Akun secara otomatis untuk tahun {bulkTahun}.</p>
+                <button onClick={downloadBulkTemplate} className="w-full py-3 bg-white text-sky-600 border border-sky-200 rounded-xl font-bold shadow-sm hover:bg-sky-50 flex items-center justify-center gap-2">
+                  <Download size={18} /> DOWNLOAD TEMPLATE EXCEL
+                </button>
+              </div>
+
+              <div className="bg-teal-50 border border-teal-100 rounded-2xl p-5">
+                <h3 className="font-bold text-teal-800 mb-2">Langkah 2: Upload Data</h3>
+                <p className="text-sm text-teal-700 mb-4">Isi kolom Anggaran dan Realisasi di file template, lalu upload kembali ke sini.</p>
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="block w-full text-sm text-teal-700 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Master Akun */}
       {isAkunModalOpen && (
