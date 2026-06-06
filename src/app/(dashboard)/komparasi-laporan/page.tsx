@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BarChart4, Search, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CheckSquare, CornerDownRight } from 'lucide-react';
+import { BarChart4, Search, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CheckSquare, CornerDownRight, Download } from 'lucide-react';
 import Select from 'react-select';
+import * as XLSX from 'xlsx';
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
@@ -211,6 +212,50 @@ export default function KomparasiLaporanPage() {
   };
   computeSums(roots);
 
+  const exportToExcel = () => {
+    // Build Header
+    const headerRow1 = ['Keterangan'];
+    const headerRow2 = [''];
+    selectedYearVals.forEach(y => {
+      headerRow1.push(`TAHUN ${y}`, '', '', '');
+      headerRow2.push('Rencana/Anggaran', 'Realisasi', 'Selisih', '%');
+    });
+
+    // Build Rows
+    const excelRows = flattenedRows.map(row => {
+      const lbl = row.keterangan;
+      // Tambahkan spasi untuk indentasi
+      const indent = '   '.repeat(row.level);
+      const rowData: any[] = [`${indent}${lbl}`];
+      
+      selectedYearVals.forEach(y => {
+        const d = matrix[lbl][y];
+        const selisih = d.anggaran - d.realisasi;
+        const persen = d.anggaran > 0 ? (d.realisasi / d.anggaran) : 0; // Use raw decimal for Excel % formatting
+        
+        rowData.push(d.anggaran, d.realisasi, selisih, persen);
+      });
+      return rowData;
+    });
+
+    const worksheetData = [headerRow1, headerRow2, ...excelRows];
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // Set percentage format
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    for (let R = 2; R <= range.e.r; ++R) {
+      for (let C = 4; C <= range.e.c; C += 4) { // Percentage column is every 4th column starting from index 4
+        const cellAddress = { c: C, r: R };
+        const cellRef = XLSX.utils.encode_cell(cellAddress);
+        if (ws[cellRef]) ws[cellRef].z = '0.00%';
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Komparasi");
+    XLSX.writeFile(wb, `Komparasi_Laporan_${new Date().getTime()}.xlsx`);
+  };
+
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 pb-20">
       {/* Header */}
@@ -219,12 +264,20 @@ export default function KomparasiLaporanPage() {
           <h1 className="text-3xl font-black flex items-center gap-3"><BarChart4 size={32} /> Komparasi Laporan Eksekutif</h1>
           <p className="text-teal-100 font-medium mt-2 max-w-xl">Laporan terstruktur dengan hierarki bersarang (Induk-Anak) layaknya P&L. Penjumlahan akan dihitung otomatis oleh sistem.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-white text-teal-700 hover:bg-gray-100 px-6 py-3 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md"
-        >
-          <Plus size={20} /> TAMBAH BARIS DATA
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={exportToExcel}
+            className="bg-teal-800 text-white hover:bg-teal-900 px-6 py-3 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-teal-600"
+          >
+            <Download size={20} /> EXPORT EXCEL
+          </button>
+          <button 
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="bg-white text-teal-700 hover:bg-gray-100 px-6 py-3 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md"
+          >
+            <Plus size={20} /> TAMBAH BARIS DATA
+          </button>
+        </div>
       </div>
 
       {/* Filter Multi Select */}
