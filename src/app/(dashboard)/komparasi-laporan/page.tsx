@@ -755,9 +755,9 @@ export default function KomparasiLaporanPage() {
                   const bSTP = getA('Belanja SCIENCE TECHNO PARK -ADB', yStr);
                   
                   const surplusY_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', yStr);
-                  const surplusY1_A = getA('SURPLUS/(DEFISIT) ANGGARAN', prevStr);
-                  const surplusY1_R = getR('SURPLUS/(DEFISIT) ANGGARAN', prevStr);
-                  const danaAbadi = getA('PENAMBAHAN DANA ABADI', prevStr);
+                  const surplusY1_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
+                  const surplusY1_R = getR('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
+                  const danaAbadi = getR('PENAMBAHAN DANA ABADI', prevStr);
                   
                   const fRp = (v: number) => `Rp${new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v))}`;
                   const fPct = (v: number, d: number) => d ? `${Math.abs(v/d*100).toFixed(2).replace('.',',')}%` : '0,00%';
