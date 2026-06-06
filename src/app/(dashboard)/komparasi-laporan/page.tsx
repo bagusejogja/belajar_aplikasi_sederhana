@@ -21,14 +21,17 @@ export default function KomparasiLaporanPage() {
   const [isAkunModalOpen, setIsAkunModalOpen] = useState(false);
   const [isNilaiModalOpen, setIsNilaiModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isNarasiModalOpen, setIsNarasiModalOpen] = useState(false);
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
   const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), anggaran: 0, realisasi: 0 });
   const [selectedAkunName, setSelectedAkunName] = useState('');
 
-  // Bulk Upload State
+  // Bulk & Narasi State
   const [bulkTahun, setBulkTahun] = useState(new Date().getFullYear());
+  const [narasiTahun, setNarasiTahun] = useState(new Date().getFullYear());
+  const [narasiText, setNarasiText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -355,8 +358,15 @@ export default function KomparasiLaporanPage() {
       
       selectedYearVals.forEach(y => {
         const d = matrix[akun.id][y];
-        const selisih = d.realisasi - d.anggaran;
-        const persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; 
+        let selisih = d.realisasi - d.anggaran;
+        let persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; 
+        
+        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+        if (isZeroOverride) {
+            selisih = 0;
+            persen = 0;
+        }
+
         rowData.push(d.anggaran, d.realisasi, selisih, persen);
       });
 
@@ -402,15 +412,23 @@ export default function KomparasiLaporanPage() {
       flattenedRows.forEach(akun => {
         const d = matrix[akun.id][y];
         const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
-        const selisih = d.realisasi - d.anggaran;
-        const persen = d.anggaran !== 0 ? ((selisih / d.anggaran) * 100).toFixed(2) + '%' : '-';
+        let selisih = d.realisasi - d.anggaran;
+        let persen = d.anggaran !== 0 ? ((selisih / d.anggaran) * 100).toFixed(2) + '%' : '-';
+        
+        // Zero Override
+        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+        if (isZeroOverride) {
+            selisih = 0;
+            persen = '0,00%';
+        }
+
         
         let displayLabel = akun.keterangan;
         if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
         
         tableRows.push(new TableRow({
           children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: displayLabel, bold: isBold })], indent: { left: akun.level * 300 } })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: displayLabel, bold: isBold })], indent: { left: akun.level * 150 } })] }),
             new TableCell({ children: [new Paragraph({ text: d.anggaran !== 0 ? fmt(d.anggaran) : '-', alignment: AlignmentType.RIGHT })] }),
             new TableCell({ children: [new Paragraph({ text: d.realisasi !== 0 ? fmt(d.realisasi) : '-', alignment: AlignmentType.RIGHT })] }),
             new TableCell({ children: [new Paragraph({ text: (d.anggaran!==0 || d.realisasi!==0) ? fmt(selisih) : '-', alignment: AlignmentType.RIGHT })] }),
@@ -462,6 +480,9 @@ export default function KomparasiLaporanPage() {
           <p className="text-teal-100 font-medium mt-2 max-w-xl">Menggunakan Master Keterangan Akun Tersentralisasi. Kalkulasi Surplus Defisit Otomatis. Mendukung Input Massal (Bulk Upload Excel).</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-end">
+          <button onClick={() => { setNarasiTahun(new Date().getFullYear()); setNarasiText(''); setIsNarasiModalOpen(true); }} className="bg-white text-indigo-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-indigo-200">
+            <FileText size={18} /> BUAT NARASI
+          </button>
           <button onClick={() => setIsBulkModalOpen(true)} className="bg-white text-teal-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-teal-200">
             <FileUp size={18} /> BULK IMPORT
           </button>
@@ -562,9 +583,16 @@ export default function KomparasiLaporanPage() {
                       
                       {selectedYearVals.map(y => {
                         const d = matrix[akun.id][y];
-                        const selisih = d.realisasi - d.anggaran;
-                        const persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
+                        let selisih = d.realisasi - d.anggaran;
+                        let persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
                         
+                        // Rule: SURPLUS sampai PENAMBAHAN DANA ABADI = 0
+                        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI', 'Belanja Tambahan SCIENCE TECHNO PARK -ADB'].includes(akun.keterangan);
+                        if (isZeroOverride) {
+                           selisih = 0;
+                           persen = 0;
+                        }
+
                         return (
                           <React.Fragment key={`${akun.id}-${y}`}>
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.anggaran !== 0 ? 'text-gray-800' : 'text-gray-300'}`}>
@@ -573,11 +601,11 @@ export default function KomparasiLaporanPage() {
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.realisasi !== 0 ? 'text-sky-700' : 'text-gray-300'}`}>
                               {d.realisasi !== 0 ? fmt(d.realisasi) : '-'}
                             </td>
-                            <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 font-bold ${selisih > 0 ? 'text-emerald-600' : selisih < 0 ? 'text-rose-600' : 'text-gray-300'}`}>
-                              {d.anggaran !== 0 || d.realisasi !== 0 ? fmt(selisih) : '-'}
+                            <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 font-bold ${isZeroOverride ? 'text-gray-400' : (selisih > 0 ? 'text-emerald-600' : selisih < 0 ? 'text-rose-600' : 'text-gray-300')}`}>
+                              {isZeroOverride ? '0' : (d.anggaran !== 0 || d.realisasi !== 0 ? fmt(selisih) : '-')}
                             </td>
-                            <td className={`p-3 text-center font-black text-[11px] border-r border-gray-200 ${persen < 0 ? 'text-rose-600 bg-rose-50/50' : persen > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
-                              {d.anggaran > 0 ? `${persen.toFixed(2).replace('.',',')}%` : '-'}
+                            <td className={`p-3 text-center font-black text-[11px] border-r border-gray-200 ${isZeroOverride ? 'text-gray-400' : (persen < 0 ? 'text-rose-600 bg-rose-50/50' : persen > 0 ? 'text-emerald-600' : 'text-gray-300')}`}>
+                              {isZeroOverride ? '0,00%' : (d.anggaran > 0 ? `${persen.toFixed(2).replace('.',',')}%` : '-')}
                             </td>
                             <td className="p-2 border-r border-gray-200 text-center">
                               {akun.is_sum || isCustom ? (
@@ -647,6 +675,101 @@ export default function KomparasiLaporanPage() {
                   className="block w-full text-sm text-teal-700 file:mr-4 file:py-2.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Narasi */}
+      {isNarasiModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="bg-indigo-50 p-6 border-b border-indigo-100 flex justify-between items-center shrink-0">
+              <h2 className="text-xl font-black text-indigo-900 flex items-center gap-2"><FileText size={24}/> Generator Narasi Laporan</h2>
+              <button onClick={() => setIsNarasiModalOpen(false)} className="text-indigo-400 hover:text-indigo-700"><X size={20} /></button>
+            </div>
+            <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+              <div className="flex items-end gap-4">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pilih Tahun Laporan Induk (RKAT) *</label>
+                  <input required type="number" value={narasiTahun} onChange={e => setNarasiTahun(parseInt(e.target.value))} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-xl" />
+                </div>
+                <button onClick={() => {
+                  const y = narasiTahun;
+                  const prev = y - 1;
+                  const yStr = String(y);
+                  const prevStr = String(prev);
+                  
+                  const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
+                  const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
+                  
+                  const pY = getA('JUMLAH PENERIMAAN', yStr);
+                  const pY1_A = getA('JUMLAH PENERIMAAN', prevStr);
+                  const pY1_R = getR('JUMLAH PENERIMAAN', prevStr);
+                  
+                  const selP_A = pY - pY1_A;
+                  const pctP_A = pY1_A ? (selP_A / pY1_A * 100) : 0;
+                  const selP_R = pY - pY1_R;
+                  const pctP_R = pY1_R ? (selP_R / pY1_R * 100) : 0;
+                  
+                  const pPem = getA('Jumlah Penerimaan Dana Pemerintah', yStr);
+                  const pMas = getA('Jumlah Penerimaan Dana Masyarakat', yStr);
+                  
+                  const gaji = getA('Penerimaan Gaji dan Tunjangan PNS', yStr);
+                  const bptnbh = getA('Bantuan Pendanaan PTN Badan Hukum', yStr);
+                  const pen = getA('Penelitian', yStr);
+                  const bea = getA('Beasiswa dan Kontrak Kerjasama Pemerintah', yStr);
+                  
+                  const pend = getA('Penerimaan Pendidikan', yStr);
+                  const nonPend = getA('Penerimaan Non Pendidikan', yStr);
+                  
+                  const pengY = getA('JUMLAH PENGELUARAN', yStr);
+                  const pengY1_A = getA('JUMLAH PENGELUARAN', prevStr);
+                  const pengY1_R = getR('JUMLAH PENGELUARAN', prevStr);
+                  
+                  const selPeng_A = pengY - pengY1_A;
+                  const pctPeng_A = pengY1_A ? (selPeng_A / pengY1_A * 100) : 0;
+                  const selPeng_R = pengY - pengY1_R;
+                  const pctPeng_R = pengY1_R ? (selPeng_R / pengY1_R * 100) : 0;
+                  
+                  const bPegawai = getA('Belanja Pegawai', yStr);
+                  const bBarang = getA('Belanja Barang & Jasa', yStr);
+                  const bPem = getA('Belanja Perbaikan dan Pemeliharaan', yStr);
+                  const bPerj = getA('Belanja Perjalanan', yStr);
+                  const bModal = getA('Belanja Modal', yStr);
+                  const bEquity = getA('Belanja EQUITY', yStr) || getA('EQUITY', yStr);
+                  const bSTP = getA('Belanja SCIENCE TECHNO PARK -ADB', yStr);
+                  
+                  const surplusY_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', yStr);
+                  const surplusY1_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
+                  const surplusY1_R = getR('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
+                  const danaAbadi = getA('PENAMBAHAN DANA ABADI', prevStr);
+                  
+                  const fRp = (v: number) => `Rp${fmt(v)}`;
+                  const fPct = (v: number, d: number) => d ? `${(v/d*100).toFixed(2).replace('.',',')}%` : '0,00%';
+                  const fP = (v: number) => `${v.toFixed(2).replace('.',',')}%`;
+                  
+                  const t1 = `Estimasi penerimaan RKAT UGM ${y} sebesar ${fRp(pY)}, naik ${fRp(selP_A)} (${fP(pctP_A)}) dari anggaran penerimaan ${prev} atau naik ${fRp(selP_R)} (${fP(pctP_R)}) dari realisasi penerimaan ${prev}. Estimasi penerimaan ${y} bersumber dari penerimaan pemerintah (APBN) ${fRp(pPem)} (${fPct(pPem, pY)}) dan penerimaan dana masyarakat ${fRp(pMas)} (${fPct(pMas, pY)}). Penerimaan pemerintah meliputi Gaji dan Tunjangan PNS ${fRp(gaji)} (${fPct(gaji, pPem)}), BPPTN-BH ${fRp(bptnbh)} (${fPct(bptnbh, pPem)}), penelitian ${fRp(pen)} (${fPct(pen, pPem)}), dan beasiswa dan kerja sama pemerintah ${fRp(bea)} (${fPct(bea, pPem)}), sedangkan penerimaan dana masyarakat bersumber dari pendidikan ${fRp(pend)} (${fPct(pend, pMas)}) dan nonpendidikan ${fRp(nonPend)} (${fPct(nonPend, pMas)}).`;
+                  const t2 = `Estimasi pengeluaran RKAT ${y} berjumlah ${fRp(pengY)}, naik ${fRp(selPeng_A)} (${fP(pctPeng_A)}) dari anggaran pengeluaran ${prev} atau naik ${fRp(selPeng_R)} (${fP(pctPeng_R)}) dari realisasi pengeluaran ${prev}. Komposisi pengeluaran adalah belanja pegawai ${fRp(bPegawai)} (${fPct(bPegawai, pengY)}); belanja barang dan jasa ${fRp(bBarang)} (${fPct(bBarang, pengY)}); belanja perbaikan dan pemeliharaan ${fRp(bPem)} (${fPct(bPem, pengY)}); belanja perjalanan ${fRp(bPerj)} (${fPct(bPerj, pengY)}); belanja modal ${fRp(bModal)} (${fPct(bModal, pengY)}); belanja Program Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(bEquity)} (${fPct(bEquity, pengY)}); dan belanja Science Techno Park (Primestep) ${fRp(bSTP)}.`;
+                  const t3 = `Secara keseluruhan usulan RKAT ${y} diestimasikan menghasilkan surplus anggaran sebesar ${fRp(surplusY_A)} atau ${fPct(surplusY_A, pY)} dari usulan anggaran penerimaan ${y}. Surplus anggaran ${y} ini lebih besar dibandingkan dengan surplus anggaran ${prev} yang sebesar ${fRp(surplusY1_A)} (${fPct(surplusY1_A, pY1_A)} dari anggaran penerimaan ${prev}) atau realisasi surplus ${prev} yang sebesar ${fRp(surplusY1_R)} (${fPct(surplusY1_R, pY1_R)} dari realisasi penerimaan ${prev}). Namun demikian dari surplus anggaran ${prev} baru sebesar ${fRp(danaAbadi)} yang dapat dialokasikan ke dana abadi karena pertimbangan likuiditas.`;
+                  
+                  setNarasiText(`${t1}\n\n${t2}\n\n${t3}`);
+                }} className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shrink-0 transition-transform active:scale-95">
+                  GENERATE TEKS
+                </button>
+              </div>
+
+              {narasiText && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-gray-700 text-sm">Hasil Narasi:</h3>
+                    <button onClick={() => { navigator.clipboard.writeText(narasiText); alert('Teks berhasil di-copy!'); }} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100">
+                      📋 COPY TEXT
+                    </button>
+                  </div>
+                  <textarea readOnly value={narasiText} className="w-full h-[400px] p-5 bg-white border-2 border-indigo-100 rounded-2xl text-gray-800 leading-relaxed text-sm focus:outline-none focus:border-indigo-300 resize-none" />
+                </div>
+              )}
             </div>
           </div>
         </div>
