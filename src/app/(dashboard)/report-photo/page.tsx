@@ -71,8 +71,8 @@ export default function ReportPhotoPage() {
            let imgSrc = lnk;
            const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
            if (gdriveMatch && gdriveMatch[1]) {
-              // Optimasi: Gunakan sz=w400 untuk keseimbangan size & kualitas tajam
-              imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w400`;
+              // Optimasi: Gunakan sz=w200 untuk memperkecil file size PDF lebih lanjut
+              imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200`;
            }
            return (
               <div key={idx} className="border border-gray-200 shadow-sm bg-white p-1 rounded inline-block mx-1 mb-2 overflow-hidden">

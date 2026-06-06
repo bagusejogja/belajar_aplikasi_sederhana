@@ -26,6 +26,8 @@ export default function DaftarSuratPage() {
   const [unitOptions, setUnitOptions] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [yearOptions, setYearOptions] = useState<string[]>([]);
+  const [selectedKlasifikasi, setSelectedKlasifikasi] = useState<any[]>([]);
+  const [klasifikasiOptions, setKlasifikasiOptions] = useState<any[]>([]);
   const [perms, setPerms] = useState<any>({ can_view: true, can_create: false, can_edit: true, can_delete: false });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +60,14 @@ export default function DaftarSuratPage() {
 
       const years = Array.from(new Set(rawData.map((item: any) => item.tahun_anggaran?.toString()).filter(Boolean))).sort().reverse() as string[];
       setYearOptions(years.length > 0 ? years : ['2026', '2025']);
+
+      const jenisSet = new Set<string>();
+      rawData.forEach(item => {
+        if (Array.isArray(item.jenis_json)) {
+          item.jenis_json.forEach(j => jenisSet.add(j));
+        }
+      });
+      setKlasifikasiOptions(Array.from(jenisSet).sort().map(j => ({ value: j, label: j })));
       
     } catch (error) {
       console.error("Gagal mengambil data surat:", error);
@@ -106,7 +116,11 @@ export default function DaftarSuratPage() {
       selectedYear === 'Semua Tahun' || 
       item.tahun_anggaran?.toString() === selectedYear;
 
-    return matchesSearch && matchesUnit && matchesYear;
+    const matchesKlasifikasi = 
+      selectedKlasifikasi.length === 0 || 
+      selectedKlasifikasi.some(k => Array.isArray(item.jenis_json) && item.jenis_json.includes(k.value));
+
+    return matchesSearch && matchesUnit && matchesYear && matchesKlasifikasi;
   });
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -297,13 +311,26 @@ export default function DaftarSuratPage() {
           </select>
         </div>
 
-        <div className="w-full md:w-[320px]">
+        <div className="w-full md:w-[250px]">
           <Select
             isMulti
             options={unitOptions}
             value={selectedUnits}
             onChange={(val: any) => { setSelectedUnits(val || []); setCurrentPage(1); }}
             placeholder="Filter Unit Kerja..."
+            styles={{
+              control: (base) => ({ ...base, borderRadius: '1.5rem', padding: '0.6rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+            }}
+          />
+        </div>
+
+        <div className="w-full md:w-[250px]">
+          <Select
+            isMulti
+            options={klasifikasiOptions}
+            value={selectedKlasifikasi}
+            onChange={(val: any) => { setSelectedKlasifikasi(val || []); setCurrentPage(1); }}
+            placeholder="Filter Klasifikasi..."
             styles={{
               control: (base) => ({ ...base, borderRadius: '1.5rem', padding: '0.6rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
             }}

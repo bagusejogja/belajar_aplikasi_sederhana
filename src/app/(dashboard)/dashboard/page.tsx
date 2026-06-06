@@ -673,8 +673,10 @@ export default function DashboardPage() {
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="font-black text-gray-800 text-lg">Group COA Induk/Kelompok — Mutasi Per Bulan</h3>
-            <p className="text-xs text-gray-500 mt-1 italic">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
+            <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-sky-500 text-2xl flex items-center gap-3">
+              <BarChart2 size={28} className="text-indigo-600" /> Group COA Induk/Kelompok — Mutasi Per Bulan
+            </h3>
+            <p className="text-sm font-semibold text-gray-500 mt-2 italic">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
           </div>
         </div>
         <div className="overflow-x-auto">
