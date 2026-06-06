@@ -64,10 +64,10 @@ export default function DaftarSuratPage() {
       const jenisSet = new Set<string>();
       rawData.forEach(item => {
         if (Array.isArray(item.jenis_json)) {
-          item.jenis_json.forEach(j => jenisSet.add(j));
+          item.jenis_json.forEach((j: string) => jenisSet.add(j));
         }
       });
-      setKlasifikasiOptions(Array.from(jenisSet).sort().map(j => ({ value: j, label: j })));
+      setKlasifikasiOptions(Array.from(jenisSet).sort().map((j: string) => ({ value: j, label: j })));
       
     } catch (error) {
       console.error("Gagal mengambil data surat:", error);
