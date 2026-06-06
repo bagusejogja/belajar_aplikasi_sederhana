@@ -2,28 +2,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, Archive, Calendar } from 'lucide-react';
+import { FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, Archive, Settings } from 'lucide-react';
 
 export default function ArsipKegiatanPage() {
-  const [data, setData] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [archives, setArchives] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selectedYear, setSelectedYear] = useState<string>('Semua');
-  const [years, setYears] = useState<string[]>([]);
   
-  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+  const [expandedCats, setExpandedCats] = useState<number[]>([]);
+  const [expandedYears, setExpandedYears] = useState<string[]>([]); // "catId-year"
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    tahun: new Date().getFullYear(),
-    nama_kegiatan: '',
-    catatan: '',
-    fase_dokumen: [] as any[]
-  });
+  // Modal Category
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [catForm, setCatForm] = useState({ id: null as any, nama_kegiatan: '', deskripsi: '', template_fase: [''] });
 
-  const [uploadingPhase, setUploadingPhase] = useState<number | null>(null);
+  // Modal Archive (Year)
+  const [isArcModalOpen, setIsArcModalOpen] = useState(false);
+  const [arcForm, setArcForm] = useState({ id: null as any, kategori_id: null as any, tahun: new Date().getFullYear(), catatan: '', fase_dokumen: [] as any[] });
+
+  const [uploadingPhase, setUploadingPhase] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -31,104 +29,96 @@ export default function ArsipKegiatanPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: arsipData, error } = await supabase
-      .from('app_arsip_kegiatan')
-      .select('*')
-      .order('tahun', { ascending: false })
-      .order('id', { ascending: true });
+    const [{ data: catData }, { data: arcData }] = await Promise.all([
+      supabase.from('app_arsip_kategori').select('*').order('nama_kegiatan', { ascending: true }),
+      supabase.from('app_arsip_kegiatan').select('*, app_arsip_kategori(nama_kegiatan)').order('tahun', { ascending: false })
+    ]);
     
-    if (error) {
-      console.error(error);
-    } else {
-      setData(arsipData || []);
-      const uniqueYears = Array.from(new Set((arsipData || []).map(d => String(d.tahun))));
-      setYears(uniqueYears.sort().reverse());
-    }
+    setCategories(catData || []);
+    setArchives(arcData || []);
     setLoading(false);
   };
 
-  const toggleExpand = (id: number) => {
-    setExpandedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleCat = (id: number) => {
+    setExpandedCats(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleYear = (key: string) => {
+    setExpandedYears(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  // --- CATEGORY LOGIC ---
+  const handleCatSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      await supabase.from('app_arsip_kegiatan').update(form).eq('id', editingId);
-    } else {
-      await supabase.from('app_arsip_kegiatan').insert([form]);
-    }
-    setIsModalOpen(false);
-    resetForm();
+    const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter(t => t.trim() !== '')) };
+    if (catForm.id) await supabase.from('app_arsip_kategori').update(payload).eq('id', catForm.id);
+    else await supabase.from('app_arsip_kategori').insert([payload]);
+    setIsCatModalOpen(false);
     fetchData();
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Yakin ingin menghapus seluruh arsip kegiatan ini?')) {
+  const handleCatDelete = async (id: number) => {
+    if (confirm('Yakin ingin menghapus Folder Kategori ini? Semua arsip tahunan di dalamnya akan ikut terhapus!')) {
+      await supabase.from('app_arsip_kategori').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
+  // --- ARCHIVE LOGIC ---
+  const handleArcSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (arcForm.id) {
+      await supabase.from('app_arsip_kegiatan').update({ catatan: arcForm.catatan, fase_dokumen: arcForm.fase_dokumen }).eq('id', arcForm.id);
+    } else {
+      // Init from template
+      const cat = categories.find(c => c.id === arcForm.kategori_id);
+      let phases = [];
+      if (cat && cat.template_fase) {
+         const tpl = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase;
+         phases = tpl.map((nama: string) => ({ nama_fase: nama, files: [] }));
+      }
+      await supabase.from('app_arsip_kegiatan').insert([{ kategori_id: arcForm.kategori_id, tahun: arcForm.tahun, catatan: arcForm.catatan, fase_dokumen: phases }]);
+    }
+    setIsArcModalOpen(false);
+    fetchData();
+  };
+
+  const handleArcDelete = async (id: number) => {
+    if (confirm('Yakin ingin menghapus arsip tahun ini?')) {
       await supabase.from('app_arsip_kegiatan').delete().eq('id', id);
       fetchData();
     }
   };
 
-  const resetForm = () => {
-    setEditingId(null);
-    setForm({ tahun: new Date().getFullYear(), nama_kegiatan: '', catatan: '', fase_dokumen: [] });
-  };
-
-  const openEdit = (item: any) => {
-    setEditingId(item.id);
-    setForm({
-      tahun: item.tahun,
-      nama_kegiatan: item.nama_kegiatan,
-      catatan: item.catatan || '',
-      fase_dokumen: typeof item.fase_dokumen === 'string' ? JSON.parse(item.fase_dokumen) : (item.fase_dokumen || [])
-    });
-    setIsModalOpen(true);
-  };
-
-  // Phase Management in Form
-  const addPhase = () => {
-    setForm(prev => ({ ...prev, fase_dokumen: [...prev.fase_dokumen, { nama_fase: `Fase ${prev.fase_dokumen.length + 1}`, files: [] }] }));
-  };
-  const updatePhaseName = (idx: number, name: string) => {
-    const newPhases = [...form.fase_dokumen];
-    newPhases[idx].nama_fase = name;
-    setForm({ ...form, fase_dokumen: newPhases });
-  };
-  const removePhase = (idx: number) => {
-    const newPhases = form.fase_dokumen.filter((_, i) => i !== idx);
-    setForm({ ...form, fase_dokumen: newPhases });
-  };
-
-  // File Management in Form
-  const addLink = (phaseIdx: number) => {
+  // --- FILE LOGIC ---
+  const addLink = async (arcId: number, phaseIdx: number, phases: any[]) => {
     const url = prompt('Masukkan URL Google Drive / Link lainnya:');
     if (!url) return;
     const name = prompt('Masukkan nama file/tautan (misal: Undangan Rapat):') || 'Link Terlampir';
     
-    const newPhases = [...form.fase_dokumen];
+    const newPhases = [...phases];
     newPhases[phaseIdx].files.push({ name, url, type: 'link' });
-    setForm({ ...form, fase_dokumen: newPhases });
+    await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+    fetchData();
   };
 
-  const uploadFile = async (phaseIdx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadFile = async (arcId: number, phaseIdx: number, phases: any[], e: React.ChangeEvent<HTMLInputElement>, catName: string, tahun: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadingPhase(phaseIdx);
+    setUploadingPhase(`${arcId}-${phaseIdx}`);
     const formData = new FormData();
     formData.append('file', file);
-    // Masukkan ke folder spesifik R2 sesuai nama kegiatan agar rapi
-    const safeFolderName = form.nama_kegiatan.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() || 'arsip_umum';
-    formData.append('folder', `arsip_kegiatan/${form.tahun}/${safeFolderName}`);
+    const safeFolderName = catName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() || 'arsip_umum';
+    formData.append('folder', `arsip_kegiatan/${safeFolderName}/${tahun}`);
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
-        const newPhases = [...form.fase_dokumen];
+        const newPhases = [...phases];
         newPhases[phaseIdx].files.push({ name: file.name, url: data.publicUrl, type: 'file' });
-        setForm({ ...form, fase_dokumen: newPhases });
+        await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+        fetchData();
       } else {
         alert('Gagal upload: ' + data.error);
       }
@@ -140,30 +130,28 @@ export default function ArsipKegiatanPage() {
     }
   };
 
-  const removeFile = (phaseIdx: number, fileIdx: number) => {
-    const newPhases = [...form.fase_dokumen];
+  const removeFile = async (arcId: number, phaseIdx: number, fileIdx: number, phases: any[]) => {
+    const newPhases = [...phases];
     newPhases[phaseIdx].files = newPhases[phaseIdx].files.filter((_: any, i: number) => i !== fileIdx);
-    setForm({ ...form, fase_dokumen: newPhases });
+    await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+    fetchData();
   };
 
-  const filteredData = data.filter(d => 
-    (selectedYear === 'Semua' || String(d.tahun) === selectedYear) &&
-    d.nama_kegiatan.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredCats = categories.filter(c => c.nama_kegiatan.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Header */}
       <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-sky-800 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <FolderTree size={120} />
         </div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-black flex items-center gap-3"><Archive size={32} /> Arsip Kegiatan Berjenjang</h1>
-          <p className="text-indigo-100 font-medium mt-2 max-w-xl">Kelola folder arsip per kegiatan secara multi-tahun. Satu kegiatan dapat memiliki banyak fase dan file yang tersimpan rapi di Cloudflare R2 / GDrive.</p>
+          <h1 className="text-3xl font-black flex items-center gap-3"><Archive size={32} /> Arsip Kegiatan Tahunan</h1>
+          <p className="text-indigo-100 font-medium mt-2 max-w-xl">Kelola Arsip berdasarkan Folder Kegiatan Besar. Template tahap/fase otomatis terbentuk saat membuat arsip tahun baru.</p>
         </div>
         <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
+          onClick={() => { setCatForm({ id: null, nama_kegiatan: '', deskripsi: '', template_fase: ['Tahap 1', 'Tahap 2'] }); setIsCatModalOpen(true); }}
           className="relative z-10 bg-white text-indigo-800 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
         >
           <Plus size={20} /> BUAT FOLDER KEGIATAN
@@ -171,26 +159,16 @@ export default function ArsipKegiatanPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4">
-        <div className="relative flex-1 w-full">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
             type="text" 
-            placeholder="Cari nama kegiatan..." 
+            placeholder="Cari folder kegiatan besar..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-indigo-100 font-medium text-gray-700"
+            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-indigo-100 font-bold text-gray-700"
           />
-        </div>
-        <div className="w-full md:w-auto">
-          <select 
-            value={selectedYear} 
-            onChange={e => setSelectedYear(e.target.value)}
-            className="w-full bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl outline-none focus:ring-2 ring-indigo-100 border-none cursor-pointer"
-          >
-            <option value="Semua">📅 Semua Tahun</option>
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
         </div>
       </div>
 
@@ -198,84 +176,136 @@ export default function ArsipKegiatanPage() {
       <div className="space-y-4">
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={40} /></div>
-        ) : filteredData.length === 0 ? (
+        ) : filteredCats.length === 0 ? (
            <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center text-gray-400 font-bold italic shadow-sm">Belum ada folder kegiatan yang dibuat.</div>
         ) : (
-          filteredData.map(kegiatan => {
-            const isExpanded = expandedIds.includes(kegiatan.id);
-            const phases = typeof kegiatan.fase_dokumen === 'string' ? JSON.parse(kegiatan.fase_dokumen) : (kegiatan.fase_dokumen || []);
-            const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
+          filteredCats.map(cat => {
+            const isCatExpanded = expandedCats.includes(cat.id);
+            const catArcs = archives.filter(a => a.kategori_id === cat.id);
 
             return (
-              <div key={kegiatan.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300">
+              <div key={cat.id} className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
+                {/* Category Header */}
                 <div 
-                  className={`p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer transition-colors ${isExpanded ? 'bg-indigo-50/50' : 'hover:bg-gray-50'}`}
-                  onClick={() => toggleExpand(kegiatan.id)}
+                  className={`p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer transition-colors ${isCatExpanded ? 'bg-indigo-50 border-b border-indigo-100' : 'hover:bg-gray-50'}`}
+                  onClick={() => toggleCat(cat.id)}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-2xl ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600'}`}>
-                      <Folder size={24} />
+                  <div className="flex items-center gap-4">
+                    <div className={`p-4 rounded-2xl shadow-inner ${isCatExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                      <Folder size={28} className={isCatExpanded ? 'fill-indigo-500' : 'fill-gray-200'} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-indigo-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest">{kegiatan.tahun}</span>
-                        <h3 className="text-lg font-black text-gray-800">{kegiatan.nama_kegiatan}</h3>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm font-semibold text-gray-500 mt-1">
-                        <span>{phases.length} Fase</span>
-                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                        <span>{totalFiles} File/Link Tersimpan</span>
+                      <h3 className="text-xl font-black text-gray-800">{cat.nama_kegiatan}</h3>
+                      <div className="flex items-center gap-3 text-sm font-bold text-gray-500 mt-1">
+                        <span className="bg-white px-2 py-0.5 rounded-md border border-gray-200 shadow-sm">{catArcs.length} Tahun Data</span>
+                        {cat.deskripsi && <span className="text-gray-400 truncate max-w-xs">{cat.deskripsi}</span>}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                    <button onClick={(e) => { e.stopPropagation(); openEdit(kegiatan); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl font-black text-xs flex items-center gap-2 transition-colors">
-                      <Edit2 size={16}/> EDIT
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(kegiatan.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors">
-                      <Trash2 size={18}/>
-                    </button>
-                    <div className="w-px h-6 bg-gray-200 mx-2 hidden md:block"></div>
-                    {isExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                  <div className="flex items-center gap-3">
+                    <button onClick={(e) => { e.stopPropagation(); setCatForm({ ...cat, template_fase: typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleCatDelete(cat.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
+                    <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                    {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
                   </div>
                 </div>
 
-                {isExpanded && (
-                  <div className="p-6 border-t border-gray-100 bg-gray-50/30">
-                    {kegiatan.catatan && (
-                      <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
-                        <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan Kegiatan:</strong>
-                        <p className="whitespace-pre-wrap font-medium">{kegiatan.catatan}</p>
-                      </div>
-                    )}
-                    
-                    {phases.length === 0 ? (
-                      <div className="text-center py-10 text-gray-400 font-medium italic">Belum ada fase dan file di dalam kegiatan ini. Klik Edit untuk menambahkan.</div>
+                {/* Years inside Category */}
+                {isCatExpanded && (
+                  <div className="bg-gray-50/50 p-6">
+                    <div className="mb-6 flex justify-between items-center">
+                      <h4 className="font-bold text-gray-500 uppercase tracking-widest text-xs">Arsip Berdasarkan Tahun</h4>
+                      <button 
+                        onClick={() => { setArcForm({ id: null, kategori_id: cat.id, tahun: new Date().getFullYear(), catatan: '', fase_dokumen: [] }); setIsArcModalOpen(true); }}
+                        className="bg-white border border-gray-200 hover:border-indigo-300 text-indigo-600 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+                      >
+                        <Plus size={16} /> BUKA TAHUN BARU
+                      </button>
+                    </div>
+
+                    {catArcs.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 font-medium italic border-2 border-dashed border-gray-200 rounded-2xl">Belum ada arsip tahunan. Klik "Buka Tahun Baru" untuk mulai.</div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {phases.map((phase: any, pIdx: number) => (
-                          <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                            <h4 className="font-black text-gray-800 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2">
-                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">{pIdx + 1}</span>
-                              {phase.nama_fase}
-                            </h4>
-                            {(!phase.files || phase.files.length === 0) ? (
-                              <p className="text-xs text-gray-400 italic text-center py-4">Kosong</p>
-                            ) : (
-                              <ul className="space-y-3">
-                                {phase.files.map((file: any, fIdx: number) => (
-                                  <li key={fIdx}>
-                                    <a href={file.url} target="_blank" rel="noreferrer" className="group flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
-                                      {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                      <span className="text-sm font-semibold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2">{file.name}</span>
-                                    </a>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        ))}
+                      <div className="space-y-4">
+                        {catArcs.map(arc => {
+                          const yearKey = `${cat.id}-${arc.tahun}`;
+                          const isYearExpanded = expandedYears.includes(yearKey);
+                          const phases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
+                          const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
+
+                          return (
+                            <div key={arc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                              <div 
+                                className="p-4 flex justify-between items-center cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                                onClick={() => toggleYear(yearKey)}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <span className="bg-indigo-900 text-white text-lg font-black px-4 py-1.5 rounded-xl shadow-sm">{arc.tahun}</span>
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-gray-700">{totalFiles} File Tersimpan</span>
+                                    {arc.catatan && <span className="text-xs text-gray-400 truncate max-w-sm">{arc.catatan}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <button onClick={(e) => { e.stopPropagation(); setArcForm({ ...arc, fase_dokumen: phases }); setIsArcModalOpen(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 size={16}/></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleArcDelete(arc.id); }} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 size={16}/></button>
+                                  {isYearExpanded ? <ChevronDown size={20} className="text-gray-400"/> : <ChevronRight size={20} className="text-gray-400"/>}
+                                </div>
+                              </div>
+
+                              {/* Static Phases inside Year */}
+                              {isYearExpanded && (
+                                <div className="p-6 border-t border-gray-100 bg-gray-50/30">
+                                  {arc.catatan && (
+                                    <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
+                                      <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan:</strong>
+                                      <p className="whitespace-pre-wrap font-medium">{arc.catatan}</p>
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {phases.map((phase: any, pIdx: number) => (
+                                      <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                                          <h4 className="font-black text-gray-800 flex items-center gap-2">
+                                            <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">{pIdx + 1}</span>
+                                            {phase.nama_fase}
+                                          </h4>
+                                          <div className="flex gap-1">
+                                            <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
+                                              {uploadingPhase === `${arc.id}-${pIdx}` ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                              <input type="file" className="hidden" onChange={e => uploadFile(arc.id, pIdx, phases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${pIdx}`} />
+                                            </label>
+                                            <button onClick={() => addLink(arc.id, pIdx, phases)} className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Beri Link GDrive"><LinkIcon size={16}/></button>
+                                          </div>
+                                        </div>
+                                        
+                                        {(!phase.files || phase.files.length === 0) ? (
+                                          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
+                                        ) : (
+                                          <ul className="space-y-3">
+                                            {phase.files.map((file: any, fIdx: number) => (
+                                              <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
+                                                <a href={file.url} target="_blank" rel="noreferrer" className="flex items-start gap-3 w-full pr-2">
+                                                  {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
+                                                  <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
+                                                </a>
+                                                <button onClick={() => removeFile(arc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
+                                                  <Trash2 size={14} />
+                                                </button>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -286,102 +316,90 @@ export default function ArsipKegiatanPage() {
         )}
       </div>
 
-      {/* Modal Edit/Add */}
-      {isModalOpen && (
+      {/* MODAL KATEGORI (TEMPLATE FASE) */}
+      {isCatModalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <div className="bg-gray-50 p-6 border-b border-gray-100 flex justify-between items-center shrink-0">
-              <h2 className="text-2xl font-black text-gray-800">{editingId ? 'Edit Folder Kegiatan' : 'Buat Folder Kegiatan Baru'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-700 bg-white p-2 rounded-full shadow-sm"><X size={20} /></button>
+              <h2 className="text-2xl font-black text-gray-800">{catForm.id ? 'Edit Kategori & Template' : 'Buat Folder Kategori Baru'}</h2>
+              <button onClick={() => setIsCatModalOpen(false)} className="text-gray-400 hover:text-gray-700 bg-white p-2 rounded-full shadow-sm"><X size={20} /></button>
             </div>
             
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/50">
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-3">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nama Kegiatan *</label>
-                    <input required type="text" value={form.nama_kegiatan} onChange={e => setForm({...form, nama_kegiatan: e.target.value})} className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-black text-lg shadow-sm" placeholder="Misal: Penyusunan Anggaran Tahunan..." />
-                  </div>
+            <form onSubmit={handleCatSave} className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nama Kegiatan Besar *</label>
+                <input required type="text" value={catForm.nama_kegiatan} onChange={e => setCatForm({...catForm, nama_kegiatan: e.target.value})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-black text-lg shadow-sm" placeholder="Misal: Pembayaran Gaji PNS..." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Deskripsi Singkat</label>
+                <input type="text" value={catForm.deskripsi} onChange={e => setCatForm({...catForm, deskripsi: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium" />
+              </div>
+
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center mb-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tahun *</label>
-                    <input required type="number" value={form.tahun} onChange={e => setForm({...form, tahun: parseInt(e.target.value)})} className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-black text-lg shadow-sm text-center" />
+                    <h3 className="font-black text-lg text-gray-800">Template Fase Statis</h3>
+                    <p className="text-xs text-gray-500 font-medium mt-1">Fase ini akan di-generate otomatis saat Anda membuka arsip tahun baru.</p>
                   </div>
+                  <button type="button" onClick={() => setCatForm({...catForm, template_fase: [...catForm.template_fase, '']})} className="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1">
+                    <Plus size={14} /> FASE
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Catatan Tambahan</label>
-                  <textarea value={form.catatan} onChange={e => setForm({...form, catatan: e.target.value})} className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-medium h-24 resize-none shadow-sm" placeholder="Opsional: Keterangan singkat mengenai kegiatan ini..." />
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h3 className="font-black text-lg text-gray-800">Fase Dokumen</h3>
-                      <p className="text-xs text-gray-500 mt-1 font-medium">Buat urutan kegiatan dan lampirkan file (R2) atau link (GDrive) di setiap fase.</p>
+                
+                <div className="space-y-3">
+                  {catForm.template_fase.map((fase, i) => (
+                    <div key={i} className="flex gap-2 items-center relative">
+                      <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center font-black text-xs shrink-0">{i + 1}</span>
+                      <input 
+                        type="text" 
+                        value={fase} 
+                        onChange={e => {
+                          const newTpl = [...catForm.template_fase];
+                          newTpl[i] = e.target.value;
+                          setCatForm({...catForm, template_fase: newTpl});
+                        }} 
+                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold" 
+                        placeholder="Nama dokumen/tahap..." 
+                      />
+                      <button type="button" onClick={() => setCatForm({...catForm, template_fase: catForm.template_fase.filter((_, idx) => idx !== i)})} className="text-gray-300 hover:text-rose-500 p-2"><X size={18}/></button>
                     </div>
-                    <button type="button" onClick={addPhase} className="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 transition-colors">
-                      <Plus size={16} /> TAMBAH FASE BARU
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {form.fase_dokumen.map((phase, pIdx) => (
-                      <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm relative group">
-                        <button type="button" onClick={() => removePhase(pIdx)} className="absolute top-4 right-4 text-gray-300 hover:text-rose-500 transition-colors p-1 bg-gray-50 rounded-lg">
-                          <X size={16} />
-                        </button>
-                        
-                        <div className="mb-4 pr-10">
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Nama Fase {pIdx + 1}</label>
-                          <input type="text" value={phase.nama_fase} onChange={e => updatePhaseName(pIdx, e.target.value)} className="w-full bg-transparent border-b-2 border-gray-100 focus:border-indigo-500 outline-none py-2 font-black text-gray-800 text-lg transition-colors" placeholder="Misal: 1. Surat Undangan Rapat" />
-                        </div>
-
-                        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                          <div className="flex flex-wrap items-center gap-3 mb-4">
-                            <label className="relative cursor-pointer bg-white border border-gray-200 hover:border-indigo-500 hover:text-indigo-600 px-4 py-2 rounded-xl font-bold text-xs text-gray-600 transition-colors shadow-sm flex items-center gap-2">
-                              {uploadingPhase === pIdx ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                              Upload File (R2)
-                              <input type="file" className="hidden" onChange={e => uploadFile(pIdx, e)} disabled={uploadingPhase === pIdx} />
-                            </label>
-                            <button type="button" onClick={() => addLink(pIdx)} className="bg-white border border-gray-200 hover:border-sky-500 hover:text-sky-600 px-4 py-2 rounded-xl font-bold text-xs text-gray-600 transition-colors shadow-sm flex items-center gap-2">
-                              <LinkIcon size={16} /> Link (GDrive dll)
-                            </button>
-                          </div>
-
-                          {phase.files.length > 0 && (
-                            <ul className="space-y-2">
-                              {phase.files.map((file: any, fIdx: number) => (
-                                <li key={fIdx} className="flex justify-between items-center bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
-                                  <div className="flex items-center gap-3 overflow-hidden">
-                                    {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 shrink-0" /> : <FileText size={16} className="text-indigo-500 shrink-0" />}
-                                    <a href={file.url} target="_blank" rel="noreferrer" className="text-sm font-semibold text-gray-700 hover:text-indigo-600 truncate">{file.name}</a>
-                                  </div>
-                                  <button type="button" onClick={() => removeFile(pIdx, fIdx)} className="text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-colors shrink-0">
-                                    <Trash2 size={16} />
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {form.fase_dokumen.length === 0 && (
-                      <div className="text-center py-10 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-bold">
-                        Belum ada fase. Silakan tambah fase dokumen terlebih dahulu.
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
               </div>
-            </div>
-
+            </form>
             <div className="bg-white p-6 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
-              <button onClick={handleSave} className="px-8 py-3 font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200">
-                <Save size={18} /> SIMPAN SEMUA DATA
+              <button type="button" onClick={() => setIsCatModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
+              <button onClick={handleCatSave} className="px-8 py-3 font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200">
+                <Save size={18} /> SIMPAN TEMPLATE
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ARCHIVE (BUKA TAHUN BARU) */}
+      {isArcModalOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gray-50 p-6 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-xl font-black text-gray-800">{arcForm.id ? 'Edit Catatan Arsip' : 'Buka Arsip Tahun Baru'}</h2>
+              <button onClick={() => setIsArcModalOpen(false)} className="text-gray-400 hover:text-gray-700 bg-white p-2 rounded-full shadow-sm"><X size={20} /></button>
+            </div>
+            <form onSubmit={handleArcSave} className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tahun Arsip *</label>
+                <input required type="number" value={arcForm.tahun} disabled={!!arcForm.id} onChange={e => setArcForm({...arcForm, tahun: parseInt(e.target.value)})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-black text-2xl text-center shadow-sm disabled:opacity-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Catatan Ekstra (Opsional)</label>
+                <textarea value={arcForm.catatan} onChange={e => setArcForm({...arcForm, catatan: e.target.value})} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 font-medium h-24 resize-none" placeholder="Catatan untuk tahun ini..." />
+              </div>
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="submit" className="w-full py-4 font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg shadow-indigo-200">
+                  <Save size={18} /> {arcForm.id ? 'SIMPAN CATATAN' : 'GENERATE DARI TEMPLATE'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
