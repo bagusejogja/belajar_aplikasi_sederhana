@@ -707,10 +707,12 @@ export default function KomparasiLaporanPage() {
                   const y = narasiTahun;
                   const yStr = String(y);
                   
-                  // Cari tahun sebelumnya berdasarkan urutan data tahun yang tersedia
-                  const idx = selectedYearVals.indexOf(yStr);
-                  const prevStr = idx >= 0 && idx + 1 < selectedYearVals.length ? selectedYearVals[idx + 1] : String(y - 1);
-                  const prev = parseInt(prevStr);
+                  // Cari tahun sebelumnya berdasarkan urutan data tahun yang tersedia (Matematis)
+                  const yNum = Number(y);
+                  const availableYears = selectedYearVals.map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a);
+                  const smallerYears = availableYears.filter(ay => ay < yNum);
+                  const prev = smallerYears.length > 0 ? smallerYears[0] : (yNum - 1);
+                  const prevStr = String(prev);
                   
                   const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
                   const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
