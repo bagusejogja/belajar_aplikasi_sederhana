@@ -705,9 +705,12 @@ export default function KomparasiLaporanPage() {
                 </div>
                 <button onClick={() => {
                   const y = narasiTahun;
-                  const prev = y - 1;
                   const yStr = String(y);
-                  const prevStr = String(prev);
+                  
+                  // Cari tahun sebelumnya berdasarkan urutan data tahun yang tersedia
+                  const idx = selectedYearVals.indexOf(yStr);
+                  const prevStr = idx >= 0 && idx + 1 < selectedYearVals.length ? selectedYearVals[idx + 1] : String(y - 1);
+                  const prev = parseInt(prevStr);
                   
                   const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
                   const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
@@ -756,7 +759,7 @@ export default function KomparasiLaporanPage() {
                   const surplusY1_R = getR('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
                   const danaAbadi = getA('PENAMBAHAN DANA ABADI', prevStr);
                   
-                  const fRp = (v: number) => `Rp${fmt(Math.abs(v))}`;
+                  const fRp = (v: number) => `Rp${new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v))}`;
                   const fPct = (v: number, d: number) => d ? `${Math.abs(v/d*100).toFixed(2).replace('.',',')}%` : '0,00%';
                   const fP = (v: number) => `${Math.abs(v).toFixed(2).replace('.',',')}%`;
                   
