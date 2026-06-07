@@ -283,10 +283,10 @@ export default function ArsipKegiatanPage() {
         <div className="flex-1 w-full">
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pilih Kegiatan Besar</label>
           <Select 
-            options={categories.map(c => ({ value: c.id, label: c.nama_kegiatan }))}
-            value={categories.filter(c => c.id === selectedCatId).map(c => ({ value: c.id, label: c.nama_kegiatan }))[0] || null}
-            onChange={(val: any) => setSelectedCatId(val ? val.value : null)}
-            placeholder="Semua Kegiatan Besar..."
+            options={[{ value: null, label: '— SEMUA KEGIATAN BESAR (KOMPLIT) —' }, ...categories.map(c => ({ value: c.id, label: c.nama_kegiatan }))]}
+            value={selectedCatId ? { value: selectedCatId, label: categories.find(c => c.id === selectedCatId)?.nama_kegiatan } : { value: null, label: '— SEMUA KEGIATAN BESAR (KOMPLIT) —' }}
+            onChange={(val: any) => setSelectedCatId(val && val.value !== null ? val.value : null)}
+            placeholder="Cari atau pilih kegiatan..."
             isClearable
             styles={{
               control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' })
@@ -614,15 +614,26 @@ export default function ArsipKegiatanPage() {
                                   )}
 
                                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {phases.map((phase: any, pIdx: number) => (
+                                    {phases.map((phase: any, pIdx: number) => {
+                                      const catTemplatePhases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
+                                      const globalNote = catTemplatePhases[pIdx]?.catatan_global || phase.catatan_global;
+
+                                      return (
                                       <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-                                          <div>
+                                        <div className="flex justify-between items-start border-b border-gray-100 pb-3 mb-4">
+                                          <div className="flex-1 pr-4">
                                             <h4 className="font-black text-gray-800 flex items-center gap-2">
                                               <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
                                               {phase.nama_fase}
                                             </h4>
-                                            {phase.catatan_global && <p className="text-[10px] font-bold text-indigo-400 mt-1 pl-8">{phase.catatan_global}</p>}
+                                            {globalNote ? (
+                                              <div className="group/note flex items-start gap-1 mt-1 pl-8">
+                                                <p className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100 flex-1 whitespace-pre-wrap leading-relaxed">{globalNote}</p>
+                                                <button onClick={(e) => { e.stopPropagation(); editGlobalNote(cat.id, pIdx, catTemplatePhases); }} className="opacity-0 group-hover/note:opacity-100 p-1 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded transition-all" title="Edit Catatan Global Tahapan Ini"><Edit2 size={12}/></button>
+                                              </div>
+                                            ) : (
+                                              <button onClick={(e) => { e.stopPropagation(); editGlobalNote(cat.id, pIdx, catTemplatePhases); }} className="text-[9px] font-bold text-gray-400 hover:text-indigo-500 mt-1 pl-8 border border-dashed border-gray-300 hover:border-indigo-300 rounded px-2 py-0.5 transition-colors">+ Tambah Catatan Tahapan</button>
+                                            )}
                                           </div>
                                           <div className="flex gap-1 shrink-0 ml-2">
                                             <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
@@ -654,7 +665,7 @@ export default function ArsipKegiatanPage() {
                                           </ul>
                                         )}
                                       </div>
-                                    ))}
+                                    )})}
                                   </div>
                                 </div>
                             );
