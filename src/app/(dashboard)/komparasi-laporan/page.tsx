@@ -634,7 +634,7 @@ export default function KomparasiLaporanPage() {
                     tick={{ fill: '#64748b', fontSize: 12 }} 
                   />
                   <RechartsTooltip 
-                    formatter={(value: number) => [`Rp${new Intl.NumberFormat('id-ID').format(value)}`, '']}
+                    formatter={(value: any) => [`Rp${new Intl.NumberFormat('id-ID').format(value || 0)}`, 'Nominal']}
                     cursor={{fill: '#f1f5f9'}}
                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   />
