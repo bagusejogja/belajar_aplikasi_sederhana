@@ -16,7 +16,7 @@ export default function ArsipKegiatanPage() {
 
   // Modal Category
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
-  const [catForm, setCatForm] = useState({ id: null as any, nama_kegiatan: '', deskripsi: '', template_fase: [''] });
+  const [catForm, setCatForm] = useState({ id: null as any, nama_kegiatan: '', deskripsi: '', template_fase: [{nama_fase: ''}] as any[] });
 
   // Modal Archive (Year)
   const [isArcModalOpen, setIsArcModalOpen] = useState(false);
@@ -51,7 +51,7 @@ export default function ArsipKegiatanPage() {
   // --- CATEGORY LOGIC ---
   const handleCatSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter(t => t.trim() !== '')) };
+    const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter((t: any) => t.nama_fase && t.nama_fase.trim() !== '')) };
     let err;
     if (catForm.id) {
       const { id, ...updateData } = payload;
@@ -91,7 +91,7 @@ export default function ArsipKegiatanPage() {
       let phases = [];
       if (cat && cat.template_fase) {
          const tpl = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase;
-         phases = tpl.map((nama: string) => ({ nama_fase: nama, files: [] }));
+         phases = tpl.map((p: any) => ({ nama_fase: typeof p === 'string' ? p : p.nama_fase, files: [] }));
       }
       const { error } = await supabase.from('app_arsip_kegiatan').insert([{ kategori_id: arcForm.kategori_id, tahun: arcForm.tahun, catatan: arcForm.catatan, fase_dokumen: phases }]);
       err = error;
@@ -178,6 +178,15 @@ export default function ArsipKegiatanPage() {
     fetchData();
   };
 
+  const editGlobalNote = async (catId: number, phaseIdx: number, phases: any[]) => {
+    const note = prompt(`Masukkan catatan GLOBAL untuk "${phases[phaseIdx].nama_fase}":\n(Berlaku untuk semua tahun)`, phases[phaseIdx].catatan_global || '');
+    if (note === null) return;
+    const newPhases = [...phases];
+    newPhases[phaseIdx].catatan_global = note;
+    await supabase.from('app_arsip_kategori').update({ template_fase: JSON.stringify(newPhases) }).eq('id', catId);
+    fetchData();
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Header */}
@@ -190,7 +199,7 @@ export default function ArsipKegiatanPage() {
           <p className="text-indigo-100 font-medium mt-2 max-w-xl">Kelola Arsip berdasarkan Folder Kegiatan Besar. Template tahap/fase otomatis terbentuk saat membuat arsip tahun baru.</p>
         </div>
         <button 
-          onClick={() => { setCatForm({ id: null, nama_kegiatan: '', deskripsi: '', template_fase: ['Tahap 1', 'Tahap 2'] }); setIsCatModalOpen(true); }}
+          onClick={() => { setCatForm({ id: null, nama_kegiatan: '', deskripsi: '', template_fase: [{nama_fase: 'Tahap 1', catatan_global: ''}, {nama_fase: 'Tahap 2', catatan_global: ''}] }); setIsCatModalOpen(true); }}
           className="relative z-10 bg-white text-indigo-800 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
         >
           <Plus size={20} /> BUAT FOLDER KEGIATAN
@@ -237,6 +246,7 @@ export default function ArsipKegiatanPage() {
             if (!cat) return null;
             
             const phases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
+            const normalizedPhases = phases.map((p: any) => typeof p === 'string' ? { nama_fase: p, catatan_global: '' } : p);
 
             return (
               <div className="overflow-x-auto custom-scrollbar pb-4">
@@ -246,7 +256,7 @@ export default function ArsipKegiatanPage() {
                     {cat.deskripsi && <p className="text-sm text-gray-500 font-medium mt-1">{cat.deskripsi}</p>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <button onClick={() => { setCatForm({ ...cat, template_fase: phases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                    <button onClick={() => { setCatForm({ ...cat, template_fase: normalizedPhases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
                     <button onClick={() => { handleCatDelete(cat.id); setSelectedCatId(null); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
                   </div>
                 </div>
@@ -278,13 +288,22 @@ export default function ArsipKegiatanPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {phases.map((phaseName: string, pIdx: number) => (
-                        <tr key={pIdx} className="hover:bg-indigo-50/30 transition-colors group">
-                          <td className="p-4 sticky left-0 bg-white group-hover:bg-indigo-50/30 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10 align-top">
-                            <h4 className="font-black text-gray-800 flex items-start gap-3 text-sm">
-                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
-                              <span className="mt-0.5">{phaseName}</span>
-                            </h4>
+                      {normalizedPhases.map((phaseItem: any, pIdx: number) => {
+                        const phaseName = phaseItem.nama_fase;
+                        return (
+                        <tr key={pIdx}>
+                          <td className="p-4 sticky left-0 bg-white border-r border-gray-100 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] align-top group/global">
+                            <h3 className="font-black text-gray-800 flex items-start gap-3">
+                              <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs shrink-0 mt-0.5">{pIdx + 1}</span>
+                              <span className="mt-1">{phaseName}</span>
+                            </h3>
+                            <div className="mt-3 pl-9">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catatan Global:</span>
+                                <button onClick={() => editGlobalNote(cat.id, pIdx, normalizedPhases)} className="opacity-0 group-hover/global:opacity-100 text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded transition-opacity"><Edit2 size={10} className="inline mr-1" />Edit</button>
+                              </div>
+                              <p className="text-xs text-gray-600 leading-relaxed">{phaseItem.catatan_global || <span className="italic text-gray-400">Belum ada catatan...</span>}</p>
+                            </div>
                           </td>
                           {selectedYears.map((y: number) => {
                             const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
@@ -425,21 +444,21 @@ export default function ArsipKegiatanPage() {
                     <h3 className="font-black text-lg text-gray-800">Template Fase Statis</h3>
                     <p className="text-xs text-gray-500 font-medium mt-1">Fase ini akan di-generate otomatis saat Anda membuka arsip tahun baru.</p>
                   </div>
-                  <button type="button" onClick={() => setCatForm({...catForm, template_fase: [...catForm.template_fase, '']})} className="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1">
+                  <button type="button" onClick={() => setCatForm({...catForm, template_fase: [...catForm.template_fase, {nama_fase: '', catatan_global: ''}]})} className="bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-black text-xs flex items-center gap-1">
                     <Plus size={14} /> FASE
                   </button>
                 </div>
                 
                 <div className="space-y-3">
-                  {catForm.template_fase.map((fase, i) => (
+                  {catForm.template_fase.map((faseObj, i) => (
                     <div key={i} className="flex gap-2 items-center relative">
                       <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center font-black text-xs shrink-0">{i + 1}</span>
                       <input 
                         type="text" 
-                        value={fase} 
+                        value={faseObj.nama_fase} 
                         onChange={e => {
                           const newTpl = [...catForm.template_fase];
-                          newTpl[i] = e.target.value;
+                          newTpl[i].nama_fase = e.target.value;
                           setCatForm({...catForm, template_fase: newTpl});
                         }} 
                         className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold" 
