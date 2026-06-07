@@ -24,7 +24,12 @@ export default function ArsipKegiatanPage() {
   };
   
   const toggleYear = (key: string) => {
-    setExpandedYears(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
+    setExpandedYears(prev => {
+       const catId = key.split('-')[0];
+       const filtered = prev.filter(k => !k.startsWith(`${catId}-`));
+       if (prev.includes(key)) return filtered;
+       return [...filtered, key];
+    });
   };
 
   // Modal Category
@@ -70,7 +75,12 @@ export default function ArsipKegiatanPage() {
 
   const currentYear = new Date().getFullYear();
   const dbYears = archives.map(a => a.tahun);
-  const baseYears = Array.from({length: 11}, (_, i) => currentYear - 5 + i); // 5 years back, 5 years forward
+  const startYear = 2023;
+  const endYear = currentYear + 1;
+  const baseYears = [];
+  for (let y = startYear; y <= endYear; y++) {
+    baseYears.push(y);
+  }
   const allYears = Array.from(new Set([...dbYears, ...baseYears])).sort((a, b) => b - a);
 
   // --- CATEGORY LOGIC ---
@@ -553,90 +563,102 @@ export default function ArsipKegiatanPage() {
                       {catArcs.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 font-medium italic border-2 border-dashed border-gray-200 rounded-2xl">Belum ada arsip tahunan. Klik "Buka Tahun Baru" untuk mulai.</div>
                       ) : (
-                        <div className="space-y-4">
-                          {catArcs.map(arc => {
-                            const yearKey = `${cat.id}-${arc.tahun}`;
-                            const isYearExpanded = expandedYears.includes(yearKey);
-                            const phases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
-                            const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
+                        <div>
+                          {/* Horizontal Tab Buttons */}
+                          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                            {catArcs.map(arc => {
+                              const yearKey = `${cat.id}-${arc.tahun}`;
+                              const isYearExpanded = expandedYears.includes(yearKey);
+                              const phases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
+                              const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
 
-                            return (
-                              <div key={arc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                              return (
                                 <div 
-                                  className="p-4 flex justify-between items-center cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                                  key={arc.id}
                                   onClick={() => toggleYear(yearKey)}
+                                  className={`cursor-pointer flex-shrink-0 w-56 p-5 rounded-2xl border transition-all duration-300 ${isYearExpanded ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 -translate-y-1' : 'bg-white border-gray-200 text-gray-700 hover:border-indigo-300 hover:shadow-sm'}`}
                                 >
-                                  <div className="flex items-center gap-4">
-                                    <span className="bg-indigo-900 text-white text-lg font-black px-4 py-1.5 rounded-xl shadow-sm">{arc.tahun}</span>
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-gray-700">{totalFiles} File Tersimpan</span>
-                                      {arc.catatan && <span className="text-xs text-gray-400 truncate max-w-sm">{arc.catatan}</span>}
-                                    </div>
+                                  <div className="flex justify-between items-center mb-3">
+                                     <span className="text-3xl font-black">{arc.tahun}</span>
+                                     <div className="flex gap-1.5">
+                                        <button onClick={(e) => { e.stopPropagation(); setArcForm({ ...arc, fase_dokumen: phases }); setIsArcModalOpen(true); }} className={`p-2 rounded-xl transition-colors ${isYearExpanded ? 'bg-indigo-500 hover:bg-indigo-400 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-500'}`}><Edit2 size={14}/></button>
+                                        <button onClick={(e) => { e.stopPropagation(); handleArcDelete(arc.id); }} className={`p-2 rounded-xl transition-colors ${isYearExpanded ? 'bg-rose-500 hover:bg-rose-400 text-white' : 'bg-rose-50 hover:bg-rose-100 text-rose-500'}`}><Trash2 size={14}/></button>
+                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-3">
-                                    <button onClick={(e) => { e.stopPropagation(); setArcForm({ ...arc, fase_dokumen: phases }); setIsArcModalOpen(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 size={16}/></button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleArcDelete(arc.id); }} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 size={16}/></button>
-                                    {isYearExpanded ? <ChevronDown size={20} className="text-gray-400"/> : <ChevronRight size={20} className="text-gray-400"/>}
+                                  <div className={`text-sm font-bold flex items-center gap-1.5 ${isYearExpanded ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                     <FileText size={14} /> {totalFiles} File Tersimpan
                                   </div>
                                 </div>
+                              );
+                            })}
+                          </div>
 
-                                {isYearExpanded && (
-                                  <div className="p-6 border-t border-gray-100 bg-gray-50/30">
-                                    {arc.catatan && (
-                                      <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
-                                        <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan:</strong>
-                                        <p className="whitespace-pre-wrap font-medium">{arc.catatan}</p>
-                                      </div>
-                                    )}
+                          {/* Detail / Phase List for Active Year */}
+                          {(() => {
+                            const expandedArc = catArcs.find(arc => expandedYears.includes(`${cat.id}-${arc.tahun}`));
+                            if (!expandedArc) return null;
+                            const phases = typeof expandedArc.fase_dokumen === 'string' ? JSON.parse(expandedArc.fase_dokumen) : (expandedArc.fase_dokumen || []);
 
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                      {phases.map((phase: any, pIdx: number) => (
-                                        <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                                          <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-                                            <div>
-                                              <h4 className="font-black text-gray-800 flex items-center gap-2">
-                                                <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
-                                                {phase.nama_fase}
-                                              </h4>
-                                              {phase.catatan_global && <p className="text-[10px] font-bold text-indigo-400 mt-1 pl-8">{phase.catatan_global}</p>}
-                                            </div>
-                                            <div className="flex gap-1 shrink-0 ml-2">
-                                              <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
-                                                {uploadingPhase === `${arc.id}-${pIdx}` ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                                                <input type="file" className="hidden" onChange={e => uploadFile(arc.id, pIdx, phases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${pIdx}`} />
-                                              </label>
-                                              <button onClick={() => addLink(arc.id, pIdx, phases, cat.nama_kegiatan, arc.tahun)} className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Beri Link GDrive"><LinkIcon size={16}/></button>
-                                            </div>
-                                          </div>
-                                          
-                                          {(!phase.files || phase.files.length === 0) ? (
-                                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
-                                          ) : (
-                                            <ul className="space-y-3">
-                                              {phase.files.map((file: any, fIdx: number) => (
-                                                <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
-                                                  <a href={file.url} target="_blank" rel="noreferrer" className="flex flex-col gap-0.5 w-full pr-2">
-                                                    <div className="flex items-start gap-3">
-                                                      {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                                      <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
-                                                    </div>
-                                                    {file.uploaded_at && <span className="text-[9px] font-bold text-indigo-300 ml-7">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
-                                                  </a>
-                                                  <button onClick={() => removeFile(arc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
-                                                    <Trash2 size={14} />
-                                                  </button>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
+                            return (
+                                <div className="mt-2 p-6 border border-indigo-100 bg-white rounded-3xl shadow-sm animate-in slide-in-from-top-4 duration-300">
+                                  <div className="flex items-center gap-3 mb-6">
+                                    <h4 className="font-black text-2xl text-gray-800">Arsip Tahun {expandedArc.tahun}</h4>
+                                    <div className="h-px bg-gray-200 flex-1"></div>
                                   </div>
-                                )}
-                              </div>
-                            )
-                          })}
+
+                                  {expandedArc.catatan && (
+                                    <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
+                                      <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan Ekstra {expandedArc.tahun}:</strong>
+                                      <p className="whitespace-pre-wrap font-medium">{expandedArc.catatan}</p>
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {phases.map((phase: any, pIdx: number) => (
+                                      <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                                          <div>
+                                            <h4 className="font-black text-gray-800 flex items-center gap-2">
+                                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
+                                              {phase.nama_fase}
+                                            </h4>
+                                            {phase.catatan_global && <p className="text-[10px] font-bold text-indigo-400 mt-1 pl-8">{phase.catatan_global}</p>}
+                                          </div>
+                                          <div className="flex gap-1 shrink-0 ml-2">
+                                            <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
+                                              {uploadingPhase === `${expandedArc.id}-${pIdx}` ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                              <input type="file" className="hidden" onChange={e => uploadFile(expandedArc.id, pIdx, phases, e, cat.nama_kegiatan, expandedArc.tahun)} disabled={uploadingPhase === `${expandedArc.id}-${pIdx}`} />
+                                            </label>
+                                            <button onClick={() => addLink(expandedArc.id, pIdx, phases, cat.nama_kegiatan, expandedArc.tahun)} className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Beri Link GDrive"><LinkIcon size={16}/></button>
+                                          </div>
+                                        </div>
+                                        
+                                        {(!phase.files || phase.files.length === 0) ? (
+                                          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
+                                        ) : (
+                                          <ul className="space-y-3">
+                                            {phase.files.map((file: any, fIdx: number) => (
+                                              <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
+                                                <a href={file.url} target="_blank" rel="noreferrer" className="flex flex-col gap-0.5 w-full pr-2">
+                                                  <div className="flex items-start gap-3">
+                                                    {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
+                                                    <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
+                                                  </div>
+                                                  {file.uploaded_at && <span className="text-[9px] font-bold text-indigo-300 ml-7">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
+                                                </a>
+                                                <button onClick={() => removeFile(expandedArc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
+                                                  <Trash2 size={14} />
+                                                </button>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
