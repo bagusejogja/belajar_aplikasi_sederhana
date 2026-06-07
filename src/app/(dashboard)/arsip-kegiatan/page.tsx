@@ -379,7 +379,7 @@ export default function ArsipKegiatanPage() {
                             );
                           })}
                         </tr>
-                      ))}
+                      })}
                       
                       {/* CATATAN TAHUNAN ROW */}
                       <tr className="bg-amber-50/50 hover:bg-amber-50 transition-colors group">
