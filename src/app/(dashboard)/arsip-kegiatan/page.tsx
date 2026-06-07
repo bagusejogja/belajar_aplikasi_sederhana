@@ -172,14 +172,16 @@ export default function ArsipKegiatanPage() {
     });
   };
 
-  // --- FILE LOGIC ---
+  // --- FILE & NOTE LOGIC ---
+  const normalizePhases = (arr: any[]) => arr.map(p => typeof p === 'string' ? { nama_fase: p, files: [] } : { ...p, files: p.files || [] });
+
   const addLink = async (arcId: number, phaseIdx: number, phases: any[], catName: string, tahun: number) => {
+    const newPhases = normalizePhases(phases);
     const url = prompt('Masukkan URL Google Drive / Link lainnya:');
     if (!url) return;
-    const defaultName = `${tahun} ${catName} ${phases[phaseIdx].nama_fase}`;
+    const defaultName = `${tahun} ${catName} ${newPhases[phaseIdx].nama_fase}`;
     const name = prompt('Masukkan nama file/tautan (misal: Undangan Rapat):', defaultName) || defaultName;
     
-    const newPhases = [...phases];
     newPhases[phaseIdx].files.push({ name, url, type: 'link', uploaded_at: new Date().toISOString() });
     await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
     fetchData();
@@ -205,11 +207,11 @@ export default function ArsipKegiatanPage() {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
-        const newPhases = [...phases];
+        const newPhases = normalizePhases(phases);
         
         // Format nama file: [tahun]_[kegiatanbesar]_[fasedokumen]
         const safeCatName = catName.replace(/[^a-zA-Z0-9]/g, '_');
-        const safePhaseName = phases[phaseIdx].nama_fase.replace(/[^a-zA-Z0-9]/g, '_');
+        const safePhaseName = newPhases[phaseIdx].nama_fase.replace(/[^a-zA-Z0-9]/g, '_');
         const extMatch = file.name.match(/\.[0-9a-z]+$/i);
         const ext = extMatch ? extMatch[0] : '';
         const newFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
@@ -231,7 +233,7 @@ export default function ArsipKegiatanPage() {
 
   const removeFile = async (arcId: number, phaseIdx: number, fileIdx: number, phases: any[]) => {
     confirmAction('Yakin ingin mencabut file ini dari daftar?', async () => {
-      const newPhases = [...phases];
+      const newPhases = normalizePhases(phases);
       newPhases[phaseIdx].files = newPhases[phaseIdx].files.filter((_: any, i: number) => i !== fileIdx);
       await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
       toast.success('File dicabut');
@@ -240,18 +242,18 @@ export default function ArsipKegiatanPage() {
   };
 
   const editPhaseNote = async (arcId: number, phaseIdx: number, phases: any[]) => {
-    const note = prompt('Masukkan catatan untuk fase ini:', phases[phaseIdx].catatan || '');
+    const newPhases = normalizePhases(phases);
+    const note = prompt('Masukkan catatan untuk fase ini:', newPhases[phaseIdx].catatan || '');
     if (note === null) return;
-    const newPhases = [...phases];
     newPhases[phaseIdx].catatan = note;
     await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
     fetchData();
   };
 
   const editGlobalNote = async (catId: number, phaseIdx: number, phases: any[]) => {
-    const note = prompt(`Masukkan catatan GLOBAL untuk "${phases[phaseIdx].nama_fase}":\n(Berlaku untuk semua tahun)`, phases[phaseIdx].catatan_global || '');
+    const newPhases = normalizePhases(phases);
+    const note = prompt(`Masukkan catatan GLOBAL untuk "${newPhases[phaseIdx].nama_fase}":\n(Berlaku untuk semua tahun)`, newPhases[phaseIdx].catatan_global || '');
     if (note === null) return;
-    const newPhases = [...phases];
     newPhases[phaseIdx].catatan_global = note;
     await supabase.from('app_arsip_kategori').update({ template_fase: JSON.stringify(newPhases) }).eq('id', catId);
     fetchData();
