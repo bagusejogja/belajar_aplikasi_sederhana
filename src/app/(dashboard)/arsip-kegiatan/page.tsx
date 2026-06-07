@@ -379,6 +379,7 @@ export default function ArsipKegiatanPage() {
                             );
                           })}
                         </tr>
+                        );
                       })}
                       
                       {/* CATATAN TAHUNAN ROW */}
