@@ -158,8 +158,6 @@ export default function ArsipKegiatanPage() {
     fetchData();
   };
 
-  const filteredCats = categories.filter(c => c.nama_kegiatan.toLowerCase().includes(search.toLowerCase()));
-
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Header */}
