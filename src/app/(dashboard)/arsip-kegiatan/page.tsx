@@ -139,7 +139,15 @@ export default function ArsipKegiatanPage() {
       const data = await res.json();
       if (data.success) {
         const newPhases = [...phases];
-        newPhases[phaseIdx].files.push({ name: file.name, url: data.publicUrl, type: 'file' });
+        
+        // Format nama file: [tahun]_[kegiatanbesar]_[fasedokumen]
+        const safeCatName = catName.replace(/[^a-zA-Z0-9]/g, '_');
+        const safePhaseName = phases[phaseIdx].nama_fase.replace(/[^a-zA-Z0-9]/g, '_');
+        const extMatch = file.name.match(/\.[0-9a-z]+$/i);
+        const ext = extMatch ? extMatch[0] : '';
+        const newFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
+
+        newPhases[phaseIdx].files.push({ name: newFileName, url: data.publicUrl, type: 'file' });
         await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
         fetchData();
       } else {
