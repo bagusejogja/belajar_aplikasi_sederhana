@@ -6,6 +6,7 @@ import { BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRig
 import Select from 'react-select';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, TextRun, AlignmentType } from 'docx';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
@@ -22,9 +23,10 @@ export default function KomparasiLaporanPage() {
   const [isNilaiModalOpen, setIsNilaiModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isNarasiModalOpen, setIsNarasiModalOpen] = useState(false);
+  const [isChartOpen, setIsChartOpen] = useState(false);
   
   // Forms
-  const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
+  const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
   const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), versi: 'Final', anggaran: 0, realisasi: 0 });
   const [selectedAkunName, setSelectedAkunName] = useState('');
 
@@ -184,21 +186,15 @@ export default function KomparasiLaporanPage() {
   computeSums(roots);
 
   // Kalkulasi Custom untuk TOTAL & SURPLUS
-  const sum1Label = 'JUMLAH PENERIMAAN';
-  const sum2Label = 'JUMLAH PENGELUARAN';
-  const surplus1Label = 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA'; 
-  const surplus2Label = 'SURPLUS/(DEFISIT) ANGGARAN';
-  const sisaLebihLabel = 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA';
-
-  const jpRow = flattenedRows.find(r => r.keterangan === sum1Label);
-  const jpPemerintah = flattenedRows.find(r => r.keterangan === 'Jumlah Penerimaan Dana Pemerintah');
-  const jpMasyarakat = flattenedRows.find(r => r.keterangan === 'Jumlah Penerimaan Dana Masyarakat');
+  const jpRow = flattenedRows.find(r => r.kode_sistem === 'JML_PEN');
+  const jpPemerintah = flattenedRows.find(r => r.kode_sistem === 'PEN_PEM');
+  const jpMasyarakat = flattenedRows.find(r => r.kode_sistem === 'PEN_MAS');
   
-  const jpengRow = flattenedRows.find(r => r.keterangan === sum2Label);
+  const jpengRow = flattenedRows.find(r => r.kode_sistem === 'JML_PENG');
 
-  const s1Row = flattenedRows.find(r => r.keterangan === surplus1Label);
-  const s2Row = flattenedRows.find(r => r.keterangan === surplus2Label);
-  const sisaRow = flattenedRows.find(r => r.keterangan === sisaLebihLabel);
+  const s1Row = flattenedRows.find(r => r.kode_sistem === 'SURPLUS_1');
+  const s2Row = flattenedRows.find(r => r.kode_sistem === 'SURPLUS_2');
+  const sisaRow = flattenedRows.find(r => r.kode_sistem === 'SISA_LEBIH');
 
   selectedYearVals.forEach(y => {
     // 1. JUMLAH PENERIMAAN (Pemerintah + Masyarakat)
@@ -212,8 +208,8 @@ export default function KomparasiLaporanPage() {
       let sumAng = 0; let sumReal = 0;
       let startCounting = false;
       for (const r of flattenedRows) {
-        if (r.keterangan === 'PENGELUARAN') { startCounting = true; continue; }
-        if (r.keterangan === sum2Label) break;
+        if (r.kode_sistem === 'ROOT_PENGELUARAN') { startCounting = true; continue; }
+        if (r.kode_sistem === 'JML_PENG') break;
         if (startCounting && r.level === 1) {
           sumAng += matrix[r.id][y].anggaran;
           sumReal += matrix[r.id][y].realisasi;
@@ -257,7 +253,7 @@ export default function KomparasiLaporanPage() {
     // Untuk simplifikasi, kita list semua, tapi yg is_sum kita beri hint.
     flattenedRows.forEach(akun => {
       // Kita export semua, user isi yg bukan is_sum
-      const isAuto = akun.is_sum || akun.keterangan.includes('SURPLUS');
+      const isAuto = akun.is_sum || akun.kode_sistem?.includes('SURPLUS');
       const row = ws.addRow({
         id: akun.id,
         ket: `${'   '.repeat(akun.level)}${akun.keterangan}${isAuto ? ' [OTOMATIS - JANGAN DIISI]' : ''}`,
@@ -567,7 +563,7 @@ export default function KomparasiLaporanPage() {
             <FileText size={18} /> WORD
           </button>
           <button 
-            onClick={() => { setAkunForm({ id: null, keterangan: '', parent_id: null, urutan: akunMaster.length + 1, level: 0, is_sum: false, is_bold: false }); setIsAkunModalOpen(true); }}
+            onClick={() => { setAkunForm({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: akunMaster.length + 1, level: 0, is_sum: false, is_bold: false }); setIsAkunModalOpen(true); }}
             className="bg-white text-teal-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md"
           >
             <Settings size={18} /> MASTER AKUN
@@ -596,6 +592,64 @@ export default function KomparasiLaporanPage() {
           />
         </div>
       </div>
+
+      {/* Chart Visualisasi */}
+      {selectedYearVals.length > 0 && !loading && (
+        <details className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden group cursor-pointer">
+          <summary className="p-6 bg-slate-50 font-black text-gray-700 flex justify-between items-center outline-none select-none hover:bg-slate-100 transition-colors">
+            <div className="flex items-center gap-3">
+              <BarChart4 size={24} className="text-indigo-500" />
+              Tampilkan Grafik Tren (Penerimaan vs Pengeluaran)
+            </div>
+            <div className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full group-open:hidden">Klik untuk melihat detail</div>
+            <div className="text-xs bg-gray-200 text-gray-700 px-3 py-1 rounded-full hidden group-open:block">Tutup grafik</div>
+          </summary>
+          <div className="p-8 border-t border-gray-100 flex flex-col items-center animate-in slide-in-from-top-4 fade-in">
+            <h3 className="text-xl font-bold text-gray-800 mb-6">Tren Anggaran dan Realisasi per Tahun</h3>
+            <div className="w-full h-[400px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={selectedYearVals.map(y => {
+                    const pAnggaran = jpRow && matrix[jpRow.id] && matrix[jpRow.id][y] ? matrix[jpRow.id][y].anggaran : 0;
+                    const pRealisasi = jpRow && matrix[jpRow.id] && matrix[jpRow.id][y] ? matrix[jpRow.id][y].realisasi : 0;
+                    const pengAnggaran = jpengRow && matrix[jpengRow.id] && matrix[jpengRow.id][y] ? matrix[jpengRow.id][y].anggaran : 0;
+                    const pengRealisasi = jpengRow && matrix[jpengRow.id] && matrix[jpengRow.id][y] ? matrix[jpengRow.id][y].realisasi : 0;
+                    
+                    return {
+                      name: y.split('___').join(' - '),
+                      'Penerimaan (Rencana)': pAnggaran,
+                      'Penerimaan (Realisasi)': pRealisasi,
+                      'Pengeluaran (Rencana)': pengAnggaran,
+                      'Pengeluaran (Realisasi)': pengRealisasi,
+                    };
+                  })}
+                  margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontWeight: 'bold' }} />
+                  <YAxis 
+                    tickFormatter={(value) => `${(value / 1000000000).toFixed(0)}M`} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#64748b', fontSize: 12 }} 
+                  />
+                  <RechartsTooltip 
+                    formatter={(value: number) => [`Rp${new Intl.NumberFormat('id-ID').format(value)}`, '']}
+                    cursor={{fill: '#f1f5f9'}}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '20px', fontWeight: 'bold', color: '#334155' }} />
+                  <Bar dataKey="Penerimaan (Rencana)" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Penerimaan (Realisasi)" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Pengeluaran (Rencana)" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Pengeluaran (Realisasi)" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-gray-400 mt-4 font-medium">*Nilai pada sumbu Y disingkat dalam satuan Miliar (M).</p>
+          </div>
+        </details>
+      )}
 
       {/* Matrix Table */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -634,7 +688,7 @@ export default function KomparasiLaporanPage() {
               <tbody className="divide-y divide-gray-100">
                 {flattenedRows.map((akun, idx) => {
                   const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
-                  const isCustom = akun.keterangan.includes('SURPLUS');
+                  const isCustom = akun.kode_sistem?.includes('SURPLUS') || false;
                   
                   let displayLabel = akun.keterangan;
                   if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
@@ -662,7 +716,7 @@ export default function KomparasiLaporanPage() {
                         let persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
                         
                         // Rule: SURPLUS sampai PENAMBAHAN DANA ABADI = 0
-                        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
+                        const isZeroOverride = ['SURPLUS_1', 'SISA_LEBIH', 'SURPLUS_2', 'DANA_ABADI'].includes(akun.kode_sistem || '');
                         if (isZeroOverride) {
                            selisih = 0;
                            persen = 0;
@@ -671,11 +725,11 @@ export default function KomparasiLaporanPage() {
                         // Menghitung % per group (Proporsi Vertikal)
                         let propAnggaran = 0;
                         let propRealisasi = 0;
-                        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
-                        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+                        const jpRowIdx = flattenedRows.findIndex(x => x.kode_sistem === 'JML_PEN');
+                        const jpEngRowIdx = flattenedRows.findIndex(x => x.kode_sistem === 'JML_PENG');
                         const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
                         
-                        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+                        if (!isZeroOverride && !akun.kode_sistem?.includes('SURPLUS')) {
                             let denomAng = 0;
                             let denomReal = 0;
                             if (myIdx <= jpRowIdx && jpRow) {
@@ -694,14 +748,14 @@ export default function KomparasiLaporanPage() {
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.anggaran !== 0 ? 'text-gray-800' : 'text-gray-300'}`}>
                               {d.anggaran !== 0 ? fmt(d.anggaran) : '-'}
                             </td>
-                            <td className={`p-3 text-center font-mono text-[10px] border-r border-gray-100 ${isZeroOverride || akun.keterangan.includes('SURPLUS') ? 'text-gray-300' : 'text-emerald-700'}`}>
-                              {isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.anggaran !== 0 ? `${Math.abs(propAnggaran).toFixed(2).replace('.',',')}%` : '-')}
+                            <td className="p-3 border-r border-slate-100 text-center text-emerald-600 font-medium">
+                              {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-emerald-50 px-1 py-0.5 rounded text-emerald-600">{Math.abs(propAnggaran).toFixed(2).replace('.',',')}%</span>}
                             </td>
-                            <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.realisasi !== 0 ? 'text-sky-700' : 'text-gray-300'}`}>
-                              {d.realisasi !== 0 ? fmt(d.realisasi) : '-'}
+                            <td className="p-3 border-r border-slate-100 text-right font-black text-sky-700">
+                              {d.realisasi !== 0 ? fmt(d.realisasi) : <span className="text-gray-300">-</span>}
                             </td>
-                            <td className={`p-3 text-center font-mono text-[10px] border-r border-gray-100 ${isZeroOverride || akun.keterangan.includes('SURPLUS') ? 'text-gray-300' : 'text-sky-700'}`}>
-                              {isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.realisasi !== 0 ? `${Math.abs(propRealisasi).toFixed(2).replace('.',',')}%` : '-')}
+                            <td className="p-3 border-r border-slate-100 text-center text-sky-600 font-medium">
+                              {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-sky-50 px-1 py-0.5 rounded text-sky-600">{Math.abs(propRealisasi).toFixed(2).replace('.',',')}%</span>}
                             </td>
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 font-bold ${isZeroOverride ? 'text-gray-400' : (selisih > 0 ? 'text-emerald-600' : selisih < 0 ? 'text-rose-600' : 'text-gray-300')}`}>
                               {isZeroOverride ? '0' : (d.anggaran !== 0 || d.realisasi !== 0 ? fmt(selisih) : '-')}
@@ -816,52 +870,52 @@ export default function KomparasiLaporanPage() {
                   const yText = String(yNum);
                   const prevText = String(prevNum);
                   
-                  const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
-                  const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
+                  const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.kode_sistem === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
+                  const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.kode_sistem === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
                   
-                  const pY = getA('JUMLAH PENERIMAAN', yStr);
-                  const pY1_A = getA('JUMLAH PENERIMAAN', prevStr);
-                  const pY1_R = getR('JUMLAH PENERIMAAN', prevStr);
+                  const pY = getA('JML_PEN', yStr);
+                  const pY1_A = getA('JML_PEN', prevStr);
+                  const pY1_R = getR('JML_PEN', prevStr);
                   
                   const selP_A = pY - pY1_A;
                   const pctP_A = pY1_A ? (selP_A / pY1_A * 100) : 0;
                   const selP_R = pY - pY1_R;
                   const pctP_R = pY1_R ? (selP_R / pY1_R * 100) : 0;
                   
-                  const pPem = getA('Jumlah Penerimaan Dana Pemerintah', yStr);
-                  const pMas = getA('Jumlah Penerimaan Dana Masyarakat', yStr);
+                  const pPem = getA('PEN_PEM', yStr);
+                  const pMas = getA('PEN_MAS', yStr);
                   
-                  const gaji = getA('Penerimaan Gaji dan Tunjangan PNS', yStr);
-                  const bptnbh = getA('Bantuan Pendanaan PTN Badan Hukum', yStr);
-                  const pen = getA('Penelitian', yStr);
-                  const bea = getA('Beasiswa dan Kontrak Kerjasama Pemerintah', yStr);
-                  const hibahSTP = getA('HIBAH SCIENCE TECHNO PARK -ADB', yStr);
-                  const hibahEq = getA('EQUITY', yStr);
+                  const gaji = getA('PEN_GAJI', yStr);
+                  const bptnbh = getA('PEN_BPPTN', yStr);
+                  const pen = getA('PEN_LIT', yStr);
+                  const bea = getA('PEN_BEA', yStr);
+                  const hibahSTP = getA('PEN_STP', yStr);
+                  const hibahEq = getA('PEN_EQ', yStr);
                   
-                  const pend = getA('Penerimaan Pendidikan', yStr);
-                  const nonPend = getA('Penerimaan Non Pendidikan', yStr);
+                  const pend = getA('PEN_PEND', yStr);
+                  const nonPend = getA('PEN_NONPEND', yStr);
                   
-                  const pengY = getA('JUMLAH PENGELUARAN', yStr);
-                  const pengY1_A = getA('JUMLAH PENGELUARAN', prevStr);
-                  const pengY1_R = getR('JUMLAH PENGELUARAN', prevStr);
+                  const pengY = getA('JML_PENG', yStr);
+                  const pengY1_A = getA('JML_PENG', prevStr);
+                  const pengY1_R = getR('JML_PENG', prevStr);
                   
                   const selPeng_A = pengY - pengY1_A;
                   const pctPeng_A = pengY1_A ? (selPeng_A / pengY1_A * 100) : 0;
                   const selPeng_R = pengY - pengY1_R;
                   const pctPeng_R = pengY1_R ? (selPeng_R / pengY1_R * 100) : 0;
                   
-                  const bPegawai = getA('Belanja Pegawai', yStr);
-                  const bBarang = getA('Belanja Barang & Jasa', yStr);
-                  const bPem = getA('Belanja Perbaikan dan Pemeliharaan', yStr);
-                  const bPerj = getA('Belanja Perjalanan', yStr);
-                  const bModal = getA('Belanja Modal', yStr);
-                  const bEquity = getA('Belanja EQUITY', yStr);
-                  const bSTP = getA('Belanja SCIENCE TECHNO PARK -ADB', yStr);
+                  const bPegawai = getA('PENG_PEG', yStr);
+                  const bBarang = getA('PENG_BRG', yStr);
+                  const bPem = getA('PENG_PEMEL', yStr);
+                  const bPerj = getA('PENG_PERJ', yStr);
+                  const bModal = getA('PENG_MODAL', yStr);
+                  const bEquity = getA('PENG_EQ', yStr);
+                  const bSTP = getA('PENG_STP', yStr);
                   
-                  const surplusY_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', yStr);
-                  const surplusY1_A = getA('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
-                  const surplusY1_R = getR('SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', prevStr);
-                  const danaAbadi = getR('PENAMBAHAN DANA ABADI', prevStr);
+                  const surplusY_A = getA('SURPLUS_1', yStr);
+                  const surplusY1_A = getA('SURPLUS_1', prevStr);
+                  const surplusY1_R = getR('SURPLUS_1', prevStr);
+                  const danaAbadi = getR('DANA_ABADI', prevStr);
                   
                   const selisihSurplus = surplusY_A - surplusY1_R;
                   
@@ -922,6 +976,10 @@ export default function KomparasiLaporanPage() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Keterangan Akun *</label>
                 <input required type="text" value={akunForm.keterangan} onChange={e => setAkunForm({...akunForm, keterangan: e.target.value})} className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl font-bold" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Kode Sistem Internal (Opsional - Jangan diubah sembarangan)</label>
+                <input type="text" value={akunForm.kode_sistem} onChange={e => setAkunForm({...akunForm, kode_sistem: e.target.value})} placeholder="Contoh: JML_PEN" className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl font-mono text-sm" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
