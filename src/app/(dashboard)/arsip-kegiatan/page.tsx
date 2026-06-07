@@ -388,23 +388,24 @@ export default function ArsipKegiatanPage() {
                         return (
                         <tr key={pIdx}>
                           <td className="p-4 sticky left-0 bg-white border-r border-gray-100 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] align-top group/global">
-                            <h3 className="font-black text-gray-800 flex items-start gap-3">
+                            <div className="min-h-[2rem] flex items-start gap-3 mb-3">
                               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs shrink-0 mt-0.5">{pIdx + 1}</span>
-                              <span className="mt-1">{phaseName}</span>
-                            </h3>
-                            <div className="mt-3 pl-9">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catatan Global:</span>
-                                <button onClick={() => editGlobalNote(cat.id, pIdx, normalizedPhases)} className="opacity-0 group-hover/global:opacity-100 text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded transition-opacity"><Edit2 size={10} className="inline mr-1" />Edit</button>
-                              </div>
-                              <p className="text-xs text-gray-600 leading-relaxed">{phaseItem.catatan_global || <span className="italic text-gray-400">Belum ada catatan...</span>}</p>
+                              <h3 className="font-black text-gray-800 mt-1">{phaseName}</h3>
+                            </div>
+                            <div className="ml-9 group/global relative border-l-2 border-indigo-300 pl-2">
+                              <p className="text-[10px] text-indigo-900 leading-tight">
+                                <span className="font-bold text-indigo-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Global:</span>
+                                {phaseItem.catatan_global || <span className="text-indigo-500/50 italic">Belum ada catatan...</span>}
+                              </p>
+                              <button onClick={() => editGlobalNote(cat.id, pIdx, normalizedPhases)} className="absolute top-0 right-0 opacity-0 group-hover/global:opacity-100 bg-white/80 p-0.5 rounded text-indigo-600 hover:text-indigo-800 transition-all"><Edit2 size={10}/></button>
                             </div>
                           </td>
                           {selectedYears.map((y: number) => {
                             const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
                             if (!arc) {
                               return (
-                                <td key={`${pIdx}-${y}`} className="p-4 border-r border-gray-100 text-center align-middle bg-gray-50/50">
+                                <td key={`${pIdx}-${y}`} className="p-4 border-r border-gray-100 text-center align-top bg-gray-50/50">
+                                  <div className="min-h-[2rem] mb-3"></div>
                                   {pIdx === 0 && (
                                     <button 
                                       onClick={() => { setArcForm({ id: null, kategori_id: selectedCatId, tahun: y, catatan: '', fase_dokumen: [] }); setIsArcModalOpen(true); }}
@@ -413,7 +414,7 @@ export default function ArsipKegiatanPage() {
                                       <Plus size={16} /> BUKA ARSIP {y}
                                     </button>
                                   )}
-                                  {pIdx > 0 && <span className="text-[10px] text-gray-400 italic">Menunggu arsip dibuka...</span>}
+                                  {pIdx > 0 && <span className="text-[10px] text-gray-400 italic block mt-2">Menunggu arsip dibuka...</span>}
                                 </td>
                               );
                             }
@@ -425,24 +426,25 @@ export default function ArsipKegiatanPage() {
 
                             return (
                               <td key={`${pIdx}-${y}`} className="p-4 border-r border-gray-100 align-top bg-white">
+                                <div className="min-h-[2rem] mb-3"></div>
                                 {!phaseData ? (
-                                  <span className="text-[10px] text-gray-400 italic block text-center mt-4">Fase tidak ditemukan di tahun ini.</span>
+                                  <span className="text-[10px] text-gray-400 italic block text-center mt-2">Fase tidak ditemukan di tahun ini.</span>
                                 ) : (
                                   <div className="flex flex-col h-full">
-                                    <div className="flex justify-between items-start gap-1 mb-3">
-                                      <div className="flex-1 mr-2 group/note relative border-l-2 border-amber-300 pl-2">
+                                    <div className="flex flex-col gap-3 mb-4">
+                                      <div className="group/note relative border-l-2 border-amber-300 pl-2">
                                         <p className="text-[10px] text-amber-900 leading-tight">
                                           <span className="font-bold text-amber-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Fase:</span>
                                           {phaseData.catatan || <span className="text-amber-500/50 italic">Kosong...</span>}
                                         </p>
                                         <button onClick={() => editPhaseNote(arc.id, arcPhaseIdx, arcPhases)} className="absolute top-0 right-0 opacity-0 group-hover/note:opacity-100 bg-white/80 p-0.5 rounded text-amber-600 hover:text-amber-800 transition-all"><Edit2 size={10}/></button>
                                       </div>
-                                      <div className="flex gap-1 shrink-0 flex-col sm:flex-row">
-                                        <label className="cursor-pointer px-2 py-1 bg-gray-100 text-gray-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors text-[10px] font-bold flex items-center gap-1 shadow-sm" title="Upload File Fisik">
+                                      <div className="flex gap-2">
+                                        <label className="cursor-pointer flex-1 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Upload File Fisik">
                                           {uploadingPhase === `${arc.id}-${arcPhaseIdx}` ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Upload
                                           <input type="file" className="hidden" onChange={e => uploadFile(arc.id, arcPhaseIdx, arcPhases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${arcPhaseIdx}`} />
                                         </label>
-                                        <button onClick={() => addLink(arc.id, arcPhaseIdx, arcPhases, cat.nama_kegiatan, arc.tahun)} className="px-2 py-1 bg-gray-100 text-gray-600 hover:text-white hover:bg-sky-600 rounded-lg transition-colors text-[10px] font-bold flex items-center gap-1 shadow-sm" title="Beri Link GDrive"><LinkIcon size={12}/> Link</button>
+                                        <button onClick={() => addLink(arc.id, arcPhaseIdx, arcPhases, cat.nama_kegiatan, arc.tahun)} className="flex-1 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-sky-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Beri Link GDrive"><LinkIcon size={12}/> Link</button>
                                       </div>
                                     </div>
                                     
