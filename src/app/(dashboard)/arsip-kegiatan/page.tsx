@@ -352,6 +352,12 @@ export default function ArsipKegiatanPage() {
                                     )}
                                     </div>
                                   </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 )}
