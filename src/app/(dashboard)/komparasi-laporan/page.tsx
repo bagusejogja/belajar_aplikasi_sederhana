@@ -553,7 +553,7 @@ export default function KomparasiLaporanPage() {
           <p className="text-teal-100 font-medium mt-2 max-w-xl">Menggunakan Master Keterangan Akun Tersentralisasi. Kalkulasi Surplus Defisit Otomatis. Mendukung Input Massal (Bulk Upload Excel).</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap justify-end">
-          <button onClick={() => { setNarasiTahun(new Date().getFullYear()); setNarasiText(''); setIsNarasiModalOpen(true); }} className="bg-white text-indigo-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-indigo-200">
+          <button onClick={() => { setNarasiTahun(selectedYearVals.length > 0 ? selectedYearVals[0] : ''); setNarasiText(''); setIsNarasiModalOpen(true); }} className="bg-white text-indigo-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-indigo-200">
             <FileText size={18} /> BUAT NARASI
           </button>
           <button onClick={() => setIsBulkModalOpen(true)} className="bg-white text-teal-700 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md border border-teal-200">
