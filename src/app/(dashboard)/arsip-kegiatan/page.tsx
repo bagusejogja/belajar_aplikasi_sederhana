@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, Archive, Settings } from 'lucide-react';
-
+import toast from 'react-hot-toast';
 import Select from 'react-select';
 
 export default function ArsipKegiatanPage() {
@@ -35,12 +35,24 @@ export default function ArsipKegiatanPage() {
       supabase.from('app_arsip_kegiatan').select('*, app_arsip_kategori(nama_kegiatan)').order('tahun', { ascending: false })
     ]);
     
-    if (catErr) alert('Gagal memuat kategori: ' + catErr.message);
-    if (arcErr) alert('Gagal memuat arsip: ' + arcErr.message);
+    if (catErr) toast.error('Gagal memuat kategori: ' + catErr.message);
+    if (arcErr) toast.error('Gagal memuat arsip: ' + arcErr.message);
     
     setCategories(catData || []);
     setArchives(arcData || []);
     setLoading(false);
+  };
+
+  const confirmAction = (msg: string, onConfirm: () => void) => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <span className="font-bold text-sm text-gray-800">{msg}</span>
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => { toast.dismiss(t.id); onConfirm(); }} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Ya, Lanjutkan</button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 transition-colors">Batal</button>
+        </div>
+      </div>
+    ), { duration: Infinity, style: { border: '1px solid #fee2e2' } });
   };
 
   const currentYear = new Date().getFullYear();
@@ -64,23 +76,38 @@ export default function ArsipKegiatanPage() {
     }
     
     if (err) {
-      alert('Gagal menyimpan kategori: ' + err.message);
+      toast.error('Gagal menyimpan kategori: ' + err.message);
       return;
     }
+    toast.success('Kategori berhasil disimpan!');
     setIsCatModalOpen(false);
     fetchData();
   };
 
   const handleCatDelete = async (id: number) => {
-    if (confirm('Yakin ingin menghapus Folder Kategori ini? Semua arsip tahunan di dalamnya akan ikut terhapus!')) {
-      await supabase.from('app_arsip_kategori').delete().eq('id', id);
-      fetchData();
+    const hasArchives = archives.some(a => a.kategori_id === id);
+    if (hasArchives) {
+       toast.error('Gagal! Folder ini sudah berisi arsip tahunan. Harap hapus arsip tahunannya terlebih dahulu.', { duration: 5000 });
+       return;
     }
+    confirmAction('Yakin ingin menghapus Folder Kategori ini?', async () => {
+      await supabase.from('app_arsip_kategori').delete().eq('id', id);
+      toast.success('Kategori dihapus');
+      if (selectedCatId === id) setSelectedCatId(null);
+      fetchData();
+    });
   };
 
   // --- ARCHIVE LOGIC ---
   const handleArcSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!arcForm.id) {
+       const exists = archives.find(a => a.tahun === arcForm.tahun && a.kategori_id === arcForm.kategori_id);
+       if (exists) {
+          toast.error(`Arsip tahun ${arcForm.tahun} sudah ada!`);
+          return;
+       }
+    }
     let err;
     if (arcForm.id) {
       const { error } = await supabase.from('app_arsip_kegiatan').update({ catatan: arcForm.catatan, fase_dokumen: arcForm.fase_dokumen }).eq('id', arcForm.id);
@@ -98,18 +125,20 @@ export default function ArsipKegiatanPage() {
     }
     
     if (err) {
-      alert('Gagal menyimpan arsip tahun: ' + err.message);
+      toast.error('Gagal menyimpan arsip tahun: ' + err.message);
       return;
     }
+    toast.success('Arsip berhasil disimpan!');
     setIsArcModalOpen(false);
     fetchData();
   };
 
   const handleArcDelete = async (id: number) => {
-    if (confirm('Yakin ingin menghapus arsip tahun ini?')) {
+    confirmAction('Yakin ingin menghapus arsip tahun ini?', async () => {
       await supabase.from('app_arsip_kegiatan').delete().eq('id', id);
+      toast.success('Arsip dihapus');
       fetchData();
-    }
+    });
   };
 
   // --- FILE LOGIC ---
@@ -129,7 +158,13 @@ export default function ArsipKegiatanPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 10MB!');
+      return;
+    }
+
     setUploadingPhase(`${arcId}-${phaseIdx}`);
+    const toastId = toast.loading('Mengunggah file...');
     const formData = new FormData();
     formData.append('file', file);
     const safeFolderName = catName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() || 'arsip_umum';
@@ -150,23 +185,27 @@ export default function ArsipKegiatanPage() {
 
         newPhases[phaseIdx].files.push({ name: newFileName, url: data.publicUrl, type: 'file', uploaded_at: new Date().toISOString() });
         await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+        toast.success('File berhasil diunggah!', { id: toastId });
         fetchData();
       } else {
-        alert('Gagal upload: ' + data.error);
+        toast.error('Gagal upload: ' + data.error, { id: toastId });
       }
     } catch (err) {
       console.error(err);
-      alert('Terjadi kesalahan saat upload');
+      toast.error('Terjadi kesalahan saat upload', { id: toastId });
     } finally {
       setUploadingPhase(null);
     }
   };
 
   const removeFile = async (arcId: number, phaseIdx: number, fileIdx: number, phases: any[]) => {
-    const newPhases = [...phases];
-    newPhases[phaseIdx].files = newPhases[phaseIdx].files.filter((_: any, i: number) => i !== fileIdx);
-    await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
-    fetchData();
+    confirmAction('Yakin ingin mencabut file ini dari daftar?', async () => {
+      const newPhases = [...phases];
+      newPhases[phaseIdx].files = newPhases[phaseIdx].files.filter((_: any, i: number) => i !== fileIdx);
+      await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+      toast.success('File dicabut');
+      fetchData();
+    });
   };
 
   const editPhaseNote = async (arcId: number, phaseIdx: number, phases: any[]) => {
@@ -239,8 +278,18 @@ export default function ArsipKegiatanPage() {
       </div>
 
       {/* Matrix View */}
-      {selectedCatId ? (
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      {loading ? (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 w-full">
+          <div className="animate-pulse flex flex-col gap-6">
+             <div className="flex gap-4">
+               <div className="h-10 bg-indigo-50 rounded-xl w-1/4"></div>
+               <div className="h-10 bg-indigo-50 rounded-xl w-1/4"></div>
+             </div>
+             <div className="h-[400px] bg-gray-50 rounded-2xl w-full border border-gray-100"></div>
+          </div>
+        </div>
+      ) : selectedCatId ? (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300">
           {(() => {
             const cat = categories.find(c => c.id === selectedCatId);
             if (!cat) return null;
@@ -274,12 +323,12 @@ export default function ArsipKegiatanPage() {
                               <span>TAHUN {y}</span>
                               <button onClick={() => {
                                 const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
-                                if (arc) {
-                                  setArcForm({ ...arc, fase_dokumen: typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : arc.fase_dokumen });
-                                  setIsArcModalOpen(true);
-                                } else {
-                                  alert('Buka arsip tahun ini terlebih dahulu sebelum mengeditnya.');
-                                }
+                                  if (arc) {
+                                    setArcForm({ ...arc, fase_dokumen: typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : arc.fase_dokumen });
+                                    setIsArcModalOpen(true);
+                                  } else {
+                                    toast.error('Buka arsip tahun ini terlebih dahulu sebelum mengeditnya.');
+                                  }
                               }} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700 rounded text-slate-400 transition-opacity" title="Edit Arsip Tahun Ini"><Edit2 size={12}/></button>
                             </div>
                             <div className="text-[10px] font-normal text-indigo-200 normal-case mt-1">{cat.nama_kegiatan}</div>
@@ -414,9 +463,14 @@ export default function ArsipKegiatanPage() {
           })()}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center shadow-sm">
-           <FolderTree size={64} className="mx-auto text-indigo-200 mb-4" />
-           <p className="text-gray-400 font-bold italic text-lg">Silakan pilih "Kegiatan Besar" pada filter di atas untuk memulai.</p>
+        <div className="bg-white rounded-3xl border border-gray-100 py-24 text-center shadow-sm animate-in zoom-in-95 duration-300">
+           <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-indigo-50 mb-6">
+             <FolderTree size={48} className="text-indigo-400" />
+           </div>
+           <h3 className="text-2xl font-black text-gray-800 mb-3">Pilih Kegiatan Besar</h3>
+           <p className="text-gray-500 font-medium max-w-md mx-auto leading-relaxed">
+             Silakan pilih "Kegiatan Besar" pada filter di atas untuk mulai mengelola dan melihat arsip dokumen tahunan.
+           </p>
         </div>
       )}
 
