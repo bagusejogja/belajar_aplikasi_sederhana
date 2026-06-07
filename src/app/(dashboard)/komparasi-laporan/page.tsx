@@ -25,12 +25,13 @@ export default function KomparasiLaporanPage() {
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
-  const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), anggaran: 0, realisasi: 0 });
+  const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), versi: 'Final', anggaran: 0, realisasi: 0 });
   const [selectedAkunName, setSelectedAkunName] = useState('');
 
   // Bulk & Narasi State
   const [bulkTahun, setBulkTahun] = useState(new Date().getFullYear());
-  const [narasiTahun, setNarasiTahun] = useState(new Date().getFullYear());
+  const [bulkVersi, setBulkVersi] = useState('Final');
+  const [narasiTahun, setNarasiTahun] = useState('');
   const [narasiText, setNarasiText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,11 +47,12 @@ export default function KomparasiLaporanPage() {
     setAkunMaster(akunData || []);
     setDataNilai(nilaiData || []);
     
-    const uniqueYears = Array.from(new Set((nilaiData || []).map(d => String(d.tahun)))).sort().reverse();
+    const uniqueYears = Array.from(new Set((nilaiData || []).map(d => `${d.tahun}___${d.versi || 'Final'}`))).sort().reverse();
     setAllYears(uniqueYears);
     
     if (selectedYears.length === 0 && uniqueYears.length > 0) {
-      setSelectedYears(uniqueYears.slice(0, 3).map(y => ({ value: y, label: y })));
+      setSelectedYears(uniqueYears.slice(0, 3).map(y => ({ value: y, label: y.replace('___', ' - ') })));
+      if (!narasiTahun) setNarasiTahun(uniqueYears[0]);
     }
     setLoading(false);
   };
@@ -85,6 +87,7 @@ export default function KomparasiLaporanPage() {
     const payload = {
       akun_id: nilaiForm.akun_id,
       tahun: nilaiForm.tahun,
+      versi: nilaiForm.versi || 'Final',
       anggaran: nilaiForm.anggaran,
       realisasi: nilaiForm.realisasi
     };
@@ -143,7 +146,7 @@ export default function KomparasiLaporanPage() {
   });
 
   dataNilai.forEach(d => {
-    const y = String(d.tahun);
+    const y = `${d.tahun}___${d.versi || 'Final'}`;
     if (matrix[d.akun_id] && matrix[d.akun_id][y]) {
       matrix[d.akun_id][y] = {
         id: d.id,
@@ -300,6 +303,7 @@ export default function KomparasiLaporanPage() {
              upserts.push({
                akun_id: akunId,
                tahun: bulkTahun,
+               versi: bulkVersi || 'Final',
                anggaran: Number(anggaran) || 0,
                realisasi: Number(realisasi) || 0
              });
@@ -308,8 +312,8 @@ export default function KomparasiLaporanPage() {
       });
 
       if (upserts.length > 0) {
-        // Karena ada UNIQUE constraint (akun_id, tahun), kita bisa upsert
-        const { error } = await supabase.from('app_laporan_statis').upsert(upserts, { onConflict: 'akun_id, tahun' });
+        // Karena ada UNIQUE constraint (akun_id, tahun, versi), kita bisa upsert
+        const { error } = await supabase.from('app_laporan_statis').upsert(upserts, { onConflict: 'akun_id, tahun, versi' });
         if (error) throw error;
         alert(`Berhasil import ${upserts.length} data untuk tahun ${bulkTahun}!`);
         setIsBulkModalOpen(false);
@@ -334,8 +338,8 @@ export default function KomparasiLaporanPage() {
     const header1 = ['Keterangan'];
     const header2 = [''];
     selectedYearVals.forEach(y => {
-      header1.push(`TAHUN ${y}`, '', '', '');
-      header2.push('Rencana/Anggaran', 'Realisasi', 'Selisih', '% (Naik/Turun)');
+      header1.push(`TAHUN ${y.split('___').join(' - ')}`, '', '', '', '', '');
+      header2.push('Rencana (Rp)', '%', 'Realisasi (Rp)', '%', 'Selisih (Rp)', '%');
     });
 
     ws.addRow(header1);
@@ -343,9 +347,9 @@ export default function KomparasiLaporanPage() {
 
     let colIdx = 2;
     selectedYearVals.forEach(() => {
-      ws.mergeCells(1, colIdx, 1, colIdx + 3);
+      ws.mergeCells(1, colIdx, 1, colIdx + 5);
       ws.getCell(1, colIdx).alignment = { horizontal: 'center', vertical: 'middle' };
-      colIdx += 4;
+      colIdx += 6;
     });
 
     [1, 2].forEach(rowIdx => {
@@ -376,7 +380,34 @@ export default function KomparasiLaporanPage() {
             persen = 0;
         }
 
-        rowData.push(d.anggaran, d.realisasi, selisih, persen);
+        let propAnggaran = 0;
+        let propRealisasi = 0;
+        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+        
+        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+            let denomAng = 0;
+            let denomReal = 0;
+            if (myIdx <= jpRowIdx && jpRow) {
+                denomAng = matrix[jpRow.id][y].anggaran;
+                denomReal = matrix[jpRow.id][y].realisasi;
+            } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
+                denomAng = matrix[jpengRow.id][y].anggaran;
+                denomReal = matrix[jpengRow.id][y].realisasi;
+            }
+            if (denomAng !== 0) propAnggaran = d.anggaran / denomAng;
+            if (denomReal !== 0) propRealisasi = d.realisasi / denomReal;
+        }
+
+        rowData.push(
+          d.anggaran, 
+          isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : Math.abs(propAnggaran), 
+          d.realisasi, 
+          isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : Math.abs(propRealisasi), 
+          selisih, 
+          persen
+        );
       });
 
       const row = ws.addRow(rowData);
@@ -385,15 +416,17 @@ export default function KomparasiLaporanPage() {
       let cIdx = 2;
       selectedYearVals.forEach(() => {
         row.getCell(cIdx).numFmt = '#,##0'; 
-        row.getCell(cIdx+1).numFmt = '#,##0'; 
+        row.getCell(cIdx+1).numFmt = '0.00%'; 
         row.getCell(cIdx+2).numFmt = '#,##0'; 
         row.getCell(cIdx+3).numFmt = '0.00%'; 
-        cIdx += 4;
+        row.getCell(cIdx+4).numFmt = '#,##0'; 
+        row.getCell(cIdx+5).numFmt = '0.00%'; 
+        cIdx += 6;
       });
     });
 
     ws.getColumn(1).width = 50;
-    for (let i = 2; i <= (selectedYearVals.length * 4) + 1; i++) {
+    for (let i = 2; i <= (selectedYearVals.length * 6) + 1; i++) {
        ws.getColumn(i).width = 18;
     }
 
@@ -410,11 +443,21 @@ export default function KomparasiLaporanPage() {
       
       tableRows.push(new TableRow({
         children: [
-          new TableCell({ children: [new Paragraph({ text: "Keterangan", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Anggaran", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Realisasi", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Selisih", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: '0F766E' } })
+          new TableCell({ children: [new Paragraph({ text: "Keterangan", alignment: AlignmentType.CENTER })], rowSpan: 2, shading: { fill: '0F766E' } }),
+          new TableCell({ children: [new Paragraph({ text: "Rencana (Rp)", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } }),
+          new TableCell({ children: [new Paragraph({ text: "Realisasi (Rp)", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } }),
+          new TableCell({ children: [new Paragraph({ text: "Selisih", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } })
+        ]
+      }));
+      
+      tableRows.push(new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
+          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
+          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
+          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
+          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
+          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } })
         ]
       }));
 
@@ -430,8 +473,27 @@ export default function KomparasiLaporanPage() {
             selisih = 0;
             persen = '0,00%';
         }
-
         
+        let propAnggaran = 0;
+        let propRealisasi = 0;
+        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+        
+        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+            let denomAng = 0;
+            let denomReal = 0;
+            if (myIdx <= jpRowIdx && jpRow) {
+                denomAng = matrix[jpRow.id][y].anggaran;
+                denomReal = matrix[jpRow.id][y].realisasi;
+            } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
+                denomAng = matrix[jpengRow.id][y].anggaran;
+                denomReal = matrix[jpengRow.id][y].realisasi;
+            }
+            if (denomAng !== 0) propAnggaran = (d.anggaran / denomAng) * 100;
+            if (denomReal !== 0) propRealisasi = (d.realisasi / denomReal) * 100;
+        }
+
         let displayLabel = akun.keterangan;
         if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
         
@@ -439,7 +501,9 @@ export default function KomparasiLaporanPage() {
           children: [
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: displayLabel, bold: isBold })], indent: { left: akun.level * 150 } })] }),
             new TableCell({ children: [new Paragraph({ text: d.anggaran !== 0 ? fmt(d.anggaran) : '-', alignment: AlignmentType.RIGHT })] }),
+            new TableCell({ children: [new Paragraph({ text: isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.anggaran !== 0 ? `${Math.abs(propAnggaran).toFixed(2).replace('.',',')}%` : '-'), alignment: AlignmentType.CENTER })] }),
             new TableCell({ children: [new Paragraph({ text: d.realisasi !== 0 ? fmt(d.realisasi) : '-', alignment: AlignmentType.RIGHT })] }),
+            new TableCell({ children: [new Paragraph({ text: isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.realisasi !== 0 ? `${Math.abs(propRealisasi).toFixed(2).replace('.',',')}%` : '-'), alignment: AlignmentType.CENTER })] }),
             new TableCell({ children: [new Paragraph({ text: (d.anggaran!==0 || d.realisasi!==0) ? fmt(selisih) : '-', alignment: AlignmentType.RIGHT })] }),
             new TableCell({ children: [new Paragraph({ text: persen, alignment: AlignmentType.CENTER })] })
           ]
@@ -548,19 +612,21 @@ export default function KomparasiLaporanPage() {
                     Keterangan
                   </th>
                   {selectedYearVals.map(y => (
-                    <th key={`head-${y}`} colSpan={5} className="p-3 text-center border-r border-slate-700 border-b border-slate-700 bg-slate-800 font-black">
-                      TAHUN {y}
+                    <th key={`head-${y}`} colSpan={7} className="p-3 text-center border-r border-slate-700 border-b border-slate-700 bg-slate-800 font-black">
+                      TAHUN {y.split('___').join(' - ')}
                     </th>
                   ))}
                 </tr>
                 <tr className="bg-slate-800 text-white uppercase tracking-tighter text-[10px] font-bold">
                   {selectedYearVals.map(y => (
                     <React.Fragment key={`subhead-${y}`}>
-                      <th className="p-3 border-r border-slate-700 text-right text-emerald-300 w-[140px]">Rencana/Anggaran</th>
-                      <th className="p-3 border-r border-slate-700 text-right text-sky-300 w-[140px]">Realisasi</th>
-                      <th className="p-3 border-r border-slate-700 text-right text-amber-300 w-[120px]">Selisih</th>
-                      <th className="p-3 border-r border-slate-700 text-center text-rose-300 w-[70px]">%</th>
-                      <th className="p-3 border-r border-slate-700 text-center w-[80px]">Aksi</th>
+                      <th className="p-3 border-r border-slate-700 text-right text-emerald-300 w-[120px]">Rencana (Rp)</th>
+                      <th className="p-3 border-r border-slate-700 text-center text-emerald-100 w-[60px]">%</th>
+                      <th className="p-3 border-r border-slate-700 text-right text-sky-300 w-[120px]">Realisasi (Rp)</th>
+                      <th className="p-3 border-r border-slate-700 text-center text-sky-100 w-[60px]">%</th>
+                      <th className="p-3 border-r border-slate-700 text-right text-amber-300 w-[120px]">Selisih (Rp)</th>
+                      <th className="p-3 border-r border-slate-700 text-center text-rose-300 w-[60px]">%</th>
+                      <th className="p-3 border-r border-slate-700 text-center w-[70px]">Aksi</th>
                     </React.Fragment>
                   ))}
                 </tr>
@@ -602,13 +668,40 @@ export default function KomparasiLaporanPage() {
                            persen = 0;
                         }
 
+                        // Menghitung % per group (Proporsi Vertikal)
+                        let propAnggaran = 0;
+                        let propRealisasi = 0;
+                        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+                        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+                        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+                        
+                        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+                            let denomAng = 0;
+                            let denomReal = 0;
+                            if (myIdx <= jpRowIdx && jpRow) {
+                                denomAng = matrix[jpRow.id][y].anggaran;
+                                denomReal = matrix[jpRow.id][y].realisasi;
+                            } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
+                                denomAng = matrix[jpengRow.id][y].anggaran;
+                                denomReal = matrix[jpengRow.id][y].realisasi;
+                            }
+                            if (denomAng !== 0) propAnggaran = (d.anggaran / denomAng) * 100;
+                            if (denomReal !== 0) propRealisasi = (d.realisasi / denomReal) * 100;
+                        }
+
                         return (
                           <React.Fragment key={`${akun.id}-${y}`}>
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.anggaran !== 0 ? 'text-gray-800' : 'text-gray-300'}`}>
                               {d.anggaran !== 0 ? fmt(d.anggaran) : '-'}
                             </td>
+                            <td className={`p-3 text-center font-mono text-[10px] border-r border-gray-100 ${isZeroOverride || akun.keterangan.includes('SURPLUS') ? 'text-gray-300' : 'text-emerald-700'}`}>
+                              {isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.anggaran !== 0 ? `${Math.abs(propAnggaran).toFixed(2).replace('.',',')}%` : '-')}
+                            </td>
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.realisasi !== 0 ? 'text-sky-700' : 'text-gray-300'}`}>
                               {d.realisasi !== 0 ? fmt(d.realisasi) : '-'}
+                            </td>
+                            <td className={`p-3 text-center font-mono text-[10px] border-r border-gray-100 ${isZeroOverride || akun.keterangan.includes('SURPLUS') ? 'text-gray-300' : 'text-sky-700'}`}>
+                              {isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.realisasi !== 0 ? `${Math.abs(propRealisasi).toFixed(2).replace('.',',')}%` : '-')}
                             </td>
                             <td className={`p-3 text-right font-mono text-[12px] border-r border-gray-100 font-bold ${isZeroOverride ? 'text-gray-400' : (selisih > 0 ? 'text-emerald-600' : selisih < 0 ? 'text-rose-600' : 'text-gray-300')}`}>
                               {isZeroOverride ? '0' : (d.anggaran !== 0 || d.realisasi !== 0 ? fmt(selisih) : '-')}
@@ -623,7 +716,7 @@ export default function KomparasiLaporanPage() {
                                 d.id ? (
                                   <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => {
-                                      setNilaiForm({ id: d.id, akun_id: akun.id, tahun: parseInt(y), anggaran: d.anggaran, realisasi: d.realisasi });
+                                      setNilaiForm({ id: d.id, akun_id: akun.id, tahun: parseInt(y.split('___')[0]), versi: y.split('___')[1] || 'Final', anggaran: d.anggaran, realisasi: d.realisasi });
                                       setSelectedAkunName(akun.keterangan);
                                       setIsNilaiModalOpen(true);
                                     }} className="p-1.5 text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg"><Edit2 size={14}/></button>
@@ -631,7 +724,7 @@ export default function KomparasiLaporanPage() {
                                 ) : (
                                    <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button onClick={() => {
-                                          setNilaiForm({ id: null, akun_id: akun.id, tahun: parseInt(y), anggaran: 0, realisasi: 0 });
+                                          setNilaiForm({ id: null, akun_id: akun.id, tahun: parseInt(y.split('___')[0]), versi: y.split('___')[1] || 'Final', anggaran: 0, realisasi: 0 });
                                           setSelectedAkunName(akun.keterangan);
                                           setIsNilaiModalOpen(true);
                                       }} className="p-1.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg" title="Isi Data di Tahun Ini"><Plus size={14}/></button>
@@ -662,7 +755,9 @@ export default function KomparasiLaporanPage() {
             <div className="p-6 space-y-6">
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pilih Tahun Input *</label>
-                <input required type="number" value={bulkTahun} onChange={e => setBulkTahun(parseInt(e.target.value))} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-2xl text-center" />
+                <input required type="number" value={bulkTahun} onChange={e => setBulkTahun(parseInt(e.target.value))} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-2xl text-center mb-4" />
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Versi Data (Contoh: Final, Perubahan 1) *</label>
+                <input required type="text" value={bulkVersi} onChange={e => setBulkVersi(e.target.value)} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-bold text-lg text-center" />
               </div>
               
               <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5">
@@ -701,18 +796,25 @@ export default function KomparasiLaporanPage() {
               <div className="flex items-end gap-4">
                 <div className="flex-1">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pilih Tahun Laporan Induk (RKAT) *</label>
-                  <input required type="number" value={narasiTahun} onChange={e => setNarasiTahun(parseInt(e.target.value))} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-xl" />
+                  <select required value={narasiTahun} onChange={e => setNarasiTahun(e.target.value)} className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl font-black text-xl">
+                    {selectedYearVals.map(y => <option key={y} value={y}>{y.split('___').join(' - ')}</option>)}
+                  </select>
                 </div>
                 <button onClick={() => {
-                  const y = narasiTahun;
-                  const yStr = String(y);
+                  const yStr = narasiTahun;
                   
                   // Cari tahun sebelumnya berdasarkan urutan data tahun yang tersedia (Matematis)
-                  const yNum = Number(y);
-                  const availableYears = selectedYearVals.map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a);
+                  const yNum = Number(yStr.split('___')[0]);
+                  const availableYears = Array.from(new Set(selectedYearVals.map(y => Number(y.split('___')[0])))).filter(n => !isNaN(n)).sort((a, b) => b - a);
                   const smallerYears = availableYears.filter(ay => ay < yNum);
-                  const prev = smallerYears.length > 0 ? smallerYears[0] : (yNum - 1);
-                  const prevStr = String(prev);
+                  const prevNum = smallerYears.length > 0 ? smallerYears[0] : (yNum - 1);
+                  
+                  // Temukan key persis dari prevNum di selectedYearVals, jika tidak ada fallback ke string angka saja
+                  const prevStrObj = selectedYearVals.find(y => Number(y.split('___')[0]) === prevNum);
+                  const prevStr = prevStrObj || String(prevNum);
+                  
+                  const yText = String(yNum);
+                  const prevText = String(prevNum);
                   
                   const getA = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].anggaran : 0; };
                   const getR = (name: string, yr: string) => { const r = flattenedRows.find(x => x.keterangan === name); return r && matrix[r.id] && matrix[r.id][yr] ? matrix[r.id][yr].realisasi : 0; };
@@ -769,9 +871,9 @@ export default function KomparasiLaporanPage() {
                   
                   const arahBanding = (v1: number, v2: number) => v1 >= v2 ? 'lebih besar' : 'lebih kecil';
 
-                  const t1 = `Estimasi penerimaan RKAT UGM ${y} sebesar ${fRp(pY)}, yang terdiri atas penerimaan pemerintah (APBN) ${fRp(pPem)} (${fPct(pPem, pY)})—meliputi Gaji dan Tunjangan PNS ${fRp(gaji)} (${fPct(gaji, pY)}); BPPTN-BH ${fRp(bptnbh)} (${fPct(bptnbh, pY)}); penelitian ${fRp(pen)} (${fPct(pen, pY)}); beasiswa dan kerja sama pemerintah ${fRp(bea)} (${fPct(bea, pY)}); Hibah Science Techno Park – ADB ${fRp(hibahSTP)} (${fPct(hibahSTP, pY)}); Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(hibahEq)} (${fPct(hibahEq, pY)}); serta penerimaan dana masyarakat ${fRp(pMas)} (${fPct(pMas, pY)}), yang mencakup penerimaan pendidikan ${fRp(pend)} (${fPct(pend, pY)}) dan nonpendidikan ${fRp(nonPend)} (${fPct(nonPend, pY)}).`;
-                  const t2 = `Estimasi pengeluaran RKAT ${y} berjumlah ${fRp(pengY)}, dengan komposisi: belanja pegawai ${fRp(bPegawai)} (${fPct(bPegawai, pengY)}); belanja barang dan jasa ${fRp(bBarang)} (${fPct(bBarang, pengY)}); belanja perbaikan dan pemeliharaan ${fRp(bPem)} (${fPct(bPem, pengY)}); belanja perjalanan ${fRp(bPerj)} (${fPct(bPerj, pengY)}); belanja modal ${fRp(bModal)} (${fPct(bModal, pengY)}); belanja Science Techno Park (Primestep) ADB ${fRp(bSTP)} (${fPct(bSTP, pengY)}); belanja Program Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(bEquity)} (${fPct(bEquity, pengY)}).`;
-                  const t3 = `Secara keseluruhan usulan RKAT ${y} diestimasikan menghasilkan surplus anggaran sebesar ${fRp(surplusY_A)} atau ${fPct(surplusY_A, pY)} dari usulan anggaran penerimaan ${y}. Surplus anggaran ${y} ini ${arahBanding(surplusY_A, surplusY1_R)} dibandingkan dengan surplus anggaran ${prev} yang sebesar ${fRp(selisihSurplus)} (${fPct(selisihSurplus, pY1_A)} dari anggaran penerimaan ${prev}) atau realisasi surplus ${prev} yang sebesar ${fRp(surplusY1_R)} (${fPct(surplusY1_R, pY1_R)} dari realisasi penerimaan ${prev}). Namun demikian dari surplus anggaran ${prev} baru sebesar ${fRp(danaAbadi)} yang dapat dialokasikan ke dana abadi karena pertimbangan likuiditas.`;
+                  const t1 = `Estimasi penerimaan RKAT UGM ${yText} sebesar ${fRp(pY)}, yang terdiri atas penerimaan pemerintah (APBN) ${fRp(pPem)} (${fPct(pPem, pY)})—meliputi Gaji dan Tunjangan PNS ${fRp(gaji)} (${fPct(gaji, pY)}); BPPTN-BH ${fRp(bptnbh)} (${fPct(bptnbh, pY)}); penelitian ${fRp(pen)} (${fPct(pen, pY)}); beasiswa dan kerja sama pemerintah ${fRp(bea)} (${fPct(bea, pY)}); Hibah Science Techno Park – ADB ${fRp(hibahSTP)} (${fPct(hibahSTP, pY)}); Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(hibahEq)} (${fPct(hibahEq, pY)}); serta penerimaan dana masyarakat ${fRp(pMas)} (${fPct(pMas, pY)}), yang mencakup penerimaan pendidikan ${fRp(pend)} (${fPct(pend, pY)}) dan nonpendidikan ${fRp(nonPend)} (${fPct(nonPend, pY)}).`;
+                  const t2 = `Estimasi pengeluaran RKAT ${yText} berjumlah ${fRp(pengY)}, dengan komposisi: belanja pegawai ${fRp(bPegawai)} (${fPct(bPegawai, pengY)}); belanja barang dan jasa ${fRp(bBarang)} (${fPct(bBarang, pengY)}); belanja perbaikan dan pemeliharaan ${fRp(bPem)} (${fPct(bPem, pengY)}); belanja perjalanan ${fRp(bPerj)} (${fPct(bPerj, pengY)}); belanja modal ${fRp(bModal)} (${fPct(bModal, pengY)}); belanja Science Techno Park (Primestep) ADB ${fRp(bSTP)} (${fPct(bSTP, pengY)}); belanja Program Enhancing Quality Education for International University Impact and Recognition (EQUITY) ${fRp(bEquity)} (${fPct(bEquity, pengY)}).`;
+                  const t3 = `Secara keseluruhan usulan RKAT ${yText} diestimasikan menghasilkan surplus anggaran sebesar ${fRp(surplusY_A)} atau ${fPct(surplusY_A, pY)} dari usulan anggaran penerimaan ${yText}. Surplus anggaran ${yText} ini ${arahBanding(surplusY_A, surplusY1_R)} dibandingkan dengan surplus anggaran ${prevText} yang sebesar ${fRp(selisihSurplus)} (${fPct(selisihSurplus, pY1_A)} dari anggaran penerimaan ${prevText}) atau realisasi surplus ${prevText} yang sebesar ${fRp(surplusY1_R)} (${fPct(surplusY1_R, pY1_R)} dari realisasi penerimaan ${prevText}). Namun demikian dari surplus anggaran ${prevText} baru sebesar ${fRp(danaAbadi)} yang dapat dialokasikan ke dana abadi karena pertimbangan likuiditas.`;
                   
                   setNarasiText(`${t1}\n\n${t2}\n\n${t3}`);
                 }} className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shrink-0 transition-transform active:scale-95">
