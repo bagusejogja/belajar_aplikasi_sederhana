@@ -632,8 +632,8 @@ export default function ArsipKegiatanPage() {
 
                                       return (
                                       <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                                        <div className="flex justify-between items-start border-b border-gray-100 pb-3 mb-4">
-                                          <div className="flex-1 pr-4">
+                                        <div className="mb-3">
+                                          <div className="flex-1">
                                             <h4 className="font-black text-gray-800 flex items-center gap-2">
                                               <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
                                               {phase.nama_fase}
@@ -646,21 +646,23 @@ export default function ArsipKegiatanPage() {
                                             ) : (
                                               <button onClick={(e) => { e.stopPropagation(); editGlobalNote(cat.id, pIdx, catTemplatePhases); }} className="text-[9px] font-bold text-gray-400 hover:text-indigo-500 mt-1 pl-8 border border-dashed border-gray-300 hover:border-indigo-300 rounded px-2 py-0.5 transition-colors">+ Tambah Catatan Tahapan</button>
                                             )}
-
-                                            <div className="mt-3 group/phasenote relative border-l-2 border-amber-300 pl-2 ml-8">
-                                              <p className="text-[10px] text-amber-900 leading-tight">
-                                                <span className="font-bold text-amber-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Fase {expandedArc.tahun}:</span>
-                                                {phase.catatan || <span className="text-amber-500/50 italic">Kosong...</span>}
-                                              </p>
-                                              <button onClick={(e) => { e.stopPropagation(); editPhaseNote(expandedArc.id, pIdx, phases); }} className="absolute top-0 right-0 opacity-0 group-hover/phasenote:opacity-100 bg-amber-50 p-0.5 rounded text-amber-600 hover:text-amber-800 transition-all"><Edit2 size={10}/></button>
-                                            </div>
                                           </div>
-                                          <div className="flex gap-1 shrink-0 ml-2 flex-col">
-                                            <label className="cursor-pointer px-2 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Upload File Fisik">
+                                        </div>
+
+                                        <div className="mb-4 pb-4 border-b border-gray-100 flex flex-col gap-3">
+                                          <div className="group/phasenote relative border-l-2 border-amber-300 pl-2">
+                                            <p className="text-[10px] text-amber-900 leading-tight">
+                                              <span className="font-bold text-amber-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Fase {expandedArc.tahun}:</span>
+                                              {phase.catatan || <span className="text-amber-500/50 italic">Kosong...</span>}
+                                            </p>
+                                            <button onClick={(e) => { e.stopPropagation(); editPhaseNote(expandedArc.id, pIdx, phases); }} className="absolute top-0 right-0 opacity-0 group-hover/phasenote:opacity-100 bg-amber-50 p-0.5 rounded text-amber-600 hover:text-amber-800 transition-all"><Edit2 size={10}/></button>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <label className="cursor-pointer flex-1 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Upload File Fisik">
                                               {uploadingPhase === `${expandedArc.id}-${pIdx}` ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Upload
                                               <input type="file" className="hidden" onChange={e => uploadFile(expandedArc.id, pIdx, phases, e, cat.nama_kegiatan, expandedArc.tahun)} disabled={uploadingPhase === `${expandedArc.id}-${pIdx}`} />
                                             </label>
-                                            <button onClick={() => addLink(expandedArc.id, pIdx, phases, cat.nama_kegiatan, expandedArc.tahun)} className="px-2 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-sky-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Beri Link GDrive"><LinkIcon size={12}/> Link</button>
+                                            <button onClick={() => addLink(expandedArc.id, pIdx, phases, cat.nama_kegiatan, expandedArc.tahun)} className="flex-1 py-1.5 bg-gray-100 text-gray-600 hover:text-white hover:bg-sky-600 rounded-lg transition-colors text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm" title="Beri Link GDrive"><LinkIcon size={12}/> Link</button>
                                           </div>
                                         </div>
                                         
