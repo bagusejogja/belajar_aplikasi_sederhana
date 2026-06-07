@@ -14,6 +14,19 @@ export default function ArsipKegiatanPage() {
   const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
   const [selectedYears, setSelectedYears] = useState<number[]>([]);
 
+  // View States
+  const [viewMode, setViewMode] = useState<'list' | 'matrix'>('list');
+  const [expandedCats, setExpandedCats] = useState<number[]>([]);
+  const [expandedYears, setExpandedYears] = useState<string[]>([]);
+
+  const toggleCat = (id: number) => {
+    setExpandedCats(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  
+  const toggleYear = (key: string) => {
+    setExpandedYears(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
+  };
+
   // Modal Category
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [catForm, setCatForm] = useState({ id: null as any, nama_kegiatan: '', deskripsi: '', template_fase: [{nama_fase: ''}] as any[] });
@@ -245,6 +258,16 @@ export default function ArsipKegiatanPage() {
         </button>
       </div>
 
+      {/* View Toggle */}
+      <div className="flex justify-end gap-2 relative z-10">
+        <button onClick={() => setViewMode('list')} className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
+          <Folder size={18} /> Tampilan List
+        </button>
+        <button onClick={() => setViewMode('matrix')} className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${viewMode === 'matrix' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
+          <Archive size={18} /> Sandingkan Tahun
+        </button>
+      </div>
+
       {/* Filter */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4 z-10 relative">
         <div className="flex-1 w-full">
@@ -253,13 +276,15 @@ export default function ArsipKegiatanPage() {
             options={categories.map(c => ({ value: c.id, label: c.nama_kegiatan }))}
             value={categories.filter(c => c.id === selectedCatId).map(c => ({ value: c.id, label: c.nama_kegiatan }))[0] || null}
             onChange={(val: any) => setSelectedCatId(val ? val.value : null)}
-            placeholder="Pilih Kegiatan Besar..."
+            placeholder="Semua Kegiatan Besar..."
+            isClearable
             styles={{
               control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' })
             }}
           />
         </div>
-        <div className="w-full md:w-[600px]">
+        {viewMode === 'matrix' && (
+          <div className="w-full md:w-[600px] animate-in slide-in-from-right-4 duration-300">
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sandingkan Tahun</label>
           <Select
             isMulti
@@ -274,10 +299,11 @@ export default function ArsipKegiatanPage() {
               multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#4338ca', color: 'white' } })
             }}
           />
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Matrix View */}
+      {/* Main Content Area */}
       {loading ? (
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 w-full">
           <div className="animate-pulse flex flex-col gap-6">
@@ -288,8 +314,10 @@ export default function ArsipKegiatanPage() {
              <div className="h-[400px] bg-gray-50 rounded-2xl w-full border border-gray-100"></div>
           </div>
         </div>
-      ) : selectedCatId ? (
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300">
+      ) : viewMode === 'matrix' ? (
+        <>
+          {selectedCatId ? (
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden animate-in fade-in duration-300">
           {(() => {
             const cat = categories.find(c => c.id === selectedCatId);
             if (!cat) return null;
@@ -471,6 +499,152 @@ export default function ArsipKegiatanPage() {
            <p className="text-gray-500 font-medium max-w-md mx-auto leading-relaxed">
              Silakan pilih "Kegiatan Besar" pada filter di atas untuk mulai mengelola dan melihat arsip dokumen tahunan.
            </p>
+        </div>
+      )}
+      </>
+      ) : (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          {(() => {
+            const filteredCats = selectedCatId ? categories.filter(c => c.id === selectedCatId) : categories;
+            if (filteredCats.length === 0) return <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center text-gray-400 font-bold italic shadow-sm">Belum ada folder kegiatan.</div>;
+            return filteredCats.map(cat => {
+              const isCatExpanded = expandedCats.includes(cat.id);
+              const catArcs = archives.filter(a => a.kategori_id === cat.id);
+
+              return (
+                <div key={cat.id} className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
+                  <div 
+                    className={`p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer transition-colors ${isCatExpanded ? 'bg-indigo-50 border-b border-indigo-100' : 'hover:bg-gray-50'}`}
+                    onClick={() => toggleCat(cat.id)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-4 rounded-2xl shadow-inner ${isCatExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                        <Folder size={28} className={isCatExpanded ? 'fill-indigo-500' : 'fill-gray-200'} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-gray-800">{cat.nama_kegiatan}</h3>
+                        <div className="flex items-center gap-3 text-sm font-bold text-gray-500 mt-1">
+                          <span className="bg-white px-2 py-0.5 rounded-md border border-gray-200 shadow-sm">{catArcs.length} Tahun Data</span>
+                          {cat.deskripsi && <span className="text-gray-400 truncate max-w-xs">{cat.deskripsi}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <button onClick={(e) => { e.stopPropagation(); setCatForm({ ...cat, template_fase: typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                      <button onClick={(e) => { e.stopPropagation(); handleCatDelete(cat.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
+                      <div className="w-px h-6 bg-gray-300 mx-2"></div>
+                      {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                    </div>
+                  </div>
+
+                  {isCatExpanded && (
+                    <div className="bg-gray-50/50 p-6">
+                      <div className="mb-6 flex justify-between items-center">
+                        <h4 className="font-bold text-gray-500 uppercase tracking-widest text-xs">Arsip Berdasarkan Tahun</h4>
+                        <button 
+                          onClick={() => { setArcForm({ id: null, kategori_id: cat.id, tahun: new Date().getFullYear(), catatan: '', fase_dokumen: [] }); setIsArcModalOpen(true); }}
+                          className="bg-white border border-gray-200 hover:border-indigo-300 text-indigo-600 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+                        >
+                          <Plus size={16} /> BUKA TAHUN BARU
+                        </button>
+                      </div>
+
+                      {catArcs.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400 font-medium italic border-2 border-dashed border-gray-200 rounded-2xl">Belum ada arsip tahunan. Klik "Buka Tahun Baru" untuk mulai.</div>
+                      ) : (
+                        <div className="space-y-4">
+                          {catArcs.map(arc => {
+                            const yearKey = `${cat.id}-${arc.tahun}`;
+                            const isYearExpanded = expandedYears.includes(yearKey);
+                            const phases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
+                            const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
+
+                            return (
+                              <div key={arc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                                <div 
+                                  className="p-4 flex justify-between items-center cursor-pointer hover:bg-indigo-50/50 transition-colors"
+                                  onClick={() => toggleYear(yearKey)}
+                                >
+                                  <div className="flex items-center gap-4">
+                                    <span className="bg-indigo-900 text-white text-lg font-black px-4 py-1.5 rounded-xl shadow-sm">{arc.tahun}</span>
+                                    <div className="flex flex-col">
+                                      <span className="font-bold text-gray-700">{totalFiles} File Tersimpan</span>
+                                      {arc.catatan && <span className="text-xs text-gray-400 truncate max-w-sm">{arc.catatan}</span>}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <button onClick={(e) => { e.stopPropagation(); setArcForm({ ...arc, fase_dokumen: phases }); setIsArcModalOpen(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 size={16}/></button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleArcDelete(arc.id); }} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 size={16}/></button>
+                                    {isYearExpanded ? <ChevronDown size={20} className="text-gray-400"/> : <ChevronRight size={20} className="text-gray-400"/>}
+                                  </div>
+                                </div>
+
+                                {isYearExpanded && (
+                                  <div className="p-6 border-t border-gray-100 bg-gray-50/30">
+                                    {arc.catatan && (
+                                      <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
+                                        <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan:</strong>
+                                        <p className="whitespace-pre-wrap font-medium">{arc.catatan}</p>
+                                      </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                      {phases.map((phase: any, pIdx: number) => (
+                                        <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                                          <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                                            <div>
+                                              <h4 className="font-black text-gray-800 flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
+                                                {phase.nama_fase}
+                                              </h4>
+                                              {phase.catatan_global && <p className="text-[10px] font-bold text-indigo-400 mt-1 pl-8">{phase.catatan_global}</p>}
+                                            </div>
+                                            <div className="flex gap-1 shrink-0 ml-2">
+                                              <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
+                                                {uploadingPhase === `${arc.id}-${pIdx}` ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                                                <input type="file" className="hidden" onChange={e => uploadFile(arc.id, pIdx, phases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${pIdx}`} />
+                                              </label>
+                                              <button onClick={() => addLink(arc.id, pIdx, phases, cat.nama_kegiatan, arc.tahun)} className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Beri Link GDrive"><LinkIcon size={16}/></button>
+                                            </div>
+                                          </div>
+                                          
+                                          {(!phase.files || phase.files.length === 0) ? (
+                                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
+                                          ) : (
+                                            <ul className="space-y-3">
+                                              {phase.files.map((file: any, fIdx: number) => (
+                                                <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
+                                                  <a href={file.url} target="_blank" rel="noreferrer" className="flex flex-col gap-0.5 w-full pr-2">
+                                                    <div className="flex items-start gap-3">
+                                                      {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
+                                                      <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
+                                                    </div>
+                                                    {file.uploaded_at && <span className="text-[9px] font-bold text-indigo-300 ml-7">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
+                                                  </a>
+                                                  <button onClick={() => removeFile(arc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
+                                                    <Trash2 size={14} />
+                                                  </button>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
