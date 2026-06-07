@@ -120,7 +120,7 @@ export default function ArsipKegiatanPage() {
     const name = prompt('Masukkan nama file/tautan (misal: Undangan Rapat):', defaultName) || defaultName;
     
     const newPhases = [...phases];
-    newPhases[phaseIdx].files.push({ name, url, type: 'link' });
+    newPhases[phaseIdx].files.push({ name, url, type: 'link', uploaded_at: new Date().toISOString() });
     await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
     fetchData();
   };
@@ -148,7 +148,7 @@ export default function ArsipKegiatanPage() {
         const ext = extMatch ? extMatch[0] : '';
         const newFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
 
-        newPhases[phaseIdx].files.push({ name: newFileName, url: data.publicUrl, type: 'file' });
+        newPhases[phaseIdx].files.push({ name: newFileName, url: data.publicUrl, type: 'file', uploaded_at: new Date().toISOString() });
         await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
         fetchData();
       } else {
@@ -341,7 +341,10 @@ export default function ArsipKegiatanPage() {
                                           <li key={fIdx} className="group flex items-start justify-between p-2 rounded-lg bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
                                             <a href={file.url} target="_blank" rel="noreferrer" className="flex items-start gap-2 w-full pr-2 overflow-hidden">
                                               {file.type === 'link' ? <LinkIcon size={14} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={14} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                              <span className="text-[11px] font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight" title={file.name}>{file.name}</span>
+                                              <div className="flex flex-col">
+                                                <span className="text-[11px] font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight" title={file.name}>{file.name}</span>
+                                                {file.uploaded_at && <span className="text-[9px] text-gray-400 mt-0.5 font-normal">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
+                                              </div>
                                             </a>
                                             <button onClick={() => removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
                                               <Trash2 size={12} />
@@ -358,6 +361,31 @@ export default function ArsipKegiatanPage() {
                           })}
                         </tr>
                       ))}
+                      
+                      {/* CATATAN TAHUNAN ROW */}
+                      <tr className="bg-amber-50/50 hover:bg-amber-50 transition-colors group">
+                        <td className="p-4 sticky left-0 bg-amber-50/80 group-hover:bg-amber-50 border-r border-amber-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10 align-top">
+                          <h4 className="font-black text-amber-800 flex items-start gap-3 text-sm">
+                            <span className="mt-0.5">Catatan Umum Tahunan</span>
+                          </h4>
+                          <p className="text-[10px] text-amber-600 mt-1">Catatan untuk keseluruhan arsip di tahun tersebut.</p>
+                        </td>
+                        {selectedYears.map((y: number) => {
+                          const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
+                          if (!arc) {
+                             return <td key={`catatan-${y}`} className="p-4 border-r border-gray-100 text-center align-middle bg-gray-50/50"></td>;
+                          }
+                          return (
+                            <td key={`catatan-${y}`} className="p-4 border-r border-amber-100 align-top">
+                               <div className="flex justify-between items-start mb-2">
+                                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">Isi Catatan:</span>
+                                  <button onClick={() => { setArcForm({ ...arc, fase_dokumen: typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : arc.fase_dokumen }); setIsArcModalOpen(true); }} className="text-[10px] bg-white border border-amber-200 text-amber-600 px-2 py-1 rounded hover:bg-amber-100 font-bold transition-colors shadow-sm">Edit Catatan</button>
+                               </div>
+                               <p className="text-xs text-amber-900 whitespace-pre-wrap">{arc.catatan || <span className="text-amber-400 italic">Belum ada catatan...</span>}</p>
+                            </td>
+                          );
+                        })}
+                      </tr>
                     </tbody>
                   </table>
                 )}
