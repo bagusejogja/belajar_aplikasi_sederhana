@@ -52,10 +52,12 @@ export default function ArsipKegiatanPage() {
     const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter(t => t.trim() !== '')) };
     let err;
     if (catForm.id) {
-      const { error } = await supabase.from('app_arsip_kategori').update(payload).eq('id', catForm.id);
+      const { id, ...updateData } = payload;
+      const { error } = await supabase.from('app_arsip_kategori').update(updateData).eq('id', catForm.id);
       err = error;
     } else {
-      const { error } = await supabase.from('app_arsip_kategori').insert([payload]);
+      const { id, ...insertData } = payload;
+      const { error } = await supabase.from('app_arsip_kategori').insert([insertData]);
       err = error;
     }
     
