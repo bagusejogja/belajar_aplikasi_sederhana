@@ -30,10 +30,13 @@ export default function ArsipKegiatanPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [{ data: catData }, { data: arcData }] = await Promise.all([
+    const [{ data: catData, error: catErr }, { data: arcData, error: arcErr }] = await Promise.all([
       supabase.from('app_arsip_kategori').select('*').order('nama_kegiatan', { ascending: true }),
       supabase.from('app_arsip_kegiatan').select('*, app_arsip_kategori(nama_kegiatan)').order('tahun', { ascending: false })
     ]);
+    
+    if (catErr) alert('Gagal memuat kategori: ' + catErr.message);
+    if (arcErr) alert('Gagal memuat arsip: ' + arcErr.message);
     
     setCategories(catData || []);
     setArchives(arcData || []);
@@ -47,8 +50,19 @@ export default function ArsipKegiatanPage() {
   const handleCatSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter(t => t.trim() !== '')) };
-    if (catForm.id) await supabase.from('app_arsip_kategori').update(payload).eq('id', catForm.id);
-    else await supabase.from('app_arsip_kategori').insert([payload]);
+    let err;
+    if (catForm.id) {
+      const { error } = await supabase.from('app_arsip_kategori').update(payload).eq('id', catForm.id);
+      err = error;
+    } else {
+      const { error } = await supabase.from('app_arsip_kategori').insert([payload]);
+      err = error;
+    }
+    
+    if (err) {
+      alert('Gagal menyimpan kategori: ' + err.message);
+      return;
+    }
     setIsCatModalOpen(false);
     fetchData();
   };
@@ -63,8 +77,10 @@ export default function ArsipKegiatanPage() {
   // --- ARCHIVE LOGIC ---
   const handleArcSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    let err;
     if (arcForm.id) {
-      await supabase.from('app_arsip_kegiatan').update({ catatan: arcForm.catatan, fase_dokumen: arcForm.fase_dokumen }).eq('id', arcForm.id);
+      const { error } = await supabase.from('app_arsip_kegiatan').update({ catatan: arcForm.catatan, fase_dokumen: arcForm.fase_dokumen }).eq('id', arcForm.id);
+      err = error;
     } else {
       // Init from template
       const cat = categories.find(c => c.id === arcForm.kategori_id);
@@ -73,7 +89,13 @@ export default function ArsipKegiatanPage() {
          const tpl = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase;
          phases = tpl.map((nama: string) => ({ nama_fase: nama, files: [] }));
       }
-      await supabase.from('app_arsip_kegiatan').insert([{ kategori_id: arcForm.kategori_id, tahun: arcForm.tahun, catatan: arcForm.catatan, fase_dokumen: phases }]);
+      const { error } = await supabase.from('app_arsip_kegiatan').insert([{ kategori_id: arcForm.kategori_id, tahun: arcForm.tahun, catatan: arcForm.catatan, fase_dokumen: phases }]);
+      err = error;
+    }
+    
+    if (err) {
+      alert('Gagal menyimpan arsip tahun: ' + err.message);
+      return;
     }
     setIsArcModalOpen(false);
     fetchData();
