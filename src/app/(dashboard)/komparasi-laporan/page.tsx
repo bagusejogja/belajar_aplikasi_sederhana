@@ -751,8 +751,8 @@ export default function KomparasiLaporanPage() {
                             <td className="p-3 border-r border-slate-100 text-center text-emerald-600 font-medium">
                               {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-emerald-50 px-1 py-0.5 rounded text-emerald-600">{Math.abs(propAnggaran).toFixed(2).replace('.',',')}%</span>}
                             </td>
-                            <td className="p-3 border-r border-slate-100 text-right font-black text-sky-700">
-                              {d.realisasi !== 0 ? fmt(d.realisasi) : <span className="text-gray-300">-</span>}
+                            <td className={`p-3 text-right font-mono text-[12px] border-r border-slate-100 ${isBold ? 'font-bold' : ''} ${d.realisasi !== 0 ? 'text-sky-700' : 'text-gray-300'}`}>
+                              {d.realisasi !== 0 ? fmt(d.realisasi) : '-'}
                             </td>
                             <td className="p-3 border-r border-slate-100 text-center text-sky-600 font-medium">
                               {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-sky-50 px-1 py-0.5 rounded text-sky-600">{Math.abs(propRealisasi).toFixed(2).replace('.',',')}%</span>}
