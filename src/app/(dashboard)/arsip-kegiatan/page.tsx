@@ -43,8 +43,10 @@ export default function ArsipKegiatanPage() {
     setLoading(false);
   };
 
-  const allYears = Array.from(new Set(archives.map(a => a.tahun))).sort((a, b) => b - a);
-  if (allYears.length === 0) allYears.push(new Date().getFullYear());
+  const currentYear = new Date().getFullYear();
+  const dbYears = archives.map(a => a.tahun);
+  const baseYears = Array.from({length: 11}, (_, i) => currentYear - 5 + i); // 5 years back, 5 years forward
+  const allYears = Array.from(new Set([...dbYears, ...baseYears])).sort((a, b) => b - a);
 
   // --- CATEGORY LOGIC ---
   const handleCatSave = async (e: React.FormEvent) => {
