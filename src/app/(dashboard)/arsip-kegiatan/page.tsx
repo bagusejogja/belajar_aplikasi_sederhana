@@ -4,14 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, Archive, Settings } from 'lucide-react';
 
+import Select from 'react-select';
+
 export default function ArsipKegiatanPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [archives, setArchives] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   
-  const [expandedCats, setExpandedCats] = useState<number[]>([]);
-  const [expandedYears, setExpandedYears] = useState<string[]>([]); // "catId-year"
+  const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
 
   // Modal Category
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
@@ -39,12 +40,8 @@ export default function ArsipKegiatanPage() {
     setLoading(false);
   };
 
-  const toggleCat = (id: number) => {
-    setExpandedCats(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-  const toggleYear = (key: string) => {
-    setExpandedYears(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
-  };
+  const allYears = Array.from(new Set(archives.map(a => a.tahun))).sort((a, b) => b - a);
+  if (allYears.length === 0) allYears.push(new Date().getFullYear());
 
   // --- CATEGORY LOGIC ---
   const handleCatSave = async (e: React.FormEvent) => {
@@ -159,162 +156,157 @@ export default function ArsipKegiatanPage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-            type="text" 
-            placeholder="Cari folder kegiatan besar..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl outline-none focus:ring-2 ring-indigo-100 font-bold text-gray-700"
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4 z-10 relative">
+        <div className="flex-1 w-full">
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pilih Kegiatan Besar</label>
+          <Select 
+            options={categories.map(c => ({ value: c.id, label: c.nama_kegiatan }))}
+            value={categories.filter(c => c.id === selectedCatId).map(c => ({ value: c.id, label: c.nama_kegiatan }))[0] || null}
+            onChange={(val: any) => setSelectedCatId(val ? val.value : null)}
+            placeholder="Pilih Kegiatan Besar..."
+            styles={{
+              control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' })
+            }}
+          />
+        </div>
+        <div className="w-full md:w-[600px]">
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sandingkan Tahun</label>
+          <Select
+            isMulti
+            options={allYears.map(y => ({ value: y, label: String(y) }))}
+            value={selectedYears.map(y => ({ value: y, label: String(y) }))}
+            onChange={(val: any) => setSelectedYears(val ? val.map((v: any) => v.value) : [])}
+            placeholder="Pilih tahun..."
+            styles={{
+              control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' }),
+              multiValue: (base) => ({ ...base, backgroundColor: '#4f46e5', borderRadius: '0.5rem' }),
+              multiValueLabel: (base) => ({ ...base, color: 'white', fontWeight: 'bold' }),
+              multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#4338ca', color: 'white' } })
+            }}
           />
         </div>
       </div>
 
-      {/* Accordion View */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={40} /></div>
-        ) : filteredCats.length === 0 ? (
-           <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center text-gray-400 font-bold italic shadow-sm">Belum ada folder kegiatan yang dibuat.</div>
-        ) : (
-          filteredCats.map(cat => {
-            const isCatExpanded = expandedCats.includes(cat.id);
-            const catArcs = archives.filter(a => a.kategori_id === cat.id);
+      {/* Matrix View */}
+      {selectedCatId ? (
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          {(() => {
+            const cat = categories.find(c => c.id === selectedCatId);
+            if (!cat) return null;
+            
+            const phases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
 
             return (
-              <div key={cat.id} className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300">
-                {/* Category Header */}
-                <div 
-                  className={`p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer transition-colors ${isCatExpanded ? 'bg-indigo-50 border-b border-indigo-100' : 'hover:bg-gray-50'}`}
-                  onClick={() => toggleCat(cat.id)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-4 rounded-2xl shadow-inner ${isCatExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                      <Folder size={28} className={isCatExpanded ? 'fill-indigo-500' : 'fill-gray-200'} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-gray-800">{cat.nama_kegiatan}</h3>
-                      <div className="flex items-center gap-3 text-sm font-bold text-gray-500 mt-1">
-                        <span className="bg-white px-2 py-0.5 rounded-md border border-gray-200 shadow-sm">{catArcs.length} Tahun Data</span>
-                        {cat.deskripsi && <span className="text-gray-400 truncate max-w-xs">{cat.deskripsi}</span>}
-                      </div>
-                    </div>
+              <div className="overflow-x-auto custom-scrollbar pb-4">
+                <div className="p-6 bg-indigo-50 border-b border-indigo-100 flex justify-between items-center min-w-[1000px]">
+                  <div>
+                    <h2 className="text-xl font-black text-gray-800 flex items-center gap-2"><Folder size={24} className="text-indigo-600"/> {cat.nama_kegiatan}</h2>
+                    {cat.deskripsi && <p className="text-sm text-gray-500 font-medium mt-1">{cat.deskripsi}</p>}
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <button onClick={(e) => { e.stopPropagation(); setCatForm({ ...cat, template_fase: typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
-                    <button onClick={(e) => { e.stopPropagation(); handleCatDelete(cat.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
-                    <div className="w-px h-6 bg-gray-300 mx-2"></div>
-                    {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button onClick={() => { setCatForm({ ...cat, template_fase: phases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                    <button onClick={() => { handleCatDelete(cat.id); setSelectedCatId(null); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
                   </div>
                 </div>
 
-                {/* Years inside Category */}
-                {isCatExpanded && (
-                  <div className="bg-gray-50/50 p-6">
-                    <div className="mb-6 flex justify-between items-center">
-                      <h4 className="font-bold text-gray-500 uppercase tracking-widest text-xs">Arsip Berdasarkan Tahun</h4>
-                      <button 
-                        onClick={() => { setArcForm({ id: null, kategori_id: cat.id, tahun: new Date().getFullYear(), catatan: '', fase_dokumen: [] }); setIsArcModalOpen(true); }}
-                        className="bg-white border border-gray-200 hover:border-indigo-300 text-indigo-600 px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
-                      >
-                        <Plus size={16} /> BUKA TAHUN BARU
-                      </button>
-                    </div>
-
-                    {catArcs.length === 0 ? (
-                      <div className="text-center py-8 text-gray-400 font-medium italic border-2 border-dashed border-gray-200 rounded-2xl">Belum ada arsip tahunan. Klik "Buka Tahun Baru" untuk mulai.</div>
-                    ) : (
-                      <div className="space-y-4">
-                        {catArcs.map(arc => {
-                          const yearKey = `${cat.id}-${arc.tahun}`;
-                          const isYearExpanded = expandedYears.includes(yearKey);
-                          const phases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
-                          const totalFiles = phases.reduce((acc: number, p: any) => acc + (p.files?.length || 0), 0);
-
-                          return (
-                            <div key={arc.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                              <div 
-                                className="p-4 flex justify-between items-center cursor-pointer hover:bg-indigo-50/50 transition-colors"
-                                onClick={() => toggleYear(yearKey)}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <span className="bg-indigo-900 text-white text-lg font-black px-4 py-1.5 rounded-xl shadow-sm">{arc.tahun}</span>
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-gray-700">{totalFiles} File Tersimpan</span>
-                                    {arc.catatan && <span className="text-xs text-gray-400 truncate max-w-sm">{arc.catatan}</span>}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <button onClick={(e) => { e.stopPropagation(); setArcForm({ ...arc, fase_dokumen: phases }); setIsArcModalOpen(true); }} className="p-2 text-gray-400 hover:text-indigo-600"><Edit2 size={16}/></button>
-                                  <button onClick={(e) => { e.stopPropagation(); handleArcDelete(arc.id); }} className="p-2 text-gray-400 hover:text-rose-600"><Trash2 size={16}/></button>
-                                  {isYearExpanded ? <ChevronDown size={20} className="text-gray-400"/> : <ChevronRight size={20} className="text-gray-400"/>}
-                                </div>
-                              </div>
-
-                              {/* Static Phases inside Year */}
-                              {isYearExpanded && (
-                                <div className="p-6 border-t border-gray-100 bg-gray-50/30">
-                                  {arc.catatan && (
-                                    <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-900 text-sm">
-                                      <strong className="block mb-1 text-amber-700 uppercase tracking-widest text-[10px]">Catatan:</strong>
-                                      <p className="whitespace-pre-wrap font-medium">{arc.catatan}</p>
-                                    </div>
+                {selectedYears.length === 0 ? (
+                  <div className="text-center py-20 text-gray-400 font-bold italic min-w-[1000px]">Silakan pilih minimal 1 tahun di filter atas untuk menampilkan tabel matriks dokumen.</div>
+                ) : (
+                  <table className="w-full text-left border-collapse min-w-[1000px]">
+                    <thead>
+                      <tr className="bg-slate-900 text-white uppercase tracking-wider text-xs">
+                        <th className="p-4 border-r border-slate-700 min-w-[300px] sticky left-0 bg-slate-900 z-20 font-black shadow-[4px_0_10px_rgba(0,0,0,0.2)]">Tahapan / Fase Dokumen</th>
+                        {selectedYears.map((y: number) => (
+                          <th key={y} className="p-4 text-center border-r border-slate-700 bg-slate-800 font-black w-[350px]">
+                            TAHUN {y}
+                            <div className="text-[10px] font-normal text-indigo-200 normal-case mt-1">Arsip Kegiatan</div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {phases.map((phaseName: string, pIdx: number) => (
+                        <tr key={pIdx} className="hover:bg-indigo-50/30 transition-colors group">
+                          <td className="p-4 sticky left-0 bg-white group-hover:bg-indigo-50/30 border-r border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)] z-10 align-top">
+                            <h4 className="font-black text-gray-800 flex items-start gap-3 text-sm">
+                              <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs shrink-0">{pIdx + 1}</span>
+                              <span className="mt-0.5">{phaseName}</span>
+                            </h4>
+                          </td>
+                          {selectedYears.map((y: number) => {
+                            const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
+                            if (!arc) {
+                              return (
+                                <td key={`${pIdx}-${y}`} className="p-4 border-r border-gray-100 text-center align-middle bg-gray-50/50">
+                                  {pIdx === 0 && (
+                                    <button 
+                                      onClick={() => { setArcForm({ id: null, kategori_id: selectedCatId, tahun: y, catatan: '', fase_dokumen: [] }); setIsArcModalOpen(true); }}
+                                      className="bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-600 px-4 py-2 rounded-xl font-black text-xs inline-flex items-center gap-2 shadow-sm transition-all"
+                                    >
+                                      <Plus size={16} /> BUKA ARSIP {y}
+                                    </button>
                                   )}
+                                  {pIdx > 0 && <span className="text-[10px] text-gray-400 italic">Menunggu arsip dibuka...</span>}
+                                </td>
+                              );
+                            }
+                            
+                            // Arsip is available. Find the phase.
+                            const arcPhases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
+                            const arcPhaseIdx = arcPhases.findIndex((f: any) => f.nama_fase === phaseName);
+                            const phaseData = arcPhaseIdx >= 0 ? arcPhases[arcPhaseIdx] : null;
 
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {phases.map((phase: any, pIdx: number) => (
-                                      <div key={pIdx} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-                                          <h4 className="font-black text-gray-800 flex items-center gap-2">
-                                            <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">{pIdx + 1}</span>
-                                            {phase.nama_fase}
-                                          </h4>
-                                          <div className="flex gap-1">
-                                            <label className="cursor-pointer p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Upload File Fisik">
-                                              {uploadingPhase === `${arc.id}-${pIdx}` ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                                              <input type="file" className="hidden" onChange={e => uploadFile(arc.id, pIdx, phases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${pIdx}`} />
-                                            </label>
-                                            <button onClick={() => addLink(arc.id, pIdx, phases)} className="p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors" title="Beri Link GDrive"><LinkIcon size={16}/></button>
-                                          </div>
-                                        </div>
-                                        
-                                        {(!phase.files || phase.files.length === 0) ? (
-                                          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
-                                        ) : (
-                                          <ul className="space-y-3">
-                                            {phase.files.map((file: any, fIdx: number) => (
-                                              <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
-                                                <a href={file.url} target="_blank" rel="noreferrer" className="flex items-start gap-3 w-full pr-2">
-                                                  {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                                  <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
-                                                </a>
-                                                <button onClick={() => removeFile(arc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
-                                                  <Trash2 size={14} />
-                                                </button>
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        )}
-                                      </div>
-                                    ))}
+                            return (
+                              <td key={`${pIdx}-${y}`} className="p-4 border-r border-gray-100 align-top bg-white">
+                                {!phaseData ? (
+                                  <span className="text-[10px] text-gray-400 italic block text-center mt-4">Fase tidak ditemukan di tahun ini.</span>
+                                ) : (
+                                  <div>
+                                    <div className="flex justify-end gap-1 mb-3">
+                                      <label className="cursor-pointer px-2 py-1 bg-gray-100 text-gray-600 hover:text-white hover:bg-indigo-600 rounded-lg transition-colors text-[10px] font-bold flex items-center gap-1 shadow-sm" title="Upload File Fisik">
+                                        {uploadingPhase === `${arc.id}-${arcPhaseIdx}` ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Upload
+                                        <input type="file" className="hidden" onChange={e => uploadFile(arc.id, arcPhaseIdx, arcPhases, e, cat.nama_kegiatan, arc.tahun)} disabled={uploadingPhase === `${arc.id}-${arcPhaseIdx}`} />
+                                      </label>
+                                      <button onClick={() => addLink(arc.id, arcPhaseIdx, arcPhases)} className="px-2 py-1 bg-gray-100 text-gray-600 hover:text-white hover:bg-sky-600 rounded-lg transition-colors text-[10px] font-bold flex items-center gap-1 shadow-sm" title="Beri Link GDrive"><LinkIcon size={12}/> Link</button>
+                                    </div>
+                                    
+                                    {(!phaseData.files || phaseData.files.length === 0) ? (
+                                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">KOSONG</p>
+                                    ) : (
+                                      <ul className="space-y-2">
+                                        {phaseData.files.map((file: any, fIdx: number) => (
+                                          <li key={fIdx} className="group flex items-start justify-between p-2 rounded-lg bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
+                                            <a href={file.url} target="_blank" rel="noreferrer" className="flex items-start gap-2 w-full pr-2 overflow-hidden">
+                                              {file.type === 'link' ? <LinkIcon size={14} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={14} className="text-indigo-500 mt-0.5 shrink-0" />}
+                                              <span className="text-[11px] font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight" title={file.name}>{file.name}</span>
+                                            </a>
+                                            <button onClick={() => removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
+                                              <Trash2 size={12} />
+                                            </button>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             );
-          })
-        )}
-      </div>
+          })()}
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl border border-gray-100 py-20 text-center shadow-sm">
+           <FolderTree size={64} className="mx-auto text-indigo-200 mb-4" />
+           <p className="text-gray-400 font-bold italic text-lg">Silakan pilih "Kegiatan Besar" pada filter di atas untuk memulai.</p>
+        </div>
+      )}
 
       {/* MODAL KATEGORI (TEMPLATE FASE) */}
       {isCatModalOpen && (
