@@ -4,60 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FileText, Printer, Loader2, Calendar } from 'lucide-react';
 
-const CompressedImage = ({ src, alt, className, style }: any) => {
-  const [dataUrl, setDataUrl] = useState(src);
-
-  useEffect(() => {
-    if (!src || src.includes('drive.google.com/thumbnail')) return;
-
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 300;
-      const MAX_HEIGHT = 300;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > MAX_WIDTH) {
-          height *= MAX_WIDTH / width;
-          width = MAX_WIDTH;
-        }
-      } else {
-        if (height > MAX_HEIGHT) {
-          width *= MAX_HEIGHT / height;
-          height = MAX_HEIGHT;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        setDataUrl(canvas.toDataURL('image/jpeg', 0.6));
-      }
-    };
-    img.onerror = () => {
-       setDataUrl(src); // fallback
-    };
-    img.src = src;
-  }, [src]);
-
-  return (
-    <img 
-      src={dataUrl} 
-      alt={alt} 
-      className={className} 
-      style={style}
-      onError={(e) => { 
-        (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-      }} 
-    />
-  );
-};
-
 export default function ReportPhotoPage() {
    const d = new Date();
    const defaultDate = d.toISOString().split('T')[0];
@@ -122,22 +68,28 @@ export default function ReportPhotoPage() {
        if (!teks) return null;
        const links = teks.split(',').map(s => s.trim()).filter(Boolean);
        return links.map((lnk, idx) => {
-           let imgSrc = lnk;
-           const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-           if (gdriveMatch && gdriveMatch[1]) {
-              // Optimasi: Gunakan sz=w200 untuk memperkecil file size PDF lebih lanjut
-              imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200`;
-           }
-           return (
-              <div key={idx} className="border border-gray-200 shadow-sm bg-white p-0.5 rounded inline-block mx-1 mb-2 overflow-hidden">
-                  <CompressedImage 
+            let imgSrc = lnk;
+            const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+            if (gdriveMatch && gdriveMatch[1]) {
+               imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200`;
+            } else if (imgSrc.startsWith('http')) {
+               // Gunakan Next.js API untuk memperkecil gambar yang di-hosting di R2 / Supabase
+               imgSrc = `/_next/image?url=${encodeURIComponent(imgSrc)}&w=256&q=50`;
+            }
+            
+            return (
+               <div key={idx} className="border border-gray-200 shadow-sm bg-white p-0.5 rounded inline-block mx-1 mb-2 overflow-hidden">
+                  <img 
                      src={imgSrc} 
                      alt="Lampiran" 
                      className="max-w-full" 
                      style={{ height: '80px', width: 'auto', objectFit: 'contain', imageRendering: '-webkit-optimize-contrast' }}
+                     onError={(e) => { 
+                        (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                     }} 
                   />
-              </div>
-           );
+               </div>
+            );
        });
     };
 
