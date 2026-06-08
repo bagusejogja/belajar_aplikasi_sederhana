@@ -75,11 +75,11 @@ export default function ReportPhotoPage() {
               imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200`;
            }
            return (
-              <div key={idx} className="border border-gray-200 shadow-sm bg-white p-1 rounded inline-block mx-1 mb-2 overflow-hidden">
+              <div key={idx} className="border border-gray-200 shadow-sm bg-white p-0.5 rounded inline-block mx-1 mb-2 overflow-hidden">
                  <img 
                     src={imgSrc} 
                     alt="Lampiran" 
-                    className="h-40 w-auto object-contain max-w-full print:max-h-48" 
+                    className="h-20 w-auto object-contain max-w-full print:max-h-20" 
                     style={{ imageRendering: '-webkit-optimize-contrast' }}
                     onError={(e) => { 
                        (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
