@@ -4,19 +4,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FileText, Printer, Loader2, Calendar } from 'lucide-react';
 
-const CanvasImage = ({ src, alt, className, style }: any) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [error, setError] = useState(false);
+const CompressedImage = ({ src, alt, className, style }: any) => {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!src) return;
+
+    if (src.includes('drive.google.com/thumbnail')) {
+      setDataUrl(src);
+      return;
+    }
+
+    const proxyUrl = `/api/image-cors?url=${encodeURIComponent(src)}`;
+
     const img = new Image();
+    img.crossOrigin = 'Anonymous';
     img.onload = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
+      const canvas = document.createElement('canvas');
       const MAX_WIDTH = 300;
       const MAX_HEIGHT = 300;
       let width = img.width;
@@ -36,23 +40,23 @@ const CanvasImage = ({ src, alt, className, style }: any) => {
 
       canvas.width = width;
       canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        setDataUrl(canvas.toDataURL('image/jpeg', 0.4));
+      }
     };
     img.onerror = () => {
-       setError(true);
+       setDataUrl(src);
     };
-    img.src = src;
+    img.src = proxyUrl;
   }, [src]);
 
-  if (error) {
-    return <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png" alt={alt} className={className} style={style} />;
+  if (!dataUrl) {
+    return <div className="h-20 w-16 flex items-center justify-center bg-gray-50"><Loader2 size={16} className="animate-spin text-gray-300"/></div>;
   }
 
-  if (src.includes('drive.google.com/thumbnail')) {
-    return <img src={src} alt={alt} className={className} style={style} />;
-  }
-
-  return <canvas ref={canvasRef} className={className} style={style} title={alt} />;
+  return <img src={dataUrl} alt={alt} className={className} style={style} />;
 };
 
 export default function ReportPhotoPage() {
@@ -127,7 +131,7 @@ export default function ReportPhotoPage() {
             
             return (
                <div key={idx} className="border border-gray-200 shadow-sm bg-white p-0.5 rounded inline-block mx-1 mb-2 overflow-hidden">
-                  <CanvasImage 
+                  <CompressedImage 
                      src={imgSrc} 
                      alt="Lampiran" 
                      className="max-w-full" 
