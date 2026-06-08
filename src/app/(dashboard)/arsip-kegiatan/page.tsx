@@ -100,6 +100,25 @@ export default function ArsipKegiatanPage() {
       const { id, ...updateData } = payload;
       const { error } = await supabase.from('app_arsip_kategori').update(updateData).eq('id', catForm.id);
       err = error;
+
+      if (!err) {
+         // Sync archives
+         const { data: existingArcs } = await supabase.from('app_arsip_kegiatan').select('*').eq('kategori_id', catForm.id);
+         if (existingArcs && existingArcs.length > 0) {
+            for (const arc of existingArcs) {
+               let oldArcPhases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
+               let newArcPhases = catForm.template_fase.map((tpl: any) => {
+                  let existing = oldArcPhases.find((o: any) => o.nama_fase === tpl._old_nama);
+                  return {
+                     ...(existing || { files: [], catatan: '' }),
+                     nama_fase: tpl.nama_fase,
+                     catatan_global: tpl.catatan_global
+                  };
+               });
+               await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newArcPhases }).eq('id', arc.id);
+            }
+         }
+      }
     } else {
       const { id, ...insertData } = payload;
       const { error } = await supabase.from('app_arsip_kategori').insert([insertData]);
@@ -250,14 +269,7 @@ export default function ArsipKegiatanPage() {
     fetchData();
   };
 
-  const editGlobalNote = async (catId: number, phaseIdx: number, phases: any[]) => {
-    const newPhases = normalizePhases(phases);
-    const note = prompt(`Masukkan catatan GLOBAL untuk "${newPhases[phaseIdx].nama_fase}":\n(Berlaku untuk semua tahun)`, newPhases[phaseIdx].catatan_global || '');
-    if (note === null) return;
-    newPhases[phaseIdx].catatan_global = note;
-    await supabase.from('app_arsip_kategori').update({ template_fase: JSON.stringify(newPhases) }).eq('id', catId);
-    fetchData();
-  };
+
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
@@ -393,13 +405,14 @@ export default function ArsipKegiatanPage() {
                               <span className="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs shrink-0 mt-0.5">{pIdx + 1}</span>
                               <h3 className="font-black text-gray-800 mt-1">{phaseName}</h3>
                             </div>
-                            <div className="ml-9 group/global relative border-l-2 border-indigo-300 pl-2">
-                              <p className="text-[10px] text-indigo-900 leading-tight">
-                                <span className="font-bold text-indigo-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Global:</span>
-                                {phaseItem.catatan_global || <span className="text-indigo-500/50 italic">Belum ada catatan...</span>}
-                              </p>
-                              <button onClick={() => editGlobalNote(cat.id, pIdx, normalizedPhases)} className="absolute top-0 right-0 opacity-0 group-hover/global:opacity-100 bg-white/80 p-0.5 rounded text-indigo-600 hover:text-indigo-800 transition-all"><Edit2 size={10}/></button>
-                            </div>
+                            {phaseItem.catatan_global ? (
+                              <div className="ml-9 group/global relative border-l-2 border-indigo-300 pl-2">
+                                <p className="text-[10px] text-indigo-900 leading-tight">
+                                  <span className="font-bold text-indigo-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Global:</span>
+                                  {phaseItem.catatan_global}
+                                </p>
+                              </div>
+                            ) : null}
                           </td>
                           {selectedYears.map((y: number) => {
                             const arc = archives.find(a => a.tahun === y && a.kategori_id === selectedCatId);
@@ -657,11 +670,8 @@ export default function ArsipKegiatanPage() {
                                                   <span className="font-bold text-indigo-700 uppercase block mb-0.5 text-[9px] tracking-wider">Catatan Global:</span>
                                                   {globalNote}
                                                 </p>
-                                                <button onClick={(e) => { e.stopPropagation(); editGlobalNote(cat.id, pIdx, catTemplatePhases); }} className="absolute top-0 right-0 opacity-0 group-hover/note:opacity-100 bg-white/90 p-0.5 rounded text-indigo-600 hover:text-indigo-800 transition-all" title="Edit Catatan Global"><Edit2 size={10}/></button>
                                               </div>
-                                            ) : (
-                                              <button onClick={(e) => { e.stopPropagation(); editGlobalNote(cat.id, pIdx, catTemplatePhases); }} className="text-[9px] font-bold text-gray-400 hover:text-indigo-500 mb-3 border border-dashed border-gray-300 hover:border-indigo-300 rounded px-2 py-0.5 transition-colors block">+ Tambah Catatan Global</button>
-                                            )}
+                                            ) : null}
 
                                             <div className="group/phasenote relative border-l-2 border-amber-300 pl-2 pb-4 border-b border-gray-100">
                                               <p className="text-[10px] text-amber-900 leading-tight">
@@ -742,8 +752,8 @@ export default function ArsipKegiatanPage() {
                 
                 <div className="space-y-3">
                   {catForm.template_fase.map((faseObj, i) => (
-                    <div key={i} className="flex gap-2 items-center relative">
-                      <div className="flex flex-col gap-0.5 shrink-0">
+                    <div key={i} className="flex gap-2 items-start relative bg-white border border-gray-100 p-3 rounded-2xl shadow-sm">
+                      <div className="flex flex-col gap-0.5 shrink-0 mt-2">
                         <button type="button" onClick={() => {
                           if (i === 0) return;
                           const newTpl = [...catForm.template_fase];
@@ -761,19 +771,32 @@ export default function ArsipKegiatanPage() {
                           setCatForm({...catForm, template_fase: newTpl});
                         }} disabled={i === catForm.template_fase.length - 1} className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 p-0.5"><ChevronDown size={14} /></button>
                       </div>
-                      <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center font-black text-xs shrink-0">{i + 1}</span>
-                      <input 
-                        type="text" 
-                        value={faseObj.nama_fase} 
-                        onChange={e => {
-                          const newTpl = [...catForm.template_fase];
-                          newTpl[i].nama_fase = e.target.value;
-                          setCatForm({...catForm, template_fase: newTpl});
-                        }} 
-                        className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold" 
-                        placeholder="Nama dokumen/tahap..." 
-                      />
-                      <button type="button" onClick={() => setCatForm({...catForm, template_fase: catForm.template_fase.filter((_, idx) => idx !== i)})} className="text-gray-300 hover:text-rose-500 p-2"><X size={18}/></button>
+                      <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center font-black text-xs shrink-0 mt-1">{i + 1}</span>
+                      <div className="flex-1 space-y-2">
+                        <input 
+                          type="text" 
+                          value={faseObj.nama_fase} 
+                          onChange={e => {
+                            const newTpl = [...catForm.template_fase];
+                            newTpl[i].nama_fase = e.target.value;
+                            setCatForm({...catForm, template_fase: newTpl});
+                          }} 
+                          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold" 
+                          placeholder="Nama dokumen/tahap..." 
+                        />
+                        <textarea
+                          rows={2}
+                          value={faseObj.catatan_global || ''}
+                          onChange={e => {
+                            const newTpl = [...catForm.template_fase];
+                            newTpl[i].catatan_global = e.target.value;
+                            setCatForm({...catForm, template_fase: newTpl});
+                          }}
+                          className="w-full p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl outline-none focus:border-indigo-500 text-xs font-medium text-indigo-900 resize-none"
+                          placeholder="Catatan global opsional (berlaku untuk fase ini di semua tahun)..."
+                        ></textarea>
+                      </div>
+                      <button type="button" onClick={() => setCatForm({...catForm, template_fase: catForm.template_fase.filter((_, idx) => idx !== i)})} className="text-gray-300 hover:text-rose-500 p-2 mt-1"><X size={18}/></button>
                     </div>
                   ))}
                 </div>
