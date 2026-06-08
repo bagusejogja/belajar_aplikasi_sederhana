@@ -553,7 +553,13 @@ export default function ArsipKegiatanPage() {
                     </div>
                     
                     <div className="flex items-center gap-3">
-                      <button onClick={(e) => { e.stopPropagation(); setCatForm({ ...cat, template_fase: typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : cat.template_fase }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                      <button onClick={(e) => { 
+                        e.stopPropagation(); 
+                        const phases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
+                        const normalizedPhases = phases.map((p: any) => typeof p === 'string' ? { nama_fase: p, catatan_global: '' } : p);
+                        setCatForm({ ...cat, template_fase: normalizedPhases }); 
+                        setIsCatModalOpen(true); 
+                      }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
                       <button onClick={(e) => { e.stopPropagation(); handleCatDelete(cat.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
                       <div className="w-px h-6 bg-gray-300 mx-2"></div>
                       {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
