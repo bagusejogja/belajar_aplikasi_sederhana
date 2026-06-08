@@ -76,14 +76,14 @@ export default function ReportPhotoPage() {
            }
            return (
               <div key={idx} className="border border-gray-200 shadow-sm bg-white p-0.5 rounded inline-block mx-1 mb-2 overflow-hidden">
-                 <img 
-                    src={imgSrc} 
-                    alt="Lampiran" 
-                    className="h-20 w-auto object-contain max-w-full print:max-h-20" 
-                    style={{ imageRendering: '-webkit-optimize-contrast' }}
-                    onError={(e) => { 
-                       (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                    }} 
+                  <img 
+                     src={imgSrc} 
+                     alt="Lampiran" 
+                     className="max-w-full" 
+                     style={{ height: '80px', width: 'auto', objectFit: 'contain', imageRendering: '-webkit-optimize-contrast' }}
+                     onError={(e) => { 
+                        (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                     }} 
                  />
               </div>
            );
@@ -112,7 +112,12 @@ export default function ReportPhotoPage() {
                <button onClick={fetchReport} className="bg-amber-500 text-white hover:bg-amber-600 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
                   BUAT LAPORAN
                </button>
-               <button onClick={() => window.print()} className="bg-white text-indigo-600 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
+               <button onClick={() => {
+                  const originalTitle = document.title;
+                  document.title = `pengajuan kas kecil ${tglAwal.replace(/-/g, '_')}`;
+                  window.print();
+                  setTimeout(() => { document.title = originalTitle; }, 1000);
+               }} className="bg-white text-indigo-600 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
                   <Printer size={18}/> PDF
                </button>
             </div>
