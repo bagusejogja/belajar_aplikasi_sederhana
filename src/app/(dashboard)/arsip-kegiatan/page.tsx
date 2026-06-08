@@ -354,7 +354,6 @@ export default function ArsipKegiatanPage() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <button onClick={() => { setCatForm({ ...cat, template_fase: normalizedPhases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
-                    <button onClick={() => { handleCatDelete(cat.id); setSelectedCatId(null); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
                   </div>
                 </div>
 
@@ -560,7 +559,6 @@ export default function ArsipKegiatanPage() {
                         setCatForm({ ...cat, template_fase: normalizedPhases }); 
                         setIsCatModalOpen(true); 
                       }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
-                      <button onClick={(e) => { e.stopPropagation(); handleCatDelete(cat.id); }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors bg-white shadow-sm border border-rose-100"><Trash2 size={18}/></button>
                       <div className="w-px h-6 bg-gray-300 mx-2"></div>
                       {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
                     </div>
@@ -745,6 +743,24 @@ export default function ArsipKegiatanPage() {
                 <div className="space-y-3">
                   {catForm.template_fase.map((faseObj, i) => (
                     <div key={i} className="flex gap-2 items-center relative">
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button type="button" onClick={() => {
+                          if (i === 0) return;
+                          const newTpl = [...catForm.template_fase];
+                          const temp = newTpl[i - 1];
+                          newTpl[i - 1] = newTpl[i];
+                          newTpl[i] = temp;
+                          setCatForm({...catForm, template_fase: newTpl});
+                        }} disabled={i === 0} className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 p-0.5"><ChevronDown size={14} className="rotate-180" /></button>
+                        <button type="button" onClick={() => {
+                          if (i === catForm.template_fase.length - 1) return;
+                          const newTpl = [...catForm.template_fase];
+                          const temp = newTpl[i + 1];
+                          newTpl[i + 1] = newTpl[i];
+                          newTpl[i] = temp;
+                          setCatForm({...catForm, template_fase: newTpl});
+                        }} disabled={i === catForm.template_fase.length - 1} className="text-gray-400 hover:text-indigo-600 disabled:opacity-30 p-0.5"><ChevronDown size={14} /></button>
+                      </div>
                       <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center font-black text-xs shrink-0">{i + 1}</span>
                       <input 
                         type="text" 
