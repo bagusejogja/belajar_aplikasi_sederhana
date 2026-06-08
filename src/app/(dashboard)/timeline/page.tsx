@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Calendar, Plus, Search, Edit2, Trash2, CheckCircle, Clock, Save, X, User, FileText, ChevronRight, ChevronDown, AlertCircle } from 'lucide-react';
-import CreatableSelect from 'react-select/creatable';
+import { Calendar, Plus, Search, Edit2, Trash2, CheckCircle, Clock, Save, X, User, FileText, ChevronRight, ChevronDown, AlertCircle, Maximize2 } from 'lucide-react';
 
 export default function TimelinePage() {
   const [data, setData] = useState<any[]>([]);
@@ -34,6 +33,7 @@ export default function TimelinePage() {
     { value: 'bg-amber-500', label: 'Kuning Amber' },
     { value: 'bg-sky-500', label: 'Biru Langit' },
     { value: 'bg-purple-500', label: 'Ungu' },
+    { value: 'bg-slate-700', label: 'Abu Gelap' },
   ];
 
   useEffect(() => {
@@ -42,19 +42,23 @@ export default function TimelinePage() {
 
   const fetchData = async () => {
     setLoading(true);
-    // Fetch Timelines
     const { data: timelineData } = await supabase
       .from('app_timeline')
       .select('*')
       .order('tanggal_mulai', { ascending: true });
     
-    // Fetch PICs from gov_units
     const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
     
     if (timelineData) setData(timelineData);
     if (unitData) {
       const uniquePics = Array.from(new Set(unitData.map(u => u.pic).filter(p => p !== '-' && p.trim() !== '')));
       setPicOptions(uniquePics.map(p => ({ value: p, label: p })));
+    }
+    
+    // Auto expand all parents by default
+    if (timelineData) {
+      const parents = timelineData.filter(d => !d.parent_id).map(p => p.id);
+      setExpandedParents(parents);
     }
     setLoading(false);
   };
@@ -63,7 +67,7 @@ export default function TimelinePage() {
     e.preventDefault();
     const payload = {
       ...form,
-      pic: form.pic?.value || form.pic?.label || null
+      pic: form.pic || null
     };
 
     if (editingId) {
@@ -105,15 +109,15 @@ export default function TimelinePage() {
       parent_id: item.parent_id,
       tanggal_mulai: item.tanggal_mulai,
       tanggal_selesai: item.tanggal_selesai || '',
-      pic: item.pic ? { value: item.pic, label: item.pic } : null,
-      status: item.status || 'Belum Selesai',
+      pic: item.pic || '',
+      status: item.status,
       keterangan: item.keterangan || '',
       warna: item.warna || 'bg-indigo-500'
     });
     setIsModalOpen(true);
   };
 
-  // Organize Data (Parent -> Children)
+  // Organize Data for Gantt Chart
   const parents = data.filter(d => !d.parent_id);
   const filteredParents = parents.filter(p => 
     p.judul_kegiatan.toLowerCase().includes(search.toLowerCase()) || 
@@ -121,109 +125,83 @@ export default function TimelinePage() {
     data.some(c => c.parent_id === p.id && c.judul_kegiatan.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const calculateDeadlineInfo = (endDateStr: string, status: string) => {
-    if (!endDateStr || status === 'Selesai') return null;
-    const end = new Date(endDateStr).setHours(23, 59, 59, 999);
-    const now = new Date().getTime();
-    const diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  const rows: any[] = [];
+  filteredParents.forEach(p => {
+    rows.push({ ...p, isChild: false, parentColor: p.warna });
+    if (expandedParents.includes(p.id)) {
+      const children = data.filter(c => c.parent_id === p.id);
+      children.forEach(c => {
+        rows.push({ ...c, isChild: true, parentColor: p.warna });
+      });
+    }
+  });
+
+  // Gantt Chart Calculations
+  const DAY_WIDTH = 12; // Pixel per day
+  const getGanttExtents = () => {
+    if (data.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
     
-    if (diffDays < 0) return { text: `Terlambat ${Math.abs(diffDays)} hari!`, isLate: true };
-    if (diffDays === 0) return { text: 'Batas waktu hari ini!', isLate: false, isWarning: true };
-    if (diffDays <= 3) return { text: `Sisa ${diffDays} hari`, isLate: false, isWarning: true };
-    return { text: `Sisa ${diffDays} hari`, isLate: false };
+    let minT = new Date(data[0].tanggal_mulai).getTime();
+    let maxT = new Date(data[0].tanggal_selesai || data[0].tanggal_mulai).getTime();
+    data.forEach(d => {
+      const s = new Date(d.tanggal_mulai).getTime();
+      const e = new Date(d.tanggal_selesai || d.tanggal_mulai).getTime();
+      if (s < minT) minT = s;
+      if (e > maxT) maxT = e;
+    });
+
+    const minDate = new Date(minT);
+    minDate.setDate(1); // Set to 1st of the month
+    
+    const maxDate = new Date(maxT);
+    maxDate.setMonth(maxDate.getMonth() + 1, 0); // Set to last day of the month
+    
+    // Tambah padding 1 bulan ke kanan biar lega
+    maxDate.setDate(maxDate.getDate() + 30);
+
+    const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / (1000 * 3600 * 24)) + 1;
+
+    const months = [];
+    let curr = new Date(minDate);
+    while (curr <= maxDate) {
+      const y = curr.getFullYear();
+      const m = curr.getMonth();
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      months.push({
+        label: curr.toLocaleString('id-ID', { month: 'short' }) + ' ' + y,
+        days: daysInMonth
+      });
+      curr.setMonth(m + 1);
+    }
+
+    return { minDate, maxDate, totalDays, months };
   };
 
-  const renderTimelineCard = (item: any, isChild = false) => {
-    const deadline = calculateDeadlineInfo(item.tanggal_selesai, item.status);
-    const children = data.filter(d => d.parent_id === item.id);
-    const hasChildren = children.length > 0;
-    const isExpanded = expandedParents.includes(item.id);
+  const { minDate, totalDays, months } = getGanttExtents();
+  const timelineWidth = totalDays * DAY_WIDTH;
 
-    return (
-      <div key={item.id} className={`relative ${isChild ? 'ml-8 md:ml-12 mt-4' : 'pl-8 md:pl-10 mt-8 group'}`}>
-        {/* Dot Timeline */}
-        {!isChild && (
-          <div className={`absolute -left-[14px] top-6 w-6 h-6 rounded-full border-4 border-white ${item.warna || 'bg-indigo-500'} shadow-md z-10`}></div>
-        )}
-        {isChild && (
-           <div className="absolute -left-[18px] top-8 w-4 h-4 rounded-full border-[3px] border-white bg-gray-300 shadow-sm z-10"></div>
-        )}
-        
-        <div className={`bg-white border transition-all rounded-2xl overflow-hidden ${isChild ? 'border-gray-100 shadow-sm' : 'border-gray-200 shadow-md hover:shadow-lg'}`}>
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-              <div className="flex items-start gap-3">
-                {!isChild && hasChildren && (
-                  <button onClick={() => toggleExpand(item.id)} className="mt-1 p-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-500">
-                    {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  </button>
-                )}
-                <div>
-                  <h3 className={`font-black text-gray-800 flex items-center gap-2 ${isChild ? 'text-lg' : 'text-xl'}`}>
-                    {item.judul_kegiatan}
-                  </h3>
-                  
-                  <div className="flex flex-wrap items-center gap-3 mt-2">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 uppercase tracking-widest">
-                      <Clock size={12} className="text-indigo-500" />
-                      {new Date(item.tanggal_mulai).toLocaleDateString('id-ID')} {item.tanggal_selesai && ` - ${new Date(item.tanggal_selesai).toLocaleDateString('id-ID')}`}
-                    </div>
-                    {item.pic && (
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 uppercase tracking-widest">
-                        <User size={12} className="text-sky-500" />
-                        PIC: <span className="text-gray-800">{item.pic}</span>
-                      </div>
-                    )}
-                    {deadline && (
-                      <div className={`flex items-center gap-1.5 text-[11px] font-black px-2 py-1 rounded-md uppercase tracking-widest border shadow-sm ${deadline.isLate ? 'bg-rose-50 text-rose-600 border-rose-200' : deadline.isWarning ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                        {deadline.isLate ? <AlertCircle size={12} /> : <Clock size={12} />}
-                        {deadline.text}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => toggleStatus(item.id, item.status)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${item.status === 'Selesai' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100' : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-gray-200'}`}
-                >
-                  {item.status === 'Selesai' ? <CheckCircle size={14} /> : <Clock size={14} />}
-                  {item.status}
-                </button>
-                <button onClick={() => openEdit(item)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={16} /></button>
-                <button onClick={() => handleDelete(item.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 size={16} /></button>
-              </div>
-            </div>
-            
-            {item.keterangan && (
-              <div className="mt-3 pt-3 border-t border-gray-50 flex items-start gap-2 text-gray-600 text-sm">
-                <FileText size={16} className="mt-0.5 text-gray-400 shrink-0" />
-                <p className="font-medium whitespace-pre-wrap">{item.keterangan}</p>
-              </div>
-            )}
-          </div>
-          
-          {/* Sub-Kegiatan (Children) */}
-          {!isChild && hasChildren && isExpanded && (
-            <div className="bg-gray-50/50 p-4 border-t border-gray-100 relative">
-              <div className="absolute left-8 top-0 bottom-4 w-px bg-gray-200"></div>
-              {children.map(child => renderTimelineCard(child, true))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const getPosition = (dateStr: string) => {
+    if (!dateStr) return 0;
+    const d = new Date(dateStr).getTime();
+    const diff = Math.floor((d - minDate.getTime()) / (1000 * 3600 * 24));
+    return diff * DAY_WIDTH;
+  };
+
+  const getWidth = (startStr: string, endStr: string) => {
+    if (!startStr) return 0;
+    const s = new Date(startStr).getTime();
+    const e = endStr ? new Date(endStr).getTime() : s;
+    const diff = Math.max(1, Math.ceil((e - s) / (1000 * 3600 * 24)));
+    return diff * DAY_WIDTH;
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20">
+    <div className="max-w-screen-2xl mx-auto space-y-6 pb-20">
       {/* Header */}
       <div className="bg-gradient-to-br from-indigo-800 to-sky-700 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
-          <h1 className="text-3xl font-black flex items-center gap-3"><Calendar size={32} /> Timeline Kegiatan</h1>
-          <p className="text-indigo-100 font-medium mt-2">Pantau jadwal Induk & Sub-Kegiatan, PIC, dan peringatan batas waktu.</p>
+          <h1 className="text-3xl font-black flex items-center gap-3"><Calendar size={32} /> Gantt Chart Kegiatan</h1>
+          <p className="text-indigo-100 font-medium mt-2">Pantau jadwal Induk & Sub-Kegiatan dalam bentuk Gantt Chart interaktif.</p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
@@ -247,17 +225,105 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      {/* Timeline View */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 min-h-[400px]">
+      {/* Gantt Chart View */}
+      <div className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden min-h-[500px] flex flex-col">
         {loading ? (
-          <div className="flex justify-center items-center h-40">
+          <div className="flex justify-center items-center h-40 flex-1">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : filteredParents.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 font-bold italic">Belum ada timeline kegiatan yang ditambahkan.</div>
+          <div className="text-center py-20 text-gray-400 font-bold italic flex-1 flex items-center justify-center">
+            Belum ada timeline kegiatan yang ditambahkan.
+          </div>
         ) : (
-          <div className="relative border-l-4 border-gray-100 ml-4 pb-4">
-            {filteredParents.map(parent => renderTimelineCard(parent, false))}
+          <div className="flex flex-1 relative">
+             {/* Left Panel (Daftar Kegiatan) */}
+             <div className="w-80 md:w-96 shrink-0 border-r border-gray-200 bg-white z-20 flex flex-col relative shadow-[2px_0_10px_rgba(0,0,0,0.03)]">
+                <div className="h-16 flex items-center px-4 font-black text-gray-800 text-sm border-b-2 border-gray-100 bg-gray-50 sticky top-0 z-30 shadow-sm">
+                   Daftar Kegiatan
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
+                   {rows.map((r, idx) => {
+                      const hasChildren = data.some(d => d.parent_id === r.id);
+                      return (
+                         <div key={r.id} className={`h-[52px] px-4 flex justify-between items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group ${r.isChild ? 'bg-white' : 'bg-gray-50/30'}`}>
+                            <div className={`flex items-center gap-2 truncate ${r.isChild ? 'pl-8' : ''}`}>
+                               {!r.isChild && (
+                                  <button onClick={() => toggleExpand(r.id)} className={`p-1 rounded hover:bg-gray-200 text-gray-500 ${!hasChildren ? 'invisible' : ''}`}>
+                                     {expandedParents.includes(r.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+                                  </button>
+                               )}
+                               {r.isChild && <div className="w-2 h-2 rounded-full border-2 border-gray-300 ml-1"></div>}
+                               <span className={`truncate ${r.isChild ? 'text-sm text-gray-600 font-medium' : 'text-sm font-black text-gray-800'}`} title={r.judul_kegiatan}>
+                                  {r.judul_kegiatan}
+                               </span>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={14}/></button>
+                               <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                            </div>
+                         </div>
+                      );
+                   })}
+                </div>
+             </div>
+
+             {/* Right Panel (Gantt Grid) */}
+             <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white">
+                <div style={{ width: `${timelineWidth}px` }} className="relative h-full">
+                   {/* Header Bulan */}
+                   <div className="h-16 border-b-2 border-gray-100 bg-gray-50 flex sticky top-0 z-10 shadow-sm">
+                      {months.map(m => (
+                         <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-200 flex flex-col justify-center items-center shrink-0">
+                            <span className="text-[11px] font-black text-gray-600 uppercase tracking-widest">{m.label}</span>
+                         </div>
+                      ))}
+                   </div>
+                   
+                   {/* Garis Vertikal Grid */}
+                   <div className="absolute top-16 bottom-0 left-0 right-0 flex pointer-events-none z-0">
+                      {months.map(m => (
+                         <div key={'grid'+m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-100 border-dashed h-full shrink-0"></div>
+                      ))}
+                   </div>
+
+                   {/* Container Bar Gantt */}
+                   <div className="absolute top-16 left-0 right-0 z-10 pointer-events-none">
+                      {rows.map((r, idx) => {
+                         const left = getPosition(r.tanggal_mulai);
+                         const width = getWidth(r.tanggal_mulai, r.tanggal_selesai);
+                         const top = idx * 52; // Sama dengan h-[52px] row di panel kiri
+                         
+                         const formatDate = (dateStr: string) => {
+                           if (!dateStr) return '';
+                           const d = new Date(dateStr);
+                           return `${d.getDate()} ${d.toLocaleString('id-ID', {month:'short'})}`;
+                         };
+
+                         return (
+                            <div key={r.id} className="absolute h-[52px] flex items-center w-full pointer-events-none" style={{ top: `${top}px` }}>
+                               <div 
+                                  style={{ left: `${left}px`, width: `${width}px` }} 
+                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-2 truncate cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-85 h-6 rounded-sm' : ''}`}
+                               >
+                                  <span className="truncate text-[10px] font-bold text-white/90 mr-2 whitespace-nowrap">{r.judul_kegiatan}</span>
+                                  <span className="text-[9px] font-black text-white/70 whitespace-nowrap shrink-0">{formatDate(r.tanggal_mulai)} {r.tanggal_selesai && `- ${formatDate(r.tanggal_selesai)}`}</span>
+                                  
+                                  {/* Tooltip Hover */}
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-normal break-words">
+                                    <p className="font-bold text-[13px] mb-1">{r.judul_kegiatan}</p>
+                                    <p className="text-gray-300">Waktu: {r.tanggal_mulai} s/d {r.tanggal_selesai || '-'}</p>
+                                    <p className="text-gray-300">PIC: {r.pic || '-'}</p>
+                                    <p className="text-gray-300">Status: {r.status}</p>
+                                    {r.keterangan && <p className="text-gray-400 mt-2 italic border-t border-gray-700 pt-1">{r.keterangan}</p>}
+                                  </div>
+                               </div>
+                            </div>
+                         );
+                      })}
+                   </div>
+                </div>
+             </div>
           </div>
         )}
       </div>
@@ -295,46 +361,37 @@ export default function TimelinePage() {
               
               {!form.parent_id && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Warna Identitas (Khusus Induk)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Warna Bar Kegiatan</label>
                   <div className="flex flex-wrap gap-3">
                     {warnaOptions.map(w => (
-                      <label key={w.value} className="cursor-pointer">
-                        <input type="radio" name="warna" value={w.value} checked={form.warna === w.value} onChange={() => setForm({...form, warna: w.value})} className="peer hidden" />
-                        <div className={`w-10 h-10 rounded-full border-4 border-white shadow-sm peer-checked:scale-110 peer-checked:shadow-md transition-transform ${w.value}`}></div>
+                      <label key={w.value} className={`cursor-pointer px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm ${form.warna === w.value ? 'border-gray-800 shadow-md ring-2 ring-gray-200' : 'border-transparent hover:bg-gray-100'}`}>
+                        <input type="radio" name="warna" value={w.value} checked={form.warna === w.value} onChange={() => setForm({...form, warna: w.value})} className="hidden" />
+                        <div className={`w-4 h-4 rounded-full ${w.value} border border-black/10`}></div>
+                        <span className={form.warna === w.value ? 'text-gray-900' : 'text-gray-500'}>{w.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Mulai *</label>
-                  <input required type="date" value={form.tanggal_mulai} onChange={e => setForm({...form, tanggal_mulai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold text-gray-700" />
+                  <input required type="date" value={form.tanggal_mulai} onChange={e => setForm({...form, tanggal_mulai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Selesai (Batas Akhir)</label>
-                  <input type="date" value={form.tanggal_selesai} onChange={e => setForm({...form, tanggal_selesai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold text-gray-700" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Selesai</label>
+                  <input type="date" value={form.tanggal_selesai} onChange={e => setForm({...form, tanggal_selesai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">PIC (Penanggung Jawab)</label>
-                  <CreatableSelect
-                    isClearable
-                    options={picOptions}
-                    value={form.pic}
-                    onChange={(val) => setForm({...form, pic: val})}
-                    placeholder="Pilih atau ketik nama PIC..."
-                    formatCreateLabel={(inputValue) => `Buat PIC baru: "${inputValue}"`}
-                    styles={{
-                      control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
-                    }}
-                  />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Penanggung Jawab (PIC)</label>
+                  <input type="text" value={form.pic} onChange={e => setForm({...form, pic: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" placeholder="Opsional" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status Penyelesaian</label>
                   <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-bold text-gray-700 cursor-pointer">
                     <option value="Belum Selesai">⏳ Belum Selesai</option>
                     <option value="Selesai">✅ Selesai</option>
@@ -343,14 +400,14 @@ export default function TimelinePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Catatan Tambahan</label>
-                <textarea value={form.keterangan} onChange={e => setForm({...form, keterangan: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium h-24 resize-none text-gray-700" placeholder="Catatan peringatan, hasil rapat, dll..." />
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Keterangan / Catatan Tambahan</label>
+                <textarea rows={3} value={form.keterangan} onChange={e => setForm({...form, keterangan: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" placeholder="Tuliskan catatan opsional jika ada..."></textarea>
               </div>
 
-              <div className="pt-6 mt-6 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">Batal</button>
-                <button type="submit" className="px-8 py-3 font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200">
-                  <Save size={18} /> SIMPAN DATA
+              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Batal</button>
+                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black transition-transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2">
+                  <Save size={18} /> {editingId ? 'SIMPAN PERUBAHAN' : 'TAMBAHKAN TIMELINE'}
                 </button>
               </div>
             </form>
