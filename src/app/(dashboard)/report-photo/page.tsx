@@ -21,8 +21,8 @@ const CompressedImage = ({ src, alt, className, style }: any) => {
     img.crossOrigin = 'Anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX_WIDTH = 300;
-      const MAX_HEIGHT = 300;
+      const MAX_WIDTH = 400;
+      const MAX_HEIGHT = 400;
       let width = img.width;
       let height = img.height;
 
@@ -135,7 +135,7 @@ export default function ReportPhotoPage() {
                      src={imgSrc} 
                      alt="Lampiran" 
                      className="max-w-full" 
-                     style={{ height: '80px', width: 'auto', objectFit: 'contain', imageRendering: '-webkit-optimize-contrast' }}
+                     style={{ height: '140px', width: 'auto', objectFit: 'contain', imageRendering: '-webkit-optimize-contrast' }}
                   />
                </div>
             );
