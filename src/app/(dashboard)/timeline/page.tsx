@@ -127,9 +127,28 @@ export default function TimelinePage() {
 
   const rows: any[] = [];
   filteredParents.forEach(p => {
-    rows.push({ ...p, isChild: false, parentColor: p.warna });
+    const children = data.filter(c => c.parent_id === p.id);
+    const hasChildren = children.length > 0;
+    
+    let minT = new Date(p.tanggal_mulai).getTime();
+    let maxT = new Date(p.tanggal_selesai || p.tanggal_mulai).getTime();
+    
+    if (hasChildren) {
+       minT = Math.min(...children.map(c => new Date(c.tanggal_mulai).getTime()));
+       maxT = Math.max(...children.map(c => new Date(c.tanggal_selesai || c.tanggal_mulai).getTime()));
+    }
+    
+    const pMod = { 
+       ...p, 
+       tanggal_mulai: new Date(minT).toISOString().split('T')[0],
+       tanggal_selesai: new Date(maxT).toISOString().split('T')[0],
+       isChild: false, 
+       parentColor: p.warna,
+       hasChildren 
+    };
+    rows.push(pMod);
+    
     if (expandedParents.includes(p.id)) {
-      const children = data.filter(c => c.parent_id === p.id);
       children.forEach(c => {
         rows.push({ ...c, isChild: true, parentColor: p.warna });
       });
@@ -137,7 +156,7 @@ export default function TimelinePage() {
   });
 
   // Gantt Chart Calculations
-  const DAY_WIDTH = 12; // Pixel per day
+  const DAY_WIDTH = 24; // Pixel per day
   const getGanttExtents = () => {
     if (data.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
     
@@ -154,10 +173,8 @@ export default function TimelinePage() {
     minDate.setDate(1); // Set to 1st of the month
     
     const maxDate = new Date(maxT);
-    maxDate.setMonth(maxDate.getMonth() + 1, 0); // Set to last day of the month
-    
-    // Tambah padding 1 bulan ke kanan biar lega
-    maxDate.setDate(maxDate.getDate() + 30);
+    maxDate.setDate(maxDate.getDate() + 30); // Tambah padding 1 bulan ke kanan biar lega
+    maxDate.setMonth(maxDate.getMonth() + 1, 0); // Set to last day of that month
 
     const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / (1000 * 3600 * 24)) + 1;
 
@@ -167,9 +184,20 @@ export default function TimelinePage() {
       const y = curr.getFullYear();
       const m = curr.getMonth();
       const daysInMonth = new Date(y, m + 1, 0).getDate();
+      
+      const daysArray = [];
+      for(let d = 1; d <= daysInMonth; d++) {
+         const dateObj = new Date(y, m, d);
+         if (dateObj > maxDate) break;
+         const dayOfWeek = dateObj.getDay();
+         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+         daysArray.push({ date: d, isWeekend, fullDate: dateObj });
+      }
+
       months.push({
-        label: curr.toLocaleString('id-ID', { month: 'short' }) + ' ' + y,
-        days: daysInMonth
+        label: curr.toLocaleString('id-ID', { month: 'long' }) + ' ' + y,
+        days: daysArray.length,
+        daysArray
       });
       curr.setMonth(m + 1);
     }
@@ -272,19 +300,37 @@ export default function TimelinePage() {
              <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white">
                 <div style={{ width: `${timelineWidth}px` }} className="relative h-full">
                    {/* Header Bulan */}
-                   <div className="h-16 border-b-2 border-gray-100 bg-gray-50 flex sticky top-0 z-10 shadow-sm">
+                   <div className="h-8 border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
                       {months.map(m => (
-                         <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-200 flex flex-col justify-center items-center shrink-0">
-                            <span className="text-[11px] font-black text-gray-600 uppercase tracking-widest">{m.label}</span>
+                         <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-gray-100">
+                            <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{m.label}</span>
                          </div>
+                      ))}
+                   </div>
+                   
+                   {/* Header Tanggal */}
+                   <div className="h-8 border-b-2 border-gray-200 bg-white flex sticky top-8 z-20 shadow-sm">
+                      {months.map(m => (
+                         m.daysArray.map((d: any, i: number) => (
+                            <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
+                               <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-500' : 'text-gray-500'}`}>{d.date}</span>
+                            </div>
+                         ))
                       ))}
                    </div>
                    
                    {/* Garis Vertikal Grid */}
                    <div className="absolute top-16 bottom-0 left-0 right-0 flex pointer-events-none z-0">
                       {months.map(m => (
-                         <div key={'grid'+m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-100 border-dashed h-full shrink-0"></div>
+                         m.daysArray.map((d: any, i: number) => (
+                            <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
+                         ))
                       ))}
+                   </div>
+                   
+                   {/* Garis Hari Ini */}
+                   <div className="absolute top-16 bottom-0 w-[2px] bg-sky-500/60 pointer-events-none z-10" style={{ left: `${getPosition(new Date().toISOString())}px` }}>
+                     <div className="absolute top-0 -translate-x-1/2 -translate-y-full bg-sky-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-t">HARI INI</div>
                    </div>
 
                    {/* Container Bar Gantt */}
@@ -299,15 +345,20 @@ export default function TimelinePage() {
                            const d = new Date(dateStr);
                            return `${d.getDate()} ${d.toLocaleString('id-ID', {month:'short'})}`;
                          };
+                         
+                         const isPast = new Date(r.tanggal_selesai || r.tanggal_mulai) < new Date(new Date().setHours(0,0,0,0));
+                         const isOverdue = isPast && r.status !== 'Selesai';
+                         const bgStyle = isOverdue ? { backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 10px, transparent 10px, transparent 20px)' } : {};
 
                          return (
                             <div key={r.id} className="absolute h-[52px] flex items-center w-full pointer-events-none" style={{ top: `${top}px` }}>
                                <div 
-                                  style={{ left: `${left}px`, width: `${width}px` }} 
-                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-2 truncate cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-85 h-6 rounded-sm' : ''}`}
+                                  onClick={() => openEdit(r)}
+                                  style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
+                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 truncate cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
-                                  <span className="truncate text-[10px] font-bold text-white/90 mr-2 whitespace-nowrap">{r.judul_kegiatan}</span>
-                                  <span className="text-[9px] font-black text-white/70 whitespace-nowrap shrink-0">{formatDate(r.tanggal_mulai)} {r.tanggal_selesai && `- ${formatDate(r.tanggal_selesai)}`}</span>
+                                  <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md">{r.judul_kegiatan}</span>
+                                  <span className="text-[9px] font-black text-white/90 whitespace-nowrap shrink-0 drop-shadow-md">{formatDate(r.tanggal_mulai)} {r.tanggal_selesai && r.tanggal_selesai !== r.tanggal_mulai ? `- ${formatDate(r.tanggal_selesai)}` : ''}</span>
                                   
                                   {/* Tooltip Hover */}
                                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-normal break-words">
@@ -315,7 +366,9 @@ export default function TimelinePage() {
                                     <p className="text-gray-300">Waktu: {r.tanggal_mulai} s/d {r.tanggal_selesai || '-'}</p>
                                     <p className="text-gray-300">PIC: {r.pic || '-'}</p>
                                     <p className="text-gray-300">Status: {r.status}</p>
+                                    {isOverdue && <p className="text-rose-400 font-bold mt-1">⚠️ Terlewat (Overdue)</p>}
                                     {r.keterangan && <p className="text-gray-400 mt-2 italic border-t border-gray-700 pt-1">{r.keterangan}</p>}
+                                    <p className="text-sky-300 text-[10px] mt-2 italic font-bold">Klik balok ini untuk mengedit</p>
                                   </div>
                                </div>
                             </div>
@@ -376,12 +429,12 @@ export default function TimelinePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Mulai *</label>
-                  <input required type="date" value={form.tanggal_mulai} onChange={e => setForm({...form, tanggal_mulai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Mulai * {(!form.parent_id && data.some(d => d.parent_id === editingId)) ? <span className="text-rose-500 normal-case">(Otomatis dari anak)</span> : ''}</label>
+                  <input required type="date" value={form.tanggal_mulai} onChange={e => setForm({...form, tanggal_mulai: e.target.value})} disabled={!form.parent_id && data.some(d => d.parent_id === editingId)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700 disabled:opacity-50" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Selesai</label>
-                  <input type="date" value={form.tanggal_selesai || ''} onChange={e => setForm({...form, tanggal_selesai: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" />
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Selesai {(!form.parent_id && data.some(d => d.parent_id === editingId)) ? <span className="text-rose-500 normal-case">(Otomatis dari anak)</span> : ''}</label>
+                  <input type="date" value={form.tanggal_selesai || ''} onChange={e => setForm({...form, tanggal_selesai: e.target.value})} disabled={!form.parent_id && data.some(d => d.parent_id === editingId)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700 disabled:opacity-50" />
                 </div>
               </div>
 
