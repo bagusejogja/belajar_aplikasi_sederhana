@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import Select from 'react-select';
 import { 
   Calendar, Search, ChevronRight, ChevronDown, CheckCircle, Plus, LayoutGrid, Clock, Tag, X, Edit2, Download, User, FileText, AlertCircle, Maximize2, Trash2, Save 
 } from 'lucide-react';
@@ -13,6 +14,7 @@ export default function TimelinePage() {
   const [search, setSearch] = useState('');
   
   const [expandedParents, setExpandedParents] = useState<number[]>([]);
+  const ganttScrollRef = useRef<HTMLDivElement>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,23 +60,24 @@ export default function TimelinePage() {
       .select('*')
       .order('tanggal_mulai', { ascending: true });
     
-    const { data: picData, error: picError } = await supabase.from('ref_pic').select('*');
-    if (timelineData) setData(timelineData);
+    let allPics: string[] = [];
     
+    const { data: picData, error: picError } = await supabase.from('ref_pic').select('*');
     if (!picError && picData && picData.length > 0) {
-      const uniquePics = Array.from(new Set(picData.map(u => u.pic || u.nama || u.nama_pic || u.name).filter(p => p && p !== '-' && p.trim() !== '')));
-      setPicOptions(uniquePics.map((p: any) => ({ value: p, label: p })));
-    } else {
-      const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
-      if (unitData) {
-        const uniquePics = Array.from(new Set(unitData.map(u => u.pic).filter(p => p !== '-' && p.trim() !== '')));
-        setPicOptions(uniquePics.map(p => ({ value: p, label: p })));
-      }
+      allPics = [...allPics, ...picData.map(u => u.pic || u.nama || u.nama_pic || u.name)];
     }
     
-    // Auto expand all parents by default
+    const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
+    if (unitData) {
+      allPics = [...allPics, ...unitData.map(u => u.pic)];
+    }
+
+    const uniquePics = Array.from(new Set(allPics.filter(p => p && p !== '-' && p.trim() !== '')));
+    setPicOptions(uniquePics.map((p: any) => ({ value: p, label: p })));
+    
     if (timelineData) {
-      const parents = timelineData.filter(d => !d.parent_id).map(p => p.id);
+      setData(timelineData);
+      const parents = timelineData.filter(d => !d.parent_id).map(d => d.id);
       setExpandedParents(parents);
     }
     setLoading(false);
@@ -277,6 +280,18 @@ export default function TimelinePage() {
     return diff * DAY_WIDTH;
   };
 
+  useEffect(() => {
+    if (ganttScrollRef.current && data.length > 0) {
+      const timer = setTimeout(() => {
+        if (ganttScrollRef.current) {
+          const todayLeft = getPosition(new Date().toISOString());
+          ganttScrollRef.current.scrollLeft = todayLeft - ganttScrollRef.current.clientWidth / 2;
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [data, minDate]);
+
   const handleExportWord = () => {
     if (rows.length === 0) return alert('Tidak ada data untuk di-export');
     
@@ -323,7 +338,13 @@ export default function TimelinePage() {
     
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Timeline Export</title></head>
+      <head>
+        <meta charset='utf-8'>
+        <title>Timeline Export</title>
+        <style>
+          @page { size: landscape; margin: 1cm; }
+        </style>
+      </head>
       <body>
         <h2 style="font-family: sans-serif;">Gantt Chart Kegiatan (Rekap per Pekan)</h2>
         ${tableHtml}
@@ -423,7 +444,7 @@ export default function TimelinePage() {
              </div>
 
              {/* Right Panel (Gantt Grid) */}
-             <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white">
+             <div ref={ganttScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white scroll-smooth">
                 <div style={{ width: `${timelineWidth}px` }} className="relative h-full pb-64">
                    {/* Header Bulan */}
                    <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
@@ -497,9 +518,9 @@ export default function TimelinePage() {
                                      style={{ 
                                         left: `${realisasiLeft}px`, 
                                         width: `${realisasiWidth}px`,
-                                        top: '36px'
+                                        top: '26px'
                                      }} 
-                                     className="absolute h-2 bg-emerald-500/80 rounded-full shadow-sm z-0"
+                                     className="absolute h-[14px] bg-emerald-400 border border-white/50 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.3)] z-30 pointer-events-none"
                                      title={`Realisasi: ${r.tanggal_dikerjakan_mulai} s/d ${r.tanggal_dikerjakan_selesai || '-'}`}
                                   ></div>
                                )}
@@ -581,11 +602,10 @@ export default function TimelinePage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Warna Bar Kegiatan</label>
                   <div className="flex flex-wrap gap-3">
                     {warnaOptions.map(w => (
-                      <label key={w.value} className={`cursor-pointer px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm ${form.warna === w.value ? 'border-gray-800 shadow-md ring-2 ring-gray-200' : 'border-transparent hover:bg-gray-100'}`}>
-                        <input type="radio" name="warna" value={w.value} checked={form.warna === w.value} onChange={() => setForm({...form, warna: w.value})} className="hidden" />
+                      <button type="button" key={w.value} onClick={() => setForm({...form, warna: w.value})} className={`cursor-pointer px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm outline-none ${form.warna === w.value ? 'border-gray-800 shadow-md ring-2 ring-gray-200' : 'border-transparent hover:bg-gray-100'}`}>
                         <div className={`w-4 h-4 rounded-full ${w.value} border border-black/10`}></div>
                         <span className={form.warna === w.value ? 'text-gray-900' : 'text-gray-500'}>{w.label}</span>
-                      </label>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -624,7 +644,16 @@ export default function TimelinePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Penanggung Jawab (PIC)</label>
-                  <input type="text" value={form.pic || ''} onChange={e => setForm({...form, pic: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" placeholder="Opsional" />
+                  <Select 
+                    options={picOptions} 
+                    value={picOptions.find(p => p.value === form.pic) || null}
+                    onChange={(val: any) => setForm({...form, pic: val ? val.value : ''})}
+                    placeholder="Pilih PIC..."
+                    isClearable
+                    styles={{
+                      control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', fontWeight: 500, color: '#374151' }),
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status Penyelesaian</label>
