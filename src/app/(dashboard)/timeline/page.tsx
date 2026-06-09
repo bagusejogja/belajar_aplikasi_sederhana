@@ -40,14 +40,19 @@ export default function TimelinePage() {
   }, [form.tanggal_dikerjakan_mulai, form.tanggal_dikerjakan_selesai]);
 
   const warnaOptions = [
-    { value: 'bg-indigo-500', label: 'Biru Indigo' },
-    { value: 'bg-emerald-500', label: 'Hijau Emerald' },
-    { value: 'bg-rose-500', label: 'Merah Rose' },
-    { value: 'bg-amber-500', label: 'Kuning Amber' },
-    { value: 'bg-sky-500', label: 'Biru Langit' },
-    { value: 'bg-purple-500', label: 'Ungu' },
-    { value: 'bg-slate-700', label: 'Abu Gelap' },
+    { value: 'bg-indigo-500', label: 'Biru Indigo', hex: '#6366f1' },
+    { value: 'bg-emerald-500', label: 'Hijau Emerald', hex: '#10b981' },
+    { value: 'bg-rose-500', label: 'Merah Rose', hex: '#f43f5e' },
+    { value: 'bg-amber-500', label: 'Kuning Amber', hex: '#f59e0b' },
+    { value: 'bg-sky-500', label: 'Biru Langit', hex: '#0ea5e9' },
+    { value: 'bg-purple-500', label: 'Ungu', hex: '#a855f7' },
+    { value: 'bg-slate-700', label: 'Abu Gelap', hex: '#334155' },
   ];
+
+  const getColorHex = (val: string) => {
+    const opt = warnaOptions.find(w => w.value === val);
+    return opt ? opt.hex : '#6366f1';
+  };
 
   useEffect(() => {
     fetchData();
@@ -518,16 +523,17 @@ export default function TimelinePage() {
                                      style={{ 
                                         left: `${realisasiLeft}px`, 
                                         width: `${realisasiWidth}px`,
-                                        top: '34px'
+                                        top: '34px',
+                                        backgroundColor: '#34d399'
                                      }} 
-                                     className="absolute h-2 bg-emerald-400 border border-white/50 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.3)] z-30 pointer-events-none"
+                                     className="absolute h-2 border border-white/50 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.3)] z-30 pointer-events-none"
                                      title={`Realisasi: ${r.tanggal_dikerjakan_mulai} s/d ${r.tanggal_dikerjakan_selesai || '-'}`}
                                   ></div>
                                )}
                                <div 
                                   onClick={() => openEdit(r)}
-                                  style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
-                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.isChild && r.warna !== 'bg-indigo-500' ? r.warna : (r.parentColor || r.warna || 'bg-indigo-500')} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
+                                  style={{ left: `${left}px`, width: `${width}px`, backgroundColor: getColorHex(r.isChild && r.warna !== 'bg-indigo-500' ? r.warna : (r.parentColor || r.warna || 'bg-indigo-500')), ...bgStyle }} 
+                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
                                   <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
                                     {r.status === 'Selesai' && <CheckCircle size={10} className="text-emerald-300 shrink-0" />}
@@ -602,8 +608,8 @@ export default function TimelinePage() {
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Warna Bar Kegiatan</label>
                   <div className="flex flex-wrap gap-3">
                     {warnaOptions.map(w => (
-                      <button type="button" key={w.value} onClick={() => setForm({...form, warna: w.value})} className={`cursor-pointer px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm outline-none ${form.warna === w.value ? 'border-gray-800 shadow-md ring-2 ring-gray-200' : 'border-transparent hover:bg-gray-100'}`}>
-                        <div className={`w-4 h-4 rounded-full ${w.value} border border-black/10`}></div>
+                      <button type="button" key={w.value} onClick={() => setForm({...form, warna: w.value})} className={`cursor-pointer px-4 py-2 rounded-xl border-2 transition-all flex items-center gap-2 font-bold text-sm outline-none ${form.warna === w.value ? 'border-gray-800 shadow-md ring-2 ring-gray-200 bg-gray-50' : 'border-transparent hover:bg-gray-100'}`}>
+                        <div style={{ backgroundColor: w.hex }} className={`w-4 h-4 rounded-full border border-black/10`}></div>
                         <span className={form.warna === w.value ? 'text-gray-900' : 'text-gray-500'}>{w.label}</span>
                       </button>
                     ))}
