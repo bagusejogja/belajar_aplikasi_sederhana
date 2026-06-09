@@ -518,16 +518,16 @@ export default function TimelinePage() {
                                      style={{ 
                                         left: `${realisasiLeft}px`, 
                                         width: `${realisasiWidth}px`,
-                                        top: '26px'
+                                        top: '34px'
                                      }} 
-                                     className="absolute h-[14px] bg-emerald-400 border border-white/50 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.3)] z-30 pointer-events-none"
+                                     className="absolute h-2 bg-emerald-400 border border-white/50 rounded-full shadow-[0_2px_4px_rgba(0,0,0,0.3)] z-30 pointer-events-none"
                                      title={`Realisasi: ${r.tanggal_dikerjakan_mulai} s/d ${r.tanggal_dikerjakan_selesai || '-'}`}
                                   ></div>
                                )}
                                <div 
                                   onClick={() => openEdit(r)}
                                   style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
-                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
+                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.isChild && r.warna !== 'bg-indigo-500' ? r.warna : (r.parentColor || r.warna || 'bg-indigo-500')} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
                                   <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
                                     {r.status === 'Selesai' && <CheckCircle size={10} className="text-emerald-300 shrink-0" />}
@@ -597,8 +597,8 @@ export default function TimelinePage() {
                 <input required type="text" value={form.judul_kegiatan} onChange={e => setForm({...form, judul_kegiatan: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-black text-gray-800" placeholder="Misal: Rapat Anggaran..." />
               </div>
               
-              {!form.parent_id && (
-                <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="col-span-full">
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Warna Bar Kegiatan</label>
                   <div className="flex flex-wrap gap-3">
                     {warnaOptions.map(w => (
@@ -609,9 +609,7 @@ export default function TimelinePage() {
                     ))}
                   </div>
                 </div>
-              )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Mulai * {(!form.parent_id && data.some(d => d.parent_id === editingId)) ? <span className="text-rose-500 normal-case">(Otomatis dari anak)</span> : ''}</label>
                   <input required type="date" value={form.tanggal_mulai} onChange={e => setForm({...form, tanggal_mulai: e.target.value})} disabled={!form.parent_id && data.some(d => d.parent_id === editingId)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700 disabled:opacity-50" />
