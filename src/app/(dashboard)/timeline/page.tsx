@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Calendar, Plus, Search, Edit2, Trash2, CheckCircle, Clock, Save, X, User, FileText, ChevronRight, ChevronDown, AlertCircle, Maximize2 } from 'lucide-react';
+import { 
+  Calendar, Search, ChevronRight, ChevronDown, CheckCircle, Plus, LayoutGrid, Clock, Tag, X, Edit2, Download, User, FileText, AlertCircle, Maximize2, Trash2, Save 
+} from 'lucide-react';
 
 export default function TimelinePage() {
   const [data, setData] = useState<any[]>([]);
@@ -56,12 +58,16 @@ export default function TimelinePage() {
       .select('*')
       .order('tanggal_mulai', { ascending: true });
     
-    const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
-    
-    if (timelineData) setData(timelineData);
-    if (unitData) {
-      const uniquePics = Array.from(new Set(unitData.map(u => u.pic).filter(p => p !== '-' && p.trim() !== '')));
-      setPicOptions(uniquePics.map(p => ({ value: p, label: p })));
+    const { data: picData, error: picError } = await supabase.from('ref_pic').select('*');
+    if (!picError && picData && picData.length > 0) {
+      const uniquePics = Array.from(new Set(picData.map(u => u.pic || u.nama || u.nama_pic || u.name).filter(p => p && p !== '-' && p.trim() !== '')));
+      setPicOptions(uniquePics.map((p: any) => ({ value: p, label: p })));
+    } else {
+      const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
+      if (unitData) {
+        const uniquePics = Array.from(new Set(unitData.map(u => u.pic).filter(p => p !== '-' && p.trim() !== '')));
+        setPicOptions(uniquePics.map(p => ({ value: p, label: p })));
+      }
     }
     
     // Auto expand all parents by default
@@ -201,6 +207,7 @@ export default function TimelinePage() {
       let currentWeekNum = -1;
       let weeks = [];
       let currentWeekDays = 0;
+      let weekStartDate = null;
 
       for(let d = 1; d <= daysInMonth; d++) {
          const dateObj = new Date(y, m, d);
@@ -217,10 +224,12 @@ export default function TimelinePage() {
          
          if (w !== currentWeekNum) {
             if (currentWeekNum !== -1) {
-               weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays });
+               const lastDay = new Date(y, m, d - 1);
+               weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: lastDay });
             }
             currentWeekNum = w;
             currentWeekDays = 1;
+            weekStartDate = dateObj;
          } else {
             currentWeekDays++;
          }
@@ -228,7 +237,12 @@ export default function TimelinePage() {
          daysArray.push({ date: d, isWeekend, fullDate: dateObj });
       }
       if (currentWeekDays > 0) {
-         weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays });
+         const lastDay = new Date(y, m, daysInMonth);
+         if (lastDay > maxDate) {
+            weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: maxDate });
+         } else {
+            weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: lastDay });
+         }
       }
 
       months.push({
@@ -257,8 +271,72 @@ export default function TimelinePage() {
     if (!startStr) return 0;
     const s = new Date(startStr).getTime();
     const e = endStr ? new Date(endStr).getTime() : s;
-    const diff = Math.max(1, Math.ceil((e - s) / (1000 * 3600 * 24)));
+    const diff = Math.max(1, Math.ceil((e - s) / (1000 * 3600 * 24)) + 1);
     return diff * DAY_WIDTH;
+  };
+
+  const handleExportWord = () => {
+    if (rows.length === 0) return alert('Tidak ada data untuk di-export');
+    
+    const { months } = getGanttExtents();
+    
+    // Bikin tabel HTML
+    let tableHtml = `<table border="1" style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 10px;">
+      <thead>
+        <tr>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6;">Daftar Kegiatan</th>
+          ${months.map(m => `<th colspan="${m.weeks.length}" style="padding: 5px; background: #e5e7eb;">${m.label}</th>`).join('')}
+        </tr>
+        <tr>
+          ${months.map(m => m.weeks.map((w: any) => `<th style="padding: 5px; background: #f9fafb;">${w.label}</th>`).join('')).join('')}
+        </tr>
+      </thead>
+      <tbody>
+    `;
+
+    rows.forEach(r => {
+      let rowHtml = `<tr>
+        <td style="padding: 5px; ${!r.isChild ? 'font-weight: bold;' : 'padding-left: 15px;'}">${r.judul_kegiatan}</td>`;
+      
+      const rStart = new Date(r.tanggal_mulai).getTime();
+      const rEnd = r.tanggal_selesai ? new Date(r.tanggal_selesai).getTime() : rStart;
+      
+      months.forEach(m => {
+        m.weeks.forEach((w: any) => {
+          const weekStart = w.startDate.getTime();
+          const weekEnd = w.endDate.getTime();
+          
+          const isOverlap = rStart <= weekEnd && rEnd >= weekStart;
+          const colorHex = isOverlap ? '#4f46e5' : 'transparent';
+          
+          rowHtml += `<td style="background-color: ${colorHex};"></td>`;
+        });
+      });
+      
+      rowHtml += `</tr>`;
+      tableHtml += rowHtml;
+    });
+
+    tableHtml += `</tbody></table>`;
+    
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>Timeline Export</title></head>
+      <body>
+        <h2 style="font-family: sans-serif;">Gantt Chart Kegiatan (Rekap per Pekan)</h2>
+        ${tableHtml}
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'timeline_pekan.doc';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -269,12 +347,20 @@ export default function TimelinePage() {
           <h1 className="text-3xl font-black flex items-center gap-3"><Calendar size={32} /> Gantt Chart Kegiatan</h1>
           <p className="text-indigo-100 font-medium mt-2">Pantau jadwal Induk & Sub-Kegiatan dalam bentuk Gantt Chart interaktif.</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-white text-indigo-700 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
-        >
-          <Plus size={20} /> TAMBAH KEGIATAN
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+           <button 
+             onClick={handleExportWord}
+             className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-sky-400"
+           >
+             <Download size={20} /> WORD (PEKAN)
+           </button>
+           <button 
+             onClick={() => { resetForm(); setIsModalOpen(true); }}
+             className="bg-white text-indigo-700 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
+           >
+             <Plus size={20} /> TAMBAH KEGIATAN
+           </button>
+        </div>
       </div>
 
       {/* Filter */}
@@ -313,14 +399,14 @@ export default function TimelinePage() {
                       const hasChildren = data.some(d => d.parent_id === r.id);
                       return (
                          <div key={r.id} className={`h-[52px] px-4 flex justify-between items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group ${r.isChild ? 'bg-white' : 'bg-gray-50/30'}`}>
-                            <div className={`flex items-center gap-2 truncate ${r.isChild ? 'pl-8' : ''}`}>
+                            <div className={`flex items-center gap-2 min-w-0 flex-1 ${r.isChild ? 'pl-8' : ''}`}>
                                {!r.isChild && (
-                                  <button onClick={() => toggleExpand(r.id)} className={`p-1 rounded hover:bg-gray-200 text-gray-500 ${!hasChildren ? 'invisible' : ''}`}>
+                                  <button onClick={() => toggleExpand(r.id)} className={`p-1 rounded hover:bg-gray-200 text-gray-500 ${!hasChildren ? 'invisible' : ''} shrink-0`}>
                                      {expandedParents.includes(r.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                                   </button>
                                )}
-                               {r.isChild && <div className="w-2 h-2 rounded-full border-2 border-gray-300 ml-1"></div>}
-                               <span className={`truncate ${r.isChild ? 'text-sm text-gray-600 font-medium' : 'text-sm font-black text-gray-800'}`} title={r.judul_kegiatan}>
+                               {r.isChild && <div className="w-2 h-2 rounded-full border-2 border-gray-300 ml-1 shrink-0"></div>}
+                               <span className={`line-clamp-2 pr-2 ${r.isChild ? 'text-[11px] text-gray-600 font-medium leading-tight' : 'text-xs font-black text-gray-800 leading-tight'}`} title={r.judul_kegiatan}>
                                   {r.judul_kegiatan}
                                </span>
                             </div>
@@ -399,8 +485,22 @@ export default function TimelinePage() {
                          const isOverdue = isPast && r.status !== 'Selesai';
                          const bgStyle = isOverdue ? { backgroundImage: 'repeating-linear-gradient(45deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 10px, transparent 10px, transparent 20px)' } : {};
 
+                         const realisasiLeft = r.tanggal_dikerjakan_mulai ? getPosition(r.tanggal_dikerjakan_mulai) : 0;
+                         const realisasiWidth = (r.tanggal_dikerjakan_mulai && r.tanggal_dikerjakan_selesai) ? getWidth(r.tanggal_dikerjakan_mulai, r.tanggal_dikerjakan_selesai) : getWidth(r.tanggal_dikerjakan_mulai, r.tanggal_dikerjakan_mulai);
+
                          return (
                             <div key={r.id} className="absolute h-[52px] flex items-center w-full pointer-events-none" style={{ top: `${top}px` }}>
+                               {r.tanggal_dikerjakan_mulai && (
+                                  <div 
+                                     style={{ 
+                                        left: `${realisasiLeft}px`, 
+                                        width: `${realisasiWidth}px`,
+                                        top: '36px'
+                                     }} 
+                                     className="absolute h-2 bg-emerald-500/80 rounded-full shadow-sm z-0"
+                                     title={`Realisasi: ${r.tanggal_dikerjakan_mulai} s/d ${r.tanggal_dikerjakan_selesai || '-'}`}
+                                  ></div>
+                               )}
                                <div 
                                   onClick={() => openEdit(r)}
                                   style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
@@ -408,7 +508,6 @@ export default function TimelinePage() {
                                >
                                   <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
                                     {r.status === 'Selesai' && <CheckCircle size={10} className="text-emerald-300 shrink-0" />}
-                                    {r.judul_kegiatan}
                                   </span>
                                   <span className="text-[9px] font-black text-white/90 whitespace-nowrap shrink-0 drop-shadow-md">{formatDate(r.tanggal_mulai)} {r.tanggal_selesai && r.tanggal_selesai !== r.tanggal_mulai ? `- ${formatDate(r.tanggal_selesai)}` : ''}</span>
                                   
