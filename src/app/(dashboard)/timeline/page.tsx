@@ -12,6 +12,7 @@ export default function TimelinePage() {
   const [picOptions, setPicOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterYear, setFilterYear] = useState<string>('All');
   
   const [expandedParents, setExpandedParents] = useState<number[]>([]);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
@@ -90,13 +91,18 @@ export default function TimelinePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    let finalLink = form.link_hasil || '';
+    if (finalLink && !finalLink.startsWith('http://') && !finalLink.startsWith('https://')) {
+      finalLink = 'https://' + finalLink;
+    }
+
     const payload = {
       ...form,
       pic: form.pic || null,
       tanggal_selesai: form.tanggal_selesai || null,
       tanggal_dikerjakan_mulai: form.tanggal_dikerjakan_mulai || null,
       tanggal_dikerjakan_selesai: form.tanggal_dikerjakan_selesai || null,
-      link_hasil: form.link_hasil || null
+      link_hasil: finalLink || null
     };
 
     let error;
@@ -159,16 +165,31 @@ export default function TimelinePage() {
   };
 
   // Organize Data for Gantt Chart
-  const parents = data.filter(d => !d.parent_id);
+  const availableYears = Array.from(new Set(data.flatMap(d => {
+    if (!d.tanggal_mulai) return [];
+    const sy = new Date(d.tanggal_mulai).getFullYear();
+    const ey = d.tanggal_selesai ? new Date(d.tanggal_selesai).getFullYear() : sy;
+    return [sy, ey];
+  }))).sort((a,b) => b - a);
+
+  const displayedData = filterYear === 'All' ? data : data.filter(d => {
+    if (!d.tanggal_mulai) return false;
+    const y = parseInt(filterYear);
+    const sy = new Date(d.tanggal_mulai).getFullYear();
+    const ey = d.tanggal_selesai ? new Date(d.tanggal_selesai).getFullYear() : sy;
+    return y >= sy && y <= ey;
+  });
+
+  const parents = displayedData.filter(d => !d.parent_id);
   const filteredParents = parents.filter(p => 
     p.judul_kegiatan.toLowerCase().includes(search.toLowerCase()) || 
     (p.pic && p.pic.toLowerCase().includes(search.toLowerCase())) ||
-    data.some(c => c.parent_id === p.id && c.judul_kegiatan.toLowerCase().includes(search.toLowerCase()))
+    displayedData.some(c => c.parent_id === p.id && c.judul_kegiatan.toLowerCase().includes(search.toLowerCase()))
   );
 
   const rows: any[] = [];
   filteredParents.forEach(p => {
-    const children = data.filter(c => c.parent_id === p.id);
+    const children = displayedData.filter(c => c.parent_id === p.id);
     const hasChildren = children.length > 0;
     
     let minT = new Date(p.tanggal_mulai).getTime();
@@ -199,11 +220,11 @@ export default function TimelinePage() {
   // Gantt Chart Calculations
   const DAY_WIDTH = 24; // Pixel per day
   const getGanttExtents = () => {
-    if (data.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
+    if (displayedData.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
     
-    let minT = new Date(data[0].tanggal_mulai).getTime();
-    let maxT = new Date(data[0].tanggal_selesai || data[0].tanggal_mulai).getTime();
-    data.forEach(d => {
+    let minT = new Date(displayedData[0].tanggal_mulai).getTime();
+    let maxT = new Date(displayedData[0].tanggal_selesai || displayedData[0].tanggal_mulai).getTime();
+    displayedData.forEach(d => {
       const s = new Date(d.tanggal_mulai).getTime();
       const e = new Date(d.tanggal_selesai || d.tanggal_mulai).getTime();
       if (s < minT) minT = s;
@@ -310,6 +331,34 @@ export default function TimelinePage() {
     }
   }, [data, minDate]);
 
+  const exportToExcel = () => {
+    const headers = ['Nama Kegiatan', 'PIC', 'Rencana Mulai', 'Rencana Selesai', 'Realisasi Mulai', 'Realisasi Selesai', 'Status', 'Keterangan', 'Link Hasil'];
+    const csvRows = [headers.join(',')];
+    
+    rows.forEach(r => {
+      const cols = [
+        `"${(r.judul_kegiatan || '').replace(/"/g, '""')}"`,
+        `"${(r.pic || '').replace(/"/g, '""')}"`,
+        `"${r.tanggal_mulai || ''}"`,
+        `"${r.tanggal_selesai || ''}"`,
+        `"${r.tanggal_dikerjakan_mulai || ''}"`,
+        `"${r.tanggal_dikerjakan_selesai || ''}"`,
+        `"${r.status || ''}"`,
+        `"${(r.keterangan || '').replace(/"/g, '""')}"`,
+        `"${(r.link_hasil || '').replace(/"/g, '""')}"`
+      ];
+      csvRows.push(cols.join(','));
+    });
+    
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `timeline_kegiatan.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleExportWord = () => {
     if (rows.length === 0) return alert('Tidak ada data untuk di-export');
     
@@ -396,6 +445,12 @@ export default function TimelinePage() {
              <Download size={20} /> WORD (PEKAN)
            </button>
            <button 
+             onClick={exportToExcel}
+             className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-emerald-400"
+           >
+             <FileText size={20} /> EXCEL (CSV)
+           </button>
+           <button 
              onClick={() => { resetForm(); setIsModalOpen(true); }}
              className="bg-white text-indigo-700 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
            >
@@ -414,6 +469,17 @@ export default function TimelinePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-medium text-gray-700"
+          />
+        </div>
+        <div className="relative w-48 shrink-0 z-40">
+          <Select 
+             options={[{value: 'All', label: 'Semua Tahun'}, ...availableYears.map(y => ({value: y.toString(), label: `Tahun ${y}`}))]}
+             value={{value: filterYear, label: filterYear === 'All' ? 'Semua Tahun' : `Tahun ${filterYear}`}}
+             onChange={(v: any) => setFilterYear(v.value)}
+             className="text-sm font-bold"
+             styles={{
+                control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
+             }}
           />
         </div>
       </div>
@@ -446,8 +512,8 @@ export default function TimelinePage() {
                                      {expandedParents.includes(r.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
                                   </button>
                                )}
-                               {r.isChild && <div className="w-2 h-2 rounded-full border-2 border-gray-300 ml-1 shrink-0"></div>}
-                               <span className={`line-clamp-2 pr-2 ${r.isChild ? 'text-[11px] text-gray-600 font-medium leading-tight' : 'text-xs font-black text-gray-800 leading-tight'}`} title={r.judul_kegiatan}>
+                               {r.isChild && <div className="text-gray-300 ml-1 font-mono text-sm shrink-0">└─ </div>}
+                               <span className={`line-clamp-2 pr-2 ${r.isChild ? 'text-[11px] text-gray-600 font-bold leading-tight' : 'text-xs font-black text-gray-800 leading-tight'}`} title={r.judul_kegiatan}>
                                   {r.judul_kegiatan}
                                </span>
                             </div>
@@ -505,8 +571,8 @@ export default function TimelinePage() {
                    </div>
                    
                    {/* Garis Hari Ini */}
-                   <div className="absolute top-[72px] bottom-0 w-[2px] bg-sky-500/60 pointer-events-none z-10" style={{ left: `${getPosition(new Date().toISOString())}px` }}>
-                     <div className="absolute top-0 -translate-x-1/2 -translate-y-full bg-sky-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-t">HARI INI</div>
+                   <div className="absolute top-0 bottom-0 w-[2px] bg-rose-500/80 pointer-events-none z-40" style={{ left: `${getPosition(new Date().toISOString()) + (DAY_WIDTH/2)}px` }}>
+                     <div className="absolute top-12 -translate-x-1/2 bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">HARI INI</div>
                    </div>
 
                    {/* Container Bar Gantt */}
@@ -686,11 +752,20 @@ export default function TimelinePage() {
                 <textarea rows={3} value={form.keterangan} onChange={e => setForm({...form, keterangan: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700" placeholder="Tuliskan catatan opsional jika ada..."></textarea>
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Batal</button>
-                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black transition-transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2">
-                  <Save size={18} /> {editingId ? 'SIMPAN PERUBAHAN' : 'TAMBAHKAN TIMELINE'}
-                </button>
+              <div className="pt-4 flex justify-between items-center border-t border-gray-100">
+                <div>
+                  {editingId && (
+                     <button type="button" onClick={() => handleDelete(editingId)} className="px-6 py-3 rounded-xl font-bold text-rose-500 hover:bg-rose-50 transition-colors flex items-center gap-2">
+                        <Trash2 size={18} /> Hapus Kegiatan
+                     </button>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Batal</button>
+                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black transition-transform hover:scale-105 shadow-md hover:shadow-lg flex items-center gap-2">
+                    <Save size={18} /> {editingId ? 'SIMPAN PERUBAHAN' : 'TAMBAHKAN TIMELINE'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
