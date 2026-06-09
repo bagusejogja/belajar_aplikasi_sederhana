@@ -20,11 +20,20 @@ export default function TimelinePage() {
     parent_id: null as number | null,
     tanggal_mulai: '',
     tanggal_selesai: '',
+    tanggal_dikerjakan_mulai: '',
+    tanggal_dikerjakan_selesai: '',
+    link_hasil: '',
     pic: null as any,
     status: 'Belum Selesai',
     keterangan: '',
     warna: 'bg-indigo-500'
   });
+
+  useEffect(() => {
+    if (form.tanggal_dikerjakan_mulai && form.tanggal_dikerjakan_selesai) {
+      setForm(prev => ({ ...prev, status: 'Selesai' }));
+    }
+  }, [form.tanggal_dikerjakan_mulai, form.tanggal_dikerjakan_selesai]);
 
   const warnaOptions = [
     { value: 'bg-indigo-500', label: 'Biru Indigo' },
@@ -99,7 +108,7 @@ export default function TimelinePage() {
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({ judul_kegiatan: '', parent_id: null, tanggal_mulai: '', tanggal_selesai: '', pic: null, status: 'Belum Selesai', keterangan: '', warna: 'bg-indigo-500' });
+    setForm({ judul_kegiatan: '', parent_id: null, tanggal_mulai: '', tanggal_selesai: '', tanggal_dikerjakan_mulai: '', tanggal_dikerjakan_selesai: '', link_hasil: '', pic: null, status: 'Belum Selesai', keterangan: '', warna: 'bg-indigo-500' });
   };
 
   const openEdit = (item: any) => {
@@ -109,6 +118,9 @@ export default function TimelinePage() {
       parent_id: item.parent_id,
       tanggal_mulai: item.tanggal_mulai,
       tanggal_selesai: item.tanggal_selesai || '',
+      tanggal_dikerjakan_mulai: item.tanggal_dikerjakan_mulai || '',
+      tanggal_dikerjakan_selesai: item.tanggal_dikerjakan_selesai || '',
+      link_hasil: item.link_hasil || '',
       pic: item.pic || '',
       status: item.status,
       keterangan: item.keterangan || '',
@@ -186,18 +198,44 @@ export default function TimelinePage() {
       const daysInMonth = new Date(y, m + 1, 0).getDate();
       
       const daysArray = [];
+      let currentWeekNum = -1;
+      let weeks = [];
+      let currentWeekDays = 0;
+
       for(let d = 1; d <= daysInMonth; d++) {
          const dateObj = new Date(y, m, d);
          if (dateObj > maxDate) break;
          const dayOfWeek = dateObj.getDay();
          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+         
+         const getWeek = (date: Date) => {
+            const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+            const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+            return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+         }
+         const w = getWeek(dateObj);
+         
+         if (w !== currentWeekNum) {
+            if (currentWeekNum !== -1) {
+               weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays });
+            }
+            currentWeekNum = w;
+            currentWeekDays = 1;
+         } else {
+            currentWeekDays++;
+         }
+
          daysArray.push({ date: d, isWeekend, fullDate: dateObj });
+      }
+      if (currentWeekDays > 0) {
+         weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays });
       }
 
       months.push({
         label: curr.toLocaleString('id-ID', { month: 'long' }) + ' ' + y,
         days: daysArray.length,
-        daysArray
+        daysArray,
+        weeks
       });
       curr.setMonth(m + 1);
     }
@@ -300,16 +338,27 @@ export default function TimelinePage() {
              <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white">
                 <div style={{ width: `${timelineWidth}px` }} className="relative h-full">
                    {/* Header Bulan */}
-                   <div className="h-8 border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
+                   <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
                       {months.map(m => (
                          <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-gray-100">
-                            <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{m.label}</span>
+                            <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">{m.label}</span>
                          </div>
                       ))}
                    </div>
                    
+                   {/* Header Pekan */}
+                   <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-[24px] z-20 shadow-sm">
+                      {months.map(m => (
+                         m.weeks.map((w: any, i: number) => (
+                            <div key={m.label+'-w-'+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className="border-r border-gray-200 flex justify-center items-center shrink-0 bg-white">
+                               <span className="text-[9px] font-bold text-sky-600 uppercase tracking-widest">{w.label}</span>
+                            </div>
+                         ))
+                      ))}
+                   </div>
+
                    {/* Header Tanggal */}
-                   <div className="h-8 border-b-2 border-gray-200 bg-white flex sticky top-8 z-20 shadow-sm">
+                   <div className="h-[24px] border-b-2 border-gray-200 bg-white flex sticky top-[48px] z-20 shadow-sm">
                       {months.map(m => (
                          m.daysArray.map((d: any, i: number) => (
                             <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
@@ -320,7 +369,7 @@ export default function TimelinePage() {
                    </div>
                    
                    {/* Garis Vertikal Grid */}
-                   <div className="absolute top-16 bottom-0 left-0 right-0 flex pointer-events-none z-0">
+                   <div className="absolute top-[72px] bottom-0 left-0 right-0 flex pointer-events-none z-0">
                       {months.map(m => (
                          m.daysArray.map((d: any, i: number) => (
                             <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
@@ -329,12 +378,12 @@ export default function TimelinePage() {
                    </div>
                    
                    {/* Garis Hari Ini */}
-                   <div className="absolute top-16 bottom-0 w-[2px] bg-sky-500/60 pointer-events-none z-10" style={{ left: `${getPosition(new Date().toISOString())}px` }}>
+                   <div className="absolute top-[72px] bottom-0 w-[2px] bg-sky-500/60 pointer-events-none z-10" style={{ left: `${getPosition(new Date().toISOString())}px` }}>
                      <div className="absolute top-0 -translate-x-1/2 -translate-y-full bg-sky-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-t">HARI INI</div>
                    </div>
 
                    {/* Container Bar Gantt */}
-                   <div className="absolute top-16 left-0 right-0 z-10 pointer-events-none">
+                   <div className="absolute top-[72px] left-0 right-0 z-10 pointer-events-none">
                       {rows.map((r, idx) => {
                          const left = getPosition(r.tanggal_mulai);
                          const width = getWidth(r.tanggal_mulai, r.tanggal_selesai);
@@ -357,16 +406,30 @@ export default function TimelinePage() {
                                   style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
                                   className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 truncate cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
-                                  <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md">{r.judul_kegiatan}</span>
+                                  <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
+                                    {r.status === 'Selesai' && <CheckCircle size={10} className="text-emerald-300 shrink-0" />}
+                                    {r.judul_kegiatan}
+                                  </span>
                                   <span className="text-[9px] font-black text-white/90 whitespace-nowrap shrink-0 drop-shadow-md">{formatDate(r.tanggal_mulai)} {r.tanggal_selesai && r.tanggal_selesai !== r.tanggal_mulai ? `- ${formatDate(r.tanggal_selesai)}` : ''}</span>
                                   
                                   {/* Tooltip Hover */}
-                                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-normal break-words">
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 p-3 bg-gray-900 text-white text-xs rounded-xl shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 whitespace-normal break-words">
                                     <p className="font-bold text-[13px] mb-1">{r.judul_kegiatan}</p>
-                                    <p className="text-gray-300">Waktu: {r.tanggal_mulai} s/d {r.tanggal_selesai || '-'}</p>
-                                    <p className="text-gray-300">PIC: {r.pic || '-'}</p>
-                                    <p className="text-gray-300">Status: {r.status}</p>
+                                    <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-1 my-2 border-y border-gray-700 py-2">
+                                       <span className="text-gray-400">Rencana</span><span className="text-gray-200">: {r.tanggal_mulai} s/d {r.tanggal_selesai || '-'}</span>
+                                       <span className="text-gray-400">Dikerjakan</span><span className="text-gray-200">: {r.tanggal_dikerjakan_mulai ? `${r.tanggal_dikerjakan_mulai} s/d ${r.tanggal_dikerjakan_selesai || '-'}` : 'Belum dikerjakan'}</span>
+                                       <span className="text-gray-400">PIC</span><span className="text-gray-200">: {r.pic || '-'}</span>
+                                       <span className="text-gray-400">Status</span><span className={`font-bold ${r.status === 'Selesai' ? 'text-emerald-400' : 'text-amber-400'}`}>: {r.status}</span>
+                                    </div>
                                     {isOverdue && <p className="text-rose-400 font-bold mt-1">⚠️ Terlewat (Overdue)</p>}
+                                    {r.link_hasil && (
+                                       <div className="mt-1 mb-2">
+                                          <span className="text-gray-400 block mb-0.5">Link Hasil:</span>
+                                          <div className="text-sky-400 text-[10px] break-all max-h-16 overflow-hidden">
+                                             {r.link_hasil.split('\n').map((l: string, i: number) => <div key={i} className="truncate">{l}</div>)}
+                                          </div>
+                                       </div>
+                                    )}
                                     {r.keterangan && <p className="text-gray-400 mt-2 italic border-t border-gray-700 pt-1">{r.keterangan}</p>}
                                     <p className="text-sky-300 text-[10px] mt-2 italic font-bold">Klik balok ini untuk mengedit</p>
                                   </div>
@@ -435,6 +498,25 @@ export default function TimelinePage() {
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Selesai {(!form.parent_id && data.some(d => d.parent_id === editingId)) ? <span className="text-rose-500 normal-case">(Otomatis dari anak)</span> : ''}</label>
                   <input type="date" value={form.tanggal_selesai || ''} onChange={e => setForm({...form, tanggal_selesai: e.target.value})} disabled={!form.parent_id && data.some(d => d.parent_id === editingId)} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-gray-700 disabled:opacity-50" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                <div className="col-span-full">
+                   <h4 className="text-sm font-black text-indigo-900 flex items-center gap-2 mb-2"><CheckCircle size={16}/> Laporan Realisasi (Pekerjaan)</h4>
+                   <p className="text-xs text-indigo-700 mb-4">Isi tanggal realisasi di bawah ini jika tugas sudah mulai dikerjakan. Status akan otomatis berubah menjadi "Selesai" jika rentang waktu terisi penuh.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Tgl Dikerjakan (Mulai)</label>
+                  <input type="date" value={form.tanggal_dikerjakan_mulai || ''} onChange={e => setForm({...form, tanggal_dikerjakan_mulai: e.target.value})} className="w-full p-3 bg-white border border-indigo-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-indigo-900" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Tgl Dikerjakan (Selesai)</label>
+                  <input type="date" value={form.tanggal_dikerjakan_selesai || ''} onChange={e => setForm({...form, tanggal_dikerjakan_selesai: e.target.value})} className="w-full p-3 bg-white border border-indigo-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-indigo-900" />
+                </div>
+                <div className="col-span-full">
+                  <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Multi-Link Hasil / Bukti Pekerjaan</label>
+                  <textarea rows={2} value={form.link_hasil} onChange={e => setForm({...form, link_hasil: e.target.value})} className="w-full p-3 bg-white border border-indigo-200 rounded-xl outline-none focus:border-indigo-500 font-medium text-indigo-900 text-sm" placeholder="Paste link hasil di sini (pisahkan dengan enter bila lebih dari 1)..."></textarea>
                 </div>
               </div>
 
