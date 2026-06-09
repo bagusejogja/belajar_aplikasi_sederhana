@@ -59,6 +59,8 @@ export default function TimelinePage() {
       .order('tanggal_mulai', { ascending: true });
     
     const { data: picData, error: picError } = await supabase.from('ref_pic').select('*');
+    if (timelineData) setData(timelineData);
+    
     if (!picError && picData && picData.length > 0) {
       const uniquePics = Array.from(new Set(picData.map(u => u.pic || u.nama || u.nama_pic || u.name).filter(p => p && p !== '-' && p.trim() !== '')));
       setPicOptions(uniquePics.map((p: any) => ({ value: p, label: p })));
