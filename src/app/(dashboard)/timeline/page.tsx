@@ -92,14 +92,27 @@ export default function TimelinePage() {
     e.preventDefault();
     const payload = {
       ...form,
-      pic: form.pic || null
+      pic: form.pic || null,
+      tanggal_selesai: form.tanggal_selesai || null,
+      tanggal_dikerjakan_mulai: form.tanggal_dikerjakan_mulai || null,
+      tanggal_dikerjakan_selesai: form.tanggal_dikerjakan_selesai || null,
+      link_hasil: form.link_hasil || null
     };
 
+    let error;
     if (editingId) {
-      await supabase.from('app_timeline').update(payload).eq('id', editingId);
+      const { error: err } = await supabase.from('app_timeline').update(payload).eq('id', editingId);
+      error = err;
     } else {
-      await supabase.from('app_timeline').insert([payload]);
+      const { error: err } = await supabase.from('app_timeline').insert([payload]);
+      error = err;
     }
+
+    if (error) {
+      alert('Gagal menyimpan: ' + error.message);
+      return;
+    }
+
     setIsModalOpen(false);
     resetForm();
     fetchData();

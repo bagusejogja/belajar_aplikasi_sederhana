@@ -9,6 +9,6 @@ envStr.split('\n').forEach(line => {
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 (async () => {
-  const { data, error } = await supabase.from('app_timeline').select('id, judul_kegiatan, warna').order('id', { ascending: false }).limit(10);
+  const { data, error } = await supabase.from('app_timeline').update({ tanggal_dikerjakan_mulai: '' }).eq('id', 3).select();
   console.log('Result:', error || data);
 })();
