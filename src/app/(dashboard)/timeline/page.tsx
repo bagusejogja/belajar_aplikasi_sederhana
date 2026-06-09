@@ -336,7 +336,7 @@ export default function TimelinePage() {
 
              {/* Right Panel (Gantt Grid) */}
              <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white">
-                <div style={{ width: `${timelineWidth}px` }} className="relative h-full">
+                <div style={{ width: `${timelineWidth}px` }} className="relative h-full pb-64">
                    {/* Header Bulan */}
                    <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
                       {months.map(m => (
@@ -404,7 +404,7 @@ export default function TimelinePage() {
                                <div 
                                   onClick={() => openEdit(r)}
                                   style={{ left: `${left}px`, width: `${width}px`, ...bgStyle }} 
-                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 truncate cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
+                                  className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.parentColor || 'bg-indigo-500'} ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
                                   <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
                                     {r.status === 'Selesai' && <CheckCircle size={10} className="text-emerald-300 shrink-0" />}
