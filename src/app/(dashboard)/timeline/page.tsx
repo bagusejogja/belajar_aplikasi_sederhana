@@ -572,7 +572,6 @@ export default function TimelinePage() {
                    
                    {/* Garis Hari Ini */}
                    <div className="absolute top-0 bottom-0 w-[2px] bg-rose-500/80 pointer-events-none z-40" style={{ left: `${getPosition(new Date().toISOString()) + (DAY_WIDTH/2)}px` }}>
-                     <div className="absolute top-12 -translate-x-1/2 bg-rose-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-md">HARI INI</div>
                    </div>
 
                    {/* Container Bar Gantt */}
