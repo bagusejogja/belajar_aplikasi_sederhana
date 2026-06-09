@@ -154,7 +154,7 @@ export default function DaftarSuratPage() {
     if (filteredData.length === 0) return alert("Tidak ada data untuk di-export");
 
     // Header Kolom
-    const headers = ["No", "No Surat", "Tanggal Surat", "Perihal", "Unit Kerja", "PIC", "Jenis Revisi", "Link Dokumen"];
+    const headers = ["No", "No Surat", "Tanggal Surat", "Perihal", "Unit Kerja", "PIC", "Jenis Revisi", "Nominal Semula", "Nominal Menjadi", "Link Dokumen"];
     
     // Data Baris
     const csvContent = [
@@ -168,6 +168,8 @@ export default function DaftarSuratPage() {
           `"${item.gov_units?.nama_unit || ''}"`,
           `"${item.pic || ''}"`,
           `"${Array.isArray(item.jenis_json) ? item.jenis_json.join('; ') : ''}"`,
+          item.nominal_semula || 0,
+          item.nominal_menjadi || 0,
           item.file_upload || item.link_google_drive || ''
         ];
         return row.join(",");

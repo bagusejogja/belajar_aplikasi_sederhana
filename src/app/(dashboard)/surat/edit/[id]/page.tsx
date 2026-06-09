@@ -27,6 +27,9 @@ export default function EditSuratPage() {
     pic: '',
     tanggal_disposisi: '',
     tanggal_selesai: '',
+    baris_rkat_dirubah: '',
+    nominal_semula: '',
+    nominal_menjadi: '',
     link_google_drive: '',
     jenis_json: [],
   });
@@ -69,9 +72,25 @@ export default function EditSuratPage() {
     }
   };
 
+  // FORMATTER RIBUAN
+  const formatNumber = (num: string | number) => {
+    if (!num) return '';
+    const clean = num.toString().replace(/\D/g, '');
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  const parseNumber = (formatted: string) => {
+    return formatted.replace(/\D/g, '');
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    if (name === 'nominal_semula' || name === 'nominal_menjadi') {
+      const numericValue = parseNumber(value);
+      setFormData((prev: any) => ({ ...prev, [name]: numericValue }));
+    } else {
+      setFormData((prev: any) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -207,7 +226,60 @@ export default function EditSuratPage() {
           </div>
         </div>
 
-        {/* CARD 3: STATUS PROSES */}
+        {/* CARD 3: BUDGET & NOMINAL */}
+        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="bg-amber-50 p-3 rounded-2xl text-amber-600">
+              <FileText size={24} />
+            </div>
+            <h2 className="text-xl font-black text-gray-800 tracking-tight">Anggaran Terkait</h2>
+          </div>
+
+          <div className="space-y-2 mb-6">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Baris RKAT yang Dirubah</label>
+            <input 
+              type="text" 
+              name="baris_rkat_dirubah" 
+              value={formData.baris_rkat_dirubah} 
+              onChange={handleInputChange}
+              placeholder="cth: 521211 - Belanja Bahan Operasional..."
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold text-gray-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Semula</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">Rp</span>
+                <input 
+                  type="text" 
+                  name="nominal_semula" 
+                  value={formatNumber(formData.nominal_semula)} 
+                  onChange={handleInputChange}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 font-bold text-gray-700"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Menjadi</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-indigo-400">Rp</span>
+                <input 
+                  type="text" 
+                  name="nominal_menjadi" 
+                  value={formatNumber(formData.nominal_menjadi)} 
+                  onChange={handleInputChange}
+                  className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 font-bold text-indigo-700"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CARD 4: STATUS PROSES */}
         <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-8">
             <div className="bg-amber-50 p-3 rounded-2xl text-amber-600">
