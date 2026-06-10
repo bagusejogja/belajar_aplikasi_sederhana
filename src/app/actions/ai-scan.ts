@@ -109,3 +109,36 @@ export async function listAvailableModels() {
   }
 }
 
+export async function generateAnalysisFromText(ocrText: string) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+    const prompt = `
+      Anda adalah asisten ahli keuangan pemerintah. Analisis hasil ekstraksi teks dari usulan anggaran berikut:
+      
+      === TEKS ===
+      ${ocrText}
+      === END TEKS ===
+
+      Berikan hasil analisis dalam format JSON murni dengan kunci:
+      {
+        "ringkasan_html": "Berikan ringkasan substansi dari surat ini (Apa yang diusulkan dan mengapa). Format dalam HTML ringan (misal <p>...</p>).",
+        "rekomendasi_html": "Berikan kesimpulan & rekomendasi logis apakah usulan ini patut disetujui, dan efisiensinya. Format dalam HTML ringan (misal <p>...</p><ul><li>...</li></ul>)."
+      }
+
+      PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.
+    `;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    const jsonString = responseText.replace(/```json|```/g, "").trim();
+    const extractedData = JSON.parse(jsonString);
+
+    return { success: true, data: extractedData };
+  } catch (error: any) {
+    console.error("Error AI Analysis from Text:", error);
+    return { success: false, error: error.message };
+  }
+}
+

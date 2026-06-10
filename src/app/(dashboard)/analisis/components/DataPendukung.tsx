@@ -15,16 +15,67 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
         
-        const mapped = data.map((row: any, i) => ({
-          no_urut: row['No'] || (i + 1).toString(),
-          uraian_kegiatan: row['Uraian'] || row['Kegiatan'] || '-',
-          anggaran: row['Anggaran'] || '0',
-          realisasi: row['Realisasi'] || '0',
-          persen_serapan: row['Serapan'] || '0%'
+        // Baca sebagai array of arrays
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        // Simaster data usually starts at row 5 (index 4)
+        const rows = data.slice(4); 
+        
+        let mapped: any[] = [];
+
+        rows.forEach((row: any) => {
+           const uraian = row[3]; // D
+           const anggaranRaw = row[4]; // E
+           const realisasiRaw = row[5]; // F
+           const serapanRaw = row[6]; // G
+
+           if (!uraian && !anggaranRaw) return; // Skip empty rows
+
+           // Bersihkan angka
+           const anggaran = typeof anggaranRaw === 'number' ? anggaranRaw : parseFloat((anggaranRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
+           
+           if (anggaran > 0) {
+              const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseFloat((realisasiRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
+              let serapanVal = 0;
+              let serapanText = '0%';
+              
+              if (typeof serapanRaw === 'number') {
+                 // jika di excel tersimpan sebagai 0.5 untuk 50%
+                 serapanVal = serapanRaw <= 1 ? serapanRaw * 100 : serapanRaw;
+                 serapanText = serapanVal.toFixed(2) + '%';
+              } else {
+                 const sStr = (serapanRaw || '0').toString();
+                 serapanVal = parseFloat(sStr.replace(/[^0-9.-]+/g, ''));
+                 serapanText = sStr.includes('%') ? sStr : serapanVal + '%';
+              }
+
+              // Format currency
+              const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+              mapped.push({
+                 uraian_kegiatan: uraian || '-',
+                 anggaran: formatRp(anggaran),
+                 realisasi: formatRp(realisasi),
+                 persen_serapan: serapanText,
+                 _serapanVal: serapanVal // for sorting
+              });
+           }
+        });
+
+        // Sort by prosentase descending
+        mapped.sort((a, b) => b._serapanVal - a._serapanVal);
+        
+        // Tambahkan nomor urut
+        const finalMapped = mapped.map((m, idx) => ({
+           no_urut: idx + 1,
+           uraian_kegiatan: m.uraian_kegiatan,
+           anggaran: m.anggaran,
+           realisasi: m.realisasi,
+           persen_serapan: m.persen_serapan
         }));
-        setDetailData(mapped);
+
+        setDetailData(finalMapped);
       };
       reader.readAsBinaryString(e.target.files[0]);
     }
@@ -65,18 +116,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {activeSubTab === 'realisasi' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
-          <div className="p-4 bg-gray-50 flex justify-end gap-2 items-center">
-            <button onClick={() => {
-              const ws = XLSX.utils.json_to_sheet([{ No: 1, Uraian: 'Kegiatan A', Anggaran: 1000000, Realisasi: 500000, Serapan: '50%' }]);
-              const wb = XLSX.utils.book_new();
-              XLSX.utils.book_append_sheet(wb, ws, "Format");
-              XLSX.writeFile(wb, "Format_Realisasi.xlsx");
-            }} className="cursor-pointer bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center gap-2">
-              <FileSpreadsheet size={14}/> Download Format
-            </button>
-            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center gap-2">
-              <FileSpreadsheet size={14}/> Import Excel
-              <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} />
+          <div className="p-4 bg-gray-50 flex justify-between gap-4 items-center flex-wrap">
+            <p className="text-xs text-gray-500 font-medium">
+              Data ditarik dari kolom D5 - G.<br/> 
+              Unduh dari <a href="https://finance.simaster.ugm.ac.id/laporan/realisasi_detail_belanja/" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">SIMASTER UGM (Realisasi Detail Belanja)</a>
+            </p>
+            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+              <FileSpreadsheet size={16}/> Upload Excel SIMASTER
+              <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleExcelUpload} />
             </label>
           </div>
           <div className="overflow-y-auto custom-scrollbar flex-1">

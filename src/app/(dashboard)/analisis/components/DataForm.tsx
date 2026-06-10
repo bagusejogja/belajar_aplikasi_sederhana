@@ -1,13 +1,40 @@
 'use client';
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, Plus, Trash2, Wand2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
+import { generateAnalysisFromText } from '@/app/actions/ai-scan';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 export default function DataForm({ mainData, setMainData, isDetailMode, detailData, setDetailData }: any) {
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!mainData.ringkasan_ai) {
+      alert("Harap lakukan Ekstraksi OCR terlebih dahulu agar AI bisa membaca surat.");
+      return;
+    }
+    setIsGeneratingAI(true);
+    try {
+      const res = await generateAnalysisFromText(mainData.ringkasan_ai);
+      if (res.success && res.data) {
+        setMainData({
+          ...mainData,
+          analisis_html: res.data.ringkasan_html || mainData.analisis_html,
+          rekomendasi_html: res.data.rekomendasi_html || mainData.rekomendasi_html
+        });
+        alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
+      } else {
+        alert("Gagal generate AI: " + res.error);
+      }
+    } catch (e: any) {
+      alert("Terjadi kesalahan: " + e.message);
+    }
+    setIsGeneratingAI(false);
+  };
+
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const reader = new FileReader();
@@ -147,6 +174,13 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026</label>
           <input type="text" value={mainData.posisi_pagu} onChange={e => setMainData({...mainData, posisi_pagu: e.target.value})} placeholder="Contoh: 1.500.000.000" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
+        </div>
+        <div className="col-span-full flex items-center justify-between mt-4">
+           <h3 className="text-sm font-black text-indigo-700 uppercase tracking-widest">📝 Hasil Analisis Teks</h3>
+           <button onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-4 py-2 rounded-xl font-bold text-xs transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
+             {isGeneratingAI ? <div className="w-4 h-4 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={16}/>} 
+             {isGeneratingAI ? 'AI Sedang Berpikir...' : 'Generate Ringkasan & Rekomendasi (AI)'}
+           </button>
         </div>
         <div className="col-span-full">
           <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
