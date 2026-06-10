@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Landmark, Plus, Search, Trash2, Edit2, Loader2, Save, X, AlertTriangle, Building2, Filter, User as UserIcon
+  Landmark, Plus, Search, Edit2, Loader2, Save, X, AlertTriangle, Building2, Filter, User as UserIcon, Layers
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -23,8 +23,9 @@ export default function GovUnitsPage() {
   const [loading, setLoading] = useState(true);
 
   // Filter states
-  const [filterJenis, setFilterJenis] = useState('');
-  const [filterPic, setFilterPic] = useState('');
+  const [filterJenis, setFilterJenis] = useState<string[]>([]);
+  const [filterPic, setFilterPic] = useState<string[]>([]);
+  const [filterGroup, setFilterGroup] = useState<string[]>([]);
   const [filterUnit, setFilterUnit] = useState('');
 
   // Modal State
@@ -133,34 +134,27 @@ export default function GovUnitsPage() {
     }
   };
 
-  const handleDelete = async (id: number, nama: string) => {
-     if (!confirm(`Apakah Anda yakin ingin menghapus unit "${nama}"?`)) return;
-     
-     try {
-        const { error } = await supabase.from('gov_units').delete().eq('id', id);
-        if (error) throw error;
-        fetchData();
-     } catch (e: any) {
-        alert('Gagal menghapus: ' + e.message);
-     }
-  };
-
   // Mengambil unique value untuk dropdown filter
   const uniqueJenis = useMemo(() => Array.from(new Set(units.map(u => u.jenis).filter(Boolean))), [units]);
   const uniquePic = useMemo(() => Array.from(new Set(units.map(u => u.pic).filter(Boolean))), [units]);
+  const uniqueGroup = useMemo(() => Array.from(new Set(units.map(u => u.group_org).filter(Boolean))), [units]);
 
   // Filtering Logic
   const filteredUnits = useMemo(() => {
     return units.filter(u => {
-       const matchJenis = filterJenis ? u.jenis === filterJenis : true;
-       const matchPic = filterPic ? u.pic === filterPic : true;
+       // Hanya tampilkan status aktif (is_active === true)
+       if (!u.is_active) return false;
+
+       const matchJenis = filterJenis.length === 0 || filterJenis.includes(u.jenis || '');
+       const matchPic = filterPic.length === 0 || filterPic.includes(u.pic || '');
+       const matchGroup = filterGroup.length === 0 || filterGroup.includes(u.group_org || '');
        const matchUnit = filterUnit ? 
           u.nama_unit.toLowerCase().includes(filterUnit.toLowerCase()) || 
           u.kode_unit.toLowerCase().includes(filterUnit.toLowerCase()) 
           : true;
-       return matchJenis && matchPic && matchUnit;
+       return matchJenis && matchPic && matchGroup && matchUnit;
     });
-  }, [units, filterJenis, filterPic, filterUnit]);
+  }, [units, filterJenis, filterPic, filterGroup, filterUnit]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-sky-600" size={40} /></div>;
 
@@ -173,7 +167,7 @@ export default function GovUnitsPage() {
               <Landmark size={24} />
            </div>
            <div>
-              <h2 className="text-xl font-bold text-gray-900">Unit Pemerintah (Gov)</h2>
+              <h2 className="text-xl font-bold text-gray-900">Unit</h2>
               <p className="text-gray-500 text-sm">Kelola master data unit, PIC, Jenis, dan Catatan</p>
            </div>
         </div>
@@ -186,14 +180,17 @@ export default function GovUnitsPage() {
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-         <div className="flex items-center gap-2 text-gray-700 font-bold mb-2">
-            <Filter size={18} className="text-sky-500" /> Filter Data
+         <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-gray-700 font-bold">
+               <Filter size={18} className="text-sky-500" /> Filter Data (Multi-Pilihan)
+            </div>
+            <span className="text-xs text-gray-400 italic">Tekan CTRL/CMD untuk memilih lebih dari satu</span>
          </div>
-         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cari Nama/Kode Unit</label>
                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <Search className="absolute left-3 top-3 text-gray-400" size={16} />
                   <input 
                      type="text" 
                      placeholder="Ketik untuk mencari..." 
@@ -205,13 +202,27 @@ export default function GovUnitsPage() {
             </div>
             
             <div>
+               <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Group <Layers size={12}/></label>
+               <select 
+                  multiple
+                  value={filterGroup} 
+                  onChange={(e) => setFilterGroup(Array.from(e.target.selectedOptions, option => option.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
+                  size={3}
+               >
+                  {uniqueGroup.map((grp: any, i) => <option key={i} value={grp}>{grp}</option>)}
+               </select>
+            </div>
+
+            <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">PIC <UserIcon size={12}/></label>
                <select 
+                  multiple
                   value={filterPic} 
-                  onChange={(e) => setFilterPic(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
+                  onChange={(e) => setFilterPic(Array.from(e.target.selectedOptions, option => option.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
+                  size={3}
                >
-                  <option value="">Semua PIC</option>
                   {uniquePic.map((pic: any, i) => <option key={i} value={pic}>{pic}</option>)}
                </select>
             </div>
@@ -219,11 +230,12 @@ export default function GovUnitsPage() {
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Jenis <Building2 size={12}/></label>
                <select 
+                  multiple
                   value={filterJenis} 
-                  onChange={(e) => setFilterJenis(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
+                  onChange={(e) => setFilterJenis(Array.from(e.target.selectedOptions, option => option.value))}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
+                  size={3}
                >
-                  <option value="">Semua Jenis</option>
                   {uniqueJenis.map((jenis: any, i) => <option key={i} value={jenis}>{jenis}</option>)}
                </select>
             </div>
@@ -240,7 +252,6 @@ export default function GovUnitsPage() {
                      <th className="px-6 py-4">Nama Unit</th>
                      <th className="px-6 py-4">Grup & Jenis</th>
                      <th className="px-6 py-4">PIC</th>
-                     <th className="px-6 py-4">Catatan</th>
                      <th className="px-6 py-4 text-center">Status</th>
                      <th className="px-6 py-4 text-center">Aksi</th>
                   </tr>
@@ -262,7 +273,6 @@ export default function GovUnitsPage() {
                               <span className="text-gray-700">{u.pic || '-'}</span>
                            </div>
                         </td>
-                        <td className="px-6 py-4 text-gray-500 text-xs italic max-w-xs truncate">{u.catatan || '-'}</td>
                         <td className="px-6 py-4 text-center">
                            {u.is_active ? 
                               <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold">Aktif</span> : 
@@ -274,16 +284,13 @@ export default function GovUnitsPage() {
                               <button onClick={() => handleOpenModal(u)} className="p-2 text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg transition-colors" title="Edit">
                                  <Edit2 size={16} />
                               </button>
-                              <button onClick={() => u.id && handleDelete(u.id, u.nama_unit)} className="p-2 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors" title="Hapus">
-                                 <Trash2 size={16} />
-                              </button>
                            </div>
                         </td>
                      </tr>
                   ))}
                   {filteredUnits.length === 0 && (
                      <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500 flex-col items-center flex justify-center w-full">
+                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500 flex-col items-center flex justify-center w-full">
                            <AlertTriangle size={32} className="text-gray-300 mb-2"/>
                            Tidak ada data yang sesuai dengan filter.
                         </td>
@@ -301,7 +308,7 @@ export default function GovUnitsPage() {
                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 shrink-0">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
                      <div className="p-2 bg-sky-100 text-sky-600 rounded-xl"><Landmark size={20} /></div>
-                     {editingUnit ? 'Edit Unit Pemerintah' : 'Tambah Unit Pemerintah'}
+                     {editingUnit ? 'Edit Unit' : 'Tambah Unit'}
                   </h3>
                   <button onClick={() => setIsModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-900 rounded-xl transition-all">
                      <X size={20} />
