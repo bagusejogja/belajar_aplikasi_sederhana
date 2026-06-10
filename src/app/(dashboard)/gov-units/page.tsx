@@ -23,9 +23,9 @@ export default function GovUnitsPage() {
   const [loading, setLoading] = useState(true);
 
   // Filter states
-  const [filterJenis, setFilterJenis] = useState<string[]>([]);
-  const [filterPic, setFilterPic] = useState<string[]>([]);
-  const [filterGroup, setFilterGroup] = useState<string[]>([]);
+  const [filterJenis, setFilterJenis] = useState('');
+  const [filterPic, setFilterPic] = useState('');
+  const [filterGroup, setFilterGroup] = useState('');
   const [filterUnit, setFilterUnit] = useState('');
 
   // Modal State
@@ -145,9 +145,9 @@ export default function GovUnitsPage() {
        // Hanya tampilkan status aktif (is_active === true)
        if (!u.is_active) return false;
 
-       const matchJenis = filterJenis.length === 0 || filterJenis.includes(u.jenis || '');
-       const matchPic = filterPic.length === 0 || filterPic.includes(u.pic || '');
-       const matchGroup = filterGroup.length === 0 || filterGroup.includes(u.group_org || '');
+       const matchJenis = filterJenis === '' || u.jenis === filterJenis;
+       const matchPic = filterPic === '' || u.pic === filterPic;
+       const matchGroup = filterGroup === '' || u.group_org === filterGroup;
        const matchUnit = filterUnit ? 
           u.nama_unit.toLowerCase().includes(filterUnit.toLowerCase()) || 
           u.kode_unit.toLowerCase().includes(filterUnit.toLowerCase()) 
@@ -182,9 +182,8 @@ export default function GovUnitsPage() {
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-700 font-bold">
-               <Filter size={18} className="text-sky-500" /> Filter Data (Multi-Pilihan)
+               <Filter size={18} className="text-sky-500" /> Filter Data
             </div>
-            <span className="text-xs text-gray-400 italic">Tekan CTRL/CMD untuk memilih lebih dari satu</span>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
@@ -204,12 +203,11 @@ export default function GovUnitsPage() {
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Group <Layers size={12}/></label>
                <select 
-                  multiple
                   value={filterGroup} 
-                  onChange={(e) => setFilterGroup(Array.from(e.target.selectedOptions, option => option.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
-                  size={3}
+                  onChange={(e) => setFilterGroup(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
                >
+                  <option value="">Semua Group</option>
                   {uniqueGroup.map((grp: any, i) => <option key={i} value={grp}>{grp}</option>)}
                </select>
             </div>
@@ -217,12 +215,11 @@ export default function GovUnitsPage() {
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">PIC <UserIcon size={12}/></label>
                <select 
-                  multiple
                   value={filterPic} 
-                  onChange={(e) => setFilterPic(Array.from(e.target.selectedOptions, option => option.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
-                  size={3}
+                  onChange={(e) => setFilterPic(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
                >
+                  <option value="">Semua PIC</option>
                   {uniquePic.map((pic: any, i) => <option key={i} value={pic}>{pic}</option>)}
                </select>
             </div>
@@ -230,12 +227,11 @@ export default function GovUnitsPage() {
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Jenis <Building2 size={12}/></label>
                <select 
-                  multiple
                   value={filterJenis} 
-                  onChange={(e) => setFilterJenis(Array.from(e.target.selectedOptions, option => option.value))}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm custom-scrollbar"
-                  size={3}
+                  onChange={(e) => setFilterJenis(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
                >
+                  <option value="">Semua Jenis</option>
                   {uniqueJenis.map((jenis: any, i) => <option key={i} value={jenis}>{jenis}</option>)}
                </select>
             </div>
@@ -334,7 +330,14 @@ export default function GovUnitsPage() {
                      </div>
                      <div>
                         <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Penanggung Jawab (PIC)</label>
-                        <input type="text" value={formData.pic} onChange={(e) => setFormData({...formData, pic: e.target.value})} className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-sky-500 outline-none text-sm" placeholder="Nama PIC" />
+                        <select 
+                           value={formData.pic} 
+                           onChange={(e) => setFormData({...formData, pic: e.target.value})} 
+                           className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-sky-500 outline-none text-sm appearance-none bg-white"
+                        >
+                           <option value="">-- Pilih PIC --</option>
+                           {uniquePic.map((pic: any, i) => <option key={i} value={pic}>{pic}</option>)}
+                        </select>
                      </div>
                   </div>
 
