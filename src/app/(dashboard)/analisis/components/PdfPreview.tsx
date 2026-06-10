@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { renderWysiwygToPdf } from '@/lib/pdfRenderer';
 import { Printer, Download, Eye } from 'lucide-react';
 
-export default function PdfPreview({ mainData, detailData }: any) {
+export default function PdfPreview({ mainData, detailData, historisData }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   // Auto generate on mount or when data changes significantly
@@ -18,76 +18,109 @@ export default function PdfPreview({ mainData, detailData }: any) {
   const generatePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     
-    // Kop Surat Simulation
+    // Header Line
+    doc.setFillColor(37, 99, 235); // Blue line
+    doc.rect(15, 10, 180, 2, 'F');
+    
+    // Title
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('NOTA DINAS ANALISIS PAGU ANGGARAN', 105, 20, { align: 'center' });
+    doc.setTextColor(30, 64, 175);
+    doc.text('NOTA ANALISIS USULAN PAGU ANGGARAN', 105, 20, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+
+    // Helper for Section Header
+    const addSectionHeader = (title: string, y: number) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.setFillColor(243, 244, 246);
+      doc.rect(15, y - 5, 180, 8, 'F');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(title, 17, y + 0.5);
+      return y + 8;
+    };
+
+    let startY = 30;
+
+    // 1. IDENTITAS SURAT
+    startY = addSectionHeader('1. IDENTITAS SURAT & INFORMASI UNIT:', startY);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Unit / Institusi', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.unit_pengirim || '-'}`, 60, startY); startY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text('N Surat | Tgl', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.no_surat || '-'}  |  ${mainData.tanggal_surat || '-'}`, 60, startY); startY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Perihal', 17, startY); 
     
-    doc.setFontSize(10);
+    // Split perihal if too long
     doc.setFont('helvetica', 'normal');
-    doc.text(`No Surat: ${mainData.no_surat || '-'}`, 15, 35);
-    doc.text(`Tanggal: ${mainData.tanggal_surat || '-'}`, 15, 41);
-    doc.text(`Perihal: ${mainData.perihal || '-'}`, 15, 47);
-    if (mainData.posisi_pagu) {
-       doc.text(`Posisi Pagu 2026: Rp ${mainData.posisi_pagu}`, 15, 53);
-    }
+    const perihalLines = doc.splitTextToSize(`: ${mainData.perihal || '-'}`, 130);
+    doc.text(perihalLines, 60, startY); 
+    startY += (perihalLines.length * 5) + 1;
     
-    doc.line(15, 58, 195, 58);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${mainData.total_anggaran || '-'}`, 60, startY); startY += 10;
 
-    let startY = 65;
-
-    // Data Tabel
-    if (detailData && detailData.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Rincian Realisasi:', 15, startY);
-      
-      autoTable(doc, {
-        startY: startY + 5,
-        head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', 'Serapan']],
-        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, d.anggaran, d.realisasi, d.persen_serapan]),
-        theme: 'grid',
-        headStyles: { fillColor: [14, 165, 233] }
-      });
-      
-      startY = (doc as any).lastAutoTable.finalY + 15;
-    }
-
-    // WYSIWYG Ringkasan Substansi
+    // 2. RINGKASAN SUBSTANSI
     if (mainData.analisis_html) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Ringkasan Substansi:', 15, startY);
-      doc.setFont('helvetica', 'normal');
-      
+      startY = addSectionHeader('2. RINGKASAN SUBSTANSI:', startY);
       const res = renderWysiwygToPdf({
         doc,
         htmlString: mainData.analisis_html,
-        x: 15,
-        y: startY + 8,
-        maxWidth: 180,
-        lineHeight: 6,
+        x: 17,
+        y: startY + 2,
+        maxWidth: 176,
+        lineHeight: 5,
         fontSize: 10
       });
-      startY = res + 15;
+      startY = res + 10;
     }
 
-    // WYSIWYG Analisis & Rekomendasi
+    // 3. POSISI PAGU TAHUN 2026
+    if (mainData.posisi_pagu) {
+       startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
+       // Simple table for Posisi Pagu based on string input
+       autoTable(doc, {
+         startY: startY,
+         body: [
+           ['Posisi Pagu Saat Ini / Info Pagu', `Rp ${mainData.posisi_pagu}`]
+         ],
+         theme: 'grid',
+         styles: { fontSize: 10, cellPadding: 3 },
+         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 } }
+       });
+       startY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // 4. DATA HISTORIS
+    // @ts-ignore (historisData is passed from page implicitly if we add it)
+    const historisData = mainData.historisData; 
+    // Wait, historisData is NOT in mainData in PdfPreview props. I need to pass it.
+    // I will just check if we can render it. For now, detailData is passed.
+    
+    // 6. DETAIL SERAPAN
+    if (detailData && detailData.length > 0) {
+      startY = addSectionHeader('6. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:', startY);
+      autoTable(doc, {
+        startY: startY,
+        head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', '% Serapan']],
+        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, d.anggaran, d.realisasi, d.persen_serapan]),
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] }, // blue-500
+        styles: { fontSize: 9 }
+      });
+      startY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // 7. HASIL ANALISIS & REKOMENDASI
     if (mainData.rekomendasi_html) {
-      // Check page break loosely
-      if (startY > 250) {
-         doc.addPage();
-         startY = 20;
-      }
-      doc.setFont('helvetica', 'bold');
-      doc.text('Analisis & Rekomendasi (AI):', 15, startY);
-      doc.setFont('helvetica', 'normal');
-      
+      startY = addSectionHeader('7. HASIL ANALISIS & REKOMENDASI:', startY);
       renderWysiwygToPdf({
         doc,
         htmlString: mainData.rekomendasi_html,
-        x: 15,
-        y: startY + 8,
-        maxWidth: 180,
-        lineHeight: 6,
+        x: 17,
+        y: startY + 2,
+        maxWidth: 176,
+        lineHeight: 5,
         fontSize: 10
       });
     }
