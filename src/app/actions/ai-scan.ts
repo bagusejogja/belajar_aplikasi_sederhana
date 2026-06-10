@@ -120,10 +120,10 @@ export async function generateAnalysisFromText(ocrText: string) {
       ${ocrText}
       === END TEKS ===
 
-      Berikan hasil analisis dalam format JSON murni dengan kunci:
+      Berikan hasil analisis yang sangat tajam, analitis, dan bergaya bahasa birokrasi pemerintahan formal dalam format JSON murni dengan kunci:
       {
-        "ringkasan_html": "Berikan ringkasan substansi dari surat ini (Apa yang diusulkan dan mengapa). Format dalam HTML ringan (misal <p>...</p>).",
-        "rekomendasi_html": "Berikan kesimpulan & rekomendasi logis apakah usulan ini patut disetujui, dan efisiensinya. Format dalam HTML ringan (misal <p>...</p><ul><li>...</li></ul>)."
+        "ringkasan_html": "Berikan ringkasan substansi dari surat ini (Apa tujuan utama, rincian biaya yang diusulkan, dan mengapa ini penting). Gunakan kalimat formal dan padat. Format dalam HTML ringan (misal <p>...</p>).",
+        "rekomendasi_html": "Berikan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas (misalnya: Disetujui Penuh, Disetujui Sebagian, atau Ditolak dengan alasan kuat). Format dalam HTML ringan (misal <p>...</p><ul><li>...</li></ul>)."
       }
 
       PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.

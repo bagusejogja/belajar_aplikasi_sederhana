@@ -118,7 +118,6 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
           <div className="p-4 bg-gray-50 flex justify-between gap-4 items-center flex-wrap">
             <p className="text-xs text-gray-500 font-medium">
-              Data ditarik dari kolom D5 - G.<br/> 
               Unduh dari <a href="https://finance.simaster.ugm.ac.id/laporan/realisasi_detail_belanja/" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">SIMASTER UGM (Realisasi Detail Belanja)</a>
             </p>
             <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
@@ -134,8 +133,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <th className="px-4 py-3">Uraian Kegiatan</th>
                   <th className="px-4 py-3 text-right">Anggaran</th>
                   <th className="px-4 py-3 text-right">Realisasi</th>
-                  <th className="px-4 py-3 text-center">Serapan</th>
-                  <th className="px-4 py-3 text-center w-16">Aksi</th>
+                  <th className="px-4 py-3 text-center w-20">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -168,18 +166,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         const newD = [...detailData];
                         newD[idx].persen_serapan = e.target.value;
                         setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none text-center focus:border-b border-emerald-500"/>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => setDetailData(detailData.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-500/10">
-                        <Trash2 size={16}/>
-                      </button>
+                      }} className="w-full bg-transparent outline-none text-center font-bold text-emerald-600 focus:border-b border-emerald-500"/>
                     </td>
                   </tr>
                 ))}
                 {(!detailData || detailData.length === 0) && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
                   </tr>
                 )}
               </tbody>

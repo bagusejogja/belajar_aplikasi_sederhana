@@ -188,6 +188,16 @@ export default function AnalisisPaguPage() {
                   <div id="form" className="scroll-mt-8"><DataForm mainData={mainData} setMainData={setMainData} /></div>
                   <hr className="border-gray-100" />
                   <div id="pendukung" className="scroll-mt-8"><DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
+
+                  {/* Floating Action Bar */}
+                  <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-indigo-100 p-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50">
+                     <button onClick={handleSave} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-black transition-all shadow-md flex items-center gap-2 disabled:opacity-50">
+                       {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save size={20}/>} Simpan Data
+                     </button>
+                     <button onClick={() => setActiveTab('pdf')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-black transition-all shadow-md flex items-center gap-2">
+                       <Printer size={20}/> Lihat & Cetak PDF
+                     </button>
+                  </div>
                </div>
             )}
             {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} />}
