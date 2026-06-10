@@ -1,7 +1,8 @@
 'use client';
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Plus, Trash2, History, Paperclip, ClipboardPaste } from 'lucide-react';
+import { FileSpreadsheet, Plus, Trash2, History, Paperclip, ClipboardPaste, BarChart3 } from 'lucide-react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
@@ -196,6 +197,47 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {activeSubTab === 'historis' && (
         <div className="flex flex-col gap-6 flex-1">
+          {historisData && historisData.length > 0 && (
+             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="text-indigo-600" size={20}/>
+                  <h3 className="font-black text-gray-800 text-sm">Grafik Pagu vs Realisasi (Multi-Tahun)</h3>
+                </div>
+                <div className="w-full h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={historisData.map((d: any) => {
+                        const parseNum = (str: string) => {
+                          const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+                          return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+                        };
+                        const kurang = parseNum(d.kurang);
+                        return {
+                          name: d.tahun,
+                          PaguAwal: parseNum(d.pagu_awal),
+                          Penambahan: parseNum(d.tambah),
+                          Pengurangan: kurang > 0 ? -kurang : kurang,
+                          TotalPagu: parseNum(d.total_pagu),
+                          Realisasi: parseNum(d.realisasi_historis),
+                        };
+                      })}
+                      margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                    >
+                      <CartesianGrid stroke="#f5f5f5" />
+                      <XAxis dataKey="name" tick={{fontSize: 12, fill: '#6b7280'}} tickMargin={10} />
+                      <YAxis tickFormatter={(val) => `${val / 1000000} M`} tick={{fontSize: 12, fill: '#6b7280'}} />
+                      <Tooltip formatter={(value: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value || 0)} />
+                      <Legend wrapperStyle={{fontSize: '12px'}} />
+                      <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Penambahan" stackId="a" fill="#10b981" name="Penambahan" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Pengurangan" stackId="a" fill="#ef4444" name="Pengurangan" radius={[0, 0, 4, 4]} />
+                      <Line type="monotone" dataKey="TotalPagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 4}} activeDot={{r: 6}} />
+                      <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" name="Realisasi" dot={{r: 4}} activeDot={{r: 6}} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
+          )}
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[350px]">
             <div className="overflow-y-auto custom-scrollbar flex-1">
               <table className="w-full text-left text-sm text-gray-700">
