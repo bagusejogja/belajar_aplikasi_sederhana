@@ -76,26 +76,40 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     }
 
     // 3. POSISI PAGU TAHUN 2026
-    if (mainData.posisi_pagu) {
-       startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
-       // Simple table for Posisi Pagu based on string input
-       autoTable(doc, {
-         startY: startY,
-         body: [
-           ['Posisi Pagu Saat Ini / Info Pagu', `Rp ${mainData.posisi_pagu}`]
-         ],
-         theme: 'grid',
-         styles: { fontSize: 10, cellPadding: 3 },
-         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 } }
-       });
-       startY = (doc as any).lastAutoTable.finalY + 10;
-    }
+    const targetYear = '2026';
+    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+    const parseNum = (str: string) => parseFloat((str || '0').toString().replace(/[^0-9.-]+/g, ''));
+    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
-    // 4. DATA HISTORIS
-    // @ts-ignore (historisData is passed from page implicitly if we add it)
-    const historisData = mainData.historisData; 
-    // Wait, historisData is NOT in mainData in PdfPreview props. I need to pass it.
-    // I will just check if we can render it. For now, detailData is passed.
+    const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+    const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
+
+    startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
+    autoTable(doc, {
+      startY: startY,
+      body: [
+        ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
+        ['Penambahan Pagu +', `+ Rp ${historisYearRow.tambah || '0'}`],
+        ['Pengurangan Pagu -', `- Rp ${historisYearRow.kurang || '0'}`],
+        ['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`],
+        ['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`],
+        ['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`],
+        ['Usulan Tambahan (Surat)', `Rp ${mainData.total_anggaran || '0'}`]
+      ],
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 } },
+      didParseCell: function(data) {
+        if (data.row.index === 3 || data.row.index === 5 || data.row.index === 6) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+        if (data.row.index === 3) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
+        if (data.row.index === 5) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        if (data.row.index === 6) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
+      }
+    });
+    startY = (doc as any).lastAutoTable.finalY + 10;
+
     
     // 6. DETAIL SERAPAN
     if (detailData && detailData.length > 0) {

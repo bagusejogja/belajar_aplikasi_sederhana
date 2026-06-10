@@ -8,8 +8,17 @@ import { generateAnalysisFromText } from '@/app/actions/ai-scan';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
-export default function DataForm({ mainData, setMainData, isDetailMode, detailData, setDetailData }: any) {
+export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [] }: any) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  const targetYear = '2026';
+  const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+  
+  const parseNum = (str: string) => parseFloat((str || '0').toString().replace(/[^0-9.-]+/g, ''));
+  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+  const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+  const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
 
   const handleGenerateAI = async () => {
     if (!mainData.ringkasan_ai) {
@@ -171,9 +180,42 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Anggaran</label>
           <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
         </div>
-        <div>
+        <div className="col-span-full mt-4">
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026</label>
-          <input type="text" value={mainData.posisi_pagu} onChange={e => setMainData({...mainData, posisi_pagu: e.target.value})} placeholder="Contoh: 1.500.000.000" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <table className="w-full text-sm text-left">
+              <tbody className="divide-y divide-gray-100">
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-gray-700 w-1/2">Pagu Awal</td>
+                  <td className="px-4 py-2 text-right">Rp {historisYearRow.pagu_awal || '0'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-gray-700">Penambahan Pagu +</td>
+                  <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah || '0'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-gray-700">Pengurangan Pagu -</td>
+                  <td className="px-4 py-2 text-right">- Rp {historisYearRow.kurang || '0'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50 bg-indigo-50/30">
+                  <td className="px-4 py-2 font-bold text-indigo-900">Pagu Sampai Saat Ini</td>
+                  <td className="px-4 py-2 text-right font-bold text-indigo-900">Rp {historisYearRow.total_pagu || '0'}</td>
+                </tr>
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
+                  <td className="px-4 py-2 text-right">Rp {formatRp(totalRealisasiDetail)}</td>
+                </tr>
+                <tr className="hover:bg-gray-50 bg-emerald-50/30">
+                  <td className="px-4 py-2 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
+                  <td className="px-4 py-2 text-right font-bold text-emerald-900">Rp {formatRp(totalSisaDetail)}</td>
+                </tr>
+                <tr className="hover:bg-gray-50 bg-amber-50">
+                  <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
+                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {mainData.total_anggaran || '0'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
         <div className="col-span-full flex items-center justify-between mt-4">
            <h3 className="text-sm font-black text-indigo-700 uppercase tracking-widest">📝 Hasil Analisis Teks</h3>

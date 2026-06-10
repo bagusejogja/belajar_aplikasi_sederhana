@@ -91,7 +91,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
       tambah: l[2] || '0',
       kurang: l[3] || '0',
       total_pagu: l[4] || '0',
-      realisasi_historis: l[5] || '0'
+      realisasi_historis: l[5] || '0',
+      persen_serapan: l[6] || '0%'
     }));
     setHistorisData([...historisData, ...mapped]);
     setPasteData('');
@@ -206,6 +207,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                     <th className="px-3 py-3 text-right">- Kurang</th>
                     <th className="px-3 py-3 text-right text-emerald-600">Total Pagu</th>
                     <th className="px-3 py-3 text-right text-rose-600">Realisasi</th>
+                    <th className="px-3 py-3 text-center w-20">% Serapan</th>
                     <th className="px-2 py-3"></th>
                   </tr>
                 </thead>
@@ -218,19 +220,20 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       <td className="px-3 py-2"><input type="text" value={d.kurang} onChange={(e) => { const n=[...historisData]; n[idx].kurang=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.total_pagu} onChange={(e) => { const n=[...historisData]; n[idx].total_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-emerald-600 focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.realisasi_historis} onChange={(e) => { const n=[...historisData]; n[idx].realisasi_historis=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-rose-600 focus:border-b border-rose-500"/></td>
+                      <td className="px-3 py-2"><input type="text" value={d.persen_serapan || ''} onChange={(e) => { const n=[...historisData]; n[idx].persen_serapan=e.target.value; setHistorisData(n); }} className="w-full text-center bg-transparent outline-none font-bold focus:border-b border-emerald-500"/></td>
                       <td className="px-2 py-2">
                         <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-600"><Trash2 size={14}/></button>
                       </td>
                     </tr>
                   ))}
                   {(!historisData || historisData.length === 0) && (
-                    <tr><td colSpan={7} className="p-8 text-center text-gray-500 italic">Belum ada data historis.</td></tr>
+                    <tr><td colSpan={8} className="p-8 text-center text-gray-500 italic">Belum ada data historis.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
+               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                  <Plus size={16}/> Tambah Baris
                </button>
             </div>
@@ -239,7 +242,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col gap-3 shadow-inner">
              <div className="flex items-center gap-2 text-emerald-700 font-black mb-2"><ClipboardPaste size={18}/> Paste Zone Multi-Tahun</div>
              <p className="text-xs text-gray-500 leading-relaxed">
-               Anda dapat melakukan copy tabel dari Excel (Kolom: Tahun, Pagu Awal, Tambah, Kurang, Total Pagu, Realisasi) lalu paste di kotak bawah ini.
+               Anda dapat melakukan copy tabel dari Excel (Kolom: Tahun, Pagu Awal, Tambah, Kurang, Total Pagu, Realisasi, % Serapan) lalu paste di kotak bawah ini.
              </p>
              <textarea 
                 className="w-full flex-1 min-h-[100px] p-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-700 text-xs font-mono resize-none custom-scrollbar shadow-sm"
