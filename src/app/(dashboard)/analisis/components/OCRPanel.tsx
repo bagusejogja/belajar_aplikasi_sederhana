@@ -108,40 +108,40 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h2 className="text-xl font-black text-white flex items-center gap-2 mb-2"><ScanTextIcon /> Ekstraksi Teks Otomatis (OCR)</h2>
-        <p className="text-gray-400 text-sm">Unggah gambar dokumen atau pindaian surat (termasuk PDF) untuk mengekstrak teksnya secara otomatis.</p>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
+      <div className="shrink-0">
+        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><ScanTextIcon /> Ekstraksi Teks Otomatis (OCR)</h2>
+        <p className="text-gray-500 text-sm">Unggah gambar dokumen atau pindaian surat (termasuk PDF) untuk mengekstrak teksnya secara otomatis.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <label className={`flex flex-col items-center justify-center w-full h-64 border-2 ${fileUrl ? 'border-sky-500 bg-sky-500/10' : 'border-gray-600 bg-gray-800/50'} border-dashed rounded-2xl cursor-pointer hover:bg-gray-800 hover:border-sky-500 transition-all group relative overflow-hidden`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1 min-h-0">
+        <div className="space-y-4 flex flex-col">
+          <label className={`flex flex-col items-center justify-center w-full flex-1 min-h-[250px] border-2 ${fileUrl ? 'border-indigo-400 bg-indigo-50/50' : 'border-gray-300 bg-gray-50'} border-dashed rounded-2xl cursor-pointer hover:bg-gray-100 hover:border-indigo-400 transition-all group relative overflow-hidden`}>
             {fileUrl ? (
-               <div className="flex flex-col items-center justify-center z-10 text-sky-400">
+               <div className="flex flex-col items-center justify-center z-10 text-indigo-600">
                   <FileTextIcon size={48} className="mb-2" />
                   <p className="font-bold text-center px-4 truncate w-full">{fileName}</p>
-                  <p className="text-xs text-sky-200 mt-2">Klik untuk ganti file</p>
+                  <p className="text-xs text-indigo-400 mt-2">Klik untuk ganti file</p>
                </div>
             ) : (
                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                 <Upload className="w-10 h-10 mb-3 text-gray-500 group-hover:text-sky-400 transition-colors" />
-                 <p className="mb-2 text-sm text-gray-400"><span className="font-semibold text-sky-400">Klik untuk upload</span> gambar atau PDF</p>
-                 <p className="text-xs text-gray-500">PNG, JPG, WEBP, atau PDF (Max. 5MB)</p>
+                 <Upload className="w-10 h-10 mb-3 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                 <p className="mb-2 text-sm text-gray-500"><span className="font-bold text-indigo-600">Klik untuk upload</span> gambar atau PDF</p>
+                 <p className="text-xs text-gray-400">PNG, JPG, WEBP, atau PDF (Max. 5MB)</p>
                </div>
             )}
             <input type="file" className="hidden" accept="image/*, application/pdf" onChange={handleFileUpload} />
           </label>
 
-          <button onClick={runOCR} disabled={!fileUrl || loading} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={runOCR} disabled={!fileUrl || loading} className="w-full shrink-0 flex justify-center items-center gap-2 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             <ScanLine size={18} /> {loading ? `Memproses Ekstraksi... ${progress}%` : 'Jalankan Ekstraksi Teks'}
           </button>
         </div>
 
-        <div className="flex flex-col">
-          <label className="text-sm font-bold text-gray-300 mb-2 flex items-center gap-2"><AlertCircle size={14} className="text-sky-400"/> Hasil Ekstraksi Teks</label>
+        <div className="flex flex-col min-h-[300px]">
+          <label className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><AlertCircle size={14} className="text-indigo-500"/> Hasil Ekstraksi Teks</label>
           <textarea 
-            className="w-full flex-1 p-4 bg-gray-900 border border-gray-700 rounded-2xl outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 text-gray-300 custom-scrollbar resize-none font-mono text-sm"
+            className="w-full h-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 text-gray-700 custom-scrollbar resize-none font-mono text-sm leading-relaxed transition-all shadow-inner"
             placeholder="Hasil teks akan muncul di sini..."
             value={mainData.ringkasan_ai}
             onChange={(e) => setMainData({...mainData, ringkasan_ai: e.target.value})}
@@ -153,5 +153,5 @@ export default function OCRPanel({ mainData, setMainData }: any) {
 }
 
 function ScanTextIcon() {
-  return <ScanLine size={24} className="text-sky-400" />;
+  return <ScanLine size={24} className="text-indigo-600" />;
 }

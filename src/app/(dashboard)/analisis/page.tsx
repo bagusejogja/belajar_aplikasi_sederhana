@@ -46,7 +46,8 @@ export default function AnalisisPaguPage() {
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
        if (historis) setHistorisData(historis);
 
-       setActiveTab('form'); // Switch back to main form
+       // Defaultnya ke form, tapi jika di-trigger oleh Lihat PDF, akan diganti ke pdf di RiwayatList
+       setActiveTab('form');
     } catch (e) {
        console.error("Gagal load riwayat:", e);
     }
@@ -116,57 +117,55 @@ export default function AnalisisPaguPage() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-100 font-sans overflow-hidden">
+    <div className="flex h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -my-6">
       {/* Sidebar Local */}
-      <div className="w-72 bg-gray-800/80 backdrop-blur-xl border-r border-white/10 flex flex-col p-6 shadow-2xl">
-        <h1 className="text-2xl font-black bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent mb-8">
-          Sistem Analisis Pagu
+      <div className="w-72 bg-white border-r border-gray-200 flex flex-col p-6 shadow-sm z-10">
+        <h1 className="text-xl font-black text-indigo-700 mb-8 flex items-center gap-2">
+          <FileText size={24}/> Analisis Pagu
         </h1>
         
         <nav className="flex flex-col gap-2 flex-1">
-          <button onClick={() => setActiveTab('ocr')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'ocr' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/50 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'hover:bg-white/5 text-gray-400'}`}>
+          <button onClick={() => setActiveTab('ocr')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'ocr' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <ScanText size={20} /> Ekstraksi OCR
           </button>
-          <button onClick={() => setActiveTab('form')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'form' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]' : 'hover:bg-white/5 text-gray-400'}`}>
+          <button onClick={() => setActiveTab('form')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'form' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <FileText size={20} /> Data Utama
           </button>
-          <button onClick={() => setActiveTab('pendukung')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'pendukung' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'hover:bg-white/5 text-gray-400'}`}>
+          <button onClick={() => setActiveTab('pendukung')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'pendukung' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <FileSpreadsheet size={20} /> Data Pendukung
           </button>
-          <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'pdf' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'hover:bg-white/5 text-gray-400'}`}>
+          <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'pdf' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <Printer size={20} /> Cetak PDF
           </button>
           
-          <div className="my-2 border-t border-white/5"></div>
+          <div className="my-2 border-t border-gray-100"></div>
           
-          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'riwayat' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'hover:bg-white/5 text-gray-400'}`}>
+          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'riwayat' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <History size={20} /> Riwayat Analisis
           </button>
         </nav>
 
-        <div className="pt-6 border-t border-white/10 space-y-3">
+        <div className="pt-6 border-t border-gray-100 space-y-3">
           {analisisId && (
-            <p className="text-center text-xs text-sky-400 mb-2 truncate">Memuat: {mainData.no_surat}</p>
+            <p className="text-center text-xs text-indigo-600 mb-2 truncate font-bold">Memuat: {mainData.no_surat}</p>
           )}
-          <button onClick={handleBaru} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 border border-white/10 text-gray-300 font-bold transition-all">
+          <button onClick={handleBaru} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold transition-all shadow-sm">
             + Analisis Baru
           </button>
-          <button onClick={handleSave} disabled={loading} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold shadow-lg transition-all disabled:opacity-50">
-            {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save size={18} />} Simpan Data
+          <button onClick={handleSave} disabled={loading} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-100 transition-all disabled:opacity-50">
+            {loading ? <div className="w-5 h-5 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={18} />} Simpan Data
           </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-gray-900/50 overflow-y-auto custom-scrollbar p-8 relative">
-         <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-sky-500/10 to-transparent pointer-events-none -z-10"></div>
-         
-         <div className="max-w-5xl mx-auto backdrop-blur-md bg-gray-800/40 border border-white/10 rounded-3xl p-8 shadow-2xl h-[85vh]">
+      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-8 relative">
+         <div className="max-w-5xl mx-auto bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm h-full min-h-[85vh]">
             {activeTab === 'ocr' && <OCRPanel mainData={mainData} setMainData={setMainData} />}
             {activeTab === 'form' && <DataForm mainData={mainData} setMainData={setMainData} />}
             {activeTab === 'pendukung' && <DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} />}
             {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} />}
-            {activeTab === 'riwayat' && <RiwayatList onLoadAnalisis={loadRiwayatData} />}
+            {activeTab === 'riwayat' && <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={setActiveTab} />}
          </div>
       </div>
     </div>

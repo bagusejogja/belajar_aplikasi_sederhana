@@ -35,8 +35,8 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex justify-between items-end">
           <div>
-            <h2 className="text-xl font-black text-white flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-400"/> Detail Realisasi & Anggaran</h2>
-            <p className="text-gray-400 text-sm">Upload file Excel atau masukkan secara manual rincian pagu anggaran.</p>
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-600"/> Detail Realisasi & Anggaran</h2>
+            <p className="text-gray-500 text-sm">Upload file Excel atau masukkan secara manual rincian pagu anggaran.</p>
           </div>
           <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg flex items-center gap-2">
              <FileSpreadsheet size={16}/> Import Excel (.xlsx)
@@ -44,9 +44,9 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           </label>
         </div>
 
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-inner">
-          <table className="w-full text-left text-sm text-gray-300">
-            <thead className="bg-gray-800 text-gray-400 uppercase font-black text-xs">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <table className="w-full text-left text-sm text-gray-700">
+            <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 w-16 text-center">No</th>
                 <th className="px-4 py-3">Uraian Kegiatan</th>
@@ -56,10 +56,10 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
                 <th className="px-4 py-3 text-center w-16">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {detailData.map((d: any, idx: number) => (
-                <tr key={idx} className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
-                  <td className="px-4 py-3 text-center">{d.no_urut}</td>
+                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-center font-medium">{d.no_urut}</td>
                   <td className="px-4 py-3">
                     <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
                       const newD = [...detailData];
@@ -102,8 +102,8 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
               )}
             </tbody>
           </table>
-          <div className="p-4 bg-gray-800/50 border-t border-gray-700">
-             <button onClick={() => setDetailData([...detailData, { no_urut: detailData.length + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-400 hover:text-emerald-300 font-bold text-sm flex items-center gap-1">
+          <div className="p-4 bg-gray-50 border-t border-gray-100">
+             <button onClick={() => setDetailData([...detailData, { no_urut: detailData.length + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                <Plus size={16}/> Tambah Baris Manual
              </button>
           </div>
@@ -115,39 +115,39 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
-        <h2 className="text-xl font-black text-white flex items-center gap-2 mb-2">Form Data Utama</h2>
-        <p className="text-gray-400 text-sm">Lengkapi metadata surat dan informasi analisis di bawah ini.</p>
+        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2">Form Data Utama</h2>
+        <p className="text-gray-500 text-sm">Lengkapi metadata surat dan informasi analisis di bawah ini.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">No Surat</label>
-          <input type="text" value={mainData.no_surat} onChange={e => setMainData({...mainData, no_surat: e.target.value})} className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-gray-200" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">No Surat</label>
+          <input type="text" value={mainData.no_surat} onChange={e => setMainData({...mainData, no_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Tanggal Surat</label>
-          <input type="date" value={mainData.tanggal_surat} onChange={e => setMainData({...mainData, tanggal_surat: e.target.value})} className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-gray-200 custom-calendar-icon" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Surat</label>
+          <input type="date" value={mainData.tanggal_surat} onChange={e => setMainData({...mainData, tanggal_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white custom-calendar-icon" />
         </div>
         <div className="col-span-full">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Perihal</label>
-          <input type="text" value={mainData.perihal} onChange={e => setMainData({...mainData, perihal: e.target.value})} className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-gray-200" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Perihal</label>
+          <input type="text" value={mainData.perihal} onChange={e => setMainData({...mainData, perihal: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Unit Pengirim</label>
-          <input type="text" value={mainData.unit_pengirim} onChange={e => setMainData({...mainData, unit_pengirim: e.target.value})} className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-gray-200" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
+          <input type="text" value={mainData.unit_pengirim} onChange={e => setMainData({...mainData, unit_pengirim: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Total Anggaran</label>
-          <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-indigo-500 text-gray-200 font-mono" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Anggaran</label>
+          <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
         </div>
         <div className="col-span-full">
-          <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">Editor WYSIWYG Kustom (Analisis HTML)</label>
+          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Editor WYSIWYG Kustom (Analisis HTML)</label>
           <textarea 
             rows={5}
             value={mainData.analisis_html} 
             onChange={e => setMainData({...mainData, analisis_html: e.target.value})} 
             placeholder="Tuliskan format teks dengan tag HTML seperti <p>, <b>, <i>, <ul><li>..."
-            className="w-full p-4 bg-gray-900 border border-gray-700 rounded-2xl outline-none focus:border-indigo-500 text-gray-200 font-mono text-sm" 
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 text-gray-900 font-mono text-sm focus:bg-white shadow-inner" 
           />
         </div>
       </div>

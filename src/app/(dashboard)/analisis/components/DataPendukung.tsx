@@ -52,28 +52,28 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
       <div className="flex justify-between items-end shrink-0">
         <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-400"/> Data Pendukung</h2>
-          <p className="text-gray-400 text-sm">Kelola rincian anggaran, pagu historis, dan lampiran.</p>
+          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-600"/> Data Pendukung</h2>
+          <p className="text-gray-500 text-sm">Kelola rincian anggaran, pagu historis, dan lampiran.</p>
         </div>
       </div>
 
-      <div className="flex border-b border-gray-700 gap-4">
-        <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Detail Realisasi Belanja</button>
-        <button onClick={() => setActiveSubTab('historis')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Data Pagu Historis</button>
-        <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}>Lampiran Lainnya</button>
+      <div className="flex border-b border-gray-200 gap-4">
+        <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Detail Realisasi Belanja</button>
+        <button onClick={() => setActiveSubTab('historis')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Historis</button>
+        <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Lampiran Lainnya</button>
       </div>
 
       {activeSubTab === 'realisasi' && (
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-inner flex-1 flex flex-col">
-          <div className="p-4 bg-gray-800/50 flex justify-end">
-            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-lg flex items-center gap-2">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
+          <div className="p-4 bg-gray-50 flex justify-end">
+            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center gap-2">
               <FileSpreadsheet size={14}/> Import Excel
               <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} />
             </label>
           </div>
           <div className="overflow-y-auto custom-scrollbar flex-1">
-            <table className="w-full text-left text-sm text-gray-300">
-              <thead className="bg-gray-800 text-gray-400 uppercase font-black text-xs sticky top-0">
+            <table className="w-full text-left text-sm text-gray-700">
+              <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs sticky top-0 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 w-16 text-center">No</th>
                   <th className="px-4 py-3">Uraian Kegiatan</th>
@@ -83,9 +83,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <th className="px-4 py-3 text-center w-16">Aksi</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 {detailData?.map((d: any, idx: number) => (
-                  <tr key={idx} className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-center">{d.no_urut}</td>
                     <td className="px-4 py-3">
                       <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
@@ -130,8 +130,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               </tbody>
             </table>
           </div>
-          <div className="p-4 bg-gray-800/50 border-t border-gray-700 shrink-0">
-             <button onClick={() => setDetailData([...(detailData||[]), { no_urut: (detailData?.length||0) + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-400 hover:text-emerald-300 font-bold text-sm flex items-center gap-1">
+          <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
+             <button onClick={() => setDetailData([...(detailData||[]), { no_urut: (detailData?.length||0) + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                <Plus size={16}/> Tambah Baris Manual
              </button>
           </div>
@@ -140,31 +140,31 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {activeSubTab === 'historis' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
-          <div className="md:col-span-2 bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-inner flex flex-col">
+          <div className="md:col-span-2 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
             <div className="overflow-y-auto custom-scrollbar flex-1">
-              <table className="w-full text-left text-sm text-gray-300">
-                <thead className="bg-gray-800 text-gray-400 uppercase font-black text-[10px] sticky top-0">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-3">Tahun</th>
                     <th className="px-3 py-3 text-right">Pagu Awal</th>
                     <th className="px-3 py-3 text-right">+ Tambah</th>
                     <th className="px-3 py-3 text-right">- Kurang</th>
-                    <th className="px-3 py-3 text-right text-emerald-400">Total Pagu</th>
-                    <th className="px-3 py-3 text-right text-rose-400">Realisasi</th>
+                    <th className="px-3 py-3 text-right text-emerald-600">Total Pagu</th>
+                    <th className="px-3 py-3 text-right text-rose-600">Realisasi</th>
                     <th className="px-2 py-3"></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {historisData?.map((d: any, idx: number) => (
-                    <tr key={idx} className="border-b border-gray-800 hover:bg-gray-800/50">
+                    <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-3 py-2"><input type="text" value={d.tahun} onChange={(e) => { const n=[...historisData]; n[idx].tahun=e.target.value; setHistorisData(n); }} className="w-12 bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.pagu_awal} onChange={(e) => { const n=[...historisData]; n[idx].pagu_awal=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.tambah} onChange={(e) => { const n=[...historisData]; n[idx].tambah=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.kurang} onChange={(e) => { const n=[...historisData]; n[idx].kurang=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.total_pagu} onChange={(e) => { const n=[...historisData]; n[idx].total_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none text-emerald-400 focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.realisasi_historis} onChange={(e) => { const n=[...historisData]; n[idx].realisasi_historis=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none text-rose-400 focus:border-b border-rose-500"/></td>
+                      <td className="px-3 py-2"><input type="text" value={d.total_pagu} onChange={(e) => { const n=[...historisData]; n[idx].total_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-emerald-600 focus:border-b border-emerald-500"/></td>
+                      <td className="px-3 py-2"><input type="text" value={d.realisasi_historis} onChange={(e) => { const n=[...historisData]; n[idx].realisasi_historis=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-rose-600 focus:border-b border-rose-500"/></td>
                       <td className="px-2 py-2">
-                        <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-400"><Trash2 size={14}/></button>
+                        <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-600"><Trash2 size={14}/></button>
                       </td>
                     </tr>
                   ))}
@@ -174,25 +174,25 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 </tbody>
               </table>
             </div>
-            <div className="p-3 bg-gray-800/50 border-t border-gray-700">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0' }])} className="text-emerald-400 hover:text-emerald-300 font-bold text-sm flex items-center gap-1">
+            <div className="p-3 bg-gray-50 border-t border-gray-100">
+               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                  <Plus size={16}/> Tambah Baris
                </button>
             </div>
           </div>
 
-          <div className="bg-gray-800/40 border border-gray-700 rounded-2xl p-4 flex flex-col gap-3">
-             <div className="flex items-center gap-2 text-emerald-400 font-bold mb-2"><ClipboardPaste size={18}/> Paste Zone Multi-Tahun</div>
-             <p className="text-xs text-gray-400 leading-relaxed">
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col gap-3 shadow-inner">
+             <div className="flex items-center gap-2 text-emerald-700 font-black mb-2"><ClipboardPaste size={18}/> Paste Zone Multi-Tahun</div>
+             <p className="text-xs text-gray-500 leading-relaxed">
                Anda dapat melakukan copy tabel dari Excel (Kolom: Tahun, Pagu Awal, Tambah, Kurang, Total Pagu, Realisasi) lalu paste di kotak bawah ini.
              </p>
              <textarea 
-                className="w-full flex-1 p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-emerald-500 text-gray-300 text-xs font-mono resize-none custom-scrollbar"
+                className="w-full flex-1 p-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-700 text-xs font-mono resize-none custom-scrollbar shadow-sm"
                 placeholder="Paste data tabular di sini..."
                 value={pasteData}
                 onChange={e => setPasteData(e.target.value)}
              />
-             <button onClick={handlePasteMultiTahun} disabled={!pasteData} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg font-bold text-sm transition-colors shadow-md">
+             <button onClick={handlePasteMultiTahun} disabled={!pasteData} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">
                Proses Paste Data
              </button>
           </div>
@@ -201,14 +201,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {activeSubTab === 'lampiran' && (
         <div className="flex-1">
-          <div className="bg-gray-800/40 border border-gray-700 rounded-2xl p-6 max-w-2xl space-y-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl space-y-6 shadow-sm">
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> File Lampiran Fisik</label>
-              <input type="text" value={mainData.file_lampiran || ''} onChange={e => setMainData({...mainData, file_lampiran: e.target.value})} placeholder="Misal: lampiran_01.pdf" className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-emerald-500 text-gray-200" />
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> File Lampiran Fisik</label>
+              <input type="text" value={mainData.file_lampiran || ''} onChange={e => setMainData({...mainData, file_lampiran: e.target.value})} placeholder="Misal: lampiran_01.pdf" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> Link Dokumen (Google Drive / Cloud)</label>
-              <input type="text" value={mainData.link_lampiran || ''} onChange={e => setMainData({...mainData, link_lampiran: e.target.value})} placeholder="https://..." className="w-full p-3 bg-gray-900 border border-gray-700 rounded-xl outline-none focus:border-emerald-500 text-gray-200" />
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> Link Dokumen (Google Drive / Cloud)</label>
+              <input type="text" value={mainData.link_lampiran || ''} onChange={e => setMainData({...mainData, link_lampiran: e.target.value})} placeholder="https://..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
             </div>
           </div>
         </div>

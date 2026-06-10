@@ -8,6 +8,13 @@ import { Printer, Download, Eye } from 'lucide-react';
 export default function PdfPreview({ mainData, detailData }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
+  // Auto generate on mount or when data changes significantly
+  React.useEffect(() => {
+     if (mainData?.no_surat || mainData?.analisis_html) {
+        generatePDF();
+     }
+  }, [mainData?.no_surat, mainData?.analisis_html]);
+
   const generatePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     
@@ -77,26 +84,26 @@ export default function PdfPreview({ mainData, detailData }: any) {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
       <div className="flex justify-between items-end shrink-0">
         <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2 mb-2"><Printer className="text-rose-400"/> Cetak Dokumen PDF</h2>
-          <p className="text-gray-400 text-sm">Preview langsung hasil cetak dengan WYSIWYG Renderer khusus.</p>
+          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><Printer className="text-indigo-600"/> Cetak Dokumen PDF</h2>
+          <p className="text-gray-500 text-sm">Preview langsung hasil cetak dengan WYSIWYG Renderer khusus.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={generatePDF} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg flex items-center gap-2">
-            <Eye size={16}/> Generate Preview
+          <button onClick={generatePDF} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+            <Eye size={16}/> Refresh Preview
           </button>
-          <button onClick={handleDownload} disabled={!pdfUrl} className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-lg flex items-center gap-2 disabled:opacity-50">
+          <button onClick={handleDownload} disabled={!pdfUrl} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-md flex items-center gap-2 disabled:opacity-50">
             <Download size={16}/> Unduh PDF
           </button>
         </div>
       </div>
 
-      <div className="flex-1 bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden shadow-inner p-2">
+      <div className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl overflow-hidden shadow-inner p-2">
          {pdfUrl ? (
-            <iframe src={pdfUrl} className="w-full h-[600px] rounded-xl border-none bg-white" />
+            <iframe src={pdfUrl} className="w-full h-full min-h-[600px] rounded-xl border-none bg-white shadow-sm" />
          ) : (
-            <div className="w-full h-full min-h-[400px] flex flex-col items-center justify-center text-gray-500 gap-4">
+            <div className="w-full h-full min-h-[400px] flex flex-col items-center justify-center text-gray-400 gap-4">
                <Printer size={48} className="opacity-20" />
-               <p>Klik "Generate Preview" untuk melihat hasil cetakan PDF</p>
+               <p className="font-medium text-sm">Preview PDF akan muncul di sini</p>
             </div>
          )}
       </div>
