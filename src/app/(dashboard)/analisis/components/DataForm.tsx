@@ -177,7 +177,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           <input type="text" value={mainData.unit_pengirim} onChange={e => setMainData({...mainData, unit_pengirim: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Anggaran</label>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu</label>
           <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
         </div>
         <div className="col-span-full mt-4">

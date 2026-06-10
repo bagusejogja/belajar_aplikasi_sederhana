@@ -110,14 +110,27 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
 
-    
-    // 6. DETAIL SERAPAN
-    if (detailData && detailData.length > 0) {
-      startY = addSectionHeader('6. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:', startY);
+    // 4. DATA HISTORIS PAGU MULTI-TAHUN
+    if (historisData && historisData.length > 0) {
+      startY = addSectionHeader('4. DATA HISTORIS PAGU MULTI-TAHUN:', startY);
       autoTable(doc, {
         startY: startY,
-        head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', '% Serapan']],
-        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, d.anggaran, d.realisasi, d.persen_serapan]),
+        head: [['Tahun', 'Pagu Awal', '+ Tambah', '- Kurang', 'Total Pagu', 'Realisasi', '% Serapan']],
+        body: historisData.map((d: any) => [d.tahun, d.pagu_awal, d.tambah, d.kurang, d.total_pagu, d.realisasi_historis, d.persen_serapan || '-']),
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] }, // blue-500
+        styles: { fontSize: 9 }
+      });
+      startY = (doc as any).lastAutoTable.finalY + 10;
+    }
+    
+    // 5. DETAIL SERAPAN REALISASI BELANJA
+    if (detailData && detailData.length > 0) {
+      startY = addSectionHeader('5. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:', startY);
+      autoTable(doc, {
+        startY: startY,
+        head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', 'Sisa Anggaran', '% Serapan']],
+        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, d.anggaran, d.realisasi, d.sisa_anggaran || '-', d.persen_serapan]),
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246] }, // blue-500
         styles: { fontSize: 9 }
@@ -125,9 +138,9 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
       startY = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // 7. HASIL ANALISIS & REKOMENDASI
+    // 6. HASIL ANALISIS & REKOMENDASI
     if (mainData.rekomendasi_html) {
-      startY = addSectionHeader('7. HASIL ANALISIS & REKOMENDASI:', startY);
+      startY = addSectionHeader('6. HASIL ANALISIS & REKOMENDASI:', startY);
       renderWysiwygToPdf({
         doc,
         htmlString: mainData.rekomendasi_html,
