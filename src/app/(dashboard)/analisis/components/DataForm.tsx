@@ -2,6 +2,10 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 export default function DataForm({ mainData, setMainData, isDetailMode, detailData, setDetailData }: any) {
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,13 +146,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         </div>
         <div className="col-span-full">
           <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Editor WYSIWYG Kustom (Analisis HTML)</label>
-          <textarea 
-            rows={5}
-            value={mainData.analisis_html} 
-            onChange={e => setMainData({...mainData, analisis_html: e.target.value})} 
-            placeholder="Tuliskan format teks dengan tag HTML seperti <p>, <b>, <i>, <ul><li>..."
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 text-gray-900 font-mono text-sm focus:bg-white shadow-inner" 
-          />
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+             <ReactQuill 
+                theme="snow" 
+                value={mainData.analisis_html || ''} 
+                onChange={(val) => setMainData({...mainData, analisis_html: val})} 
+                className="h-64"
+             />
+          </div>
         </div>
       </div>
     </div>

@@ -99,7 +99,18 @@ export default function OCRPanel({ mainData, setMainData }: any) {
       } else {
         extractedText = await extractTextFromImage(fileUrl);
       }
-      setMainData({ ...mainData, ringkasan_ai: extractedText });
+      
+      // Auto-parse
+      const noSuratMatch = extractedText.match(/(?:nomor|no)[.\s]*(?::|;)?\s*([A-Za-z0-9/.-]+)/i);
+      const perihalMatch = extractedText.match(/(?:hal|perihal)[.\s]*(?::|;)?\s*([^\n]+)/i);
+      
+      setMainData({ 
+         ...mainData, 
+         ringkasan_ai: extractedText,
+         no_surat: noSuratMatch ? noSuratMatch[1].trim() : mainData.no_surat,
+         perihal: perihalMatch ? perihalMatch[1].trim() : mainData.perihal,
+      });
+      alert('Ekstraksi teks selesai! Data Utama otomatis terisi jika ditemukan format yang sesuai.');
     } catch (e) {
       console.error(e);
       alert('Ekstraksi Teks Gagal! Pastikan file tidak korup.');

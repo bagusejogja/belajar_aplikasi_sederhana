@@ -10,7 +10,7 @@ import RiwayatList from './components/RiwayatList';
 import { FileText, ScanText, FileSpreadsheet, History, Printer, Save } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
-  const [activeTab, setActiveTab] = useState('ocr');
+  const [activeTab, setActiveTab] = useState('main');
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
@@ -46,8 +46,8 @@ export default function AnalisisPaguPage() {
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
        if (historis) setHistorisData(historis);
 
-       // Defaultnya ke form, tapi jika di-trigger oleh Lihat PDF, akan diganti ke pdf di RiwayatList
-       setActiveTab('form');
+       // Defaultnya ke main, tapi jika di-trigger oleh Lihat PDF, akan diganti ke pdf di RiwayatList
+       setActiveTab('main');
     } catch (e) {
        console.error("Gagal load riwayat:", e);
     }
@@ -113,7 +113,15 @@ export default function AnalisisPaguPage() {
      });
      setDetailData([]);
      setHistorisData([]);
-     setActiveTab('ocr');
+     setActiveTab('main');
+  };
+
+  const scrollToSection = (id: string) => {
+    if (activeTab !== 'main') setActiveTab('main');
+    setTimeout(() => {
+       const el = document.getElementById(id);
+       if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   return (
@@ -125,14 +133,20 @@ export default function AnalisisPaguPage() {
         </h1>
         
         <nav className="flex flex-col gap-2 flex-1">
-          <button onClick={() => setActiveTab('ocr')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'ocr' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
+          <button onClick={() => scrollToSection('ocr')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
             <ScanText size={20} /> Ekstraksi OCR
           </button>
-          <button onClick={() => setActiveTab('form')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'form' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
+          <button onClick={() => scrollToSection('form')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
             <FileText size={20} /> Data Utama
           </button>
-          <button onClick={() => setActiveTab('pendukung')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'pendukung' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
+          <button onClick={() => scrollToSection('pendukung')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
             <FileSpreadsheet size={20} /> Data Pendukung
+          </button>
+          
+          <div className="my-2 border-t border-gray-100"></div>
+
+          <button onClick={() => setActiveTab('main')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'main' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
+            <FileText size={20} /> Form Analisis (All-in-One)
           </button>
           <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'pdf' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
             <Printer size={20} /> Cetak PDF
@@ -159,11 +173,17 @@ export default function AnalisisPaguPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-8 relative">
-         <div className="max-w-5xl mx-auto bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm h-full min-h-[85vh]">
-            {activeTab === 'ocr' && <OCRPanel mainData={mainData} setMainData={setMainData} />}
-            {activeTab === 'form' && <DataForm mainData={mainData} setMainData={setMainData} />}
-            {activeTab === 'pendukung' && <DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} />}
+      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-8 relative scroll-smooth">
+         <div className="max-w-5xl mx-auto bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm min-h-[85vh]">
+            {activeTab === 'main' && (
+               <div className="space-y-12 pb-24">
+                  <div id="ocr" className="scroll-mt-8"><OCRPanel mainData={mainData} setMainData={setMainData} /></div>
+                  <hr className="border-gray-100" />
+                  <div id="form" className="scroll-mt-8"><DataForm mainData={mainData} setMainData={setMainData} /></div>
+                  <hr className="border-gray-100" />
+                  <div id="pendukung" className="scroll-mt-8"><DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
+               </div>
+            )}
             {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} />}
             {activeTab === 'riwayat' && <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={setActiveTab} />}
          </div>
