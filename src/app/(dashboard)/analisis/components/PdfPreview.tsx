@@ -28,10 +28,13 @@ export default function PdfPreview({ mainData, detailData }: any) {
     doc.text(`No Surat: ${mainData.no_surat || '-'}`, 15, 35);
     doc.text(`Tanggal: ${mainData.tanggal_surat || '-'}`, 15, 41);
     doc.text(`Perihal: ${mainData.perihal || '-'}`, 15, 47);
+    if (mainData.posisi_pagu) {
+       doc.text(`Posisi Pagu 2026: Rp ${mainData.posisi_pagu}`, 15, 53);
+    }
     
-    doc.line(15, 52, 195, 52);
+    doc.line(15, 58, 195, 58);
 
-    let startY = 60;
+    let startY = 65;
 
     // Data Tabel
     if (detailData && detailData.length > 0) {
@@ -49,16 +52,38 @@ export default function PdfPreview({ mainData, detailData }: any) {
       startY = (doc as any).lastAutoTable.finalY + 15;
     }
 
-    // WYSIWYG
+    // WYSIWYG Ringkasan Substansi
     if (mainData.analisis_html) {
       doc.setFont('helvetica', 'bold');
-      doc.text('Hasil Analisis:', 15, startY);
+      doc.text('Ringkasan Substansi:', 15, startY);
       doc.setFont('helvetica', 'normal');
       
-      // Use our custom precise renderer
-      renderWysiwygToPdf({
+      const res = renderWysiwygToPdf({
         doc,
         htmlString: mainData.analisis_html,
+        x: 15,
+        y: startY + 8,
+        maxWidth: 180,
+        lineHeight: 6,
+        fontSize: 10
+      });
+      startY = res + 15;
+    }
+
+    // WYSIWYG Analisis & Rekomendasi
+    if (mainData.rekomendasi_html) {
+      // Check page break loosely
+      if (startY > 250) {
+         doc.addPage();
+         startY = 20;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text('Analisis & Rekomendasi (AI):', 15, startY);
+      doc.setFont('helvetica', 'normal');
+      
+      renderWysiwygToPdf({
+        doc,
+        htmlString: mainData.rekomendasi_html,
         x: 15,
         y: startY + 8,
         maxWidth: 180,

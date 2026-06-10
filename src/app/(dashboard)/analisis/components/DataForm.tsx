@@ -144,14 +144,29 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Total Anggaran</label>
           <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
         </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026</label>
+          <input type="text" value={mainData.posisi_pagu} onChange={e => setMainData({...mainData, posisi_pagu: e.target.value})} placeholder="Contoh: 1.500.000.000" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
+        </div>
         <div className="col-span-full">
-          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Editor WYSIWYG Kustom (Analisis HTML)</label>
+          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
              <ReactQuill 
                 theme="snow" 
                 value={mainData.analisis_html || ''} 
                 onChange={(val) => setMainData({...mainData, analisis_html: val})} 
-                className="h-64"
+                className="h-[200px]"
+             />
+          </div>
+        </div>
+        <div className="col-span-full mt-8">
+          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Analisis & Rekomendasi (AI Analysis)</label>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+             <ReactQuill 
+                theme="snow" 
+                value={mainData.rekomendasi_html || ''} 
+                onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
+                className="h-[250px]"
              />
           </div>
         </div>

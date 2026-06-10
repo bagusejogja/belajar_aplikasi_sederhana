@@ -25,6 +25,8 @@ export default function AnalisisPaguPage() {
     persen_serapan: '0',
     ringkasan_ai: '',
     analisis_html: '',
+    posisi_pagu: '',
+    rekomendasi_html: '',
     file_lampiran: '',
     link_lampiran: ''
   });
@@ -109,6 +111,7 @@ export default function AnalisisPaguPage() {
      setMainData({
         no_surat: '', tanggal_surat: '', perihal: '', unit_pengirim: '',
         total_anggaran: '0', total_realisasi: '0', persen_serapan: '0', ringkasan_ai: '', analisis_html: '',
+        posisi_pagu: '', rekomendasi_html: '',
         file_lampiran: '', link_lampiran: ''
      });
      setDetailData([]);
@@ -125,56 +128,59 @@ export default function AnalisisPaguPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -my-6">
-      {/* Sidebar Local */}
-      <div className="w-72 bg-white border-r border-gray-200 flex flex-col p-6 shadow-sm z-10">
-        <h1 className="text-xl font-black text-indigo-700 mb-8 flex items-center gap-2">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -my-6">
+      {/* Top Navbar */}
+      <div className="bg-white border-b border-gray-200 flex items-center justify-between px-8 py-4 shadow-sm z-10 shrink-0">
+        <h1 className="text-xl font-black text-indigo-700 flex items-center gap-2">
           <FileText size={24}/> Analisis Pagu
         </h1>
         
-        <nav className="flex flex-col gap-2 flex-1">
-          <button onClick={() => scrollToSection('ocr')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
-            <ScanText size={20} /> Ekstraksi OCR
-          </button>
-          <button onClick={() => scrollToSection('form')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
-            <FileText size={20} /> Data Utama
-          </button>
-          <button onClick={() => scrollToSection('pendukung')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all hover:bg-gray-50 text-gray-500`}>
-            <FileSpreadsheet size={20} /> Data Pendukung
-          </button>
-          
-          <div className="my-2 border-t border-gray-100"></div>
+        <nav className="flex items-center gap-1 mx-4 overflow-x-auto custom-scrollbar">
+          {activeTab === 'main' && (
+             <>
+               <button onClick={() => scrollToSection('ocr')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
+                 <ScanText size={16} /> Ekstraksi OCR
+               </button>
+               <button onClick={() => scrollToSection('form')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
+                 <FileText size={16} /> Data Utama
+               </button>
+               <button onClick={() => scrollToSection('pendukung')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
+                 <FileSpreadsheet size={16} /> Data Pendukung
+               </button>
+               <div className="h-6 w-[1px] bg-gray-200 mx-2"></div>
+             </>
+          )}
 
-          <button onClick={() => setActiveTab('main')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'main' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
-            <FileText size={20} /> Form Analisis (All-in-One)
+          <button onClick={() => setActiveTab('main')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'main' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
+            <FileText size={16} /> Form Analisis (All-in-One)
           </button>
-          <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'pdf' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
-            <Printer size={20} /> Cetak PDF
+          <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'pdf' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
+            <Printer size={16} /> Cetak PDF
           </button>
-          
-          <div className="my-2 border-t border-gray-100"></div>
-          
-          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all ${activeTab === 'riwayat' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'hover:bg-gray-50 text-gray-500'}`}>
-            <History size={20} /> Riwayat Analisis
+          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'riwayat' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
+            <History size={16} /> Riwayat Analisis
           </button>
         </nav>
 
-        <div className="pt-6 border-t border-gray-100 space-y-3">
+        <div className="flex items-center gap-3 shrink-0">
           {analisisId && (
-            <p className="text-center text-xs text-indigo-600 mb-2 truncate font-bold">Memuat: {mainData.no_surat}</p>
+            <div className="hidden lg:flex flex-col items-end mr-2">
+               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Sedang Edit</span>
+               <span className="text-xs text-indigo-600 font-black truncate max-w-[150px]">{mainData.no_surat || analisisId}</span>
+            </div>
           )}
-          <button onClick={handleBaru} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold transition-all shadow-sm">
-            + Analisis Baru
+          <button onClick={handleBaru} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold transition-all shadow-sm text-sm">
+            + Baru
           </button>
-          <button onClick={handleSave} disabled={loading} className="w-full flex justify-center items-center gap-2 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-100 transition-all disabled:opacity-50">
-            {loading ? <div className="w-5 h-5 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={18} />} Simpan Data
+          <button onClick={handleSave} disabled={loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-100 transition-all disabled:opacity-50 text-sm">
+            {loading ? <div className="w-4 h-4 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={16} />} Simpan
           </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-8 relative scroll-smooth">
-         <div className="max-w-5xl mx-auto bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm min-h-[85vh]">
+      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-6 lg:p-8 relative scroll-smooth">
+         <div className="max-w-7xl mx-auto bg-white border border-gray-100 rounded-[2rem] p-6 lg:p-10 shadow-sm min-h-[85vh]">
             {activeTab === 'main' && (
                <div className="space-y-12 pb-24">
                   <div id="ocr" className="scroll-mt-8"><OCRPanel mainData={mainData} setMainData={setMainData} /></div>

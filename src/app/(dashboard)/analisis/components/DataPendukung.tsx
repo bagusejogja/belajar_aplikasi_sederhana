@@ -65,7 +65,15 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {activeSubTab === 'realisasi' && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
-          <div className="p-4 bg-gray-50 flex justify-end">
+          <div className="p-4 bg-gray-50 flex justify-end gap-2 items-center">
+            <button onClick={() => {
+              const ws = XLSX.utils.json_to_sheet([{ No: 1, Uraian: 'Kegiatan A', Anggaran: 1000000, Realisasi: 500000, Serapan: '50%' }]);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Format");
+              XLSX.writeFile(wb, "Format_Realisasi.xlsx");
+            }} className="cursor-pointer bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center gap-2">
+              <FileSpreadsheet size={14}/> Download Format
+            </button>
             <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition-colors shadow-sm flex items-center gap-2">
               <FileSpreadsheet size={14}/> Import Excel
               <input type="file" className="hidden" accept=".xlsx, .xls, .csv" onChange={handleExcelUpload} />
@@ -139,8 +147,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
       )}
 
       {activeSubTab === 'historis' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1">
-          <div className="md:col-span-2 bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+        <div className="flex flex-col gap-6 flex-1">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[350px]">
             <div className="overflow-y-auto custom-scrollbar flex-1">
               <table className="w-full text-left text-sm text-gray-700">
                 <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
@@ -157,7 +165,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 <tbody className="divide-y divide-gray-100">
                   {historisData?.map((d: any, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-3 py-2"><input type="text" value={d.tahun} onChange={(e) => { const n=[...historisData]; n[idx].tahun=e.target.value; setHistorisData(n); }} className="w-12 bg-transparent outline-none focus:border-b border-emerald-500"/></td>
+                      <td className="px-3 py-2"><input type="text" value={d.tahun} onChange={(e) => { const n=[...historisData]; n[idx].tahun=e.target.value; setHistorisData(n); }} className="w-16 bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.pagu_awal} onChange={(e) => { const n=[...historisData]; n[idx].pagu_awal=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.tambah} onChange={(e) => { const n=[...historisData]; n[idx].tambah=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.kurang} onChange={(e) => { const n=[...historisData]; n[idx].kurang=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
@@ -174,7 +182,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 </tbody>
               </table>
             </div>
-            <div className="p-3 bg-gray-50 border-t border-gray-100">
+            <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
                <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                  <Plus size={16}/> Tambah Baris
                </button>
@@ -187,7 +195,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                Anda dapat melakukan copy tabel dari Excel (Kolom: Tahun, Pagu Awal, Tambah, Kurang, Total Pagu, Realisasi) lalu paste di kotak bawah ini.
              </p>
              <textarea 
-                className="w-full flex-1 p-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-700 text-xs font-mono resize-none custom-scrollbar shadow-sm"
+                className="w-full flex-1 min-h-[100px] p-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-700 text-xs font-mono resize-none custom-scrollbar shadow-sm"
                 placeholder="Paste data tabular di sini..."
                 value={pasteData}
                 onChange={e => setPasteData(e.target.value)}
