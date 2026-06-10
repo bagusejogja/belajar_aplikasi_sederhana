@@ -59,8 +59,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            }
         });
 
-        // Sort by prosentase descending
-        mapped.sort((a, b) => b._serapanVal - a._serapanVal);
+        // Sort by prosentase ascending (terkecil di atas)
+        mapped.sort((a, b) => a._serapanVal - b._serapanVal);
         
         // Tambahkan nomor urut
         const finalMapped = mapped.map((m, idx) => ({

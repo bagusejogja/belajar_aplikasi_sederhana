@@ -14,7 +14,10 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const targetYear = '2026';
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
   
-  const parseNum = (str: string) => parseFloat((str || '0').toString().replace(/[^0-9.-]+/g, ''));
+  const parseNum = (str: string) => {
+    const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
   const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
@@ -26,8 +29,19 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
       return;
     }
     setIsGeneratingAI(true);
+    
+    const aiContext = `[INFORMASI USULAN]
+Total Nominal Usulan: Rp ${mainData.total_anggaran || '0'}
+Sisa Kapasitas Pagu Saat Ini: Rp ${formatRp(totalSisaDetail)}
+Realisasi S.d. Saat Ini: Rp ${formatRp(totalRealisasiDetail)}
+Pagu Awal 2026: Rp ${historisYearRow.pagu_awal || '0'}
+Total Pagu Terkini 2026: Rp ${historisYearRow.total_pagu || '0'}
+
+[SURAT PENGAJUAN / OCR]
+${mainData.ringkasan_ai}`;
+
     try {
-      const res = await generateAnalysisFromText(mainData.ringkasan_ai);
+      const res = await generateAnalysisFromText(aiContext);
       if (res.success && res.data) {
         setMainData({
           ...mainData,

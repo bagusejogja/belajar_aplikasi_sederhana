@@ -78,7 +78,10 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     // 3. POSISI PAGU TAHUN 2026
     const targetYear = '2026';
     const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
-    const parseNum = (str: string) => parseFloat((str || '0').toString().replace(/[^0-9.-]+/g, ''));
+    const parseNum = (str: string) => {
+      const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+      return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+    };
     const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
     const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
@@ -122,6 +125,57 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
         styles: { fontSize: 9 }
       });
       startY = (doc as any).lastAutoTable.finalY + 10;
+
+      // Draw simple bar chart for Historis Data
+      const chartX = 17;
+      const chartY = startY;
+      const chartWidth = 176;
+      const chartHeight = 35;
+      
+      const maxVal = Math.max(...historisData.map((d: any) => Math.max(parseNum(d.total_pagu), parseNum(d.realisasi_historis))));
+      
+      if (maxVal > 0) {
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text('Grafik Pagu vs Realisasi (Multi-Tahun)', chartX, chartY - 3);
+        
+        doc.setDrawColor(200);
+        doc.line(chartX, chartY, chartX, chartY + chartHeight); 
+        doc.line(chartX, chartY + chartHeight, chartX + chartWidth, chartY + chartHeight); 
+        
+        const barWidth = 8;
+        const groupSpacing = 15;
+        let currentX = chartX + 10;
+        
+        historisData.forEach((d: any) => {
+          const paguVal = parseNum(d.total_pagu);
+          const realVal = parseNum(d.realisasi_historis);
+          const paguH = (paguVal / maxVal) * (chartHeight - 5);
+          const realH = (realVal / maxVal) * (chartHeight - 5);
+          
+          doc.setFillColor(59, 130, 246);
+          doc.rect(currentX, chartY + chartHeight - paguH, barWidth, paguH, 'F');
+          
+          doc.setFillColor(225, 29, 72);
+          doc.rect(currentX + barWidth, chartY + chartHeight - realH, barWidth, realH, 'F');
+          
+          doc.setTextColor(100);
+          doc.setFontSize(7);
+          doc.text(d.tahun || '', currentX + barWidth, chartY + chartHeight + 4, { align: 'center' });
+          currentX += (barWidth * 2) + groupSpacing;
+        });
+        
+        // Legend
+        doc.setFillColor(59, 130, 246);
+        doc.rect(chartX + chartWidth - 35, chartY - 5, 3, 3, 'F');
+        doc.text('Total Pagu', chartX + chartWidth - 30, chartY - 2);
+        
+        doc.setFillColor(225, 29, 72);
+        doc.rect(chartX + chartWidth - 15, chartY - 5, 3, 3, 'F');
+        doc.text('Realisasi', chartX + chartWidth - 10, chartY - 2);
+        
+        startY = chartY + chartHeight + 10;
+      }
     }
     
     // 5. DETAIL SERAPAN REALISASI BELANJA
