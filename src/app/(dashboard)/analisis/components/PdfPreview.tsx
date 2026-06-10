@@ -126,55 +126,105 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
       });
       startY = (doc as any).lastAutoTable.finalY + 10;
 
-      // Draw simple bar chart for Historis Data
+      // Advanced Combo Chart for Historis Data
       const chartX = 17;
       const chartY = startY;
       const chartWidth = 176;
-      const chartHeight = 35;
+      const chartHeight = 45;
       
-      const maxVal = Math.max(...historisData.map((d: any) => Math.max(parseNum(d.total_pagu), parseNum(d.realisasi_historis))));
+      const maxVal = Math.max(...historisData.map((d: any) => Math.max(parseNum(d.pagu_awal) + parseNum(d.tambah), parseNum(d.total_pagu), parseNum(d.realisasi_historis)))) || 1;
+      const minValRaw = Math.min(...historisData.map((d: any) => -parseNum(d.kurang)));
+      const minVal = Math.min(minValRaw, 0);
       
-      if (maxVal > 0) {
+      const range = maxVal - minVal;
+      const scale = (chartHeight - 10) / (range || 1);
+      const zeroY = chartY + 5 + (maxVal * scale);
+      
+      if (range > 0) {
         doc.setFontSize(8);
         doc.setTextColor(100);
-        doc.text('Grafik Pagu vs Realisasi (Multi-Tahun)', chartX, chartY - 3);
+        doc.text('Grafik Posisi Pagu Multi-Tahun', chartX, chartY - 2);
         
+        // Draw Zero Line
         doc.setDrawColor(200);
-        doc.line(chartX, chartY, chartX, chartY + chartHeight); 
-        doc.line(chartX, chartY + chartHeight, chartX + chartWidth, chartY + chartHeight); 
+        doc.line(chartX, zeroY, chartX + chartWidth, zeroY); 
         
-        const barWidth = 8;
-        const groupSpacing = 15;
+        const barWidth = 12;
+        const availableWidth = chartWidth - 20;
+        const stepX = availableWidth / (historisData.length || 1);
         let currentX = chartX + 10;
         
+        let pointsPagu: {x: number, y: number}[] = [];
+        let pointsRealisasi: {x: number, y: number}[] = [];
+        
         historisData.forEach((d: any) => {
-          const paguVal = parseNum(d.total_pagu);
-          const realVal = parseNum(d.realisasi_historis);
-          const paguH = (paguVal / maxVal) * (chartHeight - 5);
-          const realH = (realVal / maxVal) * (chartHeight - 5);
+          const paguAwal = parseNum(d.pagu_awal);
+          const tambah = parseNum(d.tambah);
+          const kurang = parseNum(d.kurang);
+          const totalPagu = parseNum(d.total_pagu);
+          const realisasi = parseNum(d.realisasi_historis);
           
+          const paguAwalH = paguAwal * scale;
+          const tambahH = tambah * scale;
+          const kurangH = kurang * scale;
+          
+          // Draw Pagu Awal (Blue)
           doc.setFillColor(59, 130, 246);
-          doc.rect(currentX, chartY + chartHeight - paguH, barWidth, paguH, 'F');
+          doc.rect(currentX, zeroY - paguAwalH, barWidth, paguAwalH, 'F');
           
-          doc.setFillColor(225, 29, 72);
-          doc.rect(currentX + barWidth, chartY + chartHeight - realH, barWidth, realH, 'F');
+          // Draw Penambahan (Green on top of Pagu Awal)
+          doc.setFillColor(16, 185, 129);
+          doc.rect(currentX, zeroY - paguAwalH - tambahH, barWidth, tambahH, 'F');
+          
+          // Draw Pengurangan (Red below zero line)
+          if (kurangH > 0) {
+            doc.setFillColor(239, 68, 68);
+            doc.rect(currentX, zeroY, barWidth, kurangH, 'F');
+          }
+          
+          // Record points for lines
+          const centerX = currentX + (barWidth / 2);
+          pointsPagu.push({ x: centerX, y: zeroY - (totalPagu * scale) });
+          pointsRealisasi.push({ x: centerX, y: zeroY - (realisasi * scale) });
           
           doc.setTextColor(100);
           doc.setFontSize(7);
-          doc.text(d.tahun || '', currentX + barWidth, chartY + chartHeight + 4, { align: 'center' });
-          currentX += (barWidth * 2) + groupSpacing;
+          doc.text(d.tahun || '', centerX, zeroY + (Math.abs(minVal) * scale) + 5, { align: 'center' });
+          currentX += stepX;
+        });
+        
+        // Draw Line Total Pagu (Cyan)
+        doc.setDrawColor(6, 182, 212);
+        doc.setLineWidth(0.5);
+        for(let i=0; i<pointsPagu.length-1; i++) {
+           doc.line(pointsPagu[i].x, pointsPagu[i].y, pointsPagu[i+1].x, pointsPagu[i+1].y);
+        }
+        pointsPagu.forEach(p => {
+           doc.setFillColor(6, 182, 212);
+           doc.circle(p.x, p.y, 1, 'F');
+        });
+        
+        // Draw Line Realisasi (Orange Dashed - approximate with short lines or solid for jsPDF simplicity, but let's draw solid orange)
+        doc.setDrawColor(245, 158, 11);
+        for(let i=0; i<pointsRealisasi.length-1; i++) {
+           doc.line(pointsRealisasi[i].x, pointsRealisasi[i].y, pointsRealisasi[i+1].x, pointsRealisasi[i+1].y);
+        }
+        pointsRealisasi.forEach(p => {
+           doc.setFillColor(245, 158, 11);
+           doc.circle(p.x, p.y, 1, 'F');
         });
         
         // Legend
-        doc.setFillColor(59, 130, 246);
-        doc.rect(chartX + chartWidth - 35, chartY - 5, 3, 3, 'F');
-        doc.text('Total Pagu', chartX + chartWidth - 30, chartY - 2);
+        const legendY = chartY - 2;
+        doc.setFontSize(7);
+        let lx = chartX + 45;
+        doc.setFillColor(59, 130, 246); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Pagu Awal', lx+4, legendY); lx += 20;
+        doc.setFillColor(16, 185, 129); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Penambahan', lx+4, legendY); lx += 22;
+        doc.setFillColor(239, 68, 68); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Pengurangan', lx+4, legendY); lx += 22;
+        doc.setFillColor(6, 182, 212); doc.circle(lx+1.5, legendY - 1, 1.5, 'F'); doc.text('Total Pagu', lx+4, legendY); lx += 20;
+        doc.setFillColor(245, 158, 11); doc.circle(lx+1.5, legendY - 1, 1.5, 'F'); doc.text('Realisasi', lx+4, legendY);
         
-        doc.setFillColor(225, 29, 72);
-        doc.rect(chartX + chartWidth - 15, chartY - 5, 3, 3, 'F');
-        doc.text('Realisasi', chartX + chartWidth - 10, chartY - 2);
-        
-        startY = chartY + chartHeight + 10;
+        startY = chartY + chartHeight + 15;
       }
     }
     
