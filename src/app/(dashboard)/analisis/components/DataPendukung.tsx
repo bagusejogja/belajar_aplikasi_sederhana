@@ -23,12 +23,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         const rows = data.slice(4); 
         
         let mapped: any[] = [];
+        let totalAnggaranUpload = 0;
 
         rows.forEach((row: any) => {
            const uraian = row[3]; // D
            const anggaranRaw = row[4]; // E
            const realisasiRaw = row[5]; // F
-           const serapanRaw = row[6]; // G
+           const sisaRaw = row[6]; // G (Sisa Anggaran)
 
            if (!uraian && !anggaranRaw) return; // Skip empty rows
 
@@ -36,19 +37,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            const anggaran = typeof anggaranRaw === 'number' ? anggaranRaw : parseFloat((anggaranRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
            
            if (anggaran > 0) {
+              totalAnggaranUpload += anggaran;
               const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseFloat((realisasiRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
-              let serapanVal = 0;
-              let serapanText = '0%';
-              
-              if (typeof serapanRaw === 'number') {
-                 // jika di excel tersimpan sebagai 0.5 untuk 50%
-                 serapanVal = serapanRaw <= 1 ? serapanRaw * 100 : serapanRaw;
-                 serapanText = serapanVal.toFixed(2) + '%';
-              } else {
-                 const sStr = (serapanRaw || '0').toString();
-                 serapanVal = parseFloat(sStr.replace(/[^0-9.-]+/g, ''));
-                 serapanText = sStr.includes('%') ? sStr : serapanVal + '%';
-              }
+              let sisa = typeof sisaRaw === 'number' ? sisaRaw : parseFloat((sisaRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
+              if (isNaN(sisa)) sisa = anggaran - realisasi;
+
+              let serapanVal = (realisasi / anggaran) * 100;
+              let serapanText = serapanVal.toFixed(2) + '%';
 
               // Format currency
               const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
@@ -57,6 +52,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                  uraian_kegiatan: uraian || '-',
                  anggaran: formatRp(anggaran),
                  realisasi: formatRp(realisasi),
+                 sisa_anggaran: formatRp(sisa),
                  persen_serapan: serapanText,
                  _serapanVal: serapanVal // for sorting
               });
@@ -72,10 +68,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            uraian_kegiatan: m.uraian_kegiatan,
            anggaran: m.anggaran,
            realisasi: m.realisasi,
+           sisa_anggaran: m.sisa_anggaran,
            persen_serapan: m.persen_serapan
         }));
 
         setDetailData(finalMapped);
+        const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+        setMainData((prev: any) => ({ ...prev, total_anggaran: formatRp(totalAnggaranUpload) }));
       };
       reader.readAsBinaryString(e.target.files[0]);
     }
@@ -133,6 +132,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <th className="px-4 py-3">Uraian Kegiatan</th>
                   <th className="px-4 py-3 text-right">Anggaran</th>
                   <th className="px-4 py-3 text-right">Realisasi</th>
+                  <th className="px-4 py-3 text-right">Sisa Anggaran</th>
                   <th className="px-4 py-3 text-center w-20">%</th>
                 </tr>
               </thead>
@@ -162,6 +162,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
                     </td>
                     <td className="px-4 py-3">
+                      <input type="text" value={d.sisa_anggaran} onChange={(e) => {
+                        const newD = [...detailData];
+                        newD[idx].sisa_anggaran = e.target.value;
+                        setDetailData(newD);
+                      }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                    </td>
+                    <td className="px-4 py-3">
                       <input type="text" value={d.persen_serapan} onChange={(e) => {
                         const newD = [...detailData];
                         newD[idx].persen_serapan = e.target.value;
@@ -172,7 +179,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 ))}
                 {(!detailData || detailData.length === 0) && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
                   </tr>
                 )}
               </tbody>
