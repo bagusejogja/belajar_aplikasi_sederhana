@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Landmark, Plus, Search, Edit2, Loader2, Save, X, AlertTriangle, Building2, Filter, User as UserIcon, Layers
 } from 'lucide-react';
+import Select from 'react-select';
 import { supabase } from '@/lib/supabase';
 
 // Tipe Data untuk gov_units
@@ -23,9 +24,9 @@ export default function GovUnitsPage() {
   const [loading, setLoading] = useState(true);
 
   // Filter states
-  const [filterJenis, setFilterJenis] = useState('');
-  const [filterPic, setFilterPic] = useState('');
-  const [filterGroup, setFilterGroup] = useState('');
+  const [filterJenis, setFilterJenis] = useState<any[]>([]);
+  const [filterPic, setFilterPic] = useState<any[]>([]);
+  const [filterGroup, setFilterGroup] = useState<any[]>([]);
   const [filterUnit, setFilterUnit] = useState('');
 
   // Modal State
@@ -135,9 +136,9 @@ export default function GovUnitsPage() {
   };
 
   // Mengambil unique value untuk dropdown filter
-  const uniqueJenis = useMemo(() => Array.from(new Set(units.map(u => u.jenis).filter(Boolean))), [units]);
-  const uniquePic = useMemo(() => Array.from(new Set(units.map(u => u.pic).filter(Boolean))), [units]);
-  const uniqueGroup = useMemo(() => Array.from(new Set(units.map(u => u.group_org).filter(Boolean))), [units]);
+  const uniqueJenis = useMemo(() => Array.from(new Set(units.map(u => u.jenis).filter(Boolean))).map(j => ({ value: j, label: j })), [units]);
+  const uniquePic = useMemo(() => Array.from(new Set(units.map(u => u.pic).filter(Boolean))).map(p => ({ value: p, label: p })), [units]);
+  const uniqueGroup = useMemo(() => Array.from(new Set(units.map(u => u.group_org).filter(Boolean))).map(g => ({ value: g, label: g })), [units]);
 
   // Filtering Logic
   const filteredUnits = useMemo(() => {
@@ -145,9 +146,9 @@ export default function GovUnitsPage() {
        // Hanya tampilkan status aktif (is_active === true)
        if (!u.is_active) return false;
 
-       const matchJenis = filterJenis === '' || u.jenis === filterJenis;
-       const matchPic = filterPic === '' || u.pic === filterPic;
-       const matchGroup = filterGroup === '' || u.group_org === filterGroup;
+       const matchJenis = filterJenis.length === 0 || filterJenis.some(f => f.value === u.jenis);
+       const matchPic = filterPic.length === 0 || filterPic.some(f => f.value === u.pic);
+       const matchGroup = filterGroup.length === 0 || filterGroup.some(f => f.value === u.group_org);
        const matchUnit = filterUnit ? 
           u.nama_unit.toLowerCase().includes(filterUnit.toLowerCase()) || 
           u.kode_unit.toLowerCase().includes(filterUnit.toLowerCase()) 
@@ -202,38 +203,41 @@ export default function GovUnitsPage() {
             
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Group <Layers size={12}/></label>
-               <select 
-                  value={filterGroup} 
-                  onChange={(e) => setFilterGroup(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
-               >
-                  <option value="">Semua Group</option>
-                  {uniqueGroup.map((grp: any, i) => <option key={i} value={grp}>{grp}</option>)}
-               </select>
+               <Select
+                  isMulti
+                  options={uniqueGroup}
+                  value={filterGroup}
+                  onChange={(val) => setFilterGroup(val as any[])}
+                  placeholder="Semua Group"
+                  className="text-sm font-bold react-select-container"
+                  classNamePrefix="react-select"
+               />
             </div>
 
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">PIC <UserIcon size={12}/></label>
-               <select 
-                  value={filterPic} 
-                  onChange={(e) => setFilterPic(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
-               >
-                  <option value="">Semua PIC</option>
-                  {uniquePic.map((pic: any, i) => <option key={i} value={pic}>{pic}</option>)}
-               </select>
+               <Select
+                  isMulti
+                  options={uniquePic}
+                  value={filterPic}
+                  onChange={(val) => setFilterPic(val as any[])}
+                  placeholder="Semua PIC"
+                  className="text-sm font-bold react-select-container"
+                  classNamePrefix="react-select"
+               />
             </div>
 
             <div>
                <label className="block text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1">Jenis <Building2 size={12}/></label>
-               <select 
-                  value={filterJenis} 
-                  onChange={(e) => setFilterJenis(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm appearance-none"
-               >
-                  <option value="">Semua Jenis</option>
-                  {uniqueJenis.map((jenis: any, i) => <option key={i} value={jenis}>{jenis}</option>)}
-               </select>
+               <Select
+                  isMulti
+                  options={uniqueJenis}
+                  value={filterJenis}
+                  onChange={(val) => setFilterJenis(val as any[])}
+                  placeholder="Semua Jenis"
+                  className="text-sm font-bold react-select-container"
+                  classNamePrefix="react-select"
+               />
             </div>
          </div>
       </div>
@@ -336,7 +340,7 @@ export default function GovUnitsPage() {
                            className="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-sky-500 outline-none text-sm appearance-none bg-white"
                         >
                            <option value="">-- Pilih PIC --</option>
-                           {uniquePic.map((pic: any, i) => <option key={i} value={pic}>{pic}</option>)}
+                           {uniquePic.map((pic: any, i) => <option key={i} value={pic.value}>{pic.label}</option>)}
                         </select>
                      </div>
                   </div>
