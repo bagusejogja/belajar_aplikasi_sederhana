@@ -1,8 +1,9 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List } from 'lucide-react';
+import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
+import html2canvas from 'html2canvas';
 
 export default function DashboardPenerimaan() {
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
@@ -13,6 +14,7 @@ export default function DashboardPenerimaan() {
   
   // UI States
   const [activeTab, setActiveTab] = useState<'REKAPITULASI' | 'DETAIL'>('DETAIL');
+  const dashboardRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -144,8 +146,28 @@ export default function DashboardPenerimaan() {
     }
   };
 
+  const downloadPNG = async () => {
+    if (!dashboardRef.current) return;
+    try {
+      toast.loading('Sedang merender gambar PNG...', { id: 'png-export' });
+      const canvas = await html2canvas(dashboardRef.current, {
+        scale: 2, // higher resolution
+        useCORS: true,
+        backgroundColor: '#f9fafb' // tailwind gray-50 fallback
+      });
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `Dashboard_Penerimaan_${tahun}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('Gambar PNG berhasil diunduh!', { id: 'png-export' });
+    } catch (err) {
+      toast.error('Gagal mengekspor gambar.', { id: 'png-export' });
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl animate-in fade-in duration-500">
+    <div className="space-y-6 max-w-7xl animate-in fade-in duration-500" ref={dashboardRef}>
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight">Monitoring Penerimaan</h1>
@@ -223,9 +245,14 @@ export default function DashboardPenerimaan() {
                      <List size={16}/> Detail Transaksi
                   </button>
                </div>
-               <button onClick={downloadCSV} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
-                 <Download size={16}/> Excel {activeTab === 'REKAPITULASI' ? 'Rekap' : 'Detail'}
-               </button>
+               <div className="flex gap-2">
+                 <button onClick={downloadPNG} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
+                   <ImageIcon size={16}/> Export PNG
+                 </button>
+                 <button onClick={downloadCSV} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
+                   <Download size={16}/> Excel {activeTab === 'REKAPITULASI' ? 'Rekap' : 'Detail'}
+                 </button>
+               </div>
             </div>
             
             {activeTab === 'REKAPITULASI' ? (
