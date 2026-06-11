@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 
 export default function DashboardPenerimaan() {
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
-  const [dataRealisasi, setDataRealisasi] = useState<any[]>([]);
+  const [dataPenerimaan, setDataPenerimaan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -14,7 +14,7 @@ export default function DashboardPenerimaan() {
     try {
       const res = await fetch(`/api/penerimaan/data?tahun=${tahun}`);
       const json = await res.json();
-      if (json.success) setDataRealisasi(json.data || []);
+      if (json.success) setDataPenerimaan(json.data || []);
     } catch (e) {
       toast.error('Gagal mengambil data dashboard');
     }
@@ -23,12 +23,16 @@ export default function DashboardPenerimaan() {
 
   useEffect(() => { fetchData(); }, [tahun]);
 
+  // Pisahkan data rencana dan realisasi
+  const dataRencana = dataPenerimaan.filter(d => d.tipe_data === 'RENCANA');
+  const dataRealisasi = dataPenerimaan.filter(d => d.tipe_data === 'REALISASI');
+
   // Kalkulasi Total Setahun
-  const totalRencana = dataRealisasi.reduce((acc, curr) => acc + (Number(curr.rencana) || 0), 0);
-  const totalRealisasi = dataRealisasi.reduce((acc, curr) => acc + (Number(curr.realisasi) || 0), 0);
+  const totalRencana = dataRencana.reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+  const totalRealisasi = dataRealisasi.reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
   const persentase = totalRencana > 0 ? ((totalRealisasi / totalRencana) * 100).toFixed(2) : 0;
 
-  // Persiapkan Data Bulanan (Gabungan dari semua jenis penerimaan per bulan)
+  // Persiapkan Data Bulanan
   const monthlyData: any[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -36,19 +40,18 @@ export default function DashboardPenerimaan() {
   let accumRealisasi = 0;
 
   for (let i = 1; i <= 12; i++) {
-    const dataBulanIni = dataRealisasi.filter(d => d.bulan === i);
-    const sumRencana = dataBulanIni.reduce((acc, curr) => acc + (Number(curr.rencana) || 0), 0);
-    const sumRealisasi = dataBulanIni.reduce((acc, curr) => acc + (Number(curr.realisasi) || 0), 0);
+    // Rencana biasanya diinput di bulan 1, jika ada tambahan di bulan X maka akan masuk di bulan X
+    const sumRencanaBulanIni = dataRencana.filter(d => d.bulan === i).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+    const sumRealisasiBulanIni = dataRealisasi.filter(d => d.bulan === i).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
 
-    accumRencana += sumRencana;
-    accumRealisasi += sumRealisasi;
+    accumRencana += sumRencanaBulanIni;
+    accumRealisasi += sumRealisasiBulanIni;
 
     monthlyData.push({
       bulanId: i,
       name: monthNames[i - 1],
-      Rencana: sumRencana,
-      Realisasi: sumRealisasi,
-      AkumulasiRencana: accumRencana,
+      RealisasiBulanan: sumRealisasiBulanIni,
+      RencanaAktif: accumRencana, // Ini akan menjadi flat line sesuai permintaan
       AkumulasiRealisasi: accumRealisasi
     });
   }
@@ -78,7 +81,7 @@ export default function DashboardPenerimaan() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Total Rencana</span></div>
+            <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Total Rencana Aktif</span></div>
             <div className="text-3xl font-black text-gray-900 relative">{formatRupiah(totalRencana)}</div>
          </div>
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
@@ -99,7 +102,7 @@ export default function DashboardPenerimaan() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Grafik Bulanan (Isolated Month) */}
           <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[450px]">
-            <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> TREN BULANAN (Target vs Realisasi)</h3>
+            <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2"><BarChart3 size={18} className="text-indigo-600"/> REALISASI BULANAN VS RENCANA</h3>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
@@ -107,8 +110,9 @@ export default function DashboardPenerimaan() {
                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 12, fill: '#6b7280'}} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} />
                 <Legend wrapperStyle={{fontSize: '12px', paddingTop: '20px'}} iconType="circle" />
-                <Bar dataKey="Rencana" fill="#e0e7ff" radius={[6, 6, 0, 0]} barSize={20} />
-                <Line type="monotone" dataKey="Realisasi" stroke="#4f46e5" strokeWidth={4} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                <Bar dataKey="RealisasiBulanan" name="Realisasi Bulan Ini" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={20} />
+                {/* Garis Rencana Flat */}
+                <Line type="stepAfter" dataKey="RencanaAktif" name="Pagu/Rencana Aktif" stroke="#f59e0b" strokeWidth={3} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -129,7 +133,7 @@ export default function DashboardPenerimaan() {
                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 12, fill: '#6b7280'}} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} />
                 <Legend wrapperStyle={{fontSize: '12px', paddingTop: '20px'}} iconType="circle" />
-                <Line type="step" dataKey="AkumulasiRencana" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="YTD Rencana" dot={false} />
+                <Line type="stepAfter" dataKey="RencanaAktif" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" name="YTD Rencana" dot={false} />
                 <Area type="monotone" dataKey="AkumulasiRealisasi" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorAkumRealisasi)" name="YTD Realisasi" />
               </AreaChart>
             </ResponsiveContainer>
