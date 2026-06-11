@@ -272,9 +272,9 @@ export default function DashboardPenerimaan() {
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
-                     {pivotData.length === 0 ? (
+                     {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
                        <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
-                     ) : pivotData.map((row) => (
+                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
                        <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
                          <td className="px-4 py-3 font-medium text-gray-900">{row.nama}</td>
                          <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
