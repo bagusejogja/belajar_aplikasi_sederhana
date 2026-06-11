@@ -36,10 +36,27 @@ export async function POST(req: NextRequest) {
       throw new Error("Payload harus berupa array 'data_penerimaan'");
     }
 
-    // Supabase upsert requires unique constraints. We have UNIQUE(jenis_penerimaan_id, tipe_data, tahun, bulan, trx_id, nominal)
+    // Periksa apakah ini input manual dari UI
+    const isManual = data_penerimaan.every((d: any) => d.trx_id === 'MANUAL');
+
+    if (isManual && data_penerimaan.length > 0) {
+      // Hapus data manual yang sudah ada untuk bulan, tahun, dan tipe data ini
+      const sample = data_penerimaan[0];
+      await supabase
+        .from('data_penerimaan')
+        .delete()
+        .match({ 
+          tahun: sample.tahun, 
+          bulan: sample.bulan, 
+          tipe_data: sample.tipe_data, 
+          trx_id: 'MANUAL' 
+        });
+    }
+
+    // Eksekusi insert (baik untuk manual maupun dari paste zone)
     const { data, error } = await supabase
       .from('data_penerimaan')
-      .upsert(data_penerimaan, { onConflict: 'jenis_penerimaan_id,tipe_data,tahun,bulan,trx_id,nominal' })
+      .insert(data_penerimaan)
       .select();
 
     if (error) throw error;
