@@ -10,7 +10,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from('jenis_penerimaan')
       .select('*')
-      .order('kode', { ascending: true });
+      .order('id', { ascending: true });
 
     if (error) throw error;
     return NextResponse.json({ success: true, data });
@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from('jenis_penerimaan')
         .update({ 
-          kode: body.kode, 
           nama_penerimaan: body.nama_penerimaan, 
           status: body.status,
+          catatan: body.catatan,
           updated_at: new Date().toISOString()
         })
         .eq('id', body.id)
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
       const { data, error } = await supabase
         .from('jenis_penerimaan')
         .insert([{ 
-          kode: body.kode, 
           nama_penerimaan: body.nama_penerimaan,
-          status: body.status || 'active'
+          status: body.status || 'active',
+          catatan: body.catatan
         }])
         .select();
       if (error) throw error;

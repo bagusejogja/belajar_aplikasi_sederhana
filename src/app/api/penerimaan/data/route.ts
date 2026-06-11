@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     
     let query = supabase
       .from('data_penerimaan')
-      .select('*, jenis_penerimaan(kode, nama_penerimaan)');
+      .select('*, jenis_penerimaan(id, nama_penerimaan)');
       
     if (tahun) {
       query = query.eq('tahun', tahun);

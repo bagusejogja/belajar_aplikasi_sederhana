@@ -32,7 +32,7 @@ export default function InputPenerimaan() {
         const ext = existingData.find((d: any) => d.jenis_penerimaan_id === master.id && d.bulan.toString() === bulan);
         return {
           jenis_penerimaan_id: master.id,
-          kode: master.kode,
+          id: master.id,
           nama: master.nama_penerimaan,
           tahun: tahun,
           bulan: bulan,
@@ -65,35 +65,54 @@ export default function InputPenerimaan() {
     setDataInput(newData);
   };
 
-  const handlePasteProcess = () => {
+  const handlePasteProcess = async () => {
     if (!pasteData.trim()) return;
     
-    const rows = pasteData.split('\\n');
-    let newDataInput = [...dataInput];
+    const rows = pasteData.split('\n');
+    let multiPayload: any[] = [];
     let matchCount = 0;
 
     rows.forEach(row => {
-      const cols = row.split('\\t');
-      if (cols.length >= 3) {
-        const kode = cols[0].trim();
-        const rencana = parseInt(cols[1].replace(/[^0-9]/g, '')) || 0;
-        const realisasi = parseInt(cols[2].replace(/[^0-9]/g, '')) || 0;
+      const cols = row.split('\t');
+      if (cols.length >= 4) {
+        const id_penerimaan = parseInt(cols[0].trim()) || 0;
+        const bln = parseInt(cols[1].trim()) || 0;
+        const rencana = parseInt(cols[2].replace(/[^0-9]/g, '')) || 0;
+        const realisasi = parseInt(cols[3].replace(/[^0-9]/g, '')) || 0;
 
-        const idx = newDataInput.findIndex(d => d.kode.toLowerCase() === kode.toLowerCase());
-        if (idx !== -1) {
-          newDataInput[idx].rencana = rencana;
-          newDataInput[idx].realisasi = realisasi;
-          matchCount++;
+        if (id_penerimaan > 0 && bln >= 1 && bln <= 12) {
+           multiPayload.push({
+              jenis_penerimaan_id: id_penerimaan,
+              tahun: tahun, // Tahun yang aktif di dropdown
+              bulan: bln,
+              rencana: rencana,
+              realisasi: realisasi
+           });
+           matchCount++;
         }
       }
     });
 
-    setDataInput(newDataInput);
-    setPasteData('');
     if (matchCount > 0) {
-      toast.success(`Berhasil mem-paste dan mencocokkan ${matchCount} data!`);
+      try {
+        const res = await fetch('/api/penerimaan/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data_penerimaan: multiPayload })
+        });
+        const json = await res.json();
+        if (json.success) {
+          toast.success(`Berhasil menyimpan ${matchCount} data paste multi-bulan!`);
+          setPasteData('');
+          fetchMasterAndData(); // Reload tabel untuk mencerminkan perubahan jika di bulan yg sama
+        } else {
+          toast.error('Gagal paste: ' + json.error);
+        }
+      } catch (e: any) {
+        toast.error('Error saat paste: ' + e.message);
+      }
     } else {
-      toast.error('Tidak ada Kode Penerimaan yang cocok dari data Paste.');
+      toast.error('Tidak ada data valid yang bisa dibaca. Pastikan format: ID | BULAN | RENCANA | REALISASI');
     }
   };
 
@@ -157,7 +176,7 @@ export default function InputPenerimaan() {
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-4 w-32">Kode</th>
+                <th className="px-4 py-4 w-20 text-center">ID</th>
                 <th className="px-4 py-4">Nama Penerimaan</th>
                 <th className="px-4 py-4 text-right w-48 text-indigo-600">Anggaran (Rencana)</th>
                 <th className="px-4 py-4 text-right w-48 text-emerald-600">Realisasi</th>
@@ -170,7 +189,7 @@ export default function InputPenerimaan() {
                 <tr><td colSpan={4} className="p-8 text-center text-gray-500 italic">Tidak ada Master Jenis Penerimaan yang aktif. Silakan tambah di menu Master.</td></tr>
               ) : dataInput.map((row) => (
                 <tr key={row.jenis_penerimaan_id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono font-bold text-gray-900">{row.kode}</td>
+                  <td className="px-4 py-3 font-mono font-bold text-gray-900 text-center">{row.id}</td>
                   <td className="px-4 py-3 font-medium text-gray-700">{row.nama}</td>
                   <td className="px-4 py-3">
                     <input 
@@ -204,19 +223,19 @@ export default function InputPenerimaan() {
       </div>
 
       <div className="bg-indigo-50/50 border border-indigo-100 rounded-[2rem] p-6 shadow-sm">
-         <div className="flex items-center gap-2 text-indigo-800 font-black mb-2"><ClipboardPaste size={20}/> Bulk Upload (Paste Zone)</div>
-         <p className="text-sm text-indigo-600/80 mb-4 font-medium flex items-center gap-1.5"><Info size={16}/> Copy data dari Excel (tanpa header) dengan urutan 3 kolom: <b>KODE | RENCANA | REALISASI</b></p>
+         <div className="flex items-center gap-2 text-indigo-800 font-black mb-2"><ClipboardPaste size={20}/> Bulk Upload Multi-Bulan (Paste Zone)</div>
+         <p className="text-sm text-indigo-600/80 mb-4 font-medium flex items-center gap-1.5"><Info size={16}/> Copy data dari Excel (tanpa header) dengan urutan 4 kolom: <b>ID PENERIMAAN | BULAN (1-12) | RENCANA | REALISASI</b>. Data yang dipaste akan <b>langsung tersimpan</b> ke database untuk tahun {tahun}.</p>
          
          <div className="flex gap-4">
             <textarea 
                value={pasteData}
                onChange={(e) => setPasteData(e.target.value)}
-               placeholder="PNP-01    500000000    200000000&#10;BPU-02    100000000    5000000"
+               placeholder="1    1    500000000    200000000&#10;1    2    100000000    5000000&#10;2    1    400000       400000"
                className="flex-1 bg-white border border-indigo-200 rounded-2xl p-4 font-mono text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 min-h-[120px] resize-none"
             />
-            <button onClick={handlePasteProcess} disabled={!pasteData.trim()} className="bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-500 text-white px-6 rounded-2xl font-bold transition-all shadow-md flex flex-col items-center justify-center gap-2 min-w-[140px]">
+            <button onClick={handlePasteProcess} disabled={!pasteData.trim() || loading} className="bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-500 text-white px-6 rounded-2xl font-bold transition-all shadow-md flex flex-col items-center justify-center gap-2 min-w-[140px]">
                <ClipboardPaste size={24}/>
-               Terapkan Data
+               Simpan Paste
             </button>
          </div>
       </div>

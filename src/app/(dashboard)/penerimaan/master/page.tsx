@@ -7,7 +7,7 @@ export default function MasterPenerimaan() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ id: null, kode: '', nama_penerimaan: '', status: 'active' });
+  const [formData, setFormData] = useState({ id: null, nama_penerimaan: '', status: 'active', catatan: '' });
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,7 +52,7 @@ export default function MasterPenerimaan() {
           <p className="text-gray-500 mt-1">Kelola daftar jenis penerimaan untuk kebutuhan input realisasi.</p>
         </div>
         <button 
-          onClick={() => { setFormData({ id: null, kode: '', nama_penerimaan: '', status: 'active' }); setShowModal(true); }}
+          onClick={() => { setFormData({ id: null, nama_penerimaan: '', status: 'active', catatan: '' }); setShowModal(true); }}
           className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-md flex items-center gap-2"
         >
           <Plus size={18}/> Tambah Baru
@@ -63,9 +63,10 @@ export default function MasterPenerimaan() {
         <table className="w-full text-left text-sm text-gray-700">
           <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs">
             <tr>
-              <th className="px-6 py-4">Kode</th>
+              <th className="px-6 py-4 w-20">ID</th>
               <th className="px-6 py-4">Nama Penerimaan</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Catatan</th>
               <th className="px-6 py-4 w-24 text-center">Aksi</th>
             </tr>
           </thead>
@@ -76,7 +77,7 @@ export default function MasterPenerimaan() {
               <tr><td colSpan={4} className="p-8 text-center text-gray-500 italic">Belum ada data jenis penerimaan.</td></tr>
             ) : data.map((item, idx) => (
               <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 font-mono font-bold text-gray-900">{item.kode}</td>
+                <td className="px-6 py-4 font-mono font-bold text-gray-900">{item.id}</td>
                 <td className="px-6 py-4 font-medium text-gray-800">{item.nama_penerimaan}</td>
                 <td className="px-6 py-4">
                   {item.status === 'active' ? (
@@ -89,6 +90,7 @@ export default function MasterPenerimaan() {
                      </span>
                   )}
                 </td>
+                <td className="px-6 py-4 text-gray-500 text-sm max-w-xs truncate">{item.catatan || '-'}</td>
                 <td className="px-6 py-4 text-center">
                   <button 
                     onClick={() => { setFormData(item); setShowModal(true); }}
@@ -111,14 +113,6 @@ export default function MasterPenerimaan() {
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Kode Penerimaan</label>
-                <input 
-                  type="text" required value={formData.kode} onChange={e => setFormData({...formData, kode: e.target.value})}
-                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 focus:bg-white transition-all font-mono"
-                  placeholder="Misal: PNBP-01"
-                />
-              </div>
-              <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nama Penerimaan</label>
                 <input 
                   type="text" required value={formData.nama_penerimaan} onChange={e => setFormData({...formData, nama_penerimaan: e.target.value})}
@@ -135,6 +129,14 @@ export default function MasterPenerimaan() {
                   <option value="active">AKTIF</option>
                   <option value="inactive">NON-AKTIF</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Catatan (Opsional)</label>
+                <textarea 
+                  value={formData.catatan} onChange={e => setFormData({...formData, catatan: e.target.value})}
+                  className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 focus:bg-white transition-all resize-none h-24"
+                  placeholder="Catatan tambahan..."
+                />
               </div>
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all">Batal</button>
