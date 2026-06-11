@@ -75,23 +75,35 @@ export default function InputPenerimaan() {
     let multiPayload: any[] = [];
     let matchCount = 0;
 
-    rows.forEach(row => {
+    rows.forEach((row, i) => {
       const cols = row.split('\t');
-      if (cols.length >= 4) {
-        const id_penerimaan = parseInt(cols[0].trim()) || 0;
-        const tipe_data_raw = cols[1].trim().toUpperCase();
-        const bln = parseInt(cols[2].trim()) || 0;
-        const nominal = parseInt(cols[3].replace(/[^0-9]/g, '')) || 0;
+      if (cols.length >= 5) {
+        const id_penerimaan = parseInt(cols[0]?.trim()) || 0;
+        const tipe_data_raw = cols[1]?.trim().toUpperCase();
+        const thn = cols[2]?.trim();
+        const bln = parseInt(cols[3]?.trim()) || 0;
+        const nominal = parseInt(cols[4]?.replace(/[^0-9]/g, '')) || 0;
+        
+        const nama_unit = cols[5]?.trim() || '';
+        const kode_unit = cols[6]?.trim() || '';
+        const tanggal_pembayaran = cols[7]?.trim() || '';
+        const trx_id = cols[8]?.trim() || `PASTE-${Date.now()}-${i}`;
+        const payment_code = cols[9]?.trim() || '';
 
         const tipe_data = (tipe_data_raw === 'RENCANA' || tipe_data_raw === 'REALISASI') ? tipe_data_raw : '';
 
-        if (id_penerimaan > 0 && bln >= 1 && bln <= 12 && tipe_data) {
+        if (id_penerimaan > 0 && bln >= 1 && bln <= 12 && tipe_data && thn?.length === 4) {
            multiPayload.push({
               jenis_penerimaan_id: id_penerimaan,
               tipe_data: tipe_data,
-              tahun: tahun,
+              tahun: thn,
               bulan: bln,
-              nominal: nominal
+              nominal: nominal,
+              nama_unit: nama_unit,
+              kode_unit: kode_unit,
+              tanggal_pembayaran: tanggal_pembayaran,
+              trx_id: trx_id,
+              payment_code: payment_code
            });
            matchCount++;
         }
@@ -128,7 +140,8 @@ export default function InputPenerimaan() {
         tipe_data: tipeInput,
         tahun: d.tahun,
         bulan: parseInt(d.bulan),
-        nominal: d.nominal
+        nominal: d.nominal,
+        trx_id: 'MANUAL'
       }));
 
       const res = await fetch('/api/penerimaan/data', {
@@ -222,13 +235,13 @@ export default function InputPenerimaan() {
 
       <div className="bg-indigo-50/50 border border-indigo-100 rounded-[2rem] p-6 shadow-sm">
          <div className="flex items-center gap-2 text-indigo-800 font-black mb-2"><ClipboardPaste size={20}/> Bulk Upload Multi-Bulan (Paste Zone)</div>
-         <p className="text-sm text-indigo-600/80 mb-4 font-medium flex items-center gap-1.5"><Info size={16}/> Copy data dari Excel (tanpa header) dengan urutan 4 kolom: <b>ID PENERIMAAN | TIPE | BULAN | NOMINAL</b>. Pastikan kolom Tipe diisi "RENCANA" atau "REALISASI".</p>
+         <p className="text-sm text-indigo-600/80 mb-4 font-medium flex items-center gap-1.5"><Info size={16}/> Copy data dari Excel (tanpa header) dengan urutan 10 kolom: <b>ID PENERIMAAN | TIPE | TAHUN | BULAN | NOMINAL | NAMA UNIT | KODE UNIT | TGL BAYAR | TRX ID | PAYMENT CODE</b>. Kolom ke-6 s.d. 10 bersifat opsional (bisa dikosongkan/di-skip di Excel).</p>
          
          <div className="flex gap-4">
             <textarea 
                value={pasteData}
                onChange={(e) => setPasteData(e.target.value)}
-               placeholder="1    RENCANA      1    500000000&#10;1    REALISASI    1    45000000&#10;1    REALISASI    2    60000000"
+               placeholder="1    RENCANA      2024    1    500000000&#10;1    REALISASI    2024    1    45000000    Unit A    001    2024-01-05    TRX-998    PAY-554"
                className="flex-1 bg-white border border-indigo-200 rounded-2xl p-4 font-mono text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 min-h-[120px] resize-none"
             />
             <button onClick={handlePasteProcess} disabled={!pasteData.trim() || loading} className="bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-500 text-white px-6 rounded-2xl font-bold transition-all shadow-md flex flex-col items-center justify-center gap-2 min-w-[140px]">
