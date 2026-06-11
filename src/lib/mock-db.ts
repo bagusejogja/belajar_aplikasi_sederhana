@@ -50,7 +50,13 @@ export const menuList: MenuItem[] = [
   { title: 'Gaji PNS', path: '/gaji-pns', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  
+  { title: 'Laporan Komparasi', path: '/komparasi-laporan', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+
+  // --- PENERIMAAN ---
+  { title: 'Dashboard Penerimaan', path: '/penerimaan', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER'], group: 'Penerimaan' },
+  { title: 'Input Penerimaan', path: '/penerimaan/input', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Penerimaan' },
+  { title: 'Master Penerimaan', path: '/penerimaan/master', icon: 'Settings', roles: ['ADMIN', 'MANAGER'], group: 'Penerimaan' },
+
   // --- PERSURATAN ---
   { title: 'Daftar Arsip Surat', path: '/surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
   { title: 'Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
