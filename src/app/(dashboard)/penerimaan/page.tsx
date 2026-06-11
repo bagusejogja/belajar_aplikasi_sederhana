@@ -12,7 +12,7 @@ export default function DashboardPenerimaan() {
   const [loading, setLoading] = useState(true);
   
   // UI States
-  const [activeTab, setActiveTab] = useState<'REKAPITULASI' | 'DETAIL'>('REKAPITULASI');
+  const [activeTab, setActiveTab] = useState<'REKAPITULASI' | 'DETAIL'>('DETAIL');
 
   const fetchData = async () => {
     setLoading(true);
@@ -103,31 +103,28 @@ export default function DashboardPenerimaan() {
   // Function to download CSV
   const downloadCSV = () => {
     if (activeTab === 'DETAIL') {
-      const headers = ['ID', 'TIPE DATA', 'TAHUN', 'BULAN', 'NOMINAL', 'NAMA UNIT', 'KODE UNIT', 'TANGGAL BAYAR', 'TRX ID', 'PAYMENT CODE'];
-      const rows = filteredData.map(d => [
-        d.jenis_penerimaan_id,
-        d.tipe_data,
-        d.tahun,
-        d.bulan,
-        d.nominal,
-        `"${d.nama_unit || ''}"`,
-        `"${d.kode_unit || ''}"`,
-        `"${d.tanggal_pembayaran || ''}"`,
-        `"${d.trx_id || ''}"`,
-        `"${d.payment_code || ''}"`
+      const headers = ['Nama Penerimaan', 'Total Rencana', 'Total Realisasi', 'Selisih', '% Capaian'];
+      const rows = pivotData.map(d => [
+        `"${d.nama || ''}"`,
+        d.rencana,
+        d.total,
+        d.selisih,
+        d.persentase
       ]);
 
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `data_penerimaan_${tahun}_detail.csv`);
+      link.setAttribute("download", `data_penerimaan_${tahun}_ringkasan.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } else {
       const headers = ['Nama Penerimaan', 'Pagu (Rencana)', ...monthNames, 'Total Realisasi', 'Selisih', '% Capaian'];
-      const rows = pivotData.map(p => [
+      // Filter pivotData: dont export zeros if both rencana and total are 0
+      const activePivot = pivotData.filter(p => p.rencana > 0 || p.total > 0);
+      const rows = activePivot.map(p => [
         `"${p.nama}"`,
         p.rencana,
         ...p.bulanan,
@@ -245,9 +242,9 @@ export default function DashboardPenerimaan() {
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
-                     {pivotData.length === 0 ? (
+                     {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
                        <tr><td colSpan={16} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
-                     ) : pivotData.map((row) => (
+                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
                        <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
                          <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[200px]" title={row.nama}>{row.nama}</td>
                          <td className="px-4 py-3 font-bold text-right text-indigo-700 border-r border-gray-100 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
@@ -267,31 +264,23 @@ export default function DashboardPenerimaan() {
                  <table className="w-full text-left text-sm text-gray-700">
                    <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] whitespace-nowrap">
                      <tr>
-                       <th className="px-4 py-3">Bulan</th>
-                       <th className="px-4 py-3">Tipe</th>
-                       <th className="px-4 py-3 text-right">Nominal</th>
-                       <th className="px-4 py-3">Nama Unit</th>
-                       <th className="px-4 py-3">Kode Unit</th>
-                       <th className="px-4 py-3">Tgl Bayar</th>
-                       <th className="px-4 py-3">Trx ID</th>
-                       <th className="px-4 py-3">Payment Code</th>
+                       <th className="px-4 py-3">Nama Penerimaan</th>
+                       <th className="px-4 py-3 text-right">Total Rencana</th>
+                       <th className="px-4 py-3 text-right">Total Realisasi</th>
+                       <th className="px-4 py-3 text-right">Selisih</th>
+                       <th className="px-4 py-3 text-right">% Capaian</th>
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-gray-100">
-                     {filteredData.length === 0 ? (
-                       <tr><td colSpan={8} className="p-8 text-center text-gray-500 italic">Tidak ada transaksi.</td></tr>
-                     ) : filteredData.sort((a,b) => a.bulan - b.bulan).map((row) => (
+                     {pivotData.length === 0 ? (
+                       <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
+                     ) : pivotData.map((row) => (
                        <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
-                         <td className="px-4 py-3 font-mono text-center bg-gray-50/50">{row.bulan}</td>
-                         <td className="px-4 py-3 font-bold">
-                           <span className={`px-2 py-1 rounded text-[10px] uppercase ${row.tipe_data === 'RENCANA' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>{row.tipe_data}</span>
-                         </td>
-                         <td className="px-4 py-3 font-bold text-right text-gray-900">{formatRupiah(row.nominal)}</td>
-                         <td className="px-4 py-3">{row.nama_unit || '-'}</td>
-                         <td className="px-4 py-3">{row.kode_unit || '-'}</td>
-                         <td className="px-4 py-3">{row.tanggal_pembayaran || '-'}</td>
-                         <td className="px-4 py-3 font-mono text-xs text-gray-500">{row.trx_id || '-'}</td>
-                         <td className="px-4 py-3 font-mono text-xs text-gray-500">{row.payment_code || '-'}</td>
+                         <td className="px-4 py-3 font-medium text-gray-900">{row.nama}</td>
+                         <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
+                         <td className="px-4 py-3 font-bold text-right text-emerald-700 bg-emerald-50/30">{formatRupiah(row.total)}</td>
+                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-red-500' : 'text-gray-900'}`}>{formatRupiah(row.selisih)}</td>
+                         <td className="px-4 py-3 font-bold text-right">{row.persentase}%</td>
                        </tr>
                      ))}
                    </tbody>
