@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 
 export default function DashboardPenerimaan() {
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
@@ -150,19 +150,18 @@ export default function DashboardPenerimaan() {
     if (!dashboardRef.current) return;
     try {
       toast.loading('Sedang merender gambar PNG...', { id: 'png-export' });
-      const canvas = await html2canvas(dashboardRef.current, {
-        scale: 2, // higher resolution
-        useCORS: true,
-        backgroundColor: '#f9fafb' // tailwind gray-50 fallback
+      const dataUrl = await htmlToImage.toPng(dashboardRef.current, {
+        quality: 1,
+        backgroundColor: '#f9fafb',
+        pixelRatio: 2 // High Resolution
       });
-      const dataUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `Dashboard_Penerimaan_${tahun}.png`;
       link.href = dataUrl;
       link.click();
       toast.success('Gambar PNG berhasil diunduh!', { id: 'png-export' });
-    } catch (err) {
-      toast.error('Gagal mengekspor gambar.', { id: 'png-export' });
+    } catch (err: any) {
+      toast.error('Gagal mengekspor gambar: ' + err.message, { id: 'png-export' });
     }
   };
 
