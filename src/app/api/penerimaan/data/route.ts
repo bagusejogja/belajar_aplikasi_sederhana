@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
       throw new Error("Payload harus berupa array 'data_penerimaan'");
     }
 
-    // Supabase upsert requires unique constraints. We have UNIQUE(jenis_penerimaan_id, tipe_data, tahun, bulan, trx_id)
+    // Supabase upsert requires unique constraints. We have UNIQUE(jenis_penerimaan_id, tipe_data, tahun, bulan, trx_id, nominal)
     const { data, error } = await supabase
       .from('data_penerimaan')
-      .upsert(data_penerimaan, { onConflict: 'jenis_penerimaan_id,tipe_data,tahun,bulan,trx_id' })
+      .upsert(data_penerimaan, { onConflict: 'jenis_penerimaan_id,tipe_data,tahun,bulan,trx_id,nominal' })
       .select();
 
     if (error) throw error;

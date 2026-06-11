@@ -74,6 +74,7 @@ export default function InputPenerimaan() {
     const rows = pasteData.split('\n');
     let multiPayload: any[] = [];
     let matchCount = 0;
+    const uniqueTracker = new Set();
 
     rows.forEach((row, i) => {
       const cols = row.split('\t');
@@ -93,7 +94,7 @@ export default function InputPenerimaan() {
         const tipe_data = (tipe_data_raw === 'RENCANA' || tipe_data_raw === 'REALISASI') ? tipe_data_raw : '';
 
         if (id_penerimaan > 0 && bln >= 1 && bln <= 12 && tipe_data && thn?.length === 4) {
-           multiPayload.push({
+           const rowData = {
               jenis_penerimaan_id: id_penerimaan,
               tipe_data: tipe_data,
               tahun: thn,
@@ -104,8 +105,14 @@ export default function InputPenerimaan() {
               tanggal_pembayaran: tanggal_pembayaran,
               trx_id: trx_id,
               payment_code: payment_code
-           });
-           matchCount++;
+           };
+           // Deduplikasi murni jika ada baris yg 100% sama persis di copy paste berulang kali
+           const rowString = JSON.stringify(rowData);
+           if (!uniqueTracker.has(rowString)) {
+              uniqueTracker.add(rowString);
+              multiPayload.push(rowData);
+              matchCount++;
+           }
         }
       }
     });
