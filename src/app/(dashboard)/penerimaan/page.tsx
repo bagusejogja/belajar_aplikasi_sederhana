@@ -123,11 +123,13 @@ export default function DashboardPenerimaan() {
   const kekurangan = totalRencana - totalRealisasi;
   const isSurplus = kekurangan < 0;
 
-  const comparisonData = pivotData.filter(p => p.rencana > 0 || p.total > 0).map(p => ({
-    name: p.nama,
-    Rencana: p.rencana,
-    Realisasi: p.total
-  }));
+  const comparisonData = pivotData.filter(p => p.rencana > 0 || p.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .map(p => ({
+      name: p.nama,
+      Rencana: p.rencana,
+      Realisasi: p.total
+    }));
 
   const gaugeValue = Math.min(Number(persentase), 100);
   const gaugeColor = Number(persentase) >= 100 ? '#10b981' : Number(persentase) >= 50 ? '#f59e0b' : '#ef4444';
@@ -240,8 +242,8 @@ export default function DashboardPenerimaan() {
            <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-                 <XAxis dataKey="tahun" tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                 <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={65} axisLine={false} tickLine={false} />
                  <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
                  <Legend wrapperStyle={{fontSize: '10px'}} iconType="circle" />
                  <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={15} />
@@ -321,10 +323,10 @@ export default function DashboardPenerimaan() {
                    <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada realisasi</div>
                 ) : (
                    <ResponsiveContainer width="100%" height="100%">
-                      <ComposedChart data={comparisonData} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                      <ComposedChart data={comparisonData} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0"/>
-                         <XAxis type="number" tickFormatter={formatMilyar} tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                         <YAxis type="category" dataKey="name" tick={{fontSize: 10, fill: '#374151', width: 100}} axisLine={false} tickLine={false} width={120} />
+                         <XAxis type="number" tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#6b7280', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                         <YAxis type="category" dataKey="name" tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} width={180} />
                          <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
                          <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
                          <Bar dataKey="Rencana" fill="#f87171" radius={[0, 4, 4, 0]} barSize={12} />
