@@ -127,14 +127,6 @@ export default function DashboardPenerimaan() {
   const kekurangan = totalRencana - totalRealisasi;
   const isSurplus = kekurangan < 0;
 
-  const comparisonData = pivotData.filter(p => p.rencana > 0 || p.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .map(p => ({
-      name: p.nama,
-      Rencana: p.rencana,
-      Realisasi: p.total
-    }));
-
   const gaugeValue = Math.min(Number(persentase), 100);
   const gaugeColor = Number(persentase) >= 100 ? '#10b981' : Number(persentase) >= 50 ? '#f59e0b' : '#ef4444';
   const gaugeData = [
@@ -147,6 +139,13 @@ export default function DashboardPenerimaan() {
     if (p >= 100) return <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
     if (p >= 50) return <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
     return <span className="inline-block px-2 py-1 bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
+  };
+
+  const getProgressColor = (percent: string | number) => {
+    const p = Number(percent);
+    if (p >= 100) return 'bg-emerald-500';
+    if (p >= 50) return 'bg-amber-400';
+    return 'bg-rose-500';
   };
 
   // Function to download CSV
@@ -270,24 +269,6 @@ export default function DashboardPenerimaan() {
         </div>
       </div>
 
-      {/* Tren Historis */}
-      {!loading && trendData.length > 1 && (
-        <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[200px]">
-           <h3 className="font-black text-gray-900 mb-2 text-xs uppercase px-2 text-gray-500">Riwayat Tren Rencana vs Realisasi</h3>
-           <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-                 <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
-                 <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
-                 <Legend wrapperStyle={{fontSize: '10px'}} iconType="circle" />
-                 <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={15} />
-                 <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 3, strokeWidth: 2}} activeDot={{r: 5}} />
-              </ComposedChart>
-           </ResponsiveContainer>
-        </div>
-      )}
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
@@ -350,28 +331,27 @@ export default function DashboardPenerimaan() {
                 </div>
              </div>
 
-             <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[400px]">
-                <h3 className="font-black text-gray-900 mb-2 text-sm uppercase flex-shrink-0">Perbandingan Rencana vs Realisasi per Jenis</h3>
-                {comparisonData.length === 0 ? (
-                   <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada realisasi</div>
-                ) : (
-                   <div className="flex-1 w-full overflow-y-auto overflow-x-hidden pr-2">
-                      <div style={{ height: Math.max(300, comparisonData.length * 70), minHeight: '100%' }}>
-                         <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={comparisonData} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 0 }} barGap={6}>
-                               <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb"/>
-                               <XAxis type="number" tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#6b7280', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                               <YAxis type="category" dataKey="name" tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} width={180} />
-                               <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} cursor={{fill: '#f8fafc'}} />
-                               <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
-                               <Bar dataKey="Rencana" fill="#f87171" radius={[0, 4, 4, 0]} barSize={16} />
-                               <Bar dataKey="Realisasi" fill="#10b981" radius={[0, 4, 4, 0]} barSize={16} />
-                            </ComposedChart>
-                         </ResponsiveContainer>
-                      </div>
-                   </div>
-                )}
-             </div>
+             {/* Tren Historis dipindah ke samping Speedometer */}
+             {!loading && trendData.length > 1 ? (
+               <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px]">
+                 <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Riwayat Tren Rencana vs Realisasi</h3>
+                 <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+                       <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                       <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
+                       <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} cursor={{fill: '#f8fafc'}} />
+                       <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
+                       <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={25} />
+                       <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                    </ComposedChart>
+                 </ResponsiveContainer>
+               </div>
+             ) : (
+               <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px]">
+                 <p className="text-gray-400 font-bold text-sm">Data tren belum tersedia.</p>
+               </div>
+             )}
           </div>
 
           <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px]">
@@ -460,7 +440,12 @@ export default function DashboardPenerimaan() {
                        <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
                      ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).sort((a,b) => Number(a.persentase) - Number(b.persentase)).map((row) => (
                        <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
-                         <td className="px-4 py-3 font-medium text-gray-900">{row.nama}</td>
+                         <td className="px-4 py-4 w-1/3">
+                            <div className="font-black text-gray-900">{row.nama}</div>
+                            <div className="w-full max-w-[250px] h-2 bg-gray-200 rounded-full mt-2 overflow-hidden flex" title={`${row.persentase}% tercapai`}>
+                               <div className={`h-full ${getProgressColor(row.persentase)} transition-all duration-1000`} style={{ width: `${Math.min(Number(row.persentase), 100)}%` }}></div>
+                            </div>
+                         </td>
                          <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
                          <td className="px-4 py-3 font-bold text-right text-emerald-700 bg-emerald-50/30">{formatRupiah(row.total)}</td>
                          <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
