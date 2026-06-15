@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import Select from 'react-select';
 import toast from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 
@@ -9,7 +10,7 @@ export default function DashboardPenerimaan() {
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
   const [allDataPenerimaan, setAllDataPenerimaan] = useState<any[]>([]);
   const [jenisPenerimaan, setJenisPenerimaan] = useState<any[]>([]);
-  const [selectedJenis, setSelectedJenis] = useState<string>('ALL');
+  const [selectedJenisOptions, setSelectedJenisOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // UI States
@@ -37,10 +38,13 @@ export default function DashboardPenerimaan() {
   useEffect(() => { fetchData(); }, []);
 
   // Data processing
+  const isAllSelected = selectedJenisOptions.length === 0;
+  const selectedJenisIds = selectedJenisOptions.map(opt => opt.value);
+
   const dataPenerimaan = allDataPenerimaan.filter(d => d.tahun.toString() === tahun.toString());
-  const filteredData = selectedJenis === 'ALL' 
+  const filteredData = isAllSelected 
     ? dataPenerimaan 
-    : dataPenerimaan.filter(d => d.jenis_penerimaan_id.toString() === selectedJenis);
+    : dataPenerimaan.filter(d => selectedJenisIds.includes(d.jenis_penerimaan_id.toString()));
 
   const dataRencana = filteredData.filter(d => d.tipe_data === 'RENCANA');
   const dataRealisasi = filteredData.filter(d => d.tipe_data === 'REALISASI');
@@ -77,7 +81,7 @@ export default function DashboardPenerimaan() {
   // Trend Data for History Chart
   const trendDataMap = new Map();
   allDataPenerimaan.forEach(d => {
-    if (selectedJenis !== 'ALL' && d.jenis_penerimaan_id.toString() !== selectedJenis) return;
+    if (!isAllSelected && !selectedJenisIds.includes(d.jenis_penerimaan_id.toString())) return;
     
     if (!trendDataMap.has(d.tahun)) {
       trendDataMap.set(d.tahun, { tahun: d.tahun.toString(), Rencana: 0, Realisasi: 0 });
@@ -90,7 +94,7 @@ export default function DashboardPenerimaan() {
 
   // Pivot Table Logic
   const activeJenisPenerimaan = jenisPenerimaan.filter(j => j.status === 'active');
-  const targetJenis = selectedJenis === 'ALL' ? activeJenisPenerimaan : activeJenisPenerimaan.filter(j => j.id.toString() === selectedJenis);
+  const targetJenis = isAllSelected ? activeJenisPenerimaan : activeJenisPenerimaan.filter(j => selectedJenisIds.includes(j.id.toString()));
 
   const pivotData = targetJenis.map(jenis => {
     const dRencana = dataPenerimaan.filter(d => d.jenis_penerimaan_id === jenis.id && d.tipe_data === 'RENCANA');
@@ -190,43 +194,74 @@ export default function DashboardPenerimaan() {
   };
 
   const downloadPNG = async () => {
-    if (!dashboardRef.current) return;
+    if (typeof window === 'undefined') return;
+    const dashboardElement = dashboardRef.current;
+    if (!dashboardElement) return;
+
+    const toastId = toast.loading('Mempersiapkan gambar untuk diunduh...');
+    
     try {
-      toast.loading('Sedang merender gambar PNG...', { id: 'png-export' });
-      const dataUrl = await htmlToImage.toPng(dashboardRef.current, {
+      const dataUrl = await htmlToImage.toPng(dashboardElement, {
         quality: 1,
         backgroundColor: '#f9fafb',
-        pixelRatio: 2 // High Resolution
+        pixelRatio: 2
       });
       const link = document.createElement('a');
       link.download = `Dashboard_Penerimaan_${tahun}.png`;
       link.href = dataUrl;
       link.click();
-      toast.success('Gambar PNG berhasil diunduh!', { id: 'png-export' });
+      toast.success('Gambar PNG berhasil diunduh!', { id: toastId });
     } catch (err: any) {
-      toast.error('Gagal mengekspor gambar: ' + err.message, { id: 'png-export' });
+      toast.error('Gagal mengekspor gambar: ' + err.message, { id: toastId });
     }
   };
 
   return (
     <div className="space-y-6 max-w-7xl animate-in fade-in duration-500" ref={dashboardRef}>
-      <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Monitoring Penerimaan</h1>
-          <p className="text-gray-500 mt-1">Analisis dan pelacakan capaian penerimaan secara terpadu.</p>
+           <h1 className="text-2xl font-black text-indigo-900 tracking-tight flex items-center gap-2">
+             <Target className="text-indigo-600" />
+             Dashboard Penerimaan
+           </h1>
+           <p className="text-sm text-gray-500 font-medium">Pantau ringkasan dan detail penerimaan institusi.</p>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200">
-              <Filter size={18} className="text-indigo-600"/>
-              <select value={selectedJenis} onChange={e => setSelectedJenis(e.target.value)} className="bg-transparent font-bold text-gray-800 outline-none max-w-[200px] truncate">
-                 <option value="ALL">Semua Jenis Penerimaan</option>
-                 {activeJenisPenerimaan.map(j => (
-                    <option key={j.id} value={j.id}>{j.nama_penerimaan}</option>
-                 ))}
-              </select>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200 w-full md:w-[350px]">
+              <Filter size={18} className="text-indigo-600 shrink-0"/>
+              <Select 
+                isMulti
+                options={activeJenisPenerimaan.map(j => ({ value: j.id.toString(), label: j.nama_penerimaan }))}
+                value={selectedJenisOptions}
+                onChange={(selected) => setSelectedJenisOptions(selected as any[])}
+                placeholder="Semua Jenis Penerimaan"
+                className="w-full text-sm font-bold text-gray-800"
+                classNamePrefix="select"
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    border: 'none',
+                    boxShadow: 'none',
+                    backgroundColor: 'transparent',
+                    minHeight: '32px'
+                  }),
+                  multiValue: (base) => ({
+                    ...base,
+                    backgroundColor: '#e0e7ff',
+                    borderRadius: '0.5rem'
+                  }),
+                  multiValueLabel: (base) => ({
+                    ...base,
+                    color: '#4f46e5'
+                  }),
+                  valueContainer: (base) => ({
+                    ...base,
+                    padding: '0 8px'
+                  })
+                }}
+              />
            </div>
-           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200">
+           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200 shrink-0">
               <ListFilter size={18} className="text-indigo-600"/>
               <select value={tahun} onChange={e => setTahun(e.target.value)} className="bg-transparent font-bold text-gray-800 outline-none">
                  {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
@@ -235,15 +270,15 @@ export default function DashboardPenerimaan() {
         </div>
       </div>
 
-      {/* Tren Historis di Bawah Filter */}
+      {/* Tren Historis */}
       {!loading && trendData.length > 1 && (
         <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[200px]">
-           <h3 className="font-black text-gray-900 mb-2 text-xs uppercase px-2 text-gray-500">Riwayat Tren Rencana vs Realisasi ({trendData[0].tahun} - {trendData[trendData.length-1].tahun})</h3>
+           <h3 className="font-black text-gray-900 mb-2 text-xs uppercase px-2 text-gray-500">Riwayat Tren Rencana vs Realisasi</h3>
            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
                  <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={65} axisLine={false} tickLine={false} />
+                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
                  <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
                  <Legend wrapperStyle={{fontSize: '10px'}} iconType="circle" />
                  <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={15} />
@@ -288,7 +323,6 @@ export default function DashboardPenerimaan() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {/* Speedometer Chart */}
              <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px] relative">
                 <h3 className="font-black text-gray-900 mb-2 text-sm text-center uppercase w-full absolute top-6">Indikator Capaian</h3>
                 <ResponsiveContainer width="100%" height="100%">
@@ -316,7 +350,6 @@ export default function DashboardPenerimaan() {
                 </div>
              </div>
 
-             {/* Bar Chart Komparasi Jenis Penerimaan */}
              <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px]">
                 <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Perbandingan Rencana vs Realisasi per Jenis</h3>
                 {comparisonData.length === 0 ? (
@@ -324,7 +357,7 @@ export default function DashboardPenerimaan() {
                 ) : (
                    <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={comparisonData} layout="vertical" margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0"/>
+                         <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb"/>
                          <XAxis type="number" tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#6b7280', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                          <YAxis type="category" dataKey="name" tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} axisLine={false} tickLine={false} width={180} />
                          <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
@@ -337,20 +370,19 @@ export default function DashboardPenerimaan() {
              </div>
           </div>
 
-          {/* Grafik Terpadu */}
           <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px]">
             <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2 uppercase"><TrendingUp size={18} className="text-indigo-600"/> Grafik Terpadu Realisasi & Target</h3>
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-                <XAxis dataKey="name" tick={{fontSize: 12, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={formatMilyar} tick={{fontSize: 12, fill: '#6b7280'}} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} />
+              <ComposedChart data={monthlyData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid stroke="#f0f0f0" vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="left" tickFormatter={formatMilyar} tick={{fill: '#6b7280', fontSize: 12, fontWeight: 'bold'}} axisLine={false} tickLine={false} width={90}/>
+                <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} cursor={{fill: '#f3f4f6'}} />
                 <Legend wrapperStyle={{fontSize: '12px', paddingTop: '20px'}} iconType="circle" />
                 
-                <Bar dataKey="RealisasiBulanan" name="Realisasi Bulanan" fill="#818cf8" radius={[4, 4, 0, 0]} barSize={30} />
-                <Line type="stepAfter" dataKey="RencanaAktif" name="Pagu/Rencana Aktif" stroke="#f59e0b" strokeWidth={3} dot={false} strokeDasharray="5 5" />
-                <Line type="monotone" dataKey="AkumulasiRealisasi" name="Akumulasi Realisasi" stroke="#10b981" strokeWidth={4} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                <Bar yAxisId="left" dataKey="RealisasiBulanan" name="Realisasi Bulanan" fill="#818cf8" radius={[4, 4, 0, 0]} barSize={30} />
+                <Line yAxisId="left" type="stepAfter" dataKey="RencanaAktif" name="Pagu/Rencana Aktif" stroke="#f59e0b" strokeWidth={3} dot={false} strokeDasharray="5 5" />
+                <Line yAxisId="left" type="monotone" dataKey="AkumulasiRealisasi" name="Akumulasi Realisasi" stroke="#10b981" strokeWidth={4} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
