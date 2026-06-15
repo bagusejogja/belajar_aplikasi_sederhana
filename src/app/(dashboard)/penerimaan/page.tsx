@@ -7,7 +7,7 @@ import * as htmlToImage from 'html-to-image';
 
 export default function DashboardPenerimaan() {
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
-  const [dataPenerimaan, setDataPenerimaan] = useState<any[]>([]);
+  const [allDataPenerimaan, setAllDataPenerimaan] = useState<any[]>([]);
   const [jenisPenerimaan, setJenisPenerimaan] = useState<any[]>([]);
   const [selectedJenis, setSelectedJenis] = useState<string>('ALL');
   const [loading, setLoading] = useState(true);
@@ -20,13 +20,13 @@ export default function DashboardPenerimaan() {
     setLoading(true);
     try {
       const [resData, resJenis] = await Promise.all([
-         fetch(`/api/penerimaan/data?tahun=${tahun}`),
+         fetch(`/api/penerimaan/data`),
          fetch(`/api/penerimaan/jenis`)
       ]);
       const jsonData = await resData.json();
       const jsonJenis = await resJenis.json();
       
-      if (jsonData.success) setDataPenerimaan(jsonData.data || []);
+      if (jsonData.success) setAllDataPenerimaan(jsonData.data || []);
       if (jsonJenis.success) setJenisPenerimaan(jsonJenis.data || []);
     } catch (e) {
       toast.error('Gagal mengambil data dashboard');
@@ -34,9 +34,10 @@ export default function DashboardPenerimaan() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [tahun]);
+  useEffect(() => { fetchData(); }, []);
 
   // Data processing
+  const dataPenerimaan = allDataPenerimaan.filter(d => d.tahun.toString() === tahun.toString());
   const filteredData = selectedJenis === 'ALL' 
     ? dataPenerimaan 
     : dataPenerimaan.filter(d => d.jenis_penerimaan_id.toString() === selectedJenis);
@@ -54,7 +55,10 @@ export default function DashboardPenerimaan() {
   let accumRencana = 0;
   let accumRealisasi = 0;
 
-  for (let i = 1; i <= 12; i++) {
+  const maxMonthData = filteredData.reduce((max, curr) => Math.max(max, curr.bulan), 1);
+  const maxMonth = Math.max(1, Math.min(12, maxMonthData));
+
+  for (let i = 1; i <= maxMonth; i++) {
     const sumRencanaBulanIni = dataRencana.filter(d => d.bulan === i).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
     const sumRealisasiBulanIni = dataRealisasi.filter(d => d.bulan === i).reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
 
@@ -69,6 +73,20 @@ export default function DashboardPenerimaan() {
       AkumulasiRealisasi: accumRealisasi
     });
   }
+
+  // Trend Data for History Chart
+  const trendDataMap = new Map();
+  allDataPenerimaan.forEach(d => {
+    if (selectedJenis !== 'ALL' && d.jenis_penerimaan_id.toString() !== selectedJenis) return;
+    
+    if (!trendDataMap.has(d.tahun)) {
+      trendDataMap.set(d.tahun, { tahun: d.tahun.toString(), Rencana: 0, Realisasi: 0 });
+    }
+    const item = trendDataMap.get(d.tahun);
+    if (d.tipe_data === 'RENCANA') item.Rencana += Number(d.nominal) || 0;
+    if (d.tipe_data === 'REALISASI') item.Realisasi += Number(d.nominal) || 0;
+  });
+  const trendData = Array.from(trendDataMap.values()).sort((a: any, b: any) => Number(a.tahun) - Number(b.tahun));
 
   // Pivot Table Logic
   const activeJenisPenerimaan = jenisPenerimaan.filter(j => j.status === 'active');
@@ -105,8 +123,11 @@ export default function DashboardPenerimaan() {
   const kekurangan = totalRencana - totalRealisasi;
   const isSurplus = kekurangan < 0;
 
-  const donutData = pivotData.filter(p => p.total > 0).map(p => ({ name: p.nama, value: p.total }));
-  const donutColors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#0ea5e9', '#14b8a6', '#f43f5e'];
+  const comparisonData = pivotData.filter(p => p.rencana > 0 || p.total > 0).map(p => ({
+    name: p.nama,
+    Rencana: p.rencana,
+    Realisasi: p.total
+  }));
 
   const gaugeValue = Math.min(Number(persentase), 100);
   const gaugeColor = Number(persentase) >= 100 ? '#10b981' : Number(persentase) >= 50 ? '#f59e0b' : '#ef4444';
@@ -212,6 +233,24 @@ export default function DashboardPenerimaan() {
         </div>
       </div>
 
+      {/* Tren Historis di Bawah Filter */}
+      {!loading && trendData.length > 1 && (
+        <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[200px]">
+           <h3 className="font-black text-gray-900 mb-2 text-xs uppercase px-2 text-gray-500">Riwayat Tren Rencana vs Realisasi ({trendData[0].tahun} - {trendData[trendData.length-1].tahun})</h3>
+           <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+                 <XAxis dataKey="tahun" tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                 <YAxis tickFormatter={formatMilyar} tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                 <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
+                 <Legend wrapperStyle={{fontSize: '10px'}} iconType="circle" />
+                 <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={15} />
+                 <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 3, strokeWidth: 2}} activeDot={{r: 5}} />
+              </ComposedChart>
+           </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
@@ -275,30 +314,22 @@ export default function DashboardPenerimaan() {
                 </div>
              </div>
 
-             {/* Donut Chart Proporsi */}
+             {/* Bar Chart Komparasi Jenis Penerimaan */}
              <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px]">
-                <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Proporsi Realisasi Berdasarkan Jenis</h3>
-                {donutData.length === 0 ? (
+                <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Perbandingan Rencana vs Realisasi per Jenis</h3>
+                {comparisonData.length === 0 ? (
                    <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada realisasi</div>
                 ) : (
                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                         <Pie
-                           data={donutData}
-                           cx="50%"
-                           cy="50%"
-                           innerRadius={60}
-                           outerRadius={90}
-                           paddingAngle={2}
-                           dataKey="value"
-                         >
-                           {donutData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={donutColors[index % donutColors.length]} />
-                           ))}
-                         </Pie>
-                         <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} />
-                         <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{fontSize: '11px', fontWeight: 'bold'}} />
-                      </PieChart>
+                      <ComposedChart data={comparisonData} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0"/>
+                         <XAxis type="number" tickFormatter={formatMilyar} tick={{fontSize: 10, fill: '#6b7280'}} axisLine={false} tickLine={false} />
+                         <YAxis type="category" dataKey="name" tick={{fontSize: 10, fill: '#374151', width: 100}} axisLine={false} tickLine={false} width={120} />
+                         <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} />
+                         <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
+                         <Bar dataKey="Rencana" fill="#f87171" radius={[0, 4, 4, 0]} barSize={12} />
+                         <Bar dataKey="Realisasi" fill="#10b981" radius={[0, 4, 4, 0]} barSize={12} />
+                      </ComposedChart>
                    </ResponsiveContainer>
                 )}
              </div>
@@ -389,7 +420,7 @@ export default function DashboardPenerimaan() {
                    <tbody className="divide-y divide-gray-100">
                      {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
                        <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
-                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
+                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).sort((a,b) => Number(a.persentase) - Number(b.persentase)).map((row) => (
                        <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
                          <td className="px-4 py-3 font-medium text-gray-900">{row.nama}</td>
                          <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
