@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon } from 'lucide-react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 
@@ -102,6 +102,26 @@ export default function DashboardPenerimaan() {
   const formatRupiah = (val: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val);
   const formatMilyar = (val: any) => `${(val / 1000000000).toFixed(2)} M`;
 
+  const kekurangan = totalRencana - totalRealisasi;
+  const isSurplus = kekurangan < 0;
+
+  const donutData = pivotData.filter(p => p.total > 0).map(p => ({ name: p.nama, value: p.total }));
+  const donutColors = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#0ea5e9', '#14b8a6', '#f43f5e'];
+
+  const gaugeValue = Math.min(Number(persentase), 100);
+  const gaugeColor = Number(persentase) >= 100 ? '#10b981' : Number(persentase) >= 50 ? '#f59e0b' : '#ef4444';
+  const gaugeData = [
+    { name: 'Capaian', value: gaugeValue },
+    { name: 'Sisa', value: 100 - gaugeValue }
+  ];
+
+  const renderBadge = (percent: string | number) => {
+    const p = Number(percent);
+    if (p >= 100) return <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
+    if (p >= 50) return <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
+    return <span className="inline-block px-2 py-1 bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
+  };
+
   // Function to download CSV
   const downloadCSV = () => {
     if (activeTab === 'DETAIL') {
@@ -196,18 +216,29 @@ export default function DashboardPenerimaan() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Pagu Rencana Aktif</span></div>
-            <div className="text-3xl font-black text-gray-900 relative">{formatRupiah(totalRencana)}</div>
+            <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Pagu Rencana (Target)</span></div>
+            <div className="text-3xl font-black text-gray-900 relative truncate" title={formatRupiah(totalRencana)}>{formatRupiah(totalRencana)}</div>
          </div>
          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-3 text-emerald-600 mb-2 relative"><Activity size={20}/><span className="font-black text-xs tracking-widest uppercase">Total Realisasi</span></div>
-            <div className="text-3xl font-black text-gray-900 relative">{formatRupiah(totalRealisasi)}</div>
+            <div className="flex justify-between items-center mb-2 relative">
+               <div className="flex items-center gap-3 text-emerald-600"><Activity size={20}/><span className="font-black text-xs tracking-widest uppercase">Total Realisasi</span></div>
+               <span className="font-bold text-xs text-gray-500">{persentase}%</span>
+            </div>
+            <div className="text-3xl font-black text-gray-900 relative truncate" title={formatRupiah(totalRealisasi)}>{formatRupiah(totalRealisasi)}</div>
+            <div className="w-full bg-gray-100 rounded-full h-2 mt-4 relative overflow-hidden">
+               <div className="h-2 rounded-full transition-all duration-1000" style={{width: `${gaugeValue}%`, backgroundColor: gaugeColor}}></div>
+            </div>
          </div>
-         <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-lg flex flex-col justify-center relative overflow-hidden text-white">
-            <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-3 text-indigo-200 mb-2 relative"><TrendingUp size={20}/><span className="font-black text-xs tracking-widest uppercase">Persentase Capaian</span></div>
-            <div className="text-4xl font-black relative">{persentase}%</div>
+         <div className={`p-6 rounded-[2rem] shadow-sm border flex flex-col justify-center relative overflow-hidden ${isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
+            <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-2xl ${isSurplus ? 'bg-emerald-200/50' : 'bg-rose-200/50'}`}></div>
+            <div className={`flex items-center gap-3 mb-2 relative ${isSurplus ? 'text-emerald-700' : 'text-rose-700'}`}>
+               <AlertCircle size={20}/>
+               <span className="font-black text-xs tracking-widest uppercase">{isSurplus ? 'Surplus / Kelebihan Target' : 'Kekurangan Target'}</span>
+            </div>
+            <div className={`text-3xl font-black relative truncate ${isSurplus ? 'text-emerald-900' : 'text-rose-900'}`} title={formatRupiah(Math.abs(kekurangan))}>
+               {formatRupiah(Math.abs(kekurangan))}
+            </div>
          </div>
       </div>
 
@@ -215,6 +246,64 @@ export default function DashboardPenerimaan() {
         <div className="h-64 flex items-center justify-center bg-white rounded-[2rem] border border-gray-100"><p className="text-gray-500 font-bold">Memuat Grafik...</p></div>
       ) : (
         <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             {/* Speedometer Chart */}
+             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px] relative">
+                <h3 className="font-black text-gray-900 mb-2 text-sm text-center uppercase w-full absolute top-6">Indikator Capaian</h3>
+                <ResponsiveContainer width="100%" height="100%">
+                   <PieChart>
+                      <Pie
+                        data={gaugeData}
+                        cx="50%"
+                        cy="75%"
+                        startAngle={180}
+                        endAngle={0}
+                        innerRadius={80}
+                        outerRadius={110}
+                        paddingAngle={0}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        <Cell key="cell-0" fill={gaugeColor} />
+                        <Cell key="cell-1" fill="#f3f4f6" />
+                      </Pie>
+                   </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute bottom-10 flex flex-col items-center">
+                   <span className="text-4xl font-black" style={{color: gaugeColor}}>{persentase}%</span>
+                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Keseluruhan</span>
+                </div>
+             </div>
+
+             {/* Donut Chart Proporsi */}
+             <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px]">
+                <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Proporsi Realisasi Berdasarkan Jenis</h3>
+                {donutData.length === 0 ? (
+                   <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada realisasi</div>
+                ) : (
+                   <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                         <Pie
+                           data={donutData}
+                           cx="50%"
+                           cy="50%"
+                           innerRadius={60}
+                           outerRadius={90}
+                           paddingAngle={2}
+                           dataKey="value"
+                         >
+                           {donutData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={donutColors[index % donutColors.length]} />
+                           ))}
+                         </Pie>
+                         <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} />
+                         <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{fontSize: '11px', fontWeight: 'bold'}} />
+                      </PieChart>
+                   </ResponsiveContainer>
+                )}
+             </div>
+          </div>
+
           {/* Grafik Terpadu */}
           <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px]">
             <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2 uppercase"><TrendingUp size={18} className="text-indigo-600"/> Grafik Terpadu Realisasi & Target</h3>
@@ -278,8 +367,8 @@ export default function DashboardPenerimaan() {
                            <td key={idx} className="px-4 py-3 text-right">{val > 0 ? formatRupiah(val) : '-'}</td>
                          ))}
                          <td className="px-4 py-3 font-bold text-right text-emerald-700 border-l border-gray-100 bg-emerald-50/30">{formatRupiah(row.total)}</td>
-                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-red-500' : 'text-gray-900'}`}>{formatRupiah(row.selisih)}</td>
-                         <td className="px-4 py-3 font-bold text-right">{row.persentase}%</td>
+                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
+                         <td className="px-4 py-3 text-right">{renderBadge(row.persentase)}</td>
                        </tr>
                      ))}
                    </tbody>
@@ -305,8 +394,8 @@ export default function DashboardPenerimaan() {
                          <td className="px-4 py-3 font-medium text-gray-900">{row.nama}</td>
                          <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
                          <td className="px-4 py-3 font-bold text-right text-emerald-700 bg-emerald-50/30">{formatRupiah(row.total)}</td>
-                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-red-500' : 'text-gray-900'}`}>{formatRupiah(row.selisih)}</td>
-                         <td className="px-4 py-3 font-bold text-right">{row.persentase}%</td>
+                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
+                         <td className="px-4 py-3 text-right">{renderBadge(row.persentase)}</td>
                        </tr>
                      ))}
                    </tbody>
