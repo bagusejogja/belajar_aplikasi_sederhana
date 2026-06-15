@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import Select from 'react-select';
 import toast from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
@@ -11,6 +11,7 @@ export default function DashboardPenerimaan() {
   const [allDataPenerimaan, setAllDataPenerimaan] = useState<any[]>([]);
   const [jenisPenerimaan, setJenisPenerimaan] = useState<any[]>([]);
   const [selectedJenisOptions, setSelectedJenisOptions] = useState<any[]>([]);
+  const [showTrend, setShowTrend] = useState(false);
   const [loading, setLoading] = useState(true);
   
   // UI States
@@ -126,6 +127,11 @@ export default function DashboardPenerimaan() {
 
   const kekurangan = totalRencana - totalRealisasi;
   const isSurplus = kekurangan < 0;
+
+  const topAchievers = [...pivotData]
+    .filter(p => p.rencana > 0)
+    .sort((a, b) => Number(b.persentase) - Number(a.persentase))
+    .slice(0, 3);
 
   const gaugeValue = Math.min(Number(persentase), 100);
   const gaugeColor = Number(persentase) >= 100 ? '#10b981' : Number(persentase) >= 50 ? '#f59e0b' : '#ef4444';
@@ -269,9 +275,41 @@ export default function DashboardPenerimaan() {
         </div>
       </div>
 
+      {/* Tren Historis (Collapsible) */}
+      {!loading && trendData.length > 1 && (
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300">
+           <button 
+             onClick={() => setShowTrend(!showTrend)} 
+             className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+           >
+             <div className="flex items-center gap-2">
+               <Activity size={18} className="text-indigo-600"/>
+               <h3 className="font-black text-gray-900 text-sm uppercase">Riwayat Tren Rencana vs Realisasi</h3>
+             </div>
+             {showTrend ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
+           </button>
+           
+           <div className={`transition-all duration-500 ease-in-out ${showTrend ? 'max-h-[300px] opacity-100 p-4' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+             <div className="h-[250px]">
+               <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+                     <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                     <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
+                     <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} cursor={{fill: '#f8fafc'}} />
+                     <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
+                     <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={25} />
+                     <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                  </ComposedChart>
+               </ResponsiveContainer>
+             </div>
+           </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden transition-all hover:shadow-md hover:-translate-y-1">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
             <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Pagu Rencana (Target)</span></div>
             <div className="text-3xl font-black text-gray-900 relative truncate" title={formatRupiah(totalRencana)}>{formatRupiah(totalRencana)}</div>
@@ -304,7 +342,7 @@ export default function DashboardPenerimaan() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px] relative">
+             <div className="md:col-span-1 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px] relative transition-all hover:shadow-md">
                 <h3 className="font-black text-gray-900 mb-2 text-sm text-center uppercase w-full absolute top-6">Indikator Capaian</h3>
                 <ResponsiveContainer width="100%" height="100%">
                    <PieChart>
@@ -331,30 +369,45 @@ export default function DashboardPenerimaan() {
                 </div>
              </div>
 
-             {/* Tren Historis dipindah ke samping Speedometer */}
-             {!loading && trendData.length > 1 ? (
-               <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px]">
-                 <h3 className="font-black text-gray-900 mb-2 text-sm uppercase">Riwayat Tren Rencana vs Realisasi</h3>
-                 <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
-                       <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                       <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
-                       <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} cursor={{fill: '#f8fafc'}} />
-                       <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
-                       <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={25} />
-                       <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
-                    </ComposedChart>
-                 </ResponsiveContainer>
-               </div>
-             ) : (
-               <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px]">
-                 <p className="text-gray-400 font-bold text-sm">Data tren belum tersedia.</p>
-               </div>
-             )}
+             {/* Top Achievers Leaderboard */}
+             <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px] transition-all hover:shadow-md">
+                 <h3 className="font-black text-gray-900 mb-4 text-sm uppercase flex items-center gap-2">
+                   <Award size={18} className="text-amber-500" />
+                   Pahlawan Pendapatan (Top 3 Capaian)
+                 </h3>
+                 {topAchievers.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada data capaian.</div>
+                 ) : (
+                    <div className="flex flex-col gap-4 flex-1 justify-center">
+                       {topAchievers.map((achiever, idx) => {
+                          const isFirst = idx === 0;
+                          const medalColor = idx === 0 ? 'text-amber-400 bg-amber-50' : idx === 1 ? 'text-gray-400 bg-gray-50' : 'text-amber-700 bg-amber-50/50';
+                          return (
+                            <div key={achiever.id} className="flex items-center gap-4 animate-in slide-in-from-right duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
+                               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${medalColor} shrink-0`}>
+                                 {idx + 1}
+                               </div>
+                               <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-end mb-1">
+                                     <div className={`font-bold truncate ${isFirst ? 'text-gray-900 text-base' : 'text-gray-700 text-sm'}`}>{achiever.nama}</div>
+                                     <div className={`font-black ${isFirst ? 'text-emerald-600 text-lg' : 'text-emerald-500 text-sm'}`}>{achiever.persentase}%</div>
+                                  </div>
+                                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                     <div 
+                                       className={`h-full ${getProgressColor(achiever.persentase)} transition-all duration-1000 ease-out`} 
+                                       style={{ width: `${Math.min(Number(achiever.persentase), 100)}%` }}
+                                     ></div>
+                                  </div>
+                               </div>
+                            </div>
+                          )
+                       })}
+                    </div>
+                 )}
+             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px]">
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px] transition-all hover:shadow-md">
             <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2 uppercase"><TrendingUp size={18} className="text-indigo-600"/> Grafik Terpadu Realisasi & Target</h3>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={monthlyData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
