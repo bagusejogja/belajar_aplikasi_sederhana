@@ -12,19 +12,30 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const tahun = searchParams.get('tahun');
     
-    let query = supabase
-      .from('data_penerimaan')
-      .select('*, jenis_penerimaan(id, nama_penerimaan)')
-      .limit(100000);
-      
-    if (tahun) {
-      query = query.eq('tahun', tahun);
-    }
+    let allData: any[] = [];
+    let from = 0;
+    const step = 1000;
 
-    const { data, error } = await query;
-    if (error) throw error;
+    while (true) {
+      let query = supabase
+        .from('data_penerimaan')
+        .select('*, jenis_penerimaan(id, nama_penerimaan)')
+        .range(from, from + step - 1);
+        
+      if (tahun) {
+        query = query.eq('tahun', tahun);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      
+      allData = allData.concat(data);
+      if (data.length < step) break;
+      from += step;
+    }
     
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: allData });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
