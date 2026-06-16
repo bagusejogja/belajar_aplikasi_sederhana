@@ -5,6 +5,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -12,7 +14,8 @@ export async function GET(req: NextRequest) {
     
     let query = supabase
       .from('data_penerimaan')
-      .select('*, jenis_penerimaan(id, nama_penerimaan)');
+      .select('*, jenis_penerimaan(id, nama_penerimaan)')
+      .limit(100000);
       
     if (tahun) {
       query = query.eq('tahun', tahun);
