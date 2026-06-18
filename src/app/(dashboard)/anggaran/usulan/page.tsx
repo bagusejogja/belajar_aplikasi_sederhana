@@ -5,14 +5,16 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
-  CheckCircle, Clock, UploadCloud
+  CheckCircle, Clock, UploadCloud, Calendar, BarChart3
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function UsulanAnggaranPage() {
   const [rawData, setRawData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
+  const [selectedTP, setSelectedTP] = useState<string>('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDownloadingMulti, setIsDownloadingMulti] = useState(false);
 
@@ -38,8 +40,27 @@ export default function UsulanAnggaranPage() {
     }
   };
 
+  const availableTPs = useMemo(() => {
+    const tps = new Set<string>();
+    rawData.forEach(item => {
+      const t = item.tahun || item.Tahun;
+      const p = item.periode || item.Periode;
+      if (t && p) {
+        tps.add(`${t} - ${p}`);
+      }
+    });
+    // Sort descending by Year, then Period
+    return Array.from(tps).sort((a, b) => b.localeCompare(a));
+  }, [rawData]);
+
+  useEffect(() => {
+    if (availableTPs.length > 0 && !selectedTP) {
+      setSelectedTP(availableTPs[0]); // default to latest
+    }
+  }, [availableTPs, selectedTP]);
+
   const handleProcess = async (id: number) => {
-    if (!confirm("Tandai usulan ini sebagai Sudah Diproses?")) return;
+    if (!confirm("Tandai revisi ini sebagai Sudah Diproses?")) return;
     
     setIsLoading(true);
     try {
@@ -90,14 +111,32 @@ export default function UsulanAnggaranPage() {
       const itemPic = item.pic || item.PIC;
       const matchesPic = picFilter ? itemPic === picFilter : true;
 
-      return matchesSearch && matchesPic;
+      // Filter TP
+      const t = item.tahun || item.Tahun;
+      const p = item.periode || item.Periode;
+      const itemTP = (t && p) ? `${t} - ${p}` : '';
+      const matchesTP = selectedTP ? itemTP === selectedTP : true;
+
+      return matchesSearch && matchesPic && matchesTP;
     });
-  }, [rawData, searchQuery, picFilter]);
+  }, [rawData, searchQuery, picFilter, selectedTP]);
+
+  const dashboardData = useMemo(() => {
+    const unitCounts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || 'Unknown';
+      unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    
+    return Object.entries(unitCounts)
+      .map(([name, Total]) => ({ name, Total }))
+      .sort((a, b) => b.Total - a.Total); // Sort descending
+  }, [filteredData]);
 
   // Reset selection when search/filter changes
   useEffect(() => {
     setSelectedIds([]);
-  }, [searchQuery, picFilter]);
+  }, [searchQuery, picFilter, selectedTP]);
 
   const exportToCSV = () => {
     if (filteredData.length === 0) return;
@@ -123,7 +162,7 @@ export default function UsulanAnggaranPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Data_Usulan_Anggaran_${new Date().getTime()}.csv`);
+    link.setAttribute("download", `Data_Revisi_Terjadwal_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -252,8 +291,6 @@ export default function UsulanAnggaranPage() {
   const renderFileLinks = (val: any, unitVal: string, uploadTime: string) => {
     const files = extractFilesFromValue(val);
 
-
-
     if (files.length === 0) return <span>-</span>;
 
     if (files.length === 1) {
@@ -304,8 +341,8 @@ export default function UsulanAnggaranPage() {
           <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest mb-2">
             <FileText size={14} /> Anggaran
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-none mb-4">Usulan Anggaran</h1>
-          <p className="text-gray-500 font-medium max-w-md">Data usulan dari form submissions. Filter berdasarkan PIC dan ekspor ke Excel.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-none mb-4">Revisi Terjadwal</h1>
+          <p className="text-gray-500 font-medium max-w-md">Data revisi anggaran dari form submissions. Filter berdasarkan PIC, Tahun, Periode, dan ekspor ke Excel.</p>
         </div>
 
         <div className="flex gap-3 relative z-10">
@@ -335,6 +372,51 @@ export default function UsulanAnggaranPage() {
         </div>
       </div>
 
+      {/* Dashboard Section */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
+        <h2 className="text-xl font-black text-gray-800 mb-6 flex items-center gap-2">
+          <BarChart3 className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP})` : ''}
+        </h2>
+        {dashboardData.length > 0 ? (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dashboardData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 'bold' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  height={80}
+                />
+                <YAxis 
+                  tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 'bold' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f3f4f6' }}
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                />
+                <Bar dataKey="Total" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40}>
+                  {dashboardData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#4f46e5' : '#818cf8'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+            <BarChart3 size={48} className="opacity-20 mb-4" />
+            <p className="font-bold">Belum ada data revisi untuk ditampilkan</p>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
@@ -348,7 +430,23 @@ export default function UsulanAnggaranPage() {
             />
           </div>
           
-          <div className="w-full md:w-64">
+          <div className="w-full md:w-48">
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <select 
+                value={selectedTP}
+                onChange={(e) => setSelectedTP(e.target.value)}
+                className="w-full pl-12 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer"
+              >
+                <option value="">Semua Tahun-Periode</option>
+                {availableTPs.map((tp, idx) => (
+                  <option key={idx} value={tp}>{tp}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="w-full md:w-48">
             <div className="relative">
               <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <select 
@@ -375,7 +473,6 @@ export default function UsulanAnggaranPage() {
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
                 <tr className="bg-gray-900 shadow-md">
-                  {/* Checkbox Kolom */}
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-10 text-center">
                     <input 
                       type="checkbox" 
@@ -390,12 +487,10 @@ export default function UsulanAnggaranPage() {
                       className="w-4 h-4 rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
                   </th>
-                  {/* Kolom Khusus */}
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-16">NO</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">Pengirim (Email & Unit)</th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">PIC & Status</th>
                   
-                  {/* Kolom Dinamis Sisanya */}
                   {Object.keys(filteredData[0] || {})
                     .filter(header => !['id', 'created_at', 'status', 'waktu_proses', 'email', 'Email', 'unit', 'Unit', 'pic', 'PIC', 'Unit Kerja', 'unit_kerja', 'tahun', 'Tahun', 'periode', 'Periode'].includes(header))
                     .map((header) => (
@@ -415,7 +510,6 @@ export default function UsulanAnggaranPage() {
 
                   return (
                   <tr key={idx} className={`transition-colors group bg-white ${selectedIds.includes(row.id) ? 'bg-indigo-50/50' : 'hover:bg-indigo-50/30'}`}>
-                    {/* Checkbox Row */}
                     <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50 text-center">
                       <input 
                         type="checkbox" 
@@ -431,12 +525,10 @@ export default function UsulanAnggaranPage() {
                       />
                     </td>
                     
-                    {/* NO */}
                     <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50">
                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs">{idx + 1}</span>
                     </td>
 
-                    {/* Pengirim: Email atas, Unit bawah, lalu Tahun & Periode */}
                     <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50">
                        <div className="flex flex-col gap-1">
                           <span className="text-xs font-bold text-gray-900">{emailVal}</span>
@@ -447,7 +539,6 @@ export default function UsulanAnggaranPage() {
                        </div>
                     </td>
 
-                    {/* PIC & Status: PIC atas, Status bawah */}
                     <td className="px-6 py-4 whitespace-nowrap bg-gray-50/30 border-r border-gray-100">
                       <div className="flex flex-col gap-2 items-start">
                         <span className="text-xs font-black text-indigo-700 uppercase tracking-wide">{picVal}</span>
@@ -473,13 +564,12 @@ export default function UsulanAnggaranPage() {
                             onClick={() => handleProcess(row.id)}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-[9px] uppercase tracking-wider hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all active:scale-95"
                           >
-                            <CheckCircle size={12} /> Proses Usulan
+                            <CheckCircle size={12} /> Proses Revisi
                           </button>
                         )}
                       </div>
                     </td>
 
-                    {/* Kolom Data Lainnya */}
                     {Object.keys(filteredData[0])
                       .filter(key => !['id', 'created_at', 'status', 'waktu_proses', 'email', 'Email', 'unit', 'Unit', 'pic', 'PIC', 'Unit Kerja', 'unit_kerja', 'tahun', 'Tahun', 'periode', 'Periode'].includes(key))
                       .map((key) => (

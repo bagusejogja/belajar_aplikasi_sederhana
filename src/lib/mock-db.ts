@@ -73,7 +73,7 @@ export const menuList: MenuItem[] = [
 
   // --- ANGGARAN ---
   { title: 'Analisis Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-  { title: 'Usulan Anggaran', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
+  { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 
   // --- MANAJEMEN KEGIATAN ---
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
