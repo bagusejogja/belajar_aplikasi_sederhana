@@ -371,10 +371,10 @@ export default function DashboardPenerimaan() {
 
              {/* Top Achievers Leaderboard */}
              <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px] transition-all hover:shadow-md">
-                 <h3 className="font-black text-gray-900 mb-4 text-sm uppercase flex items-center gap-2">
-                   <Award size={18} className="text-amber-500" />
-                   Pahlawan Pendapatan (Top 3 Capaian)
-                 </h3>
+                 <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                  <Award className="w-5 h-5 mr-2 text-yellow-500" />
+                  3 Penerimaan Tertinggi
+                </h3>
                  {topAchievers.length === 0 ? (
                     <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada data capaian.</div>
                  ) : (

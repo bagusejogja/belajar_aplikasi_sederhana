@@ -67,14 +67,23 @@ export async function POST(req: NextRequest) {
         });
     }
 
-    // Eksekusi insert (baik untuk manual maupun dari paste zone)
-    const { data, error } = await supabase
-      .from('data_penerimaan')
-      .insert(data_penerimaan)
-      .select();
+    // Eksekusi insert (baik untuk manual maupun dari paste zone) dengan Chunking
+    // Untuk mencegah error "Payload Too Large" dari Supabase saat upload 13rb+ baris
+    const chunkSize = 1000;
+    const insertedData = [];
+    
+    for (let i = 0; i < data_penerimaan.length; i += chunkSize) {
+      const chunk = data_penerimaan.slice(i, i + chunkSize);
+      const { data, error } = await supabase
+        .from('data_penerimaan')
+        .insert(chunk)
+        .select();
 
-    if (error) throw error;
-    return NextResponse.json({ success: true, data });
+      if (error) throw error;
+      if (data) insertedData.push(...data);
+    }
+
+    return NextResponse.json({ success: true, data: insertedData });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
