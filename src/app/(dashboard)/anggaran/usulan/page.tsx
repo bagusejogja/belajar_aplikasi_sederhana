@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 export default function UsulanAnggaranPage() {
   const [rawData, setRawData] = useState<any[]>([]);
+  const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
@@ -25,13 +26,23 @@ export default function UsulanAnggaranPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('form_submissions')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [formRes, unitsRes] = await Promise.all([
+        supabase.from('form_submissions').select('*').order('created_at', { ascending: false }),
+        supabase.from('gov_units').select('nama_unit, group_org')
+      ]);
 
-      if (error) throw error;
-      setRawData(data || []);
+      if (formRes.error) throw formRes.error;
+      setRawData(formRes.data || []);
+      
+      if (unitsRes.data) {
+        const mapping: Record<string, string> = {};
+        unitsRes.data.forEach(u => {
+           if (u.nama_unit && u.group_org) {
+             mapping[u.nama_unit] = u.group_org;
+           }
+        });
+        setUnitGroups(mapping);
+      }
     } catch (err: any) {
       console.error("Gagal ambil data:", err);
       alert("Gagal mengambil data: " + err.message);
@@ -101,24 +112,32 @@ export default function UsulanAnggaranPage() {
   }, [rawData]);
 
   const filteredData = useMemo(() => {
-    return rawData.filter(item => {
-      // Pencarian umum
-      const matchesSearch = Object.values(item).some(val => 
+    const filtered = rawData.filter(item => {
+      const matchesSearch = Object.values(item).some(val =>
         String(val).toLowerCase().includes(searchQuery.toLowerCase())
       );
-      
-      // Filter PIC
       const itemPic = item.pic || item.PIC;
       const matchesPic = picFilter ? itemPic === picFilter : true;
-
-      // Filter TP
       const t = item.tahun || item.Tahun;
       const p = item.periode || item.Periode;
       const itemTP = (t && p) ? `${t} - ${p}` : '';
       const matchesTP = selectedTP ? itemTP === selectedTP : true;
-
       return matchesSearch && matchesPic && matchesTP;
     });
+    // sort: yang belum selesai (bukan 'Sudah Diproses') ditaruh di atas, lalu urut tanggal terbaru
+    filtered.sort((a, b) => {
+      const isADone = (a.status ?? '') === 'Sudah Diproses';
+      const isBDone = (b.status ?? '') === 'Sudah Diproses';
+      
+      if (!isADone && isBDone) return -1;
+      if (isADone && !isBDone) return 1;
+      
+      // Jika statusnya sama, urutkan berdasarkan created_at (terbaru di atas)
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+    return filtered;
   }, [rawData, searchQuery, picFilter, selectedTP]);
 
   const dashboardData = useMemo(() => {
@@ -128,9 +147,15 @@ export default function UsulanAnggaranPage() {
       unitCounts[unit] = (unitCounts[unit] || 0) + 1;
     });
     
-    return Object.entries(unitCounts)
-      .map(([name, Total]) => ({ name, Total }))
-      .sort((a, b) => b.Total - a.Total); // Sort descending
+    const freqGroups: Record<number, string[]> = {};
+    Object.entries(unitCounts).forEach(([unit, count]) => {
+       if (!freqGroups[count]) freqGroups[count] = [];
+       freqGroups[count].push(unit);
+    });
+
+    return Object.entries(freqGroups)
+      .map(([Total, units]) => ({ name: units.join(', '), Total: Number(Total) }))
+      .sort((a, b) => b.Total - a.Total); // Sort descending by frequency
   }, [filteredData]);
 
   // Reset selection when search/filter changes
@@ -378,36 +403,51 @@ export default function UsulanAnggaranPage() {
           <BarChart3 className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP})` : ''}
         </h2>
         {dashboardData.length > 0 ? (
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dashboardData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 'bold' }} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  height={80}
-                />
-                <YAxis 
-                  tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 'bold' }} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  allowDecimals={false}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f3f4f6' }}
-                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
-                />
-                <Bar dataKey="Total" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={40}>
-                  {dashboardData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#4f46e5' : '#818cf8'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="p-4 border-b text-xs uppercase tracking-widest text-gray-500 font-bold">Unit (Frekuensi Sama)</th>
+                  <th className="p-4 border-b text-center text-xs uppercase tracking-widest text-gray-500 font-bold">Frekuensi Revisi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
+                  const getGroupColor = (group?: string) => {
+                    switch(group) {
+                       case 'Fakultas': return 'bg-sky-100 text-sky-700 border border-sky-200';
+                       case 'KPTU': return 'bg-amber-100 text-amber-700 border border-amber-200';
+                       case 'Pusat Studi': return 'bg-violet-100 text-violet-700 border border-violet-200';
+                       case 'Tempat Ibadah': return 'bg-rose-100 text-rose-700 border border-rose-200';
+                       default: return 'bg-gray-100 text-gray-700 border border-gray-200';
+                    }
+                  };
+                  const units = d.name.split(', ');
+                  return (
+                    <tr key={i} className="border-b hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-2">
+                          {units.map((unit: string, ui: number) => {
+                            const cleanUnit = unit.trim();
+                            const groupOrg = unitGroups[cleanUnit];
+                            return (
+                              <span key={ui} className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getGroupColor(groupOrg)} shadow-sm`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
+                                {cleanUnit}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-lg shadow-sm shadow-indigo-200">
+                          {d.Total}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="h-64 flex flex-col items-center justify-center text-gray-400">

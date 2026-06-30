@@ -13,6 +13,7 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterYear, setFilterYear] = useState<string>('All');
+  const [viewMode, setViewMode] = useState<'hari'|'pekan'>('hari');
   
   const [expandedParents, setExpandedParents] = useState<number[]>([]);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
@@ -83,8 +84,7 @@ export default function TimelinePage() {
     
     if (timelineData) {
       setData(timelineData);
-      const parents = timelineData.filter(d => !d.parent_id).map(d => d.id);
-      setExpandedParents(parents);
+      // setExpandedParents(parents); // Default collapsed
     }
     setLoading(false);
   };
@@ -218,7 +218,7 @@ export default function TimelinePage() {
   });
 
   // Gantt Chart Calculations
-  const DAY_WIDTH = 24; // Pixel per day
+  const DAY_WIDTH = viewMode === 'pekan' ? 5 : 24; // Pixel per day
   const getGanttExtents = () => {
     if (displayedData.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
     
@@ -460,8 +460,8 @@ export default function TimelinePage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
-        <div className="relative flex-1">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
             type="text" 
@@ -471,6 +471,22 @@ export default function TimelinePage() {
             className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-medium text-gray-700"
           />
         </div>
+        
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl shrink-0">
+           <button 
+             onClick={() => setViewMode('hari')} 
+             className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'hari' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+           >
+             Harian
+           </button>
+           <button 
+             onClick={() => setViewMode('pekan')} 
+             className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'pekan' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+           >
+             Pekanan
+           </button>
+        </div>
+
         <div className="relative w-48 shrink-0 z-40">
           <Select 
              options={[{value: 'All', label: 'Semua Tahun'}, ...availableYears.map(y => ({value: y.toString(), label: `Tahun ${y}`}))]}
@@ -550,24 +566,34 @@ export default function TimelinePage() {
                       ))}
                    </div>
 
-                   {/* Header Tanggal */}
-                   <div className="h-[24px] border-b-2 border-gray-200 bg-white flex sticky top-[48px] z-20 shadow-sm">
-                      {months.map(m => (
-                         m.daysArray.map((d: any, i: number) => (
-                            <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
-                               <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-500' : 'text-gray-500'}`}>{d.date}</span>
-                            </div>
-                         ))
-                      ))}
-                   </div>
+                   {/* Header Tanggal (Hanya tampil di mode Harian) */}
+                   {viewMode === 'hari' && (
+                     <div className="h-[24px] border-b-2 border-gray-200 bg-white flex sticky top-[48px] z-20 shadow-sm">
+                        {months.map(m => (
+                           m.daysArray.map((d: any, i: number) => (
+                              <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
+                                 <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-500' : 'text-gray-500'}`}>{d.date}</span>
+                              </div>
+                           ))
+                        ))}
+                     </div>
+                   )}
                    
                    {/* Garis Vertikal Grid */}
-                   <div className="absolute top-[72px] bottom-0 left-0 right-0 flex pointer-events-none z-0">
-                      {months.map(m => (
-                         m.daysArray.map((d: any, i: number) => (
-                            <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
+                   <div className={`absolute bottom-0 left-0 right-0 flex pointer-events-none z-0 ${viewMode === 'hari' ? 'top-[72px]' : 'top-[48px]'}`}>
+                      {viewMode === 'hari' ? (
+                         months.map(m => (
+                            m.daysArray.map((d: any, i: number) => (
+                               <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
+                            ))
                          ))
-                      ))}
+                      ) : (
+                         months.map(m => (
+                            m.weeks.map((w: any, i: number) => (
+                               <div key={'grid-week'+m.label+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className={`border-r border-gray-200 border-dashed h-full shrink-0`}></div>
+                            ))
+                         ))
+                      )}
                    </div>
                    
                    {/* Garis Hari Ini */}
@@ -575,7 +601,7 @@ export default function TimelinePage() {
                    </div>
 
                    {/* Container Bar Gantt */}
-                   <div className="absolute top-[72px] left-0 right-0 z-10 pointer-events-none">
+                   <div className={`absolute left-0 right-0 z-10 pointer-events-none ${viewMode === 'hari' ? 'top-[72px]' : 'top-[48px]'}`}>
                       {rows.map((r, idx) => {
                          const left = getPosition(r.tanggal_mulai);
                          const width = getWidth(r.tanggal_mulai, r.tanggal_selesai);

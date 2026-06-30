@@ -22,7 +22,8 @@ import {
   Layers,
   MessageSquare,
   BookOpen,
-  Settings
+  Settings,
+  Search
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -65,6 +66,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState('Viewer'); // Default pengamat untuk keamanan
   const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
+  const [menuSearch, setMenuSearch] = useState('');
 
   useEffect(() => {
      const getUserProfile = async () => {
@@ -137,6 +139,17 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
         {/* Navigation - Grouped */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-6">
+          <div className="relative mb-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input 
+              type="text"
+              placeholder="Cari menu..."
+              value={menuSearch}
+              onChange={e => setMenuSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+            />
+          </div>
+
           {Object.entries(
             menuList.reduce((acc, item) => {
               const group = item.group || 'Lainnya';
@@ -145,10 +158,12 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               return acc;
             }, {} as Record<string, typeof menuList>)
           ).map(([group, items]) => {
-            // Filter items by role/access
+            // Filter items by role/access AND search query
             const visibleItems = items.filter(item => {
               if (userRole === 'Pending') return false;
-              return allowedPaths.includes(item.path) || userRole.toLowerCase() === 'admin';
+              const hasAccess = allowedPaths.includes(item.path) || userRole.toLowerCase() === 'admin';
+              const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
+              return hasAccess && matchesSearch;
             });
 
             if (visibleItems.length === 0) return null;

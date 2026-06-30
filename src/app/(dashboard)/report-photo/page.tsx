@@ -66,6 +66,7 @@ export default function ReportPhotoPage() {
    
    const [tglAwal, setTglAwal] = useState(firstDayOfMonth);
    const [tglAkhir, setTglAkhir] = useState(defaultDate);
+   const [showUangMasuk, setShowUangMasuk] = useState(false);
    
    const [transactions, setTransactions] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
@@ -77,12 +78,29 @@ export default function ReportPhotoPage() {
    const fetchReport = async () => {
       setLoading(true);
       try {
+         // Konversi tanggal WIB ke UTC murni:
+         // WIB = UTC+7, jadi 00:00 WIB = 17:00 UTC hari sebelumnya
+         // dan 23:59:59 WIB = 16:59:59 UTC hari yang sama
+         const toUtcStart = (dateStr: string) => {
+           // dateStr = 'YYYY-MM-DD' dalam WIB
+           // 00:00:00 WIB = tanggal kemarin jam 17:00:00 UTC
+           const d = new Date(`${dateStr}T00:00:00`);
+           d.setHours(d.getHours() - 7); // kurangi 7 jam untuk dapat UTC
+           return d.toISOString();
+         };
+         const toUtcEnd = (dateStr: string) => {
+           // 23:59:59 WIB = hari yang sama jam 16:59:59 UTC
+           const d = new Date(`${dateStr}T23:59:59`);
+           d.setHours(d.getHours() - 7);
+           return d.toISOString();
+         };
+
          const { data, error } = await supabase
                .from('transactions')
                .select('*, ref_akun!inner(nomor_akun, nama_akun), ref_personel(nama_orang)')
                .eq('disetujui', 'Disetujui')
-               .gte('tanggal_disetujui', tglAwal)
-               .lte('tanggal_disetujui', tglAkhir)
+               .gte('tanggal_disetujui', toUtcStart(tglAwal))
+               .lte('tanggal_disetujui', toUtcEnd(tglAkhir))
                .order('tanggal_disetujui', { ascending: true });
 
          if (error) throw error;
@@ -100,6 +118,8 @@ export default function ReportPhotoPage() {
 
    transactions.forEach(t => {
        const isPemasukan = Number(t.uang_masuk) > 0;
+       if (isPemasukan && !showUangMasuk) return; // Skip uang masuk jika checkbox tidak dicentang
+
        const nominal = isPemasukan ? Number(t.uang_masuk) : Number(t.uang_keluar);
        const akunKey = t.ref_akun ? t.ref_akun.nomor_akun : '99999.00';
        const akunNama = t.ref_akun ? t.ref_akun.nama_akun : 'Tanpa Akun';
@@ -117,7 +137,8 @@ export default function ReportPhotoPage() {
        ...rekapMap[k]
    })).sort((a, b) => a.kode.localeCompare(b.kode));
 
-   const totalTrxAll = transactions.length;
+   const filteredTransactions = transactions.filter(t => showUangMasuk || Number(t.uang_masuk) <= 0);
+   const totalTrxAll = filteredTransactions.length;
 
     const renderFotoKecil = (teks: string | null) => {
        if (!teks) return null;
@@ -159,6 +180,16 @@ export default function ReportPhotoPage() {
                <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-widest text-indigo-200">Sampai:</span>
                   <input type="date" value={tglAkhir} onChange={e => setTglAkhir(e.target.value)} className="bg-white text-indigo-900 border-0 font-bold rounded-xl outline-none p-2 text-sm" />
+               </div>
+               <div className="flex items-center gap-2 ml-2">
+                  <input 
+                     type="checkbox" 
+                     id="uangMasuk"
+                     checked={showUangMasuk} 
+                     onChange={e => setShowUangMasuk(e.target.checked)} 
+                     className="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <label htmlFor="uangMasuk" className="text-xs font-bold uppercase tracking-widest text-white cursor-pointer select-none">Tampilkan Uang Masuk</label>
                </div>
                
                <button onClick={fetchReport} className="bg-amber-500 text-white hover:bg-amber-600 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
@@ -239,7 +270,7 @@ export default function ReportPhotoPage() {
                            </tr>
                         </thead>
                         <tbody>
-                           {transactions.map((trx, i) => {
+                           {filteredTransactions.map((trx, i) => {
                               const isPemasukan = Number(trx.uang_masuk) > 0;
                               const nominal = isPemasukan ? trx.uang_masuk : trx.uang_keluar;
                               const akunKey = trx.ref_akun ? trx.ref_akun.nomor_akun : '99999.00';
@@ -248,7 +279,7 @@ export default function ReportPhotoPage() {
                               return (
                                  <tr key={i} className="border-b border-gray-300 align-top break-inside-avoid">
                                     <td className="p-3 border-r border-gray-300 font-black text-[13px] text-center">
-                                       {new Date(trx.tanggal_disetujui).toLocaleDateString('id-ID').replace(/\//g, '-')}
+                                       {new Date(trx.tanggal_disetujui).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }).replace(/\//g, '-')}
                                     </td>
                                     <td className="p-4 border-r border-gray-300">
                                        <div className="mb-4">
