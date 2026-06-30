@@ -79,8 +79,8 @@ export const menuList: MenuItem[] = [
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 
   // --- INPUT FORM ---
-  { title: 'Pengajuan Form MAK', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
-  { title: 'Input Form Delta', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
+  { title: 'Form Tolakan Verif', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
+  { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
 
   // --- MANAJEMEN KEGIATAN ---
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
