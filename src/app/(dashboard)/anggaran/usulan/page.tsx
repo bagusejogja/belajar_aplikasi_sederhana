@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
-  CheckCircle, Clock, UploadCloud, Calendar, BarChart3
+  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
@@ -355,6 +355,10 @@ export default function UsulanAnggaranPage() {
     );
   };
 
+  const total = filteredData.length;
+  const selesai = filteredData.filter(d => d.status === 'Sudah Diproses').length;
+  const proses = filteredData.filter(d => d.status !== 'Sudah Diproses').length;
+
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 relative overflow-hidden">
@@ -395,6 +399,25 @@ export default function UsulanAnggaranPage() {
             <Download size={16} /> Export CSV
           </button>
         </div>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: 'Total Pengajuan', value: total, color: 'from-indigo-500 to-indigo-600', icon: <ClipboardList size={24} /> },
+          { label: 'Proses Revisi',   value: proses,  color: 'from-amber-400 to-amber-500',   icon: <Clock size={24} /> },
+          { label: 'Selesai',         value: selesai, color: 'from-emerald-500 to-emerald-600', icon: <CheckCircle size={24} /> },
+        ].map((s, i) => (
+          <div key={i} className={`bg-gradient-to-br ${s.color} text-white rounded-3xl p-6 shadow-sm`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">{s.label}</p>
+                <p className="text-4xl font-black">{s.value}</p>
+              </div>
+              <div className="opacity-30">{s.icon}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Dashboard Section */}

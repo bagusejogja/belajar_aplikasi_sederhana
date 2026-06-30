@@ -139,7 +139,7 @@ export default function TambahPaguFormPage() {
           <p className="text-gray-500 font-medium mt-1">Lengkapi formulir di bawah untuk mencatat usulan anggaran baru.</p>
         </div>
         <button 
-          onClick={() => router.back()}
+          onClick={() => router.push('/tambah-pagu')}
           className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
         >
           <ArrowLeft size={18} /> KEMBALI

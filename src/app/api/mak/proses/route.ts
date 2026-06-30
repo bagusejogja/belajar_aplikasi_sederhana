@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
+    let emailSent = false;
+    let emailError = null;
+
     // Kirim email jika ada email target
     if (emailTarget) {
       try {
@@ -94,13 +97,20 @@ export async function POST(req: NextRequest) {
             </div>
           `,
         });
-      } catch (emailErr) {
+        emailSent = true;
+      } catch (emailErr: any) {
         console.error('Gagal mengirim email:', emailErr);
-        // Jangan gagalkan request hanya karena email gagal
+        emailError = emailErr.message || String(emailErr);
+        // Jangan gagalkan request (hanya gagalkan email)
       }
     }
 
-    return NextResponse.json({ success: true, message: 'Status diperbarui dan email terkirim.' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Status diperbarui.',
+      emailSent,
+      emailError
+    });
   } catch (err: any) {
     console.error('Error in mak/proses:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

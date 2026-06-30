@@ -58,8 +58,8 @@ export const menuList: MenuItem[] = [
   { title: 'Master Penerimaan', path: '/penerimaan/master', icon: 'Settings', roles: ['ADMIN', 'MANAGER'], group: 'Penerimaan' },
 
   // --- PERSURATAN ---
-  { title: 'Daftar Arsip Surat', path: '/surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
-  { title: 'Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
+  { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
+  { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
   
   // --- MASTER & PENGATURAN ---
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
@@ -72,10 +72,15 @@ export const menuList: MenuItem[] = [
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN ---
+  { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Anggaran' },
+  { title: 'Laporan Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Analisis Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-  { title: 'Pengajuan Form MAK', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
+
+  // --- INPUT FORM ---
+  { title: 'Pengajuan Form MAK', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
+  { title: 'Input Form Delta', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
 
   // --- MANAJEMEN KEGIATAN ---
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },

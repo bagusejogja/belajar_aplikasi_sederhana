@@ -20,7 +20,7 @@ import {
 export default function DaftarSuratPage() {
   const [data, setData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showStats, setShowStats] = useState(false);
+  const [showStats, setShowStats] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<any[]>([]);
   const [unitOptions, setUnitOptions] = useState<any[]>([]);
@@ -123,6 +123,19 @@ export default function DaftarSuratPage() {
     return matchesSearch && matchesUnit && matchesYear && matchesKlasifikasi;
   });
 
+  const unitStatsData = useMemo(() => {
+    const unitCounts: any = {};
+    filteredData.forEach(item => {
+      const uName = item.gov_units?.nama_unit || 'Unknown';
+      unitCounts[uName] = (unitCounts[uName] || 0) + 1;
+    });
+
+    return Object.entries(unitCounts)
+      .map(([name, count]) => ({ name, count: Number(count) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [filteredData]);
+
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -220,20 +233,13 @@ export default function DaftarSuratPage() {
           >
             <FileSpreadsheet size={20} /> EXPORT EXCEL
           </button>
-          {perms.can_create && (
-            <Link 
-              href="/surat/tambah" 
-              className="flex items-center gap-3 px-10 py-5 bg-gray-900 text-white rounded-[2rem] font-black shadow-2xl hover:bg-black transition-all active:scale-95 border-b-4 border-indigo-500"
-            >
-              <Plus size={20} strokeWidth={4} /> TAMBAH SURAT
-            </Link>
-          )}
         </div>
       </div>
 
       {/* Stats Section */}
       {showStats && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12 animate-in fade-in slide-in-from-top-4 duration-500">
+        <>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="lg:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 h-[450px]">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-lg font-black text-gray-800 tracking-tight">Tren Surat Masuk Bulanan</h3>
@@ -306,6 +312,33 @@ export default function DaftarSuratPage() {
             </div>
           </div>
         </div>
+        
+        <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 mb-12 h-[400px] animate-in fade-in slide-in-from-top-4 duration-500 delay-150">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-lg font-black text-gray-800 tracking-tight flex items-center gap-2">
+                <Building2 size={20} className="text-indigo-600" /> Distribusi Surat per Unit Kerja (Top 10)
+              </h3>
+            </div>
+            <div className="h-[280px] w-full pr-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={unitStatsData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
+                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#d1d5db' }} />
+                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '900', fill: '#6b7280' }} width={180} />
+                  <Tooltip 
+                    cursor={{ fill: '#f9fafb' }} 
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }} 
+                  />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={24} fill="#10b981">
+                    {unitStatsData.map((entry: any, index: number) => (
+                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#34d399'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+        </div>
+        </>
       )}
 
       {/* Filter Area */}
