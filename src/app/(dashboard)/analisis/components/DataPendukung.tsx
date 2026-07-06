@@ -8,9 +8,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
 
 
-  const showTambahPagu = historisData?.some((d: any) => d._raw?.paguTambahPagu > 0);
-  const showEfisiensi = historisData?.some((d: any) => d._raw?.paguEfisiensi > 0);
-  const showTalangan = historisData?.some((d: any) => d._raw?.paguTalangan > 0);
+  const showTambahPagu = historisData?.some((d: any) => d.tambah_pagu && d.tambah_pagu !== '0');
+  const showEfisiensi = historisData?.some((d: any) => d.efisiensi && d.efisiensi !== '0');
+  const showTalangan = historisData?.some((d: any) => d.talangan && d.talangan !== '0');
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -271,21 +271,6 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
             </div>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col gap-3 shadow-inner">
-             <div className="flex items-center gap-2 text-emerald-700 font-black mb-2"><ClipboardPaste size={18}/> Paste Zone Multi-Tahun</div>
-             <p className="text-xs text-gray-500 leading-relaxed">
-               Anda dapat melakukan copy tabel dari Excel (Kolom: Tahun, Pagu Awal, Tambah, Kurang, Total Pagu, Realisasi, % Serapan) lalu paste di kotak bawah ini.
-             </p>
-             <textarea 
-                className="w-full flex-1 min-h-[100px] p-4 bg-white border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-700 text-xs font-mono resize-none custom-scrollbar shadow-sm"
-                placeholder="Paste data tabular di sini..."
-                value={pasteData}
-                onChange={e => setPasteData(e.target.value)}
-             />
-             <button onClick={handlePasteMultiTahun} disabled={!pasteData} className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">
-               Proses Paste Data
-             </button>
-          </div>
         </div>
       )}
 

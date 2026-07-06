@@ -297,22 +297,22 @@ ${mainData.ringkasan_ai}`;
                   <td className="px-4 py-2 font-medium text-gray-700">Pengalihan (+/-)</td>
                   <td className="px-4 py-2 text-right">Rp {historisYearRow.pengalihan || '0'}</td>
                 </tr>
-                {historisYearRow._raw?.paguTambahPagu > 0 && (
+                {historisYearRow.tambah_pagu && historisYearRow.tambah_pagu !== '0' && (
                   <tr className="hover:bg-gray-50 text-emerald-600">
                     <td className="px-4 py-2 font-medium">Tambah Pagu +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu || '0'}</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu}</td>
                   </tr>
                 )}
-                {historisYearRow._raw?.paguEfisiensi > 0 && (
+                {historisYearRow.efisiensi && historisYearRow.efisiensi !== '0' && (
                   <tr className="hover:bg-gray-50 text-rose-600">
                     <td className="px-4 py-2 font-medium">Efisiensi -</td>
-                    <td className="px-4 py-2 text-right">- Rp {historisYearRow.efisiensi || '0'}</td>
+                    <td className="px-4 py-2 text-right">- Rp {historisYearRow.efisiensi}</td>
                   </tr>
                 )}
-                {historisYearRow._raw?.paguTalangan > 0 && (
+                {historisYearRow.talangan && historisYearRow.talangan !== '0' && (
                   <tr className="hover:bg-gray-50 text-amber-600">
                     <td className="px-4 py-2 font-medium">Talangan +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.talangan || '0'}</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.talangan}</td>
                   </tr>
                 )}
                 <tr className="hover:bg-gray-50 bg-indigo-50/30">
