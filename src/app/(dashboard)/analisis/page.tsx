@@ -185,7 +185,7 @@ export default function AnalisisPaguPage() {
                <div className="space-y-12 pb-24">
                   <div id="ocr" className="scroll-mt-8"><OCRPanel mainData={mainData} setMainData={setMainData} /></div>
                   <hr className="border-gray-100" />
-                  <div id="form" className="scroll-mt-8"><DataForm mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} /></div>
+                  <div id="form" className="scroll-mt-8"><DataForm mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
                   <hr className="border-gray-100" />
                   <div id="pendukung" className="scroll-mt-8"><DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
 

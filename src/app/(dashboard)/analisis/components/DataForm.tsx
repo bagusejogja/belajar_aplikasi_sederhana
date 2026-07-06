@@ -5,11 +5,79 @@ import { FileSpreadsheet, Plus, Trash2, Wand2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 import { generateAnalysisFromText } from '@/app/actions/ai-scan';
+import Select from 'react-select';
+import { supabase } from '@/lib/supabase';
+import { useEffect } from 'react';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
-export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [] }: any) {
+export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [], setHistorisData }: any) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [units, setUnits] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      const { data } = await supabase.from('gov_units').select('id, nama_unit').order('nama_unit');
+      if (data) setUnits(data);
+    };
+    fetchUnits();
+  }, []);
+
+  const handleUnitChange = async (selectedOption: any) => {
+    setMainData({ ...mainData, unit_pengirim: selectedOption?.label || '' });
+    
+    if (!selectedOption) return;
+    
+    // Fetch riwayat pagu & realisasi
+    try {
+      const unitId = selectedOption.value;
+      const { data: paguData } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
+      const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
+      
+      if (paguData && realisasiData && setHistorisData) {
+        // Group by year
+        const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
+        const newHistoris = years.sort().map(year => {
+          const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
+          const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
+          
+          const totalPagu = paguTahun.reduce((acc, p) => acc + Number(p.nominal), 0);
+          const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
+          
+          let serapan = 0;
+          if (totalPagu > 0) serapan = (totalRealisasi / totalPagu) * 100;
+          
+          return {
+            tahun: year,
+            pagu_awal: '0',
+            tambah: '0',
+            kurang: '0',
+            total_pagu: formatRp(totalPagu),
+            realisasi_historis: formatRp(totalRealisasi),
+            persen_serapan: serapan.toFixed(2) + '%'
+          };
+        });
+        
+        // Append current paste zone if any exists (to keep year 2026 manual data if they pasted it)
+        const currentData = historisData || [];
+        const merged = [...newHistoris];
+        
+        currentData.forEach((cd: any) => {
+          const exists = merged.findIndex(m => m.tahun === cd.tahun);
+          if (exists === -1) {
+            merged.push(cd); // if manual paste has year that is not in DB
+          } else if (cd.tahun === targetYear) {
+            // Keep paste zone for current year as requested by user
+            merged[exists] = cd;
+          }
+        });
+        
+        setHistorisData(merged.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const targetYear = '2026';
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
@@ -188,7 +256,15 @@ ${mainData.ringkasan_ai}`;
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
-          <input type="text" value={mainData.unit_pengirim} onChange={e => setMainData({...mainData, unit_pengirim: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
+          <Select 
+            options={units.map(u => ({ value: u.id, label: u.nama_unit }))}
+            value={units.find(u => u.nama_unit === mainData.unit_pengirim) ? { value: units.find(u => u.nama_unit === mainData.unit_pengirim).id, label: mainData.unit_pengirim } : null}
+            onChange={handleUnitChange}
+            placeholder="Cari atau pilih Unit Kerja..."
+            isClearable
+            className="text-sm"
+            styles={{ control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }) }}
+          />
         </div>
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu</label>
