@@ -35,13 +35,24 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
       const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
       
       if (paguData && realisasiData && setHistorisData) {
-        // Group by year
+        // Group by year (filter tahun >= 2019)
         const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
-        const newHistoris = years.sort().map(year => {
+        const filteredYears = years.filter(y => parseInt(y) >= 2019);
+        
+        const newHistoris = filteredYears.sort().map(year => {
           const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
           const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
           
-          const totalPagu = paguTahun.reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguPengalihan = paguTambah - paguKurang;
+          
+          const paguTambahPagu = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguEfisiensi = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
+          
+          const totalPagu = paguAwal + paguPengalihan + paguTambahPagu - paguEfisiensi + paguTalangan;
           const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
           
           let serapan = 0;
@@ -49,12 +60,15 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           
           return {
             tahun: year,
-            pagu_awal: '0',
-            tambah: '0',
-            kurang: '0',
+            pagu_awal: formatRp(paguAwal),
+            pengalihan: formatRp(paguPengalihan),
+            tambah_pagu: formatRp(paguTambahPagu),
+            efisiensi: formatRp(paguEfisiensi),
+            talangan: formatRp(paguTalangan),
             total_pagu: formatRp(totalPagu),
             realisasi_historis: formatRp(totalRealisasi),
-            persen_serapan: serapan.toFixed(2) + '%'
+            persen_serapan: serapan.toFixed(2) + '%',
+            _raw: { paguTambahPagu, paguEfisiensi, paguTalangan } // Untuk cek kolom dinamis
           };
         });
         
@@ -280,13 +294,27 @@ ${mainData.ringkasan_ai}`;
                   <td className="px-4 py-2 text-right">Rp {historisYearRow.pagu_awal || '0'}</td>
                 </tr>
                 <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-700">Penambahan Pagu +</td>
-                  <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah || '0'}</td>
+                  <td className="px-4 py-2 font-medium text-gray-700">Pengalihan (+/-)</td>
+                  <td className="px-4 py-2 text-right">Rp {historisYearRow.pengalihan || '0'}</td>
                 </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-700">Pengurangan Pagu -</td>
-                  <td className="px-4 py-2 text-right">- Rp {historisYearRow.kurang || '0'}</td>
-                </tr>
+                {historisYearRow._raw?.paguTambahPagu > 0 && (
+                  <tr className="hover:bg-gray-50 text-emerald-600">
+                    <td className="px-4 py-2 font-medium">Tambah Pagu +</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu || '0'}</td>
+                  </tr>
+                )}
+                {historisYearRow._raw?.paguEfisiensi > 0 && (
+                  <tr className="hover:bg-gray-50 text-rose-600">
+                    <td className="px-4 py-2 font-medium">Efisiensi -</td>
+                    <td className="px-4 py-2 text-right">- Rp {historisYearRow.efisiensi || '0'}</td>
+                  </tr>
+                )}
+                {historisYearRow._raw?.paguTalangan > 0 && (
+                  <tr className="hover:bg-gray-50 text-amber-600">
+                    <td className="px-4 py-2 font-medium">Talangan +</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.talangan || '0'}</td>
+                  </tr>
+                )}
                 <tr className="hover:bg-gray-50 bg-indigo-50/30">
                   <td className="px-4 py-2 font-bold text-indigo-900">Pagu Sampai Saat Ini</td>
                   <td className="px-4 py-2 text-right font-bold text-indigo-900">Rp {historisYearRow.total_pagu || '0'}</td>

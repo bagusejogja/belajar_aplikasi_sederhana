@@ -6,7 +6,11 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 
 export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
-  const [pasteData, setPasteData] = useState('');
+
+
+  const showTambahPagu = historisData?.some((d: any) => d._raw?.paguTambahPagu > 0);
+  const showEfisiensi = historisData?.some((d: any) => d._raw?.paguEfisiensi > 0);
+  const showTalangan = historisData?.some((d: any) => d._raw?.paguTalangan > 0);
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -81,24 +85,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     }
   };
 
-  const handlePasteMultiTahun = () => {
-    if (!pasteData.trim()) return;
-    const lines = pasteData.split('\n').map(l => l.split('\t'));
-    
-    // Asumsikan urutan paste: Tahun | Pagu Awal | Tambah | Kurang | Total Pagu | Realisasi Historis
-    const mapped = lines.filter(l => l.length >= 2).map(l => ({
-      tahun: l[0] || '',
-      pagu_awal: l[1] || '0',
-      tambah: l[2] || '0',
-      kurang: l[3] || '0',
-      total_pagu: l[4] || '0',
-      realisasi_historis: l[5] || '0',
-      persen_serapan: l[6] || '0%'
-    }));
-    setHistorisData([...historisData, ...mapped]);
-    setPasteData('');
-    alert('Data historis berhasil ditambahkan dari Paste Zone!');
-  };
+
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
@@ -214,9 +201,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         const kurang = parseNum(d.kurang);
                         return {
                           name: d.tahun,
+                          name: d.tahun,
                           PaguAwal: parseNum(d.pagu_awal),
-                          Penambahan: parseNum(d.tambah),
-                          Pengurangan: kurang > 0 ? -kurang : kurang,
+                          Pengalihan: parseNum(d.pengalihan),
                           TotalPagu: parseNum(d.total_pagu),
                           Realisasi: parseNum(d.realisasi_historis),
                         };
@@ -229,8 +216,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       <Tooltip formatter={(value: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value || 0)} />
                       <Legend wrapperStyle={{fontSize: '12px'}} />
                       <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="Penambahan" stackId="a" fill="#10b981" name="Penambahan" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Pengurangan" stackId="a" fill="#ef4444" name="Pengurangan" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan (+/-)" radius={[4, 4, 0, 0]} />
                       <Line type="monotone" dataKey="TotalPagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 4}} activeDot={{r: 6}} />
                       <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" name="Realisasi" dot={{r: 4}} activeDot={{r: 6}} />
                     </ComposedChart>
@@ -245,8 +231,10 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <tr>
                     <th className="px-3 py-3">Tahun</th>
                     <th className="px-3 py-3 text-right">Pagu Awal</th>
-                    <th className="px-3 py-3 text-right">+ Tambah</th>
-                    <th className="px-3 py-3 text-right">- Kurang</th>
+                    <th className="px-3 py-3 text-right">Pengalihan</th>
+                    {showTambahPagu && <th className="px-3 py-3 text-right text-emerald-600">Tambah Pagu</th>}
+                    {showEfisiensi && <th className="px-3 py-3 text-right text-rose-600">Efisiensi</th>}
+                    {showTalangan && <th className="px-3 py-3 text-right text-amber-600">Talangan</th>}
                     <th className="px-3 py-3 text-right text-emerald-600">Total Pagu</th>
                     <th className="px-3 py-3 text-right text-rose-600">Realisasi</th>
                     <th className="px-3 py-3 text-center w-20">% Serapan</th>
@@ -258,8 +246,10 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="px-3 py-2"><input type="text" value={d.tahun} onChange={(e) => { const n=[...historisData]; n[idx].tahun=e.target.value; setHistorisData(n); }} className="w-16 bg-transparent outline-none focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.pagu_awal} onChange={(e) => { const n=[...historisData]; n[idx].pagu_awal=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.tambah} onChange={(e) => { const n=[...historisData]; n[idx].tambah=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.kurang} onChange={(e) => { const n=[...historisData]; n[idx].kurang=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
+                      <td className="px-3 py-2"><input type="text" value={d.pengalihan} onChange={(e) => { const n=[...historisData]; n[idx].pengalihan=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
+                      {showTambahPagu && <td className="px-3 py-2"><input type="text" value={d.tambah_pagu} onChange={(e) => { const n=[...historisData]; n[idx].tambah_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500 text-emerald-600"/></td>}
+                      {showEfisiensi && <td className="px-3 py-2"><input type="text" value={d.efisiensi} onChange={(e) => { const n=[...historisData]; n[idx].efisiensi=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-rose-500 text-rose-600"/></td>}
+                      {showTalangan && <td className="px-3 py-2"><input type="text" value={d.talangan} onChange={(e) => { const n=[...historisData]; n[idx].talangan=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-amber-500 text-amber-600"/></td>}
                       <td className="px-3 py-2"><input type="text" value={d.total_pagu} onChange={(e) => { const n=[...historisData]; n[idx].total_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-emerald-600 focus:border-b border-emerald-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.realisasi_historis} onChange={(e) => { const n=[...historisData]; n[idx].realisasi_historis=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-rose-600 focus:border-b border-rose-500"/></td>
                       <td className="px-3 py-2"><input type="text" value={d.persen_serapan || ''} onChange={(e) => { const n=[...historisData]; n[idx].persen_serapan=e.target.value; setHistorisData(n); }} className="w-full text-center bg-transparent outline-none font-bold focus:border-b border-emerald-500"/></td>
@@ -275,7 +265,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               </table>
             </div>
             <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', tambah: '0', kurang: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
+               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                  <Plus size={16}/> Tambah Baris
                </button>
             </div>
