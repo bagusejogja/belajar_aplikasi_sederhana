@@ -46,13 +46,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguPengalihan = paguTambah - paguKurang;
+          const paguPengalihan = paguTambah + paguKurang; // kurang sudah bernilai negatif dari excel
           
-          const paguTambahPagu = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPagu = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase().includes('tambah pagu')).reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguEfisiensi = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
           
-          const totalPagu = paguAwal + paguPengalihan + paguTambahPagu - paguEfisiensi + paguTalangan;
+          // efisiensi sudah bernilai negatif di excel, jadi kita tambahkan saja
+          const totalPagu = paguAwal + paguPengalihan + paguTambahPagu + paguEfisiensi + paguTalangan;
           const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
           
           let serapan = 0;

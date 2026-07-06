@@ -12,6 +12,9 @@ try {
   sql += '-- GENERATED SQL DARI db.xlsx (Tanpa Grouping / Baris per Baris)\n';
   sql += '-- =========================================================\n\n';
   
+  sql += 'TRUNCATE TABLE public.gov_realisasi_anggaran RESTART IDENTITY CASCADE;\n';
+  sql += 'TRUNCATE TABLE public.gov_pagu_anggaran RESTART IDENTITY CASCADE;\n\n';
+  
   if (dataRealisasi.length > 0) {
     sql += '-- DATA REALISASI:\n';
     dataRealisasi.forEach(row => {
