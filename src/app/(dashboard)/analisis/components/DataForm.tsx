@@ -75,21 +75,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           };
         });
         
-        // Append current paste zone if any exists (to keep year 2026 manual data if they pasted it)
-        const currentData = historisData || [];
-        const merged = [...newHistoris];
-        
-        currentData.forEach((cd: any) => {
-          const exists = merged.findIndex(m => m.tahun === cd.tahun);
-          if (exists === -1) {
-            merged.push(cd); // if manual paste has year that is not in DB
-          } else if (cd.tahun === targetYear) {
-            // Keep paste zone for current year as requested by user
-            merged[exists] = cd;
-          }
-        });
-        
-        setHistorisData(merged.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
+        setHistorisData(newHistoris.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
       }
     } catch (e) {
       console.error(e);
