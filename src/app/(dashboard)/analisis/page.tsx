@@ -154,6 +154,9 @@ export default function AnalisisPaguPage() {
           <button onClick={handleBaru} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold transition-all shadow-sm text-sm">
             + Baru
           </button>
+          <button onClick={() => setActiveTab('pdf')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100 transition-all text-sm">
+            <Printer size={16} /> Lihat PDF
+          </button>
           <button onClick={handleSave} disabled={loading} className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md shadow-indigo-100 transition-all disabled:opacity-50 text-sm">
             {loading ? <div className="w-4 h-4 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={16} />} Simpan
           </button>
@@ -171,15 +174,7 @@ export default function AnalisisPaguPage() {
                   <hr className="border-gray-100" />
                   <div id="pendukung" className="scroll-mt-8"><DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
 
-                  {/* Floating Action Bar */}
-                  <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-md border border-indigo-100 p-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50">
-                     <button onClick={handleSave} disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-black transition-all shadow-md flex items-center gap-2 disabled:opacity-50">
-                       {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Save size={20}/>} Simpan Data
-                     </button>
-                     <button onClick={() => setActiveTab('pdf')} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-black transition-all shadow-md flex items-center gap-2">
-                       <Printer size={20}/> Lihat & Cetak PDF
-                     </button>
-                  </div>
+
                </div>
             )}
             {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} />}
