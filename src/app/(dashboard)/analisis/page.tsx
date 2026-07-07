@@ -46,7 +46,30 @@ export default function AnalisisPaguPage() {
        if (detail) setDetailData(detail);
 
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
-       if (historis) setHistorisData(historis);
+       if (historis) {
+          // Karena sebelumnya kita mapping dari Excel dan mengabaikan tambah/kurang di state baru, 
+          // kita load apa adanya ke historisData
+          setHistorisData(historis);
+       }
+
+       // Parse kembali analisis_html yang menyimpan JSON rekomendasi
+       if (utama && utama.analisis_html) {
+          try {
+             const parsed = JSON.parse(utama.analisis_html);
+             setMainData(prev => ({
+                ...prev,
+                analisis_html: parsed.analisis || '',
+                rekomendasi_html: parsed.rekomendasi || ''
+             }));
+          } catch (e) {
+             // Jika bukan JSON (format lama)
+             setMainData(prev => ({
+                ...prev,
+                analisis_html: utama.analisis_html,
+                rekomendasi_html: ''
+             }));
+          }
+       }
 
        // Defaultnya ke main, tapi jika di-trigger oleh Lihat PDF, akan diganti ke pdf di RiwayatList
        setActiveTab('main');
@@ -62,12 +85,33 @@ export default function AnalisisPaguPage() {
     try {
       const targetId = analisisId || `ANL-${Date.now()}`;
       
+      // Validasi dan Filter Payload
+      const payloadUtama = {
+        id_analisis: targetId,
+        no_surat: mainData.no_surat || '',
+        tanggal_surat: mainData.tanggal_surat || null,
+        perihal: mainData.perihal || '',
+        unit_pengirim: mainData.unit_pengirim || '',
+        total_anggaran: mainData.total_anggaran || '0',
+        total_realisasi: mainData.total_realisasi || '0',
+        persen_serapan: mainData.persen_serapan || '0',
+        ringkasan_ai: mainData.ringkasan_ai || '',
+        analisis_html: JSON.stringify({
+           analisis: mainData.analisis_html || '',
+           rekomendasi: mainData.rekomendasi_html || ''
+        }),
+        file_lampiran: mainData.file_lampiran || '',
+        link_lampiran: mainData.link_lampiran || ''
+      };
+
       // Update or Insert Utama
       if (analisisId) {
-        await supabase.from('app_analisis_utama').update(mainData).eq('id_analisis', targetId);
+        const { error: err1 } = await supabase.from('app_analisis_utama').update(payloadUtama).eq('id_analisis', targetId);
+        if (err1) throw err1;
       } else {
         setAnalisisId(targetId);
-        await supabase.from('app_analisis_utama').insert([{...mainData, id_analisis: targetId}]);
+        const { error: err2 } = await supabase.from('app_analisis_utama').insert([payloadUtama]);
+        if (err2) throw err2;
       }
 
       // Sync Detail Realisasi
@@ -130,7 +174,7 @@ export default function AnalisisPaguPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -my-6">
       {/* Top Navbar */}
-      <div className="bg-white border-b border-gray-200 flex items-center justify-between px-8 py-4 shadow-sm z-10 shrink-0">
+      <div className="bg-white border-b border-gray-200 flex flex-wrap lg:flex-nowrap items-center justify-between px-4 lg:px-8 py-4 shadow-sm z-10 shrink-0 gap-4 overflow-x-auto">
         <h1 className="text-xl font-black text-indigo-700 flex items-center gap-2">
           <FileText size={24}/> Analisis Pagu
         </h1>
