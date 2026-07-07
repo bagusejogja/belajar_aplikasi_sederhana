@@ -90,6 +90,41 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         });
         
         setHistorisData(merged.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
+        
+        // Auto-fill detailData untuk tahun terkini (misal 2026 atau tertinggi)
+        if (realisasiData.length > 0 && setDetailData) {
+           const latestYear = Math.max(...filteredYears).toString();
+           const latestRealisasi = realisasiData.filter(r => r.tahun_anggaran === latestYear);
+           
+           if (latestRealisasi.length > 0) {
+              const newDetailData = latestRealisasi.map((r, i) => {
+                 // Hitung pagu per sumber dana di tahun tersebut
+                 const paguTerkait = paguData.filter(p => p.tahun_anggaran === latestYear && p.sumber_dana === r.sumber_dana);
+                 const anggaran = paguTerkait.reduce((acc, p) => acc + Number(p.nominal), 0);
+                 const serapan = anggaran > 0 ? (Number(r.realisasi) / anggaran) * 100 : 0;
+                 return {
+                    no_urut: i + 1,
+                    uraian_kegiatan: r.sumber_dana || 'Kegiatan',
+                    anggaran: formatRp(anggaran),
+                    realisasi: formatRp(Number(r.realisasi)),
+                    persen_serapan: serapan.toFixed(2) + '%'
+                 };
+              });
+              setDetailData(newDetailData);
+              
+              // Auto update mainData
+              const totalAngg = newDetailData.reduce((acc, d) => acc + parseNum(d.anggaran), 0);
+              const totalReal = newDetailData.reduce((acc, d) => acc + parseNum(d.realisasi), 0);
+              const persenSerapan = totalAngg > 0 ? ((totalReal / totalAngg) * 100).toFixed(2) : '0';
+              setMainData(prev => ({ 
+                 ...prev, 
+                 unit_pengirim: selectedOption?.label || '',
+                 total_anggaran: formatRp(totalAngg),
+                 total_realisasi: formatRp(totalReal),
+                 persen_serapan: persenSerapan
+              }));
+           }
+        }
       }
     } catch (e) {
       console.error(e);

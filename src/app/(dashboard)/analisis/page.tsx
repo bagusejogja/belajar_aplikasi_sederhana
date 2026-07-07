@@ -135,11 +135,11 @@ export default function AnalisisPaguPage() {
           <FileText size={24}/> Analisis Pagu
         </h1>
         
-        <nav className="flex items-center gap-1 mx-4 overflow-x-auto custom-scrollbar">
-          <button onClick={() => setActiveTab('main')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'main' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
-            <FileText size={16} /> Form Analisis (All-in-One)
+        <nav className="flex items-center gap-2 mx-4 overflow-x-auto custom-scrollbar">
+          <button onClick={() => setActiveTab('main')} className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-white border font-bold transition-all shadow-sm text-sm whitespace-nowrap ${activeTab === 'main' ? 'border-indigo-200 text-indigo-600 bg-indigo-50/50' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+            <FileText size={16} /> Form Analisis
           </button>
-          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'riwayat' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
+          <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-2 px-4 py-2 rounded-xl bg-white border font-bold transition-all shadow-sm text-sm whitespace-nowrap ${activeTab === 'riwayat' ? 'border-amber-200 text-amber-600 bg-amber-50/50' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
             <History size={16} /> Riwayat Analisis
           </button>
         </nav>
