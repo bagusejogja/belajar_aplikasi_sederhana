@@ -48,12 +48,13 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguPengalihan = paguTambah + paguKurang; // kurang sudah bernilai negatif dari excel
           
-          const paguTambahPagu = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase().includes('tambah pagu')).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguPenugasan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguInisiatif = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguEfisiensi = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
           
           // efisiensi sudah bernilai negatif di excel, jadi kita tambahkan saja
-          const totalPagu = paguAwal + paguPengalihan + paguTambahPagu + paguEfisiensi + paguTalangan;
+          const totalPagu = paguAwal + paguPengalihan + paguTambahPaguPenugasan + paguTambahPaguInisiatif + paguEfisiensi + paguTalangan;
           const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
           
           let serapan = 0;
@@ -63,13 +64,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
             tahun: year,
             pagu_awal: formatRp(paguAwal),
             pengalihan: formatRp(paguPengalihan),
-            tambah_pagu: formatRp(paguTambahPagu),
+            tambah_pagu_penugasan: formatRp(paguTambahPaguPenugasan),
+            tambah_pagu_inisiatif: formatRp(paguTambahPaguInisiatif),
             efisiensi: formatRp(paguEfisiensi),
             talangan: formatRp(paguTalangan),
             total_pagu: formatRp(totalPagu),
             realisasi_historis: formatRp(totalRealisasi),
             persen_serapan: serapan.toFixed(2) + '%',
-            _raw: { paguTambahPagu, paguEfisiensi, paguTalangan } // Untuk cek kolom dinamis
+            _raw: { paguTambahPaguPenugasan, paguTambahPaguInisiatif, paguEfisiensi, paguTalangan } // Untuk cek kolom dinamis
           };
         });
         
@@ -298,10 +300,16 @@ ${mainData.ringkasan_ai}`;
                   <td className="px-4 py-2 font-medium text-gray-700">Pengalihan (+/-)</td>
                   <td className="px-4 py-2 text-right">Rp {historisYearRow.pengalihan || '0'}</td>
                 </tr>
-                {historisYearRow.tambah_pagu && historisYearRow.tambah_pagu !== '0' && (
+                {historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0' && (
                   <tr className="hover:bg-gray-50 text-emerald-600">
-                    <td className="px-4 py-2 font-medium">Tambah Pagu +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu}</td>
+                    <td className="px-4 py-2 font-medium">Tambah Pagu Penugasan +</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu_penugasan}</td>
+                  </tr>
+                )}
+                {historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0' && (
+                  <tr className="hover:bg-gray-50 text-emerald-600">
+                    <td className="px-4 py-2 font-medium">Tambah Pagu Inisiatif +</td>
+                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu_inisiatif}</td>
                   </tr>
                 )}
                 {historisYearRow.efisiensi && historisYearRow.efisiensi !== '0' && (
