@@ -90,32 +90,6 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         });
         
         setHistorisData(merged.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
-        
-        // Auto-fill detailData untuk tahun terkini
-        if (setDetailData) {
-           const latestYear = Math.max(...filteredYears).toString();
-           // Ambil sumber dana dari pagu maupun realisasi di tahun terbaru
-           const paguLatest = paguData.filter(p => p.tahun_anggaran === latestYear);
-           const realisasiLatest = realisasiData.filter(r => r.tahun_anggaran === latestYear);
-           
-           const sumberDanaList = Array.from(new Set([...paguLatest.map(p => p.sumber_dana), ...realisasiLatest.map(r => r.sumber_dana)])).filter(Boolean);
-           
-           if (sumberDanaList.length > 0) {
-              const newDetailData = sumberDanaList.map((sumber, i) => {
-                 const paguSumber = paguLatest.filter(p => p.sumber_dana === sumber).reduce((acc, p) => acc + Number(p.nominal), 0);
-                 const realisasiSumber = realisasiLatest.filter(r => r.sumber_dana === sumber).reduce((acc, r) => acc + Number(r.realisasi), 0);
-                 const serapan = paguSumber > 0 ? (realisasiSumber / paguSumber) * 100 : 0;
-                 return {
-                    no_urut: i + 1,
-                    uraian_kegiatan: sumber || 'Kegiatan',
-                    anggaran: formatRp(paguSumber),
-                    realisasi: formatRp(realisasiSumber),
-                    persen_serapan: serapan.toFixed(2) + '%'
-                 };
-              });
-              setDetailData(newDetailData);
-           }
-        }
       }
     } catch (e) {
       console.error(e);

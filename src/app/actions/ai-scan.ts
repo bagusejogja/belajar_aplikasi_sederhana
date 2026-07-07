@@ -14,7 +14,7 @@ export async function scanSuratWithAI(formData: FormData) {
     const base64Data = Buffer.from(bytes).toString('base64');
 
     // 2. Inisialisasi Model Gemini Flash (Versi Paling Stabil)
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // 3. Siapkan Prompt yang Sangat Spesifik
     const prompt = `
@@ -111,7 +111,7 @@ export async function listAvailableModels() {
 
 export async function generateAnalysisFromText(ocrText: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
       Anda adalah asisten ahli keuangan pemerintah. Analisis hasil ekstraksi teks dari usulan anggaran berikut:
