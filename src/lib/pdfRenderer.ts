@@ -11,6 +11,15 @@ interface RenderOptions {
   fontSize?: number;
 }
 
+const decodeEntities = (text: string) => {
+  return text.replace(/&nbsp;/g, ' ')
+             .replace(/&amp;/g, '&')
+             .replace(/&lt;/g, '<')
+             .replace(/&gt;/g, '>')
+             .replace(/&quot;/g, '"')
+             .replace(/&#39;/g, "'");
+};
+
 /**
  * Custom PDF Renderer to handle WYSIWYG HTML tags (<b>, <i>, <ul>, <li>, text-align: justify)
  * and render them precisely onto a jsPDF document.
@@ -21,18 +30,14 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
   doc.setFontSize(fontSize);
   let currentY = y;
 
-  // Simple parser: strip tags but keep structure for basic blocks
-  // In a real robust implementation, we would parse the DOM nodes.
-  // For this migration, we implement a reliable line-wrapper that supports paragraphs.
-
   const paragraphs = htmlString.split(/<\/?p>/).filter(p => p.trim() !== '');
 
   paragraphs.forEach(p => {
-    // Handle bullet points
     if (p.includes('<li>')) {
       const listItems = p.split(/<\/?li>/).filter(li => li.trim() !== '' && !li.includes('<ul>') && !li.includes('</ul>'));
       listItems.forEach(li => {
-        const cleanText = li.replace(/<[^>]*>?/gm, '').trim();
+        let cleanText = li.replace(/<[^>]*>?/gm, '').trim();
+        cleanText = decodeEntities(cleanText);
         if (cleanText) {
           const lines = doc.splitTextToSize(cleanText, maxWidth - 10);
           doc.text('•', x + 5, currentY);
@@ -41,14 +46,12 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
         }
       });
     } else {
-      // Basic justify text handler
-      const cleanText = p.replace(/<[^>]*>?/gm, '').trim();
+      let cleanText = p.replace(/<[^>]*>?/gm, '').trim();
+      cleanText = decodeEntities(cleanText);
       if (cleanText) {
-        // Justify text by splitting and adjusting space width
         const lines = doc.splitTextToSize(cleanText, maxWidth);
         lines.forEach((line: string, index: number) => {
           if (index < lines.length - 1 && line.length > 0) {
-            // It's not the last line, apply justify
             const words = line.split(' ');
             if (words.length > 1) {
               const totalWordWidth = words.reduce((acc, word) => acc + doc.getTextWidth(word), 0);
@@ -64,7 +67,6 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
               doc.text(line, x, currentY);
             }
           } else {
-            // Last line, normal left align
             doc.text(line, x, currentY);
           }
           currentY += lineHeight;

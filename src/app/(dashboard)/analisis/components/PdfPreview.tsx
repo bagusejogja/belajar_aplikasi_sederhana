@@ -87,18 +87,32 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
     const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
 
+    const bodyPagu = [
+      ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
+      ['Pengalihan (+/-)', `Rp ${historisYearRow.pengalihan || '0'}`]
+    ];
+    if (historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0') {
+       bodyPagu.push(['Tambah Pagu Penugasan +', `+ Rp ${historisYearRow.tambah_pagu_penugasan}`]);
+    }
+    if (historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0') {
+       bodyPagu.push(['Tambah Pagu Inisiatif +', `+ Rp ${historisYearRow.tambah_pagu_inisiatif}`]);
+    }
+    if (historisYearRow.efisiensi && historisYearRow.efisiensi !== '0') {
+       bodyPagu.push(['Efisiensi -', `- Rp ${historisYearRow.efisiensi}`]);
+    }
+    if (historisYearRow.talangan && historisYearRow.talangan !== '0') {
+       bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
+    }
+    
+    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
+    bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
+    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
+    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${mainData.total_anggaran || '0'}`]);
+
     startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
     autoTable(doc, {
       startY: startY,
-      body: [
-        ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
-        ['Penambahan Pagu +', `+ Rp ${historisYearRow.tambah || '0'}`],
-        ['Pengurangan Pagu -', `- Rp ${historisYearRow.kurang || '0'}`],
-        ['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`],
-        ['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`],
-        ['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`],
-        ['Usulan Tambahan (Surat)', `Rp ${mainData.total_anggaran || '0'}`]
-      ],
+      body: bodyPagu,
       theme: 'grid',
       styles: { fontSize: 10, cellPadding: 3 },
       columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 } },
@@ -132,41 +146,48 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
       const chartWidth = 176;
       const chartHeight = 45;
       
-      const maxVal = Math.max(...historisData.map((d: any) => Math.max(parseNum(d.pagu_awal) + parseNum(d.tambah), parseNum(d.total_pagu), parseNum(d.realisasi_historis)))) || 1;
-      const minValRaw = Math.min(...historisData.map((d: any) => -parseNum(d.kurang)));
-      const minVal = Math.min(minValRaw, 0);
-      
-      const range = maxVal - minVal;
-      const scale = (chartHeight - 10) / (range || 1);
-      const zeroY = chartY + 5 + (maxVal * scale);
-      
-      if (range > 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(100);
-        doc.text('Grafik Posisi Pagu Multi-Tahun', chartX, chartY - 2);
-        
-        // Draw Zero Line
-        doc.setDrawColor(200);
-        doc.line(chartX, zeroY, chartX + chartWidth, zeroY); 
-        
-        const barWidth = 12;
-        const availableWidth = chartWidth - 20;
-        const stepX = availableWidth / (historisData.length || 1);
-        let currentX = chartX + 10;
-        
-        let pointsPagu: {x: number, y: number}[] = [];
-        let pointsRealisasi: {x: number, y: number}[] = [];
-        
-        historisData.forEach((d: any) => {
-          const paguAwal = parseNum(d.pagu_awal);
-          const tambah = parseNum(d.tambah);
-          const kurang = parseNum(d.kurang);
-          const totalPagu = parseNum(d.total_pagu);
-          const realisasi = parseNum(d.realisasi_historis);
+          const maxVal = Math.max(...historisData.map((d: any) => Math.max(
+             parseNum(d.pagu_awal) + Math.max(0, parseNum(d.pengalihan)) + parseNum(d.tambah_pagu_penugasan) + parseNum(d.tambah_pagu_inisiatif) + parseNum(d.talangan),
+             parseNum(d.total_pagu), parseNum(d.realisasi_historis)
+          ))) || 1;
+          const minValRaw = Math.min(...historisData.map((d: any) => Math.min(0, parseNum(d.pengalihan)) - parseNum(d.efisiensi)));
+          const minVal = Math.min(minValRaw, 0);
           
-          const paguAwalH = paguAwal * scale;
-          const tambahH = tambah * scale;
-          const kurangH = kurang * scale;
+          const range = maxVal - minVal;
+          const scale = (chartHeight - 10) / (range || 1);
+          const zeroY = chartY + 5 + (maxVal * scale);
+          
+          if (range > 0) {
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.text('Grafik Posisi Pagu Multi-Tahun', chartX, chartY - 2);
+            
+            // Draw Zero Line
+            doc.setDrawColor(200);
+            doc.line(chartX, zeroY, chartX + chartWidth, zeroY); 
+            
+            const barWidth = 12;
+            const availableWidth = chartWidth - 20;
+            const stepX = availableWidth / (historisData.length || 1);
+            let currentX = chartX + 10;
+            
+            let pointsPagu: {x: number, y: number}[] = [];
+            let pointsRealisasi: {x: number, y: number}[] = [];
+            
+            historisData.forEach((d: any) => {
+              const paguAwal = parseNum(d.pagu_awal);
+              const pengalihan = parseNum(d.pengalihan);
+              const efisiensi = parseNum(d.efisiensi);
+              
+              const tambah = Math.max(0, pengalihan) + parseNum(d.tambah_pagu_penugasan) + parseNum(d.tambah_pagu_inisiatif) + parseNum(d.talangan);
+              const kurang = Math.abs(Math.min(0, pengalihan)) + efisiensi;
+              
+              const totalPagu = parseNum(d.total_pagu);
+              const realisasi = parseNum(d.realisasi_historis);
+              
+              const paguAwalH = paguAwal * scale;
+              const tambahH = tambah * scale;
+              const kurangH = kurang * scale;
           
           // Draw Pagu Awal (Blue)
           doc.setFillColor(59, 130, 246);

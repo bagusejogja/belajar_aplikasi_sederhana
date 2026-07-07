@@ -108,6 +108,27 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
   const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
 
+  useEffect(() => {
+    if (historisData && historisData.length > 0 && detailData && detailData.length > 0) {
+      const idx = historisData.findIndex((d: any) => d.tahun === '2026');
+      if (idx !== -1) {
+        const calculatedRealisasi = formatRp(totalRealisasiDetail);
+        if (historisData[idx].realisasi_historis !== calculatedRealisasi) {
+          const newData = [...historisData];
+          newData[idx] = { ...newData[idx], realisasi_historis: calculatedRealisasi };
+          
+          const pagu = parseNum(newData[idx].total_pagu);
+          if (pagu > 0) {
+            newData[idx].persen_serapan = ((totalRealisasiDetail / pagu) * 100).toFixed(2) + '%';
+          } else {
+            newData[idx].persen_serapan = '0%';
+          }
+          setHistorisData(newData);
+        }
+      }
+    }
+  }, [totalRealisasiDetail, detailData]);
+
   const handleGenerateAI = async () => {
     if (!mainData.ringkasan_ai) {
       alert("Harap lakukan Ekstraksi OCR terlebih dahulu agar AI bisa membaca surat.");
