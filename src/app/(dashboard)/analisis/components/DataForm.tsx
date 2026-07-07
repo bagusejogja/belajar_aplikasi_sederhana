@@ -91,38 +91,29 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         
         setHistorisData(merged.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
         
-        // Auto-fill detailData untuk tahun terkini (misal 2026 atau tertinggi)
-        if (realisasiData.length > 0 && setDetailData) {
+        // Auto-fill detailData untuk tahun terkini
+        if (setDetailData) {
            const latestYear = Math.max(...filteredYears).toString();
-           const latestRealisasi = realisasiData.filter(r => r.tahun_anggaran === latestYear);
+           // Ambil sumber dana dari pagu maupun realisasi di tahun terbaru
+           const paguLatest = paguData.filter(p => p.tahun_anggaran === latestYear);
+           const realisasiLatest = realisasiData.filter(r => r.tahun_anggaran === latestYear);
            
-           if (latestRealisasi.length > 0) {
-              const newDetailData = latestRealisasi.map((r, i) => {
-                 // Hitung pagu per sumber dana di tahun tersebut
-                 const paguTerkait = paguData.filter(p => p.tahun_anggaran === latestYear && p.sumber_dana === r.sumber_dana);
-                 const anggaran = paguTerkait.reduce((acc, p) => acc + Number(p.nominal), 0);
-                 const serapan = anggaran > 0 ? (Number(r.realisasi) / anggaran) * 100 : 0;
+           const sumberDanaList = Array.from(new Set([...paguLatest.map(p => p.sumber_dana), ...realisasiLatest.map(r => r.sumber_dana)])).filter(Boolean);
+           
+           if (sumberDanaList.length > 0) {
+              const newDetailData = sumberDanaList.map((sumber, i) => {
+                 const paguSumber = paguLatest.filter(p => p.sumber_dana === sumber).reduce((acc, p) => acc + Number(p.nominal), 0);
+                 const realisasiSumber = realisasiLatest.filter(r => r.sumber_dana === sumber).reduce((acc, r) => acc + Number(r.realisasi), 0);
+                 const serapan = paguSumber > 0 ? (realisasiSumber / paguSumber) * 100 : 0;
                  return {
                     no_urut: i + 1,
-                    uraian_kegiatan: r.sumber_dana || 'Kegiatan',
-                    anggaran: formatRp(anggaran),
-                    realisasi: formatRp(Number(r.realisasi)),
+                    uraian_kegiatan: sumber || 'Kegiatan',
+                    anggaran: formatRp(paguSumber),
+                    realisasi: formatRp(realisasiSumber),
                     persen_serapan: serapan.toFixed(2) + '%'
                  };
               });
               setDetailData(newDetailData);
-              
-              // Auto update mainData
-              const totalAngg = newDetailData.reduce((acc, d) => acc + parseNum(d.anggaran), 0);
-              const totalReal = newDetailData.reduce((acc, d) => acc + parseNum(d.realisasi), 0);
-              const persenSerapan = totalAngg > 0 ? ((totalReal / totalAngg) * 100).toFixed(2) : '0';
-              setMainData(prev => ({ 
-                 ...prev, 
-                 unit_pengirim: selectedOption?.label || '',
-                 total_anggaran: formatRp(totalAngg),
-                 total_realisasi: formatRp(totalReal),
-                 persen_serapan: persenSerapan
-              }));
            }
         }
       }
@@ -140,10 +131,21 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   };
   const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
+  const totalAnggaranDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.anggaran), 0) || 0;
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
   const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
 
   useEffect(() => {
+    // Selalu sinkronkan mainData.total_anggaran dan realisasi jika detailData berubah
+    if (detailData && detailData.length > 0) {
+      setMainData((prev: any) => ({
+        ...prev,
+        total_anggaran: formatRp(totalAnggaranDetail),
+        total_realisasi: formatRp(totalRealisasiDetail),
+        persen_serapan: totalAnggaranDetail > 0 ? ((totalRealisasiDetail / totalAnggaranDetail) * 100).toFixed(2) : '0'
+      }));
+    }
+
     if (historisData && historisData.length > 0 && detailData && detailData.length > 0) {
       const idx = historisData.findIndex((d: any) => d.tahun === '2026');
       if (idx !== -1) {
@@ -162,7 +164,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         }
       }
     }
-  }, [totalRealisasiDetail, detailData]);
+  }, [totalAnggaranDetail, totalRealisasiDetail, detailData]);
 
   const handleGenerateAI = async () => {
     if (!mainData.ringkasan_ai) {
@@ -335,8 +337,12 @@ ${mainData.ringkasan_ai}`;
             onChange={handleUnitChange}
             placeholder="Cari atau pilih Unit Kerja..."
             isClearable
+            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
             className="text-sm"
-            styles={{ control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }) }}
+            styles={{ 
+              control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }),
+              menuPortal: base => ({ ...base, zIndex: 9999 })
+            }}
           />
         </div>
         <div>
