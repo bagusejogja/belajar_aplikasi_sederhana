@@ -103,13 +103,19 @@ export default function VerificationPage() {
                   }
 
                   return (
-                     <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm">
-                        <img src={imgSrc} alt="Lampiran" className="w-full h-auto max-h-64 object-contain" onError={(e) => {
-                           (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                           (e.target as any).className = 'w-16 h-16 object-contain opacity-50 m-6';
-                        }} />
+                     <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm flex items-center justify-center">
+                        <img 
+                           src={imgSrc} 
+                           alt="Lampiran" 
+                           className="w-full h-auto max-h-64 object-contain" 
+                           onError={(e) => {
+                              // Gunakan SVG lokal sebagai placeholder jika gambar gagal dimuat (misal PDF)
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAydjRzMiA0IDQgNEgyIi8+PHBhdGggZD0iTTQgMjJWMm0xNiAyMHYtOG0wIDBoLTQiLz48L3N2Zz4=';
+                              (e.target as HTMLImageElement).className = 'w-16 h-16 object-contain opacity-50 m-6';
+                           }} 
+                        />
                         <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                           <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Klik Perbesar</span>
+                           <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Buka Lampiran</span>
                         </div>
                      </div>
                   );

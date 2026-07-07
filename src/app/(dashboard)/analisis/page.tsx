@@ -136,26 +136,8 @@ export default function AnalisisPaguPage() {
         </h1>
         
         <nav className="flex items-center gap-1 mx-4 overflow-x-auto custom-scrollbar">
-          {activeTab === 'main' && (
-             <>
-               <button onClick={() => scrollToSection('ocr')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
-                 <ScanText size={16} /> Ekstraksi OCR
-               </button>
-               <button onClick={() => scrollToSection('form')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
-                 <FileText size={16} /> Data Utama
-               </button>
-               <button onClick={() => scrollToSection('pendukung')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all hover:bg-gray-100 text-gray-600 text-sm whitespace-nowrap`}>
-                 <FileSpreadsheet size={16} /> Data Pendukung
-               </button>
-               <div className="h-6 w-[1px] bg-gray-200 mx-2"></div>
-             </>
-          )}
-
           <button onClick={() => setActiveTab('main')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'main' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
             <FileText size={16} /> Form Analisis (All-in-One)
-          </button>
-          <button onClick={() => setActiveTab('pdf')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'pdf' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
-            <Printer size={16} /> Cetak PDF
           </button>
           <button onClick={() => setActiveTab('riwayat')} className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all text-sm whitespace-nowrap ${activeTab === 'riwayat' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'hover:bg-gray-100 text-gray-600'}`}>
             <History size={16} /> Riwayat Analisis

@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Upload, CheckCircle, Loader2, FileText, AlertCircle, Building2, Search } from 'lucide-react';
-import { mockUnits } from '@/lib/mock-db';
 
 export default function InputMakPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -11,10 +10,19 @@ export default function InputMakPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const [unitSearch, setUnitSearch] = useState('');
+  const [units, setUnits] = useState<any[]>([]);
   const [email, setEmail] = useState('');
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [noteFiles, setNoteFiles] = useState<FileList | null>(null);
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      const { data } = await supabase.from('gov_units').select('id, nama_unit').order('nama_unit');
+      if (data) setUnits(data);
+    };
+    fetchUnits();
+  }, []);
 
   const handleUpload = async (file: File, folder: string) => {
     const formData = new FormData();
@@ -37,7 +45,7 @@ export default function InputMakPage() {
 
     try {
       // Cari Unit berdasarkan string pencarian (autocomplete)
-      const selectedUnit = mockUnits.find(u => u.name.toLowerCase() === unitSearch.toLowerCase());
+      const selectedUnit = units.find(u => u.nama_unit.toLowerCase() === unitSearch.toLowerCase());
       
       if (!selectedUnit) {
         throw new Error('Unit Kerja tidak valid. Silakan pilih dari saran yang muncul.');
@@ -60,8 +68,8 @@ export default function InputMakPage() {
 
       const payload = {
         email: email,
-        unit: selectedUnit.name,
-        pic: selectedUnit.pic || '-',
+        unit: selectedUnit.nama_unit,
+        pic: '-', // unit dari db belum tentu punya PIC, default -
         tahun: tahun,
         status: 'Proses Revisi', 
         kategori: 'Perubahan MAK', 
@@ -164,8 +172,8 @@ export default function InputMakPage() {
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <datalist id="unit-list">
-                  {mockUnits.map(u => (
-                    <option key={u.id} value={u.name} />
+                  {units.map(u => (
+                    <option key={u.id} value={u.nama_unit} />
                   ))}
                 </datalist>
               </div>
