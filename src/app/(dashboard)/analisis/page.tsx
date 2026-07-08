@@ -46,7 +46,7 @@ export default function AnalisisPaguPage() {
        if (detail) {
           const cleanedDetail = detail.map(d => ({
              ...d,
-             uraian_kegiatan: (d.uraian_kegiatan || '').toString().replace(/^[\s0-9\-\u2013\u2014]+/, '').trim() || '-'
+             uraian_kegiatan: (d.uraian_kegiatan || '').toString().replace(/^[\s\u200B\uFEFF]*\d+[\s\u200B\uFEFF]*[-\u2013\u2014]\s*/, '').trim() || '-'
           }));
           setDetailData(cleanedDetail);
        }
