@@ -22,7 +22,7 @@ export async function scanSuratWithAI(formData: FormData) {
       Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan) dengan kunci berikut:
       {
         "no_surat": "Isi dengan nomor surat lengkap",
-        "tanggal_surat": "Isi dengan tanggal surat format YYYY-MM-DD",
+        "tanggal_surat": "Isi dengan tanggal surat (Ubah tanggal format Indonesia seperti '1 Januari 2026' menjadi format YYYY-MM-DD. WAJIB YYYY-MM-DD)",
         "perihal_surat": "Isi dengan perihal/hal surat secara lengkap",
         "unit_kerja": "Isi dengan nama instansi/unit pengirim surat",
         "nominal_usulan": "Isi dengan total nominal usulan anggaran/tambahan pagu yang diminta (hanya angka)"
@@ -32,16 +32,11 @@ export async function scanSuratWithAI(formData: FormData) {
       PENTING: Hanya berikan JSON saja.
     `;
 
-    // 4. Kirim ke Gemini
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: base64Data,
-          mimeType: file.type
-        }
-      }
-    ]);
+    // 4. Kirim ke Gemini dengan mode JSON
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [ { text: prompt }, { inlineData: { data: base64Data, mimeType: file.type } } ] }],
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
     const responseText = result.response.text();
     
@@ -124,13 +119,16 @@ export async function generateAnalysisFromText(ocrText: string) {
       Berikan hasil analisis yang sangat tajam, analitis, dan bergaya bahasa birokrasi pemerintahan formal dalam format JSON murni dengan kunci:
       {
         "ringkasan_html": "Berikan ringkasan substansi dari surat ini (Apa tujuan utama, rincian biaya yang diusulkan, dan mengapa ini penting). Gunakan kalimat formal dan padat. Format dalam HTML ringan (misal <p>...</p>).",
-        "rekomendasi_html": "Berikan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas (misalnya: Disetujui Penuh, Disetujui Sebagian, atau Ditolak dengan alasan kuat). Format dalam HTML ringan (misal <p>...</p><ul><li>...</li></ul>)."
+        "rekomendasi_html": "Berikan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas. Format HTML ringan."
       }
 
       PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.
     `;
 
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
+    });
     const responseText = result.response.text();
     
     const jsonString = responseText.replace(/```json|```/g, "").trim();

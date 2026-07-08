@@ -177,7 +177,7 @@ ${mainData.ringkasan_ai}`;
         // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => ({
           no_urut: row['No'] || (i + 1).toString(),
-          uraian_kegiatan: row['Uraian'] || row['Kegiatan'] || '-',
+          uraian_kegiatan: (row['Uraian'] || row['Kegiatan'] || '').toString().replace(/^[\s-]+/, '') || '-',
           anggaran: row['Anggaran'] || '0',
           realisasi: row['Realisasi'] || '0',
           persen_serapan: row['Serapan'] || '0%'
