@@ -133,6 +133,7 @@ export async function generateAnalysisFromText(ocrText: string) {
       }
 
       PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.
+      PENTING 2: Untuk tag HTML, JANGAN pernah menggunakan tanda kutip ganda ("). Gunakan tanda kutip tunggal (') untuk semua atribut HTML agar format JSON tidak rusak. Hindari penggunaan enter/newline (\\n) berlebihan.
     `;
 
     const request = {
@@ -161,13 +162,13 @@ export async function generateAnalysisFromText(ocrText: string) {
        let cleanText = responseText.replace(/```json|```/g, "").replace(/[{}]/g, "").trim();
        
        const extractVal = (key: string, text: string) => {
-          const regex = new RegExp(`"${key}"\\s*:\\s*"(.*?)"(?:,|\\n|$)`, 'is');
+          const regex = new RegExp(`"${key}"\\s*:\\s*"(.*?)"\\s*(?:,|})`, 'is');
           const match = text.match(regex);
           return match ? match[1].replace(/\\"/g, '"').replace(/\\n/g, '<br/>') : '';
        };
        
        extractedData = {
-          ringkasan_html: extractVal('ringkasan_html', responseText) || "<p><b>Error Parsing JSON. Output Mentah:</b></p><br/>" + cleanText,
+          ringkasan_html: extractVal('ringkasan_html', responseText) || "<p><b>Error Parsing JSON AI. Output Mentah:</b></p><br/>" + cleanText,
           rekomendasi_html: extractVal('rekomendasi_html', responseText) || ""
        };
     }

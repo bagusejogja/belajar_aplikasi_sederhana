@@ -149,7 +149,7 @@ ${mainData.ringkasan_ai}`;
       if (res.success && res.data) {
         setMainData((prev: any) => ({
           ...prev,
-          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || res.data.analisis || res.data.analisis_html || prev.analisis_html,
+          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || res.data.analisis || res.data.analisis_html || JSON.stringify(res.data) || prev.analisis_html,
           rekomendasi_html: res.data.rekomendasi_html || res.data.rekomendasi || res.data.rekomendasiHtml || prev.rekomendasi_html
         }));
         alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
