@@ -50,8 +50,27 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
       cleanText = decodeEntities(cleanText);
       if (cleanText) {
         const lines = doc.splitTextToSize(cleanText, maxWidth);
-        doc.text(cleanText, x, currentY, { maxWidth: maxWidth, align: 'justify', lineHeightFactor: lineHeight / doc.getLineHeight() });
-        currentY += lines.length * lineHeight;
+        lines.forEach((line: string, index: number) => {
+          if (index < lines.length - 1 && line.length > 0) {
+            const words = line.split(' ');
+            if (words.length > 1) {
+              const totalWordWidth = words.reduce((acc, word) => acc + doc.getTextWidth(word), 0);
+              const spaceLeft = maxWidth - totalWordWidth;
+              const spaceWidth = spaceLeft / (words.length - 1);
+              
+              let currX = x;
+              words.forEach((word) => {
+                doc.text(word, currX, currentY);
+                currX += doc.getTextWidth(word) + spaceWidth;
+              });
+            } else {
+              doc.text(line, x, currentY);
+            }
+          } else {
+            doc.text(line, x, currentY);
+          }
+          currentY += lineHeight;
+        });
       }
     }
     currentY += 2; // Paragraph spacing

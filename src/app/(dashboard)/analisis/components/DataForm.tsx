@@ -149,8 +149,8 @@ ${mainData.ringkasan_ai}`;
       if (res.success && res.data) {
         setMainData((prev: any) => ({
           ...prev,
-          analisis_html: res.data.ringkasan_html || prev.analisis_html,
-          rekomendasi_html: res.data.rekomendasi_html || prev.rekomendasi_html
+          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || prev.analisis_html,
+          rekomendasi_html: res.data.rekomendasi_html || res.data.rekomendasi || res.data.rekomendasiHtml || prev.rekomendasi_html
         }));
         alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
       } else {
@@ -177,7 +177,7 @@ ${mainData.ringkasan_ai}`;
         // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => ({
           no_urut: row['No'] || (i + 1).toString(),
-          uraian_kegiatan: (row['Uraian'] || row['Kegiatan'] || '').toString().replace(/^[\s0-9-]+/, '').trim() || '-',
+          uraian_kegiatan: (row['Uraian'] || row['Kegiatan'] || '').toString().replace(/^[\s0-9\-\u2013\u2014]+/, '').trim() || '-',
           anggaran: row['Anggaran'] || '0',
           realisasi: row['Realisasi'] || '0',
           persen_serapan: row['Serapan'] || '0%'
