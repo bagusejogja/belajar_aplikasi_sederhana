@@ -126,19 +126,18 @@ export async function generateAnalysisFromText(ocrText: string) {
       ${ocrText}
       === END TEKS ===
 
-      Berikan hasil analisis yang sangat tajam, analitis, dan bergaya bahasa birokrasi pemerintahan formal dalam format JSON murni dengan kunci:
-      {
-        "ringkasan_html": "Berikan ringkasan substansi dari surat ini (Apa tujuan utama, rincian biaya yang diusulkan, dan mengapa ini penting). Gunakan kalimat formal dan padat. Format dalam HTML ringan (misal <p>...</p>).",
-        "rekomendasi_html": "Berikan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas. Format HTML ringan."
-      }
-
-      PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.
-      PENTING 2: Untuk tag HTML, JANGAN pernah menggunakan tanda kutip ganda ("). Gunakan tanda kutip tunggal (') untuk semua atribut HTML agar format JSON tidak rusak. Hindari penggunaan enter/newline (\\n) berlebihan.
+      Berikan hasil analisis yang sangat tajam, analitis, dan bergaya bahasa birokrasi pemerintahan formal.
+      Untuk memudahkan pembacaan sistem, berikan output dalam format persis seperti di bawah ini, tanpa awalan/akhiran tambahan:
+      
+      === RINGKASAN ===
+      (Isi dengan ringkasan substansi dari surat ini. Apa tujuan utama, rincian biaya yang diusulkan, dan mengapa ini penting. Gunakan kalimat formal dan padat. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
+      
+      === REKOMENDASI ===
+      (Isi dengan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
     `;
 
     const request = {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
     };
 
     let result;
@@ -152,28 +151,25 @@ export async function generateAnalysisFromText(ocrText: string) {
     }
     
     const responseText = result.response.text();
-    let extractedData: any = {};
+    let ringkasan = "";
+    let rekomendasi = "";
     
-    try {
-       const jsonString = responseText.replace(/```json|```/g, "").trim();
-       extractedData = JSON.parse(jsonString);
-    } catch (parseError) {
-       console.log("JSON parse failed, returning raw text...", parseError);
-       let cleanText = responseText.replace(/```json|```/g, "").replace(/[{}]/g, "").trim();
-       
-       const extractVal = (key: string, text: string) => {
-          const regex = new RegExp(`"${key}"\\s*:\\s*"(.*?)"\\s*(?:,|})`, 'is');
-          const match = text.match(regex);
-          return match ? match[1].replace(/\\"/g, '"').replace(/\\n/g, '<br/>') : '';
-       };
-       
-       extractedData = {
-          ringkasan_html: extractVal('ringkasan_html', responseText) || "<p><b>Error Parsing JSON AI. Output Mentah:</b></p><br/>" + cleanText,
-          rekomendasi_html: extractVal('rekomendasi_html', responseText) || ""
-       };
+    const parts = responseText.split('=== REKOMENDASI ===');
+    if (parts.length > 1) {
+       ringkasan = parts[0].replace('=== RINGKASAN ===', '').trim();
+       rekomendasi = parts[1].trim();
+    } else {
+       ringkasan = "<p><b>Format respons AI tidak sesuai. Output Mentah:</b></p><br/>" + responseText;
+       rekomendasi = "<p>-</p>";
     }
 
-    return { success: true, data: extractedData };
+    return { 
+       success: true, 
+       data: { 
+          ringkasan_html: ringkasan, 
+          rekomendasi_html: rekomendasi 
+       } 
+    };
   } catch (error: any) {
     console.error("Error AI Analysis from Text:", error);
     return { success: false, error: error.message };
