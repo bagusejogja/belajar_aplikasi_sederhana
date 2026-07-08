@@ -176,7 +176,7 @@ ${mainData.ringkasan_ai}`;
         // For simplicity, we just push them as they are if they match our keys, 
         // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => {
-          let uraian = (row['Uraian'] || row['Kegiatan'] || '').toString();
+          let uraian = String(row['Uraian'] || row['Kegiatan'] || '');
           const dashIdx = uraian.search(/[-\u2013\u2014]/);
           if (dashIdx !== -1 && dashIdx < 25) {
              uraian = uraian.substring(dashIdx + 1).trim();

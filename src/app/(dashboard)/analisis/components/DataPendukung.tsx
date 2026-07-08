@@ -202,7 +202,6 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         const kurang = parseNum(d.kurang);
                         return {
                           name: d.tahun,
-                          name: d.tahun,
                           PaguAwal: parseNum(d.pagu_awal),
                           Pengalihan: parseNum(d.pengalihan),
                           TotalPagu: parseNum(d.total_pagu),

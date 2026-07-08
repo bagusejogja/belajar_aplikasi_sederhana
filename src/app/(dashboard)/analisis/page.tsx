@@ -91,14 +91,14 @@ export default function AnalisisPaguPage() {
        if (utama && utama.analisis_html) {
           try {
              const parsed = JSON.parse(utama.analisis_html);
-             setMainData(prev => ({
+             setMainData((prev: any) => ({
                 ...prev,
                 analisis_html: parsed.analisis || '',
                 rekomendasi_html: parsed.rekomendasi || ''
              }));
           } catch (e) {
              // Jika bukan JSON (format lama)
-             setMainData(prev => ({
+             setMainData((prev: any) => ({
                 ...prev,
                 analisis_html: utama.analisis_html,
                 rekomendasi_html: ''
