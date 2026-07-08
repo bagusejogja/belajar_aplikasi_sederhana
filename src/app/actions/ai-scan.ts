@@ -151,9 +151,26 @@ export async function generateAnalysisFromText(ocrText: string) {
     }
     
     const responseText = result.response.text();
+    let extractedData: any = {};
     
-    const jsonString = responseText.replace(/```json|```/g, "").trim();
-    const extractedData = JSON.parse(jsonString);
+    try {
+       const jsonString = responseText.replace(/```json|```/g, "").trim();
+       extractedData = JSON.parse(jsonString);
+    } catch (parseError) {
+       console.log("JSON parse failed, returning raw text...", parseError);
+       let cleanText = responseText.replace(/```json|```/g, "").replace(/[{}]/g, "").trim();
+       
+       const extractVal = (key: string, text: string) => {
+          const regex = new RegExp(`"${key}"\\s*:\\s*"(.*?)"(?:,|\\n|$)`, 'is');
+          const match = text.match(regex);
+          return match ? match[1].replace(/\\"/g, '"').replace(/\\n/g, '<br/>') : '';
+       };
+       
+       extractedData = {
+          ringkasan_html: extractVal('ringkasan_html', responseText) || "<p><b>Error Parsing JSON. Output Mentah:</b></p><br/>" + cleanText,
+          rekomendasi_html: extractVal('rekomendasi_html', responseText) || ""
+       };
+    }
 
     return { success: true, data: extractedData };
   } catch (error: any) {

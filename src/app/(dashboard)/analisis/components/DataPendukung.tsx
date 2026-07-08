@@ -82,7 +82,6 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
         setDetailData(finalMapped);
         const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
-        setMainData((prev: any) => ({ ...prev, total_anggaran: formatRp(totalAnggaranUpload) }));
       };
       reader.readAsBinaryString(e.target.files[0]);
     }
