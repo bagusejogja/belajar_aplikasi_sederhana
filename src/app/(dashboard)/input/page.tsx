@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Info, ImagePlus, UploadCloud, X } from 'lucide-react';
+import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
@@ -9,17 +9,20 @@ import Select from 'react-select';
 export default function InputPage() {
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
   const [listBelanja, setListBelanja] = useState<RefJenisBelanja[]>([]);
+  const [listRekening, setListRekening] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [tipeTransaksi, setTipeTransaksi] = useState<'Pengeluaran' | 'Pemasukan'>('Pengeluaran');
+  const [tipeTransaksi, setTipeTransaksi] = useState<'Pengeluaran' | 'Pemasukan' | 'Transfer'>('Pengeluaran');
   const [formData, setFormData] = useState({
      tanggal: new Date().toISOString().split('T')[0],
      jenis_belanja_id: null as any,
      personel_id: null as any,
+     rek_tujuan_id: null as any,
      toko: '',
      uraian: '',
      nominal: '',
+     catatan: ''
   });
 
   // State File Update (Dukung Banyak File)
@@ -42,13 +45,15 @@ export default function InputPage() {
 
   const fetchReferences = async () => {
      try {
-        const [belanjaRes, personelRes] = await Promise.all([
+        const [belanjaRes, personelRes, rekRes] = await Promise.all([
            supabase.from('ref_jenis_belanja').select('*').eq('status', 'Aktif').order('id', { ascending: true }),
-           supabase.from('ref_personel').select('*').eq('status', 'Aktif').order('id', { ascending: true })
+           supabase.from('ref_personel').select('*').eq('status', 'Aktif').order('id', { ascending: true }),
+           supabase.from('master_rekening').select('*, ref_bank(nama_bank)').order('nama_rekening', { ascending: true })
         ]);
 
         if (belanjaRes.data) setListBelanja(belanjaRes.data as any);
         if (personelRes.data) setListPersonel(personelRes.data as any);
+        if (rekRes.data) setListRekening(rekRes.data as any);
      } catch (error) {
         console.error("Gagal menarik data Master:", error);
      } finally {
@@ -125,9 +130,16 @@ export default function InputPage() {
 
   const handleSave = async (e: React.FormEvent) => {
      e.preventDefault();
-     if (!formData.jenis_belanja_id || !formData.personel_id || !formData.uraian || !formData.nominal) {
-        alert("Lengkapi Jenis Belanja, Personel, Uraian, dan Nominal!");
-        return;
+     if (tipeTransaksi === 'Transfer') {
+        if (!formData.jenis_belanja_id || !formData.rek_tujuan_id || !formData.uraian || !formData.nominal) {
+           alert("Lengkapi Kategori Belanja, Dibayarkan Ke, Nominal, dan Uraian!");
+           return;
+        }
+     } else {
+        if (!formData.jenis_belanja_id || !formData.personel_id || !formData.uraian || !formData.nominal) {
+           alert("Lengkapi Jenis Belanja, Personel, Uraian, dan Nominal!");
+           return;
+        }
      }
 
      setIsSaving(true);
@@ -135,42 +147,63 @@ export default function InputPage() {
         // Ambil UUID user yang sedang login secara otomatis (di belakang layar)
         const { data: sessionData } = await supabase.auth.getSession();
         const currentUserId = sessionData?.session?.user?.id || null;
+        const currentUserEmail = sessionData?.session?.user?.email || 'Sistem';
 
-        const selectedBelanja = listBelanja.find(b => b.id === formData.jenis_belanja_id.value);
-        if (!selectedBelanja) throw new Error("Jenis Belanja tidak valid");
+        const selectedBelanja = listBelanja.find(b => b.id === formData.jenis_belanja_id?.value);
 
         // Proses Gambar
         const notaUrl = attachments.nota.files.length > 0 ? await uploadMultipleFiles(attachments.nota.files) : attachments.nota.url;
         const kegiatanUrl = attachments.kegiatan.files.length > 0 ? await uploadMultipleFiles(attachments.kegiatan.files) : attachments.kegiatan.url;
         const barangUrl = attachments.barang.files.length > 0 ? await uploadMultipleFiles(attachments.barang.files) : attachments.barang.url;
-        const transferUrl = attachments.transfer.files.length > 0 ? await uploadMultipleFiles(attachments.transfer.files) : attachments.transfer.url;
-
-        const nominalAngka = Number(formData.nominal) || 0;
-        const uang_masuk = tipeTransaksi === 'Pemasukan' ? nominalAngka : 0;
-        const uang_keluar = tipeTransaksi === 'Pengeluaran' ? nominalAngka : 0;
-
-        const { error } = await supabase.from('transactions').insert([
-           {
-              tanggal: formData.tanggal,
-              akun_id: selectedBelanja.akun_id,
-              personel_id: formData.personel_id.value,
-              toko: formData.toko || null,
-              uraian: formData.uraian,
-              uang_masuk,
-              uang_keluar,
-              foto_nota: notaUrl || null,
-              foto_kegiatan: kegiatanUrl || null,
-              foto_barang: barangUrl || null,
-              foto_bukti_transfer: transferUrl || null,
-              disetujui: 'Menunggu',
-              created_by: currentUserId  // UUID user otomatis dicatat di sini
-           }
-        ]);
-
-        if (error) throw error;
         
-        alert("Transaksi BERHASIL disimpan lengkap dengan Beberapa Fotonya! 🚀");
-        setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, toko: '', uraian: '', nominal: '' });
+        const nominalAngka = Number(formData.nominal) || 0;
+
+        if (tipeTransaksi === 'Transfer') {
+           const { error } = await supabase.from('pengajuan_transfer').insert([
+              {
+                 tanggal_pengajuan: formData.tanggal,
+                 kategori_belanja_id: formData.jenis_belanja_id.value,
+                 rek_tujuan_id: formData.rek_tujuan_id.value,
+                 nominal: nominalAngka,
+                 kegiatan: formData.uraian,
+                 barang: currentUserEmail,
+                 catatan: formData.catatan,
+                 nota_url: notaUrl || null,
+                 foto_kegiatan: kegiatanUrl || null,
+                 foto_barang: barangUrl || null,
+                 status: 'Diajukan',
+                 created_by: currentUserId
+              }
+           ]);
+           if (error) throw error;
+        } else {
+           if (!selectedBelanja) throw new Error("Jenis Belanja tidak valid");
+           const transferUrl = attachments.transfer.files.length > 0 ? await uploadMultipleFiles(attachments.transfer.files) : attachments.transfer.url;
+           const uang_masuk = tipeTransaksi === 'Pemasukan' ? nominalAngka : 0;
+           const uang_keluar = tipeTransaksi === 'Pengeluaran' ? nominalAngka : 0;
+
+           const { error } = await supabase.from('transactions').insert([
+              {
+                 tanggal: formData.tanggal,
+                 akun_id: selectedBelanja.akun_id,
+                 personel_id: formData.personel_id.value,
+                 toko: formData.toko || null,
+                 uraian: formData.uraian,
+                 uang_masuk,
+                 uang_keluar,
+                 foto_nota: notaUrl || null,
+                 foto_kegiatan: kegiatanUrl || null,
+                 foto_barang: barangUrl || null,
+                 foto_bukti_transfer: transferUrl || null,
+                 disetujui: 'Menunggu',
+                 created_by: currentUserId
+              }
+           ]);
+           if (error) throw error;
+        }
+        
+        alert(`Data ${tipeTransaksi === 'Transfer' ? 'Pengajuan Transfer' : 'Transaksi'} BERHASIL disimpan! 🚀`);
+        setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, rek_tujuan_id: null, toko: '', uraian: '', nominal: '', catatan: '' });
         setAttachments({
            nota: { files: [], url: '' }, kegiatan: { files: [], url: '' },
            barang: { files: [], url: '' }, transfer: { files: [], url: '' }
@@ -186,44 +219,63 @@ export default function InputPage() {
 
   const optionBelanja = listBelanja.map(b => ({ value: b.id, label: b.nama_belanja }));
   const optionPersonel = listPersonel.map(p => ({ value: p.id, label: p.nama_orang }));
+  const optionRekening = listRekening.map(r => ({
+      value: r.rek_id,
+      label: `${r.nama_rekening} - ${r.ref_bank?.nama_bank} (${r.no_rekening})`
+  }));
+
+  const inputColor = tipeTransaksi === 'Pemasukan' ? 'emerald' : tipeTransaksi === 'Transfer' ? 'blue' : 'red';
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 overflow-hidden max-w-5xl mx-auto">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 overflow-hidden max-w-5xl mx-auto animate-in zoom-in-95 duration-300">
          <form onSubmit={handleSave} className="space-y-8">
-            <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+            <div className="flex flex-col sm:flex-row bg-gray-100 p-1.5 rounded-2xl gap-1">
                <button type="button" onClick={() => setTipeTransaksi('Pengeluaran')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Pengeluaran' ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PENGELUARAN KAS (-)</button>
                <button type="button" onClick={() => setTipeTransaksi('Pemasukan')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PEMASUKAN KAS (+)</button>
+               <button type="button" onClick={() => setTipeTransaksi('Transfer')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Transfer' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PENGAJUAN TRANSFER</button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tgl Transaksi</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{tipeTransaksi === 'Transfer' ? 'Tgl Pengajuan' : 'Tgl Transaksi'}</label>
                   <input type="date" name="tanggal" value={formData.tanggal} onChange={handleInputChange} required className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-3.5 outline-none font-medium" />
                </div>
                <div className="space-y-2 relative z-50">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Barang / Kategori Belanja</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{tipeTransaksi === 'Transfer' ? 'Kategori Belanja' : 'Barang / Kategori Belanja'}</label>
                   <Select options={optionBelanja} placeholder="Ketik disini..." value={formData.jenis_belanja_id} onChange={(val) => setFormData({...formData, jenis_belanja_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
                </div>
-               <div className="space-y-2 relative z-40">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Personel Pemohon</label>
-                  <Select options={optionPersonel} placeholder="Cari..." value={formData.personel_id} onChange={(val) => setFormData({...formData, personel_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
-               </div>
+               {tipeTransaksi === 'Transfer' ? (
+                  <div className="space-y-2 relative z-40">
+                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dibayarkan Ke (Rekening)</label>
+                     <Select options={optionRekening} placeholder="Pilih Rekening Tujuan..." value={formData.rek_tujuan_id} onChange={(val) => setFormData({...formData, rek_tujuan_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
+                  </div>
+               ) : (
+                  <div className="space-y-2 relative z-40">
+                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Personel Pemohon</label>
+                     <Select options={optionPersonel} placeholder="Cari..." value={formData.personel_id} onChange={(val) => setFormData({...formData, personel_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
+                  </div>
+               )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nominal Rincian</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nominal {tipeTransaksi === 'Transfer' ? 'Transfer' : 'Rincian'}</label>
                   <div className="relative">
-                     <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black ${tipeTransaksi === 'Pemasukan' ? 'text-emerald-500' : 'text-red-500'}`}>Rp</span>
-                     <input type="number" name="nominal" value={formData.nominal} onChange={handleInputChange} required className={`w-full bg-${tipeTransaksi === 'Pemasukan' ? 'emerald' : 'red'}-50 border border-${tipeTransaksi === 'Pemasukan' ? 'emerald' : 'red'}-100 text-${tipeTransaksi === 'Pemasukan' ? 'emerald' : 'red'}-700 rounded-2xl pl-12 pr-4 py-4 outline-none font-black text-xl`} placeholder="0" />
+                     <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-${inputColor}-600`}>Rp</span>
+                     <input type="number" name="nominal" value={formData.nominal} onChange={handleInputChange} required className={`w-full bg-${inputColor}-50 border border-${inputColor}-100 text-${inputColor}-700 rounded-2xl pl-12 pr-4 py-4 outline-none font-black text-xl`} placeholder="0" />
                   </div>
                </div>
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nama Toko & Catatan Uraian</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Uraian / Rincian Kegiatan</label>
                   <div className="flex flex-col gap-2">
-                     <input type="text" name="toko" value={formData.toko} onChange={handleInputChange} placeholder="Nama Toko..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
-                     <input type="text" name="uraian" required value={formData.uraian} onChange={handleInputChange} placeholder="Uraian Pembayaran..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
+                     {tipeTransaksi !== 'Transfer' && (
+                        <input type="text" name="toko" value={formData.toko} onChange={handleInputChange} placeholder="Nama Toko..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
+                     )}
+                     <input type="text" name="uraian" required value={formData.uraian} onChange={handleInputChange} placeholder={tipeTransaksi === 'Transfer' ? "Contoh: Honor Narasumber A.n Budi..." : "Uraian Pembayaran..."} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
+                     {tipeTransaksi === 'Transfer' && (
+                        <input type="text" name="catatan" value={formData.catatan} onChange={handleInputChange} placeholder="Catatan Opsional..." className="w-full bg-amber-50 border border-amber-200 rounded-xl p-3" />
+                     )}
                   </div>
                </div>
             </div>
@@ -232,6 +284,8 @@ export default function InputPage() {
                <label className="text-sm font-bold text-indigo-800 flex items-center gap-2"><UploadCloud/> Lampiran Foto (BISA PILIH LEBIH DARI 1 GAMBAR!)</label>
                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {(Object.keys(attachments) as Array<keyof typeof attachments>).map((key) => {
+                     if (tipeTransaksi === 'Transfer' && key === 'transfer') return null; // Bukti TF di-upload saat approval untuk transfer
+                     
                      const item = attachments[key];
                      const title = key === 'nota' ? 'Nota/Kwitansi' : key === 'kegiatan' ? 'Kegiatan' : key === 'barang' ? 'Barang' : 'Bukti TF';
                      
@@ -264,8 +318,9 @@ export default function InputPage() {
             </div>
 
             <div className="flex justify-center pt-8 border-t border-gray-100">
-               <button type="submit" disabled={isSaving} className="px-10 py-5 w-full bg-indigo-600 text-white rounded-2xl font-black shadow-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 disabled:opacity-70 text-lg">
-                  {isSaving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />} {isSaving ? "Mengunggah..." : "SIMPAN"}
+               <button type="submit" disabled={isSaving} className={`px-10 py-5 w-full bg-${inputColor}-600 text-white rounded-2xl font-black shadow-2xl hover:bg-${inputColor}-700 transition-all flex items-center justify-center gap-3 disabled:opacity-70 text-lg`}>
+                  {isSaving ? <Loader2 size={24} className="animate-spin" /> : (tipeTransaksi === 'Transfer' ? <Send size={24} /> : <Save size={24} />)} 
+                  {isSaving ? "Mengunggah..." : (tipeTransaksi === 'Transfer' ? "KIRIM PENGAJUAN TRANSFER" : "SIMPAN TRANSAKSI KAS")}
                </button>
             </div>
          </form>

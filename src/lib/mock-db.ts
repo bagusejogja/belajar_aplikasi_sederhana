@@ -31,6 +31,8 @@ export const menuList: MenuItem[] = [
   { title: 'Dashboard Masjid', path: '/dashboard', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Verifikasi Kas', path: '/verifikasi', icon: 'CheckCircle', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
   { title: 'Input Kas Masjid', path: '/input', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
+  { title: 'Approval Transfer', path: '/approval-transfer', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
+  { title: 'Rekap Transfer', path: '/rekap-transfer', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Perbaikan Input', path: '/revisi', icon: 'ShieldAlert', roles: ['STAFF'], group: 'Masjid' },
   { title: 'Laporan Detail', path: '/reports', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Laporan Ringkasan', path: '/summary', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
@@ -62,6 +64,7 @@ export const menuList: MenuItem[] = [
   { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
   
   // --- MASTER & PENGATURAN ---
+  { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN'], group: 'Master' },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
@@ -87,3 +90,4 @@ export const menuList: MenuItem[] = [
   { title: 'Arsip Berjenjang', path: '/arsip-kegiatan', icon: 'FolderTree', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
 ];
+

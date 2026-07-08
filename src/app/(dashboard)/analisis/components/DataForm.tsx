@@ -147,10 +147,11 @@ ${mainData.ringkasan_ai}`;
     try {
       const res = await generateAnalysisFromText(aiContext);
       if (res.success && res.data) {
+        const analysisData = res.data as any;
         setMainData((prev: any) => ({
           ...prev,
-          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || res.data.analisis || res.data.analisis_html || JSON.stringify(res.data) || prev.analisis_html,
-          rekomendasi_html: res.data.rekomendasi_html || res.data.rekomendasi || res.data.rekomendasiHtml || prev.rekomendasi_html
+          analisis_html: analysisData.ringkasan_html || analysisData.ringkasan || analysisData.ringkasanHtml || analysisData.analisis || analysisData.analisis_html || JSON.stringify(analysisData) || prev.analisis_html,
+          rekomendasi_html: analysisData.rekomendasi_html || analysisData.rekomendasi || analysisData.rekomendasiHtml || prev.rekomendasi_html
         }));
         alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
       } else {
