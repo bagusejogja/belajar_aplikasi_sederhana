@@ -177,12 +177,7 @@ ${mainData.ringkasan_ai}`;
         // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => {
           let uraian = String(row['Uraian'] || row['Kegiatan'] || '');
-          const dashIdx = uraian.search(/[-\u2013\u2014]/);
-          if (dashIdx !== -1 && dashIdx < 25) {
-             uraian = uraian.substring(dashIdx + 1).trim();
-          } else {
-             uraian = uraian.trim();
-          }
+          uraian = uraian.replace(/^[^a-zA-Z]+/, '').trim();
 
           return {
             no_urut: row['No'] || (i + 1).toString(),

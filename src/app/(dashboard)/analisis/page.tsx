@@ -46,12 +46,7 @@ export default function AnalisisPaguPage() {
        if (detail) {
           const cleanedDetail = detail.map(d => {
              let uraian = (d.uraian_kegiatan || '').toString();
-             const dashIdx = uraian.search(/[-\u2013\u2014]/);
-             if (dashIdx !== -1 && dashIdx < 25) {
-                uraian = uraian.substring(dashIdx + 1).trim();
-             } else {
-                uraian = uraian.trim();
-             }
+             uraian = uraian.replace(/^[^a-zA-Z]+/, '').trim();
              return {
                 ...d,
                 uraian_kegiatan: uraian || '-'
