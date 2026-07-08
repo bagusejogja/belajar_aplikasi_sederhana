@@ -53,9 +53,11 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
               // Format currency
               const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+              
+              let cleanUraian = String(uraian || '').replace(/^[^a-zA-Z]+/, '').trim();
 
               mapped.push({
-                 uraian_kegiatan: uraian || '-',
+                 uraian_kegiatan: cleanUraian || '-',
                  anggaran: formatRp(anggaran),
                  realisasi: formatRp(realisasi),
                  sisa_anggaran: formatRp(sisa),
