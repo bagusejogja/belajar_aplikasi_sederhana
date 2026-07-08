@@ -43,7 +43,13 @@ export default function AnalisisPaguPage() {
           setAnalisisId(id_analisis);
        }
        const { data: detail } = await supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id_analisis).order('no_urut', { ascending: true });
-       if (detail) setDetailData(detail);
+       if (detail) {
+          const cleanedDetail = detail.map(d => ({
+             ...d,
+             uraian_kegiatan: (d.uraian_kegiatan || '').toString().replace(/^[\s0-9\-\u2013\u2014]+/, '').trim() || '-'
+          }));
+          setDetailData(cleanedDetail);
+       }
 
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
        if (historis) {
