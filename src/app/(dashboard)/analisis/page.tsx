@@ -47,9 +47,29 @@ export default function AnalisisPaguPage() {
 
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
        if (historis) {
-          // Karena sebelumnya kita mapping dari Excel dan mengabaikan tambah/kurang di state baru, 
-          // kita load apa adanya ke historisData
-          setHistorisData(historis);
+          // Parse JSON dari kolom tambah untuk mengembalikan field ekstra
+          const parsedHistoris = historis.map(h => {
+             let parsed: any = {};
+             try { if (h.tambah && h.tambah.startsWith('{')) parsed = JSON.parse(h.tambah); } catch(e) {}
+             
+             const parseNum = (str: string) => {
+               const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+               return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+             };
+             const pagu = parseNum(h.total_pagu);
+             const real = parseNum(h.realisasi_historis);
+             
+             return {
+                ...h,
+                pengalihan: parsed.pengalihan || h.tambah || '0', // fallback ke h.tambah jika bukan json
+                tambah_pagu_penugasan: parsed.tambah_pagu_penugasan || '0',
+                tambah_pagu_inisiatif: parsed.tambah_pagu_inisiatif || '0',
+                efisiensi: parsed.efisiensi || '0',
+                talangan: parsed.talangan || '0',
+                persen_serapan: pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '0%'
+             };
+          });
+          setHistorisData(parsedHistoris);
        }
 
        // Parse kembali analisis_html yang menyimpan JSON rekomendasi
@@ -131,16 +151,23 @@ export default function AnalisisPaguPage() {
       // Sync Historis
       await supabase.from('app_pagu_historis').delete().eq('id_analisis', targetId);
       if (historisData.length > 0) {
-         await supabase.from('app_pagu_historis').insert(historisData.map(d => ({
+         const { error: err3 } = await supabase.from('app_pagu_historis').insert(historisData.map(d => ({
             id_analisis: targetId,
             no_surat: mainData.no_surat,
             tahun: d.tahun,
             pagu_awal: d.pagu_awal,
-            tambah: d.tambah,
-            kurang: d.kurang,
+            tambah: JSON.stringify({
+               pengalihan: d.pengalihan || '0',
+               tambah_pagu_penugasan: d.tambah_pagu_penugasan || '0',
+               tambah_pagu_inisiatif: d.tambah_pagu_inisiatif || '0',
+               efisiensi: d.efisiensi || '0',
+               talangan: d.talangan || '0'
+            }),
+            kurang: '',
             total_pagu: d.total_pagu,
             realisasi_historis: d.realisasi_historis
          })));
+         if (err3) throw err3;
       }
 
       alert('Seluruh Data (Utama, Realisasi, Historis) berhasil disimpan!');

@@ -96,13 +96,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
 
   useEffect(() => {
-    // Selalu sinkronkan mainData.total_anggaran dan realisasi jika detailData berubah
+    // Hanya sinkronkan realisasi dan persen serapan ke mainData, jangan mengubah total_anggaran (Usulan Tambahan)
     if (detailData && detailData.length > 0) {
       setMainData((prev: any) => ({
         ...prev,
-        total_anggaran: formatRp(totalAnggaranDetail),
         total_realisasi: formatRp(totalRealisasiDetail),
-        persen_serapan: totalAnggaranDetail > 0 ? ((totalRealisasiDetail / totalAnggaranDetail) * 100).toFixed(2) : '0'
+        persen_serapan: prev.total_anggaran && parseNum(prev.total_anggaran) > 0 
+           ? ((totalRealisasiDetail / parseNum(prev.total_anggaran)) * 100).toFixed(2) 
+           : '0'
       }));
     }
 
@@ -146,11 +147,11 @@ ${mainData.ringkasan_ai}`;
     try {
       const res = await generateAnalysisFromText(aiContext);
       if (res.success && res.data) {
-        setMainData({
-          ...mainData,
-          analisis_html: res.data.ringkasan_html || mainData.analisis_html,
-          rekomendasi_html: res.data.rekomendasi_html || mainData.rekomendasi_html
-        });
+        setMainData((prev: any) => ({
+          ...prev,
+          analisis_html: res.data.ringkasan_html || prev.analisis_html,
+          rekomendasi_html: res.data.rekomendasi_html || prev.rekomendasi_html
+        }));
         alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
       } else {
         alert("Gagal generate AI: " + res.error);

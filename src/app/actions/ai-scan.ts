@@ -24,7 +24,8 @@ export async function scanSuratWithAI(formData: FormData) {
         "no_surat": "Isi dengan nomor surat lengkap",
         "tanggal_surat": "Isi dengan tanggal surat format YYYY-MM-DD",
         "perihal_surat": "Isi dengan perihal/hal surat secara lengkap",
-        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat"
+        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat",
+        "nominal_usulan": "Isi dengan total nominal usulan anggaran/tambahan pagu yang diminta (hanya angka)"
       }
       
       Jika ada informasi yang tidak ditemukan, kosongkan nilainya.
