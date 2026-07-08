@@ -45,9 +45,9 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     // 1. IDENTITAS SURAT
     startY = addSectionHeader('1. IDENTITAS SURAT & INFORMASI UNIT:', startY);
     doc.setFont('helvetica', 'bold');
-    doc.text('Unit / Institusi', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.unit_pengirim || '-'}`, 60, startY); startY += 6;
+    doc.text('Unit', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.unit_pengirim || '-'}`, 60, startY); startY += 6;
     doc.setFont('helvetica', 'bold');
-    doc.text('N Surat | Tgl', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.no_surat || '-'}  |  ${mainData.tanggal_surat || '-'}`, 60, startY); startY += 6;
+    doc.text('No Surat | Tgl', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.no_surat || '-'}  |  ${mainData.tanggal_surat || '-'}`, 60, startY); startY += 6;
     doc.setFont('helvetica', 'bold');
     doc.text('Perihal', 17, startY); 
     
@@ -57,8 +57,16 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     doc.text(perihalLines, 60, startY); 
     startY += (perihalLines.length * 5) + 1;
     
+    const targetYear = '2026';
+    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+    const parseNum = (str: string) => {
+      const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+      return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+    };
+    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
     doc.setFont('helvetica', 'bold');
-    doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${mainData.total_anggaran || '-'}`, 60, startY); startY += 10;
+    doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${formatRp(parseNum(mainData.total_anggaran)) || '-'}`, 60, startY); startY += 10;
 
     // 2. RINGKASAN SUBSTANSI
     if (mainData.analisis_html) {
@@ -76,13 +84,6 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     }
 
     // 3. POSISI PAGU TAHUN 2026
-    const targetYear = '2026';
-    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
-    const parseNum = (str: string) => {
-      const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
-      return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-    };
-    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
     const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
     const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
@@ -107,15 +108,15 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
     bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
-    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${mainData.total_anggaran || '0'}`]);
+    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
 
     startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
     autoTable(doc, {
       startY: startY,
       body: bodyPagu,
       theme: 'grid',
-      styles: { fontSize: 10, cellPadding: 3 },
-      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 } },
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
       didParseCell: function(data) {
         if (data.row.index === 3 || data.row.index === 5 || data.row.index === 6) {
           data.cell.styles.fontStyle = 'bold';
@@ -132,11 +133,15 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
       startY = addSectionHeader('4. DATA HISTORIS PAGU MULTI-TAHUN:', startY);
       autoTable(doc, {
         startY: startY,
-        head: [['Tahun', 'Pagu Awal', '+ Tambah', '- Kurang', 'Total Pagu', 'Realisasi', '% Serapan']],
-        body: historisData.map((d: any) => [d.tahun, d.pagu_awal, d.tambah, d.kurang, d.total_pagu, d.realisasi_historis, d.persen_serapan || '-']),
+        head: [['Tahun', 'Pagu Awal', 'Pengalihan', '+ Pagu Penugasan', '+ Pagu Inisiatif', '- Efisiensi', '+ Talangan', 'Total Pagu', 'Realisasi', '% Serapan']],
+        body: historisData.map((d: any) => [d.tahun, d.pagu_awal, d.pengalihan, d.tambah_pagu_penugasan, d.tambah_pagu_inisiatif, d.efisiensi, d.talangan, d.total_pagu, d.realisasi_historis, d.persen_serapan || '-']),
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246] }, // blue-500
-        styles: { fontSize: 9 }
+        styles: { fontSize: 7, cellPadding: 1.5 },
+        columnStyles: { 
+           1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 
+           5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'center' } 
+        }
       });
       startY = (doc as any).lastAutoTable.finalY + 10;
 
