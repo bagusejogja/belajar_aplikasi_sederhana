@@ -177,7 +177,12 @@ ${mainData.ringkasan_ai}`;
         // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => {
           let uraian = String(row['Uraian'] || row['Kegiatan'] || '');
-          uraian = uraian.replace(/^[^a-zA-Z]+/, '').trim();
+          const firstLetter = uraian.match(/[a-zA-Z]/);
+          if (firstLetter && firstLetter.index !== undefined) {
+             uraian = uraian.substring(firstLetter.index).trim();
+          } else {
+             uraian = uraian.trim();
+          }
 
           return {
             no_urut: row['No'] || (i + 1).toString(),
