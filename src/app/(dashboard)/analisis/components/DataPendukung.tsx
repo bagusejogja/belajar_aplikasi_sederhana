@@ -206,6 +206,10 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                           name: d.tahun,
                           PaguAwal: parseNum(d.pagu_awal),
                           Pengalihan: parseNum(d.pengalihan),
+                          TambahPenugasan: parseNum(d.tambah_pagu_penugasan),
+                          TambahInisiatif: parseNum(d.tambah_pagu_inisiatif),
+                          Efisiensi: parseNum(d.efisiensi),
+                          Talangan: parseNum(d.talangan),
                           TotalPagu: parseNum(d.total_pagu),
                           Realisasi: parseNum(d.realisasi_historis),
                         };
@@ -218,7 +222,11 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       <Tooltip formatter={(value: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value || 0)} />
                       <Legend wrapperStyle={{fontSize: '12px'}} />
                       <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
-                      <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan (+/-)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan (+/-)" radius={[0, 0, 0, 0]} />
+                      {showTambahPaguPenugasan && <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tambah Pagu Penugasan" radius={[0, 0, 0, 0]} />}
+                      {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tambah Pagu Inisiatif" radius={[0, 0, 0, 0]} />}
+                      {showEfisiensi && <Bar dataKey="Efisiensi" stackId="a" fill="#f43f5e" name="Efisiensi" radius={[0, 0, 0, 0]} />}
+                      {showTalangan && <Bar dataKey="Talangan" stackId="a" fill="#f59e0b" name="Talangan" radius={[4, 4, 0, 0]} />}
                       <Line type="monotone" dataKey="TotalPagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 4}} activeDot={{r: 6}} />
                       <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" name="Realisasi" dot={{r: 4}} activeDot={{r: 6}} />
                     </ComposedChart>

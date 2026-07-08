@@ -149,7 +149,7 @@ ${mainData.ringkasan_ai}`;
       if (res.success && res.data) {
         setMainData((prev: any) => ({
           ...prev,
-          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || prev.analisis_html,
+          analisis_html: res.data.ringkasan_html || res.data.ringkasan || res.data.ringkasanHtml || res.data.analisis || res.data.analisis_html || prev.analisis_html,
           rekomendasi_html: res.data.rekomendasi_html || res.data.rekomendasi || res.data.rekomendasiHtml || prev.rekomendasi_html
         }));
         alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
@@ -371,7 +371,7 @@ ${mainData.ringkasan_ai}`;
                 </tr>
                 <tr className="hover:bg-gray-50 bg-amber-50">
                   <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
-                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {mainData.total_anggaran || '0'}</td>
+                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {formatRp(parseFloat((mainData.total_anggaran || '0').toString().replace(/[^0-9.-]+/g, '')) || 0)}</td>
                 </tr>
               </tbody>
             </table>

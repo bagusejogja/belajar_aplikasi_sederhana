@@ -40,6 +40,10 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
         cleanText = decodeEntities(cleanText);
         if (cleanText) {
           const lines = doc.splitTextToSize(cleanText, maxWidth - 10);
+          if (currentY + (lines.length * lineHeight) > 275) {
+            doc.addPage();
+            currentY = 20;
+          }
           doc.text('•', x + 5, currentY);
           doc.text(lines, x + 10, currentY);
           currentY += lines.length * lineHeight;
@@ -51,6 +55,10 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
       if (cleanText) {
         const lines = doc.splitTextToSize(cleanText, maxWidth);
         lines.forEach((line: string, index: number) => {
+          if (currentY > 280) {
+            doc.addPage();
+            currentY = 20;
+          }
           if (index < lines.length - 1 && line.length > 0) {
             const words = line.split(' ');
             if (words.length > 1) {

@@ -130,17 +130,39 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
 
     // 4. DATA HISTORIS PAGU MULTI-TAHUN
     if (historisData && historisData.length > 0) {
+      const showPenugasan = historisData.some((d:any) => parseNum(d.tambah_pagu_penugasan) > 0);
+      const showInisiatif = historisData.some((d:any) => parseNum(d.tambah_pagu_inisiatif) > 0);
+      const showEfisiensi = historisData.some((d:any) => parseNum(d.efisiensi) > 0);
+      const showTalangan = historisData.some((d:any) => parseNum(d.talangan) > 0);
+
+      const tableHead = ['Tahun', 'Pagu Awal', 'Pengalihan'];
+      if (showPenugasan) tableHead.push('+ Pagu Penugasan');
+      if (showInisiatif) tableHead.push('+ Pagu Inisiatif');
+      if (showEfisiensi) tableHead.push('- Efisiensi');
+      if (showTalangan) tableHead.push('+ Talangan');
+      tableHead.push('Total Pagu', 'Realisasi', '% Serapan');
+
+      const tableBody = historisData.map((d: any) => {
+         const row = [d.tahun, d.pagu_awal, d.pengalihan];
+         if (showPenugasan) row.push(d.tambah_pagu_penugasan);
+         if (showInisiatif) row.push(d.tambah_pagu_inisiatif);
+         if (showEfisiensi) row.push(d.efisiensi);
+         if (showTalangan) row.push(d.talangan);
+         row.push(d.total_pagu, d.realisasi_historis, d.persen_serapan || '-');
+         return row;
+      });
+
       startY = addSectionHeader('4. DATA HISTORIS PAGU MULTI-TAHUN:', startY);
       autoTable(doc, {
         startY: startY,
-        head: [['Tahun', 'Pagu Awal', 'Pengalihan', '+ Pagu Penugasan', '+ Pagu Inisiatif', '- Efisiensi', '+ Talangan', 'Total Pagu', 'Realisasi', '% Serapan']],
-        body: historisData.map((d: any) => [d.tahun, d.pagu_awal, d.pengalihan, d.tambah_pagu_penugasan, d.tambah_pagu_inisiatif, d.efisiensi, d.talangan, d.total_pagu, d.realisasi_historis, d.persen_serapan || '-']),
+        head: [tableHead],
+        body: tableBody,
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246] }, // blue-500
         styles: { fontSize: 7, cellPadding: 1.5 },
         columnStyles: { 
            1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 
-           5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'center' } 
+           5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' }, 10: { halign: 'center' } 
         }
       });
       startY = (doc as any).lastAutoTable.finalY + 10;
@@ -195,17 +217,49 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
               const kurangH = kurang * scale;
           
           // Draw Pagu Awal (Blue)
+          let currentBarY = zeroY;
+          
           doc.setFillColor(59, 130, 246);
-          doc.rect(currentX, zeroY - paguAwalH, barWidth, paguAwalH, 'F');
+          doc.rect(currentX, currentBarY - paguAwalH, barWidth, paguAwalH, 'F');
+          currentBarY -= paguAwalH;
           
-          // Draw Penambahan (Green on top of Pagu Awal)
-          doc.setFillColor(16, 185, 129);
-          doc.rect(currentX, zeroY - paguAwalH - tambahH, barWidth, tambahH, 'F');
+          if (pengalihan > 0) {
+             const h = pengalihan * scale;
+             doc.setFillColor(139, 92, 246);
+             doc.rect(currentX, currentBarY - h, barWidth, h, 'F');
+             currentBarY -= h;
+          }
+          if (parseNum(d.tambah_pagu_penugasan) > 0) {
+             const h = parseNum(d.tambah_pagu_penugasan) * scale;
+             doc.setFillColor(16, 185, 129);
+             doc.rect(currentX, currentBarY - h, barWidth, h, 'F');
+             currentBarY -= h;
+          }
+          if (parseNum(d.tambah_pagu_inisiatif) > 0) {
+             const h = parseNum(d.tambah_pagu_inisiatif) * scale;
+             doc.setFillColor(52, 211, 153);
+             doc.rect(currentX, currentBarY - h, barWidth, h, 'F');
+             currentBarY -= h;
+          }
+          if (parseNum(d.talangan) > 0) {
+             const h = parseNum(d.talangan) * scale;
+             doc.setFillColor(245, 158, 11);
+             doc.rect(currentX, currentBarY - h, barWidth, h, 'F');
+             currentBarY -= h;
+          }
           
-          // Draw Pengurangan (Red below zero line)
-          if (kurangH > 0) {
-            doc.setFillColor(239, 68, 68);
-            doc.rect(currentX, zeroY, barWidth, kurangH, 'F');
+          let currentRedY = zeroY;
+          if (pengalihan < 0) {
+             const h = Math.abs(pengalihan) * scale;
+             doc.setFillColor(139, 92, 246);
+             doc.rect(currentX, currentRedY, barWidth, h, 'F');
+             currentRedY += h;
+          }
+          if (parseNum(d.efisiensi) > 0) {
+             const h = parseNum(d.efisiensi) * scale;
+             doc.setFillColor(244, 63, 94);
+             doc.rect(currentX, currentRedY, barWidth, h, 'F');
+             currentRedY += h;
           }
           
           // Record points for lines
@@ -230,7 +284,7 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
            doc.circle(p.x, p.y, 1, 'F');
         });
         
-        // Draw Line Realisasi (Orange Dashed - approximate with short lines or solid for jsPDF simplicity, but let's draw solid orange)
+        // Draw Line Realisasi
         doc.setDrawColor(245, 158, 11);
         for(let i=0; i<pointsRealisasi.length-1; i++) {
            doc.line(pointsRealisasi[i].x, pointsRealisasi[i].y, pointsRealisasi[i+1].x, pointsRealisasi[i+1].y);
@@ -242,12 +296,22 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
         
         // Legend
         const legendY = chartY - 2;
-        doc.setFontSize(7);
+        doc.setFontSize(5);
         let lx = chartX + 45;
-        doc.setFillColor(59, 130, 246); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Pagu Awal', lx+4, legendY); lx += 20;
-        doc.setFillColor(16, 185, 129); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Penambahan', lx+4, legendY); lx += 22;
-        doc.setFillColor(239, 68, 68); doc.rect(lx, legendY - 2.5, 3, 3, 'F'); doc.text('Pengurangan', lx+4, legendY); lx += 22;
-        doc.setFillColor(6, 182, 212); doc.circle(lx+1.5, legendY - 1, 1.5, 'F'); doc.text('Total Pagu', lx+4, legendY); lx += 20;
+        doc.setFillColor(59, 130, 246); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Pagu Awal', lx+3, legendY); lx += 14;
+        doc.setFillColor(139, 92, 246); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Pengalihan', lx+3, legendY); lx += 14;
+        
+        const showPenugasan = historisData.some((d:any) => parseNum(d.tambah_pagu_penugasan) > 0);
+        const showInisiatif = historisData.some((d:any) => parseNum(d.tambah_pagu_inisiatif) > 0);
+        const showEfisiensi = historisData.some((d:any) => parseNum(d.efisiensi) > 0);
+        const showTalangan = historisData.some((d:any) => parseNum(d.talangan) > 0);
+        
+        if (showPenugasan) { doc.setFillColor(16, 185, 129); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Tmbh Penugasan', lx+3, legendY); lx += 18; }
+        if (showInisiatif) { doc.setFillColor(52, 211, 153); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Tmbh Inisiatif', lx+3, legendY); lx += 16; }
+        if (showEfisiensi) { doc.setFillColor(244, 63, 94); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Efisiensi', lx+3, legendY); lx += 12; }
+        if (showTalangan) { doc.setFillColor(245, 158, 11); doc.rect(lx, legendY - 2, 2, 2, 'F'); doc.text('Talangan', lx+3, legendY); lx += 12; }
+        
+        doc.setFillColor(6, 182, 212); doc.circle(lx+1, legendY - 1, 1, 'F'); doc.text('Total Pagu', lx+3, legendY); lx += 14;
         doc.setFillColor(245, 158, 11); doc.circle(lx+1.5, legendY - 1, 1.5, 'F'); doc.text('Realisasi', lx+4, legendY);
         
         startY = chartY + chartHeight + 15;
