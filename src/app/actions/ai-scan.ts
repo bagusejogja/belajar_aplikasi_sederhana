@@ -43,8 +43,8 @@ export async function scanSuratWithAI(formData: FormData) {
        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
        result = await model.generateContent(request);
     } catch (err) {
-       console.log('Gemini 2.5 Flash error, fallback to gemini-1.5-flash', err);
-       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+       console.log('Gemini 2.5 Flash error, fallback to gemini-2.0-flash', err);
+       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
        result = await fallbackModel.generateContent(request);
     }
 
@@ -145,8 +145,8 @@ export async function generateAnalysisFromText(ocrText: string) {
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       result = await model.generateContent(request);
     } catch (err) {
-      console.log('Gemini 2.5 Flash error, fallback to gemini-1.5-flash', err);
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      console.log('Gemini 2.5 Flash error, fallback to gemini-2.0-flash', err);
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       result = await fallbackModel.generateContent(request);
     }
     
