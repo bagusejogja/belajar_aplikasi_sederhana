@@ -32,11 +32,21 @@ export async function scanSuratWithAI(formData: FormData) {
       PENTING: Hanya berikan JSON saja.
     `;
 
-    // 4. Kirim ke Gemini dengan mode JSON
-    const result = await model.generateContent({
+    // 4. Kirim ke Gemini dengan mode JSON (dengan fallback jika 503)
+    const request = {
       contents: [{ role: "user", parts: [ { text: prompt }, { inlineData: { data: base64Data, mimeType: file.type } } ] }],
       generationConfig: { responseMimeType: "application/json" }
-    });
+    };
+    
+    let result;
+    try {
+       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+       result = await model.generateContent(request);
+    } catch (err) {
+       console.log('Gemini 2.5 Flash error, fallback to gemini-1.5-flash', err);
+       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+       result = await fallbackModel.generateContent(request);
+    }
 
     const responseText = result.response.text();
     
@@ -125,10 +135,21 @@ export async function generateAnalysisFromText(ocrText: string) {
       PENTING: Hanya kembalikan JSON murni. Jangan tambah markdown blok \`\`\`json.
     `;
 
-    const result = await model.generateContent({
+    const request = {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json" }
-    });
+    };
+
+    let result;
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      result = await model.generateContent(request);
+    } catch (err) {
+      console.log('Gemini 2.5 Flash error, fallback to gemini-1.5-flash', err);
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      result = await fallbackModel.generateContent(request);
+    }
+    
     const responseText = result.response.text();
     
     const jsonString = responseText.replace(/```json|```/g, "").trim();
