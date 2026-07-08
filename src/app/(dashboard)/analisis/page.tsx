@@ -44,10 +44,19 @@ export default function AnalisisPaguPage() {
        }
        const { data: detail } = await supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id_analisis).order('no_urut', { ascending: true });
        if (detail) {
-          const cleanedDetail = detail.map(d => ({
-             ...d,
-             uraian_kegiatan: (d.uraian_kegiatan || '').toString().replace(/^[\s\u200B\uFEFF]*\d+[\s\u200B\uFEFF]*[-\u2013\u2014]\s*/, '').trim() || '-'
-          }));
+          const cleanedDetail = detail.map(d => {
+             let uraian = (d.uraian_kegiatan || '').toString();
+             const dashIdx = uraian.search(/[-\u2013\u2014]/);
+             if (dashIdx !== -1 && dashIdx < 25) {
+                uraian = uraian.substring(dashIdx + 1).trim();
+             } else {
+                uraian = uraian.trim();
+             }
+             return {
+                ...d,
+                uraian_kegiatan: uraian || '-'
+             };
+          });
           setDetailData(cleanedDetail);
        }
 
