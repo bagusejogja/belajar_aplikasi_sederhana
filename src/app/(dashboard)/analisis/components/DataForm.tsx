@@ -188,9 +188,10 @@ ${mainData.ringkasan_ai}`;
             no_urut: row['No'] || (i + 1).toString(),
             uraian_kegiatan: uraian || '-',
             anggaran: row['Anggaran'] || '0',
-          realisasi: row['Realisasi'] || '0',
-          persen_serapan: row['Serapan'] || '0%'
-        }));
+            realisasi: row['Realisasi'] || '0',
+            persen_serapan: row['Serapan'] || '0%'
+          };
+        });
         setDetailData(mapped);
       };
       reader.readAsBinaryString(e.target.files[0]);
