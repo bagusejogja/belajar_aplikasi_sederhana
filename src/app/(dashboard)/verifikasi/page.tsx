@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Select from 'react-select';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 export default function VerificationPage() {
   const [pendingTrx, setPendingTrx] = useState<any[]>([]);
@@ -54,7 +55,7 @@ export default function VerificationPage() {
         
         if (status === 'Revisi' || status === 'Ditolak') {
             if (!catatan[id] || catatan[id].trim() === '') {
-                alert("Mohon isi Catatan Alasan untuk staf agar mereka tahu apa yang salah!");
+                toast.error("Mohon isi Catatan Alasan untuk staf agar mereka tahu apa yang salah!");
                 setProcessingId(null);
                 return;
             }
@@ -79,9 +80,10 @@ export default function VerificationPage() {
            delete newC[id];
            return newC;
         });
+        toast.success(`Berhasil! Transaksi telah ${status}`);
 
      } catch (err: any) {
-        alert("Gagal memverifikasi: " + err.message);
+        toast.error("Gagal memverifikasi: " + err.message);
      } finally {
         setProcessingId(null);
      }
@@ -295,7 +297,7 @@ export default function VerificationPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
+            className="fixed inset-0 z-50 bg-slate-900/40 flex flex-col items-center justify-center p-4 backdrop-blur-md" onClick={() => setPreviewImage(null)}>
             <motion.img 
                initial={{ scale: 0.9, opacity: 0 }}
                animate={{ scale: 1, opacity: 1 }}

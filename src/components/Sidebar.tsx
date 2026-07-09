@@ -23,7 +23,9 @@ import {
   MessageSquare,
   BookOpen,
   Settings,
-  Search
+  Search,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -67,6 +69,25 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const [userRole, setUserRole] = useState('Viewer'); // Default pengamat untuk keamanan
   const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
   const [menuSearch, setMenuSearch] = useState('');
+  
+  // State untuk accordion grup, by default bisa kita buka semua saat load
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [isGroupsInitialized, setIsGroupsInitialized] = useState(false);
+
+  useEffect(() => {
+    // Inisialisasi accordion terbuka semua
+    if (!isGroupsInitialized) {
+      const allGroups = Array.from(new Set(menuList.map(m => m.group || 'Lainnya')));
+      setExpandedGroups(allGroups);
+      setIsGroupsInitialized(true);
+    }
+  }, [isGroupsInitialized]);
+
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
+    );
+  };
 
   useEffect(() => {
      const getUserProfile = async () => {
@@ -168,10 +189,20 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
             if (visibleItems.length === 0) return null;
 
+            const isExpanded = expandedGroups.includes(group) || menuSearch !== '';
+
             return (
               <div key={group} className="space-y-1">
-                <h3 className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">{group}</h3>
-                <div className="space-y-1">
+                <button 
+                  onClick={() => toggleGroup(group)}
+                  className="w-full px-4 flex items-center justify-between text-left group/btn"
+                >
+                  <h3 className="text-[10px] font-bold text-gray-400 group-hover/btn:text-indigo-500 transition-colors uppercase tracking-[0.2em]">{group}</h3>
+                  {isExpanded ? <ChevronDown size={14} className="text-gray-400 group-hover/btn:text-indigo-500" /> : <ChevronRight size={14} className="text-gray-400 group-hover/btn:text-indigo-500" />}
+                </button>
+                
+                {isExpanded && (
+                  <div className="space-y-1 mt-2">
                   {visibleItems.map((item) => {
                     const Icon = iconMap[item.icon] || LayoutDashboard;
                     const isActive = pathname === item.path;
@@ -202,6 +233,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     );
                   })}
                 </div>
+                )}
               </div>
             );
           })}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Loader2, CheckCircle, XCircle, Search, FileText, Eye, AlertCircle, Copy, Check, UploadCloud } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 export default function ApprovalTransferPage() {
   const [listData, setListData] = useState<any[]>([]);
@@ -59,7 +60,7 @@ export default function ApprovalTransferPage() {
   const handleAction = async (status_update: 'Disetujui' | 'Ditolak') => {
     if (!confirm(`Yakin ingin mengubah status menjadi ${status_update}?`)) return;
     if (status_update === 'Disetujui' && !buktiFile) {
-        alert("Peringatan: Anda WAJIB mengunggah Bukti Transfer sebelum menyetujui!");
+        toast.error("Peringatan: Anda WAJIB mengunggah Bukti Transfer sebelum menyetujui!");
         return;
     }
     
@@ -87,9 +88,10 @@ export default function ApprovalTransferPage() {
         .eq('id', selectedData.id);
         
       setIsModalOpen(false);
+      toast.success(`Berhasil! Status diubah menjadi ${status_update}`);
       fetchData();
     } catch (err: any) {
-      alert("Gagal memproses: " + err.message);
+      toast.error("Gagal memproses: " + err.message);
     } finally {
       setIsProcessing(false);
     }
@@ -236,8 +238,8 @@ export default function ApprovalTransferPage() {
       </div>
 
       {isModalOpen && selectedData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+           <div className="bg-white/95 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] border border-white/40">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><FileText className="text-amber-600"/> Detail Pengajuan</h2>
                  <button onClick={() => setIsModalOpen(false)} className="p-2 text-gray-400 hover:bg-gray-200 rounded-full transition-colors"><XCircle size={24}/></button>

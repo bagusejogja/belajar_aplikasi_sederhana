@@ -5,6 +5,7 @@ import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send } from 'lucide-rea
 import { supabase } from '@/lib/supabase';
 import { RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
+import toast from 'react-hot-toast';
 
 export default function InputPage() {
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
@@ -132,12 +133,12 @@ export default function InputPage() {
      e.preventDefault();
      if (tipeTransaksi === 'Transfer') {
         if (!formData.jenis_belanja_id || !formData.rek_tujuan_id || !formData.uraian || !formData.nominal) {
-           alert("Lengkapi Kategori Belanja, Dibayarkan Ke, Nominal, dan Uraian!");
+           toast.error("Lengkapi Kategori Belanja, Dibayarkan Ke, Nominal, dan Uraian!");
            return;
         }
      } else {
         if (!formData.jenis_belanja_id || !formData.personel_id || !formData.uraian || !formData.nominal) {
-           alert("Lengkapi Jenis Belanja, Personel, Uraian, dan Nominal!");
+           toast.error("Lengkapi Jenis Belanja, Personel, Uraian, dan Nominal!");
            return;
         }
      }
@@ -202,14 +203,14 @@ export default function InputPage() {
            if (error) throw error;
         }
         
-        alert(`Data ${tipeTransaksi === 'Transfer' ? 'Pengajuan Transfer' : 'Transaksi'} BERHASIL disimpan! 🚀`);
+        toast.success(`Data ${tipeTransaksi === 'Transfer' ? 'Pengajuan Transfer' : 'Transaksi'} BERHASIL disimpan! 🚀`);
         setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, rek_tujuan_id: null, toko: '', uraian: '', nominal: '', catatan: '' });
         setAttachments({
            nota: { files: [], url: '' }, kegiatan: { files: [], url: '' },
            barang: { files: [], url: '' }, transfer: { files: [], url: '' }
         });
      } catch (err: any) {
-        alert("Gagal menyimpan: " + err.message);
+        toast.error("Gagal menyimpan: " + err.message);
      } finally {
         setIsSaving(false);
      }

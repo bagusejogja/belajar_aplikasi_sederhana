@@ -7,12 +7,14 @@ import {
   Eye, PlusCircle, Edit3, Trash2, CheckCircle2, Circle
 } from 'lucide-react';
 import { menuList } from '@/lib/mock-db';
+import toast from 'react-hot-toast';
 
 export default function MenusPage() {
   const [roles, setRoles] = useState<string[]>(['ADMIN', 'STAFF', 'VIEWER', 'Pemroses Anggaran', 'MANAGER']);
   const [newRole, setNewRole] = useState('');
   const [selectedRole, setSelectedRole] = useState('ADMIN');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Untuk first load
+  const [isFetching, setIsFetching] = useState(false); // Untuk perpindahan antar role
   const [saving, setSaving] = useState(false);
   
   // Mapping: { "/path": { can_view: true, can_create: false, ... } }
@@ -32,7 +34,9 @@ export default function MenusPage() {
   }, [selectedRole]);
 
   const fetchRolesAndPermissions = async () => {
-    setLoading(true);
+    if (Object.keys(rolePermissions).length === 0) setLoading(true);
+    else setIsFetching(true);
+    
     try {
       // 1. Ambil semua role unik dari tabel app_users dan app_role_menus
       const { data: userRoles } = await supabase.from('app_users').select('role');
@@ -81,10 +85,12 @@ export default function MenusPage() {
       });
 
       setRolePermissions(perms);
+      setRolePermissions(perms);
     } catch (err: any) {
       console.error(err);
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
   };
 
@@ -166,10 +172,10 @@ export default function MenusPage() {
         if (errorIns) throw errorIns;
       }
 
-      alert(`Akses untuk ${selectedRole} berhasil diperbarui!`);
+      toast.success(`Akses untuk ${selectedRole} berhasil diperbarui!`);
       if (selectedRole === 'Admin') window.location.reload();
     } catch (err: any) {
-      alert("Gagal menyimpan: " + err.message);
+      toast.error("Gagal menyimpan: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -190,15 +196,17 @@ export default function MenusPage() {
         {/* Action Bar Utama (Satu Baris Panjang) */}
         <div className="flex-1 flex items-center bg-gray-50/80 rounded-2xl border border-gray-100 h-14 w-full overflow-hidden">
           {/* Pilih Jabatan */}
-          <div className="px-6 flex items-center gap-3 border-r border-gray-200 shrink-0 h-full">
+          <div className="px-6 flex items-center gap-3 border-r border-gray-200 shrink-0 h-full relative">
             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Aktor</span>
             <select 
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="bg-transparent text-sm font-black text-indigo-900 outline-none cursor-pointer min-w-[120px]"
+              disabled={isFetching || saving}
+              className="bg-transparent text-sm font-black text-indigo-900 outline-none cursor-pointer min-w-[120px] disabled:opacity-50"
             >
               {roles.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
+            {isFetching && <Loader2 size={14} className="animate-spin text-indigo-500 absolute right-2" />}
           </div>
 
           {/* Input Jabatan Baru (LEBAR) */}
@@ -244,7 +252,7 @@ export default function MenusPage() {
       {loading ? (
         <div className="h-64 flex justify-center items-center"><Loader2 size={40} className="animate-spin text-indigo-600"/></div>
       ) : (
-        <div className="space-y-4">
+        <div className={`space-y-4 transition-all duration-300 ${isFetching ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
           {Object.keys(groupedMenus).map(group => {
             const isExpanded = expandedGroups.includes(group);
             return (
