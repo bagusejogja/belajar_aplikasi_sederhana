@@ -7,6 +7,14 @@ import { supabase } from '@/lib/supabase';
 // Helper for formatting Rp
 const fmtRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
+// Helper for formatting Date (dd-mm-yyyy)
+const formatDate = (dateStr: string) => {
+   if (!dateStr) return '-';
+   const d = new Date(dateStr);
+   if (isNaN(d.getTime())) return dateStr;
+   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+};
+
 export default function RekapAsetPage() {
   const [dataAset, setDataAset] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +73,7 @@ export default function RekapAsetPage() {
                nominal: t.uang_keluar,
                foto_barang: t.foto_barang,
                foto_bukti: t.foto_nota || t.foto_kegiatan,
+               bukti_transfer: null,
              });
           }
         });
@@ -82,8 +91,9 @@ export default function RekapAsetPage() {
                nama_akun: akunMap[b.akun_id]?.nama_akun || 'Unknown',
                keterangan: b.deskripsi,
                nominal: b.debet,
-               foto_barang: pengajuan.foto_barang || null,
-               foto_bukti: pengajuan.nota_url || pengajuan.foto_kegiatan || null,
+               foto_barang: pengajuan.foto_barang || b.foto_barang || null,
+               foto_bukti: pengajuan.nota_url || pengajuan.foto_kegiatan || b.foto_nota || b.foto_kegiatan || null,
+               bukti_transfer: b.bukti_transfer || null,
              });
           }
         });
@@ -159,13 +169,14 @@ export default function RekapAsetPage() {
                               <th className="p-4 font-bold text-right">Nominal</th>
                               <th className="p-4 font-bold text-center">Foto Barang</th>
                               <th className="p-4 font-bold text-center">Bukti Trx</th>
+                              <th className="p-4 font-bold text-center">Bukti Transfer</th>
                               <th className="p-4 font-bold text-center">Sumber</th>
                            </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                            {group.items.map((item: any) => (
                               <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                 <td className="p-4 font-bold text-gray-700 whitespace-nowrap">{item.tanggal}</td>
+                                 <td className="p-4 font-bold text-gray-700 whitespace-nowrap">{formatDate(item.tanggal)}</td>
                                  <td className="p-4 text-gray-600 font-medium max-w-[300px] truncate">{item.keterangan}</td>
                                  <td className="p-4 text-right font-black text-emerald-600 whitespace-nowrap">Rp {fmtRp(item.nominal)}</td>
                                  <td className="p-4 text-center">
@@ -178,6 +189,13 @@ export default function RekapAsetPage() {
                                  <td className="p-4 text-center">
                                     {item.foto_bukti ? (
                                        <button onClick={() => setSelectedImage(item.foto_bukti)} className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg inline-block transition-colors">
+                                          <ImageIcon size={18} />
+                                       </button>
+                                    ) : <span className="text-gray-300">-</span>}
+                                 </td>
+                                 <td className="p-4 text-center">
+                                    {item.bukti_transfer ? (
+                                       <button onClick={() => setSelectedImage(item.bukti_transfer)} className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg inline-block transition-colors">
                                           <ImageIcon size={18} />
                                        </button>
                                     ) : <span className="text-gray-300">-</span>}
