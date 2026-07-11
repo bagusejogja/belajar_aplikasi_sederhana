@@ -214,7 +214,7 @@ export default function AnalisisPaguPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -my-6">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -mb-6 mt-0">
       {/* Top Navbar */}
       <div className="bg-white border-b border-gray-200 flex flex-wrap lg:flex-nowrap items-center justify-between px-4 lg:px-8 py-4 shadow-sm z-10 shrink-0 gap-4 overflow-x-auto">
         <h1 className="text-xl font-black text-indigo-700 flex items-center gap-2">
