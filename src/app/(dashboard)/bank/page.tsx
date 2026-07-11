@@ -195,8 +195,36 @@ export default function BankTransaksiPage() {
    };
 
    const [editingRow, setEditingRow] = useState<any | null>(null);
-   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
    const [editAkunId, setEditAkunId] = useState<string>('');
+   
+   // State untuk foto spesifik
+   const [fotoNotaUrls, setFotoNotaUrls] = useState<string[]>([]);
+   const [fotoKegiatanUrls, setFotoKegiatanUrls] = useState<string[]>([]);
+   const [fotoBarangUrls, setFotoBarangUrls] = useState<string[]>([]);
+   const [buktiTransferUrls, setBuktiTransferUrls] = useState<string[]>([]);
+   const [isSavingRevisi, setIsSavingRevisi] = useState(false);
+
+   const simpanRevisiBank = async () => {
+      if (!editingRow) return;
+      setIsSavingRevisi(true);
+      try {
+         await supabase.from('bank_transactions').update({
+            akun_id: editAkunId ? Number(editAkunId) : null,
+            foto_nota: fotoNotaUrls.join(',') || null,
+            foto_kegiatan: fotoKegiatanUrls.join(',') || null,
+            foto_barang: fotoBarangUrls.join(',') || null,
+            bukti_transfer: buktiTransferUrls.join(',') || null,
+            foto_bukti: null // clear legacy
+         }).eq('id', editingRow.id);
+         alert('Simpan revisi berhasil!');
+         setEditingRow(null);
+         fetchHistory(true);
+      } catch (e: any) {
+         alert('Gagal simpan revisi: ' + e.message);
+      } finally {
+         setIsSavingRevisi(false);
+      }
+   };
 
    const filteredHistory = dbTransactions.filter((row: any) => {
       const matchSearch = (row.deskripsi || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -306,7 +334,14 @@ export default function BankTransaksiPage() {
                            <td className="p-6">
                               <div className="flex flex-col items-center gap-2">
                                  <div className="flex gap-1">
-                                    <button onClick={() => { setEditingRow(row); setPreviewUrls((row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); setEditAkunId(row.akun_id?.toString() || ''); }} className={`p-2 rounded-lg border transition-all active:scale-95 shadow-sm ${row.foto_bukti ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-400'}`}>
+                                    <button onClick={() => { 
+                                       setEditingRow(row); 
+                                       setFotoNotaUrls((row.foto_nota || row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); 
+                                       setFotoKegiatanUrls((row.foto_kegiatan || '').split(',').filter((s: string) => s.startsWith('http'))); 
+                                       setFotoBarangUrls((row.foto_barang || '').split(',').filter((s: string) => s.startsWith('http'))); 
+                                       setBuktiTransferUrls((row.bukti_transfer || '').split(',').filter((s: string) => s.startsWith('http'))); 
+                                       setEditAkunId(row.akun_id?.toString() || ''); 
+                                    }} className={`p-2 rounded-lg border transition-all active:scale-95 shadow-sm ${(row.foto_nota || row.foto_bukti) ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-400'}`}>
                                        <ImagePlus size={16}/>
                                     </button>
                                     {!row.pengajuan_id && row.debet > 0 && (
@@ -386,22 +421,64 @@ export default function BankTransaksiPage() {
                               )}
                            </>
                         ) : (
-                           <div>
-                              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4">Bukti / Lampiran ({previewUrls.length})</label>
-                              <div className="grid grid-cols-2 gap-4 mt-2">
-                                 {previewUrls.map((u: string, i: number) => (
-                                    <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
-                                 ))}
-                                 <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
-                                    <Upload size={32}/>
-                                    <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
-                                 </label>
+                           <div className="space-y-6">
+                              {/* Foto Nota */}
+                              <div>
+                                 <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota / Invoice ({fotoNotaUrls.length})</label>
+                                 <div className="grid grid-cols-2 gap-4 mt-2">
+                                    {fotoNotaUrls.map((u: string, i: number) => (
+                                       <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                    ))}
+                                    <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
+                                       <Upload size={32}/>
+                                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setFotoNotaUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
+                                    </label>
+                                 </div>
+                              </div>
+                              {/* Foto Kegiatan */}
+                              <div>
+                                 <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Kegiatan ({fotoKegiatanUrls.length})</label>
+                                 <div className="grid grid-cols-2 gap-4 mt-2">
+                                    {fotoKegiatanUrls.map((u: string, i: number) => (
+                                       <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                    ))}
+                                    <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
+                                       <Upload size={32}/>
+                                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setFotoKegiatanUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
+                                    </label>
+                                 </div>
+                              </div>
+                              {/* Foto Barang */}
+                              <div>
+                                 <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Barang ({fotoBarangUrls.length})</label>
+                                 <div className="grid grid-cols-2 gap-4 mt-2">
+                                    {fotoBarangUrls.map((u: string, i: number) => (
+                                       <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                    ))}
+                                    <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
+                                       <Upload size={32}/>
+                                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setFotoBarangUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
+                                    </label>
+                                 </div>
+                              </div>
+                              {/* Bukti Transfer */}
+                              <div>
+                                 <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Bukti Transfer / Dokumen Lain ({buktiTransferUrls.length})</label>
+                                 <div className="grid grid-cols-2 gap-4 mt-2">
+                                    {buktiTransferUrls.map((u: string, i: number) => (
+                                       <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                    ))}
+                                    <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
+                                       <Upload size={32}/>
+                                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setBuktiTransferUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
+                                    </label>
+                                 </div>
                               </div>
                            </div>
                         )}
                      </div>
                   </div>
-                  <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={()=>{ alert("Simpan berhasil."); setEditingRow(null); }} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">SIMPAN REVISI</button></div>
+                  <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={simpanRevisiBank} disabled={isSavingRevisi} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95 disabled:opacity-50">{isSavingRevisi ? 'MENYIMPAN...' : 'SIMPAN REVISI'}</button></div>
                </div>
             </div>
          )}
