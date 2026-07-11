@@ -26,6 +26,8 @@ export default function BankTransaksiPage() {
    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
    const [offset, setOffset] = useState(0); 
 
+   const [listAkun, setListAkun] = useState<any[]>([]);
+
    const fetchHistory = useCallback(async (isReset = true) => {
       if (isReset) { setIsLoadingHistory(true); setOffset(0); }
       else { setIsLoadingMore(true); }
@@ -48,7 +50,15 @@ export default function BankTransaksiPage() {
       } catch (err: any) { console.error(err); } finally { setIsLoadingHistory(false); setIsLoadingMore(false); }
    }, [selectedMonth, selectedYear, offset]);
 
-   useEffect(() => { fetchHistory(true); }, [selectedMonth, selectedYear, fetchHistory]);
+   useEffect(() => { 
+      fetchHistory(true); 
+      // Ambil referensi akun untuk keperluan pemetaan otomatis saat paste
+      const getAkun = async () => {
+         const { data } = await supabase.from('ref_akun').select('id, nomor_akun');
+         if (data) setListAkun(data);
+      };
+      getAkun();
+   }, [selectedMonth, selectedYear, fetchHistory]);
 
    const formatShowDate = (dateStr: string) => {
       if (!dateStr) return '-';
@@ -103,10 +113,22 @@ export default function BankTransaksiPage() {
       for (let i = startIdx; i < rows.length; i++) {
          const p = rows[i].split(/\t|;/).map((x: string) => x.trim());
          if (p.length < 5) continue;
+         
+         const strAkun = p[2] ? p[2] : '';
+         let finalAkunId = null;
+         if (strAkun !== '\\N' && strAkun !== '') {
+             const found = listAkun.find(a => a.nomor_akun === strAkun);
+             if (found) finalAkunId = found.id;
+             else {
+                 const asNum = Number(strAkun);
+                 if (!isNaN(asNum) && Number.isInteger(asNum)) finalAkunId = asNum;
+             }
+         }
+
          ext.push({
             waktu_transaksi: parseDate(p[0] || ''),
             rekening_id: Number(p[1]) || null,
-            akun_id: (p[2] === '\\N' || !p[2]) ? null : (Number(p[2]) || null),
+            akun_id: finalAkunId,
             noref_bank: (p[3] === '\\N' || !p[3]) ? null : p[3],
             deskripsi: p[4] || '',
             debet: cleanNum(p[5]),
@@ -163,7 +185,7 @@ export default function BankTransaksiPage() {
                </div>
             </div>
             <div className="flex-[2] w-full">
-               <textarea onPaste={handlePasteData} placeholder="PASTE DI SINI..." className="w-full bg-slate-950 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-indigo-500 font-bold text-sm text-center placeholder:text-white/5" />
+               <textarea onPaste={handlePasteData} placeholder="PASTE DATA DARI EXCEL DI SINI&#10;(Waktu | Rekening | Akun | No Ref | Deskripsi | Debet | Kredit | Saldo)" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-indigo-500 font-bold text-sm text-center placeholder:text-white/30" />
                {message && <div className={`mt-1 p-1 rounded-lg text-center text-[9px] font-black uppercase ${message.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{message.text}</div>}
             </div>
          </div>

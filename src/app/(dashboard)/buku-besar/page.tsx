@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Search, Filter, Printer, BookOpen, Calendar as CalendarIcon, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import Select from 'react-select';
 
 const fmt = (n: number) => Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 2 });
 
@@ -181,7 +182,13 @@ export default function BukuBesarPage() {
 
     unifiedData.forEach(d => {
       // Filter by Rekening
-      if (selectedRekening !== 'all' && d.rekening_id !== selectedRekening) return;
+      if (selectedRekening !== 'all') {
+          if (selectedRekening === 'bank') {
+              if (d.rekening_id === 'kas') return;
+          } else {
+              if (d.rekening_id !== selectedRekening) return;
+          }
+      }
       // Filter by Akun
       if (selectedAkun !== 'all' && String(d.akun_id) !== selectedAkun) return;
 
@@ -242,13 +249,20 @@ export default function BukuBesarPage() {
           <select value={selectedRekening} onChange={e => setSelectedRekening(e.target.value)} className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 outline-none min-w-[150px]">
             <option value="all">Semua Rekening Bank & Kas</option>
             <option value="kas">Kas Kecil (KK1)</option>
+            <option value="bank">Semua Bank Saja</option>
             {allRekening.map(r => <option key={r.id} value={String(r.id)}>{r.nama_rekening || r.nama || r.no_rekening}</option>)}
           </select>
 
-          <select value={selectedAkun} onChange={e => setSelectedAkun(e.target.value)} className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 outline-none min-w-[200px]">
-            <option value="all">Semua Akun (Gabungan)</option>
-            {activeAkunOptions.map(a => <option key={a.id} value={a.id}>{a.nomor} - {a.nama}</option>)}
-          </select>
+          <div className="min-w-[250px]">
+             <Select 
+                options={[{value: 'all', label: 'Semua Akun (Gabungan)'}, ...activeAkunOptions.map(a => ({ value: a.id, label: `${a.nomor} - ${a.nama}` }))]}
+                value={selectedAkun === 'all' ? {value: 'all', label: 'Semua Akun (Gabungan)'} : {value: selectedAkun, label: activeAkunOptions.find(a => a.id === selectedAkun) ? `${activeAkunOptions.find(a => a.id === selectedAkun)?.nomor} - ${activeAkunOptions.find(a => a.id === selectedAkun)?.nama}` : 'Pilih Akun'}}
+                onChange={(val: any) => setSelectedAkun(val?.value || 'all')}
+                styles={{
+                   control: (b) => ({ ...b, borderRadius: '0.75rem', border: '1px solid #e5e7eb', backgroundColor: 'white', padding: '2px' }),
+                }}
+             />
+          </div>
 
           <button onClick={() => window.print()} className="bg-indigo-600 text-white hover:bg-indigo-700 px-5 py-2.5 rounded-xl font-black transition-transform hover:scale-105 flex items-center gap-2 shadow-md">
              <Printer size={16} /> CETAK

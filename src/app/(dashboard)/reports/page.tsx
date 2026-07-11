@@ -166,7 +166,7 @@ export default function ReportsPage() {
                <PieChart size={28} />
             </div>
             <div>
-               <h2 className="text-2xl font-black text-gray-900">Buku Kas (Laporan)</h2>
+               <h2 className="text-2xl font-black text-gray-900">Laporan Kas Kecil</h2>
             </div>
          </div>
          <div className="flex flex-wrap gap-2 w-full md:w-auto">

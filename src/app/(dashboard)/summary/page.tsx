@@ -141,7 +141,7 @@ export default function SummaryPage() {
          {/* KONTROL PANEL */}
          <div className="print:hidden bg-indigo-600 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
             <div>
-               <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><PieChart size={32}/> Laporan Ringkasan Cerdas</h2>
+               <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><PieChart size={32}/> Laporan Ringkasan Kas Kecil</h2>
                <p className="text-indigo-100 font-medium text-sm">Filter Tanggal Transaksi Berjalan. Data digabung per Induk 2-Digit, lalu dipecah per Akun Asli.</p>
             </div>
             
