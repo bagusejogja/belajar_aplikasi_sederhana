@@ -77,7 +77,7 @@ export default function BankTransaksiPage() {
          const currentOffset = isReset ? 0 : offset + 1;
          const rangeFrom = currentOffset * 2000;
          const rangeTo = rangeFrom + 1999;
-         let q = supabase.from('bank_transactions').select(`*, ref_akun (nama_akun, nomor_akun)`, { count: 'exact' }).order('waktu_transaksi', { ascending: false });
+         let q = supabase.from('bank_transactions').select(`*, ref_akun (nama_akun, nomor_akun), pengajuan_transfer (*)`, { count: 'exact' }).order('waktu_transaksi', { ascending: false });
          if (selectedMonth > 0) {
             const s = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`, nm = selectedMonth === 12 ? 1 : selectedMonth + 1, ny = selectedMonth === 12 ? selectedYear + 1 : selectedYear, e = `${ny}-${String(nm).padStart(2, '0')}-01`;
             q = q.gte('waktu_transaksi', s).lt('waktu_transaksi', e);
@@ -346,11 +346,60 @@ export default function BankTransaksiPage() {
          {editingRow && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
                <div className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-white/10 animate-in zoom-in-95">
-                  <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0"><div><h4 className="text-lg font-black italic text-slate-800 uppercase flex items-center gap-4"><ImagePlus size={24} className="text-indigo-600"/> Audit Lampiran</h4></div><button onClick={() => setEditingRow(null)} className="p-3 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"><X size={24}/></button></div>
+                  <div className="p-8 border-b bg-gray-50 flex justify-between items-center shrink-0"><div><h4 className="text-lg font-black italic text-slate-800 uppercase flex items-center gap-4"><ImagePlus size={24} className="text-indigo-600"/> Lampiran </h4></div><button onClick={() => setEditingRow(null)} className="p-3 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors"><X size={24}/></button></div>
                   <div className="p-8 space-y-6 overflow-y-auto flex-1 italic scrollbar-hide text-center">
                      <div className={`p-8 rounded-[1.5rem] border-2 shadow-inner ${editingRow.debet > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}><p className="text-sm font-black text-slate-950 mb-3 leading-tight uppercase">{editingRow.deskripsi}</p><p className={`text-4xl font-black italic tracking-tighter ${editingRow.debet > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Rp {(editingRow.kredit || editingRow.debet).toLocaleString()}</p></div>
-                     <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Account ID</label><input type="text" value={editAkunId} onChange={(e: ChangeEvent<HTMLInputElement>) => setEditAkunId(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl p-4 font-black text-indigo-600 text-2xl outline-none focus:border-indigo-600 transition-all text-center" /></div>
-                     <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u: string, i: number) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} /></label></div></div>
+                     
+                     {/* BUKTI FOTO */}
+                     <div className="space-y-6 text-left">
+                        {editingRow.pengajuan_transfer ? (
+                           <>
+                              {editingRow.pengajuan_transfer.nota_url && (
+                                 <div>
+                                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Foto Nota / Invoice</label>
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                       {editingRow.pengajuan_transfer.nota_url.split(',').filter(Boolean).map((u: string, i: number) => (
+                                          <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              )}
+                              {editingRow.pengajuan_transfer.foto_kegiatan && (
+                                 <div className="mt-4">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Foto Kegiatan</label>
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                       {editingRow.pengajuan_transfer.foto_kegiatan.split(',').filter(Boolean).map((u: string, i: number) => (
+                                          <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              )}
+                              {editingRow.pengajuan_transfer.foto_barang && (
+                                 <div className="mt-4">
+                                    <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-4">Foto Barang</label>
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                       {editingRow.pengajuan_transfer.foto_barang.split(',').filter(Boolean).map((u: string, i: number) => (
+                                          <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                       ))}
+                                    </div>
+                                 </div>
+                              )}
+                           </>
+                        ) : (
+                           <div>
+                              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4">Bukti / Lampiran ({previewUrls.length})</label>
+                              <div className="grid grid-cols-2 gap-4 mt-2">
+                                 {previewUrls.map((u: string, i: number) => (
+                                    <div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>
+                                 ))}
+                                 <label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200">
+                                    <Upload size={32}/>
+                                    <input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} />
+                                 </label>
+                              </div>
+                           </div>
+                        )}
+                     </div>
                   </div>
                   <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={()=>{ alert("Simpan berhasil."); setEditingRow(null); }} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">SIMPAN REVISI</button></div>
                </div>
