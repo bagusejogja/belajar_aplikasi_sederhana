@@ -41,6 +41,7 @@ export const menuList: MenuItem[] = [
   { title: 'Buku Besar', path: '/buku-besar', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Laporan Gabungan', path: '/gabungan-reports', icon: 'Database', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Analisis Pivot', path: '/pivot', icon: 'LayoutGrid', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
+  { title: 'Rekap Aset', path: '/rekap-aset', icon: 'Box', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   
   // --- DANA PEMERINTAH ---
   { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'Dana Pemerintah' },

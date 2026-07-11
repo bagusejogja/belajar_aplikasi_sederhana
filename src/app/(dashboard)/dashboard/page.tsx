@@ -734,12 +734,12 @@ export default function DashboardPage() {
                              isExpanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />
                           ) : <div className="w-3.5" />}
                           <div className="flex flex-col truncate">
-                            <span className="text-[8px] text-gray-400 leading-none">{row.nomor_akun}</span>
-                            <span className={`${isInduk ? 'text-[11px] font-black' : 'text-[11px] font-medium'} text-gray-700`}>{row.nama_akun}</span>
+                            <span className="text-[10px] text-gray-400 leading-none">{row.nomor_akun}</span>
+                            <span className={`${isInduk ? 'text-xs font-black' : 'text-xs font-bold'} text-gray-700`}>{row.nama_akun}</span>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3 text-right bg-white border-r border-indigo-50 text-[10px] font-mono text-gray-400 italic">
+                      <td className="p-3 text-right bg-white border-r border-indigo-50 text-xs font-mono text-gray-400 italic">
                         {isInduk ? fmt(row.saldoAwal || 0) : ''}
                       </td>
                       {activeMonthIdx.map(m => {
@@ -751,7 +751,7 @@ export default function DashboardPage() {
                           </td>
                         );
                       })}
-                      <td className={`p-3 text-right font-black bg-indigo-50 text-indigo-600 text-[11px] border-l border-indigo-100 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.02)]`}>
+                      <td className={`p-3 text-right font-black bg-indigo-50 text-indigo-600 text-xs border-l border-indigo-100 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.02)]`}>
                         {fmt(isPengeluaran ? Math.abs(row.masuk - row.keluar) : (row.masuk - row.keluar))}
                       </td>
                     </tr>
@@ -765,7 +765,7 @@ export default function DashboardPage() {
                 <div className={mode !== 'web' ? wrapperClass : ''}>
                   {mode === 'print-summary' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase">Ringkasan Mutasi (Induk)</h2>}
                   {mode === 'print-detail' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase mt-8 border-t-2 border-black pt-8">Rincian Lengkap Mutasi (Detail)</h2>}
-                  <table className={`text-[11px] text-left border-separate border-spacing-0 min-w-full ${mode === 'web' ? wrapperClass : ''}`}>
+                  <table className={`text-xs text-left border-separate border-spacing-0 min-w-full ${mode === 'web' ? wrapperClass : ''}`}>
                     <thead>
                       <tr className="bg-indigo-50 text-indigo-900 uppercase tracking-tighter sticky top-0 z-[60]">
                         <th className="p-4 border-r border-indigo-100 bg-indigo-50 sticky left-0 z-[70] min-w-[250px] text-xs font-black">Akun Hirarki</th>
@@ -794,7 +794,7 @@ export default function DashboardPage() {
                        </tr>
 
                        {((mode === 'web' && expandPosisiAwal) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
-                         <tr key={`awal-${r.id}`} className="bg-indigo-50/50 text-[10px] text-slate-500 italic">
+                         <tr key={`awal-${r.id}`} className="bg-indigo-50/50 text-xs text-slate-500 italic">
                             <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-b border-indigo-50">{r.nama}</td>
                             <td className="p-3 text-right border-r bg-slate-50/50 border-b border-indigo-50">{fmt(r.saldoAwal)}</td>
                             {activeMonthIdx.map(m => {
@@ -822,7 +822,7 @@ export default function DashboardPage() {
                       </tr>
 
                        {((mode === 'web' && expandPosisiAkhir) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
-                         <tr key={`akhir-${r.id}`} className="bg-slate-50 text-[10px] text-slate-500 italic">
+                         <tr key={`akhir-${r.id}`} className="bg-slate-50 text-xs text-slate-500 italic">
                             <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-t border-slate-100">{r.nama}</td>
                             <td className="p-3 text-right border-r bg-slate-50 opacity-40 border-t border-slate-100">-</td>
                             {activeMonthIdx.map(m => (

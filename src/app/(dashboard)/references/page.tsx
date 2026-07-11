@@ -12,6 +12,12 @@ export default function ReferencesPage() {
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
   const [listBelanja, setListBelanja] = useState<(RefJenisBelanja & { ref_akun: { nama_akun: string }})[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filter lists based on searchTerm
+  const filteredAkun = listAkun.filter(a => a.nama_akun.toLowerCase().includes(searchTerm.toLowerCase()) || a.nomor_akun.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPersonel = listPersonel.filter(p => p.nama_orang.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredBelanja = listBelanja.filter(b => b.nama_belanja.toLowerCase().includes(searchTerm.toLowerCase()) || b.ref_akun?.nama_akun.toLowerCase().includes(searchTerm.toLowerCase()));
 
   // Tree Collapsible State
   const [expandedInduk, setExpandedInduk] = useState<Record<string, boolean>>({});
@@ -104,7 +110,7 @@ export default function ReferencesPage() {
      const unassigned: any[] = [];
 
      // 1. Induk
-     listAkun.forEach(item => {
+     filteredAkun.forEach(item => {
         const no = String(item.nomor_akun);
         if (no.endsWith('0000') && !no.includes('.')) {
            tree[no] = { ...item, kelompoks: {} };
@@ -112,7 +118,7 @@ export default function ReferencesPage() {
      });
 
      // 2. Kelompok
-     listAkun.forEach(item => {
+     filteredAkun.forEach(item => {
         const no = String(item.nomor_akun);
         if (!no.endsWith('0000') && !no.includes('.')) {
            // Induknya adalah digit pertama + 0000 (contoh: 43010 -> 40000)
@@ -126,7 +132,7 @@ export default function ReferencesPage() {
      });
 
      // 3. Anak
-     listAkun.forEach(item => {
+     filteredAkun.forEach(item => {
         const no = String(item.nomor_akun);
         if (no.includes('.')) {
            const parentKelompok = no.split('.')[0];
@@ -140,7 +146,7 @@ export default function ReferencesPage() {
      });
 
      // Sisanya (Jika tidak ikut format 5 digit / dot)
-     listAkun.forEach(item => {
+     filteredAkun.forEach(item => {
         const no = String(item.nomor_akun);
         const isInduk = no.endsWith('0000') && !no.includes('.');
         const isKel = !no.endsWith('0000') && !no.includes('.') && tree[no.substring(0, 1) + '0000'];
@@ -167,6 +173,15 @@ export default function ReferencesPage() {
               <p className="text-gray-500 font-medium">Pengaturan Opsi Kategori Akun & Jenis Belanja</p>
            </div>
         </div>
+         <div className="relative w-full md:w-72 mt-4 md:mt-0">
+             <input
+                 type="text"
+                 placeholder="Cari Referensi..."
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
+                 className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all font-medium text-sm"
+             />
+         </div>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-[500px]">
@@ -322,14 +337,14 @@ export default function ReferencesPage() {
                                  <th className="p-4 border-b text-center w-32">Aksi</th>
                               </tr>
                            </thead>
-                           <tbody className="divide-y divide-gray-100 text-sm">
-                              {listPersonel.map((item) => (
-                                 <tr key={item.id} className="hover:bg-indigo-50/30">
-                                    <td className="p-4 font-bold text-gray-900">{item.nama_orang}</td>
-                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${item.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{item.status}</span></td>
+                           <tbody>
+                              {filteredPersonel.map((p, i) => (
+                                 <tr key={p.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
+                                    <td className="p-4 font-bold text-gray-900">{p.nama_orang}</td>
+                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${p.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span></td>
                                     <td className="p-4 text-center flex justify-center gap-2">
-                                       <button onClick={() => openModal(item)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
-                                       <button onClick={() => handleDelete(item.id, 'ref_personel')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                       <button onClick={() => openModal(p)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
+                                       <button onClick={() => handleDelete(p.id, 'ref_personel')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                                     </td>
                                  </tr>
                               ))}
@@ -350,15 +365,15 @@ export default function ReferencesPage() {
                                  <th className="p-4 border-b text-center w-32">Aksi</th>
                               </tr>
                            </thead>
-                           <tbody className="divide-y divide-gray-100 text-sm">
-                              {listBelanja.map((item) => (
-                                 <tr key={item.id} className="hover:bg-indigo-50/30">
-                                    <td className="p-4 font-bold text-gray-900">{item.nama_belanja}</td>
-                                    <td className="p-4 font-medium text-indigo-600 text-xs">{(item.ref_akun as any)?.nama_akun || 'Akun Terhapus'}</td>
-                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${item.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{item.status}</span></td>
+                           <tbody>
+                              {filteredBelanja.map((b, i) => (
+                                 <tr key={b.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
+                                    <td className="p-4 font-bold text-gray-900">{b.nama_belanja}</td>
+                                    <td className="p-4 font-medium text-indigo-600 text-xs">{(b.ref_akun as any)?.nama_akun || 'Akun Terhapus'}</td>
+                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${b.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{b.status}</span></td>
                                     <td className="p-4 text-center flex justify-center gap-2">
-                                       <button onClick={() => openModal(item)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
-                                       <button onClick={() => handleDelete(item.id, 'ref_jenis_belanja')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                       <button onClick={() => openModal(b)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
+                                       <button onClick={() => handleDelete(b.id, 'ref_jenis_belanja')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
                                     </td>
                                  </tr>
                               ))}

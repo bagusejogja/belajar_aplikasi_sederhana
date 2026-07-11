@@ -28,6 +28,47 @@ export default function BankTransaksiPage() {
 
    const [listAkun, setListAkun] = useState<any[]>([]);
 
+   // State untuk Integrasi Pengajuan
+   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+   const [selectedBankRow, setSelectedBankRow] = useState<any>(null);
+   const [pengajuanList, setPengajuanList] = useState<any[]>([]);
+   const [isLinking, setIsLinking] = useState(false);
+
+   const openLinkModal = async (row: any) => {
+      setSelectedBankRow(row);
+      setIsLinkModalOpen(true);
+      setPengajuanList([]);
+      const { data } = await supabase.from('pengajuan_transfer')
+          .select('*, master_rekening(nama_rekening)')
+          .eq('status', 'Disetujui')
+          .eq('is_integrated', false)
+          .order('tanggal_pengajuan', { ascending: false });
+      if (data) setPengajuanList(data);
+   };
+
+   const handleLink = async (pengajuan: any) => {
+      setIsLinking(true);
+      try {
+         const urls = [pengajuan.nota_url, pengajuan.foto_kegiatan, pengajuan.foto_barang].filter(Boolean).join(',');
+         
+         await supabase.from('bank_transactions').update({ 
+            pengajuan_id: pengajuan.id,
+            foto_bukti: urls || null 
+         }).eq('id', selectedBankRow.id);
+
+         await supabase.from('pengajuan_transfer').update({ is_integrated: true }).eq('id', pengajuan.id);
+
+         alert('Berhasil dikaitkan!');
+         setIsLinkModalOpen(false);
+         fetchHistory(true);
+      } catch (err: any) {
+         alert('Gagal mengaitkan: ' + err.message);
+      } finally {
+         setIsLinking(false);
+      }
+   };
+
+
    const fetchHistory = useCallback(async (isReset = true) => {
       if (isReset) { setIsLoadingHistory(true); setOffset(0); }
       else { setIsLoadingMore(true); }
@@ -264,9 +305,19 @@ export default function BankTransaksiPage() {
                            <td className="p-6"><p className="text-[10px] font-black text-slate-800 leading-none">{formatShowDate(row.waktu_transaksi)}</p><p className="text-[8px] font-bold text-slate-300 mt-1 uppercase truncate font-mono">REF: {row.noref_bank || '-'}</p></td>
                            <td className="p-6">
                               <div className="flex flex-col items-center gap-2">
-                                 <button onClick={() => { setEditingRow(row); setPreviewUrls((row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); setEditAkunId(row.akun_id?.toString() || ''); }} className={`p-2.5 rounded-xl border transition-all active:scale-95 shadow-md ${row.foto_bukti ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-500 animate-pulse'}`}>
-                                    <ImagePlus size={20}/>
-                                 </button>
+                                 <div className="flex gap-1">
+                                    <button onClick={() => { setEditingRow(row); setPreviewUrls((row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); setEditAkunId(row.akun_id?.toString() || ''); }} className={`p-2 rounded-lg border transition-all active:scale-95 shadow-sm ${row.foto_bukti ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-400'}`}>
+                                       <ImagePlus size={16}/>
+                                    </button>
+                                    {!row.pengajuan_id && row.debet > 0 && (
+                                       <button onClick={() => openLinkModal(row)} className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-100 rounded-lg transition-colors text-[10px] font-bold">
+                                          Kaitkan
+                                       </button>
+                                    )}
+                                    {row.pengajuan_id && (
+                                       <span className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold">Linked</span>
+                                    )}
+                                 </div>
                                  {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, i: number) => (<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="p-1 bg-slate-100 text-slate-400 rounded hover:bg-indigo-600 hover:text-white transition-all"><ExternalLink size={8}/></a>))}</div>}
                               </div>
                            </td>
@@ -302,6 +353,41 @@ export default function BankTransaksiPage() {
                      <div className="space-y-6"><label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block pl-4 text-left">Foto Nota ({previewUrls.length})</label><div className="grid grid-cols-2 gap-4">{previewUrls.map((u: string, i: number) => (<div key={i} className="relative aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg"><img src={u} className="w-full h-full object-cover"/></div>))}<label className="aspect-video border-2 border-dashed border-indigo-100 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-indigo-50 transition-all text-indigo-200"><Upload size={32}/><input type="file" multiple accept="image/*" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>)=>{ if(e.target.files?.length) { setPreviewUrls((p: string[])=>[...p,...Array.from(e.target.files as FileList).map((i: File)=>URL.createObjectURL(i))]); } }} /></label></div></div>
                   </div>
                   <div className="p-8 bg-slate-50 border-t flex gap-4 shrink-0"><button onClick={() => setEditingRow(null)} className="flex-1 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Batal</button><button onClick={()=>{ alert("Simpan berhasil."); setEditingRow(null); }} className="flex-[3] py-4 bg-slate-950 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">SIMPAN REVISI</button></div>
+               </div>
+            </div>
+         {/* MODAL KAITKAN */}
+         {isLinkModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+               <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                  <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                     <h3 className="font-black text-lg text-slate-800">Pilih Pengajuan Transfer</h3>
+                     <button onClick={() => setIsLinkModalOpen(false)} className="text-gray-400 hover:text-red-500"><X size={24}/></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex-1 bg-white">
+                     <div className="mb-4 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                        <p className="text-xs text-amber-800 font-bold mb-1">Data Bank (Debet): Rp {selectedBankRow?.debet?.toLocaleString()}</p>
+                        <p className="text-xs text-amber-700">{selectedBankRow?.deskripsi}</p>
+                     </div>
+                     
+                     <div className="space-y-4">
+                        {pengajuanList.length === 0 ? (
+                           <p className="text-center text-gray-400 text-sm py-10">Tidak ada pengajuan yang belum dikaitkan.</p>
+                        ) : (
+                           pengajuanList.map((p: any) => (
+                              <div key={p.id} className="border border-gray-100 rounded-xl p-4 flex justify-between items-center hover:border-indigo-300 transition-colors">
+                                 <div>
+                                    <p className="font-bold text-sm text-gray-900">{p.kegiatan}</p>
+                                    <p className="text-xs text-gray-500">{p.tanggal_pengajuan} - {p.master_rekening?.nama_rekening}</p>
+                                    <p className="font-black text-emerald-600 text-sm mt-1">Rp {p.nominal.toLocaleString()}</p>
+                                 </div>
+                                 <button onClick={() => handleLink(p)} disabled={isLinking} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors">
+                                    {isLinking ? 'Memproses...' : 'Kaitkan'}
+                                 </button>
+                              </div>
+                           ))
+                        )}
+                     </div>
+                  </div>
                </div>
             </div>
          )}
