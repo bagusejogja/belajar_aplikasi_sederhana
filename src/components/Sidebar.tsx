@@ -253,9 +253,14 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                    </div>
 
                  </div>
-                 <button onClick={handleLogout} title="Logout" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                    <LogOut size={16} />
-                 </button>
+                 <div className="flex gap-1 shrink-0">
+                    <a href="/api/backup" title="Download Backup Database" className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                       <Database size={16} />
+                    </a>
+                    <button onClick={handleLogout} title="Logout" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                       <LogOut size={16} />
+                    </button>
+                 </div>
               </div>
            </div>
         </div>
