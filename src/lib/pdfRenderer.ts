@@ -36,52 +36,126 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
     if (p.includes('<li>')) {
       const listItems = p.split(/<\/?li>/).filter(li => li.trim() !== '' && !li.includes('<ul>') && !li.includes('</ul>'));
       listItems.forEach(li => {
-        let cleanText = li.replace(/<[^>]*>?/gm, '').trim();
-        cleanText = decodeEntities(cleanText);
-        if (cleanText) {
-          const lines = doc.splitTextToSize(cleanText, maxWidth - 10);
-          if (currentY + (lines.length * lineHeight) > 275) {
-            doc.addPage();
-            currentY = 20;
-          }
+        // Parse styles for list items
+        let preprocessed = li.replace(/<strong>/g, ' <strong> ')
+                            .replace(/<\/strong>/g, ' </strong> ')
+                            .replace(/<b>/g, ' <b> ')
+                            .replace(/<\/b>/g, ' </b> ')
+                            .replace(/\n/g, ' ');
+        let rawTokens = preprocessed.split(/\s+/).filter(w => w !== '');
+        
+        let wordsWithStyle: {word: string, bold: boolean}[] = [];
+        let isBold = false;
+        
+        for (let token of rawTokens) {
+            if (token === '<strong>' || token === '<b>') { isBold = true; continue; }
+            if (token === '</strong>' || token === '</b>') { isBold = false; continue; }
+            let cleanText = decodeEntities(token.replace(/<[^>]*>?/gm, ''));
+            if (cleanText) wordsWithStyle.push({ word: cleanText, bold: isBold });
+        }
+
+        if (wordsWithStyle.length > 0) {
+          if (currentY > 275) { doc.addPage(); currentY = 20; }
+          doc.setFont('helvetica', 'normal');
           doc.text('•', x + 5, currentY);
-          doc.text(lines, x + 10, currentY);
-          currentY += lines.length * lineHeight;
+          
+          let currX = x + 10;
+          let listMaxWidth = maxWidth - 10;
+          
+          wordsWithStyle.forEach(w => {
+              doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+              let wWidth = doc.getTextWidth(w.word);
+              doc.setFont('helvetica', 'normal');
+              let spaceWidth = doc.getTextWidth(' ');
+              
+              if (currX + wWidth > x + 10 + listMaxWidth) {
+                  currentY += lineHeight;
+                  if (currentY > 280) { doc.addPage(); currentY = 20; }
+                  currX = x + 10;
+              }
+              doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+              doc.text(w.word, currX, currentY);
+              currX += wWidth + spaceWidth;
+          });
+          currentY += lineHeight;
         }
       });
     } else {
-      let cleanText = p.replace(/<[^>]*>?/gm, '').trim();
-      cleanText = decodeEntities(cleanText);
-      if (cleanText) {
-        const lines = doc.splitTextToSize(cleanText, maxWidth);
-        lines.forEach((line: string, index: number) => {
-          if (currentY > 280) {
-            doc.addPage();
-            currentY = 20;
-          }
-          if (index < lines.length - 1 && line.length > 0) {
-            const words = line.split(' ');
-            if (words.length > 1) {
-              const totalWordWidth = words.reduce((acc, word) => acc + doc.getTextWidth(word), 0);
-              const spaceLeft = maxWidth - totalWordWidth;
-              const spaceWidth = spaceLeft / (words.length - 1);
-              
-              let currX = x;
-              words.forEach((word) => {
-                doc.text(word, currX, currentY);
-                currX += doc.getTextWidth(word) + spaceWidth;
-              });
+        let preprocessed = p.replace(/<strong>/g, ' <strong> ')
+                            .replace(/<\/strong>/g, ' </strong> ')
+                            .replace(/<b>/g, ' <b> ')
+                            .replace(/<\/b>/g, ' </b> ')
+                            .replace(/\n/g, ' ');
+                            
+        let rawTokens = preprocessed.split(/\s+/).filter(w => w !== '');
+        
+        let wordsWithStyle: {word: string, bold: boolean}[] = [];
+        let isBold = false;
+        
+        for (let token of rawTokens) {
+            if (token === '<strong>' || token === '<b>') { isBold = true; continue; }
+            if (token === '</strong>' || token === '</b>') { isBold = false; continue; }
+            let cleanText = decodeEntities(token.replace(/<[^>]*>?/gm, ''));
+            if (cleanText) wordsWithStyle.push({ word: cleanText, bold: isBold });
+        }
+        
+        let lines: {words: {word: string, bold: boolean, width: number}[], width: number}[] = [];
+        let currentLine: {word: string, bold: boolean, width: number}[] = [];
+        let currentLineWidth = 0;
+        
+        for (let w of wordsWithStyle) {
+            doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+            let wWidth = doc.getTextWidth(w.word);
+            doc.setFont('helvetica', 'normal');
+            let spaceWidth = doc.getTextWidth(' ');
+            
+            if (currentLine.length === 0) {
+                currentLine.push({ ...w, width: wWidth });
+                currentLineWidth = wWidth;
             } else {
-              doc.text(line, x, currentY);
+                if (currentLineWidth + spaceWidth + wWidth > maxWidth) {
+                    lines.push({ words: currentLine, width: currentLineWidth });
+                    currentLine = [{ ...w, width: wWidth }];
+                    currentLineWidth = wWidth;
+                } else {
+                    currentLine.push({ ...w, width: wWidth });
+                    currentLineWidth += spaceWidth + wWidth;
+                }
             }
-          } else {
-            doc.text(line, x, currentY);
-          }
-          currentY += lineHeight;
+        }
+        if (currentLine.length > 0) {
+            lines.push({ words: currentLine, width: currentLineWidth });
+        }
+        
+        lines.forEach((line, index) => {
+            if (currentY > 280) { doc.addPage(); currentY = 20; }
+            
+            const isLastLine = index === lines.length - 1;
+            
+            if (!isLastLine && line.words.length > 1) {
+                let totalWordsWidth = line.words.reduce((acc, w) => acc + w.width, 0);
+                let spaceLeft = maxWidth - totalWordsWidth;
+                let spaceWidth = spaceLeft / (line.words.length - 1);
+                
+                let currX = x;
+                line.words.forEach(w => {
+                    doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+                    doc.text(w.word, currX, currentY);
+                    currX += w.width + spaceWidth;
+                });
+            } else {
+                let currX = x;
+                line.words.forEach(w => {
+                    doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+                    doc.text(w.word, currX, currentY);
+                    doc.setFont('helvetica', 'normal');
+                    currX += w.width + doc.getTextWidth(' ');
+                });
+            }
+            currentY += lineHeight;
         });
-      }
     }
-    currentY += 2; // Paragraph spacing
+    currentY += 2; 
   });
 
   return currentY;
