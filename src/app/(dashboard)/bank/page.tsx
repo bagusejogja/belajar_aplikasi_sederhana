@@ -147,8 +147,11 @@ export default function BankTransaksiPage() {
       if (rows.length > 0 && rows[0].includes('Saldo') && /\d{5}/.test(rows[0])) {
          const sRow = rows[0].replace(/(Saldo)(\d{5})/, '$1\n$2');
          const nRows = sRow.split('\n');
-         rows = [nRows[0], nRows[1], ...rows.slice(1)];
+         if (nRows.length > 1) {
+            rows = [nRows[0], nRows[1], ...rows.slice(1)];
+         }
       }
+      rows = rows.filter(r => r && typeof r === 'string' && r.trim() !== '');
       const ext: any[] = [];
       const startIdx = (rows[0].toLowerCase().includes('tgl') || rows[0].toLowerCase().includes('desk')) ? 1 : 0;
       for (let i = startIdx; i < rows.length; i++) {
