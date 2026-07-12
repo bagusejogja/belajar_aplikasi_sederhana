@@ -120,20 +120,22 @@ export async function generateAnalysisFromText(ocrText: string) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
-      Anda adalah asisten ahli keuangan pemerintah. Analisis hasil ekstraksi teks dari usulan anggaran berikut:
+      Anda adalah pimpinan (atasan) di bidang keuangan pemerintah. Berikan analisis dan instruksi tindak lanjut dari usulan anggaran berikut kepada staf/bawahan Anda:
       
       === TEKS ===
       ${ocrText}
       === END TEKS ===
 
-      Berikan hasil analisis yang sangat tajam, analitis, dan bergaya bahasa birokrasi pemerintahan formal.
+      Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
+      PENTING: Gunakan kalimat perintah aktif (contoh: gunakan kata "Tunjukkan", bukan "Menunjukkan"; "Jelaskan", bukan "Menjelaskan"; "Lengkapi", bukan "Melengkapi"). Buat evaluasi dan masukan secara poin demi poin (bernomor) terkait apa yang harus mereka perbaiki atau sesuaikan dari usulan tersebut.
+      
       Untuk memudahkan pembacaan sistem, berikan output dalam format persis seperti di bawah ini, tanpa awalan/akhiran tambahan:
       
       === RINGKASAN ===
-      (Isi dengan ringkasan substansi dari surat ini. Apa tujuan utama, rincian biaya yang diusulkan, dan mengapa ini penting. Gunakan kalimat formal dan padat. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
+      (Isi dengan ringkasan poin-poin substansi usulan. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
       
       === REKOMENDASI ===
-      (Isi dengan evaluasi kritis tentang kelayakan usulan ini. Pertimbangkan aspek efisiensi anggaran, urgensi, dan berikan rekomendasi final yang tegas. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
+      (Isi dengan masukan, instruksi perbaikan, atau keputusan final bernomor yang ditujukan langsung untuk bawahan agar segera ditindaklanjuti atau diperbaiki kelengkapannya. Gunakan kalimat perintah. Format dalam tag HTML ringan seperti <p>, <ol>, <li>, <strong>)
     `;
 
     const request = {
