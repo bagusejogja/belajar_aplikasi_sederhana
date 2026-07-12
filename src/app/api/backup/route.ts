@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import * as xlsx from 'xlsx';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -23,9 +22,20 @@ const TABLES_TO_BACKUP = [
   'app_role_menus'
 ];
 
+function formatSqlValue(val: any): string {
+  if (val === null || val === undefined) return 'NULL';
+  if (typeof val === 'number') return val.toString();
+  if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+  if (typeof val === 'object') {
+    const jsonStr = JSON.stringify(val).replace(/'/g, "''");
+    return `'${jsonStr}'::jsonb`;
+  }
+  return `'${String(val).replace(/'/g, "''")}'`;
+}
+
 export async function GET() {
   try {
-    const workbook = xlsx.utils.book_new();
+    let sqlDump = `-- Backup Database Supabase (Apps Bersama)\n-- Waktu Backup: ${new Date().toISOString()}\n\n`;
 
     for (const table of TABLES_TO_BACKUP) {
       const { data, error } = await supabase.from(table).select('*');
@@ -34,17 +44,27 @@ export async function GET() {
         continue;
       }
       
-      const worksheet = xlsx.utils.json_to_sheet(data || []);
-      xlsx.utils.book_append_sheet(workbook, worksheet, table.substring(0, 31)); // sheet names max 31 chars
+      if (!data || data.length === 0) continue;
+
+      sqlDump += `-- ==========================================\n`;
+      sqlDump += `-- Data for table: ${table}\n`;
+      sqlDump += `-- ==========================================\n`;
+
+      const columns = Object.keys(data[0]);
+      const columnsStr = columns.map(c => `"${c}"`).join(', ');
+      
+      for (const row of data) {
+        const valuesStr = columns.map(c => formatSqlValue(row[c])).join(', ');
+        sqlDump += `INSERT INTO public."${table}" (${columnsStr}) VALUES (${valuesStr});\n`;
+      }
+      sqlDump += '\n';
     }
 
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-    return new NextResponse(buffer, {
+    return new NextResponse(sqlDump, {
       status: 200,
       headers: {
-        'Content-Disposition': `attachment; filename="backup_database_${new Date().toISOString().split('T')[0]}.xlsx"`,
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="backup_database_${new Date().toISOString().split('T')[0]}.sql"`,
+        'Content-Type': 'application/sql',
       },
     });
   } catch (error: any) {
