@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { renderWysiwygToPdf } from '@/lib/pdfRenderer';
 import { Printer, Download, Eye } from 'lucide-react';
 
-export default function PdfPreview({ mainData, detailData, historisData }: any) {
+export default function PdfPreview({ mainData, detailData, historisData, setActiveTab }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   // Auto generate on mount or when data changes significantly
@@ -367,6 +367,9 @@ export default function PdfPreview({ mainData, detailData, historisData }: any) 
           <p className="text-gray-500 text-sm">Preview langsung hasil cetak dengan WYSIWYG Renderer khusus.</p>
         </div>
         <div className="flex gap-3">
+          <button onClick={() => setActiveTab && setActiveTab('main')} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+            Kembali ke Form
+          </button>
           <button onClick={generatePDF} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
             <Eye size={16}/> Refresh Preview
           </button>

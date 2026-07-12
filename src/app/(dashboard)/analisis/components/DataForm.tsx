@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { FileSpreadsheet, Plus, Trash2, Wand2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
-import { generateAnalysisFromText } from '@/app/actions/ai-scan';
+import { generateAnalysisFromText, generateRingkasanFromText } from '@/app/actions/ai-scan';
 import Select from 'react-select';
 import { supabase } from '@/lib/supabase';
 import { useEffect } from 'react';
@@ -127,7 +127,32 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     }
   }, [totalAnggaranDetail, totalRealisasiDetail, detailData]);
 
-  const handleGenerateAI = async () => {
+  const [isGeneratingRingkasan, setIsGeneratingRingkasan] = useState(false);
+
+  const handleGenerateRingkasan = async () => {
+    if (!mainData.ringkasan_ai) {
+      alert("Harap lakukan Ekstraksi OCR terlebih dahulu agar AI bisa membaca surat.");
+      return;
+    }
+    setIsGeneratingRingkasan(true);
+    try {
+      const res = await generateRingkasanFromText(mainData.ringkasan_ai);
+      if (res.success && res.data) {
+        setMainData((prev: any) => ({
+          ...prev,
+          analisis_html: res.data.ringkasan_html || prev.analisis_html
+        }));
+        alert("Berhasil membuat ringkasan via AI!");
+      } else {
+        alert("Gagal generate AI: " + res.error);
+      }
+    } catch (e: any) {
+      alert("Terjadi kesalahan: " + e.message);
+    }
+    setIsGeneratingRingkasan(false);
+  };
+
+  const handleGenerateRekomendasi = async () => {
     if (!mainData.ringkasan_ai) {
       alert("Harap lakukan Ekstraksi OCR terlebih dahulu agar AI bisa membaca surat.");
       return;
@@ -147,13 +172,11 @@ ${mainData.ringkasan_ai}`;
     try {
       const res = await generateAnalysisFromText(aiContext);
       if (res.success && res.data) {
-        const analysisData = res.data as any;
         setMainData((prev: any) => ({
           ...prev,
-          analisis_html: analysisData.ringkasan_html || analysisData.ringkasan || analysisData.ringkasanHtml || analysisData.analisis || analysisData.analisis_html || JSON.stringify(analysisData) || prev.analisis_html,
-          rekomendasi_html: analysisData.rekomendasi_html || analysisData.rekomendasi || analysisData.rekomendasiHtml || prev.rekomendasi_html
+          rekomendasi_html: res.data.rekomendasi_html || prev.rekomendasi_html
         }));
-        alert("Berhasil membuat ringkasan dan rekomendasi via AI!");
+        alert("Berhasil membuat rekomendasi via AI!");
       } else {
         alert("Gagal generate AI: " + res.error);
       }
@@ -378,32 +401,37 @@ ${mainData.ringkasan_ai}`;
             </table>
           </div>
         </div>
-        <div className="col-span-full flex items-center justify-between mt-4">
-           <h3 className="text-sm font-black text-indigo-700 uppercase tracking-widest">📝 Hasil Analisis Teks</h3>
-           <button onClick={handleGenerateAI} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-4 py-2 rounded-xl font-bold text-xs transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50">
-             {isGeneratingAI ? <div className="w-4 h-4 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={16}/>} 
-             {isGeneratingAI ? 'AI Sedang Berpikir...' : 'Generate Ringkasan & Rekomendasi (AI)'}
-           </button>
-        </div>
         <div className="col-span-full">
-          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
+            <button onClick={handleGenerateRingkasan} disabled={isGeneratingRingkasan} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+              {isGeneratingRingkasan ? <div className="w-3 h-3 border-2 border-emerald-400 border-t-emerald-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+              Generate Ringkasan (AI)
+            </button>
+          </div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
              <ReactQuill 
                 theme="snow" 
                 value={mainData.analisis_html || ''} 
                 onChange={(val) => setMainData({...mainData, analisis_html: val})} 
-                className="h-[200px]"
+                className="h-[250px] pb-12"
              />
           </div>
         </div>
-        <div className="col-span-full mt-8">
-          <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest mb-2">Analisis & Rekomendasi (AI Analysis)</label>
+        <div className="col-span-full mt-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
+            <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+              {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+              Generate Rekomendasi (AI)
+            </button>
+          </div>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
              <ReactQuill 
                 theme="snow" 
                 value={mainData.rekomendasi_html || ''} 
                 onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
-                className="h-[250px]"
+                className="h-[500px] pb-12"
              />
           </div>
         </div>

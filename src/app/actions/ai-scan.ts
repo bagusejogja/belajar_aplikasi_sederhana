@@ -115,63 +115,64 @@ export async function listAvailableModels() {
   }
 }
 
-export async function generateAnalysisFromText(ocrText: string) {
+export async function generateRingkasanFromText(ocrText: string) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
     const prompt = `
-      Anda adalah pimpinan (atasan) di bidang keuangan pemerintah. Berikan analisis dan instruksi tindak lanjut dari usulan anggaran berikut kepada staf/bawahan Anda:
+      Anda adalah asisten administrasi di pemerintahan. Buatlah ringkasan substansi dari teks surat usulan anggaran berikut:
       
       === TEKS ===
-      ${ocrText}
+      \${ocrText}
       === END TEKS ===
 
-      Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
-      PENTING: Gunakan kalimat perintah aktif (contoh: gunakan kata "Tunjukkan", bukan "Menunjukkan"; "Jelaskan", bukan "Menjelaskan"; "Lengkapi", bukan "Melengkapi"). Buat evaluasi dan masukan secara poin demi poin (bernomor) terkait apa yang harus mereka perbaiki atau sesuaikan dari usulan tersebut.
-      
-      Untuk memudahkan pembacaan sistem, berikan output dalam format persis seperti di bawah ini, tanpa awalan/akhiran tambahan:
-      
-      === RINGKASAN ===
-      (Isi dengan ringkasan poin-poin substansi usulan. Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong>)
-      
-      === REKOMENDASI ===
-      (Isi dengan masukan, instruksi perbaikan, atau keputusan final bernomor yang ditujukan langsung untuk bawahan agar segera ditindaklanjuti atau diperbaiki kelengkapannya. Gunakan kalimat perintah. Format dalam tag HTML ringan seperti <p>, <ol>, <li>, <strong>)
+      Berikan ringkasan yang jelas, padat, dan langsung pada intinya terkait apa tujuan utama surat ini, rincian biaya yang diusulkan, dan mengapa ini penting.
+      Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
     `;
 
-    const request = {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    };
-
+    const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
     let result;
     try {
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       result = await model.generateContent(request);
     } catch (err) {
-      console.log('Gemini 2.5 Flash error, fallback to gemini-2.0-flash', err);
       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       result = await fallbackModel.generateContent(request);
     }
     
-    const responseText = result.response.text();
-    let ringkasan = "";
-    let rekomendasi = "";
-    
-    const parts = responseText.split('=== REKOMENDASI ===');
-    if (parts.length > 1) {
-       ringkasan = parts[0].replace('=== RINGKASAN ===', '').trim();
-       rekomendasi = parts[1].trim();
-    } else {
-       ringkasan = "<p><b>Format respons AI tidak sesuai. Output Mentah:</b></p><br/>" + responseText;
-       rekomendasi = "<p>-</p>";
-    }
+    let ringkasan = result.response.text().replace(/```html|```/g, "").trim();
+    return { success: true, data: { ringkasan_html: ringkasan } };
+  } catch (error: any) {
+    console.error("Error AI Ringkasan from Text:", error);
+    return { success: false, error: error.message };
+  }
+}
 
-    return { 
-       success: true, 
-       data: { 
-          ringkasan_html: ringkasan, 
-          rekomendasi_html: rekomendasi 
-       } 
-    };
+export async function generateAnalysisFromText(ocrText: string) {
+  try {
+    const prompt = `
+      Anda adalah pimpinan (atasan) di bidang keuangan pemerintah. Berikan analisis dan instruksi tindak lanjut dari usulan anggaran berikut kepada staf/bawahan Anda:
+      
+      === TEKS ===
+      \${ocrText}
+      === END TEKS ===
+
+      Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
+      PENTING: Gunakan kalimat perintah aktif (contoh: gunakan kata "Tunjukkan", bukan "Menunjukkan"; "Jelaskan", bukan "Menjelaskan"; "Lengkapi", bukan "Melengkapi"). Buat evaluasi dan masukan secara poin demi poin (bernomor) terkait apa yang harus mereka perbaiki atau sesuaikan dari usulan tersebut.
+      
+      Format dalam tag HTML ringan seperti <p>, <ol>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
+    `;
+
+    const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+    let result;
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      result = await model.generateContent(request);
+    } catch (err) {
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      result = await fallbackModel.generateContent(request);
+    }
+    
+    let rekomendasi = result.response.text().replace(/```html|```/g, "").trim();
+    return { success: true, data: { rekomendasi_html: rekomendasi } };
   } catch (error: any) {
     console.error("Error AI Analysis from Text:", error);
     return { success: false, error: error.message };

@@ -263,7 +263,7 @@ export default function AnalisisPaguPage() {
 
                </div>
             )}
-            {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} />}
+            {activeTab === 'pdf' && <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} setActiveTab={setActiveTab} />}
             {activeTab === 'riwayat' && <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={setActiveTab} />}
          </div>
       </div>
