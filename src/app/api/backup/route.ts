@@ -89,22 +89,39 @@ export async function GET() {
     sqlDump += `-- ==========================================\n\n`;
 
     for (const table of TABLES_TO_BACKUP) {
-      const { data, error } = await supabase.from(table).select('*');
-      if (error) {
-        console.warn(`Could not fetch table ${table}: ${error.message}`);
-        continue;
+      let allData: any[] = [];
+      let start = 0;
+      const limit = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase.from(table).select('*').range(start, start + limit - 1);
+        if (error) {
+          console.warn(`Could not fetch table ${table}: ${error.message}`);
+          break;
+        }
+        if (!data || data.length === 0) {
+          hasMore = false;
+        } else {
+          allData = allData.concat(data);
+          if (data.length < limit) {
+             hasMore = false;
+          } else {
+             start += limit;
+          }
+        }
       }
       
-      if (!data || data.length === 0) continue;
+      if (allData.length === 0) continue;
 
       sqlDump += `-- ==========================================\n`;
-      sqlDump += `-- Data for table: ${table}\n`;
+      sqlDump += `-- Data for table: ${table} (${allData.length} rows)\n`;
       sqlDump += `-- ==========================================\n`;
 
-      const columns = Object.keys(data[0]);
+      const columns = Object.keys(allData[0]);
       const columnsStr = columns.map(c => `"${c}"`).join(', ');
       
-      for (const row of data) {
+      for (const row of allData) {
         const valuesStr = columns.map(c => formatSqlValue(row[c])).join(', ');
         sqlDump += `INSERT INTO public."${table}" (${columnsStr}) VALUES (${valuesStr});\n`;
       }
