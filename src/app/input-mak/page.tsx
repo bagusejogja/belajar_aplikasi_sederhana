@@ -11,6 +11,8 @@ export default function InputMakPage() {
 
   const [unitSearch, setUnitSearch] = useState('');
   const [units, setUnits] = useState<any[]>([]);
+  const [pic, setPic] = useState('');
+  const [uniquePics, setUniquePics] = useState<string[]>([]);
   const [email, setEmail] = useState('');
   const [tahun, setTahun] = useState(new Date().getFullYear().toString());
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -18,8 +20,11 @@ export default function InputMakPage() {
 
   useEffect(() => {
     const fetchUnits = async () => {
-      const { data } = await supabase.from('gov_units').select('id, nama_unit').order('nama_unit');
-      if (data) setUnits(data);
+      const { data } = await supabase.from('gov_units').select('id, nama_unit, pic').order('nama_unit');
+      if (data) {
+        setUnits(data);
+        setUniquePics(Array.from(new Set(data.map(u => u.pic).filter(Boolean))));
+      }
     };
     fetchUnits();
   }, []);
@@ -69,7 +74,7 @@ export default function InputMakPage() {
       const payload = {
         email: email,
         unit: selectedUnit.nama_unit,
-        pic: '-', // unit dari db belum tentu punya PIC, default -
+        pic: pic || selectedUnit.pic || '-', 
         tahun: tahun,
         status: 'Proses Revisi', 
         kategori: 'Perubahan MAK', 
@@ -83,6 +88,7 @@ export default function InputMakPage() {
 
       setSuccess(true);
       setUnitSearch('');
+      setPic('');
       setEmail('');
       setExcelFile(null);
       setNoteFiles(null);
@@ -177,6 +183,23 @@ export default function InputMakPage() {
                   ))}
                 </datalist>
               </div>
+            </div>
+
+            {/* PIC (Dropdown) */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                PIC (Penanggung Jawab)
+              </label>
+              <select
+                value={pic}
+                onChange={e => setPic(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none"
+              >
+                <option value="">Pilih PIC (Opsional / Otomatis sesuai Unit)</option>
+                {uniquePics.map((p, i) => (
+                  <option key={i} value={p}>{p}</option>
+                ))}
+              </select>
             </div>
 
             {/* Anggaran Tahun */}

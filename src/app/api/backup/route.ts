@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -36,6 +38,28 @@ function formatSqlValue(val: any): string {
 export async function GET() {
   try {
     let sqlDump = `-- Backup Database Supabase (Apps Bersama)\n-- Waktu Backup: ${new Date().toISOString()}\n\n`;
+
+    // 1. Tambahkan Struktur (DDL) dari file .sql yang ada di root jika memungkinkan
+    try {
+      const rootDir = process.cwd();
+      const files = fs.readdirSync(rootDir).filter(f => f.endsWith('.sql'));
+      if (files.length > 0) {
+        sqlDump += `-- ==========================================\n`;
+        sqlDump += `-- STRUKTUR TABEL (DDL SCHEMA)\n`;
+        sqlDump += `-- ==========================================\n\n`;
+        for (const file of files) {
+          const content = fs.readFileSync(path.join(rootDir, file), 'utf8');
+          sqlDump += `-- Dari file: ${file}\n`;
+          sqlDump += content + '\n\n';
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal membaca struktur SQL lokal:', err);
+    }
+
+    sqlDump += `-- ==========================================\n`;
+    sqlDump += `-- DATA TABEL (INSERT INTO)\n`;
+    sqlDump += `-- ==========================================\n\n`;
 
     for (const table of TABLES_TO_BACKUP) {
       const { data, error } = await supabase.from(table).select('*');
