@@ -326,7 +326,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       autoTable(doc, {
         startY: startY,
         head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', 'Sisa Anggaran', '% Serapan']],
-        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, d.anggaran, d.realisasi, d.sisa_anggaran || '-', d.persen_serapan]),
+        body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, formatRp(parseNum(d.anggaran)), formatRp(parseNum(d.realisasi)), formatRp(parseNum(d.anggaran) - parseNum(d.realisasi)), d.persen_serapan]),
         theme: 'grid',
         headStyles: { fillColor: [59, 130, 246] }, // blue-500
         styles: { fontSize: 9 }
