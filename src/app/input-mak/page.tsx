@@ -203,9 +203,10 @@ export default function InputMakPage() {
               <select
                 value={pic}
                 onChange={e => setPic(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                disabled
+                className="w-full px-4 py-3 bg-gray-100 border-none rounded-xl text-sm font-black text-gray-500 cursor-not-allowed select-none"
               >
-                <option value="">Pilih PIC (Opsional / Otomatis sesuai Unit)</option>
+                <option value="">Otomatis sesuai Unit</option>
                 {uniquePics.map((p, i) => (
                   <option key={i} value={p}>{p}</option>
                 ))}

@@ -21,7 +21,14 @@ const TABLES_TO_BACKUP = [
   'kode_sistem_masjid',
   'master_rekening',
   'app_users',
-  'app_role_menus'
+  'app_role_menus',
+  'gov_accounts',
+  'gov_units',
+  'gov_transactions',
+  'gov_name_mappings',
+  'gov_anggaran_pegawai',
+  'mak_submissions',
+  'ref_pic'
 ];
 
 function formatSqlValue(val: any): string {
