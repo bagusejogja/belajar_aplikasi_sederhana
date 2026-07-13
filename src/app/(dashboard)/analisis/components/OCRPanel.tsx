@@ -10,6 +10,19 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  useEffect(() => {
+    if (mainData?.link_lampiran && !fileUrl) {
+      setFileUrl(mainData.link_lampiran);
+      setFileName(mainData.file_lampiran || 'Document');
+      // Simple type inference
+      if (mainData.link_lampiran.toLowerCase().endsWith('.pdf')) {
+         setFileType('application/pdf');
+      } else {
+         setFileType('image/png');
+      }
+    }
+  }, [mainData?.link_lampiran]);
+
   // We load pdf.js dynamically to avoid SSR issues
   const loadPdfJs = async () => {
     const pdfjsLib = await import('pdfjs-dist');

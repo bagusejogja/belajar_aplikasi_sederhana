@@ -121,7 +121,7 @@ export async function generateRingkasanFromText(ocrText: string) {
       Anda adalah asisten administrasi di pemerintahan. Buatlah ringkasan substansi dari teks surat usulan anggaran berikut:
       
       === TEKS ===
-      \${ocrText}
+      ${ocrText}
       === END TEKS ===
 
       Berikan ringkasan yang jelas, padat, dan langsung pada intinya terkait apa tujuan utama surat ini, rincian biaya yang diusulkan, dan mengapa ini penting.
@@ -152,7 +152,7 @@ export async function generateAnalysisFromText(ocrText: string) {
       Anda adalah pimpinan (atasan) di bidang keuangan pemerintah. Berikan analisis dan instruksi tindak lanjut dari usulan anggaran berikut kepada staf/bawahan Anda:
       
       === TEKS ===
-      \${ocrText}
+      ${ocrText}
       === END TEKS ===
 
       Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
