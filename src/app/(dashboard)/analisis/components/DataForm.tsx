@@ -414,7 +414,7 @@ ${mainData.ringkasan_ai}`;
                 theme="snow" 
                 value={mainData.analisis_html || ''} 
                 onChange={(val) => setMainData({...mainData, analisis_html: val})} 
-                className="h-[200px] [&_.ql-editor_p]:text-justify"
+                className="h-[400px] pb-10 [&_.ql-editor_p]:text-justify"
              />
           </div>
         </div>
@@ -431,7 +431,7 @@ ${mainData.ringkasan_ai}`;
                 theme="snow" 
                 value={mainData.rekomendasi_html || ''} 
                 onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
-                className="h-[250px] [&_.ql-editor_p]:text-justify"
+                className="h-[400px] pb-10 [&_.ql-editor_p]:text-justify"
              />
           </div>
         </div>
