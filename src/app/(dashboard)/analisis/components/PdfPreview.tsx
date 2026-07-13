@@ -86,7 +86,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     // 3. POSISI PAGU TAHUN 2026
 
     const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
-    const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
+    const totalSisaDetail = (parseNum(historisYearRow.total_pagu) || 0) - totalRealisasiDetail;
 
     const bodyPagu = [
       ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
@@ -118,12 +118,14 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       styles: { fontSize: 8.5, cellPadding: 2 },
       columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
       didParseCell: function(data) {
-        if (data.row.index === 3 || data.row.index === 5 || data.row.index === 6) {
+        const totalRows = bodyPagu.length;
+        const r = data.row.index;
+        if (r === totalRows - 4 || r === totalRows - 2 || r === totalRows - 1) {
           data.cell.styles.fontStyle = 'bold';
         }
-        if (data.row.index === 3) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
-        if (data.row.index === 5) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
-        if (data.row.index === 6) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
+        if (r === totalRows - 4) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
+        if (r === totalRows - 2) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        if (r === totalRows - 1) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
       }
     });
     startY = (doc as any).lastAutoTable.finalY + 10;

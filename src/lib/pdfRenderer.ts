@@ -46,6 +46,7 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
         
         let wordsWithStyle: {word: string, bold: boolean}[] = [];
         let isBold = false;
+        let listMaxWidth = maxWidth - 10;
         
         for (let token of rawTokens) {
             if (token === '<strong>' || token === '<b>') { isBold = true; continue; }
@@ -54,30 +55,65 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
             if (cleanText) wordsWithStyle.push({ word: cleanText, bold: isBold });
         }
 
-        if (wordsWithStyle.length > 0) {
+        let lines: {words: {word: string, bold: boolean, width: number}[], width: number}[] = [];
+        let currentLine: {word: string, bold: boolean, width: number}[] = [];
+        let currentLineWidth = 0;
+        
+        for (let w of wordsWithStyle) {
+            doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+            let wWidth = doc.getTextWidth(w.word);
+            doc.setFont('helvetica', 'normal');
+            let spaceWidth = doc.getTextWidth(' ');
+            
+            if (currentLine.length === 0) {
+                currentLine.push({ ...w, width: wWidth });
+                currentLineWidth = wWidth;
+            } else {
+                if (currentLineWidth + spaceWidth + wWidth > listMaxWidth) {
+                    lines.push({ words: currentLine, width: currentLineWidth });
+                    currentLine = [{ ...w, width: wWidth }];
+                    currentLineWidth = wWidth;
+                } else {
+                    currentLine.push({ ...w, width: wWidth });
+                    currentLineWidth += spaceWidth + wWidth;
+                }
+            }
+        }
+        if (currentLine.length > 0) {
+            lines.push({ words: currentLine, width: currentLineWidth });
+        }
+
+        if (lines.length > 0) {
           if (currentY > 275) { doc.addPage(); currentY = 20; }
           doc.setFont('helvetica', 'normal');
           doc.text('•', x + 5, currentY);
           
-          let currX = x + 10;
-          let listMaxWidth = maxWidth - 10;
-          
-          wordsWithStyle.forEach(w => {
-              doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
-              let wWidth = doc.getTextWidth(w.word);
-              doc.setFont('helvetica', 'normal');
-              let spaceWidth = doc.getTextWidth(' ');
+          lines.forEach((line, index) => {
+              if (index > 0 && currentY > 280) { doc.addPage(); currentY = 20; }
+              const isLastLine = index === lines.length - 1;
               
-              if (currX + wWidth > x + 10 + listMaxWidth) {
-                  currentY += lineHeight;
-                  if (currentY > 280) { doc.addPage(); currentY = 20; }
-                  currX = x + 10;
+              if (!isLastLine && line.words.length > 1) {
+                  let totalWordsWidth = line.words.reduce((acc, w) => acc + w.width, 0);
+                  let spaceLeft = listMaxWidth - totalWordsWidth;
+                  let spaceWidth = spaceLeft / (line.words.length - 1);
+                  
+                  let currX = x + 10;
+                  line.words.forEach(w => {
+                      doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+                      doc.text(w.word, currX, currentY);
+                      currX += w.width + spaceWidth;
+                  });
+              } else {
+                  let currX = x + 10;
+                  line.words.forEach(w => {
+                      doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
+                      doc.text(w.word, currX, currentY);
+                      doc.setFont('helvetica', 'normal');
+                      currX += w.width + doc.getTextWidth(' ');
+                  });
               }
-              doc.setFont('helvetica', w.bold ? 'bold' : 'normal');
-              doc.text(w.word, currX, currentY);
-              currX += wWidth + spaceWidth;
+              currentY += lineHeight;
           });
-          currentY += lineHeight;
         }
       });
     } else {
