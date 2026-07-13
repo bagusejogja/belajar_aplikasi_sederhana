@@ -41,6 +41,7 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
                             .replace(/<\/strong>/g, ' </strong> ')
                             .replace(/<b>/g, ' <b> ')
                             .replace(/<\/b>/g, ' </b> ')
+                            .replace(/&nbsp;/g, ' ')
                             .replace(/\n/g, ' ');
         let rawTokens = preprocessed.split(/\s+/).filter(w => w !== '');
         
@@ -121,6 +122,7 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
                             .replace(/<\/strong>/g, ' </strong> ')
                             .replace(/<b>/g, ' <b> ')
                             .replace(/<\/b>/g, ' </b> ')
+                            .replace(/&nbsp;/g, ' ')
                             .replace(/\n/g, ' ');
                             
         let rawTokens = preprocessed.split(/\s+/).filter(w => w !== '');

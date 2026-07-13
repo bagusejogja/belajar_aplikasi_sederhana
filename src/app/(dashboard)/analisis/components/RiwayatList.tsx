@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { History, FileText, ChevronRight, Building2, Calendar, TrendingUp, Search } from 'lucide-react';
+import { History, FileText, ChevronRight, Building2, Calendar, TrendingUp, Search, Paperclip } from 'lucide-react';
 
 export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAnalisis: (id_analisis: string) => void, setActiveTab: (tab: string) => void }) {
   const [riwayat, setRiwayat] = useState<any[]>([]);
@@ -13,7 +13,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
     const fetchRiwayat = async () => {
       const { data } = await supabase
         .from('app_analisis_utama')
-        .select('id_analisis, no_surat, tanggal_surat, perihal, created_at, unit_pengirim, total_anggaran, total_realisasi, persen_serapan')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, created_at, unit_pengirim, total_anggaran, total_realisasi, persen_serapan, link_lampiran')
         .order('created_at', { ascending: false });
       
       if (data) {
@@ -91,15 +91,26 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                        <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
                           <Calendar size={12} /> {new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                        </div>
-                       <button 
-                         onClick={() => {
-                            onLoadAnalisis(r.id_analisis);
-                            setTimeout(() => setActiveTab('pdf'), 300);
-                         }}
-                         className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-emerald-100"
-                       >
-                          <FileText size={14}/> PDF
-                       </button>
+                       <div className="flex gap-2">
+                         {r.link_lampiran && (
+                           <button 
+                             onClick={() => window.open(r.link_lampiran, '_blank')}
+                             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-indigo-100"
+                             title="Lihat File Lampiran Asli"
+                           >
+                              <Paperclip size={14}/> File
+                           </button>
+                         )}
+                         <button 
+                           onClick={() => {
+                              onLoadAnalisis(r.id_analisis);
+                              setTimeout(() => setActiveTab('pdf'), 300);
+                           }}
+                           className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-emerald-100"
+                         >
+                            <FileText size={14}/> PDF
+                         </button>
+                       </div>
                     </div>
 
                     <h3 className="text-lg font-black text-slate-800 leading-tight mb-2 group-hover:text-indigo-600 transition-colors line-clamp-2">
