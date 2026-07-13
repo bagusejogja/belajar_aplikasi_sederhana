@@ -8,6 +8,7 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -32,12 +33,33 @@ export default function OCRPanel({ mainData, setMainData }: any) {
     return pdfjsLib;
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setFileName(file.name);
       setFileType(file.type);
       setFileUrl(URL.createObjectURL(file));
+      
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'analisis');
+        const res = await fetch('/api/upload', {
+           method: 'POST',
+           body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+           setMainData({ ...mainData, link_lampiran: data.publicUrl, file_lampiran: file.name });
+        } else {
+           alert('Gagal mengupload file ke Cloudflare R2: ' + data.error);
+        }
+      } catch (err) {
+        console.error("Upload error", err);
+        alert('Gagal mengupload file ke Cloudflare R2');
+      }
+      setIsUploading(false);
     }
   };
 
@@ -145,7 +167,11 @@ export default function OCRPanel({ mainData, setMainData }: any) {
                <div className="flex flex-col items-center justify-center z-10 text-indigo-600">
                   <FileTextIcon size={48} className="mb-2" />
                   <p className="font-bold text-center px-4 truncate w-full">{fileName}</p>
-                  <p className="text-xs text-indigo-400 mt-2">Klik untuk ganti file</p>
+                  {isUploading ? (
+                    <p className="text-xs text-indigo-400 mt-2 flex items-center gap-1"><span className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-400"></span> Mengupload ke Cloudflare R2...</p>
+                  ) : (
+                    <p className="text-xs text-indigo-400 mt-2">Klik untuk ganti file</p>
+                  )}
                </div>
             ) : (
                <div className="flex flex-col items-center justify-center pt-5 pb-6">
