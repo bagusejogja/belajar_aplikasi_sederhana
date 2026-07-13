@@ -29,6 +29,16 @@ export default function InputMakPage() {
     fetchUnits();
   }, []);
 
+  // Auto-fill PIC ketika Unit dipilih
+  useEffect(() => {
+    if (unitSearch && units.length > 0) {
+      const selected = units.find(u => u.nama_unit.toLowerCase() === unitSearch.toLowerCase());
+      if (selected && selected.pic) {
+        setPic(selected.pic);
+      }
+    }
+  }, [unitSearch, units]);
+
   const handleUpload = async (file: File, folder: string) => {
     const formData = new FormData();
     formData.append('file', file);
