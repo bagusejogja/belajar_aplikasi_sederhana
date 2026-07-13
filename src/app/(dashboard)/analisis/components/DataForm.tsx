@@ -93,7 +93,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
 
   const totalAnggaranDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.anggaran), 0) || 0;
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
-  const totalSisaDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.sisa_anggaran), 0) || 0;
+  const totalSisaDetail = totalAnggaranDetail - totalRealisasiDetail;
 
   useEffect(() => {
     // Hanya sinkronkan realisasi dan persen serapan ke mainData, jangan mengubah total_anggaran (Usulan Tambahan)
