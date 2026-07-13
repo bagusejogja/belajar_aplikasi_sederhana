@@ -13,6 +13,7 @@ export default function AnalisisPaguPage() {
   const [activeTab, setActiveTab] = useState('main');
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   
   // Shared state across components
   const [mainData, setMainData] = useState<any>({
@@ -203,6 +204,7 @@ export default function AnalisisPaguPage() {
      setDetailData([]);
      setHistorisData([]);
      setActiveTab('main');
+     setResetKey(prev => prev + 1);
   };
 
   const scrollToSection = (id: string) => {
@@ -214,7 +216,7 @@ export default function AnalisisPaguPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden -mx-6 -mb-6 mt-0">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden">
       {/* Top Navbar */}
       <div className="bg-white border-b border-gray-200 flex flex-wrap lg:flex-nowrap items-center justify-between px-4 lg:px-8 py-4 shadow-sm z-10 shrink-0 gap-4 overflow-x-auto">
         <h1 className="text-xl font-black text-indigo-700 flex items-center gap-2">
@@ -254,11 +256,11 @@ export default function AnalisisPaguPage() {
          <div className="max-w-7xl mx-auto bg-white border border-gray-100 rounded-[2rem] p-6 lg:p-10 shadow-sm min-h-[85vh]">
             {activeTab === 'main' && (
                <div className="space-y-12 pb-24">
-                  <div id="ocr" className="scroll-mt-8"><OCRPanel mainData={mainData} setMainData={setMainData} /></div>
+                  <div id="ocr" className="scroll-mt-8"><OCRPanel key={`ocr-${resetKey}`} mainData={mainData} setMainData={setMainData} /></div>
                   <hr className="border-gray-100" />
-                  <div id="form" className="scroll-mt-8"><DataForm mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
+                  <div id="form" className="scroll-mt-8"><DataForm key={`form-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
                   <hr className="border-gray-100" />
-                  <div id="pendukung" className="scroll-mt-8"><DataPendukung mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
+                  <div id="pendukung" className="scroll-mt-8"><DataPendukung key={`pend-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} /></div>
 
 
                </div>
