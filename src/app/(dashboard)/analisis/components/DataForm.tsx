@@ -244,6 +244,7 @@ ${mainData.ringkasan_ai}`;
                 <th className="px-4 py-3">Uraian Kegiatan</th>
                 <th className="px-4 py-3 text-right">Anggaran</th>
                 <th className="px-4 py-3 text-right">Realisasi</th>
+                <th className="px-4 py-3 text-right text-emerald-600">Sisa Anggaran</th>
                 <th className="px-4 py-3 text-center">Serapan</th>
                 <th className="px-4 py-3 text-center w-16">Aksi</th>
               </tr>
@@ -273,6 +274,9 @@ ${mainData.ringkasan_ai}`;
                       setDetailData(newD);
                     }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
                   </td>
+                  <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                    {formatRp(parseNum(d.anggaran) - parseNum(d.realisasi))}
+                  </td>
                   <td className="px-4 py-3">
                     <input type="text" value={d.persen_serapan} onChange={(e) => {
                       const newD = [...detailData];
@@ -289,7 +293,7 @@ ${mainData.ringkasan_ai}`;
               ))}
               {detailData.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>
                 </tr>
               )}
             </tbody>
