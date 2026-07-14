@@ -58,7 +58,22 @@ export default function AnalisisPaguPage() {
                 uraian_kegiatan: uraian || '-'
              };
           });
-          setDetailData(cleanedDetail);
+
+          // Sort by sisa anggaran descending
+          const sortedDetail = cleanedDetail.sort((a, b) => {
+             const parseNum = (str: string) => {
+                const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+                return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+             };
+             const sisaA = parseNum(a.anggaran) - parseNum(a.realisasi);
+             const sisaB = parseNum(b.anggaran) - parseNum(b.realisasi);
+             return sisaB - sisaA;
+          });
+          
+          // Re-assign no_urut
+          const finalDetail = sortedDetail.map((d, idx) => ({ ...d, no_urut: idx + 1 }));
+          
+          setDetailData(finalDetail);
        }
 
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
@@ -216,9 +231,9 @@ export default function AnalisisPaguPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50 text-gray-900 font-sans overflow-hidden">
+    <div className="flex flex-col bg-gray-50 text-gray-900 font-sans min-h-screen -mx-4 md:-mx-6 lg:-mx-10 -mt-6 lg:-mt-0">
       {/* Top Navbar */}
-      <div className="bg-white border-b border-gray-200 flex flex-wrap lg:flex-nowrap items-center justify-between px-4 lg:px-8 py-4 shadow-sm z-10 shrink-0 gap-4 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 flex flex-wrap lg:flex-nowrap items-center justify-between px-4 lg:px-8 py-4 shadow-sm z-40 sticky top-0 md:top-[88px] gap-4">
         <h1 className="text-xl font-black text-indigo-700 flex items-center gap-2">
           <FileText size={24}/> Analisis Pagu
         </h1>
@@ -252,7 +267,7 @@ export default function AnalisisPaguPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 bg-gray-50/50 overflow-y-auto custom-scrollbar p-6 lg:p-8 relative scroll-smooth">
+      <div className="flex-1 p-4 lg:p-8 relative">
          <div className="max-w-7xl mx-auto bg-white border border-gray-100 rounded-[2rem] p-6 lg:p-10 shadow-sm min-h-[85vh]">
             {activeTab === 'main' && (
                <div className="space-y-12 pb-24">
