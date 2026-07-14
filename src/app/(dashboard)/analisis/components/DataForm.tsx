@@ -159,12 +159,33 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     }
     setIsGeneratingAI(true);
     
-    const aiContext = `[INFORMASI USULAN]
+    const topSisaItems = [...(detailData || [])]
+    .map((d: any) => ({
+      uraian: d.uraian_kegiatan,
+      sisa: parseNum(d.anggaran) - parseNum(d.realisasi)
+    }))
+    .filter(d => d.sisa > 0)
+    .sort((a, b) => b.sisa - a.sisa)
+    .slice(0, 5)
+    .map(d => `- ${d.uraian}: Rp ${formatRp(d.sisa)}`)
+    .join('\n  ');
+
+    const aiContext = `[INFORMASI KEUANGAN & PAGU]
 Total Nominal Usulan: Rp ${mainData.total_anggaran || '0'}
 Sisa Kapasitas Pagu Saat Ini: Rp ${formatRp(totalSisaDetail)}
 Realisasi S.d. Saat Ini: Rp ${formatRp(totalRealisasiDetail)}
-Pagu Awal 2026: Rp ${historisYearRow.pagu_awal || '0'}
-Total Pagu Terkini 2026: Rp ${historisYearRow.total_pagu || '0'}
+
+[RIWAYAT PAGU 2026]
+Pagu Awal: Rp ${historisYearRow.pagu_awal || '0'}
+Pengalihan (+/-): Rp ${historisYearRow.pengalihan || '0'}
+Tambah Pagu Penugasan: Rp ${historisYearRow.tambah_pagu_penugasan || '0'}
+Tambah Pagu Inisiatif: Rp ${historisYearRow.tambah_pagu_inisiatif || '0'}
+Efisiensi: Rp ${historisYearRow.efisiensi || '0'}
+Talangan: Rp ${historisYearRow.talangan || '0'}
+Total Pagu Terkini: Rp ${historisYearRow.total_pagu || '0'}
+
+[TOP 5 KEGIATAN DENGAN SISA ANGGARAN TERBESAR]
+${topSisaItems || 'Tidak ada data rincian.'}
 
 [SURAT PENGAJUAN / OCR]
 ${mainData.ringkasan_ai}`;
