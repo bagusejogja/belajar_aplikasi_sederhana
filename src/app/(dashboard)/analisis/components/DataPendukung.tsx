@@ -152,12 +152,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         setDetailData(newD);
                       }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
                     </td>
-                    <td className="px-4 py-3">
-                      <input type="text" value={d.sisa_anggaran} onChange={(e) => {
-                        const newD = [...detailData];
-                        newD[idx].sisa_anggaran = e.target.value;
-                        setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                      {new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format((parseFloat((d.anggaran || '0').toString().replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]+/g, '')) || 0) - (parseFloat((d.realisasi || '0').toString().replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]+/g, '')) || 0))}
                     </td>
                     <td className="px-4 py-3">
                       <input type="text" value={d.persen_serapan} onChange={(e) => {
