@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 // Helper parse num
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     if (errAnalisis) {
-      console.error(Error fetching analisis:, errAnalisis);
+      console.error("Error fetching analisis:", errAnalisis);
       return NextResponse.json({ success: false, error: errAnalisis.message });
     }
 
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       .in('id_analisis', latestIds);
 
     if (errPagu) {
-      console.error(Error fetching pagu historis:, errPagu);
+      console.error("Error fetching pagu historis:", errPagu);
       return NextResponse.json({ success: false, error: errPagu.message });
     }
 
@@ -117,7 +117,7 @@ export async function GET(request: Request) {
       }
     });
   } catch (error: any) {
-    console.error(Global Pagu API error:, error);
+    console.error("Global Pagu API error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
