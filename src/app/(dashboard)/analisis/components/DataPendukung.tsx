@@ -356,12 +356,45 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            const newP = { ...p, [key]: val };
            setMainData({ ...mainData, pagu_berjalan: newP });
         };
+
+        const syncFromHistoris = () => {
+           if (historisData && historisData.length > 0) {
+             const targetRow = historisData.find((d: any) => d.tahun === '2026') || historisData[historisData.length - 1];
+             if (targetRow) {
+               setMainData({
+                 ...mainData,
+                 pagu_berjalan: {
+                   ...p,
+                   pagu_awal: targetRow.pagu_awal || '0',
+                   pengalihan: targetRow.pengalihan || '0',
+                   tambah_inisiatif: targetRow.tambah_pagu_inisiatif || '0',
+                   efisiensi: targetRow.efisiensi || '0',
+                   tambah_penugasan: targetRow.tambah_pagu_penugasan || '0',
+                 }
+               });
+             }
+           }
+        };
+
+        // Auto-sync if empty
+        useEffect(() => {
+           if (historisData && historisData.length > 0 && activeSubTab === 'berjalan') {
+             if (!p.pagu_awal && !p.pengalihan && !p.tambah_inisiatif) {
+               syncFromHistoris();
+             }
+           }
+        }, [activeSubTab, historisData]);
         
         return (
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
-            <div className="p-4 bg-emerald-50/50 border-b border-emerald-100 flex items-center gap-2 text-emerald-800">
-               <BarChart3 size={18} />
-               <span className="font-bold text-sm uppercase tracking-widest">Detail Pagu Keseluruhan Tahun Berjalan</span>
+            <div className="p-4 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between gap-2 text-emerald-800">
+               <div className="flex items-center gap-2">
+                 <BarChart3 size={18} />
+                 <span className="font-bold text-sm uppercase tracking-widest">Detail Pagu Keseluruhan Tahun Berjalan</span>
+               </div>
+               <button onClick={syncFromHistoris} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                 Tarik Data Historis
+               </button>
             </div>
             <div className="p-6">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 max-w-4xl">
