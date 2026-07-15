@@ -19,25 +19,30 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
   const showEfisiensi = historisData?.some((d: any) => d.efisiensi && d.efisiensi !== '0');
   const showTalangan = historisData?.some((d: any) => d.talangan && d.talangan !== '0');
 
-  const syncFromHistoris = () => {
-    if (historisData && historisData.length > 0) {
-      const targetRow = historisData.find((d: any) => d.tahun === '2026') || historisData[historisData.length - 1];
-      if (targetRow) {
+  const syncFromHistoris = async () => {
+    try {
+      const targetDate = mainData?.tanggal_surat || new Date().toISOString();
+      const res = await fetch(`/api/analisis/global-pagu?date=${encodeURIComponent(targetDate)}&year=2026`);
+      const result = await res.json();
+      if (result.success) {
         setMainData((prev: any) => {
           const p = prev.pagu_berjalan || {};
           return {
             ...prev,
             pagu_berjalan: {
               ...p,
-              pagu_awal: targetRow.pagu_awal || '0',
-              pengalihan: targetRow.pengalihan || '0',
-              tambah_inisiatif: targetRow.tambah_pagu_inisiatif || '0',
-              efisiensi: targetRow.efisiensi || '0',
-              tambah_penugasan: targetRow.tambah_pagu_penugasan || '0',
+              pagu_awal: result.data.pagu_awal || '0',
+              pengalihan: result.data.pengalihan || '0',
+              tambah_inisiatif: result.data.tambah_inisiatif || '0',
+              efisiensi: result.data.efisiensi || '0',
+              tambah_penugasan: result.data.tambah_penugasan || '0',
+              talangan: result.data.talangan || '0'
             }
           };
         });
       }
+    } catch (err) {
+      console.error("Gagal sinkronisasi data global:", err);
     }
   };
 
@@ -414,7 +419,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                  <span className="font-bold text-sm uppercase tracking-widest">Potret Mutasi Pagu Keseluruhan</span>
                </div>
                <button onClick={syncFromHistoris} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
-                 Tarik Data Historis
+                 Tarik Data Global
                </button>
             </div>
             <div className="p-6">
