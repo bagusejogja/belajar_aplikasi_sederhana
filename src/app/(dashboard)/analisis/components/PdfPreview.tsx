@@ -138,7 +138,45 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
 
-    // 4. DATA HISTORIS PAGU MULTI-TAHUN
+    // 4. DETAIL PAGU KESELURUHAN TAHUN BERJALAN
+    const pBerjalan = mainData?.pagu_berjalan || {};
+    const cPaguAwal = parseNum(pBerjalan.pagu_awal) || 0;
+    const cPengalihan = parseNum(pBerjalan.pengalihan) || 0;
+    const cInisiatif = parseNum(pBerjalan.tambah_inisiatif) || 0;
+    const cEfisiensi = parseNum(pBerjalan.efisiensi) || 0;
+    const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || 0;
+    const cLuncuran = parseNum(pBerjalan.luncuran) || 0;
+    const cTotal = cPaguAwal + cPengalihan + cInisiatif - cEfisiensi + cPenugasan + cLuncuran;
+
+    const bodyPaguBerjalan = [
+      ['Pagu Awal', `Rp ${formatRp(cPaguAwal)}`],
+      ['Pengalihan (+/-)', `Rp ${formatRp(cPengalihan)}`],
+      ['Tambah Pagu - Inisiatif (+)', `Rp ${formatRp(cInisiatif)}`],
+      ['Efisiensi (-)', `Rp ${formatRp(cEfisiensi)}`],
+      ['Tambah Pagu - Penugasan (+)', `Rp ${formatRp(cPenugasan)}`],
+      ['Luncuran (+)', `Rp ${formatRp(cLuncuran)}`],
+      ['Total Pagu Tahun Berjalan', `Rp ${formatRp(cTotal)}`]
+    ];
+
+    startY = addSectionHeader('4. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
+    autoTable(doc, {
+      startY: startY,
+      body: bodyPaguBerjalan,
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
+      didParseCell: function(data) {
+        const totalRows = bodyPaguBerjalan.length;
+        const r = data.row.index;
+        if (r === totalRows - 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        }
+      }
+    });
+    startY = (doc as any).lastAutoTable.finalY + 10;
+
+    // 5. DATA HISTORIS PAGU MULTI-TAHUN
     if (historisData && historisData.length > 0) {
       const showPenugasan = historisData.some((d:any) => parseNum(d.tambah_pagu_penugasan) > 0);
       const showInisiatif = historisData.some((d:any) => parseNum(d.tambah_pagu_inisiatif) > 0);
@@ -162,7 +200,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
          return row;
       });
 
-      startY = addSectionHeader('4. DATA HISTORIS PAGU MULTI-TAHUN:', startY);
+      startY = addSectionHeader('5. DATA HISTORIS PAGU MULTI-TAHUN:', startY);
       autoTable(doc, {
         startY: startY,
         head: [tableHead],
@@ -328,9 +366,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       }
     }
     
-    // 5. DETAIL SERAPAN REALISASI BELANJA
+    // 6. DETAIL SERAPAN REALISASI BELANJA
     if (detailData && detailData.length > 0) {
-      startY = addSectionHeader('5. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:', startY);
+      startY = addSectionHeader('6. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:', startY);
       autoTable(doc, {
         startY: startY,
         head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', 'Sisa Anggaran', '% Serapan']],
@@ -342,9 +380,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       startY = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // 6. HASIL ANALISIS & REKOMENDASI
+    // 7. HASIL ANALISIS & REKOMENDASI
     if (mainData.rekomendasi_html) {
-      startY = addSectionHeader('6. HASIL ANALISIS & REKOMENDASI:', startY);
+      startY = addSectionHeader('7. HASIL ANALISIS & REKOMENDASI:', startY);
       renderWysiwygToPdf({
         doc,
         htmlString: mainData.rekomendasi_html,

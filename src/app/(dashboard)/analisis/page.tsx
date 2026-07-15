@@ -28,6 +28,7 @@ export default function AnalisisPaguPage() {
     analisis_html: '',
     posisi_pagu: '',
     rekomendasi_html: '',
+    pagu_berjalan: {},
     file_lampiran: '',
     link_lampiran: ''
   });
@@ -110,7 +111,8 @@ export default function AnalisisPaguPage() {
              setMainData((prev: any) => ({
                 ...prev,
                 analisis_html: parsed.analisis || '',
-                rekomendasi_html: parsed.rekomendasi || ''
+                rekomendasi_html: parsed.rekomendasi || '',
+                pagu_berjalan: parsed.pagu_berjalan || {}
              }));
           } catch (e) {
              // Jika bukan JSON (format lama)
@@ -149,7 +151,8 @@ export default function AnalisisPaguPage() {
         ringkasan_ai: mainData.ringkasan_ai || '',
         analisis_html: JSON.stringify({
            analisis: mainData.analisis_html || '',
-           rekomendasi: mainData.rekomendasi_html || ''
+           rekomendasi: mainData.rekomendasi_html || '',
+           pagu_berjalan: mainData.pagu_berjalan || {}
         }),
         file_lampiran: mainData.file_lampiran || '',
         link_lampiran: mainData.link_lampiran || ''
@@ -213,7 +216,7 @@ export default function AnalisisPaguPage() {
      setMainData({
         no_surat: '', tanggal_surat: '', perihal: '', unit_pengirim: '',
         total_anggaran: '0', total_realisasi: '0', persen_serapan: '0', ringkasan_ai: '', analisis_html: '',
-        posisi_pagu: '', rekomendasi_html: '',
+        posisi_pagu: '', rekomendasi_html: '', pagu_berjalan: {},
         file_lampiran: '', link_lampiran: ''
      });
      setDetailData([]);

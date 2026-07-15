@@ -7,6 +7,12 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
 
+  const parseNum = (str: string) => {
+    const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+  
+  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
   const showTambahPaguPenugasan = historisData?.some((d: any) => d.tambah_pagu_penugasan && d.tambah_pagu_penugasan !== '0');
   const showTambahPaguInisiatif = historisData?.some((d: any) => d.tambah_pagu_inisiatif && d.tambah_pagu_inisiatif !== '0');
@@ -62,13 +68,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                  realisasi: formatRp(realisasi),
                  sisa_anggaran: formatRp(sisa),
                  persen_serapan: serapanText,
-                 _serapanVal: serapanVal // for sorting
+                 _serapanVal: serapanVal, // for sorting
+                 _sisaVal: sisa // for sorting by sisa anggaran
               });
            }
         });
 
-        // Sort by prosentase ascending (terkecil di atas)
-        mapped.sort((a, b) => a._serapanVal - b._serapanVal);
+        // Sort by sisa anggaran descending (terbesar ke kecil)
+        mapped.sort((a, b) => b._sisaVal - a._sisaVal);
         
         // Tambahkan nomor urut
         const finalMapped = mapped.map((m, idx) => ({
@@ -98,10 +105,11 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 gap-4">
-        <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Detail Realisasi Belanja</button>
-        <button onClick={() => setActiveSubTab('historis')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Historis</button>
-        <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Lampiran Lainnya</button>
+      <div className="flex border-b border-gray-200 gap-4 overflow-x-auto pb-2">
+        <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Detail Realisasi Belanja</button>
+        <button onClick={() => setActiveSubTab('historis')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Historis</button>
+        <button onClick={() => setActiveSubTab('berjalan')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'berjalan' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Tahun Berjalan</button>
+        <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Lampiran Lainnya</button>
       </div>
 
       {activeSubTab === 'realisasi' && (
@@ -192,31 +200,26 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                       data={historisData.map((d: any) => {
-                        const parseNum = (str: string) => {
-                          const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
-                          return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-                        };
-                        const kurang = parseNum(d.kurang);
                         return {
-                          name: d.tahun,
+                          tahun: d.tahun,
                           PaguAwal: parseNum(d.pagu_awal),
                           Pengalihan: parseNum(d.pengalihan),
                           TambahPenugasan: parseNum(d.tambah_pagu_penugasan),
                           TambahInisiatif: parseNum(d.tambah_pagu_inisiatif),
                           Efisiensi: parseNum(d.efisiensi),
                           Talangan: parseNum(d.talangan),
-                          TotalPagu: parseNum(d.total_pagu),
+                          total_pagu: d.total_pagu,
                           Realisasi: parseNum(d.realisasi_historis),
                         };
                       })}
                       margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
                     >
                       <CartesianGrid stroke="#f5f5f5" />
-                      <XAxis dataKey="name" tick={{fontSize: 12, fill: '#6b7280'}} tickMargin={10} />
-                      <YAxis tickFormatter={(val) => `${val / 1000000} M`} tick={{fontSize: 12, fill: '#6b7280'}} />
-                      <Tooltip formatter={(value: any) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value || 0)} />
+                      <XAxis dataKey="tahun" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
+                      <YAxis tickFormatter={(value) => `Rp ${new Intl.NumberFormat('id-ID', {notation: 'compact'}).format(value)}`} axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} width={80} />
+                      <Tooltip formatter={(value: any) => `Rp ${new Intl.NumberFormat('id-ID').format(value)}`} />
                       <Legend wrapperStyle={{fontSize: '12px'}} />
-                      <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey={(d: any) => parseNum(d.total_pagu)} name="Total Pagu" fill="#6366f1" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan (+/-)" radius={[0, 0, 0, 0]} />
                       {showTambahPaguPenugasan && <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tambah Pagu Penugasan" radius={[0, 0, 0, 0]} />}
                       {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tambah Pagu Inisiatif" radius={[0, 0, 0, 0]} />}
@@ -234,52 +237,170 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               <table className="w-full text-left text-sm text-gray-700">
                 <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
                   <tr>
-                    <th className="px-3 py-3">Tahun</th>
-                    <th className="px-3 py-3 text-right">Pagu Awal</th>
-                    <th className="px-3 py-3 text-right">Pengalihan</th>
-                    {showTambahPaguPenugasan && <th className="px-3 py-3 text-right text-emerald-600">Tambah Pagu - Penugasan</th>}
-                    {showTambahPaguInisiatif && <th className="px-3 py-3 text-right text-emerald-600">Tambah Pagu - Inisiatif</th>}
-                    {showEfisiensi && <th className="px-3 py-3 text-right text-rose-600">Efisiensi</th>}
-                    {showTalangan && <th className="px-3 py-3 text-right text-amber-600">Talangan</th>}
-                    <th className="px-3 py-3 text-right text-emerald-600">Total Pagu</th>
-                    <th className="px-3 py-3 text-right text-rose-600">Realisasi</th>
-                    <th className="px-3 py-3 text-center w-20">% Serapan</th>
-                    <th className="px-2 py-3"></th>
+                    <th className="px-4 py-3">Tahun</th>
+                    <th className="px-4 py-3 text-right">Pagu Awal</th>
+                    <th className="px-4 py-3 text-right">Pengalihan</th>
+                    {showTambahPaguPenugasan && <th className="px-4 py-3 text-right">Tambah Pagu (Penugasan)</th>}
+                    {showTambahPaguInisiatif && <th className="px-4 py-3 text-right">Tambah Pagu (Inisiatif)</th>}
+                    {showEfisiensi && <th className="px-4 py-3 text-right text-rose-500">Efisiensi (-)</th>}
+                    {showTalangan && <th className="px-4 py-3 text-right text-amber-500">Talangan (+)</th>}
+                    <th className="px-4 py-3 text-right font-bold text-indigo-600">Total Pagu</th>
+                    <th className="px-4 py-3 w-16 text-center">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {historisData?.map((d: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-3 py-2"><input type="text" value={d.tahun} onChange={(e) => { const n=[...historisData]; n[idx].tahun=e.target.value; setHistorisData(n); }} className="w-16 bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.pagu_awal} onChange={(e) => { const n=[...historisData]; n[idx].pagu_awal=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.pengalihan} onChange={(e) => { const n=[...historisData]; n[idx].pengalihan=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500"/></td>
-                      {showTambahPaguPenugasan && <td className="px-3 py-2"><input type="text" value={d.tambah_pagu_penugasan} onChange={(e) => { const n=[...historisData]; n[idx].tambah_pagu_penugasan=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500 text-emerald-600"/></td>}
-                      {showTambahPaguInisiatif && <td className="px-3 py-2"><input type="text" value={d.tambah_pagu_inisiatif} onChange={(e) => { const n=[...historisData]; n[idx].tambah_pagu_inisiatif=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-emerald-500 text-emerald-600"/></td>}
-                      {showEfisiensi && <td className="px-3 py-2"><input type="text" value={d.efisiensi} onChange={(e) => { const n=[...historisData]; n[idx].efisiensi=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-rose-500 text-rose-600"/></td>}
-                      {showTalangan && <td className="px-3 py-2"><input type="text" value={d.talangan} onChange={(e) => { const n=[...historisData]; n[idx].talangan=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none focus:border-b border-amber-500 text-amber-600"/></td>}
-                      <td className="px-3 py-2"><input type="text" value={d.total_pagu} onChange={(e) => { const n=[...historisData]; n[idx].total_pagu=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-emerald-600 focus:border-b border-emerald-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.realisasi_historis} onChange={(e) => { const n=[...historisData]; n[idx].realisasi_historis=e.target.value; setHistorisData(n); }} className="w-full text-right bg-transparent outline-none font-bold text-rose-600 focus:border-b border-rose-500"/></td>
-                      <td className="px-3 py-2"><input type="text" value={d.persen_serapan || ''} onChange={(e) => { const n=[...historisData]; n[idx].persen_serapan=e.target.value; setHistorisData(n); }} className="w-full text-center bg-transparent outline-none font-bold focus:border-b border-emerald-500"/></td>
-                      <td className="px-2 py-2">
-                        <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="text-rose-500 hover:text-rose-600"><Trash2 size={14}/></button>
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <input type="text" value={d.tahun} onChange={(e) => {
+                          const newD = [...historisData];
+                          newD[idx].tahun = e.target.value;
+                          setHistorisData(newD);
+                        }} className="w-20 bg-transparent outline-none font-bold text-gray-700 focus:border-b border-indigo-500"/>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input type="text" value={d.pagu_awal} onChange={(e) => {
+                          const newD = [...historisData];
+                          newD[idx].pagu_awal = e.target.value;
+                          setHistorisData(newD);
+                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input type="text" value={d.pengalihan} onChange={(e) => {
+                          const newD = [...historisData];
+                          newD[idx].pengalihan = e.target.value;
+                          setHistorisData(newD);
+                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                      </td>
+                      {showTambahPaguPenugasan && (
+                         <td className="px-4 py-3">
+                           <input type="text" value={d.tambah_pagu_penugasan} onChange={(e) => {
+                             const newD = [...historisData];
+                             newD[idx].tambah_pagu_penugasan = e.target.value;
+                             setHistorisData(newD);
+                           }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                         </td>
+                      )}
+                      {showTambahPaguInisiatif && (
+                         <td className="px-4 py-3">
+                           <input type="text" value={d.tambah_pagu_inisiatif} onChange={(e) => {
+                             const newD = [...historisData];
+                             newD[idx].tambah_pagu_inisiatif = e.target.value;
+                             setHistorisData(newD);
+                           }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                         </td>
+                      )}
+                      {showEfisiensi && (
+                         <td className="px-4 py-3">
+                           <input type="text" value={d.efisiensi} onChange={(e) => {
+                             const newD = [...historisData];
+                             newD[idx].efisiensi = e.target.value;
+                             setHistorisData(newD);
+                           }} className="w-full bg-transparent outline-none text-right text-rose-600 focus:border-b border-indigo-500"/>
+                         </td>
+                      )}
+                      {showTalangan && (
+                         <td className="px-4 py-3">
+                           <input type="text" value={d.talangan} onChange={(e) => {
+                             const newD = [...historisData];
+                             newD[idx].talangan = e.target.value;
+                             setHistorisData(newD);
+                           }} className="w-full bg-transparent outline-none text-right text-amber-600 focus:border-b border-indigo-500"/>
+                         </td>
+                      )}
+                      <td className="px-4 py-3">
+                        <input type="text" value={d.total_pagu} onChange={(e) => {
+                          const newD = [...historisData];
+                          newD[idx].total_pagu = e.target.value;
+                          setHistorisData(newD);
+                        }} className="w-full bg-transparent outline-none text-right font-bold text-indigo-700 focus:border-b border-indigo-500"/>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
                   {(!historisData || historisData.length === 0) && (
-                    <tr><td colSpan={8} className="p-8 text-center text-gray-500 italic">Belum ada data historis.</td></tr>
+                    <tr>
+                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500 italic">Belum ada data pagu historis.</td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
-                 <Plus size={16}/> Tambah Baris
+               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0' }])} className="text-indigo-600 hover:text-indigo-700 font-bold text-sm flex items-center gap-1">
+                 <Plus size={16}/> Tambah Tahun
                </button>
             </div>
           </div>
-
         </div>
       )}
+
+      {activeSubTab === 'berjalan' && (() => {
+        const p = mainData?.pagu_berjalan || {};
+        
+        const calcTotalBerjalan = () => {
+           const paguAwal = parseNum(p.pagu_awal) || 0;
+           const pengalihan = parseNum(p.pengalihan) || 0;
+           const inisiatif = parseNum(p.tambah_inisiatif) || 0;
+           const efisiensi = parseNum(p.efisiensi) || 0;
+           const penugasan = parseNum(p.tambah_penugasan) || 0;
+           const luncuran = parseNum(p.luncuran) || 0;
+           return formatRp(paguAwal + pengalihan + inisiatif - efisiensi + penugasan + luncuran);
+        };
+        
+        const updatePaguBerjalan = (key: string, val: string) => {
+           const newP = { ...p, [key]: val };
+           setMainData({ ...mainData, pagu_berjalan: newP });
+        };
+        
+        return (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
+            <div className="p-4 bg-emerald-50/50 border-b border-emerald-100 flex items-center gap-2 text-emerald-800">
+               <BarChart3 size={18} />
+               <span className="font-bold text-sm uppercase tracking-widest">Detail Pagu Keseluruhan Tahun Berjalan</span>
+            </div>
+            <div className="p-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 max-w-4xl">
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-gray-500 uppercase">Pagu Awal</label>
+                     <input type="text" value={p.pagu_awal || ''} onChange={(e) => updatePaguBerjalan('pagu_awal', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-gray-500 uppercase">Pengalihan (+/-)</label>
+                     <input type="text" value={p.pengalihan || ''} onChange={(e) => updatePaguBerjalan('pengalihan', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-emerald-600 uppercase">Tambah Pagu - Inisiatif (+)</label>
+                     <input type="text" value={p.tambah_inisiatif || ''} onChange={(e) => updatePaguBerjalan('tambah_inisiatif', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-emerald-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-rose-600 uppercase">Efisiensi (-)</label>
+                     <input type="text" value={p.efisiensi || ''} onChange={(e) => updatePaguBerjalan('efisiensi', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-rose-200 rounded-lg outline-none focus:border-rose-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-emerald-600 uppercase">Tambah Pagu - Penugasan (+)</label>
+                     <input type="text" value={p.tambah_penugasan || ''} onChange={(e) => updatePaguBerjalan('tambah_penugasan', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-emerald-200 rounded-lg outline-none focus:border-emerald-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-indigo-600 uppercase">Luncuran (+)</label>
+                     <input type="text" value={p.luncuran || ''} onChange={(e) => updatePaguBerjalan('luncuran', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
+                  
+                  <div className="col-span-1 md:col-span-2 border-t border-gray-100 my-2 pt-4">
+                     <div className="flex flex-col md:flex-row items-center justify-between bg-emerald-600 text-white p-4 rounded-xl shadow-md">
+                        <span className="font-bold uppercase tracking-widest text-sm">Total Pagu Tahun Berjalan</span>
+                        <div className="text-2xl font-black mt-2 md:mt-0 tracking-tight">Rp {calcTotalBerjalan()}</div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {activeSubTab === 'lampiran' && (
         <div className="flex-1">
