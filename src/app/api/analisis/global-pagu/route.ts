@@ -27,6 +27,9 @@ export async function GET(request: Request) {
        targetDate = new Date();
     }
 
+    // Set targetDate to the end of that day (23:59:59.999) to include all records on the same day
+    targetDate.setHours(23, 59, 59, 999);
+
     // 1. Ambil semua analisis yang dibuat <= targetDate
     const { data: allAnalisis, error: errAnalisis } = await supabase
       .from('app_analisis_utama')
