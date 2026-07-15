@@ -40,8 +40,12 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
             }
           };
         });
+        alert("Berhasil menarik data pagu keseluruhan dari seluruh unit!");
+      } else {
+        alert("Gagal menarik data: " + result.error);
       }
-    } catch (err) {
+    } catch (err: any) {
+      alert("Terjadi kesalahan jaringan: " + err.message);
       console.error("Gagal sinkronisasi data global:", err);
     }
   };
