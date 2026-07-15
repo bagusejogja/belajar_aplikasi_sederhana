@@ -44,6 +44,21 @@ export async function GET(request: Request) {
     const paguTambahPaguInisiatif = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguEfisiensi = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguTalangan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTalanganPindah = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan - pindah dari fakultas').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+
+    // Ambil data rencana penerimaan dari data_penerimaan (filter tahun N sampai tanggal creates data)
+    const { data: penerimaanData, error: errPenerimaan } = await supabase
+      .from('data_penerimaan')
+      .select('nominal')
+      .eq('tahun', year)
+      .eq('tipe_data', 'RENCANA')
+      .lte('created_at', targetDate.toISOString());
+      
+    if (errPenerimaan) {
+      console.error("Error fetching data_penerimaan:", errPenerimaan);
+    }
+    
+    const rencanaPenerimaan = (penerimaanData || []).reduce((acc: number, row: any) => acc + Number(row.nominal || 0), 0);
 
     // Format menjadi string agar mudah masuk ke state front-end
     const formatRp = (num: number) => {
@@ -58,7 +73,9 @@ export async function GET(request: Request) {
         tambah_inisiatif: formatRp(paguTambahPaguInisiatif),
         efisiensi: formatRp(paguEfisiensi),
         tambah_penugasan: formatRp(paguTambahPaguPenugasan),
-        talangan: formatRp(paguTalangan)
+        talangan: formatRp(paguTalangan),
+        talangan_pindah: formatRp(paguTalanganPindah),
+        rencana_penerimaan: formatRp(rencanaPenerimaan)
       }
     });
   } catch (error: any) {

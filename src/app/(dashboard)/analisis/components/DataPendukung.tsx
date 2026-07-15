@@ -36,7 +36,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               tambah_inisiatif: result.data.tambah_inisiatif || '0',
               efisiensi: result.data.efisiensi || '0',
               tambah_penugasan: result.data.tambah_penugasan || '0',
-              talangan: result.data.talangan || '0'
+              luncuran: result.data.talangan || '0',
+              talangan_pindah: result.data.talangan_pindah || '0',
+              rencana_penerimaan: result.data.rencana_penerimaan || '0'
             }
           };
         });
@@ -407,7 +409,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            const efisiensi = parseNum(p.efisiensi) || 0;
            const penugasan = parseNum(p.tambah_penugasan) || 0;
            const luncuran = parseNum(p.luncuran) || 0;
-           return formatRp(paguAwal + pengalihan + inisiatif - efisiensi + penugasan + luncuran);
+           return formatRp(paguAwal + pengalihan + inisiatif + efisiensi + penugasan + luncuran);
         };
         
         const updatePaguBerjalan = (key: string, val: string) => {
@@ -452,12 +454,22 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                      <label className="text-xs font-bold text-indigo-600 uppercase">Luncuran (+)</label>
                      <input type="text" value={p.luncuran || ''} onChange={(e) => updatePaguBerjalan('luncuran', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-indigo-200 rounded-lg outline-none focus:border-indigo-500 focus:bg-white text-right" placeholder="0"/>
                   </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-xs font-bold text-amber-600 uppercase">Talangan Pindah Fakultas</label>
+                     <input type="text" value={p.talangan_pindah || ''} onChange={(e) => updatePaguBerjalan('talangan_pindah', e.target.value)} className="w-full p-2.5 bg-gray-50 border border-amber-200 rounded-lg outline-none focus:border-amber-500 focus:bg-white text-right" placeholder="0"/>
+                  </div>
                   
                   <div className="col-span-1 md:col-span-2 border-t border-gray-100 my-2 pt-4">
-                     <div className="flex flex-col md:flex-row items-center justify-between bg-emerald-600 text-white p-4 rounded-xl shadow-md">
-                        <span className="font-bold uppercase tracking-widest text-sm">Potret Mutasi Pagu Keseluruhan</span>
-                        <div className="text-2xl font-black mt-2 md:mt-0 tracking-tight">Rp {calcTotalBerjalan()}</div>
-                     </div>
+                    <div className="bg-emerald-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-emerald-600/20 mb-3">
+                       <span className="font-bold tracking-wide text-sm md:text-base">POTRET MUTASI PAGU KESELURUHAN</span>
+                       <span className="font-black text-xl md:text-2xl">Rp {calcTotalBerjalan()}</span>
+                    </div>
+                    {p.rencana_penerimaan && p.rencana_penerimaan !== '0' && (
+                      <div className="bg-indigo-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-indigo-600/20">
+                         <span className="font-bold tracking-wide text-sm md:text-base">RENCANA PENERIMAAN</span>
+                         <span className="font-black text-xl md:text-2xl">Rp {p.rencana_penerimaan}</span>
+                      </div>
+                    )}
                   </div>
                </div>
             </div>
