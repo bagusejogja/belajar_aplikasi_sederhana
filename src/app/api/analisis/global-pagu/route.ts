@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     // 1. Ambil semua analisis yang dibuat <= targetDate
     const { data: allAnalisis, error: errAnalisis } = await supabase
       .from('app_analisis_utama')
-      .select('id_analisis, unit_kerja, created_at')
+      .select('id_analisis, unit_pengirim, created_at')
       .lte('created_at', targetDate.toISOString())
       .order('created_at', { ascending: false });
 
@@ -44,10 +44,10 @@ export async function GET(request: Request) {
       });
     }
 
-    // 2. Filter id_analisis terbaru per unit_kerja
-    const latestPerUnit = new Map<string, string>(); // unit_kerja -> id_analisis
+    // 2. Filter id_analisis terbaru per unit_pengirim
+    const latestPerUnit = new Map<string, string>(); // unit_pengirim -> id_analisis
     for (const anl of allAnalisis) {
-       const unit = anl.unit_kerja || 'UNKNOWN_UNIT';
+       const unit = anl.unit_pengirim || 'UNKNOWN_UNIT';
        if (!latestPerUnit.has(unit)) {
           latestPerUnit.set(unit, anl.id_analisis);
        }
