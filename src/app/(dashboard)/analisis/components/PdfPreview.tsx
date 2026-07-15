@@ -110,7 +110,15 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
 
-    startY = addSectionHeader('3. POSISI PAGU TAHUN 2026:', startY);
+    let tanggalInput = '';
+    if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
+      const ts = parseInt(mainData.id_analisis.split('-')[1]);
+      if (!isNaN(ts)) {
+        tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+    }
+
+    startY = addSectionHeader(`3. POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
     autoTable(doc, {
       startY: startY,
       body: bodyPagu,

@@ -95,6 +95,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
   const totalSisaDetail = totalAnggaranDetail - totalRealisasiDetail;
 
+  let tanggalInput = '';
+  if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
+    const ts = parseInt(mainData.id_analisis.split('-')[1]);
+    if (!isNaN(ts)) {
+      tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+  }
+
   useEffect(() => {
     // Hanya sinkronkan realisasi dan persen serapan ke mainData, jangan mengubah total_anggaran (Usulan Tambahan)
     if (detailData && detailData.length > 0) {
@@ -370,7 +378,7 @@ ${mainData.ringkasan_ai}`;
           <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
         </div>
         <div className="col-span-full mt-4">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026</label>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026 {tanggalInput ? `(per ${tanggalInput})` : ''}</label>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-sm text-left">
               <tbody className="divide-y divide-gray-100">
