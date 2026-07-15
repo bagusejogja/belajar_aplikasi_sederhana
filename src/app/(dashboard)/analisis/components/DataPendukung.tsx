@@ -21,7 +21,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
   const syncFromHistoris = async () => {
     try {
-      const targetDate = mainData?.tanggal_surat || new Date().toISOString();
+      const targetDate = mainData?.created_at || new Date().toISOString();
       const res = await fetch(`/api/analisis/global-pagu?date=${encodeURIComponent(targetDate)}&year=2026`);
       const result = await res.json();
       if (result.success) {
