@@ -46,19 +46,20 @@ export async function GET(request: Request) {
     const paguTalangan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguTalanganPindah = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan - pindah dari fakultas').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
 
-    // Ambil data rencana penerimaan dari data_penerimaan (filter tahun N sampai tanggal creates data)
+    // Ambil data rencana dan realisasi penerimaan dari data_penerimaan (filter tahun N sampai tanggal creates data)
     const { data: penerimaanData, error: errPenerimaan } = await supabase
       .from('data_penerimaan')
-      .select('nominal')
+      .select('nominal, tipe_data')
       .eq('tahun', year)
-      .eq('tipe_data', 'RENCANA')
+      .in('tipe_data', ['RENCANA', 'REALISASI'])
       .lte('created_at', targetDate.toISOString());
       
     if (errPenerimaan) {
       console.error("Error fetching data_penerimaan:", errPenerimaan);
     }
     
-    const rencanaPenerimaan = (penerimaanData || []).reduce((acc: number, row: any) => acc + Number(row.nominal || 0), 0);
+    const rencanaPenerimaan = (penerimaanData || []).filter((row: any) => row.tipe_data === 'RENCANA').reduce((acc: number, row: any) => acc + Number(row.nominal || 0), 0);
+    const realisasiPenerimaan = (penerimaanData || []).filter((row: any) => row.tipe_data === 'REALISASI').reduce((acc: number, row: any) => acc + Number(row.nominal || 0), 0);
 
     // Format menjadi string agar mudah masuk ke state front-end
     const formatRp = (num: number) => {
@@ -75,7 +76,8 @@ export async function GET(request: Request) {
         tambah_penugasan: formatRp(paguTambahPaguPenugasan),
         talangan: formatRp(paguTalangan),
         talangan_pindah: formatRp(paguTalanganPindah),
-        rencana_penerimaan: formatRp(rencanaPenerimaan)
+        rencana_penerimaan: formatRp(rencanaPenerimaan),
+        realisasi_penerimaan: formatRp(realisasiPenerimaan)
       }
     });
   } catch (error: any) {

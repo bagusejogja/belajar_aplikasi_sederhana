@@ -146,35 +146,51 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     const cEfisiensi = parseNum(pBerjalan.efisiensi) || 0;
     const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || 0;
     const cLuncuran = parseNum(pBerjalan.luncuran) || 0;
-    const cTotal = cPaguAwal + cPengalihan + cInisiatif - cEfisiensi + cPenugasan + cLuncuran;
-
-    const bodyPaguBerjalan = [
-      ['Pagu Awal', `Rp ${formatRp(cPaguAwal)}`],
-      ['Pengalihan (+/-)', `Rp ${formatRp(cPengalihan)}`],
-      ['Tambah Pagu - Inisiatif (+)', `Rp ${formatRp(cInisiatif)}`],
-      ['Efisiensi (-)', `Rp ${formatRp(cEfisiensi)}`],
-      ['Tambah Pagu - Penugasan (+)', `Rp ${formatRp(cPenugasan)}`],
-      ['Luncuran (+)', `Rp ${formatRp(cLuncuran)}`],
-      ['Total Pagu Tahun Berjalan', `Rp ${formatRp(cTotal)}`]
-    ];
+    const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
+    const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
+    const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
 
     startY = addSectionHeader('4. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
-    autoTable(doc, {
-      startY: startY,
-      body: bodyPaguBerjalan,
-      theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2 },
-      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
-      didParseCell: function(data) {
-        const totalRows = bodyPaguBerjalan.length;
-        const r = data.row.index;
-        if (r === totalRows - 1) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
-        }
-      }
-    });
-    startY = (doc as any).lastAutoTable.finalY + 10;
+    
+    const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string, titleColor: [number,number,number], valColor: [number,number,number], bgColor: [number,number,number] = [249, 250, 251]) => {
+       doc.setDrawColor(229, 231, 235);
+       doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+       doc.roundedRect(x, y, w, h, 2, 2, 'FD');
+       doc.setFontSize(7.5);
+       doc.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
+       doc.setFont('helvetica', 'bold');
+       doc.text(title, x + 3, y + 5);
+       doc.setFontSize(9.5);
+       doc.setTextColor(valColor[0], valColor[1], valColor[2]);
+       doc.text(value, x + w - 3, y + 11, { align: 'right' });
+    };
+
+    const cardH = 15;
+    const gY = 3; // gap Y
+    let cY = startY + 2;
+
+    // Row 1: Pagu Awal, Total Pagu (w=88)
+    drawCard(15, cY, 88, cardH, 'Pagu Awal', `Rp ${formatRp(cPaguAwal)}`, [107, 114, 128], [17, 24, 39]);
+    drawCard(107, cY, 88, cardH, 'Total Pagu', `Rp ${formatRp(cTotal)}`, [255, 255, 255], [255, 255, 255], [5, 150, 105]);
+    cY += cardH + gY;
+
+    // Row 2: Inisiatif, Penugasan, Luncuran (w=57.3)
+    drawCard(15, cY, 57.3, cardH, 'Tambah Pagu - Inisiatif (+)', `Rp ${formatRp(cInisiatif)}`, [5, 150, 105], [5, 150, 105]);
+    drawCard(76.3, cY, 57.3, cardH, 'Tambah Pagu - Penugasan (+)', `Rp ${formatRp(cPenugasan)}`, [5, 150, 105], [5, 150, 105]);
+    drawCard(137.6, cY, 57.3, cardH, 'Luncuran (+)', `Rp ${formatRp(cLuncuran)}`, [79, 70, 229], [79, 70, 229]);
+    cY += cardH + gY;
+
+    // Row 3: Pengalihan, Efisiensi (w=88)
+    drawCard(15, cY, 88, cardH, 'Pengalihan (+/-)', `Rp ${formatRp(cPengalihan)}`, [107, 114, 128], [17, 24, 39]);
+    drawCard(107, cY, 88, cardH, 'Efisiensi (-)', `Rp ${formatRp(cEfisiensi)}`, [225, 29, 72], [225, 29, 72]);
+    cY += cardH + gY;
+    
+    // Row 4: Rencana Penerimaan, Realisasi Penerimaan
+    drawCard(15, cY, 88, cardH, 'RENCANA PENERIMAAN', `Rp ${formatRp(cRencana)}`, [255, 255, 255], [255, 255, 255], [79, 70, 229]);
+    drawCard(107, cY, 88, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)}`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
+    cY += cardH + 10;
+    
+    startY = cY;
 
     // 5. DATA HISTORIS PAGU MULTI-TAHUN
     if (historisData && historisData.length > 0) {

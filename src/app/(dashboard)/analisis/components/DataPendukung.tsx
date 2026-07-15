@@ -38,7 +38,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               tambah_penugasan: result.data.tambah_penugasan || '0',
               luncuran: result.data.talangan || '0',
               talangan_pindah: result.data.talangan_pindah || '0',
-              rencana_penerimaan: result.data.rencana_penerimaan || '0'
+              rencana_penerimaan: result.data.rencana_penerimaan || '0',
+              realisasi_penerimaan: result.data.realisasi_penerimaan || '0'
             }
           };
         });
@@ -465,9 +466,15 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                        <span className="font-black text-xl md:text-2xl">Rp {calcTotalBerjalan()}</span>
                     </div>
                     {p.rencana_penerimaan && p.rencana_penerimaan !== '0' && (
-                      <div className="bg-indigo-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-indigo-600/20">
+                      <div className="bg-indigo-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-indigo-600/20 mt-3">
                          <span className="font-bold tracking-wide text-sm md:text-base">RENCANA PENERIMAAN</span>
                          <span className="font-black text-xl md:text-2xl">Rp {p.rencana_penerimaan}</span>
+                      </div>
+                    )}
+                    {p.realisasi_penerimaan && p.realisasi_penerimaan !== '0' && (
+                      <div className="bg-sky-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-sky-600/20 mt-3">
+                         <span className="font-bold tracking-wide text-sm md:text-base">REALISASI PENERIMAAN</span>
+                         <span className="font-black text-xl md:text-2xl">Rp {p.realisasi_penerimaan}</span>
                       </div>
                     )}
                   </div>
