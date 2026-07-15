@@ -3,14 +3,6 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// Helper parse num
-const parseNum = (val: any) => {
-  if (!val) return 0;
-  if (typeof val === 'number') return val;
-  const parsed = parseFloat(val.toString().replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]+/g, ''));
-  return isNaN(parsed) ? 0 : parsed;
-};
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,80 +22,28 @@ export async function GET(request: Request) {
     // Set targetDate to the end of that day (23:59:59.999) to include all records on the same day
     targetDate.setHours(23, 59, 59, 999);
 
-    // 1. Ambil semua analisis yang dibuat <= targetDate
-    const { data: allAnalisis, error: errAnalisis } = await supabase
-      .from('app_analisis_utama')
-      .select('id_analisis, unit_pengirim, created_at')
-      .lte('created_at', targetDate.toISOString())
-      .order('created_at', { ascending: false });
-
-    if (errAnalisis) {
-      console.error("Error fetching analisis:", errAnalisis);
-      return NextResponse.json({ success: false, error: errAnalisis.message });
-    }
-
-    if (!allAnalisis || allAnalisis.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: { pagu_awal: 0, pengalihan: 0, tambah_inisiatif: 0, efisiensi: 0, tambah_penugasan: 0, talangan: 0 }
-      });
-    }
-
-    // 2. Filter id_analisis terbaru per unit_pengirim
-    const latestPerUnit = new Map<string, string>(); // unit_pengirim -> id_analisis
-    for (const anl of allAnalisis) {
-       const unit = anl.unit_pengirim || 'UNKNOWN_UNIT';
-       if (!latestPerUnit.has(unit)) {
-          latestPerUnit.set(unit, anl.id_analisis);
-       }
-    }
-
-    const latestIds = Array.from(latestPerUnit.values());
-
-    if (latestIds.length === 0) {
-        return NextResponse.json({
-            success: true,
-            data: { pagu_awal: 0, pengalihan: 0, tambah_inisiatif: 0, efisiensi: 0, tambah_penugasan: 0, talangan: 0 }
-        });
-    }
-
-    // 3. Ambil pagu_historis berdasarkan id_analisis yang valid dan tahun yang diminta
+    // Ambil data langsung dari gov_pagu_anggaran yang created_at <= targetDate dan tahun_anggaran == year
     const { data: paguData, error: errPagu } = await supabase
-      .from('app_pagu_historis')
+      .from('gov_pagu_anggaran')
       .select('*')
-      .eq('tahun', year)
-      .in('id_analisis', latestIds);
+      .eq('tahun_anggaran', year)
+      .lte('created_at', targetDate.toISOString());
 
     if (errPagu) {
-      console.error("Error fetching pagu historis:", errPagu);
+      console.error("Error fetching gov_pagu_anggaran:", errPagu);
       return NextResponse.json({ success: false, error: errPagu.message });
     }
 
-    // 4. Sum up the values
-    let totalPaguAwal = 0;
-    let totalPengalihan = 0;
-    let totalInisiatif = 0;
-    let totalEfisiensi = 0;
-    let totalPenugasan = 0;
-    let totalTalangan = 0;
-
-    for (const row of (paguData || [])) {
-        totalPaguAwal += parseNum(row.pagu_awal);
-
-        // Parse JSON tambah
-        let parsedTambah: any = {};
-        try {
-            if (row.tambah && row.tambah.startsWith('{')) {
-                parsedTambah = JSON.parse(row.tambah);
-            }
-        } catch(e) {}
-
-        totalPengalihan += parseNum(parsedTambah.pengalihan);
-        totalInisiatif += parseNum(parsedTambah.tambah_inisiatif);
-        totalEfisiensi += parseNum(parsedTambah.efisiensi);
-        totalPenugasan += parseNum(parsedTambah.tambah_penugasan);
-        totalTalangan += parseNum(parsedTambah.talangan);
-    }
+    // Lakukan grouping seperti di DataForm.tsx
+    const paguTahun = paguData || [];
+    const paguAwal = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTambah = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguKurang = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguPengalihan = paguTambah + paguKurang; // kurang sudah bernilai negatif
+    const paguTambahPaguPenugasan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTambahPaguInisiatif = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguEfisiensi = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTalangan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
 
     // Format menjadi string agar mudah masuk ke state front-end
     const formatRp = (num: number) => {
@@ -113,12 +53,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        pagu_awal: formatRp(totalPaguAwal),
-        pengalihan: formatRp(totalPengalihan),
-        tambah_inisiatif: formatRp(totalInisiatif),
-        efisiensi: formatRp(totalEfisiensi),
-        tambah_penugasan: formatRp(totalPenugasan),
-        talangan: formatRp(totalTalangan)
+        pagu_awal: formatRp(paguAwal),
+        pengalihan: formatRp(paguPengalihan),
+        tambah_inisiatif: formatRp(paguTambahPaguInisiatif),
+        efisiensi: formatRp(paguEfisiensi),
+        tambah_penugasan: formatRp(paguTambahPaguPenugasan),
+        talangan: formatRp(paguTalangan)
       }
     });
   } catch (error: any) {
