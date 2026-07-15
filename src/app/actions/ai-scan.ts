@@ -158,6 +158,8 @@ export async function generateAnalysisFromText(ocrText: string) {
       Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
       PENTING: Gunakan kalimat perintah aktif (contoh: gunakan kata "Tunjukkan", bukan "Menunjukkan"; "Jelaskan", bukan "Menjelaskan"; "Lengkapi", bukan "Melengkapi"). Buat evaluasi dan masukan secara poin demi poin (bernomor) terkait apa yang harus mereka perbaiki atau sesuaikan dari usulan tersebut.
       
+      ATURAN MUTLAK: HANYA gunakan data kuantitatif, pagu, dan angka yang TERSEDIA di dalam teks ini. JANGAN PERNAH mengarang, menambah-nambahkan, atau berimajinasi tentang data keuangan, persentase, sisa pagu, atau kebijakan lain yang tidak tertulis secara eksplisit dalam teks yang diberikan. Jika data untuk membuat keputusan tidak cukup, nyatakan bahwa data tidak tersedia!
+      
       Format dalam tag HTML ringan seperti <p>, <ol>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
     `;
 

@@ -358,9 +358,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         }} className="w-full bg-transparent outline-none text-right text-rose-500 focus:border-b border-indigo-500" placeholder="0"/>
                       </td>
                       <td className="px-4 py-3">
-                        <input type="text" value={d.serapan_historis || ''} onChange={(e) => {
+                        <input type="text" value={d.persen_serapan || ''} onChange={(e) => {
                           const newD = [...historisData];
-                          newD[idx].serapan_historis = e.target.value;
+                          newD[idx].persen_serapan = e.target.value;
                           setHistorisData(newD);
                         }} className="w-full bg-transparent outline-none text-center focus:border-b border-indigo-500" placeholder="0%"/>
                       </td>
@@ -380,7 +380,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               </table>
             </div>
             <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', serapan_historis: '0%' }])} className="text-indigo-600 hover:text-indigo-700 font-bold text-sm flex items-center gap-1">
+               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-indigo-600 hover:text-indigo-700 font-bold text-sm flex items-center gap-1">
                  <Plus size={16}/> Tambah Tahun
                </button>
             </div>
