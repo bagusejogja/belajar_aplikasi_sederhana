@@ -42,103 +42,13 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
 
     let startY = 30;
 
-    // 1. IDENTITAS SURAT
-    startY = addSectionHeader('1. IDENTITAS SURAT & INFORMASI UNIT:', startY);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Unit', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.unit_pengirim || '-'}`, 60, startY); startY += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.text('No Surat | Tgl', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.no_surat || '-'}  |  ${mainData.tanggal_surat || '-'}`, 60, startY); startY += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Perihal', 17, startY); 
-    
-    // Split perihal if too long
-    doc.setFont('helvetica', 'normal');
-    const perihalLines = doc.splitTextToSize(`: ${mainData.perihal || '-'}`, 130);
-    doc.text(perihalLines, 60, startY); 
-    startY += (perihalLines.length * 5) + 1;
-    
-    const targetYear = '2026';
-    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
     const parseNum = (str: string) => {
       const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
       return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
     };
     const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${formatRp(parseNum(mainData.total_anggaran)) || '-'}`, 60, startY); startY += 10;
-
-    // 2. RINGKASAN SUBSTANSI
-    if (mainData.analisis_html) {
-      startY = addSectionHeader('2. RINGKASAN SUBSTANSI:', startY);
-      const res = renderWysiwygToPdf({
-        doc,
-        htmlString: mainData.analisis_html,
-        x: 17,
-        y: startY + 2,
-        maxWidth: 176,
-        lineHeight: 5,
-        fontSize: 10
-      });
-      startY = res + 10;
-    }
-
-    // 3. POSISI PAGU TAHUN 2026
-
-    const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
-    const totalSisaDetail = (parseNum(historisYearRow.total_pagu) || 0) - totalRealisasiDetail;
-
-    const bodyPagu = [
-      ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
-      ['Pengalihan (+/-)', `Rp ${historisYearRow.pengalihan || '0'}`]
-    ];
-    if (historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0') {
-       bodyPagu.push(['Tambah Pagu Penugasan +', `+ Rp ${historisYearRow.tambah_pagu_penugasan}`]);
-    }
-    if (historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0') {
-       bodyPagu.push(['Tambah Pagu Inisiatif +', `+ Rp ${historisYearRow.tambah_pagu_inisiatif}`]);
-    }
-    if (historisYearRow.efisiensi && historisYearRow.efisiensi !== '0') {
-       bodyPagu.push(['Efisiensi -', `- Rp ${historisYearRow.efisiensi}`]);
-    }
-    if (historisYearRow.talangan && historisYearRow.talangan !== '0') {
-       bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
-    }
-    
-    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
-    bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
-    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
-    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
-
-    let tanggalInput = '';
-    if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
-      const ts = parseInt(mainData.id_analisis.split('-')[1]);
-      if (!isNaN(ts)) {
-        tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-    }
-
-    startY = addSectionHeader(`3. POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
-    autoTable(doc, {
-      startY: startY,
-      body: bodyPagu,
-      theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2 },
-      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
-      didParseCell: function(data) {
-        const totalRows = bodyPagu.length;
-        const r = data.row.index;
-        if (r === totalRows - 4 || r === totalRows - 2 || r === totalRows - 1) {
-          data.cell.styles.fontStyle = 'bold';
-        }
-        if (r === totalRows - 4) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
-        if (r === totalRows - 2) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
-        if (r === totalRows - 1) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
-      }
-    });
-    startY = (doc as any).lastAutoTable.finalY + 10;
-
-    // 4. DETAIL PAGU KESELURUHAN TAHUN BERJALAN
+    // 1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN
     const pBerjalan = mainData?.pagu_berjalan || {};
     const cPaguAwal = parseNum(pBerjalan.pagu_awal) || 0;
     const cPengalihan = parseNum(pBerjalan.pengalihan) || 0;
@@ -150,7 +60,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
     const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
 
-    startY = addSectionHeader('4. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
+    startY = addSectionHeader('1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
     
     const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string, titleColor: [number,number,number], valColor: [number,number,number], bgColor: [number,number,number] = [249, 250, 251]) => {
        doc.setDrawColor(229, 231, 235);
@@ -192,6 +102,97 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     
     startY = cY;
 
+    // 2. IDENTITAS SURAT
+    startY = addSectionHeader('2. IDENTITAS SURAT & INFORMASI UNIT:', startY);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Unit', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.unit_pengirim || '-'}`, 60, startY); startY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text('No Surat | Tgl', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: ${mainData.no_surat || '-'}  |  ${mainData.tanggal_surat || '-'}`, 60, startY); startY += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Perihal', 17, startY); 
+    
+    // Split perihal if too long
+    doc.setFont('helvetica', 'normal');
+    const perihalLines = doc.splitTextToSize(`: ${mainData.perihal || '-'}`, 130);
+    doc.text(perihalLines, 60, startY); 
+    startY += (perihalLines.length * 5) + 1;
+    
+    const targetYear = '2026';
+    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${formatRp(parseNum(mainData.total_anggaran)) || '-'}`, 60, startY); startY += 10;
+
+    // 3. RINGKASAN SUBSTANSI
+    if (mainData.analisis_html) {
+      startY = addSectionHeader('3. RINGKASAN SUBSTANSI:', startY);
+      const res = renderWysiwygToPdf({
+        doc,
+        htmlString: mainData.analisis_html,
+        x: 17,
+        y: startY + 2,
+        maxWidth: 176,
+        lineHeight: 5,
+        fontSize: 10
+      });
+      startY = res + 10;
+    }
+
+    // 4. POSISI PAGU TAHUN 2026
+
+    const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+    const totalSisaDetail = (parseNum(historisYearRow.total_pagu) || 0) - totalRealisasiDetail;
+
+    const bodyPagu = [
+      ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
+      ['Pengalihan (+/-)', `Rp ${historisYearRow.pengalihan || '0'}`]
+    ];
+    if (historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0') {
+       bodyPagu.push(['Tambah Pagu Penugasan +', `+ Rp ${historisYearRow.tambah_pagu_penugasan}`]);
+    }
+    if (historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0') {
+       bodyPagu.push(['Tambah Pagu Inisiatif +', `+ Rp ${historisYearRow.tambah_pagu_inisiatif}`]);
+    }
+    if (historisYearRow.efisiensi && historisYearRow.efisiensi !== '0') {
+       bodyPagu.push(['Efisiensi -', `- Rp ${historisYearRow.efisiensi}`]);
+    }
+    if (historisYearRow.talangan && historisYearRow.talangan !== '0') {
+       bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
+    }
+    
+    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
+    bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
+    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
+    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
+
+    let tanggalInput = '';
+    if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
+      const ts = parseInt(mainData.id_analisis.split('-')[1]);
+      if (!isNaN(ts)) {
+        tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+    }
+
+    startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
+    autoTable(doc, {
+      startY: startY,
+      body: bodyPagu,
+      theme: 'grid',
+      styles: { fontSize: 8.5, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'normal', cellWidth: 80 }, 1: { halign: 'right' } },
+      didParseCell: function(data) {
+        const totalRows = bodyPagu.length;
+        const r = data.row.index;
+        if (r === totalRows - 4 || r === totalRows - 2 || r === totalRows - 1) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+        if (r === totalRows - 4) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
+        if (r === totalRows - 2) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        if (r === totalRows - 1) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
+      }
+    });
+    startY = (doc as any).lastAutoTable.finalY + 10;
+
     // 5. DATA HISTORIS PAGU MULTI-TAHUN
     if (historisData && historisData.length > 0) {
       const showPenugasan = historisData.some((d:any) => parseNum(d.tambah_pagu_penugasan) > 0);
@@ -222,7 +223,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         head: [tableHead],
         body: tableBody,
         theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246] }, // blue-500
+        headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0] }, // gray-100 with black text
         styles: { fontSize: 7, cellPadding: 1.5 },
         columnStyles: { 
            1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 
@@ -390,7 +391,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         head: [['No', 'Uraian Kegiatan', 'Anggaran', 'Realisasi', 'Sisa Anggaran', '% Serapan']],
         body: detailData.map((d: any) => [d.no_urut, d.uraian_kegiatan, formatRp(parseNum(d.anggaran)), formatRp(parseNum(d.realisasi)), formatRp(parseNum(d.anggaran) - parseNum(d.realisasi)), d.persen_serapan]),
         theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246] }, // blue-500
+        headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0] }, // gray-100 with black text
         styles: { fontSize: 9 }
       });
       startY = (doc as any).lastAutoTable.finalY + 10;

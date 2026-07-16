@@ -34,7 +34,9 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
 
   paragraphs.forEach(p => {
     if (p.includes('<li>')) {
-      const listItems = p.split(/<\/?li>/).filter(li => li.trim() !== '' && !li.includes('<ul>') && !li.includes('</ul>'));
+      let isOrdered = p.includes('<ol>');
+      let indexNum = 1;
+      const listItems = p.split(/<\/?li>/).filter(li => li.trim() !== '' && !li.includes('<ul>') && !li.includes('</ul>') && !li.includes('<ol>') && !li.includes('</ol>'));
       listItems.forEach(li => {
         // Parse styles for list items
         let preprocessed = li.replace(/<strong>/g, ' <strong> ')
@@ -87,7 +89,8 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
         if (lines.length > 0) {
           if (currentY > 275) { doc.addPage(); currentY = 20; }
           doc.setFont('helvetica', 'normal');
-          doc.text('•', x + 5, currentY);
+          doc.text(isOrdered ? `${indexNum}.` : '•', x + 5, currentY);
+          indexNum++;
           
           lines.forEach((line, index) => {
               if (index > 0 && currentY > 280) { doc.addPage(); currentY = 20; }
