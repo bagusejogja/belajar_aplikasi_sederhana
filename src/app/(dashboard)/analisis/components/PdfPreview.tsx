@@ -59,6 +59,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
     const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
     const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
+    
+    const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
+    const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : '0%';
 
     startY = addSectionHeader('1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
     
@@ -81,7 +84,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
 
     // Row 1: Pagu Awal, Total Pagu (w=88)
     drawCard(15, cY, 88, cardH, 'Pagu Awal', `Rp ${formatRp(cPaguAwal)}`, [107, 114, 128], [17, 24, 39]);
-    drawCard(107, cY, 88, cardH, 'Total Pagu', `Rp ${formatRp(cTotal)}`, [255, 255, 255], [255, 255, 255], [5, 150, 105]);
+    drawCard(107, cY, 88, cardH, 'Total Pagu', `Rp ${formatRp(cTotal)} (${persentaseTotal})`, [255, 255, 255], [255, 255, 255], [5, 150, 105]);
     cY += cardH + gY;
 
     // Row 2: Inisiatif, Penugasan, Luncuran (w=57.3)
@@ -97,8 +100,10 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     
     // Row 4: Rencana Penerimaan, Realisasi Penerimaan
     drawCard(15, cY, 88, cardH, 'RENCANA PENERIMAAN', `Rp ${formatRp(cRencana)}`, [255, 255, 255], [255, 255, 255], [79, 70, 229]);
-    drawCard(107, cY, 88, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)}`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
+    drawCard(107, cY, 88, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)} (${persentaseRealisasi})`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
     cY += cardH + 10;
+    
+    doc.setTextColor(0, 0, 0); // Reset text color to black!
     
     startY = cY;
 
