@@ -90,5 +90,9 @@ export const menuList: MenuItem[] = [
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Arsip Berjenjang', path: '/arsip-kegiatan', icon: 'FolderTree', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
+
+  // --- MOCKUP ---
+  { title: 'Approval RKAT', path: '/mockup/approval-rkat', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Mockup' },
 ];
+
 
