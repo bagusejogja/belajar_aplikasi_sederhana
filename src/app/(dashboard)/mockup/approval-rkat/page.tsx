@@ -57,7 +57,7 @@ export default function ApprovalRkatMockup() {
                 <th className="p-3 border border-[#236a99] w-12 font-medium">No.</th>
                 <th className="p-3 border border-[#236a99] font-medium">COA Akun / Komponen<br/>Detai Belanja /<br/>Deskripsi</th>
                 <th className="p-3 border border-[#236a99] font-medium w-28">Status<br/>Approval</th>
-                <th className="p-0 border border-[#236a99] w-8"></th> {/* Kolom vertical text */}
+                <th className="p-0 border border-[#236a99] w-8"></th>
                 <th className="p-3 border border-[#236a99] font-medium">Kuantitas</th>
                 <th className="p-3 border border-[#236a99] font-medium">Harga<br/>Satuan</th>
                 <th className="p-3 border border-[#236a99] font-medium">Jumlah<br/>Anggaran</th>
@@ -67,7 +67,6 @@ export default function ApprovalRkatMockup() {
               </tr>
             </thead>
             <tbody className="text-gray-600 align-top">
-              {/* Row 1 */}
               <tr>
                 <td className="p-3 border-b border-l border-gray-200 text-center align-middle">
                   <input type="checkbox" className="w-4 h-4 rounded border-gray-300" />
@@ -139,8 +138,6 @@ export default function ApprovalRkatMockup() {
                   </div>
                 </td>
               </tr>
-
-              {/* Row 2 */}
               <tr>
                 <td className="p-3 border-b border-l border-gray-200 text-center align-middle">
                   <input type="checkbox" className="w-4 h-4 rounded border-gray-300" />
