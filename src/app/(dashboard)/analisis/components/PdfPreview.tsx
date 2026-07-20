@@ -56,6 +56,20 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
   };
     const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
+    let tanggalInput = '';
+    let bulanSebelum = '';
+    if (mainData?.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
+      const ts = parseInt(mainData.id_analisis.split('-')[1]);
+      if (!isNaN(ts)) {
+        const d = new Date(ts);
+        tanggalInput = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        const d2 = new Date(ts);
+        d2.setMonth(d2.getMonth() - 1);
+        bulanSebelum = d2.toLocaleDateString('id-ID', { month: 'long' });
+      }
+    }
+
     // 1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN
     const pBerjalan = mainData?.pagu_berjalan || {};
     const cPaguAwal = parseNum(pBerjalan.pagu_awal) || 0;
@@ -67,17 +81,20 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
     const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
     const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
+    const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan || '0');
     
     const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
     const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : '0%';
+    const pctPengeluaran = cRealisasi > 0 ? ((cPengeluaran / cRealisasi) * 100).toFixed(1) + '%' : '0%';
 
-    startY = addSectionHeader('1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN:', startY);
+    const section1Title = `1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN${tanggalInput ? ` (per ${tanggalInput})` : ''}:`;
+    startY = addSectionHeader(section1Title, startY);
     
     const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string, titleColor: [number,number,number], valColor: [number,number,number], bgColor: [number,number,number] = [249, 250, 251]) => {
        doc.setDrawColor(229, 231, 235);
        doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
        doc.roundedRect(x, y, w, h, 2, 2, 'FD');
-       doc.setFontSize(7.5);
+       doc.setFontSize(title.length > 25 ? 6 : 7.5);
        doc.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
        doc.setFont('helvetica', 'bold');
        doc.text(title, x + 3, y + 5);
@@ -91,7 +108,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     let cY = startY + 2;
 
     // Row 1: Pagu Awal, Total Pagu (w=88)
-    drawCard(15, cY, 88, cardH, 'Pagu Awal', `Rp ${formatRp(cPaguAwal)}`, [107, 114, 128], [17, 24, 39]);
+    drawCard(15, cY, 88, cardH, 'Pagu Awal', `Rp ${formatRp(cPaguAwal)}`, [255, 255, 255], [255, 255, 255], [245, 158, 11]);
     drawCard(107, cY, 88, cardH, 'Total Pagu', `Rp ${formatRp(cTotal)} (${persentaseTotal})`, [255, 255, 255], [255, 255, 255], [5, 150, 105]);
     cY += cardH + gY;
 
@@ -107,10 +124,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     cY += cardH + gY;
     
     // Row 4: Rencana Penerimaan, Realisasi Penerimaan, Total Pengeluaran
-    const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan || '0');
     drawCard(15, cY, 57.3, cardH, 'RENCANA PENERIMAAN', `Rp ${formatRp(cRencana)}`, [255, 255, 255], [255, 255, 255], [79, 70, 229]);
-    drawCard(76.3, cY, 57.3, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)}`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
-    drawCard(137.6, cY, 57.3, cardH, 'TOTAL PENGELUARAN', `Rp ${formatRp(cPengeluaran)}`, [255, 255, 255], [255, 255, 255], [8, 145, 178]);
+    drawCard(76.3, cY, 57.3, cardH, `REALISASI PENERIMAAN${bulanSebelum ? ` (per ${bulanSebelum})` : ''}`, `Rp ${formatRp(cRealisasi)} (${persentaseRealisasi})`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
+    drawCard(137.6, cY, 57.3, cardH, 'TOTAL PENGELUARAN', `Rp ${formatRp(cPengeluaran)} (${pctPengeluaran})`, [255, 255, 255], [255, 255, 255], [8, 145, 178]);
     cY += cardH + 10;
     
     doc.setTextColor(0, 0, 0); // Reset text color to black!
@@ -175,21 +191,12 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
        bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
     }
     
-    let tanggalInput = '';
-    if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
-      const ts = parseInt(mainData.id_analisis.split('-')[1]);
-      if (!isNaN(ts)) {
-        tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-      }
-    }
-
     bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
-    bodyPagu.push([`TOTAL REALISASI PENGELUARAN TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}`, `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
 
-    startY = addSectionHeader(`4. TOTAL REALISASI PENGELUARAN TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
+    startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026:`, startY);
     autoTable(doc, {
       startY: startY,
       body: bodyPagu,
@@ -199,13 +206,12 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       didParseCell: function(data) {
         const totalRows = bodyPagu.length;
         const r = data.row.index;
-        if (r === totalRows - 5 || r === totalRows - 3 || r === totalRows - 2 || r === totalRows - 1) {
+        if (r === totalRows - 4 || r === totalRows - 2 || r === totalRows - 1) {
           data.cell.styles.fontStyle = 'bold';
         }
-        if (r === totalRows - 5) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
-        if (r === totalRows - 3) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
-        if (r === totalRows - 2) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
-        if (r === totalRows - 1) data.cell.styles.fillColor = [224, 242, 254]; // sky-50
+        if (r === totalRows - 4) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
+        if (r === totalRows - 2) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        if (r === totalRows - 1) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
       }
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
