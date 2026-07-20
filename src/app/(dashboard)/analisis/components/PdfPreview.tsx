@@ -165,12 +165,6 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
        bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
     }
     
-    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
-    bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
-    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
-    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
-    bodyPagu.push(['Realisasi Keseluruhan (S.d. Saat Ini)', `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
-
     let tanggalInput = '';
     if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
       const ts = parseInt(mainData.id_analisis.split('-')[1]);
@@ -178,6 +172,12 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         tanggalInput = new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
       }
     }
+
+    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
+    bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
+    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
+    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
+    bodyPagu.push([`POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}`, `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
 
     startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
     autoTable(doc, {
@@ -404,6 +404,22 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       startY = (doc as any).lastAutoTable.finalY + 10;
     }
 
+    // 6b. RINCIAN UNIT PENYUSUN REALISASI KESELURUHAN
+    const detailRealisasi = mainData?.pagu_berjalan?.detail_realisasi;
+    if (detailRealisasi && detailRealisasi.length > 0) {
+      startY = addSectionHeader('RINCIAN UNIT PENYUSUN REALISASI KESELURUHAN (Hanya is_pagu = Y):', startY);
+      autoTable(doc, {
+        startY: startY,
+        head: [['No', 'Kode', 'Nama Unit', 'Nominal Realisasi']],
+        body: detailRealisasi.map((d: any, idx: number) => [idx + 1, d.kode, d.nama, `Rp ${formatRp(d.val)}`]),
+        theme: 'grid',
+        headStyles: { fillColor: [224, 242, 254], textColor: [0, 0, 0] }, // sky-100
+        styles: { fontSize: 9 },
+        columnStyles: { 3: { halign: 'right' }, 0: { halign: 'center', cellWidth: 15 } }
+      });
+      startY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
     // 7. HASIL ANALISIS & REKOMENDASI
     if (mainData.rekomendasi_html) {
       startY = addSectionHeader('7. HASIL ANALISIS & REKOMENDASI:', startY);
@@ -427,7 +443,14 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     if (!pdfUrl) return;
     const a = document.createElement('a');
     a.href = pdfUrl;
-    a.download = `Analisis_${mainData.no_surat || 'Doc'}.pdf`;
+    
+    let unitName = mainData.unit_pengirim || '';
+    if (unitName.includes('-')) {
+        unitName = unitName.split('-').slice(1).join('-').trim();
+    }
+    const cleanUnitName = unitName.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+    
+    a.download = `Analisis_${cleanUnitName ? cleanUnitName + '_' : ''}${mainData.no_surat || 'Doc'}.pdf`;
     a.click();
   };
 
