@@ -6,6 +6,7 @@ import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 
 export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
+  const [parsedPreview, setParsedPreview] = useState<any[]>([]);
 
   const parseNum = (str: string) => {
     const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
@@ -73,6 +74,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
     const rows = pastedText.split('\n').filter(r => r.trim() !== '');
     let totalRealisasi = 0;
+    let previewArray = [];
 
     for (let i = 1; i < rows.length; i++) {
       const cols = rows[i].split('\t');
@@ -90,6 +92,11 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
           if (matchedUnit && matchedUnit.is_pagu === 'Y') {
             const parsedVal = parseNum(valString);
             totalRealisasi += parsedVal;
+            previewArray.push({
+               kode: matchedUnit.kode_unit,
+               nama: matchedUnit.nama_unit,
+               val: parsedVal
+            });
           }
         }
       }
@@ -98,6 +105,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     // Save to pagu_berjalan JSON object
     const newP = { ...(mainData?.pagu_berjalan || {}), realisasi_keseluruhan: totalRealisasi.toString() };
     setMainData({ ...mainData, pagu_berjalan: newP });
+    setParsedPreview(previewArray);
     alert(`Berhasil menghitung Realisasi Keseluruhan untuk unit dengan is_pagu = 'Y'.\nTotal: Rp ${formatRp(totalRealisasi)}`);
   };
 
@@ -441,6 +449,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
       {activeSubTab === 'berjalan' && (() => {
         const p = mainData?.pagu_berjalan || {};
         
+        let tanggalInput = '';
+        if (mainData?.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
+          const ts = parseInt(mainData.id_analisis.split('-')[1]);
+          if (!isNaN(ts)) {
+            tanggalInput = ` (per ${new Date(ts).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })})`;
+          }
+        }
+        
         const calcTotalBerjalan = () => {
            const paguAwal = parseNum(p.pagu_awal) || 0;
            const pengalihan = parseNum(p.pengalihan) || 0;
@@ -518,7 +534,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                     
                     <div className="bg-cyan-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-cyan-600/20 mt-3 relative overflow-hidden group">
                        <div className="flex flex-col relative z-10">
-                          <span className="font-bold tracking-wide text-sm md:text-base">REALISASI KESELURUHAN (S.D. SAAT INI)</span>
+                          <span className="font-bold tracking-wide text-sm md:text-base uppercase">POSISI PAGU TAHUN 2026{tanggalInput}</span>
                           <span className="text-[10px] font-normal text-cyan-100 mt-0.5">Hanya menjumlahkan unit (is_pagu = Y) dari hasil paste excel.</span>
                        </div>
                        <span className="font-black text-xl md:text-2xl relative z-10">Rp {formatRp(parseNum(p.realisasi_keseluruhan || '0'))}</span>
@@ -534,6 +550,25 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         value={""}
                         onChange={() => {}}
                       />
+                      {parsedPreview.length > 0 && (
+                        <div className="mt-3 bg-white rounded-lg border border-cyan-200 overflow-hidden text-xs max-h-60 overflow-y-auto shadow-inner">
+                          <div className="bg-cyan-50 p-2 font-bold text-cyan-800 border-b border-cyan-200 flex justify-between">
+                            <span>Data Terdeteksi ({parsedPreview.length} Unit)</span>
+                            <button onClick={() => setParsedPreview([])} className="text-gray-500 hover:text-red-500 underline text-[10px]">Tutup Preview</button>
+                          </div>
+                          <table className="w-full text-left">
+                            <tbody className="divide-y divide-gray-100">
+                              {parsedPreview.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="p-2 text-gray-500 w-16">{item.kode}</td>
+                                  <td className="p-2 text-gray-700">{item.nama}</td>
+                                  <td className="p-2 text-right font-bold text-emerald-600">Rp {formatRp(item.val)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                </div>
