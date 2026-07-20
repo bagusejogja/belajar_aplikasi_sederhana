@@ -85,8 +85,16 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const targetYear = '2026';
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
   
-  const parseNum = (str: string) => {
-    const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+  const parseNum = (str: string | number) => {
+    if (typeof str === 'number') return str;
+    let s = (str || '0').toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+       const parts = s.split('.');
+       if (parts.length === 2 && parts[0].length > 3) {
+          return parseFloat(s);
+       }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
     return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
   };
   const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
