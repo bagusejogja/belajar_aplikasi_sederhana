@@ -169,6 +169,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
+    bodyPagu.push(['Realisasi Keseluruhan (S.d. Saat Ini)', `Rp ${formatRp(mainData.realisasi_keseluruhan || 0)}`]);
 
     let tanggalInput = '';
     if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
@@ -188,12 +189,13 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       didParseCell: function(data) {
         const totalRows = bodyPagu.length;
         const r = data.row.index;
-        if (r === totalRows - 4 || r === totalRows - 2 || r === totalRows - 1) {
+        if (r === totalRows - 5 || r === totalRows - 3 || r === totalRows - 2 || r === totalRows - 1) {
           data.cell.styles.fontStyle = 'bold';
         }
-        if (r === totalRows - 4) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
-        if (r === totalRows - 2) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
-        if (r === totalRows - 1) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
+        if (r === totalRows - 5) data.cell.styles.fillColor = [224, 231, 255]; // indigo-50
+        if (r === totalRows - 3) data.cell.styles.fillColor = [209, 250, 229]; // emerald-50
+        if (r === totalRows - 2) data.cell.styles.fillColor = [254, 243, 199]; // amber-50
+        if (r === totalRows - 1) data.cell.styles.fillColor = [224, 242, 254]; // sky-50
       }
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
