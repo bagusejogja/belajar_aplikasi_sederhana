@@ -528,25 +528,24 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                        <span className="font-bold tracking-wide text-sm md:text-base">POTRET MUTASI PAGU KESELURUHAN</span>
                        <span className="font-black text-xl md:text-2xl">Rp {calcTotalBerjalan()}</span>
                     </div>
-                    {p.rencana_penerimaan && p.rencana_penerimaan !== '0' && (
-                      <div className="bg-indigo-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-indigo-600/20 mt-3">
-                         <span className="font-bold tracking-wide text-sm md:text-base">RENCANA PENERIMAAN</span>
-                         <span className="font-black text-xl md:text-2xl">Rp {p.rencana_penerimaan}</span>
-                      </div>
-                    )}
-                    {p.realisasi_penerimaan && p.realisasi_penerimaan !== '0' && (
-                      <div className="bg-sky-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-sky-600/20 mt-3">
-                         <span className="font-bold tracking-wide text-sm md:text-base">REALISASI PENERIMAAN</span>
-                         <span className="font-black text-xl md:text-2xl">Rp {p.realisasi_penerimaan}</span>
-                      </div>
-                    )}
-                    
-                    <div className="bg-cyan-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-cyan-600/20 mt-3 relative overflow-hidden group">
-                       <div className="flex flex-col relative z-10">
-                          <span className="font-bold tracking-wide text-sm md:text-base uppercase">POSISI PAGU TAHUN 2026{tanggalInput}</span>
-                          <span className="text-[10px] font-normal text-cyan-100 mt-0.5">Hanya menjumlahkan unit (is_pagu = Y) dari hasil paste excel.</span>
+
+                    <div className="flex flex-col md:flex-row gap-3 mt-3">
+                       {p.rencana_penerimaan && p.rencana_penerimaan !== '0' && (
+                         <div className="bg-indigo-600 flex-1 rounded-xl p-4 flex flex-col justify-center text-white shadow-lg shadow-indigo-600/20">
+                            <span className="font-bold tracking-wide text-[10px] md:text-xs mb-1">RENCANA PENERIMAAN</span>
+                            <span className="font-black text-lg md:text-xl">Rp {p.rencana_penerimaan}</span>
+                         </div>
+                       )}
+                       {p.realisasi_penerimaan && p.realisasi_penerimaan !== '0' && (
+                         <div className="bg-sky-600 flex-1 rounded-xl p-4 flex flex-col justify-center text-white shadow-lg shadow-sky-600/20">
+                            <span className="font-bold tracking-wide text-[10px] md:text-xs mb-1">REALISASI PENERIMAAN</span>
+                            <span className="font-black text-lg md:text-xl">Rp {p.realisasi_penerimaan}</span>
+                         </div>
+                       )}
+                       <div className="bg-cyan-600 flex-1 rounded-xl p-4 flex flex-col justify-center text-white shadow-lg shadow-cyan-600/20 relative overflow-hidden">
+                          <span className="font-bold tracking-wide text-[10px] md:text-xs uppercase mb-1">TOTAL REALISASI PENGELUARAN TAHUN 2026{tanggalInput}</span>
+                          <span className="font-black text-lg md:text-xl relative z-10">Rp {formatRp(parseNum(p.realisasi_keseluruhan || '0'))}</span>
                        </div>
-                       <span className="font-black text-xl md:text-2xl relative z-10">Rp {formatRp(parseNum(p.realisasi_keseluruhan || '0'))}</span>
                     </div>
 
                     <div className="mt-4 bg-gray-50 border border-gray-200 p-3 rounded-xl">

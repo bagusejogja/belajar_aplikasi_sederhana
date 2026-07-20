@@ -106,9 +106,11 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     drawCard(107, cY, 88, cardH, 'Efisiensi (-)', `Rp ${formatRp(cEfisiensi)}`, [225, 29, 72], [225, 29, 72]);
     cY += cardH + gY;
     
-    // Row 4: Rencana Penerimaan, Realisasi Penerimaan
-    drawCard(15, cY, 88, cardH, 'RENCANA PENERIMAAN', `Rp ${formatRp(cRencana)}`, [255, 255, 255], [255, 255, 255], [79, 70, 229]);
-    drawCard(107, cY, 88, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)} (${persentaseRealisasi})`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
+    // Row 4: Rencana Penerimaan, Realisasi Penerimaan, Total Pengeluaran
+    const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan || '0');
+    drawCard(15, cY, 57.3, cardH, 'RENCANA PENERIMAAN', `Rp ${formatRp(cRencana)}`, [255, 255, 255], [255, 255, 255], [79, 70, 229]);
+    drawCard(76.3, cY, 57.3, cardH, 'REALISASI PENERIMAAN', `Rp ${formatRp(cRealisasi)}`, [255, 255, 255], [255, 255, 255], [2, 132, 199]);
+    drawCard(137.6, cY, 57.3, cardH, 'TOTAL PENGELUARAN', `Rp ${formatRp(cPengeluaran)}`, [255, 255, 255], [255, 255, 255], [8, 145, 178]);
     cY += cardH + 10;
     
     doc.setTextColor(0, 0, 0); // Reset text color to black!
@@ -185,9 +187,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
-    bodyPagu.push([`POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}`, `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
+    bodyPagu.push([`TOTAL REALISASI PENGELUARAN TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}`, `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
 
-    startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
+    startY = addSectionHeader(`4. TOTAL REALISASI PENGELUARAN TAHUN 2026${tanggalInput ? ` (per ${tanggalInput})` : ''}:`, startY);
     autoTable(doc, {
       startY: startY,
       body: bodyPagu,
@@ -457,8 +459,9 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         unitName = unitName.split('-').slice(1).join('-').trim();
     }
     const cleanUnitName = unitName.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+    const cleanNoSurat = (mainData.no_surat || 'Doc').replace(/[^a-zA-Z0-9\s]/g, '-').trim();
     
-    a.download = `Analisis_${cleanUnitName ? cleanUnitName + '_' : ''}${mainData.no_surat || 'Doc'}.pdf`;
+    a.download = `Analisis_${cleanUnitName ? cleanUnitName + '_' : ''}${cleanNoSurat}.pdf`;
     a.click();
   };
 
