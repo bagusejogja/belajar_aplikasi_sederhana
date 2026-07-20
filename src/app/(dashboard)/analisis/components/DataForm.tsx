@@ -251,45 +251,6 @@ ${mainData.ringkasan_ai}`;
     }
   };
 
-  const handlePasteRealisasi = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData('text');
-    if (!pastedText) return;
-
-    const rows = pastedText.split('\n').filter(r => r.trim() !== '');
-    let totalRealisasi = 0;
-
-    // Mulai dari row 1 (asumsikan row 0 adalah header)
-    for (let i = 1; i < rows.length; i++) {
-      const cols = rows[i].split('\t');
-      if (cols.length >= 4) {
-        let rawUnit = cols[1].trim();
-        let valString = cols[3].trim();
-        
-        // Parsing kode unit dari "010101-Majelis Wali Amanat" atau "01 - Kantor Pusat"
-        let kodeUnit = '';
-        if (rawUnit.includes('-')) {
-          kodeUnit = rawUnit.split('-')[0].trim();
-        }
-
-        if (kodeUnit) {
-          // Cari di gov_units apakah is_pagu == 'Y'
-          const matchedUnit = units.find(u => u.kode_unit === kodeUnit);
-          if (matchedUnit && matchedUnit.is_pagu === 'Y') {
-            const parsedVal = parseNum(valString);
-            totalRealisasi += parsedVal;
-          }
-        }
-      }
-    }
-    
-    setMainData((prev: any) => ({
-      ...prev,
-      realisasi_keseluruhan: totalRealisasi
-    }));
-    alert(`Berhasil menghitung Realisasi Keseluruhan untuk unit dengan is_pagu = 'Y'.\nTotal: Rp ${formatRp(totalRealisasi)}`);
-  };
-
   if (isDetailMode) {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -469,27 +430,8 @@ ${mainData.ringkasan_ai}`;
                   <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
                   <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {formatRp(parseFloat((mainData.total_anggaran || '0').toString().replace(/[^0-9.-]+/g, '')) || 0)}</td>
                 </tr>
-                <tr className="hover:bg-gray-50 bg-sky-50 border-t-2 border-sky-100">
-                  <td className="px-4 py-3 font-bold text-sky-900 flex flex-col gap-1">
-                    <span>Realisasi Keseluruhan (S.d. Saat Ini)</span>
-                    <span className="text-[10px] text-sky-600 font-normal">Hanya menjumlahkan unit (is_pagu = Y) dari hasil paste excel.</span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-sky-900 text-lg">Rp {formatRp(mainData.realisasi_keseluruhan || 0)}</td>
-                </tr>
               </tbody>
             </table>
-          </div>
-          
-          <div className="mt-3">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Paste Rekap Realisasi (Excel)</label>
-            <textarea 
-              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg outline-none text-xs text-gray-700 focus:border-indigo-500 focus:bg-white transition-colors" 
-              rows={2} 
-              placeholder="Klik di sini lalu Paste (Ctrl+V) tabel dari Excel (Kolom 1: No, 2: Unit, 3: Anggaran, 4: Realisasi)" 
-              onPaste={handlePasteRealisasi}
-              value={""}
-              onChange={() => {}}
-            />
           </div>
         </div>
         <div className="col-span-full">

@@ -63,6 +63,44 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     }
   }, [activeSubTab, historisData]);
 
+  const handlePasteRealisasi = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text');
+    if (!pastedText) return;
+
+    // Fetch units dynamically only when pasting to save requests
+    const { data: units } = await (await import('@/lib/supabase')).supabase.from('gov_units').select('id, kode_unit, nama_unit, is_pagu');
+
+    const rows = pastedText.split('\n').filter(r => r.trim() !== '');
+    let totalRealisasi = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].split('\t');
+      if (cols.length >= 4) {
+        let rawUnit = cols[1].trim();
+        let valString = cols[3].trim();
+        
+        let kodeUnit = '';
+        if (rawUnit.includes('-')) {
+          kodeUnit = rawUnit.split('-')[0].trim();
+        }
+
+        if (kodeUnit && units) {
+          const matchedUnit = units.find((u: any) => u.kode_unit === kodeUnit);
+          if (matchedUnit && matchedUnit.is_pagu === 'Y') {
+            const parsedVal = parseNum(valString);
+            totalRealisasi += parsedVal;
+          }
+        }
+      }
+    }
+    
+    // Save to pagu_berjalan JSON object
+    const newP = { ...(mainData?.pagu_berjalan || {}), realisasi_keseluruhan: totalRealisasi.toString() };
+    setMainData({ ...mainData, pagu_berjalan: newP });
+    alert(`Berhasil menghitung Realisasi Keseluruhan untuk unit dengan is_pagu = 'Y'.\nTotal: Rp ${formatRp(totalRealisasi)}`);
+  };
+
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -477,6 +515,26 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                          <span className="font-black text-xl md:text-2xl">Rp {p.realisasi_penerimaan}</span>
                       </div>
                     )}
+                    
+                    <div className="bg-cyan-600 rounded-xl p-4 flex items-center justify-between text-white shadow-lg shadow-cyan-600/20 mt-3 relative overflow-hidden group">
+                       <div className="flex flex-col relative z-10">
+                          <span className="font-bold tracking-wide text-sm md:text-base">REALISASI KESELURUHAN (S.D. SAAT INI)</span>
+                          <span className="text-[10px] font-normal text-cyan-100 mt-0.5">Hanya menjumlahkan unit (is_pagu = Y) dari hasil paste excel.</span>
+                       </div>
+                       <span className="font-black text-xl md:text-2xl relative z-10">Rp {formatRp(parseNum(p.realisasi_keseluruhan || '0'))}</span>
+                    </div>
+
+                    <div className="mt-4 bg-gray-50 border border-gray-200 p-3 rounded-xl">
+                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><ClipboardPaste size={14}/> Paste Rekap Realisasi (Excel)</label>
+                      <textarea 
+                        className="w-full p-2 bg-white border border-gray-200 rounded-lg outline-none text-xs text-gray-700 focus:border-emerald-500 focus:bg-white transition-colors shadow-sm" 
+                        rows={2} 
+                        placeholder="Klik di sini lalu Paste (Ctrl+V) tabel dari Excel (Kolom 1: No, 2: Unit, 3: Anggaran, 4: Realisasi)" 
+                        onPaste={handlePasteRealisasi}
+                        value={""}
+                        onChange={() => {}}
+                      />
+                    </div>
                   </div>
                </div>
             </div>

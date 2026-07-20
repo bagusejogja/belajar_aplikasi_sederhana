@@ -169,7 +169,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
-    bodyPagu.push(['Realisasi Keseluruhan (S.d. Saat Ini)', `Rp ${formatRp(mainData.realisasi_keseluruhan || 0)}`]);
+    bodyPagu.push(['Realisasi Keseluruhan (S.d. Saat Ini)', `Rp ${formatRp(mainData?.pagu_berjalan?.realisasi_keseluruhan || 0)}`]);
 
     let tanggalInput = '';
     if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
