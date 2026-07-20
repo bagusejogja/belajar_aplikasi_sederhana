@@ -88,7 +88,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         }
 
         if (kodeUnit && units) {
-          const matchedUnit = units.find((u: any) => u.kode_unit === kodeUnit);
+          const cleanPastedKode = kodeUnit.replace(/^0+/, '');
+          const matchedUnit = units.find((u: any) => u.kode_unit && u.kode_unit.replace(/^0+/, '') === cleanPastedKode);
           if (matchedUnit && matchedUnit.is_pagu === 'Y') {
             const parsedVal = parseNum(valString);
             totalRealisasi += parsedVal;
