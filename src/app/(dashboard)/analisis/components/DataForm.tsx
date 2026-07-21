@@ -186,12 +186,12 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     .map(d => `- ${d.uraian}: Rp ${formatRp(d.sisa)}`)
     .join('\n  ');
 
-    const aiContext = `[INFORMASI KEUANGAN & PAGU]
+    const aiContext = `[DETAIL PAGU KESELURUHAN TAHUN BERJALAN]
 Total Nominal Usulan: Rp ${mainData.total_anggaran || '0'}
 Sisa Kapasitas Pagu Saat Ini: Rp ${formatRp(totalSisaDetail)}
 Realisasi S.d. Saat Ini: Rp ${formatRp(totalRealisasiDetail)}
 
-[RIWAYAT PAGU 2026]
+[DATA HISTORIS PAGU MULTI-TAHUN & POSISI PAGU TAHUN 2026]
 Pagu Awal: Rp ${historisYearRow.pagu_awal || '0'}
 Pengalihan (+/-): Rp ${historisYearRow.pengalihan || '0'}
 Tambah Pagu Penugasan: Rp ${historisYearRow.tambah_pagu_penugasan || '0'}
@@ -200,10 +200,11 @@ Efisiensi: Rp ${historisYearRow.efisiensi || '0'}
 Talangan: Rp ${historisYearRow.talangan || '0'}
 Total Pagu Terkini: Rp ${historisYearRow.total_pagu || '0'}
 
-[TOP 5 KEGIATAN DENGAN SISA ANGGARAN TERBESAR]
+[DETAIL SERAPAN REALISASI BELANJA TAHUN INI]
+Top 5 Kegiatan dengan sisa anggaran terbesar:
 ${topSisaItems || 'Tidak ada data rincian.'}
 
-[SURAT PENGAJUAN / OCR]
+[RINGKASAN SURAT PENGAJUAN]
 ${mainData.ringkasan_ai}`;
 
     try {

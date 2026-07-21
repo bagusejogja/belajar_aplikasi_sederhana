@@ -149,18 +149,20 @@ export async function generateRingkasanFromText(ocrText: string) {
 export async function generateAnalysisFromText(ocrText: string) {
   try {
     const prompt = `
-      Anda adalah pimpinan (atasan) di bidang keuangan pemerintah. Berikan analisis dan instruksi tindak lanjut dari usulan anggaran berikut kepada staf/bawahan Anda:
+      Anda adalah asisten analis keuangan. Berikan analisis teknis mengenai kewajaran dan kesesuaian usulan anggaran berikut berdasarkan data keuangan yang tersedia:
       
-      === TEKS ===
+      === DATA & TEKS SURAT ===
       ${ocrText}
-      === END TEKS ===
+      === END DATA ===
 
-      Berikan hasil analisis berupa instruksi, evaluasi, dan masukan langsung yang tegas kepada bawahan Anda.
-      PENTING: Gunakan kalimat perintah aktif (contoh: gunakan kata "Tunjukkan", bukan "Menunjukkan"; "Jelaskan", bukan "Menjelaskan"; "Lengkapi", bukan "Melengkapi"). Buat evaluasi dan masukan secara poin demi poin (bernomor) terkait apa yang harus mereka perbaiki atau sesuaikan dari usulan tersebut.
+      Berikan hasil analisis yang menyoroti:
+      1. Apakah sisa pagu saat ini masih mencukupi untuk memenuhi usulan anggaran?
+      2. Bagaimana rasio atau proporsi usulan tersebut dibandingkan dengan sisa pagu dan realisasi saat ini?
+      3. Apakah ada hal yang perlu diklarifikasi lebih lanjut terkait kesesuaian usulan dengan sisa pagu atau ketersediaan dana?
       
-      ATURAN MUTLAK: HANYA gunakan data kuantitatif, pagu, dan angka yang TERSEDIA di dalam teks ini. JANGAN PERNAH mengarang, menambah-nambahkan, atau berimajinasi tentang data keuangan, persentase, sisa pagu, atau kebijakan lain yang tidak tertulis secara eksplisit dalam teks yang diberikan. Jika data untuk membuat keputusan tidak cukup, nyatakan bahwa data tidak tersedia!
+      ATURAN MUTLAK: HANYA gunakan data kuantitatif, pagu, dan angka yang TERSEDIA di dalam teks ini. JANGAN PERNAH mengarang, menambah-nambahkan, atau berimajinasi tentang data keuangan, persentase, sisa pagu, atau kebijakan lain yang tidak tertulis secara eksplisit dalam teks yang diberikan. Jangan memberikan "Instruksi dan Masukan Tindak Lanjut" seolah-olah Anda seorang atasan, melainkan berikan poin-poin "Hasil Analisis Data" yang objektif.
       
-      Format dalam tag HTML ringan seperti <p>, <ol>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
+      Format dalam tag HTML ringan seperti <p>, <ol>, <ul>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
     `;
 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
