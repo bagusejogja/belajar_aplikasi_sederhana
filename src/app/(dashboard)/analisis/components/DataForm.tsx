@@ -102,6 +102,8 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const totalAnggaranDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.anggaran), 0) || 0;
   const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
   const totalSisaDetail = totalAnggaranDetail - totalRealisasiDetail;
+  const cTotalPaguUI = parseNum(historisYearRow.total_pagu || '0');
+  const sisaKapasitasAI = cTotalPaguUI > 0 ? (cTotalPaguUI - totalRealisasiDetail) : totalSisaDetail;
 
   let tanggalInput = '';
   if (mainData.id_analisis && mainData.id_analisis.startsWith('ANL-')) {
@@ -185,9 +187,6 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     .slice(0, 5)
     .map(d => `- ${d.uraian}: Rp ${formatRp(d.sisa)}`)
     .join('\n  ');
-
-    const cTotalPaguAI = parseNum(historisYearRow.total_pagu || '0');
-    const sisaKapasitasAI = cTotalPaguAI > 0 ? (cTotalPaguAI - totalRealisasiDetail) : totalSisaDetail;
 
     const aiContext = `[DETAIL PAGU KESELURUHAN TAHUN BERJALAN]
 Total Nominal Usulan: Rp ${mainData.total_anggaran || '0'}
@@ -436,7 +435,7 @@ ${mainData.ringkasan_ai}`;
                 </tr>
                 <tr className="hover:bg-gray-50 bg-emerald-50/30">
                   <td className="px-4 py-2 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
-                  <td className="px-4 py-2 text-right font-bold text-emerald-900">Rp {formatRp(totalSisaDetail)}</td>
+                  <td className="px-4 py-2 text-right font-bold text-emerald-900">Rp {formatRp(sisaKapasitasAI)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 bg-amber-50">
                   <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
