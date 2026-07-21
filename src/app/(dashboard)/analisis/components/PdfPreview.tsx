@@ -191,9 +191,12 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
        bodyPagu.push(['Talangan +', `+ Rp ${historisYearRow.talangan}`]);
     }
     
-    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${historisYearRow.total_pagu || '0'}`]);
+    const cTotalPaguHistoris = parseNum(historisYearRow.total_pagu || '0');
+    const sisaKapasitasHitung = cTotalPaguHistoris - totalRealisasiDetail;
+
+    bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${formatRp(cTotalPaguHistoris)}`]);
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
-    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(totalSisaDetail)}`]);
+    bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(sisaKapasitasHitung)}`]);
     bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
 
     startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026:`, startY);

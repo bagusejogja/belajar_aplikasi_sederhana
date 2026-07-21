@@ -186,9 +186,12 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     .map(d => `- ${d.uraian}: Rp ${formatRp(d.sisa)}`)
     .join('\n  ');
 
+    const cTotalPaguAI = parseNum(historisYearRow.total_pagu || '0');
+    const sisaKapasitasAI = cTotalPaguAI > 0 ? (cTotalPaguAI - totalRealisasiDetail) : totalSisaDetail;
+
     const aiContext = `[DETAIL PAGU KESELURUHAN TAHUN BERJALAN]
 Total Nominal Usulan: Rp ${mainData.total_anggaran || '0'}
-Sisa Kapasitas Pagu Saat Ini: Rp ${formatRp(totalSisaDetail)}
+Sisa Kapasitas Pagu Saat Ini: Rp ${formatRp(sisaKapasitasAI)}
 Realisasi S.d. Saat Ini: Rp ${formatRp(totalRealisasiDetail)}
 
 [DATA HISTORIS PAGU MULTI-TAHUN & POSISI PAGU TAHUN 2026]
