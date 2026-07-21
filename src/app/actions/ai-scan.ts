@@ -159,6 +159,7 @@ export async function generateAnalysisFromText(ocrText: string) {
       1. Apakah sisa pagu saat ini masih mencukupi untuk memenuhi usulan anggaran?
       2. Bagaimana rasio atau proporsi usulan tersebut dibandingkan dengan sisa pagu dan realisasi saat ini?
       3. Apakah ada hal yang perlu diklarifikasi lebih lanjut terkait kesesuaian usulan dengan sisa pagu atau ketersediaan dana?
+      4. KESIMPULAN KELAYAKAN: Berdasarkan analisis di atas, sebutkan secara tegas apakah pengajuan tambahan pagu ini "LAYAK DISETUJUI" atau "TIDAK LAYAK DISETUJUI" beserta alasan kuat (keterangan) yang mendukungnya.
       
       ATURAN MUTLAK: HANYA gunakan data kuantitatif, pagu, dan angka yang TERSEDIA di dalam teks ini. JANGAN PERNAH mengarang, menambah-nambahkan, atau berimajinasi tentang data keuangan, persentase, sisa pagu, atau kebijakan lain yang tidak tertulis secara eksplisit dalam teks yang diberikan. Jangan memberikan "Instruksi dan Masukan Tindak Lanjut" seolah-olah Anda seorang atasan, melainkan berikan poin-poin "Hasil Analisis Data" yang objektif.
       
