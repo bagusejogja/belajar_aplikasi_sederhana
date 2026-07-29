@@ -12,11 +12,27 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
 
   const [isUnauthorized, setIsUnauthorized] = useState(false);
+
+  useEffect(() => {
+     const savedCollapsed = localStorage.getItem('sidebar_collapsed');
+     if (savedCollapsed === 'true') {
+        setIsSidebarCollapsed(true);
+     }
+  }, []);
+
+  const handleToggleCollapsed = (val?: boolean | ((prev: boolean) => boolean)) => {
+     setIsSidebarCollapsed(prev => {
+        const next = typeof val === 'function' ? val(prev) : typeof val === 'boolean' ? val : !prev;
+        localStorage.setItem('sidebar_collapsed', String(next));
+        return next;
+     });
+  };
 
   useEffect(() => {
      const checkAuth = async () => {
@@ -82,6 +98,7 @@ export default function DashboardLayout({
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
       case '/gov-narrative': return 'Narrative Generator';
+      case '/surat/convert-ai': return 'AI Convert Surat';
       default: return 'Dashboard';
     }
   };
@@ -110,16 +127,10 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen bg-gray-50/50 overflow-hidden font-sans print:overflow-visible print:bg-white">
       <div className="print:hidden">
-         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} isCollapsed={isSidebarCollapsed} setIsCollapsed={handleToggleCollapsed} />
       </div>
       
-      {/* 
-        Area Utama Content 
-        - lg:ml-64 (Sidebar butuh 64 unit tempat di layar besar)
-        - p-4 md:p-8 (Padding menyusut di layar HP)
-        - Saat mode Print (Cetak), lebar jadi 100% dan margin kiri hilang!
-      */}
-      <div className="flex-1 flex flex-col lg:ml-64 w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible print:h-auto print:block">
+      <div className={`flex-1 flex flex-col ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible print:h-auto print:block`}>
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 lg:px-10 lg:py-8 gap-4 bg-white/50 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 lg:border-none print:hidden">
            
            <div className="flex items-center gap-3 w-full md:w-auto">

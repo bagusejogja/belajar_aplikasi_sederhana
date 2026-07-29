@@ -348,6 +348,16 @@ ${mainData.ringkasan_ai}`;
     );
   }
 
+  const handleNominalChange = (field: string, inputVal: string) => {
+    const cleaned = inputVal.replace(/[^0-9]/g, '');
+    if (!cleaned) {
+      setMainData((prev: any) => ({ ...prev, [field]: '0' }));
+      return;
+    }
+    const num = parseInt(cleaned, 10);
+    setMainData((prev: any) => ({ ...prev, [field]: formatRp(num) }));
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -385,8 +395,37 @@ ${mainData.ringkasan_ai}`;
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu</label>
-          <input type="text" value={mainData.total_anggaran} onChange={e => setMainData({...mainData, total_anggaran: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono focus:bg-white" />
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu (Rp)</label>
+          <input 
+            type="text" 
+            value={mainData.total_anggaran ? formatRp(parseNum(mainData.total_anggaran)) : ''} 
+            onChange={e => handleNominalChange('total_anggaran', e.target.value)} 
+            placeholder="0"
+            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono font-bold focus:bg-white" 
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status Persetujuan</label>
+          <select 
+            value={mainData.keputusan || 'diajukan'} 
+            onChange={e => setMainData({...mainData, keputusan: e.target.value})}
+            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-bold focus:bg-white capitalize"
+          >
+            <option value="diajukan">Diajukan</option>
+            <option value="disetujui sebagian">Disetujui Sebagian</option>
+            <option value="disetujui semua">Disetujui Semua</option>
+            <option value="ditolak">Ditolak</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Disetujui (Rp)</label>
+          <input 
+            type="text" 
+            value={mainData.nominal_disetujui ? formatRp(parseNum(mainData.nominal_disetujui)) : ''} 
+            onChange={e => handleNominalChange('nominal_disetujui', e.target.value)} 
+            placeholder="0"
+            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-emerald-700 font-mono font-bold focus:bg-white" 
+          />
         </div>
         <div className="col-span-full mt-4">
           <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026 {tanggalInput ? `(per ${tanggalInput})` : ''}</label>

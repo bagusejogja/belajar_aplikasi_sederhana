@@ -162,7 +162,26 @@ export default function MonitoringMakPage() {
 
   const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string, uploadTime: string) => {
     try {
-      const ext = originalName.split('.').pop() || 'file';
+      // 1. Cek jika URL adalah tautan SharePoint / Office365 / Google Drive (buka langsung di tab baru agar tidak korup)
+      const lowerUrl = (url || '').toLowerCase();
+      if (lowerUrl.includes('sharepoint.com') || lowerUrl.includes('onedrive') || lowerUrl.includes('drive.google.com') || lowerUrl.includes('forms.office.com')) {
+        window.open(url, '_blank');
+        return;
+      }
+
+      // 2. Deteksi ekstensi asli secara presisi dari URL terlebih dahulu, fallback ke originalName
+      const cleanUrl = url.split('?')[0];
+      const urlExt = cleanUrl.split('.').pop()?.toLowerCase();
+      let ext = 'xlsx';
+      if (urlExt && ['xls', 'xlsx', 'csv', 'pdf', 'docx', 'doc', 'zip'].includes(urlExt)) {
+        ext = urlExt;
+      } else {
+        const nameExt = originalName.split('.').pop()?.toLowerCase();
+        if (nameExt && ['xls', 'xlsx', 'csv', 'pdf', 'docx', 'doc', 'zip'].includes(nameExt)) {
+          ext = nameExt;
+        }
+      }
+
       const now = uploadTime ? new Date(uploadTime) : new Date();
       const timeStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
       
@@ -170,8 +189,21 @@ export default function MonitoringMakPage() {
       const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
       
       const response = await fetch(url);
-      const blob = await response.blob();
+      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       
+      const contentType = response.headers.get('content-type') || '';
+      // Jika yang di-return adalah HTML error page, jangan simpan sebagai binary xls/xlsx
+      if (contentType.includes('text/html')) {
+        window.open(url, '_blank');
+        return;
+      }
+
+      const arrayBuf = await response.arrayBuffer();
+      const mimeType = ext === 'xls' ? 'application/vnd.ms-excel' 
+                     : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                     : (contentType || 'application/octet-stream');
+      
+      const blob = new Blob([arrayBuf], { type: mimeType });
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -197,14 +229,25 @@ export default function MonitoringMakPage() {
     if (files.length === 0) return <span>-</span>;
     if (files.length === 1) {
       return (
-        <button 
-          onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal, uploadTime)}
-          className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
-          title={`Download: ${files[0].name}`}
-        >
-          <Download size={14} strokeWidth={2.5} />
-          <span className="text-[11px] font-black uppercase tracking-wider">Download</span>
-        </button>
+        <div className="flex items-center gap-1.5 justify-center">
+          <button 
+            onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal, uploadTime)}
+            className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
+            title={`Download: ${files[0].name}`}
+          >
+            <Download size={14} strokeWidth={2.5} />
+            <span className="text-[11px] font-black uppercase tracking-wider">Download</span>
+          </button>
+          <a
+            href={files[0].url}
+            target="_blank"
+            rel="noreferrer"
+            className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition-colors"
+            title="Buka File Asli Direct"
+          >
+            <ExternalLink size={14} />
+          </a>
+        </div>
       );
     }
     return (
@@ -473,7 +516,10 @@ export default function MonitoringMakPage() {
                       <td className="px-6 py-4 border-r border-gray-50">
                         {renderFileLinks(
                           [
-                            ...(row.lampiran_excel ? [{ url: row.lampiran_excel, name: 'Excel_Semula_Menjadi.xlsx' }] : []),
+                            ...(row.lampiran_excel ? [{ 
+                              url: row.lampiran_excel, 
+                              name: `Excel_Semula_Menjadi.${(row.lampiran_excel.split('?')[0].split('.').pop() || 'xlsx').toLowerCase()}` 
+                            }] : []),
                             ...(Array.isArray(catatan) ? catatan : [])
                           ], 
                           row.unit, 

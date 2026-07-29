@@ -30,7 +30,9 @@ export default function AnalisisPaguPage() {
     rekomendasi_html: '',
     pagu_berjalan: {},
     file_lampiran: '',
-    link_lampiran: ''
+    link_lampiran: '',
+    keputusan: 'diajukan',
+    nominal_disetujui: '0'
   });
   
   const [detailData, setDetailData] = useState<any[]>([]);
@@ -41,7 +43,11 @@ export default function AnalisisPaguPage() {
     try {
        const { data: utama } = await supabase.from('app_analisis_utama').select('*').eq('id_analisis', id_analisis).single();
        if (utama) {
-          setMainData(utama);
+          setMainData({
+             ...utama,
+             keputusan: utama.keputusan || 'diajukan',
+             nominal_disetujui: utama.nominal_disetujui || '0'
+          });
           setAnalisisId(id_analisis);
        }
        const { data: detail } = await supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id_analisis).order('no_urut', { ascending: true });
@@ -112,14 +118,18 @@ export default function AnalisisPaguPage() {
                 ...prev,
                 analisis_html: parsed.analisis || '',
                 rekomendasi_html: parsed.rekomendasi || '',
-                pagu_berjalan: parsed.pagu_berjalan || {}
+                pagu_berjalan: parsed.pagu_berjalan || {},
+                keputusan: utama.keputusan || parsed.keputusan || 'diajukan',
+                nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0'
              }));
           } catch (e) {
              // Jika bukan JSON (format lama)
              setMainData((prev: any) => ({
                 ...prev,
                 analisis_html: utama.analisis_html,
-                rekomendasi_html: ''
+                rekomendasi_html: '',
+                keputusan: utama.keputusan || 'diajukan',
+                nominal_disetujui: utama.nominal_disetujui || '0'
              }));
           }
        }
@@ -149,10 +159,14 @@ export default function AnalisisPaguPage() {
         total_realisasi: mainData.total_realisasi || '0',
         persen_serapan: mainData.persen_serapan || '0',
         ringkasan_ai: mainData.ringkasan_ai || '',
+        keputusan: mainData.keputusan || 'diajukan',
+        nominal_disetujui: mainData.nominal_disetujui || '0',
         analisis_html: JSON.stringify({
            analisis: mainData.analisis_html || '',
            rekomendasi: mainData.rekomendasi_html || '',
-           pagu_berjalan: mainData.pagu_berjalan || {}
+           pagu_berjalan: mainData.pagu_berjalan || {},
+           keputusan: mainData.keputusan || 'diajukan',
+           nominal_disetujui: mainData.nominal_disetujui || '0'
         }),
         file_lampiran: mainData.file_lampiran || '',
         link_lampiran: mainData.link_lampiran || ''
@@ -217,7 +231,7 @@ export default function AnalisisPaguPage() {
         no_surat: '', tanggal_surat: '', perihal: '', unit_pengirim: '',
         total_anggaran: '0', total_realisasi: '0', persen_serapan: '0', ringkasan_ai: '', analisis_html: '',
         posisi_pagu: '', rekomendasi_html: '', pagu_berjalan: {},
-        file_lampiran: '', link_lampiran: ''
+        file_lampiran: '', link_lampiran: '', keputusan: 'diajukan', nominal_disetujui: '0'
      });
      setDetailData([]);
      setHistorisData([]);

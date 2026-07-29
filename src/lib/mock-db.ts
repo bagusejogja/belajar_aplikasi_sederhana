@@ -61,6 +61,7 @@ export const menuList: MenuItem[] = [
   { title: 'Master Penerimaan', path: '/penerimaan/master', icon: 'Settings', roles: ['ADMIN', 'MANAGER'], group: 'Penerimaan' },
 
   // --- PERSURATAN ---
+  { title: 'AI Convert Surat', path: '/surat/convert-ai', icon: 'Wand2', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
   { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
   { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
   

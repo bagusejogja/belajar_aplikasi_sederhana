@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { History, FileText, ChevronRight, Building2, Calendar, TrendingUp, Search, Paperclip } from 'lucide-react';
+import { History, FileText, ChevronRight, Building2, Calendar, TrendingUp, Search, Paperclip, CheckCircle2, AlertCircle, XCircle, Clock } from 'lucide-react';
 
 export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAnalisis: (id_analisis: string) => void, setActiveTab: (tab: string) => void }) {
   const [riwayat, setRiwayat] = useState<any[]>([]);
@@ -9,16 +9,50 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  const parseNum = (str: string | number) => {
+    if (typeof str === 'number') return str;
+    let s = (str || '0').toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+       const parts = s.split('.');
+       if (parts.length === 2 && parts[0].length > 3) {
+          return parseFloat(s);
+       }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+
+  const formatRp = (val: any) => {
+    const num = parseNum(val);
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+  };
+
   useEffect(() => {
     const fetchRiwayat = async () => {
       const { data } = await supabase
         .from('app_analisis_utama')
-        .select('id_analisis, no_surat, tanggal_surat, perihal, created_at, unit_pengirim, total_anggaran, total_realisasi, persen_serapan, link_lampiran')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, created_at, unit_pengirim, total_anggaran, total_realisasi, persen_serapan, link_lampiran, keputusan, nominal_disetujui, analisis_html')
         .order('created_at', { ascending: false });
       
       if (data) {
-        setRiwayat(data);
-        setFiltered(data);
+        const processed = data.map(r => {
+           let keputusan = r.keputusan;
+           let nominalDisetujui = r.nominal_disetujui;
+           if (!keputusan && r.analisis_html) {
+              try {
+                 const parsed = JSON.parse(r.analisis_html);
+                 if (parsed.keputusan) keputusan = parsed.keputusan;
+                 if (parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+              } catch(e) {}
+           }
+           return {
+              ...r,
+              keputusan: keputusan || 'diajukan',
+              nominal_disetujui: nominalDisetujui || '0'
+           };
+        });
+        setRiwayat(processed);
+        setFiltered(processed);
       }
       setLoading(false);
     };
@@ -33,10 +67,41 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
       setFiltered(riwayat.filter(r => 
         (r.no_surat && r.no_surat.toLowerCase().includes(lower)) || 
         (r.perihal && r.perihal.toLowerCase().includes(lower)) ||
-        (r.unit_pengirim && r.unit_pengirim.toLowerCase().includes(lower))
+        (r.unit_pengirim && r.unit_pengirim.toLowerCase().includes(lower)) ||
+        (r.keputusan && r.keputusan.toLowerCase().includes(lower))
       ));
     }
   }, [search, riwayat]);
+
+  const getStatusBadge = (status: string) => {
+     const st = (status || 'diajukan').toLowerCase();
+     if (st === 'disetujui semua') {
+        return (
+           <span className="flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-wider border border-emerald-200 shadow-sm">
+              <CheckCircle2 size={12}/> Disetujui Semua
+           </span>
+        );
+     }
+     if (st === 'disetujui sebagian') {
+        return (
+           <span className="flex items-center gap-1 px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-[10px] font-black uppercase tracking-wider border border-indigo-200 shadow-sm">
+              <AlertCircle size={12}/> Disetujui Sebagian
+           </span>
+        );
+     }
+     if (st === 'ditolak') {
+        return (
+           <span className="flex items-center gap-1 px-3 py-1 bg-rose-100 text-rose-800 rounded-lg text-[10px] font-black uppercase tracking-wider border border-rose-200 shadow-sm">
+              <XCircle size={12}/> Ditolak
+           </span>
+        );
+     }
+     return (
+        <span className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase tracking-wider border border-amber-200 shadow-sm">
+           <Clock size={12}/> Diajukan
+        </span>
+     );
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col pb-20">
@@ -88,8 +153,11 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                >
                  <div>
                     <div className="flex justify-between items-start gap-4 mb-4">
-                       <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                          <Calendar size={12} /> {new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                       <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                             <Calendar size={12} /> {new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </div>
+                          {getStatusBadge(r.keputusan)}
                        </div>
                        <div className="flex gap-2">
                          {r.link_lampiran && (
@@ -120,13 +188,28 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                        <FileText size={12} /> {r.no_surat || 'Tanpa No Surat'}
                     </p>
 
-                    <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100/50 flex flex-col gap-3">
+                    <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100/50 flex flex-col gap-2.5">
                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                          <Building2 size={14} className="text-indigo-400" /> {r.unit_pengirim || '-'}
+                          <Building2 size={14} className="text-indigo-400 shrink-0" /> <span className="truncate">{r.unit_pengirim || '-'}</span>
                        </div>
-                       <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                          <TrendingUp size={14} className="text-emerald-400" /> Rp {r.total_anggaran || '0'}
+                       <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-200/60">
+                          <span className="text-slate-500 flex items-center gap-1.5">
+                             <TrendingUp size={14} className="text-emerald-500" /> Usulan:
+                          </span>
+                          <span className="text-slate-900 font-mono font-black text-sm">
+                             Rp {formatRp(r.total_anggaran)}
+                          </span>
                        </div>
+                       {(r.keputusan !== 'diajukan' || parseNum(r.nominal_disetujui) > 0) && (
+                          <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-200/60">
+                             <span className="text-indigo-600 flex items-center gap-1.5">
+                                <CheckCircle2 size={14} className="text-indigo-500" /> Disetujui:
+                             </span>
+                             <span className="text-emerald-600 font-mono font-black text-sm">
+                                Rp {formatRp(r.nominal_disetujui)}
+                             </span>
+                          </div>
+                       )}
                     </div>
                  </div>
 

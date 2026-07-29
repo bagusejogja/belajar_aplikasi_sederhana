@@ -184,3 +184,73 @@ export async function generateAnalysisFromText(ocrText: string) {
   }
 }
 
+export async function convertSuratToTextWithAI(formData: FormData) {
+  try {
+    const file = formData.get('file') as File;
+    const rawText = (formData.get('rawText') as string) || '';
+
+    let promptContext = '';
+    let inlineData = undefined;
+
+    if (file && file.size > 0) {
+      const bytes = await file.arrayBuffer();
+      const base64Data = Buffer.from(bytes).toString('base64');
+      inlineData = { data: base64Data, mimeType: file.type || 'application/pdf' };
+    } else if (rawText) {
+      promptContext = `TEKS SURAT:\n${rawText}\n`;
+    } else {
+      throw new Error("File atau teks surat tidak ditemukan");
+    }
+
+    const prompt = `
+      ${promptContext}
+      Tugas Anda adalah membaca dokumen/teks surat resmi berikut dan mengekstrak rincian persuratan.
+      
+      Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan) dengan struktur:
+      {
+        "no_surat": "Nomor surat lengkap",
+        "tanggal_surat": "Tanggal surat",
+        "perihal": "Perihal surat",
+        "yth": "Penerima/Tujuan surat (contoh: Yth. Wakil Rektor Bidang SDM dan Keuangan)",
+        "unit_pengirim": "Nama unit pengirim surat",
+        "teks_copas_standar": "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]"
+      }
+
+      PENTING untuk field "teks_copas_standar":
+      Format harus persis seperti format rujukan berikut (menggunakan "Nomor" berhuruf N kapital, TANPA titik dua ":"):
+      "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]"
+
+      Contoh output teks_copas_standar yang BENAR:
+      "Sesuai surat Nomor 2107/UN1/DPM/Dit-PKM/PM.00/2026 tanggal 30 Juni 2026 perihal Permohonan penambahan pagu anggaran DPKM UGM"
+
+      Hanya berikan JSON saja.
+    `;
+
+    const requestContent: any = { role: "user", parts: [{ text: prompt }] };
+    if (inlineData) requestContent.parts.push({ inlineData });
+
+    const request = {
+      contents: [requestContent],
+      generationConfig: { responseMimeType: "application/json" }
+    };
+    
+    let result;
+    try {
+       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+       result = await model.generateContent(request);
+    } catch (err) {
+       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+       result = await fallbackModel.generateContent(request);
+    }
+
+    const responseText = result.response.text();
+    const jsonString = responseText.replace(/```json|```/g, "").trim();
+    const extractedData = JSON.parse(jsonString);
+
+    return { success: true, data: extractedData };
+  } catch (error: any) {
+    console.error("Error Convert Surat AI:", error);
+    return { success: false, error: error.message };
+  }
+}
+
