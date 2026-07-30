@@ -317,6 +317,7 @@ export default function TambahPaguFormPage() {
               </div>
             </div>
 
+            {/* TEMPORARILY HIDDEN
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
                 Ringkasan Substansi Pengajuan <div className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[8px]">Rich Text Active</div>
@@ -366,6 +367,7 @@ export default function TambahPaguFormPage() {
               </div>
               <p className="text-[9px] text-gray-400 px-4 italic">* Ketik teks, blok, lalu klik LIST • untuk membuat poin-poin.</p>
             </div>
+            */}
           </div>
         </div>
 

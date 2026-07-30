@@ -44,6 +44,9 @@ export default function EditPaguPage() {
     tanggapan: ''
   });
 
+  const [filePengajuan, setFilePengajuan] = useState<File | null>(null);
+  const [fileTanggapan, setFileTanggapan] = useState<File | null>(null);
+
   useEffect(() => {
     fetchInitialData();
   }, [params.id]);
@@ -105,30 +108,29 @@ export default function EditPaguPage() {
     e.preventDefault();
     setIsSaving(true);
     try {
+      const data = new FormData();
+      data.append('id', params.id as string);
+      
       const payload = { ...formData, unit_id: formData.unit_id?.value };
       
-      // Pastikan nominal dikirim sebagai number murni ke DB
-      const cleanPayload = {
-        tahun_anggaran: payload.tahun_anggaran,
-        unit_id: payload.unit_id,
-        jenis_tambah_pagu: payload.jenis_tambah_pagu,
-        status_pengajuan: payload.status_pengajuan,
-        no_surat_pengajuan: payload.no_surat_pengajuan,
-        tanggal_surat_pengajuan: payload.tanggal_surat_pengajuan,
-        hal_surat_pengajuan: payload.hal_surat_pengajuan,
-        subyek_pengajuan_di_simaster_persuratan: payload.subyek_pengajuan_di_simaster_persuratan,
-        nominal_diajukan: parseInt(payload.nominal_diajukan || 0),
-        link_surat_pengajuan: payload.link_surat_pengajuan,
-        ringkasan_surat_pengajuan: payload.ringkasan_surat_pengajuan,
-        no_surat_tanggapan: payload.no_surat_tanggapan,
-        tanggal_surat_tanggapan: payload.tanggal_surat_tanggapan,
-        hal_surat_tanggapan: payload.hal_surat_tanggapan,
-        subyek_tanggapan_di_simaster_persuratan: payload.subyek_tanggapan_di_simaster_persuratan,
-        link_surat_tanggapan: payload.link_surat_tanggapan,
-        nominal_tanggapan: parseInt(payload.nominal_tanggapan || 0),
-      };
+      Object.entries(payload).forEach(([key, value]) => {
+        if (key === 'nominal_diajukan' || key === 'nominal_tanggapan') {
+          data.append(key, (value || '0').toString());
+        } else if (value !== null && value !== undefined) {
+          data.append(key, value.toString());
+        }
+      });
 
-      const result = await updateTambahPagu(params.id as string, cleanPayload);
+      if (filePengajuan) data.append('file_surat_pengajuan', filePengajuan);
+      if (fileTanggapan) data.append('file_surat_tanggapan', fileTanggapan);
+
+      const response = await fetch('/api/tambah-pagu/edit', {
+        method: 'POST',
+        body: data,
+      });
+
+      const result = await response.json();
+      
       if (result.success) {
         alert("Perubahan Berhasil Disimpan!");
         router.push('/tambah-pagu');
@@ -281,21 +283,38 @@ export default function EditPaguPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Pengajuan Terupload</label>
-              {existingFiles.pengajuan ? (
-                <a 
-                  href={existingFiles.pengajuan} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 bg-blue-50 text-blue-700 rounded-2xl border border-blue-100 font-bold hover:bg-blue-100 transition-all"
-                >
-                  <ExternalLink size={20} /> LIHAT FILE SURAT PENGIRIMAN
-                </a>
-              ) : (
-                <p className="text-xs text-gray-400 italic p-4 bg-gray-50 rounded-2xl">Belum ada file terupload.</p>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Pengajuan (Baru)</label>
+              <div className="relative group">
+                <input 
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="w-full bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group-hover:bg-indigo-50 transition-all">
+                  <UploadCloud size={28} className="text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <p className="text-sm font-bold text-indigo-700">
+                    {filePengajuan ? filePengajuan.name : "Upload File Pengajuan Baru"}
+                  </p>
+                  {!filePengajuan && <p className="text-xs text-indigo-400/80 font-medium">Kosongkan jika tidak ingin mengubah file</p>}
+                </div>
+              </div>
+              
+              {existingFiles.pengajuan && (
+                <div className="mt-3">
+                  <a 
+                    href={existingFiles.pengajuan} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 p-3 bg-white text-blue-600 rounded-xl border border-blue-100 font-bold hover:bg-blue-50 transition-all text-xs"
+                  >
+                    <ExternalLink size={16} /> LIHAT FILE SAAT INI
+                  </a>
+                </div>
               )}
             </div>
 
+            {/* TEMPORARILY HIDDEN
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
                 Ringkasan Substansi Pengajuan <div className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[8px]">Rich Text Active</div>
@@ -324,6 +343,7 @@ export default function EditPaguPage() {
                 `}} />
               </div>
             </div>
+            */}
           </div>
         </div>
 
@@ -375,18 +395,34 @@ export default function EditPaguPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Tanggapan Terupload</label>
-                {existingFiles.tanggapan ? (
-                  <a 
-                    href={existingFiles.tanggapan} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-4 bg-indigo-50 text-indigo-700 rounded-2xl border border-indigo-100 font-bold hover:bg-indigo-100 transition-all"
-                  >
-                    <ExternalLink size={20} /> LIHAT FILE SURAT TANGGAPAN
-                  </a>
-                ) : (
-                  <p className="text-xs text-gray-400 italic p-4 bg-gray-50 rounded-2xl">Belum ada file terupload.</p>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Tanggapan (Baru)</label>
+                <div className="relative group">
+                  <input 
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="w-full bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group-hover:bg-emerald-50 transition-all">
+                    <UploadCloud size={28} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-bold text-emerald-700">
+                      {fileTanggapan ? fileTanggapan.name : "Upload File Tanggapan Baru"}
+                    </p>
+                    {!fileTanggapan && <p className="text-xs text-emerald-400/80 font-medium">Kosongkan jika tidak ingin mengubah file</p>}
+                  </div>
+                </div>
+
+                {existingFiles.tanggapan && (
+                  <div className="mt-3">
+                    <a 
+                      href={existingFiles.tanggapan} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 p-3 bg-white text-emerald-600 rounded-xl border border-emerald-100 font-bold hover:bg-emerald-50 transition-all text-xs"
+                    >
+                      <ExternalLink size={16} /> LIHAT FILE SAAT INI
+                    </a>
+                  </div>
                 )}
               </div>
             </div>

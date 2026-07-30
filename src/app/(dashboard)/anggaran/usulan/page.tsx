@@ -13,6 +13,7 @@ export default function UsulanAnggaranPage() {
   const [rawData, setRawData] = useState<any[]>([]);
   const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
   const [selectedTP, setSelectedTP] = useState<string>('');
@@ -156,6 +157,17 @@ export default function UsulanAnggaranPage() {
     return Object.entries(freqGroups)
       .map(([Total, units]) => ({ name: units.join(', '), Total: Number(Total) }))
       .sort((a, b) => b.Total - a.Total); // Sort descending by frequency
+  }, [filteredData]);
+
+  const chartData = useMemo(() => {
+    const unitCounts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || 'Unknown';
+      unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    return Object.entries(unitCounts)
+      .map(([unit, count]) => ({ name: unit, Total: count }))
+      .sort((a, b) => b.Total - a.Total);
   }, [filteredData]);
 
   // Reset selection when search/filter changes
@@ -422,61 +434,114 @@ export default function UsulanAnggaranPage() {
 
       {/* Dashboard Section */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
-        <h2 className="text-xl font-black text-gray-800 mb-6 flex items-center gap-2">
-          <BarChart3 className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP})` : ''}
-        </h2>
-        {dashboardData.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-4 border-b text-xs uppercase tracking-widest text-gray-500 font-bold">Unit (Frekuensi Sama)</th>
-                  <th className="p-4 border-b text-center text-xs uppercase tracking-widest text-gray-500 font-bold">Frekuensi Revisi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
-                  const getGroupColor = (group?: string) => {
-                    switch(group) {
-                       case 'Fakultas': return 'bg-sky-100 text-sky-700 border border-sky-200';
-                       case 'KPTU': return 'bg-amber-100 text-amber-700 border border-amber-200';
-                       case 'Pusat Studi': return 'bg-violet-100 text-violet-700 border border-violet-200';
-                       case 'Tempat Ibadah': return 'bg-rose-100 text-rose-700 border border-rose-200';
-                       default: return 'bg-gray-100 text-gray-700 border border-gray-200';
-                    }
-                  };
-                  const units = d.name.split(', ');
-                  return (
-                    <tr key={i} className="border-b hover:bg-gray-50/50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-2">
-                          {units.map((unit: string, ui: number) => {
-                            const cleanUnit = unit.trim();
-                            const groupOrg = unitGroups[cleanUnit];
-                            return (
-                              <span key={ui} className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getGroupColor(groupOrg)} shadow-sm`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
-                                {cleanUnit}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-lg shadow-sm shadow-indigo-200">
-                          {d.Total}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+          <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
+            <BarChart3 className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP})` : ''}
+          </h2>
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button 
+              onClick={() => setActiveTab('table')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Tabel Frekuensi
+            </button>
+            <button 
+              onClick={() => setActiveTab('chart')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Grafik Batang
+            </button>
           </div>
+        </div>
+
+        {activeTab === 'table' ? (
+          dashboardData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-4 border-b text-xs uppercase tracking-widest text-gray-500 font-bold">Unit (Frekuensi Sama)</th>
+                    <th className="p-4 border-b text-center text-xs uppercase tracking-widest text-gray-500 font-bold">Frekuensi Revisi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
+                    const getGroupColor = (group?: string) => {
+                      switch(group) {
+                         case 'Fakultas': return 'bg-sky-100 text-sky-700 border border-sky-200';
+                         case 'KPTU': return 'bg-amber-100 text-amber-700 border border-amber-200';
+                         case 'Pusat Studi': return 'bg-violet-100 text-violet-700 border border-violet-200';
+                         case 'Tempat Ibadah': return 'bg-rose-100 text-rose-700 border border-rose-200';
+                         default: return 'bg-gray-100 text-gray-700 border border-gray-200';
+                      }
+                    };
+                    const units = d.name.split(', ');
+                    return (
+                      <tr key={i} className="border-b hover:bg-gray-50/50 transition-colors">
+                        <td className="p-4">
+                          <div className="flex flex-wrap gap-2">
+                            {units.map((unit: string, ui: number) => {
+                              const cleanUnit = unit.trim();
+                              const groupOrg = unitGroups[cleanUnit];
+                              return (
+                                <span key={ui} className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getGroupColor(groupOrg)} shadow-sm`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
+                                  {cleanUnit}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-lg shadow-sm shadow-indigo-200">
+                            {d.Total}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+              <BarChart3 size={48} className="opacity-20 mb-4" />
+              <p className="font-bold">Belum ada data revisi untuk ditampilkan</p>
+            </div>
+          )
         ) : (
-          <div className="h-64 flex flex-col items-center justify-center text-gray-400">
-            <BarChart3 size={48} className="opacity-20 mb-4" />
-            <p className="font-bold">Belum ada data revisi untuk ditampilkan</p>
-          </div>
+          chartData.length > 0 ? (
+            <div className="h-[400px] w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} 
+                    angle={-45} 
+                    textAnchor="end" 
+                    interval={0}
+                    height={80}
+                    tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} allowDecimals={false} />
+                  <Tooltip 
+                    cursor={{ fill: '#f9fafb' }}
+                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Bar dataKey="Total" radius={[6, 6, 0, 0]} maxBarSize={50} animationDuration={1000}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill="#4f46e5" />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center text-gray-400">
+              <BarChart3 size={48} className="opacity-20 mb-4" />
+              <p className="font-bold">Belum ada data revisi untuk ditampilkan</p>
+            </div>
+          )
         )}
       </div>
 
@@ -533,7 +598,7 @@ export default function UsulanAnggaranPage() {
               <p className="text-sm font-bold">Memuat Data...</p>
             </div>
           ) : filteredData.length > 0 ? (
-            <table className="w-full text-left border-collapse whitespace-nowrap">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-900 shadow-md">
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-10 text-center">
@@ -551,8 +616,8 @@ export default function UsulanAnggaranPage() {
                     />
                   </th>
                   <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-16">NO</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">Pengirim (Email & Unit)</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">PIC & Status</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 min-w-[200px]">Pengirim (Email & Unit)</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 min-w-[150px]">PIC & Status</th>
                   
                   {Object.keys(filteredData[0] || {})
                     .filter(header => !['id', 'created_at', 'status', 'waktu_proses', 'email', 'Email', 'unit', 'Unit', 'pic', 'PIC', 'Unit Kerja', 'unit_kerja', 'tahun', 'Tahun', 'periode', 'Periode'].includes(header))
@@ -592,11 +657,11 @@ export default function UsulanAnggaranPage() {
                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs">{idx + 1}</span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50">
+                    <td className="px-6 py-4 border-r border-gray-50">
                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-bold text-gray-900">{emailVal}</span>
-                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{unitVal}</span>
-                          <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1">
+                          <span className="text-xs font-bold text-gray-900 whitespace-normal leading-snug">{emailVal}</span>
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal leading-snug">{unitVal}</span>
+                          <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1 inline-flex w-fit px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded">
                             TAHUN {tahunVal} • PERIODE {periodeVal}
                           </span>
                        </div>
