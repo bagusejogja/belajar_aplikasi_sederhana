@@ -201,7 +201,7 @@ export default function MonitoringMakPage() {
       const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
       const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
       
-      const response = await fetch(url);
+      const response = await window.fetch(url);
       if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       
       const contentType = response.headers.get('content-type') || '';

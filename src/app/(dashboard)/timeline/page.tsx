@@ -13,6 +13,7 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterYear, setFilterYear] = useState<string>('All');
+  const [filterParentId, setFilterParentId] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'hari'|'pekan'>('hari');
   
   const [expandedParents, setExpandedParents] = useState<number[]>([]);
@@ -181,11 +182,14 @@ export default function TimelinePage() {
   });
 
   const parents = displayedData.filter(d => !d.parent_id);
-  const filteredParents = parents.filter(p => 
-    p.judul_kegiatan.toLowerCase().includes(search.toLowerCase()) || 
-    (p.pic && p.pic.toLowerCase().includes(search.toLowerCase())) ||
-    displayedData.some(c => c.parent_id === p.id && c.judul_kegiatan.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredParents = parents.filter(p => {
+    const matchSearch = p.judul_kegiatan.toLowerCase().includes(search.toLowerCase()) || 
+      (p.pic && p.pic.toLowerCase().includes(search.toLowerCase())) ||
+      displayedData.some(c => c.parent_id === p.id && c.judul_kegiatan.toLowerCase().includes(search.toLowerCase()));
+    const matchParent = filterParentId === 'All' || p.id.toString() === filterParentId;
+    
+    return matchSearch && matchParent;
+  });
 
   const rows: any[] = [];
   filteredParents.forEach(p => {
@@ -220,7 +224,7 @@ export default function TimelinePage() {
   // Gantt Chart Calculations
   const DAY_WIDTH = viewMode === 'pekan' ? 5 : 24; // Pixel per day
   const getGanttExtents = () => {
-    if (displayedData.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [] };
+    if (displayedData.length === 0) return { minDate: new Date(), maxDate: new Date(), totalDays: 0, months: [], allWeeks: [] };
     
     let minT = new Date(displayedData[0].tanggal_mulai).getTime();
     let maxT = new Date(displayedData[0].tanggal_selesai || displayedData[0].tanggal_mulai).getTime();
@@ -232,13 +236,17 @@ export default function TimelinePage() {
     });
 
     const minDate = new Date(minT);
-    minDate.setDate(1); // Set to 1st of the month
     
     const maxDate = new Date(maxT);
-    maxDate.setDate(maxDate.getDate() + 30); // Tambah padding 1 bulan ke kanan biar lega
-    maxDate.setMonth(maxDate.getMonth() + 1, 0); // Set to last day of that month
+    maxDate.setDate(maxDate.getDate() + 7); // Tambah padding 7 hari ke kanan biar sedikit lega
 
     const totalDays = Math.round((maxDate.getTime() - minDate.getTime()) / (1000 * 3600 * 24)) + 1;
+
+    const allWeeks: { label: string; days: number; startYear: number; startDate: Date; endDate: Date }[] = [];
+    let currentGlobalWeek = -1;
+    let currentGlobalWeekDays = 0;
+    let currentGlobalYear = -1;
+    let globalWeekStartDate: Date = new Date();
 
     const months = [];
     let curr = new Date(minDate);
@@ -248,12 +256,12 @@ export default function TimelinePage() {
       const daysInMonth = new Date(y, m + 1, 0).getDate();
       
       const daysArray = [];
-      let currentWeekNum = -1;
-      let weeks = [];
-      let currentWeekDays = 0;
-      let weekStartDate = null;
 
-      for(let d = 1; d <= daysInMonth; d++) {
+      const startDay = (curr.getFullYear() === minDate.getFullYear() && curr.getMonth() === minDate.getMonth()) 
+                         ? minDate.getDate() 
+                         : 1;
+
+      for(let d = startDay; d <= daysInMonth; d++) {
          const dateObj = new Date(y, m, d);
          if (dateObj > maxDate) break;
          const dayOfWeek = dateObj.getDay();
@@ -265,43 +273,41 @@ export default function TimelinePage() {
             return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
          }
          const w = getWeek(dateObj);
+         const currentYear = dateObj.getFullYear();
          
-         if (w !== currentWeekNum) {
-            if (currentWeekNum !== -1) {
-               const lastDay = new Date(y, m, d - 1);
-               weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: lastDay });
+         if (w !== currentGlobalWeek || currentYear !== currentGlobalYear) {
+            if (currentGlobalWeek !== -1) {
+               const lastDay = new Date(dateObj);
+               lastDay.setDate(lastDay.getDate() - 1);
+               allWeeks.push({ label: `${currentGlobalWeek}`, days: currentGlobalWeekDays, startYear: currentGlobalYear, startDate: globalWeekStartDate, endDate: lastDay });
             }
-            currentWeekNum = w;
-            currentWeekDays = 1;
-            weekStartDate = dateObj;
+            currentGlobalWeek = w;
+            currentGlobalYear = currentYear;
+            currentGlobalWeekDays = 1;
+            globalWeekStartDate = dateObj;
          } else {
-            currentWeekDays++;
+            currentGlobalWeekDays++;
          }
 
          daysArray.push({ date: d, isWeekend, fullDate: dateObj });
-      }
-      if (currentWeekDays > 0) {
-         const lastDay = new Date(y, m, daysInMonth);
-         if (lastDay > maxDate) {
-            weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: maxDate });
-         } else {
-            weeks.push({ label: `Pekan ${currentWeekNum}`, days: currentWeekDays, startDate: weekStartDate, endDate: lastDay });
-         }
       }
 
       months.push({
         label: curr.toLocaleString('id-ID', { month: 'long' }) + ' ' + y,
         days: daysArray.length,
-        daysArray,
-        weeks
+        daysArray
       });
       curr.setMonth(m + 1);
     }
 
-    return { minDate, maxDate, totalDays, months };
+    if (currentGlobalWeekDays > 0) {
+       allWeeks.push({ label: `${currentGlobalWeek}`, days: currentGlobalWeekDays, startYear: currentGlobalYear, startDate: globalWeekStartDate, endDate: maxDate });
+    }
+
+    return { minDate, maxDate, totalDays, months, allWeeks };
   };
 
-  const { minDate, totalDays, months } = getGanttExtents();
+  const { minDate, maxDate, totalDays, months, allWeeks } = getGanttExtents();
   const timelineWidth = totalDays * DAY_WIDTH;
 
   const getPosition = (dateStr: string) => {
@@ -323,37 +329,179 @@ export default function TimelinePage() {
     if (ganttScrollRef.current && data.length > 0) {
       const timer = setTimeout(() => {
         if (ganttScrollRef.current) {
-          const todayLeft = getPosition(new Date().toISOString());
-          ganttScrollRef.current.scrollLeft = todayLeft - ganttScrollRef.current.clientWidth / 2;
+          ganttScrollRef.current.scrollLeft = 0;
         }
       }, 300);
       return () => clearTimeout(timer);
     }
   }, [data, minDate]);
 
-  const exportToExcel = () => {
-    const headers = ['Nama Kegiatan', 'PIC', 'Rencana Mulai', 'Rencana Selesai', 'Realisasi Mulai', 'Realisasi Selesai', 'Status', 'Keterangan', 'Link Hasil'];
-    const csvRows = [headers.join(',')];
+  const generateGanttHtmlTable = () => {
+    const { months, allWeeks } = getGanttExtents();
+    const isHari = viewMode === 'hari';
     
+    let headerHtml = '';
+    if (isHari) {
+      let topHeader = '';
+      let subHeader = '';
+      months.forEach(m => {
+         topHeader += `<th colspan="${m.days}" style="padding: 5px; background: #f3f4f6; text-align: center; border: 1px solid #ccc;">${m.label}</th>`;
+         m.daysArray.forEach((d: any) => {
+            subHeader += `<th style="padding: 2px; background: ${d.isWeekend ? '#ffe4e6' : '#ffffff'}; text-align: center; border: 1px solid #ccc; font-size: 8px; min-width: 20px;">${d.date}</th>`;
+         });
+      });
+      headerHtml = `
+        <tr>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 250px; text-align: left;">Daftar Kegiatan</th>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 140px; text-align: center;">Periode Rencana</th>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 140px; text-align: center;">Periode Realisasi</th>
+          ${topHeader}
+        </tr>
+        <tr>${subHeader}</tr>
+      `;
+    } else {
+      let bulanHeader = '';
+      let pekanHeader = '';
+      
+      let currentMonthStr = '';
+      let currentMonthColspan = 0;
+      const monthGroups: {label: string, colspan: number}[] = [];
+      
+      allWeeks.forEach((w: any) => {
+         const mStr = w.startDate.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+         if (mStr !== currentMonthStr) {
+            if (currentMonthColspan > 0) {
+               monthGroups.push({ label: currentMonthStr, colspan: currentMonthColspan });
+            }
+            currentMonthStr = mStr;
+            currentMonthColspan = 1;
+         } else {
+            currentMonthColspan++;
+         }
+      });
+      if (currentMonthColspan > 0) {
+         monthGroups.push({ label: currentMonthStr, colspan: currentMonthColspan });
+      }
+
+      monthGroups.forEach(mg => {
+         bulanHeader += `<th colspan="${mg.colspan}" style="padding: 5px; background: #f3f4f6; text-align: center; border: 1px solid #ccc;">${mg.label.toUpperCase()}</th>`;
+      });
+      allWeeks.forEach((w: any) => {
+         pekanHeader += `<th style="padding: 5px; background: #f9fafb; border: 1px solid #ccc; text-align: center;">${w.label}</th>`;
+      });
+
+      headerHtml = `
+        <tr>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 250px; text-align: left;">Daftar Kegiatan</th>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 140px; text-align: center;">Periode Rencana</th>
+          <th rowspan="2" style="padding: 5px; background: #f3f4f6; border: 1px solid #ccc; min-width: 140px; text-align: center;">Periode Realisasi</th>
+          ${bulanHeader}
+        </tr>
+        <tr>${pekanHeader}</tr>
+      `;
+    }
+
+    const formatDateStr = (dateStr: string) => {
+       if (!dateStr) return '-';
+       const d = new Date(dateStr);
+       return `${d.getDate()} ${d.toLocaleString('id-ID', {month:'short'})} ${d.getFullYear()}`;
+    };
+
+    let bodyHtml = '';
     rows.forEach(r => {
-      const cols = [
-        `"${(r.judul_kegiatan || '').replace(/"/g, '""')}"`,
-        `"${(r.pic || '').replace(/"/g, '""')}"`,
-        `"${r.tanggal_mulai || ''}"`,
-        `"${r.tanggal_selesai || ''}"`,
-        `"${r.tanggal_dikerjakan_mulai || ''}"`,
-        `"${r.tanggal_dikerjakan_selesai || ''}"`,
-        `"${r.status || ''}"`,
-        `"${(r.keterangan || '').replace(/"/g, '""')}"`,
-        `"${(r.link_hasil || '').replace(/"/g, '""')}"`
-      ];
-      csvRows.push(cols.join(','));
+      const renMulai = formatDateStr(r.tanggal_mulai);
+      const renSelesai = formatDateStr(r.tanggal_selesai);
+      const realMulai = formatDateStr(r.tanggal_dikerjakan_mulai);
+      const realSelesai = formatDateStr(r.tanggal_dikerjakan_selesai);
+      
+      const renPeriod = renMulai !== '-' ? `${renMulai} - ${renSelesai !== '-' ? renSelesai : renMulai}` : '-';
+      const realPeriod = realMulai !== '-' ? `${realMulai} - ${realSelesai !== '-' ? realSelesai : realMulai}` : '-';
+
+      let rowHtml = `<tr>
+        <td style="padding: 5px; border: 1px solid #ccc; ${!r.isChild ? 'font-weight: bold;' : 'padding-left: 20px;'}">${r.judul_kegiatan}</td>
+        <td style="padding: 5px; border: 1px solid #ccc; text-align: center; font-size: 9px;">${renPeriod}</td>
+        <td style="padding: 5px; border: 1px solid #ccc; text-align: center; font-size: 9px;">${realPeriod}</td>`;
+      
+      const rStart = new Date(r.tanggal_mulai).getTime();
+      const rEnd = r.tanggal_selesai ? new Date(r.tanggal_selesai).getTime() : rStart;
+      
+      let rowColor = r.parentColor || r.warna || '#3b82f6';
+      if (rowColor.startsWith('bg-')) {
+         if (rowColor === 'bg-indigo-500') rowColor = '#6366f1';
+         else if (rowColor === 'bg-rose-500') rowColor = '#f43f5e';
+         else if (rowColor === 'bg-emerald-500') rowColor = '#10b981';
+         else if (rowColor === 'bg-amber-500') rowColor = '#f59e0b';
+         else if (rowColor === 'bg-sky-500') rowColor = '#0ea5e9';
+         else rowColor = '#6366f1';
+      }
+
+      if (isHari) {
+         months.forEach(m => {
+            m.daysArray.forEach((d: any) => {
+               const dayTime = new Date(d.fullDate).setHours(0,0,0,0);
+               const startZero = new Date(r.tanggal_mulai).setHours(0,0,0,0);
+               const endZero = r.tanggal_selesai ? new Date(r.tanggal_selesai).setHours(0,0,0,0) : startZero;
+               
+               const isOverlap = dayTime >= startZero && dayTime <= endZero;
+               const cellColor = isOverlap ? rowColor : (d.isWeekend ? '#ffe4e6' : '#ffffff');
+               
+               rowHtml += `<td style="background-color: ${cellColor}; border: 1px solid #ccc;"></td>`;
+            });
+         });
+      } else {
+         allWeeks.forEach((w: any) => {
+            const weekStart = w.startDate.getTime();
+            const weekEnd = w.endDate.getTime();
+            const isOverlap = rStart <= weekEnd && rEnd >= weekStart;
+            const cellColor = isOverlap ? rowColor : '#ffffff';
+            
+            rowHtml += `<td style="background-color: ${cellColor}; border: 1px solid #ccc;"></td>`;
+         });
+      }
+      
+      rowHtml += `</tr>`;
+      bodyHtml += rowHtml;
     });
-    
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+
+    return `<table style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 10px;">
+      <thead>${headerHtml}</thead>
+      <tbody>${bodyHtml}</tbody>
+    </table>`;
+  };
+
+  const handleExportExcel = () => {
+    if (rows.length === 0) return alert('Tidak ada data untuk di-export');
+    const tableHtml = generateGanttHtmlTable();
+    const htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Timeline</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+      </head>
+      <body>
+        <h2>Gantt Chart Kegiatan (${viewMode === 'hari' ? 'Harian' : 'Pekanan'})</h2>
+        ${tableHtml}
+      </body>
+      </html>
+    `;
+    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `timeline_kegiatan.csv`;
+    link.href = url;
+    link.download = `timeline_${viewMode}.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -361,48 +509,7 @@ export default function TimelinePage() {
 
   const handleExportWord = () => {
     if (rows.length === 0) return alert('Tidak ada data untuk di-export');
-    
-    const { months } = getGanttExtents();
-    
-    // Bikin tabel HTML
-    let tableHtml = `<table border="1" style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 10px;">
-      <thead>
-        <tr>
-          <th rowspan="2" style="padding: 5px; background: #f3f4f6;">Daftar Kegiatan</th>
-          ${months.map(m => `<th colspan="${m.weeks.length}" style="padding: 5px; background: #e5e7eb;">${m.label}</th>`).join('')}
-        </tr>
-        <tr>
-          ${months.map(m => m.weeks.map((w: any) => `<th style="padding: 5px; background: #f9fafb;">${w.label}</th>`).join('')).join('')}
-        </tr>
-      </thead>
-      <tbody>
-    `;
-
-    rows.forEach(r => {
-      let rowHtml = `<tr>
-        <td style="padding: 5px; ${!r.isChild ? 'font-weight: bold;' : 'padding-left: 15px;'}">${r.judul_kegiatan}</td>`;
-      
-      const rStart = new Date(r.tanggal_mulai).getTime();
-      const rEnd = r.tanggal_selesai ? new Date(r.tanggal_selesai).getTime() : rStart;
-      
-      months.forEach(m => {
-        m.weeks.forEach((w: any) => {
-          const weekStart = w.startDate.getTime();
-          const weekEnd = w.endDate.getTime();
-          
-          const isOverlap = rStart <= weekEnd && rEnd >= weekStart;
-          const colorHex = isOverlap ? '#4f46e5' : 'transparent';
-          
-          rowHtml += `<td style="background-color: ${colorHex};"></td>`;
-        });
-      });
-      
-      rowHtml += `</tr>`;
-      tableHtml += rowHtml;
-    });
-
-    tableHtml += `</tbody></table>`;
-    
+    const tableHtml = generateGanttHtmlTable();
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
@@ -413,26 +520,25 @@ export default function TimelinePage() {
         </style>
       </head>
       <body>
-        <h2 style="font-family: sans-serif;">Gantt Chart Kegiatan (Rekap per Pekan)</h2>
+        <h2 style="font-family: sans-serif;">Gantt Chart Kegiatan (${viewMode === 'hari' ? 'Harian' : 'Pekanan'})</h2>
         ${tableHtml}
       </body>
       </html>
     `;
-
     const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'timeline_pekan.doc';
+    link.download = `timeline_${viewMode}.doc`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto space-y-6 pb-20">
+    <div className="max-w-screen-2xl mx-auto flex flex-col h-[calc(100vh-100px)] min-h-[700px] space-y-4 pb-4 pt-4">
       {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-800 to-sky-700 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="bg-gradient-to-br from-indigo-800 to-sky-700 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
         <div>
           <h1 className="text-3xl font-black flex items-center gap-3"><Calendar size={32} /> Gantt Chart Kegiatan</h1>
           <p className="text-indigo-100 font-medium mt-2">Pantau jadwal Induk & Sub-Kegiatan dalam bentuk Gantt Chart interaktif.</p>
@@ -442,13 +548,13 @@ export default function TimelinePage() {
              onClick={handleExportWord}
              className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-sky-400"
            >
-             <Download size={20} /> WORD (PEKAN)
+             <Download size={20} /> UNDUH WORD
            </button>
            <button 
-             onClick={exportToExcel}
+             onClick={handleExportExcel}
              className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-emerald-400"
            >
-             <FileText size={20} /> EXCEL (CSV)
+             <FileText size={20} /> UNDUH EXCEL
            </button>
            <button 
              onClick={() => { resetForm(); setIsModalOpen(true); }}
@@ -460,7 +566,7 @@ export default function TimelinePage() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4 relative z-[70]">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input 
@@ -487,7 +593,7 @@ export default function TimelinePage() {
            </button>
         </div>
 
-        <div className="relative w-48 shrink-0 z-40">
+        <div className="relative w-48 shrink-0 z-[60]">
           <Select 
              options={[{value: 'All', label: 'Semua Tahun'}, ...availableYears.map(y => ({value: y.toString(), label: `Tahun ${y}`}))]}
              value={{value: filterYear, label: filterYear === 'All' ? 'Semua Tahun' : `Tahun ${filterYear}`}}
@@ -495,13 +601,28 @@ export default function TimelinePage() {
              className="text-sm font-bold"
              styles={{
                 control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
+                menu: (base) => ({ ...base, zIndex: 9999 }),
+             }}
+          />
+        </div>
+
+        <div className="relative w-64 shrink-0 z-[60]">
+          <Select 
+             options={[{value: 'All', label: 'Semua Kegiatan'}, ...parents.map((p: any) => ({value: p.id.toString(), label: p.judul_kegiatan}))]}
+             value={{value: filterParentId, label: filterParentId === 'All' ? 'Semua Kegiatan' : parents.find((p: any) => p.id.toString() === filterParentId)?.judul_kegiatan || 'Pilih Kegiatan'}}
+             onChange={(v: any) => setFilterParentId(v.value)}
+             className="text-sm font-bold"
+             placeholder="Filter Kegiatan"
+             styles={{
+                control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
+                menu: (base) => ({ ...base, zIndex: 9999 }),
              }}
           />
         </div>
       </div>
 
       {/* Gantt Chart View */}
-      <div className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden min-h-[500px] flex flex-col">
+      <div className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
         {loading ? (
           <div className="flex justify-center items-center h-40 flex-1">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -511,97 +632,119 @@ export default function TimelinePage() {
             Belum ada timeline kegiatan yang ditambahkan.
           </div>
         ) : (
-          <div className="flex flex-1 relative">
-             {/* Left Panel (Daftar Kegiatan) */}
-             <div className="w-80 md:w-96 shrink-0 border-r border-gray-200 bg-white z-20 flex flex-col relative shadow-[2px_0_10px_rgba(0,0,0,0.03)]">
-                <div className="h-16 flex items-center px-4 font-black text-gray-800 text-sm border-b-2 border-gray-100 bg-gray-50 sticky top-0 z-30 shadow-sm">
-                   Daftar Kegiatan
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
-                   {rows.map((r, idx) => {
-                      const hasChildren = data.some(d => d.parent_id === r.id);
-                      return (
-                         <div key={r.id} className={`h-[52px] px-4 flex justify-between items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group ${r.isChild ? 'bg-white' : 'bg-gray-50/30'}`}>
-                            <div className={`flex items-center gap-2 min-w-0 flex-1 ${r.isChild ? 'pl-8' : ''}`}>
-                               {!r.isChild && (
-                                  <button onClick={() => toggleExpand(r.id)} className={`p-1 rounded hover:bg-gray-200 text-gray-500 ${!hasChildren ? 'invisible' : ''} shrink-0`}>
-                                     {expandedParents.includes(r.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
-                                  </button>
-                               )}
-                               {r.isChild && <div className="text-gray-300 ml-1 font-mono text-sm shrink-0">└─ </div>}
-                               <span className={`line-clamp-2 pr-2 ${r.isChild ? 'text-[11px] text-gray-600 font-bold leading-tight' : 'text-xs font-black text-gray-800 leading-tight'}`} title={r.judul_kegiatan}>
-                                  {r.judul_kegiatan}
+          <div className="flex-1 overflow-auto custom-scrollbar bg-white rounded-b-3xl relative" onScroll={(e) => {
+             // Optional: if we want to sync anything, but native sticky is enough
+          }}>
+             <div style={{ width: `${timelineWidth + 384}px` }} className="min-w-fit">
+                
+                {/* Headers Row (Sticky Top) */}
+                <div className="sticky top-0 z-50 flex bg-white shadow-sm border-b-2 border-gray-100 h-[72px]">
+                   {/* Left Header (Sticky Left) */}
+                   <div className="w-80 md:w-96 shrink-0 bg-gray-50 flex items-center px-4 font-black text-gray-800 text-sm sticky left-0 z-50 border-r border-gray-200">
+                      Daftar Kegiatan
+                   </div>
+                   
+                   {/* Right Headers */}
+                   <div className="flex-1 flex flex-col bg-white">
+                      {/* Header Bulan */}
+                      <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex shrink-0">
+                         {months.map(m => (
+                            <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-gray-100">
+                               <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">{m.label}</span>
+                            </div>
+                         ))}
+                      </div>
+                      
+                      {/* Header Teks Pekan (Hanya tampil di mode Pekan) */}
+                      {viewMode === 'pekan' && (
+                        <div className="h-[24px] border-b border-gray-200 bg-white flex shrink-0">
+                           {months.map(m => (
+                              <div key={"text-pekan-"+m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-sky-50/20">
+                                 <span className="text-[10px] font-black text-sky-700 uppercase tracking-widest">PEKAN</span>
+                              </div>
+                           ))}
+                        </div>
+                      )}
+                      
+                      {/* Header Pekan */}
+                      <div className={`h-[24px] border-b border-gray-200 bg-gray-50 flex shrink-0`}>
+                         {allWeeks.map((w: any, i: number) => (
+                            <div key={'w-'+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-white">
+                               <span className="text-[10px] font-black text-sky-700 tracking-widest">
+                                  {viewMode === 'hari' ? `PEKAN ${w.label.replace('PEKAN ', '')}` : w.label.replace('PEKAN ', '')}
                                </span>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                               <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={14}/></button>
-                               <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
-                            </div>
-                         </div>
-                      );
-                   })}
-                </div>
-             </div>
-
-             {/* Right Panel (Gantt Grid) */}
-             <div ref={ganttScrollRef} className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar bg-white scroll-smooth">
-                <div style={{ width: `${timelineWidth}px` }} className="relative h-full pb-64">
-                   {/* Header Bulan */}
-                   <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-0 z-20 shadow-sm">
-                      {months.map(m => (
-                         <div key={m.label} style={{ width: `${m.days * DAY_WIDTH}px` }} className="border-r border-gray-300 flex justify-center items-center shrink-0 bg-gray-100">
-                            <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">{m.label}</span>
-                         </div>
-                      ))}
-                   </div>
-                   
-                   {/* Header Pekan */}
-                   <div className="h-[24px] border-b border-gray-200 bg-gray-50 flex sticky top-[24px] z-20 shadow-sm">
-                      {months.map(m => (
-                         m.weeks.map((w: any, i: number) => (
-                            <div key={m.label+'-w-'+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className="border-r border-gray-200 flex justify-center items-center shrink-0 bg-white">
-                               <span className="text-[9px] font-bold text-sky-600 uppercase tracking-widest">{w.label}</span>
-                            </div>
-                         ))
-                      ))}
-                   </div>
-
-                   {/* Header Tanggal (Hanya tampil di mode Harian) */}
-                   {viewMode === 'hari' && (
-                     <div className="h-[24px] border-b-2 border-gray-200 bg-white flex sticky top-[48px] z-20 shadow-sm">
-                        {months.map(m => (
-                           m.daysArray.map((d: any, i: number) => (
-                              <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
-                                 <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-500' : 'text-gray-500'}`}>{d.date}</span>
-                              </div>
-                           ))
-                        ))}
-                     </div>
-                   )}
-                   
-                   {/* Garis Vertikal Grid */}
-                   <div className={`absolute bottom-0 left-0 right-0 flex pointer-events-none z-0 ${viewMode === 'hari' ? 'top-[72px]' : 'top-[48px]'}`}>
-                      {viewMode === 'hari' ? (
-                         months.map(m => (
-                            m.daysArray.map((d: any, i: number) => (
-                               <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
-                            ))
-                         ))
-                      ) : (
-                         months.map(m => (
-                            m.weeks.map((w: any, i: number) => (
-                               <div key={'grid-week'+m.label+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className={`border-r border-gray-200 border-dashed h-full shrink-0`}></div>
-                            ))
-                         ))
+                         ))}
+                      </div>
+   
+                      {/* Header Tanggal (Hanya tampil di mode Harian) */}
+                      {viewMode === 'hari' && (
+                        <div className="h-[24px] border-gray-200 bg-white flex shrink-0">
+                           {months.map(m => (
+                              m.daysArray.map((d: any, i: number) => (
+                                 <div key={m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 flex justify-center items-center shrink-0 ${d.isWeekend ? 'bg-rose-50/80' : ''}`}>
+                                    <span className={`text-[10px] font-bold ${d.isWeekend ? 'text-rose-500' : 'text-gray-500'}`}>{d.date}</span>
+                                 </div>
+                              ))
+                           ))}
+                        </div>
                       )}
                    </div>
-                   
-                   {/* Garis Hari Ini */}
-                   <div className="absolute top-0 bottom-0 w-[2px] bg-rose-500/80 pointer-events-none z-40" style={{ left: `${getPosition(new Date().toISOString()) + (DAY_WIDTH/2)}px` }}>
-                   </div>
+                </div>
 
-                   {/* Container Bar Gantt */}
-                   <div className={`absolute left-0 right-0 z-10 pointer-events-none ${viewMode === 'hari' ? 'top-[72px]' : 'top-[48px]'}`}>
+                {/* Data Container */}
+                <div className="flex relative">
+                   {/* Left Panel (Daftar Kegiatan Data) */}
+                   <div className="w-80 md:w-96 shrink-0 bg-white sticky left-0 z-40 border-r border-gray-200 shadow-[2px_0_10px_rgba(0,0,0,0.03)] pb-32">
+                      <div className="flex flex-col">
+                         {rows.map((r, idx) => {
+                            const hasChildren = data.some(d => d.parent_id === r.id);
+                            return (
+                               <div key={r.id} className={`h-[52px] px-4 flex justify-between items-center border-b border-gray-100 hover:bg-gray-50 transition-colors group ${r.isChild ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                  <div className={`flex items-center gap-2 min-w-0 flex-1 ${r.isChild ? 'pl-8' : ''}`}>
+                                     {!r.isChild && (
+                                        <button onClick={() => toggleExpand(r.id)} className={`p-1 rounded hover:bg-gray-200 text-gray-500 ${!hasChildren ? 'invisible' : ''} shrink-0`}>
+                                           {expandedParents.includes(r.id) ? <ChevronDown size={16}/> : <ChevronRight size={16}/>}
+                                        </button>
+                                     )}
+                                     {r.isChild && <div className="text-gray-300 ml-1 font-mono text-sm shrink-0">└─ </div>}
+                                     <span className={`line-clamp-2 pr-2 ${r.isChild ? 'text-[11px] text-gray-600 font-bold leading-tight' : 'text-xs font-black text-gray-800 leading-tight'}`} title={r.judul_kegiatan}>
+                                        {r.judul_kegiatan}
+                                     </span>
+                                  </div>
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <button onClick={() => openEdit(r)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={14}/></button>
+                                     <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                                  </div>
+                               </div>
+                            );
+                         })}
+                      </div>
+                   </div>
+                   
+                   {/* Right Panel (Gantt Chart Data) */}
+                   <div className="flex-1 relative">
+                      {/* Garis Vertikal Grid */}
+                      <div className={`absolute top-0 bottom-0 left-0 right-0 flex pointer-events-none z-0`}>
+                         {viewMode === 'hari' ? (
+                            months.map(m => (
+                               m.daysArray.map((d: any, i: number) => (
+                                  <div key={'grid'+m.label+i} style={{ width: `${DAY_WIDTH}px` }} className={`border-r border-gray-100 border-dashed h-full shrink-0 ${d.isWeekend ? 'bg-rose-50/40' : ''}`}></div>
+                               ))
+                            ))
+                         ) : (
+                            allWeeks.map((w: any, i: number) => (
+                               <div key={'grid-week-'+i} style={{ width: `${w.days * DAY_WIDTH}px` }} className={`border-r border-gray-300 border-solid h-full shrink-0 bg-gray-50/10`}></div>
+                            ))
+                         )}
+                      </div>
+                      
+                      {/* Garis Hari Ini */}
+                      <div className="absolute top-0 bottom-0 w-[2px] bg-rose-500/80 pointer-events-none z-40" style={{ left: `${getPosition(new Date().toISOString()) + (DAY_WIDTH/2)}px` }}>
+                      </div>
+   
+                      {/* Container Bar Gantt */}
+                      <div className={`absolute left-0 right-0 z-10 pointer-events-none top-0`}>
                       {rows.map((r, idx) => {
                          const left = getPosition(r.tanggal_mulai);
                          const width = getWidth(r.tanggal_mulai, r.tanggal_selesai);
@@ -621,7 +764,7 @@ export default function TimelinePage() {
                          const realisasiWidth = (r.tanggal_dikerjakan_mulai && r.tanggal_dikerjakan_selesai) ? getWidth(r.tanggal_dikerjakan_mulai, r.tanggal_dikerjakan_selesai) : getWidth(r.tanggal_dikerjakan_mulai, r.tanggal_dikerjakan_mulai);
 
                          return (
-                            <div key={r.id} className="absolute h-[52px] flex items-center w-full pointer-events-none" style={{ top: `${top}px` }}>
+                            <div key={'bar'+r.id} className="absolute h-[52px] flex items-center w-full pointer-events-none" style={{ top: `${top}px` }}>
                                {r.tanggal_dikerjakan_mulai && (
                                   <div 
                                      style={{ 
@@ -636,7 +779,7 @@ export default function TimelinePage() {
                                )}
                                <div 
                                   onClick={() => openEdit(r)}
-                                  style={{ left: `${left}px`, width: `${width}px`, backgroundColor: getColorHex(r.isChild && r.warna !== 'bg-indigo-500' ? r.warna : (r.parentColor || r.warna || 'bg-indigo-500')), ...bgStyle }} 
+                                  style={{ left: `${left}px`, width: `${width}px`, backgroundColor: getColorHex(r.parentColor || r.warna || 'bg-indigo-500'), ...bgStyle }} 
                                   className={`absolute h-8 rounded-md shadow-sm border border-black/10 flex items-center justify-between px-3 cursor-pointer hover:brightness-110 hover:shadow-md transition-all pointer-events-auto group hover:z-50 ${r.isChild ? 'opacity-90 h-6 rounded-sm' : ''} ${isOverdue ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
                                >
                                   <span className="truncate text-[10px] font-bold text-white/95 mr-3 whitespace-nowrap drop-shadow-md flex items-center gap-1">
@@ -669,6 +812,7 @@ export default function TimelinePage() {
                             </div>
                          );
                       })}
+                   </div>
                    </div>
                 </div>
              </div>
