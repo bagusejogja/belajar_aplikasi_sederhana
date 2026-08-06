@@ -12,3 +12,9 @@ export const supabase = createClient(
 );
 
 export { isSupabaseConfigured };
+
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+export const supabaseAdmin = createClient(
+  isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? supabaseServiceKey : 'placeholder'
+);
