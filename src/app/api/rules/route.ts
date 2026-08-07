@@ -15,6 +15,7 @@ function getAuthClient(request: Request) {
 }
 
 export async function GET(request: Request) {
+  try {
     const supabaseUser = getAuthClient(request);
     const { data, error } = await supabaseUser.from('rules').select('*').order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
