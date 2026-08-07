@@ -8,8 +8,8 @@ function getAuthClient(request: Request) {
   const authHeader = request.headers.get('Authorization');
   const token = authHeader?.split('Bearer ')[1] || '';
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder',
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
 }
