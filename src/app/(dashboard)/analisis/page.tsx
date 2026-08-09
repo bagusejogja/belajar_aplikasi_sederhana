@@ -31,18 +31,6 @@ export default function AnalisisPaguPage() {
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
-  
-  // Helper calculation for progress percentage
-  const getProgressPercentage = () => {
-    switch (activeStep) {
-      case 'step1': return 20;
-      case 'step2': return 40;
-      case 'step3': return 60;
-      case 'pdf': return 80;
-      case 'step5': return 100;
-      default: return 100;
-    }
-  };
 
   // Shared state across components
   const [mainData, setMainData] = useState<any>({
@@ -291,10 +279,11 @@ export default function AnalisisPaguPage() {
   // Helper calculation for progress percentage
   const getProgressPercentage = () => {
     switch (activeStep) {
-      case 'step1': return 25;
-      case 'step2': return 50;
-      case 'step3': return 75;
-      case 'pdf': return 100;
+      case 'step1': return 20;
+      case 'step2': return 40;
+      case 'step3': return 60;
+      case 'pdf': return 80;
+      case 'step5': return 100;
       default: return 100;
     }
   };
