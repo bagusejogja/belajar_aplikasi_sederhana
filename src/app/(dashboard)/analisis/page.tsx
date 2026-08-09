@@ -254,6 +254,20 @@ export default function AnalisisPaguPage() {
      setResetKey(prev => prev + 1);
   };
 
+  const handleSetActiveTab = (tab: string) => {
+    if (tab === 'main') {
+      setActiveStep('step2');
+    } else if (tab === 'pdf') {
+      setActiveStep('pdf');
+    } else if (tab === 'riwayat') {
+      setActiveStep('riwayat');
+    } else if (['step1', 'step2', 'step3', 'all'].includes(tab)) {
+      setActiveStep(tab as any);
+    } else {
+      setActiveStep('step1');
+    }
+  };
+
   // Helper calculation for progress percentage
   const getProgressPercentage = () => {
     switch (activeStep) {
@@ -678,7 +692,7 @@ export default function AnalisisPaguPage() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} setActiveTab={setActiveStep} />
+              <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} setActiveTab={handleSetActiveTab} />
             </div>
           </div>
         )}
@@ -706,7 +720,7 @@ export default function AnalisisPaguPage() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={setActiveStep} />
+              <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={handleSetActiveTab} />
             </div>
           </div>
         )}
