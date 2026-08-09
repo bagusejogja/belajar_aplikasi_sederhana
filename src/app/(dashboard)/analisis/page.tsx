@@ -21,7 +21,8 @@ import {
   Layers,
   ArrowRight,
   BookmarkCheck,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
