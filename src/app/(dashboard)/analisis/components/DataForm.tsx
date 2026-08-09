@@ -389,52 +389,6 @@ ${mainData.ringkasan_ai}`;
     );
   }
 
-      if (paguData && realisasiData && setHistorisData) {
-        const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
-        const filteredYears = years.filter(y => parseInt(y) >= 2019);
-        
-        const newHistoris = filteredYears.sort().map(year => {
-          const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
-          const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
-          
-          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguPengalihan = paguTambah + paguKurang;
-          
-          const paguTambahPaguPenugasan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguTambahPaguInisiatif = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguEfisiensi = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
-          
-          const totalPagu = paguAwal + paguPengalihan + paguTambahPaguPenugasan + paguTambahPaguInisiatif + paguEfisiensi + paguTalangan;
-          const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
-          
-          let serapan = 0;
-          if (totalPagu > 0) serapan = (totalRealisasi / totalPagu) * 100;
-          
-          return {
-            tahun: year,
-            pagu_awal: formatRp(paguAwal),
-            pengalihan: formatRp(paguPengalihan),
-            tambah_pagu_penugasan: formatRp(paguTambahPaguPenugasan),
-            tambah_pagu_inisiatif: formatRp(paguTambahPaguInisiatif),
-            efisiensi: formatRp(paguEfisiensi),
-            talangan: formatRp(paguTalangan),
-            total_pagu: formatRp(totalPagu),
-            realisasi_historis: formatRp(totalRealisasi),
-            persen_serapan: serapan.toFixed(2) + '%',
-            _raw: { paguTambahPaguPenugasan, paguTambahPaguInisiatif, paguEfisiensi, paguTalangan }
-          };
-        });
-        
-        setHistorisData(newHistoris.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const targetYear = '2026';
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
   
