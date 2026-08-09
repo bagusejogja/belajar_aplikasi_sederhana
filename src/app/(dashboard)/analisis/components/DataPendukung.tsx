@@ -62,6 +62,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     }
   };
 
+  // Auto-sync if empty
   useEffect(() => {
     if (historisData && historisData.length > 0 && activeSubTab === 'berjalan') {
       const p = mainData?.pagu_berjalan || {};
@@ -76,6 +77,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     const pastedText = e.clipboardData.getData('text');
     if (!pastedText) return;
 
+    // Fetch units dynamically only when pasting to save requests
     const { data: units } = await (await import('@/lib/supabase')).supabase.from('gov_units').select('id, kode_unit, nama_unit, is_pagu');
 
     const rows = pastedText.split('\n').filter(r => r.trim() !== '');
@@ -109,11 +111,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
       }
     }
     
+    // Save to pagu_berjalan JSON object
     const newP = { ...(mainData?.pagu_berjalan || {}), realisasi_keseluruhan: totalRealisasi.toString() };
     setMainData({ ...mainData, pagu_berjalan: newP });
     setParsedPreview(previewArray);
     alert(`Berhasil menghitung Realisasi Keseluruhan untuk unit dengan is_pagu = 'Y'.\nTotal: Rp ${formatRp(totalRealisasi)}`);
   };
+
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -124,36 +128,56 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         
+        // Baca sebagai array of arrays
         const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        
+        // Simaster data usually starts at row 5 (index 4)
         const rows = data.slice(4); 
         
         let mapped: any[] = [];
+        let totalAnggaranUpload = 0;
 
         rows.forEach((row: any) => {
-           const uraian = row[3];
-           const anggaranRaw = row[4];
-           const realisasiRaw = row[5];
-           const sisaRaw = row[6];
+           const uraian = row[3]; // D
+           const anggaranRaw = row[4]; // E
+           const realisasiRaw = row[5]; // F
+           const sisaRaw = row[6]; // G (Sisa Anggaran)
 
-           if (!uraian && !anggaranRaw) return;
+           if (!uraian && !anggaranRaw) return; // Skip empty rows
 
+           // Bersihkan angka
            const anggaran = typeof anggaranRaw === 'number' ? anggaranRaw : parseNum(anggaranRaw);
-           const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseNum(realisasiRaw);
-           let sisa = typeof sisaRaw === 'number' ? sisaRaw : parseNum(sisaRaw);
-           if (!sisaRaw) sisa = anggaran - realisasi;
+           
+           if (anggaran > 0) {
+              totalAnggaranUpload += anggaran;
+              const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseNum(realisasiRaw);
+              let sisa = typeof sisaRaw === 'number' ? sisaRaw : parseNum(sisaRaw);
+              if (isNaN(sisa)) sisa = anggaran - realisasi;
 
-           let serapan = '0%';
-           if (anggaran > 0) serapan = ((realisasi / anggaran) * 100).toFixed(2) + '%';
+              let serapanVal = (realisasi / anggaran) * 100;
+              let serapanText = serapanVal.toFixed(2) + '%';
 
-           mapped.push({
-              uraian_kegiatan: uraian || '-',
-              anggaran: formatRp(anggaran),
-              realisasi: formatRp(realisasi),
-              sisa_anggaran: formatRp(sisa),
-              persen_serapan: serapan
-           });
+              // Format currency
+              const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+              
+              let cleanUraian = String(uraian || '').replace(/^[^a-zA-Z]+/, '').trim();
+
+              mapped.push({
+                 uraian_kegiatan: cleanUraian || '-',
+                 anggaran: formatRp(anggaran),
+                 realisasi: formatRp(realisasi),
+                 sisa_anggaran: formatRp(sisa),
+                 persen_serapan: serapanText,
+                 _serapanVal: serapanVal, // for sorting
+                 _sisaVal: sisa // for sorting by sisa anggaran
+              });
+           }
         });
 
+        // Sort by sisa anggaran descending (terbesar ke kecil)
+        mapped.sort((a, b) => b._sisaVal - a._sisaVal);
+        
+        // Tambahkan nomor urut
         const finalMapped = mapped.map((m, idx) => ({
            no_urut: idx + 1,
            uraian_kegiatan: m.uraian_kegiatan,
@@ -164,17 +188,40 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         }));
 
         setDetailData(finalMapped);
+        const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
       };
       reader.readAsBinaryString(e.target.files[0]);
     }
   };
 
+
+
   const isVertical = renderMode === 'vertical';
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
       <div className="flex justify-between items-end shrink-0">
         <div>
+          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-600"/> Data Pendukung</h2>
+          <p className="text-gray-500 text-sm">Kelola rincian anggaran, pagu historis, dan lampiran.</p>
+        </div>
+      </div>
+
+      {!isVertical && (
+        <div className="flex border-b border-gray-200 gap-4 overflow-x-auto pb-2">
+          <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Detail Realisasi Belanja</button>
+          <button onClick={() => setActiveSubTab('historis')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Historis</button>
+          <button onClick={() => setActiveSubTab('berjalan')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'berjalan' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Potret Mutasi Pagu Keseluruhan</button>
+          <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Lampiran Lainnya</button>
+        </div>
+      )}
+
+      {(isVertical || activeSubTab === 'realisasi') && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
+          <div className="p-4 bg-gray-50 flex justify-between gap-4 items-center flex-wrap">
+            <p className="text-xs text-gray-500 font-medium">
+              Unduh dari <a href="https://finance.simaster.ugm.ac.id/laporan/realisasi_detail_belanja/" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">SIMASTER UGM (Realisasi Detail Belanja)</a>
+            </p>
             <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
               <FileSpreadsheet size={16}/> Upload Excel SIMASTER
               <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleExcelUpload} />
@@ -245,7 +292,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         </div>
       )}
 
-      {activeSubTab === 'historis' && (
+      {(isVertical || activeSubTab === 'historis') && (
         <div className="flex flex-col gap-6 flex-1">
           {historisData && historisData.length > 0 && (
              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
@@ -412,7 +459,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         </div>
       )}
 
-      {activeSubTab === 'berjalan' && (() => {
+      {(isVertical || activeSubTab === 'berjalan') && (() => {
         const p = mainData?.pagu_berjalan || {};
         
         let tanggalInput = '';
@@ -542,7 +589,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
         );
       })()}
 
-      {activeSubTab === 'lampiran' && (
+      {(isVertical || activeSubTab === 'lampiran') && (
         <div className="flex-1">
           <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl space-y-6 shadow-sm">
             <div>
