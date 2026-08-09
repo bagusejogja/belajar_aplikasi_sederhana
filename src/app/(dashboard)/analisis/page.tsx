@@ -351,8 +351,8 @@ export default function AnalisisPaguPage() {
         </div>
       </header>
 
-      {/* STEPPER WIZARD NAVIGATOR (Visible when NOT in 'riwayat' or 'pdf' mode) */}
-      {activeStep !== 'riwayat' && activeStep !== 'pdf' && (
+      {/* STEPPER WIZARD NAVIGATOR (Visible when NOT in 'riwayat' mode) */}
+      {activeStep !== 'riwayat' && (
         <div className="bg-white border-b border-slate-200/80 px-4 md:px-8 py-3 z-30">
           <div className="max-w-5xl mx-auto space-y-2">
             
