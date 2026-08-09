@@ -674,6 +674,7 @@ ${mainData.ringkasan_ai}`;
                   />
                 </div>
               </div>
+            </div>
             {/* 2. DRAFT SURAT BALASAN RESMI (UGM) */}
             <div>
               <div className="flex items-center justify-between mb-2">
