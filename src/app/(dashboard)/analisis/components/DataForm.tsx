@@ -389,6 +389,65 @@ ${mainData.ringkasan_ai}`;
     );
   }
 
+  const handleNominalChange = (field: string, inputVal: string) => {
+    const cleaned = inputVal.replace(/[^0-9]/g, '');
+    if (!cleaned) {
+      setMainData((prev: any) => ({ ...prev, [field]: '0' }));
+      return;
+    }
+    const num = parseInt(cleaned, 10);
+    setMainData((prev: any) => ({ ...prev, [field]: formatRp(num) }));
+  };
+
+  const handleKeputusanChange = (newKeputusan: string) => {
+    let newNominal = mainData.nominal_disetujui;
+    if (newKeputusan === 'disetujui semua') {
+      newNominal = mainData.total_anggaran || '0';
+    } else if (newKeputusan === 'ditolak') {
+      newNominal = '0';
+    }
+    setMainData((prev: any) => ({
+      ...prev,
+      keputusan: newKeputusan,
+      nominal_disetujui: newNominal
+    }));
+  };
+
+  const handleGenerateSuratBalasan = () => {
+    const status = (mainData.keputusan || 'disetujui semua').toLowerCase();
+    const unit = mainData.unit_pengirim || 'Unit Kerja';
+    const noSurat = mainData.no_surat || '...';
+    const tglSuratIndo = formatTanggalIndo(mainData.tanggal_surat);
+    const perihal = mainData.perihal || 'Permohonan Penambahan Pagu Anggaran';
+    
+    const numDisetujui = parseNum(mainData.nominal_disetujui || mainData.total_anggaran);
+    const nominalFormatted = new Intl.NumberFormat('id-ID').format(numDisetujui);
+    const nominalTerbilangText = terbilang(numDisetujui);
+    const ket = mainData.keterangan_keputusan || '';
+
+    let htmlSurat = '';
+
+    if (status.includes('semua') || status.includes('100')) {
+      htmlSurat = `<p>Yth. ${unit}<br/>Universitas Gadjah Mada</p><br/><p style="text-align: justify;">Sehubungan dengan surat nomor <strong>${noSurat}</strong> tanggal <strong>${tglSuratIndo}</strong> perihal <strong>${perihal}</strong>, bersama ini kami sampaikan bahwa Universitas menyetujui penambahan pagu anggaran sebesar <strong>Rp${nominalFormatted},00</strong> (<em>${nominalTerbilangText}</em>) ${ket ? `untuk ${ket}` : 'untuk mendukung kelancaran kegiatan kedinasan'}. Penambahan pagu anggaran tersebut dialokasikan ke RKAT <strong>${unit}</strong>.</p><p style="text-align: justify;">Mekanisme penganggaran dan pertanggungjawaban mohon dapat berkoordinasi dengan bidang terkait di Direktorat Keuangan yaitu bidang Anggaran untuk mekanisme penganggaran, bidang Verifikasi dan bidang Pengeluaran terkait pertanggungjawaban. Penambahan dana tersebut hanya untuk kegiatan yang dimaksud dan tidak bisa dialihkan untuk kegiatan lain. Apabila diberlakukan efisiensi dari kegiatan tersebut maka sisa dana akan dikembalikan ke Universitas.</p><p>Atas perhatian dan kerja sama yang baik, kami mengucapkan terima kasih.</p>`;
+    } else if (status.includes('sebagian')) {
+      let rincianHTML = '';
+      if (detailData && detailData.length > 0) {
+        rincianHTML = '<ol style="padding-left: 20px;">\n' + detailData.map((item: any, idx: number) => `  <li><strong>${item.uraian_kegiatan}</strong> sebesar Rp${item.anggaran}.</li>`).join('\n') + '\n</ol>';
+      } else if (ket) {
+        rincianHTML = `<p style="text-align: justify;">${ket.replace(/\n/g, '<br/>')}</p>`;
+      } else {
+        rincianHTML = '<ol style="padding-left: 20px;">\n  <li>Rincian penambahan pagu disesuaikan dengan alokasi prioritas RKAT.</li>\n</ol>';
+      }
+
+      htmlSurat = `<p>Yth. ${unit}<br/>Universitas Gadjah Mada</p><br/><p style="text-align: justify;">Sebagai tindak lanjut surat Nomor <strong>${noSurat}</strong> tanggal <strong>${tglSuratIndo}</strong> perihal <strong>${perihal}</strong>, bersama ini kami sampaikan bahwa Universitas memiliki pendanaan yang sangat terbatas sehingga hanya dapat menyetujui sebagian dari permohonan penambahan pagu anggaran untuk mendukung kelancaran kegiatan kedinasan di <strong>${unit}</strong> sebesar <strong>Rp${nominalFormatted},00</strong> (<em>${nominalTerbilangText}</em>). Unit kerja juga diharapkan dapat memperhatikan ketersediaan anggaran dalam pelaksanaan kegiatan serta memperhatikan ketentuan dalam Surat Edaran Efisiensi Nomor 493/UN1.P4/Dit-Keu/KU.01.00/2026 mengenai Pelaksanaan Anggaran dan Langkah Efisiensi dalam Pelaksanaan Kegiatan di Lingkungan Universitas Gadjah Mada. Adapun detail rincian penambahan pagu adalah sebagai berikut:</p>${rincianHTML}<p style="text-align: justify;">Penambahan anggaran kegiatan tersebut dialokasikan pada RKAT <strong>${unit}</strong> Tahun Anggaran 2026.</p><p style="text-align: justify;">Mekanisme penganggaran dan pertanggungjawaban mohon dapat berkoordinasi dengan bidang terkait di Direktorat Keuangan yaitu bidang Anggaran untuk mekanisme penganggaran, bidang Verifikasi dan bidang Pengeluaran terkait pertanggungjawaban. Penambahan dana tersebut hanya untuk kegiatan yang dimaksud dan tidak bisa dialihkan untuk kegiatan lain. Apabila diberlakukan efisiensi dari kegiatan tersebut maka sisa dana akan dikembalikan ke Universitas.</p><p>Atas perhatian dan kerja sama yang baik, kami mengucapkan terima kasih.</p>`;
+    } else { // ditolak
+      htmlSurat = `<p>Yth. ${unit}<br/>Universitas Gadjah Mada</p><br/><p style="text-align: justify;">Sebagai tindak lanjut surat Nomor <strong>${noSurat}</strong> tanggal <strong>${tglSuratIndo}</strong> perihal <strong>${perihal}</strong> bersama ini kami sampaikan bahwa Universitas belum menyetujui permohonan penambahan pagu anggaran untuk <strong>${unit}</strong>. Kebutuhan pendanaan tersebut dapat dipenuhi dengan mengoptimalkan realokasi anggaran yang masih tersedia di <strong>${unit}</strong>.</p><p>Atas perhatian dan kerja sama yang baik, kami mengucapkan terima kasih.</p>`;
+    }
+
+    setMainData((prev: any) => ({ ...prev, surat_balasan_html: htmlSurat.trim() }));
+    alert("Berhasil me-generate Draft Surat Balasan UGM!");
+  };
+
   const showStep1 = section === 'step1' || section === 'all';
   const showStep3 = section === 'step3' || section === 'all';
 
