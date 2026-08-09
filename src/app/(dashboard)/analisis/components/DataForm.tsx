@@ -389,28 +389,6 @@ ${mainData.ringkasan_ai}`;
     );
   }
 
-export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [], setHistorisData, section = 'all' }: any) {
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [units, setUnits] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchUnits = async () => {
-      const { data } = await supabase.from('gov_units').select('id, kode_unit, nama_unit, is_pagu').order('nama_unit');
-      if (data) setUnits(data);
-    };
-    fetchUnits();
-  }, []);
-
-  const handleUnitChange = async (selectedOption: any) => {
-    setMainData({ ...mainData, unit_pengirim: selectedOption?.label || '' });
-    
-    if (!selectedOption) return;
-    
-    try {
-      const unitId = selectedOption.value;
-      const { data: paguData } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
-      const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
-      
       if (paguData && realisasiData && setHistorisData) {
         const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
         const filteredYears = years.filter(y => parseInt(y) >= 2019);
