@@ -18,11 +18,10 @@ import {
   PlusCircle, 
   ChevronRight, 
   ChevronLeft, 
-  CheckCircle2, 
-  Sparkles,
   Layers,
   ArrowRight,
-  BookmarkCheck
+  BookmarkCheck,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
@@ -150,7 +149,7 @@ export default function AnalisisPaguPage() {
           }
        }
 
-       setActiveStep('step2');
+       setActiveStep('step1');
     } catch (e) {
        console.error("Gagal load riwayat:", e);
     }
@@ -256,7 +255,7 @@ export default function AnalisisPaguPage() {
 
   const handleSetActiveTab = (tab: string) => {
     if (tab === 'main') {
-      setActiveStep('step2');
+      setActiveStep('step1');
     } else if (tab === 'pdf') {
       setActiveStep('pdf');
     } else if (tab === 'riwayat') {
@@ -300,7 +299,7 @@ export default function AnalisisPaguPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 font-medium hidden sm:block">Alur kerja sistematis pembuatan Nota Analisis Usulan Pagu</p>
+              <p className="text-xs text-gray-500 font-medium hidden sm:block">Alur kerja pembuatan Nota Analisis Usulan Pagu bertahap</p>
             </div>
           </div>
 
@@ -373,13 +372,13 @@ export default function AnalisisPaguPage() {
             {/* Steps Pills Bar */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
               
-              {/* STEP 1: OCR */}
+              {/* STEP 1: UPLOAD & DATA UTAMA SURAT */}
               <button
                 onClick={() => setActiveStep('step1')}
                 className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 relative overflow-hidden group ${
                   activeStep === 'step1'
                     ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm'
-                    : mainData.file_lampiran || mainData.link_lampiran
+                    : mainData.no_surat || mainData.file_lampiran
                     ? 'bg-emerald-50/40 border-emerald-300 text-emerald-900 hover:border-emerald-400'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                 }`}
@@ -387,28 +386,28 @@ export default function AnalisisPaguPage() {
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-transform group-hover:scale-105 ${
                   activeStep === 'step1'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                    : mainData.file_lampiran
+                    : mainData.no_surat
                     ? 'bg-emerald-600 text-white'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {mainData.file_lampiran ? '✓' : '1'}
+                  {mainData.no_surat ? '✓' : '1'}
                 </div>
                 <div className="overflow-hidden min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 1</div>
                   <div className="text-xs font-bold truncate flex items-center gap-1">
-                    <ScanLine size={13} className="shrink-0" />
-                    <span>Upload & OCR AI</span>
+                    <FileEdit size={13} className="shrink-0" />
+                    <span>Upload & Data Utama</span>
                   </div>
                 </div>
               </button>
 
-              {/* STEP 2: DATA UTAMA */}
+              {/* STEP 2: DETAIL REALISASI, HISTORIS & MUTASI */}
               <button
                 onClick={() => setActiveStep('step2')}
                 className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 relative overflow-hidden group ${
                   activeStep === 'step2'
                     ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm'
-                    : mainData.no_surat
+                    : detailData.length > 0 || historisData.length > 0
                     ? 'bg-emerald-50/40 border-emerald-300 text-emerald-900 hover:border-emerald-400'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                 }`}
@@ -416,28 +415,28 @@ export default function AnalisisPaguPage() {
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-transform group-hover:scale-105 ${
                   activeStep === 'step2'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                    : mainData.no_surat
+                    : detailData.length > 0
                     ? 'bg-emerald-600 text-white'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {mainData.no_surat ? '✓' : '2'}
+                  {detailData.length > 0 ? '✓' : '2'}
                 </div>
                 <div className="overflow-hidden min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 2</div>
                   <div className="text-xs font-bold truncate flex items-center gap-1">
-                    <FileEdit size={13} className="shrink-0" />
-                    <span>Data Utama & Realisasi</span>
+                    <BarChart3 size={13} className="shrink-0" />
+                    <span>Realisasi & Historis Pagu</span>
                   </div>
                 </div>
               </button>
 
-              {/* STEP 3: HISTORIS & REKOMENDASI AI */}
+              {/* STEP 3: POSISI PAGU 2026 & REKOMENDASI AI */}
               <button
                 onClick={() => setActiveStep('step3')}
                 className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 relative overflow-hidden group ${
                   activeStep === 'step3'
                     ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm'
-                    : mainData.analisis_html
+                    : mainData.rekomendasi_html
                     ? 'bg-emerald-50/40 border-emerald-300 text-emerald-900 hover:border-emerald-400'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                 }`}
@@ -445,17 +444,17 @@ export default function AnalisisPaguPage() {
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-transform group-hover:scale-105 ${
                   activeStep === 'step3'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                    : mainData.analisis_html
+                    : mainData.rekomendasi_html
                     ? 'bg-emerald-600 text-white'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {mainData.analisis_html ? '✓' : '3'}
+                  {mainData.rekomendasi_html ? '✓' : '3'}
                 </div>
                 <div className="overflow-hidden min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 3</div>
                   <div className="text-xs font-bold truncate flex items-center gap-1">
-                    <BarChart3 size={13} className="shrink-0" />
-                    <span>Historis & AI Analisis</span>
+                    <Sparkles size={13} className="shrink-0" />
+                    <span>Posisi Pagu & AI Analisis</span>
                   </div>
                 </div>
               </button>
@@ -500,7 +499,7 @@ export default function AnalisisPaguPage() {
       {/* MAIN CONTAINER CONTENT AREA */}
       <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto">
         
-        {/* STEP 1: OCR PANEL */}
+        {/* STEP 1: UPLOAD OCR & FORM DATA UTAMA + RINGKASAN AI */}
         {(activeStep === 'step1' || activeStep === 'all') && (
           <div className="space-y-6 animate-in fade-in duration-300 mb-8">
             {activeStep !== 'all' && (
@@ -510,8 +509,8 @@ export default function AnalisisPaguPage() {
                     <ScanLine size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 1 dari 4: Upload & Extrak Nota / Surat AI</h2>
-                    <p className="text-xs text-indigo-200/80">Upload berkas usulan (PDF/Gambar) untuk ekstraksi data otomatis menggunakan OCR AI</p>
+                    <h2 className="text-sm font-bold text-white">Tahap 1 dari 4: Upload Berkala & Form Data Utama Surat</h2>
+                    <p className="text-xs text-indigo-200/80">Upload berkas usulan (OCR AI), isi metadata surat, dan ringkasan substansi AI</p>
                   </div>
                 </div>
                 <button 
@@ -524,18 +523,24 @@ export default function AnalisisPaguPage() {
               </div>
             )}
 
+            {/* OCR PANEL */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
               <OCRPanel key={`ocr-${resetKey}`} mainData={mainData} setMainData={setMainData} />
             </div>
 
+            {/* FORM DATA UTAMA & RINGKASAN SUBSTANSI AI */}
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
+              <DataForm key={`form1-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} section="step1" />
+            </div>
+
             {activeStep === 'step1' && (
               <div className="flex justify-between items-center pt-2">
-                <span className="text-xs text-slate-400 font-medium">Opsional: Anda dapat langsung mengisi data di Step 2 jika tanpa berkas</span>
+                <span className="text-xs text-slate-400 font-medium">Langkah 1 Selesai: Lanjut ke rincian realisasi & historis pagu</span>
                 <button
                   onClick={() => setActiveStep('step2')}
                   className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2"
                 >
-                  <span>Lanjut ke Step 2: Form Data Utama</span>
+                  <span>Lanjut ke Step 2: Realisasi & Historis Pagu</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -543,18 +548,18 @@ export default function AnalisisPaguPage() {
           </div>
         )}
 
-        {/* STEP 2: DATA FORM (FORM ANALISIS & DETAIL REALISASI) */}
+        {/* STEP 2: DETAIL REALISASI, HISTORIS PAGU, POTRET MUTASI & LAMPIRAN (STACKED VERTICALLY DOWNWARD) */}
         {(activeStep === 'step2' || activeStep === 'all') && (
           <div className="space-y-6 animate-in fade-in duration-300 mb-8">
             {activeStep !== 'all' && (
               <div className="flex items-center justify-between bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
-                    <FileEdit size={20} />
+                    <BarChart3 size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 2 dari 4: Input Data Utama & Realisasi Anggaran</h2>
-                    <p className="text-xs text-indigo-200/80">Lengkapi nomor surat, perihal, unit pengirim, dan rincian item realisasi anggaran</p>
+                    <h2 className="text-sm font-bold text-white">Tahap 2 dari 4: Detail Realisasi, Historis Pagu & Mutasi</h2>
+                    <p className="text-xs text-indigo-200/80">Rincian Realisasi Belanja, Data Pagu Historis, Potret Mutasi Pagu, dan Lampiran</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -576,8 +581,9 @@ export default function AnalisisPaguPage() {
               </div>
             )}
 
+            {/* DATA PENDUKUNG (STACKED VERTICALLY DOWNWARD WITH NO SUBTABS) */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <DataForm key={`form-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} />
+              <DataPendukung key={`pend-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} renderMode="vertical" />
             </div>
 
             {activeStep === 'step2' && (
@@ -593,7 +599,7 @@ export default function AnalisisPaguPage() {
                   onClick={() => setActiveStep('step3')}
                   className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2"
                 >
-                  <span>Lanjut ke Step 3: Historis & Analisis AI</span>
+                  <span>Lanjut ke Step 3: Posisi Pagu 2026 & AI Analysis</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -601,18 +607,18 @@ export default function AnalisisPaguPage() {
           </div>
         )}
 
-        {/* STEP 3: DATA PENDUKUNG (HISTORIS & REKOMENDASI AI) */}
+        {/* STEP 3: POSISI PAGU TAHUN 2026 & ANALISIS REKOMENDASI AI */}
         {(activeStep === 'step3' || activeStep === 'all') && (
           <div className="space-y-6 animate-in fade-in duration-300 mb-8">
             {activeStep !== 'all' && (
               <div className="flex items-center justify-between bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
-                    <BarChart3 size={20} />
+                    <Sparkles size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 3 dari 4: Historis Pagu & Analisis AI</h2>
-                    <p className="text-xs text-indigo-200/80">Analisis tren historis 3 tahun terakhir dan buat rekomendasi kepakatan pimpinan</p>
+                    <h2 className="text-sm font-bold text-white">Tahap 3 dari 4: Posisi Pagu 2026 & Analisis Rekomendasi AI</h2>
+                    <p className="text-xs text-indigo-200/80">Penetapan Posisi Pagu Tahun 2026 dan Penyusunan Catatan Analisis AI</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -635,7 +641,7 @@ export default function AnalisisPaguPage() {
             )}
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <DataPendukung key={`pend-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} />
+              <DataForm key={`form3-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} section="step3" />
             </div>
 
             {activeStep === 'step3' && (
@@ -654,7 +660,7 @@ export default function AnalisisPaguPage() {
                     className="px-4 py-2.5 rounded-2xl bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                   >
                     <Save size={16} />
-                    <span>Simpan Draf</span>
+                    <span>Simpan Dokumen</span>
                   </button>
                   <button
                     onClick={() => setActiveStep('pdf')}

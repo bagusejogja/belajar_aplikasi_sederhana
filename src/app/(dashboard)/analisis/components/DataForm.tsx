@@ -341,12 +341,64 @@ ${mainData.ringkasan_ai}`;
           <div className="p-4 bg-gray-50 border-t border-gray-100">
              <button onClick={() => setDetailData([...detailData, { no_urut: detailData.length + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
                <Plus size={16}/> Tambah Baris Manual
-             </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+        
+        setHistorisData(newHistoris.sort((a,b) => Number(a.tahun) - Number(b.tahun)));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const targetYear = '2026';
+  const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+  
+  const parseNum = (str: string | number) => {
+    if (typeof str === 'number') return isNaN(str) ? 0 : str;
+    let s = (str || '0').toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+       const parts = s.split('.');
+       if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
+          return parseFloat(s) || 0;
+       }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+  const totalRealisasiDetail = detailData.reduce((acc: number, d: any) => {
+    return acc + parseNum(d.realisasi);
+  }, 0);
+
+  const totalPaguNumber = parseNum(historisYearRow.total_pagu);
+  const sisaKapasitasAI = totalPaguNumber - totalRealisasiDetail;
+  const tanggalInput = mainData.tanggal_surat || '';
+
+  const handleGenerateRekomendasi = async () => {
+     setIsGeneratingAI(true);
+     try {
+       const res = await generateAnalysisFromText(JSON.stringify(mainData), detailData, historisData);
+       if (res) {
+          setMainData((prev: any) => ({ ...prev, rekomendasi_html: res }));
+       }
+     } catch(e: any) {
+        alert("Gagal generate AI: " + e.message);
+     }
+     setIsGeneratingAI(false);
+  };
+
+  const handleGenerateRingkasan = async () => {
+     setIsGeneratingRingkasan(true);
+     try {
+       const res = await generateRingkasanFromText(JSON.stringify(mainData));
+       if (res) {
+          setMainData((prev: any) => ({ ...prev, analisis_html: res }));
+       }
+     } catch(e: any) {
+        alert("Gagal generate ringkasan: " + e.message);
+     }
+     setIsGeneratingRingkasan(false);
+  };
 
   const handleNominalChange = (field: string, inputVal: string) => {
     const cleaned = inputVal.replace(/[^0-9]/g, '');
@@ -358,167 +410,196 @@ ${mainData.ringkasan_ai}`;
     setMainData((prev: any) => ({ ...prev, [field]: formatRp(num) }));
   };
 
-  return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2">Form Data Utama</h2>
-        <p className="text-gray-500 text-sm">Lengkapi metadata surat dan informasi analisis di bawah ini.</p>
-      </div>
+  const showStep1 = section === 'step1' || section === 'all';
+  const showStep3 = section === 'step3' || section === 'all';
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">No Surat</label>
-          <input type="text" value={mainData.no_surat} onChange={e => setMainData({...mainData, no_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Surat</label>
-          <input type="date" value={mainData.tanggal_surat} onChange={e => setMainData({...mainData, tanggal_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white custom-calendar-icon" />
-        </div>
-        <div className="col-span-full">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Perihal</label>
-          <input type="text" value={mainData.perihal} onChange={e => setMainData({...mainData, perihal: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
-          <Select 
-            options={units.map(u => ({ value: u.id, label: u.nama_unit }))}
-            value={units.find(u => u.nama_unit === mainData.unit_pengirim) ? { value: units.find(u => u.nama_unit === mainData.unit_pengirim).id, label: mainData.unit_pengirim } : null}
-            onChange={handleUnitChange}
-            placeholder="Cari atau pilih Unit Kerja..."
-            isClearable
-            menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-            className="text-sm"
-            styles={{ 
-              control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }),
-              menuPortal: base => ({ ...base, zIndex: 9999 })
-            }}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu (Rp)</label>
-          <input 
-            type="text" 
-            value={mainData.total_anggaran ? formatRp(parseNum(mainData.total_anggaran)) : ''} 
-            onChange={e => handleNominalChange('total_anggaran', e.target.value)} 
-            placeholder="0"
-            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono font-bold focus:bg-white" 
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status Persetujuan</label>
-          <select 
-            value={mainData.keputusan || 'diajukan'} 
-            onChange={e => setMainData({...mainData, keputusan: e.target.value})}
-            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-bold focus:bg-white capitalize"
-          >
-            <option value="diajukan">Diajukan</option>
-            <option value="disetujui sebagian">Disetujui Sebagian</option>
-            <option value="disetujui semua">Disetujui Semua</option>
-            <option value="ditolak">Ditolak</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Disetujui (Rp)</label>
-          <input 
-            type="text" 
-            value={mainData.nominal_disetujui ? formatRp(parseNum(mainData.nominal_disetujui)) : ''} 
-            onChange={e => handleNominalChange('nominal_disetujui', e.target.value)} 
-            placeholder="0"
-            className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-emerald-700 font-mono font-bold focus:bg-white" 
-          />
-        </div>
-        <div className="col-span-full mt-4">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026 {tanggalInput ? `(per ${tanggalInput})` : ''}</label>
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <table className="w-full text-sm text-left">
-              <tbody className="divide-y divide-gray-100">
-                <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-700 w-1/2">Pagu Awal</td>
-                  <td className="px-4 py-2 text-right">Rp {historisYearRow.pagu_awal || '0'}</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-700">Pengalihan (+/-)</td>
-                  <td className="px-4 py-2 text-right">Rp {historisYearRow.pengalihan || '0'}</td>
-                </tr>
-                {historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0' && (
-                  <tr className="hover:bg-gray-50 text-emerald-600">
-                    <td className="px-4 py-2 font-medium">Tambah Pagu Penugasan +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu_penugasan}</td>
-                  </tr>
-                )}
-                {historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0' && (
-                  <tr className="hover:bg-gray-50 text-emerald-600">
-                    <td className="px-4 py-2 font-medium">Tambah Pagu Inisiatif +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.tambah_pagu_inisiatif}</td>
-                  </tr>
-                )}
-                {historisYearRow.efisiensi && historisYearRow.efisiensi !== '0' && (
-                  <tr className="hover:bg-gray-50 text-rose-600">
-                    <td className="px-4 py-2 font-medium">Efisiensi -</td>
-                    <td className="px-4 py-2 text-right">- Rp {historisYearRow.efisiensi}</td>
-                  </tr>
-                )}
-                {historisYearRow.talangan && historisYearRow.talangan !== '0' && (
-                  <tr className="hover:bg-gray-50 text-amber-600">
-                    <td className="px-4 py-2 font-medium">Talangan +</td>
-                    <td className="px-4 py-2 text-right">+ Rp {historisYearRow.talangan}</td>
-                  </tr>
-                )}
-                <tr className="hover:bg-gray-50 bg-indigo-50/30">
-                  <td className="px-4 py-2 font-bold text-indigo-900">Pagu Sampai Saat Ini</td>
-                  <td className="px-4 py-2 text-right font-bold text-indigo-900">Rp {historisYearRow.total_pagu || '0'}</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
-                  <td className="px-4 py-2 text-right">Rp {formatRp(totalRealisasiDetail)}</td>
-                </tr>
-                <tr className="hover:bg-gray-50 bg-emerald-50/30">
-                  <td className="px-4 py-2 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
-                  <td className="px-4 py-2 text-right font-bold text-emerald-900">Rp {formatRp(sisaKapasitasAI)}</td>
-                </tr>
-                <tr className="hover:bg-gray-50 bg-amber-50">
-                  <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
-                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {formatRp(parseNum(mainData.total_anggaran))}</td>
-                </tr>
-              </tbody>
-            </table>
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* SECTION 1: FORM DATA UTAMA & RINGKASAN SUBSTANSI AI (STEP 1) */}
+      {showStep1 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-1">Form Data Utama Surat</h2>
+            <p className="text-gray-500 text-sm">Lengkapi metadata surat usulan pagu dan ringkasan substansi di bawah ini.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">No Surat</label>
+              <input type="text" value={mainData.no_surat} onChange={e => setMainData({...mainData, no_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tanggal Surat</label>
+              <input type="date" value={mainData.tanggal_surat} onChange={e => setMainData({...mainData, tanggal_surat: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white custom-calendar-icon" />
+            </div>
+            <div className="col-span-full">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Perihal</label>
+              <input type="text" value={mainData.perihal} onChange={e => setMainData({...mainData, perihal: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
+              <Select 
+                options={units.map(u => ({ value: u.id, label: u.nama_unit }))}
+                value={units.find(u => u.nama_unit === mainData.unit_pengirim) ? { value: units.find(u => u.nama_unit === mainData.unit_pengirim).id, label: mainData.unit_pengirim } : null}
+                onChange={handleUnitChange}
+                placeholder="Cari atau pilih Unit Kerja..."
+                isClearable
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                className="text-sm"
+                styles={{ 
+                  control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }),
+                  menuPortal: base => ({ ...base, zIndex: 9999 })
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Usulan Tambahan Pagu (Rp)</label>
+              <input 
+                type="text" 
+                value={mainData.total_anggaran ? formatRp(parseNum(mainData.total_anggaran)) : ''} 
+                onChange={e => handleNominalChange('total_anggaran', e.target.value)} 
+                placeholder="0"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-mono font-bold focus:bg-white" 
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Status Persetujuan</label>
+              <select 
+                value={mainData.keputusan || 'diajukan'} 
+                onChange={e => setMainData({...mainData, keputusan: e.target.value})}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 font-bold focus:bg-white capitalize"
+              >
+                <option value="diajukan">Diajukan</option>
+                <option value="disetujui sebagian">Disetujui Sebagian</option>
+                <option value="disetujui semua">Disetujui Semua</option>
+                <option value="ditolak">Ditolak</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Nominal Disetujui (Rp)</label>
+              <input 
+                type="text" 
+                value={mainData.nominal_disetujui ? formatRp(parseNum(mainData.nominal_disetujui)) : ''} 
+                onChange={e => handleNominalChange('nominal_disetujui', e.target.value)} 
+                placeholder="0"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-emerald-700 font-mono font-bold focus:bg-white" 
+              />
+            </div>
+
+            {/* RINGKASAN SUBSTANSI (AI) */}
+            <div className="col-span-full mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
+                <button onClick={handleGenerateRingkasan} disabled={isGeneratingRingkasan} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+                  {isGeneratingRingkasan ? <div className="w-3 h-3 border-2 border-emerald-400 border-t-emerald-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+                  Generate Ringkasan (AI)
+                </button>
+              </div>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+                 <ReactQuill 
+                    theme="snow" 
+                    value={mainData.analisis_html || ''} 
+                    onChange={(val) => setMainData({...mainData, analisis_html: val})} 
+                    className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
+                 />
+              </div>
+            </div>
           </div>
         </div>
-        <div className="col-span-full">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
-            <button onClick={handleGenerateRingkasan} disabled={isGeneratingRingkasan} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
-              {isGeneratingRingkasan ? <div className="w-3 h-3 border-2 border-emerald-400 border-t-emerald-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
-              Generate Ringkasan (AI)
-            </button>
+      )}
+
+      {/* SECTION 3: POSISI PAGU TAHUN 2026 & ANALISIS AI (STEP 3) */}
+      {showStep3 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-1">Posisi Pagu & Analisis Rekomendasi AI</h2>
+            <p className="text-gray-500 text-sm">Kalkulasi posisi pagu berjalan dan penyusunan catatan analisis rekomendasi pimpinan.</p>
           </div>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-             <ReactQuill 
-                theme="snow" 
-                value={mainData.analisis_html || ''} 
-                onChange={(val) => setMainData({...mainData, analisis_html: val})} 
-                className="h-[400px] pb-10 [&_.ql-editor_p]:text-justify"
-             />
+
+          <div className="space-y-6">
+            {/* POSISI PAGU TAHUN 2026 */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Posisi Pagu Tahun 2026 {tanggalInput ? `(per ${tanggalInput})` : ''}</label>
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm text-left">
+                  <tbody className="divide-y divide-gray-100">
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-700 w-1/2">Pagu Awal</td>
+                      <td className="px-4 py-2.5 text-right font-mono">Rp {historisYearRow.pagu_awal || '0'}</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-700">Pengalihan (+/-)</td>
+                      <td className="px-4 py-2.5 text-right font-mono">Rp {historisYearRow.pengalihan || '0'}</td>
+                    </tr>
+                    {historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0' && (
+                      <tr className="hover:bg-gray-50 text-emerald-600">
+                        <td className="px-4 py-2.5 font-medium">Tambah Pagu Penugasan +</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.tambah_pagu_penugasan}</td>
+                      </tr>
+                    )}
+                    {historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0' && (
+                      <tr className="hover:bg-gray-50 text-emerald-600">
+                        <td className="px-4 py-2.5 font-medium">Tambah Pagu Inisiatif +</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.tambah_pagu_inisiatif}</td>
+                      </tr>
+                    )}
+                    {historisYearRow.efisiensi && historisYearRow.efisiensi !== '0' && (
+                      <tr className="hover:bg-gray-50 text-rose-600">
+                        <td className="px-4 py-2.5 font-medium">Efisiensi -</td>
+                        <td className="px-4 py-2.5 text-right font-mono">- Rp {historisYearRow.efisiensi}</td>
+                      </tr>
+                    )}
+                    {historisYearRow.talangan && historisYearRow.talangan !== '0' && (
+                      <tr className="hover:bg-gray-50 text-amber-600">
+                        <td className="px-4 py-2.5 font-medium">Talangan +</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.talangan}</td>
+                      </tr>
+                    )}
+                    <tr className="hover:bg-gray-50 bg-indigo-50/50">
+                      <td className="px-4 py-2.5 font-bold text-indigo-900">Pagu Sampai Saat Ini</td>
+                      <td className="px-4 py-2.5 text-right font-bold font-mono text-indigo-900">Rp {historisYearRow.total_pagu || '0'}</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-4 py-2.5 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
+                      <td className="px-4 py-2.5 text-right font-mono">Rp {formatRp(totalRealisasiDetail)}</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50 bg-emerald-50/50">
+                      <td className="px-4 py-2.5 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
+                      <td className="px-4 py-2.5 text-right font-bold font-mono text-emerald-900">Rp {formatRp(sisaKapasitasAI)}</td>
+                    </tr>
+                    <tr className="hover:bg-gray-50 bg-amber-50">
+                      <td className="px-4 py-2.5 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
+                      <td className="px-4 py-2.5 text-right font-bold font-mono text-amber-900">Rp {formatRp(parseNum(mainData.total_anggaran))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ANALISIS & REKOMENDASI (AI ANALYSIS) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
+                <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+                  {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+                  Generate Rekomendasi (AI)
+                </button>
+              </div>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+                 <ReactQuill 
+                    theme="snow" 
+                    value={mainData.rekomendasi_html || ''} 
+                    onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
+                    className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
+                 />
+              </div>
+            </div>
+
           </div>
         </div>
-        <div className="col-span-full mt-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
-            <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
-              {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
-              Generate Rekomendasi (AI)
-            </button>
-          </div>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-             <ReactQuill 
-                theme="snow" 
-                value={mainData.rekomendasi_html || ''} 
-                onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
-                className="h-[400px] pb-10 [&_.ql-editor_p]:text-justify"
-             />
-          </div>
-        </div>
-      </div>
+      )}
+
     </div>
   );
 }
