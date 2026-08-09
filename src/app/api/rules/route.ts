@@ -103,6 +103,32 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, unitkerja_nama, akun, kata_kunci_deskripsi, priority, custom_status } = body;
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID aturan harus diisi' }, { status: 400 });
+    }
+
+    const cleanAkun = akun && akun !== '*' ? akun.replace(/\*/g, '').trim() : null;
+    const cleanKeyword = kata_kunci_deskripsi ? kata_kunci_deskripsi.replace(/\*/g, '').trim() : '';
+
+    const { data, error } = await supabaseAdmin.from('rules').update({ 
+      unitkerja_nama: !unitkerja_nama || unitkerja_nama === '*' ? null : unitkerja_nama, 
+      akun: cleanAkun, 
+      kata_kunci_deskripsi: cleanKeyword,
+      priority: priority ? parseInt(priority) : 99,
+      custom_status: custom_status || null
+    }).eq('id', id).select();
+
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ success: true, data });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

@@ -115,6 +115,11 @@ export default function RulesPage() {
   const [pasteData, setPasteData] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
+  // Edit Modal State
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const fetchRulesAndUnits = async () => {
     setLoading(true);
     try {
@@ -168,6 +173,52 @@ export default function RulesPage() {
       alert('Gagal menambah aturan');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const handleOpenEdit = (rule: any) => {
+    setEditingRule({
+      id: rule.id,
+      unitkerja_nama: rule.unitkerja_nama || '*',
+      akun: rule.akun || '*',
+      kata_kunci_deskripsi: rule.kata_kunci_deskripsi || '',
+      priority: (rule.priority || 99).toString(),
+      custom_status: rule.custom_status || 'Wajib Ada'
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRule || !editingRule.id) return;
+    
+    setIsUpdating(true);
+    try {
+      const res = await fetch('/api/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingRule.id,
+          unitkerja_nama: editingRule.unitkerja_nama,
+          akun: editingRule.akun,
+          kata_kunci_deskripsi: editingRule.kata_kunci_deskripsi,
+          priority: editingRule.priority,
+          custom_status: editingRule.custom_status
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setEditDialogOpen(false);
+        setEditingRule(null);
+        fetchRulesAndUnits();
+      } else {
+        alert('Gagal memperbarui aturan: ' + (json.error || 'Terjadi kesalahan'));
+      }
+    } catch (error) {
+      console.error(error);
+      alert('Terjadi kesalahan saat memperbarui aturan.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -446,9 +497,24 @@ Direktorat Aset\t53102 | 53103\tPerbaikan dan Pemeliharaan\t1\tWajib Ada`)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 px-2 text-xs font-bold" onClick={() => handleDelete(rule.id)}>
-                        Hapus
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-8 px-2 text-xs font-bold" 
+                          onClick={() => handleOpenEdit(rule)}
+                        >
+                          ✏️ Edit
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8 px-2 text-xs font-bold" 
+                          onClick={() => handleDelete(rule.id)}
+                        >
+                          🗑️ Hapus
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -520,6 +586,86 @@ Direktorat Aset\t53102 | 53103\tPerbaikan dan Pemeliharaan\t1\tWajib Ada`)}
             </div>
           </CardContent>
         </Card>
+
+        {/* DIALOG MODAL EDIT ATURAN */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[650px] w-full max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-gray-900">✏️ Edit Aturan Rule Engine</DialogTitle>
+              <DialogDescription className="text-gray-500">
+                Ubah detail aturan untuk Unit Kerja, Kode Akun, Kata Kunci, Level, atau Status Final.
+              </DialogDescription>
+            </DialogHeader>
+
+            {editingRule && (
+              <form onSubmit={handleUpdateRule} className="space-y-4 py-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600">Unit Kerja (Bisa Multi | atau *)</label>
+                  <UnitAutocompleteInput 
+                    units={unitList} 
+                    value={editingRule.unitkerja_nama} 
+                    onChange={(val) => setEditingRule({ ...editingRule, unitkerja_nama: val })} 
+                    placeholder="Misal: Direktorat Aset | Komite Audit"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-600">Kode Akun (Bisa Multi | atau *)</label>
+                    <Input 
+                      value={editingRule.akun} 
+                      onChange={e => setEditingRule({ ...editingRule, akun: e.target.value })} 
+                      className="bg-white border-gray-300 text-gray-900 text-xs font-mono h-10" 
+                      placeholder="Contoh: 53102 | 53103 atau *" 
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-600">Level (Priority)</label>
+                    <Input 
+                      type="number" 
+                      value={editingRule.priority} 
+                      onChange={e => setEditingRule({ ...editingRule, priority: e.target.value })} 
+                      className="bg-white border-gray-300 text-gray-900 text-xs h-10 font-mono" 
+                      placeholder="99" 
+                      min="1" 
+                      max="999" 
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600">Kata Kunci / Frasa (Deskripsi)</label>
+                  <Textarea 
+                    value={editingRule.kata_kunci_deskripsi} 
+                    onChange={e => setEditingRule({ ...editingRule, kata_kunci_deskripsi: e.target.value })} 
+                    className="bg-white border-gray-300 text-gray-900 text-xs h-20" 
+                    placeholder="Frasa eksak atau kata kunci dipisah |" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-600">Label Status Final (Custom Status)</label>
+                  <Input 
+                    value={editingRule.custom_status} 
+                    onChange={e => setEditingRule({ ...editingRule, custom_status: e.target.value })} 
+                    className="bg-white border-gray-300 text-gray-900 text-xs h-10 font-bold" 
+                    placeholder="Wajib Ada" 
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                  <Button type="button" variant="ghost" onClick={() => setEditDialogOpen(false)} disabled={isUpdating}>
+                    Batal
+                  </Button>
+                  <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6" disabled={isUpdating}>
+                    {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
       </div>
     </div>
