@@ -1,7 +1,125 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Tesseract from 'tesseract.js';
-import { Upload, ScanLine, AlertCircle, FileText as FileTextIcon } from 'lucide-react';
+import { Upload, ScanLine, AlertCircle, FileText as FileTextIcon, Wand2, Sparkles } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
+  if (!ocrText) return {};
+
+  let no_surat = '';
+  let tanggal_surat = '';
+  let perihal = '';
+  let unit_pengirim = '';
+
+  // 1. Parse No Surat
+  const noSuratMatch = ocrText.match(/(?:nomor|no)[.\s]*(?::|;)?\s*([A-Za-z0-9/.\-_]+)/i);
+  if (noSuratMatch) {
+    no_surat = noSuratMatch[1].trim();
+  }
+
+  // 2. Parse Tanggal Surat (Ubah Bulan Indonesia -> YYYY-MM-DD)
+  const monthMap: Record<string, string> = {
+    januari: '01', jan: '01',
+    februari: '02', feb: '02',
+    maret: '03', mar: '03',
+    april: '04', apr: '04',
+    mei: '05',
+    juni: '06', jun: '06',
+    juli: '07', jul: '07',
+    agustus: '08', agu: '08', ags: '08',
+    september: '09', sep: '09',
+    oktober: '10', okt: '10',
+    november: '11', nov: '11',
+    desember: '12', des: '12'
+  };
+
+  const indonesianDateRegex = /(?:yogyakarta|sleman|jakarta|bandung|semarang|surabaya|tanggal|tgl)?\s*,?\s*(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|ags|sep|okt|nov|des)\s+(\d{4})/i;
+  const numericDateRegex = /(\d{4})[-/](\d{1,2})[-/](\d{1,2})|(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+
+  const dateMatchIndo = ocrText.match(indonesianDateRegex);
+  if (dateMatchIndo) {
+    const day = dateMatchIndo[1].padStart(2, '0');
+    const monthStr = dateMatchIndo[2].toLowerCase();
+    const month = monthMap[monthStr] || '01';
+    const year = dateMatchIndo[3];
+    tanggal_surat = `${year}-${month}-${day}`;
+  } else {
+    const dateMatchNum = ocrText.match(numericDateRegex);
+    if (dateMatchNum) {
+      if (dateMatchNum[1] && dateMatchNum[1].length === 4) {
+        tanggal_surat = `${dateMatchNum[1]}-${dateMatchNum[2].padStart(2, '0')}-${dateMatchNum[3].padStart(2, '0')}`;
+      } else if (dateMatchNum[6] && dateMatchNum[6].length === 4) {
+        tanggal_surat = `${dateMatchNum[6]}-${dateMatchNum[5].padStart(2, '0')}-${dateMatchNum[4].padStart(2, '0')}`;
+      }
+    }
+  }
+
+  // 3. Parse Perihal Surat (Berhenti sebelum "Yth", "Kepada Yth", "di tempat", dll)
+  const perihalMatch = ocrText.match(/(?:hal|perihal)[.\s]*(?::|;)?\s*([\s\S]+?)(?=\n\s*(?:kepada|yth|di\s+tempat|dengan\s+hormat|nomor|no\.|lampiran|\n\n|$))/i);
+  if (perihalMatch) {
+    let rawPerihal = perihalMatch[1].trim();
+    rawPerihal = rawPerihal.split(/(?:Yth|Kepada|di\s+tempat|Dengan\s+Hormat)/i)[0].trim();
+    rawPerihal = rawPerihal.replace(/[:.-]+$/, '').trim();
+    rawPerihal = rawPerihal.replace(/\s+/g, ' ');
+    perihal = rawPerihal;
+  } else {
+    const simplePerihal = ocrText.match(/(?:hal|perihal)[.\s]*(?::|;)?\s*([^\n]+)/i);
+    if (simplePerihal) {
+      let rawP = simplePerihal[1].trim();
+      rawP = rawP.split(/(?:Yth|Kepada|di\s+tempat|Dengan\s+Hormat)/i)[0].trim();
+      rawP = rawP.replace(/[:.-]+$/, '').trim();
+      perihal = rawP;
+    }
+  }
+
+  // 4. Parse Unit Pengirim (di atas TTE / Tanda tangan)
+  const unitPatterns = [
+    /(?:a\.n\.\s*Rektor\s*\n)?((?:Kepala|Ketua|Dekan|Direktur|Wakil Rektor|Manajer|Koordinator|Sekretaris|Biro|Lembaga|Fakultas)\s+[^\n,]+)/i,
+    /(?:ttd|tte|tanda\s+tangan|ditandatangani)\s+oleh\s*:?\s*([^\n]+)/i
+  ];
+
+  let rawUnit = '';
+  for (const pattern of unitPatterns) {
+    const match = ocrText.match(pattern);
+    if (match && match[1]) {
+      rawUnit = match[1].trim();
+      break;
+    }
+  }
+
+  if (availableUnits && availableUnits.length > 0) {
+    if (rawUnit) {
+      const found = availableUnits.find(u => 
+        u.nama_unit.toLowerCase().includes(rawUnit.toLowerCase()) || 
+        rawUnit.toLowerCase().includes(u.nama_unit.toLowerCase())
+      );
+      if (found) {
+        unit_pengirim = found.nama_unit;
+      } else {
+        unit_pengirim = rawUnit;
+      }
+    }
+    
+    if (!unit_pengirim) {
+      const matchedFromText = availableUnits.find(u => 
+        ocrText.toLowerCase().includes(u.nama_unit.toLowerCase())
+      );
+      if (matchedFromText) {
+        unit_pengirim = matchedFromText.nama_unit;
+      }
+    }
+  } else if (rawUnit) {
+    unit_pengirim = rawUnit;
+  }
+
+  return {
+    no_surat,
+    tanggal_surat,
+    perihal,
+    unit_pengirim
+  };
+}
 
 export default function OCRPanel({ mainData, setMainData }: any) {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -10,12 +128,20 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   const [loading, setLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [units, setUnits] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      const { data } = await supabase.from('gov_units').select('id, kode_unit, nama_unit').order('nama_unit');
+      if (data) setUnits(data);
+    };
+    fetchUnits();
+  }, []);
 
   useEffect(() => {
     if (mainData?.link_lampiran && !fileUrl) {
       setFileUrl(mainData.link_lampiran);
       setFileName(mainData.file_lampiran || 'Document');
-      // Simple type inference
       if (mainData.link_lampiran.toLowerCase().endsWith('.pdf')) {
          setFileType('application/pdf');
       } else {
@@ -24,11 +150,8 @@ export default function OCRPanel({ mainData, setMainData }: any) {
     }
   }, [mainData?.link_lampiran]);
 
-  // We load pdf.js dynamically to avoid SSR issues
   const loadPdfJs = async () => {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'; // We might need to copy worker or use a CDN
-    // Actually, setting workerSrc to a public CDN is easiest for React
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
     return pdfjsLib;
   };
@@ -86,14 +209,10 @@ export default function OCRPanel({ mainData, setMainData }: any) {
        const pdf = await loadingTask.promise;
        
        let fullText = '';
-       
-       // Just process the first 3 pages to prevent crashing browser on huge PDFs
        const pagesToProcess = Math.min(pdf.numPages, 3);
 
        for (let i = 1; i <= pagesToProcess; i++) {
          const page = await pdf.getPage(i);
-         
-         // Try extracting text first (faster and better for native PDFs)
          const textContent = await page.getTextContent();
          const pageText = textContent.items.map((item: any) => item.str).join(' ');
          
@@ -101,9 +220,8 @@ export default function OCRPanel({ mainData, setMainData }: any) {
             fullText += pageText + '\n\n';
             setProgress(Math.round((i/pagesToProcess) * 100));
          } else {
-            // If it's a scanned PDF (no text), render to canvas and use Tesseract
-            setProgress(Math.round((i/pagesToProcess) * 50)); // rendering phase
-            const viewport = page.getViewport({ scale: 2.0 }); // Higher scale for better OCR
+            setProgress(Math.round((i/pagesToProcess) * 50));
+            const viewport = page.getViewport({ scale: 2.0 });
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -123,6 +241,29 @@ export default function OCRPanel({ mainData, setMainData }: any) {
     }
   };
 
+  const handleManualParse = (textToParse?: string) => {
+    const targetText = textToParse || mainData.ringkasan_ai || '';
+    if (!targetText) {
+      alert("Teks ekstraksi masih kosong. Silakan upload & jalankan ekstraksi terlebih dahulu.");
+      return;
+    }
+    const parsed = parseOCRMetadata(targetText, units);
+    setMainData((prev: any) => ({
+      ...prev,
+      no_surat: parsed.no_surat || prev.no_surat,
+      tanggal_surat: parsed.tanggal_surat || prev.tanggal_surat,
+      perihal: parsed.perihal || prev.perihal,
+      unit_pengirim: parsed.unit_pengirim || prev.unit_pengirim,
+    }));
+
+    let infoMsg = 'Berhasil memindahkan metadata ke Form Data Utama:\n';
+    infoMsg += `- Tanggal Surat: ${parsed.tanggal_surat || '(Tidak terdeteksi)'}\n`;
+    infoMsg += `- Perihal: ${parsed.perihal || '(Tidak terdeteksi)'}\n`;
+    infoMsg += `- Unit Pengirim: ${parsed.unit_pengirim || '(Tidak terdeteksi)'}\n`;
+    infoMsg += `- No Surat: ${parsed.no_surat || '(Tidak terdeteksi)'}`;
+    alert(infoMsg);
+  };
+
   const runOCR = async () => {
     if (!fileUrl) return;
     setLoading(true);
@@ -135,17 +276,18 @@ export default function OCRPanel({ mainData, setMainData }: any) {
         extractedText = await extractTextFromImage(fileUrl);
       }
       
-      // Auto-parse
-      const noSuratMatch = extractedText.match(/(?:nomor|no)[.\s]*(?::|;)?\s*([A-Za-z0-9/.-]+)/i);
-      const perihalMatch = extractedText.match(/(?:hal|perihal)[.\s]*(?::|;)?\s*([^\n]+)/i);
+      const parsed = parseOCRMetadata(extractedText, units);
       
-      setMainData({ 
-         ...mainData, 
+      setMainData((prev: any) => ({ 
+         ...prev, 
          ringkasan_ai: extractedText,
-         no_surat: noSuratMatch ? noSuratMatch[1].trim() : mainData.no_surat,
-         perihal: perihalMatch ? perihalMatch[1].trim() : mainData.perihal,
-      });
-      alert('Ekstraksi teks selesai! Data Utama otomatis terisi jika ditemukan format yang sesuai.');
+         no_surat: parsed.no_surat || prev.no_surat,
+         tanggal_surat: parsed.tanggal_surat || prev.tanggal_surat,
+         perihal: parsed.perihal || prev.perihal,
+         unit_pengirim: parsed.unit_pengirim || prev.unit_pengirim,
+      }));
+
+      alert(`Ekstraksi teks selesai!\n\nMetadata otomatis terisi ke Form Data Utama:\n- Tanggal Surat: ${parsed.tanggal_surat || '-'}\n- Perihal: ${parsed.perihal || '-'}\n- Unit Pengirim: ${parsed.unit_pengirim || '-'}`);
     } catch (e) {
       console.error(e);
       alert('Ekstraksi Teks Gagal! Pastikan file tidak korup.');
@@ -189,7 +331,21 @@ export default function OCRPanel({ mainData, setMainData }: any) {
         </div>
 
         <div className="flex flex-col min-h-[300px]">
-          <label className="text-sm font-bold text-gray-600 mb-2 flex items-center gap-2"><AlertCircle size={14} className="text-indigo-500"/> Hasil Ekstraksi Teks</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-bold text-gray-600 flex items-center gap-2">
+              <AlertCircle size={14} className="text-indigo-500"/> Hasil Ekstraksi Teks
+            </label>
+            {mainData.ringkasan_ai && (
+              <button 
+                onClick={() => handleManualParse()} 
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                title="Pindahkan Tanggal, Perihal, dan Unit ke Form Data Utama"
+              >
+                <Sparkles size={13} className="text-indigo-600" />
+                <span>Pindahkan Metadata ke Form</span>
+              </button>
+            )}
+          </div>
           <textarea 
             className="w-full h-full p-5 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 text-gray-700 custom-scrollbar resize-none font-mono text-sm leading-relaxed transition-all shadow-inner"
             placeholder="Hasil teks akan muncul di sini..."
@@ -205,3 +361,4 @@ export default function OCRPanel({ mainData, setMainData }: any) {
 function ScanTextIcon() {
   return <ScanLine size={24} className="text-indigo-600" />;
 }
+

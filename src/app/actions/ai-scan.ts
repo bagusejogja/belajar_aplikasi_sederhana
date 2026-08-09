@@ -18,13 +18,13 @@ export async function scanSuratWithAI(formData: FormData) {
 
     // 3. Siapkan Prompt yang Sangat Spesifik
     const prompt = `
-      Tugas Anda adalah mengekstrak informasi dari gambar/PDF surat resmi pemerintah Indonesia berikut.
+      Tugas Anda adalah mengekstrak informasi dari gambar/PDF surat resmi pemerintah/universitas Indonesia berikut.
       Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan) dengan kunci berikut:
       {
         "no_surat": "Isi dengan nomor surat lengkap",
-        "tanggal_surat": "Isi dengan tanggal surat (Ubah tanggal format Indonesia seperti '1 Januari 2026' menjadi format YYYY-MM-DD. WAJIB YYYY-MM-DD)",
-        "perihal_surat": "Isi dengan perihal/hal surat secara lengkap",
-        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat",
+        "tanggal_surat": "Isi dengan tanggal surat (Format WAJIB YYYY-MM-DD. Misal '15 Juli 2026' menjadi '2026-07-15')",
+        "perihal_surat": "Isi HANYA perihal/hal surat saja. BERHENTI sebelum kata 'Yth', 'Kepada Yth', 'di Tempat', atau nama tujuan surat",
+        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat yang tertulis di kover surat atau di atas tanda tangan/TTE",
         "nominal_usulan": "Isi dengan total nominal usulan anggaran/tambahan pagu yang diminta (hanya angka)"
       }
       
