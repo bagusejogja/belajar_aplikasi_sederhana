@@ -6,8 +6,8 @@ import { r2, R2_BUCKET_NAME } from '@/lib/r2';
 // Bypasses generic Node.js SSL handshake failures in Vercel
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co');
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder');
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(req: NextRequest) {

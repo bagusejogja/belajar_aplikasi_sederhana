@@ -153,7 +153,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
               const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
               if (menuData && menuData.length > 0) {
                  setAllowedPaths(menuData.map(m => m.path));
-              } else if (roleData.role.toLowerCase() === 'admin') {
+              } else if (roleData.role.toLowerCase() === 'admin' || roleData.role.toLowerCase() === 'administrator') {
                  // Fallback jika belum di-set, Admin punya akses semua
                  setAllowedPaths(menuList.map(m => m.path));
               }
@@ -266,7 +266,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
             // Filter items by role/access AND search query
             const visibleItems = items.filter(item => {
               if (userRole === 'Pending') return false;
-              const hasAccess = allowedPaths.includes(item.path) || userRole.toLowerCase() === 'admin';
+              const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
+              const hasAccess = allowedPaths.includes(item.path) || isAdmin;
               const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
               return hasAccess && matchesSearch;
             });

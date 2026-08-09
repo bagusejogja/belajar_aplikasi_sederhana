@@ -90,6 +90,11 @@ export const menuList: MenuItem[] = [
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 
+  // --- REVIEW ANGGARAN ---
+  { title: 'Review Admin', path: '/admin', icon: 'ShieldCheck', roles: ['ADMIN'], group: 'Anggaran' },
+  { title: 'Usulan Unit Kerja', path: '/unit-kerja', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
+  { title: 'Master Aturan AI', path: '/admin/rules', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
+
   // --- INPUT FORM ---
   { title: 'Form Tolakan Verif', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
   { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
