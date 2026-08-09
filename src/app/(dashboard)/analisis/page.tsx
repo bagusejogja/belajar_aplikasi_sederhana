@@ -48,8 +48,10 @@ export default function AnalisisPaguPage() {
     pagu_berjalan: {},
     file_lampiran: '',
     link_lampiran: '',
-    keputusan: 'diajukan',
-    nominal_disetujui: '0'
+    keputusan: 'disetujui semua',
+    nominal_disetujui: '0',
+    keterangan_keputusan: '',
+    surat_balasan_html: ''
   });
   
   const [detailData, setDetailData] = useState<any[]>([]);
@@ -62,7 +64,7 @@ export default function AnalisisPaguPage() {
        if (utama) {
           setMainData({
              ...utama,
-             keputusan: utama.keputusan || 'diajukan',
+             keputusan: utama.keputusan || 'disetujui semua',
              nominal_disetujui: utama.nominal_disetujui || '0'
           });
           setAnalisisId(id_analisis);
@@ -136,16 +138,20 @@ export default function AnalisisPaguPage() {
                 analisis_html: parsed.analisis || '',
                 rekomendasi_html: parsed.rekomendasi || '',
                 pagu_berjalan: parsed.pagu_berjalan || {},
-                keputusan: utama.keputusan || parsed.keputusan || 'diajukan',
-                nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0'
+                keputusan: utama.keputusan || parsed.keputusan || 'disetujui semua',
+                nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0',
+                keterangan_keputusan: parsed.keterangan_keputusan || '',
+                surat_balasan_html: parsed.surat_balasan_html || ''
              }));
           } catch (e) {
              setMainData((prev: any) => ({
                 ...prev,
                 analisis_html: utama.analisis_html,
                 rekomendasi_html: '',
-                keputusan: utama.keputusan || 'diajukan',
-                nominal_disetujui: utama.nominal_disetujui || '0'
+                keputusan: utama.keputusan || 'disetujui semua',
+                nominal_disetujui: utama.nominal_disetujui || '0',
+                keterangan_keputusan: '',
+                surat_balasan_html: ''
              }));
           }
        }
@@ -174,14 +180,16 @@ export default function AnalisisPaguPage() {
         total_realisasi: mainData.total_realisasi || '0',
         persen_serapan: mainData.persen_serapan || '0',
         ringkasan_ai: mainData.ringkasan_ai || '',
-        keputusan: mainData.keputusan || 'diajukan',
+        keputusan: mainData.keputusan || 'disetujui semua',
         nominal_disetujui: mainData.nominal_disetujui || '0',
         analisis_html: JSON.stringify({
            analisis: mainData.analisis_html || '',
            rekomendasi: mainData.rekomendasi_html || '',
            pagu_berjalan: mainData.pagu_berjalan || {},
-           keputusan: mainData.keputusan || 'diajukan',
-           nominal_disetujui: mainData.nominal_disetujui || '0'
+           keputusan: mainData.keputusan || 'disetujui semua',
+           nominal_disetujui: mainData.nominal_disetujui || '0',
+           keterangan_keputusan: mainData.keterangan_keputusan || '',
+           surat_balasan_html: mainData.surat_balasan_html || ''
         }),
         file_lampiran: mainData.file_lampiran || '',
         link_lampiran: mainData.link_lampiran || ''

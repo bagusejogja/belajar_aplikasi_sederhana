@@ -451,6 +451,24 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         lineHeight: 5,
         fontSize: 10
       });
+      startY = (doc as any).lastWysiwygY ? (doc as any).lastWysiwygY + 10 : startY + 30;
+    }
+
+    // 8. KEPUTUSAN & DRAFT SURAT BALASAN UGM
+    if (mainData.surat_balasan_html || mainData.keputusan) {
+      const statusTitle = (mainData.keputusan || 'disetujui semua').toUpperCase();
+      startY = addSectionHeader(`8. DRAFT SURAT BALASAN RESMI UGM (STATUS: ${statusTitle}):`, startY);
+      if (mainData.surat_balasan_html) {
+        renderWysiwygToPdf({
+          doc,
+          htmlString: mainData.surat_balasan_html,
+          x: 17,
+          y: startY + 2,
+          maxWidth: 176,
+          lineHeight: 5,
+          fontSize: 10
+        });
+      }
     }
 
     // Set preview

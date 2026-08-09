@@ -323,14 +323,12 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       <YAxis tickFormatter={(value) => `Rp ${new Intl.NumberFormat('id-ID', {notation: 'compact'}).format(value)}`} axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} width={80} />
                       <Tooltip formatter={(value: any) => `Rp ${new Intl.NumberFormat('id-ID').format(value)}`} />
                       <Legend wrapperStyle={{fontSize: '12px'}} />
-                      <Bar dataKey={(d: any) => parseNum(d.total_pagu)} name="Total Pagu" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan (+/-)" radius={[0, 0, 0, 0]} />
-                      {showTambahPaguPenugasan && <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tambah Pagu Penugasan" radius={[0, 0, 0, 0]} />}
-                      {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tambah Pagu Inisiatif" radius={[0, 0, 0, 0]} />}
-                      {showEfisiensi && <Bar dataKey="Efisiensi" stackId="a" fill="#f43f5e" name="Efisiensi" radius={[0, 0, 0, 0]} />}
-                      {showTalangan && <Bar dataKey="Talangan" stackId="a" fill="#f59e0b" name="Talangan" radius={[4, 4, 0, 0]} />}
-                      <Line type="monotone" dataKey="TotalPagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 4}} activeDot={{r: 6}} />
-                      <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" name="Realisasi" dot={{r: 4}} activeDot={{r: 6}} />
+                      <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan" radius={[0, 0, 0, 0]} />
+                      {showTambahPaguPenugasan && <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tmbh Penugasan" radius={[0, 0, 0, 0]} />}
+                      {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tmbh Inisiatif" radius={[4, 4, 0, 0]} />}
+                      <Line type="monotone" dataKey={(d: any) => parseNum(d.total_pagu)} stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 5, fill: '#06b6d4'}} activeDot={{r: 7}} />
+                      <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} name="Realisasi" dot={{r: 5, fill: '#f59e0b'}} activeDot={{r: 7}} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
