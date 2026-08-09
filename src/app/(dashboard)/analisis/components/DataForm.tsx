@@ -11,6 +11,47 @@ import { useEffect } from 'react';
 
 const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
+export function terbilang(n: number): string {
+  const angka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
+  let num = Math.floor(Math.abs(n));
+  if (num === 0) return "nol rupiah";
+
+  let hasil = "";
+  if (num < 12) {
+    hasil = angka[num];
+  } else if (num < 20) {
+    hasil = terbilang(num - 10).replace(" rupiah", "") + " belas";
+  } else if (num < 100) {
+    hasil = terbilang(Math.floor(num / 10)).replace(" rupiah", "") + " puluh " + terbilang(num % 10).replace(" rupiah", "");
+  } else if (num < 200) {
+    hasil = "seratus " + terbilang(num - 100).replace(" rupiah", "");
+  } else if (num < 1000) {
+    hasil = terbilang(Math.floor(num / 100)).replace(" rupiah", "") + " ratus " + terbilang(num % 100).replace(" rupiah", "");
+  } else if (num < 2000) {
+    hasil = "seribu " + terbilang(num - 1000).replace(" rupiah", "");
+  } else if (num < 1000000) {
+    hasil = terbilang(Math.floor(num / 1000)).replace(" rupiah", "") + " ribu " + terbilang(num % 1000).replace(" rupiah", "");
+  } else if (num < 1000000000) {
+    hasil = terbilang(Math.floor(num / 1000000)).replace(" rupiah", "") + " juta " + terbilang(num % 1000000).replace(" rupiah", "");
+  } else if (num < 1000000000000) {
+    hasil = terbilang(Math.floor(num / 1000000000)).replace(" rupiah", "") + " miliar " + terbilang(num % 1000000000).replace(" rupiah", "");
+  }
+  
+  hasil = hasil.trim().replace(/\s+/g, ' ');
+  return hasil ? `${hasil} rupiah` : 'nol rupiah';
+}
+
+export function formatTanggalIndo(dateStr: string) {
+  if (!dateStr) return '...';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [], setHistorisData, section = 'all' }: any) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [units, setUnits] = useState<any[]>([]);
@@ -347,47 +388,6 @@ ${mainData.ringkasan_ai}`;
       </div>
     );
   }
-
-export function terbilang(n: number): string {
-  const angka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
-  let num = Math.floor(Math.abs(n));
-  if (num === 0) return "nol rupiah";
-
-  let hasil = "";
-  if (num < 12) {
-    hasil = angka[num];
-  } else if (num < 20) {
-    hasil = terbilang(num - 10).replace(" rupiah", "") + " belas";
-  } else if (num < 100) {
-    hasil = terbilang(Math.floor(num / 10)).replace(" rupiah", "") + " puluh " + terbilang(num % 10).replace(" rupiah", "");
-  } else if (num < 200) {
-    hasil = "seratus " + terbilang(num - 100).replace(" rupiah", "");
-  } else if (num < 1000) {
-    hasil = terbilang(Math.floor(num / 100)).replace(" rupiah", "") + " ratus " + terbilang(num % 100).replace(" rupiah", "");
-  } else if (num < 2000) {
-    hasil = "seribu " + terbilang(num - 1000).replace(" rupiah", "");
-  } else if (num < 1000000) {
-    hasil = terbilang(Math.floor(num / 1000)).replace(" rupiah", "") + " ribu " + terbilang(num % 1000).replace(" rupiah", "");
-  } else if (num < 1000000000) {
-    hasil = terbilang(Math.floor(num / 1000000)).replace(" rupiah", "") + " juta " + terbilang(num % 1000000).replace(" rupiah", "");
-  } else if (num < 1000000000000) {
-    hasil = terbilang(Math.floor(num / 1000000000)).replace(" rupiah", "") + " miliar " + terbilang(num % 1000000000).replace(" rupiah", "");
-  }
-  
-  hasil = hasil.trim().replace(/\s+/g, ' ');
-  return hasil ? `${hasil} rupiah` : 'nol rupiah';
-}
-
-export function formatTanggalIndo(dateStr: string) {
-  if (!dateStr) return '...';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-  } catch (e) {
-    return dateStr;
-  }
-}
 
 export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [], setHistorisData, section = 'all' }: any) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
