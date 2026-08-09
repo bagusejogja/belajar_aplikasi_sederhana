@@ -87,14 +87,13 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguPengalihan = paguTambah + paguKurang; // kurang sudah bernilai negatif dari excel
+          const paguPengalihan = paguTambah + paguKurang;
           
-          const paguTambahPaguPenugasan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguTambahPaguInisiatif = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguEfisiensi = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguPenugasan = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguInisiatif = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguEfisiensi = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'efisiensi') || (p.jenis_anggaran?.toLowerCase()?.includes('tambah pagu') && Number(p.nominal) < 0)).reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
           
-          // efisiensi sudah bernilai negatif di excel, jadi kita tambahkan saja
           const totalPagu = paguAwal + paguPengalihan + paguTambahPaguPenugasan + paguTambahPaguInisiatif + paguEfisiensi + paguTalangan;
           const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
           
@@ -112,7 +111,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
             total_pagu: formatRp(totalPagu),
             realisasi_historis: formatRp(totalRealisasi),
             persen_serapan: serapan.toFixed(2) + '%',
-            _raw: { paguTambahPaguPenugasan, paguTambahPaguInisiatif, paguEfisiensi, paguTalangan } // Untuk cek kolom dinamis
+            _raw: { paguTambahPaguPenugasan, paguTambahPaguInisiatif, paguEfisiensi, paguTalangan }
           };
         });
         
@@ -155,7 +154,6 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   }
 
   useEffect(() => {
-    // Hanya sinkronkan realisasi dan persen serapan ke mainData, jangan mengubah total_anggaran (Usulan Tambahan)
     if (detailData && detailData.length > 0) {
       setMainData((prev: any) => ({
         ...prev,
@@ -277,9 +275,6 @@ ${mainData.ringkasan_ai}`;
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
         
-        // Map Excel columns to our format (assuming standard headers or map them manually)
-        // For simplicity, we just push them as they are if they match our keys, 
-        // or we map by index. Here we assume standard mapping:
         const mapped = data.map((row: any, i) => {
           let uraian = String(row['Uraian'] || row['Kegiatan'] || '');
           const firstLetter = uraian.match(/[a-zA-Z]/);
@@ -450,6 +445,7 @@ ${mainData.ringkasan_ai}`;
 
   const showStep1 = section === 'step1' || section === 'all';
   const showStep3 = section === 'step3' || section === 'all';
+  const showStep5 = section === 'step5' || section === 'all';
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -524,12 +520,12 @@ ${mainData.ringkasan_ai}`;
         </div>
       )}
 
-      {/* SECTION 3: POSISI PAGU TAHUN 2026, KEPUTUSAN & ANALISIS AI (STEP 3) */}
+      {/* SECTION 3: POSISI PAGU TAHUN 2026 & ANALISIS AI (STEP 3) */}
       {showStep3 && (
         <div className="space-y-8">
           <div>
-            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2">Posisi Pagu, Keputusan & AI Analysis</h2>
-            <p className="text-gray-500 text-sm">Kalkulasi posisi pagu berjalan, penetapan persetujuan pimpinan, dan penyusunan draft surat balasan.</p>
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2">Posisi Pagu & AI Analysis</h2>
+            <p className="text-gray-500 text-sm">Kalkulasi posisi pagu berjalan dan penyusunan catatan analisis rekomendasi pimpinan.</p>
           </div>
 
           <div className="space-y-8">
@@ -548,28 +544,28 @@ ${mainData.ringkasan_ai}`;
                       <td className="px-4 py-2.5 font-medium text-gray-700">Pengalihan (+/-)</td>
                       <td className="px-4 py-2.5 text-right font-mono">Rp {historisYearRow.pengalihan || '0'}</td>
                     </tr>
-                    {historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0' && (
+                    {parseNum(historisYearRow.tambah_pagu_penugasan) > 0 && (
                       <tr className="hover:bg-gray-50 text-emerald-600">
                         <td className="px-4 py-2.5 font-medium">Tambah Pagu Penugasan +</td>
-                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.tambah_pagu_penugasan}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_penugasan)))}</td>
                       </tr>
                     )}
-                    {historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0' && (
+                    {parseNum(historisYearRow.tambah_pagu_inisiatif) > 0 && (
                       <tr className="hover:bg-gray-50 text-emerald-600">
                         <td className="px-4 py-2.5 font-medium">Tambah Pagu Inisiatif +</td>
-                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.tambah_pagu_inisiatif}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_inisiatif)))}</td>
                       </tr>
                     )}
-                    {historisYearRow.efisiensi && historisYearRow.efisiensi !== '0' && (
+                    {parseNum(historisYearRow.efisiensi) !== 0 && (
                       <tr className="hover:bg-gray-50 text-rose-600">
                         <td className="px-4 py-2.5 font-medium">Efisiensi -</td>
-                        <td className="px-4 py-2.5 text-right font-mono">- Rp {historisYearRow.efisiensi}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">- Rp {formatRp(Math.abs(parseNum(historisYearRow.efisiensi)))}</td>
                       </tr>
                     )}
-                    {historisYearRow.talangan && historisYearRow.talangan !== '0' && (
+                    {parseNum(historisYearRow.talangan) > 0 && (
                       <tr className="hover:bg-gray-50 text-amber-600">
                         <td className="px-4 py-2.5 font-medium">Talangan +</td>
-                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {historisYearRow.talangan}</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.talangan)))}</td>
                       </tr>
                     )}
                     <tr className="hover:bg-gray-50 bg-indigo-50/50">
@@ -584,16 +580,45 @@ ${mainData.ringkasan_ai}`;
                       <td className="px-4 py-2.5 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
                       <td className="px-4 py-2.5 text-right font-bold font-mono text-emerald-900">Rp {formatRp(sisaKapasitasAI)}</td>
                     </tr>
-                    <tr className="hover:bg-gray-50 bg-amber-50">
-                      <td className="px-4 py-2.5 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
-                      <td className="px-4 py-2.5 text-right font-bold font-mono text-amber-900">Rp {formatRp(parseNum(mainData.total_anggaran))}</td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* 2. KARTU KEPUTUSAN & STATUS PERSETUJUAN */}
+            {/* 3. ANALISIS & REKOMENDASI (AI ANALYSIS) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
+                <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+                  {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+                  Generate Rekomendasi (AI)
+                </button>
+              </div>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+                 <ReactQuill 
+                    theme="snow" 
+                    value={mainData.rekomendasi_html || ''} 
+                    onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
+                    className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
+                 />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 5: KEPUTUSAN PIMPINAN & DRAFT SURAT BALASAN RESMI (STEP 5) */}
+      {showStep5 && (
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2">Keputusan Pimpinan & Draft Surat Balasan</h2>
+            <p className="text-gray-500 text-sm">Penetapan persetujuan pimpinan (setelah Nota Analisis diajukan) dan penyusunan draft surat balasan resmi UGM.</p>
+          </div>
+
+          <div className="space-y-8">
+            
+            {/* 1. KARTU KEPUTUSAN & STATUS PERSETUJUAN */}
             <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-xl border border-slate-700 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-700/80 pb-4">
                 <div>
@@ -649,28 +674,7 @@ ${mainData.ringkasan_ai}`;
                   />
                 </div>
               </div>
-            </div>
-
-            {/* 3. ANALISIS & REKOMENDASI (AI ANALYSIS) */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
-                <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
-                  {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
-                  Generate Rekomendasi (AI)
-                </button>
-              </div>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-                 <ReactQuill 
-                    theme="snow" 
-                    value={mainData.rekomendasi_html || ''} 
-                    onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
-                    className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
-                 />
-              </div>
-            </div>
-
-            {/* 4. DRAFT SURAT BALASAN RESMI (UGM) */}
+            {/* 2. DRAFT SURAT BALASAN RESMI (UGM) */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-bold text-emerald-700 uppercase tracking-widest">Draft Surat Balasan Resmi (UGM Format)</label>

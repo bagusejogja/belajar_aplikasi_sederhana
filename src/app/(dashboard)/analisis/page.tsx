@@ -463,12 +463,12 @@ export default function AnalisisPaguPage() {
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 3</div>
                   <div className="text-xs font-bold truncate flex items-center gap-1">
                     <Sparkles size={13} className="shrink-0" />
-                    <span>Posisi Pagu & AI Analisis</span>
+                    <span>Posisi Pagu & AI</span>
                   </div>
                 </div>
               </button>
 
-              {/* STEP 4: PDF & PRATINJAU */}
+              {/* STEP 4: PDF & PRATINJAU NOTA */}
               <button
                 onClick={() => setActiveStep('pdf')}
                 className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 relative overflow-hidden group ${
@@ -484,7 +484,36 @@ export default function AnalisisPaguPage() {
                   <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 4</div>
                   <div className="text-xs font-bold truncate flex items-center gap-1 text-emerald-700">
                     <Printer size={13} className="shrink-0" />
-                    <span>Pratinjau & Cetak PDF</span>
+                    <span>Cetak Nota Analisis</span>
+                  </div>
+                </div>
+              </button>
+
+              {/* STEP 5: KEPUTUSAN & SURAT BALASAN */}
+              <button
+                onClick={() => setActiveStep('step5')}
+                className={`p-2.5 rounded-2xl border text-left transition-all flex items-center gap-3 relative overflow-hidden group ${
+                  activeStep === 'step5'
+                    ? 'bg-gradient-to-r from-indigo-50 to-indigo-100/50 border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm'
+                    : mainData.surat_balasan_html
+                    ? 'bg-emerald-50/40 border-emerald-300 text-emerald-900 hover:border-emerald-400'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-transform group-hover:scale-105 ${
+                  activeStep === 'step5'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                    : mainData.surat_balasan_html
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600'
+                }`}>
+                  {mainData.surat_balasan_html ? '✓' : '5'}
+                </div>
+                <div className="overflow-hidden min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">Tahap 5</div>
+                  <div className="text-xs font-bold truncate flex items-center gap-1">
+                    <FileText size={13} className="shrink-0" />
+                    <span>Keputusan & Balasan</span>
                   </div>
                 </div>
               </button>
@@ -518,7 +547,7 @@ export default function AnalisisPaguPage() {
                     <ScanLine size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 1 dari 4: Upload Berkala & Form Data Utama Surat</h2>
+                    <h2 className="text-sm font-bold text-white">Tahap 1 dari 5: Upload Berkas & Form Data Utama Surat</h2>
                     <p className="text-xs text-indigo-200/80">Upload berkas usulan (OCR AI), isi metadata surat, dan ringkasan substansi AI</p>
                   </div>
                 </div>
@@ -557,31 +586,31 @@ export default function AnalisisPaguPage() {
           </div>
         )}
 
-        {/* STEP 2: DETAIL REALISASI, HISTORIS PAGU, POTRET MUTASI & LAMPIRAN (STACKED VERTICALLY DOWNWARD) */}
+        {/* STEP 2: DETAIL REALISASI, HISTORIS PAGU, POTRET MUTASI & LAMPIRAN */}
         {(activeStep === 'step2' || activeStep === 'all') && (
           <div className="space-y-6 animate-in fade-in duration-300 mb-8">
             {activeStep !== 'all' && (
-              <div className="flex items-center justify-between bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md">
+              <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-4 rounded-2xl shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
                     <BarChart3 size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 2 dari 4: Detail Realisasi, Historis Pagu & Mutasi</h2>
-                    <p className="text-xs text-indigo-200/80">Rincian Realisasi Belanja, Data Pagu Historis, Potret Mutasi Pagu, dan Lampiran</p>
+                    <h2 className="text-sm font-bold text-white">Tahap 2 dari 5: Detail Realisasi, Historis Pagu & Lampiran</h2>
+                    <p className="text-xs text-indigo-200/80">Impor/kelola rincian realisasi belanja, potret mutasi pagu, dan grafik historis multi-tahun</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setActiveStep('step1')}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
                   >
                     <ChevronLeft size={14} />
-                    <span>Kembali</span>
+                    <span>Step 1</span>
                   </button>
                   <button 
                     onClick={() => setActiveStep('step3')}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1"
                   >
                     <span>Lanjut Step 3</span>
                     <ChevronRight size={14} />
@@ -590,9 +619,9 @@ export default function AnalisisPaguPage() {
               </div>
             )}
 
-            {/* DATA PENDUKUNG (STACKED VERTICALLY DOWNWARD WITH NO SUBTABS) */}
+            {/* DATA PENDUKUNG */}
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <DataPendukung key={`pend-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} renderMode="vertical" />
+              <DataPendukung key={`pendukung-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} renderMode="vertical" />
             </div>
 
             {activeStep === 'step2' && (
@@ -608,7 +637,7 @@ export default function AnalisisPaguPage() {
                   onClick={() => setActiveStep('step3')}
                   className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2"
                 >
-                  <span>Lanjut ke Step 3: Posisi Pagu 2026 & AI Analysis</span>
+                  <span>Lanjut ke Step 3: Posisi Pagu & AI Analysis</span>
                   <ArrowRight size={16} />
                 </button>
               </div>
@@ -620,29 +649,29 @@ export default function AnalisisPaguPage() {
         {(activeStep === 'step3' || activeStep === 'all') && (
           <div className="space-y-6 animate-in fade-in duration-300 mb-8">
             {activeStep !== 'all' && (
-              <div className="flex items-center justify-between bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-md">
+              <div className="flex items-center justify-between bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white p-4 rounded-2xl shadow-md">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
                     <Sparkles size={20} />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Tahap 3 dari 4: Posisi Pagu 2026 & Analisis Rekomendasi AI</h2>
-                    <p className="text-xs text-indigo-200/80">Penetapan Posisi Pagu Tahun 2026 dan Penyusunan Catatan Analisis AI</p>
+                    <h2 className="text-sm font-bold text-white">Tahap 3 dari 5: Kalkulasi Posisi Pagu 2026 & AI Analysis</h2>
+                    <p className="text-xs text-indigo-200/80">Kalkulasi posisi pagu berjalan dan penyusunan rekomendasi AI untuk Nota Analisis Usulan Pagu</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setActiveStep('step2')}
-                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
+                    className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
                   >
                     <ChevronLeft size={14} />
-                    <span>Kembali</span>
+                    <span>Step 2</span>
                   </button>
                   <button 
                     onClick={() => setActiveStep('pdf')}
-                    className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1"
                   >
-                    <span>Pratinjau PDF</span>
+                    <span>Lanjut Step 4</span>
                     <ChevronRight size={14} />
                   </button>
                 </div>
@@ -662,29 +691,19 @@ export default function AnalisisPaguPage() {
                   <ChevronLeft size={16} />
                   <span>Kembali ke Step 2</span>
                 </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="px-4 py-2.5 rounded-2xl bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                  >
-                    <Save size={16} />
-                    <span>Simpan Dokumen</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveStep('pdf')}
-                    className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-2"
-                  >
-                    <Printer size={16} />
-                    <span>Lanjut ke Step 4: Cetak PDF Nota Analisis</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveStep('pdf')}
+                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-2"
+                >
+                  <span>Lanjut ke Step 4: Pratinjau PDF</span>
+                  <ArrowRight size={16} />
+                </button>
               </div>
             )}
           </div>
         )}
 
-        {/* STEP 4: PDF PREVIEW & PRINT */}
+        {/* STEP 4: PDF PREVIEW & PRINT NOTA ANALISIS */}
         {activeStep === 'pdf' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex items-center justify-between bg-gradient-to-r from-emerald-900 to-slate-900 text-white p-4 rounded-2xl shadow-md">
@@ -693,21 +712,93 @@ export default function AnalisisPaguPage() {
                   <Printer size={20} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-white">Tahap 4 dari 4: Pratinjau & Cetak Nota Analisis PDF</h2>
-                  <p className="text-xs text-emerald-200/80">Dokumen Nota Analisis siap dicetak atau diunduh sebagai berkas PDF resmi</p>
+                  <h2 className="text-sm font-bold text-white">Tahap 4 dari 5: Pratinjau & Cetak Nota Analisis PDF</h2>
+                  <p className="text-xs text-emerald-200/80">Dokumen Nota Analisis siap dicetak/diajukan ke Pimpinan UGM</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setActiveStep('step3')}
-                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
-              >
-                <ChevronLeft size={14} />
-                <span>Kembali Edit Form</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setActiveStep('step3')}
+                  className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
+                >
+                  <ChevronLeft size={14} />
+                  <span>Kembali Edit</span>
+                </button>
+                <button 
+                  onClick={() => setActiveStep('step5')}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  <span>Lanjut Step 5: Keputusan Pimpinan</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
               <PdfPreview mainData={mainData} detailData={detailData} historisData={historisData} setActiveTab={handleSetActiveTab} />
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                onClick={() => setActiveStep('step3')}
+                className="px-4 py-2 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <ChevronLeft size={16} />
+                <span>Kembali ke Step 3</span>
+              </button>
+              <button
+                onClick={() => setActiveStep('step5')}
+                className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-2"
+              >
+                <span>Lanjut ke Step 5: Keputusan Pimpinan & Surat Balasan</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: KEPUTUSAN PIMPINAN & DRAFT SURAT BALASAN RESMI */}
+        {activeStep === 'step5' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-2xl shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-white/10 text-emerald-300">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Tahap 5 dari 5: Keputusan Pimpinan & Draft Surat Balasan Resmi UGM</h2>
+                  <p className="text-xs text-slate-300">Tetapkan keputusan pimpinan (setelah Nota Analisis diajukan) dan susun draft surat balasan resmi</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveStep('pdf')}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
+              >
+                <ChevronLeft size={14} />
+                <span>Kembali ke Cetak PDF</span>
+              </button>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
+              <DataForm key={`form5-${resetKey}`} mainData={mainData} setMainData={setMainData} detailData={detailData} setDetailData={setDetailData} historisData={historisData} setHistorisData={setHistorisData} section="step5" />
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                onClick={() => setActiveStep('pdf')}
+                className="px-4 py-2 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <ChevronLeft size={16} />
+                <span>Kembali ke Step 4 (Cetak PDF)</span>
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={loading}
+                className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-2"
+              >
+                <Save size={16} />
+                <span>Simpan Seluruh Dokumen Analisis</span>
+              </button>
             </div>
           </div>
         )}
