@@ -52,8 +52,15 @@ export const menuList: MenuItem[] = [
   { title: 'Tunjangan Fungsional', path: '/tunjangan-fungsional', icon: 'FileText', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Gaji PNS', path: '/gaji-pns', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+  { title: 'Copas Zone Pagu', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Laporan Komparasi', path: '/komparasi-laporan', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+
+  // --- REVIEW ANGGARAN ---
+  { title: 'Smart Review Landing', path: '/review-anggaran', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
+  { title: 'Admin Review & Pivot', path: '/review-anggaran/admin', icon: 'Layers', roles: ['ADMIN', 'MANAGER'], group: 'Review Anggaran' },
+  { title: 'Master Aturan (Rule Engine)', path: '/review-anggaran/rules', icon: 'Wand2', roles: ['ADMIN', 'MANAGER'], group: 'Review Anggaran' },
+  { title: 'Portal Usulan Unit Kerja', path: '/review-anggaran/unit-kerja', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
 
   // --- PENERIMAAN ---
   { title: 'Dashboard Penerimaan', path: '/penerimaan', icon: 'LayoutDashboard', roles: ['ADMIN', 'MANAGER'], group: 'Penerimaan' },

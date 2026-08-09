@@ -43,17 +43,17 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     let startY = 30;
 
     const parseNum = (str: string | number) => {
-    if (typeof str === 'number') return str;
-    let s = (str || '0').toString().trim();
-    if (!s.includes(',') && s.includes('.')) {
-       const parts = s.split('.');
-       if (parts.length === 2 && parts[0].length > 3) {
-          return parseFloat(s);
-       }
-    }
-    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-  };
+      if (typeof str === 'number') return isNaN(str) ? 0 : str;
+      let s = (str || '0').toString().trim();
+      if (!s.includes(',') && s.includes('.')) {
+         const parts = s.split('.');
+         if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
+            return parseFloat(s) || 0;
+         }
+      }
+      const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+      return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+    };
     const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
     let tanggalInput = '';
@@ -70,22 +70,26 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       }
     }
 
+    const targetYear = '2026';
+    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+    const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+
     // 1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN
     const pBerjalan = mainData?.pagu_berjalan || {};
-    const cPaguAwal = parseNum(pBerjalan.pagu_awal) || 0;
-    const cPengalihan = parseNum(pBerjalan.pengalihan) || 0;
-    const cInisiatif = parseNum(pBerjalan.tambah_inisiatif) || 0;
-    const cEfisiensi = parseNum(pBerjalan.efisiensi) || 0;
-    const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || 0;
-    const cLuncuran = parseNum(pBerjalan.luncuran) || 0;
+    const cPaguAwal = parseNum(pBerjalan.pagu_awal) || parseNum(historisYearRow.pagu_awal) || 0;
+    const cPengalihan = parseNum(pBerjalan.pengalihan) || parseNum(historisYearRow.pengalihan) || 0;
+    const cInisiatif = parseNum(pBerjalan.tambah_inisiatif) || parseNum(historisYearRow.tambah_pagu_inisiatif) || 0;
+    const cEfisiensi = parseNum(pBerjalan.efisiensi) || parseNum(historisYearRow.efisiensi) || 0;
+    const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || parseNum(historisYearRow.tambah_pagu_penugasan) || 0;
+    const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(historisYearRow.talangan) || 0;
     const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
     const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
     const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
-    const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan || '0');
+    const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || totalRealisasiDetail || 0;
     
     const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
-    const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : '0%';
-    const pctPengeluaran = cRealisasi > 0 ? ((cPengeluaran / cRealisasi) * 100).toFixed(1) + '%' : '0%';
+    const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : (cTotal > 0 ? ((cPengeluaran / cTotal) * 100).toFixed(1) + '%' : '0%');
+    const pctPengeluaran = cRealisasi > 0 ? ((cPengeluaran / cRealisasi) * 100).toFixed(1) + '%' : (cTotal > 0 ? ((cPengeluaran / cTotal) * 100).toFixed(1) + '%' : '0%');
 
     const section1Title = `1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN${tanggalInput ? ` (per ${tanggalInput})` : ''}:`;
     startY = addSectionHeader(section1Title, startY);
@@ -148,9 +152,6 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     doc.text(perihalLines, 60, startY); 
     startY += (perihalLines.length * 5) + 1;
     
-    const targetYear = '2026';
-    const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
-
     doc.setFont('helvetica', 'bold');
     doc.text('Nominal Usulan', 17, startY); doc.setFont('helvetica', 'normal'); doc.text(`: Rp ${formatRp(parseNum(mainData.total_anggaran)) || '-'}`, 60, startY); startY += 10;
 
@@ -171,7 +172,6 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
 
     // 4. POSISI PAGU TAHUN 2026
 
-    const totalRealisasiDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
     const totalSisaDetail = (parseNum(historisYearRow.total_pagu) || 0) - totalRealisasiDetail;
 
     const bodyPagu = [

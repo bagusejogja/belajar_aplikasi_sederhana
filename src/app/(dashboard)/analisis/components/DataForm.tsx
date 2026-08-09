@@ -86,12 +86,12 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
   
   const parseNum = (str: string | number) => {
-    if (typeof str === 'number') return str;
+    if (typeof str === 'number') return isNaN(str) ? 0 : str;
     let s = (str || '0').toString().trim();
     if (!s.includes(',') && s.includes('.')) {
        const parts = s.split('.');
-       if (parts.length === 2 && parts[0].length > 3) {
-          return parseFloat(s);
+       if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
+          return parseFloat(s) || 0;
        }
     }
     const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
@@ -478,7 +478,7 @@ ${mainData.ringkasan_ai}`;
                 </tr>
                 <tr className="hover:bg-gray-50 bg-amber-50">
                   <td className="px-4 py-2 font-bold text-amber-900">Usulan Tambahan (Surat)</td>
-                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {formatRp(parseFloat((mainData.total_anggaran || '0').toString().replace(/[^0-9.-]+/g, '')) || 0)}</td>
+                  <td className="px-4 py-2 text-right font-bold text-amber-900">Rp {formatRp(parseNum(mainData.total_anggaran))}</td>
                 </tr>
               </tbody>
             </table>

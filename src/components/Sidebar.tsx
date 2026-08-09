@@ -74,6 +74,7 @@ const groupIconMap: Record<string, any> = {
   'Persuratan': Mail,
   'Master': Database,
   'Anggaran': PieChart,
+  'Review Anggaran': ShieldCheck,
   'Input Form': FileEdit,
   'Manajemen Kegiatan': Calendar,
   'Mockup': Wand2,

@@ -146,12 +146,12 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            if (!uraian && !anggaranRaw) return; // Skip empty rows
 
            // Bersihkan angka
-           const anggaran = typeof anggaranRaw === 'number' ? anggaranRaw : parseFloat((anggaranRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
+           const anggaran = typeof anggaranRaw === 'number' ? anggaranRaw : parseNum(anggaranRaw);
            
            if (anggaran > 0) {
               totalAnggaranUpload += anggaran;
-              const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseFloat((realisasiRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
-              let sisa = typeof sisaRaw === 'number' ? sisaRaw : parseFloat((sisaRaw || '0').toString().replace(/[^0-9.-]+/g, ''));
+              const realisasi = typeof realisasiRaw === 'number' ? realisasiRaw : parseNum(realisasiRaw);
+              let sisa = typeof sisaRaw === 'number' ? sisaRaw : parseNum(sisaRaw);
               if (isNaN(sisa)) sisa = anggaran - realisasi;
 
               let serapanVal = (realisasi / anggaran) * 100;
