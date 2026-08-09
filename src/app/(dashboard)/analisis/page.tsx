@@ -26,12 +26,24 @@ import {
 } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
-  // Step State: 'step1' | 'step2' | 'step3' | 'pdf' | 'riwayat' | 'all'
-  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'riwayat' | 'all'>('step1');
+  // Step State: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'>('step1');
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   
+  // Helper calculation for progress percentage
+  const getProgressPercentage = () => {
+    switch (activeStep) {
+      case 'step1': return 20;
+      case 'step2': return 40;
+      case 'step3': return 60;
+      case 'pdf': return 80;
+      case 'step5': return 100;
+      default: return 100;
+    }
+  };
+
   // Shared state across components
   const [mainData, setMainData] = useState<any>({
     no_surat: '',
