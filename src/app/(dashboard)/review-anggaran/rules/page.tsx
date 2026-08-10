@@ -18,15 +18,56 @@ import Link from 'next/link';
 
 import * as XLSX from 'xlsx';
 
-// Autocomplete Input / Filter Unit Kerja untuk Rule Form & Filter
+// Autocomplete Input / Filter Unit Kerja untuk Rule Form & Filter (Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / Ketik Unit Kerja..." }: { units: string[], value: string, onChange: (val: string) => void, placeholder?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const filtered = units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  const filtered = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['*', ...filtered];
+  }, [filtered]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onChange(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      } else if (query.trim()) {
+        onChange(query.trim());
+        setIsOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" onKeyDown={handleKeyDown}>
       <div className="flex gap-1">
         <Input 
           value={value}
@@ -49,7 +90,7 @@ function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / 
           <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
-              placeholder="Cari Unit Kerja..."
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -63,26 +104,31 @@ function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / 
                   setQuery('');
                 }}
                 className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors ${
-                  value === '*' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : value === '*' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
                 }`}
               >
                 * (Semua Unit Kerja)
               </div>
-              {filtered.map((u) => (
-                <div
-                  key={u}
-                  onClick={() => {
-                    onChange(u);
-                    setIsOpen(false);
-                    setQuery('');
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
-                    value === u ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {u}
-                </div>
-              ))}
+              {filtered.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = value === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onChange(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {u}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </>

@@ -9,19 +9,58 @@ import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 
-// Autocomplete Filter Unit Kerja
+// Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const filteredUnits = units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  const filteredUnits = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['ALL', ...filteredUnits];
+  }, [filteredUnits]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onSelect(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative inline-block text-left" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[180px]"
+        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[200px]"
       >
         <span className="truncate">
           {selectedUnit === 'ALL' ? `🏢 Semua Unit (${units.length})` : selectedUnit}
@@ -32,10 +71,10 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-1 w-64 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute left-0 mt-1 w-72 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
-              placeholder="Cari Unit Kerja..."
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -49,28 +88,33 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
                   setQuery('');
                 }}
                 className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors flex items-center justify-between ${
-                  selectedUnit === 'ALL' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : selectedUnit === 'ALL' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
                 }`}
               >
                 <span>🏢 Semua Unit Kerja ({units.length})</span>
-                {selectedUnit === 'ALL' && <span className="text-indigo-600">✓</span>}
+                {selectedUnit === 'ALL' && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
               </div>
-              {filteredUnits.map((u) => (
-                <div
-                  key={u}
-                  onClick={() => {
-                    onSelect(u);
-                    setIsOpen(false);
-                    setQuery('');
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors flex items-center justify-between ${
-                    selectedUnit === u ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  <span className="truncate">{u}</span>
-                  {selectedUnit === u && <span className="text-indigo-600 font-bold">✓</span>}
-                </div>
-              ))}
+              {filteredUnits.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = selectedUnit === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onSelect(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors flex items-center justify-between ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <span className="truncate">{u}</span>
+                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                  </div>
+                );
+              })}
               {filteredUnits.length === 0 && (
                 <div className="p-2 text-gray-400 text-center">Unit tidak ditemukan</div>
               )}
@@ -971,6 +1015,71 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* GLOBAL FILTER CONTROL BAR (BERLAKU UNTUK SEMUA TAB & TOP CARDS) */}
+        <div className="bg-white border border-indigo-100 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-black uppercase text-gray-500 tracking-wider flex items-center gap-1">
+              ⚡ Filter Global:
+            </span>
+
+            {/* AUTOCOMPLETE FILTER UNIT KERJA */}
+            <UnitAutocompleteFilter 
+              units={unitOptions} 
+              selectedUnit={selectedUnitFilter} 
+              onSelect={(u) => setSelectedUnitFilter(u)} 
+            />
+
+            {/* FILTER KEYAKINAN AI */}
+            <select
+              value={selectedAiFilter}
+              onChange={e => setSelectedAiFilter(e.target.value)}
+              className="h-9 px-3 rounded-xl bg-purple-50 border border-purple-300 text-xs font-bold text-purple-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+            >
+              <option value="ALL">🤖 Semua Evaluasi AI</option>
+              <option value="HIGH_CONFIDENCE">🔥 AI Keyakinan Tinggi (≥ 75%)</option>
+              <option value="PENDING_AI">⚡ Perlu Persetujuan AI</option>
+              <option value="RULE_ONLY">📌 Master Rule (Reff)</option>
+            </select>
+
+            {/* FILTER STATUS (HANYA STATUS YANG ADA DI DATA) */}
+            <select
+              value={selectedStatusFilter}
+              onChange={e => setSelectedStatusFilter(e.target.value)}
+              className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+            >
+              <option value="ALL">📌 Semua Status</option>
+              <option value="KUNCI">🔒 Terkunci (Y)</option>
+              <option value="BEBAS">🔓 Bebas (N)</option>
+              {availableStatusList.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            
+            <Input 
+              placeholder="Cari ID DB, akun, deskripsi..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 w-52 h-9 text-xs"
+            />
+          </div>
+
+          {(selectedUnitFilter !== 'ALL' || selectedStatusFilter !== 'ALL' || selectedAiFilter !== 'ALL' || searchTerm.trim() !== '') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedUnitFilter('ALL');
+                setSelectedStatusFilter('ALL');
+                setSelectedAiFilter('ALL');
+                setSearchTerm('');
+              }}
+              className="text-xs text-rose-600 hover:text-rose-800 font-bold hover:bg-rose-50"
+            >
+              ✕ Reset Filter
+            </Button>
+          )}
+        </div>
+
         {/* Tab Selection */}
         <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-max mb-6 border border-gray-200">
           <button 
@@ -1081,47 +1190,7 @@ export default function AdminDashboard() {
                 </CardDescription>
               </div>
 
-              {/* AUTOCOMPLETE FILTER UNIT KERJA, FILTER KEYAKINAN AI & FILTER STATUS */}
-              <div className="flex flex-wrap items-center gap-2">
-                <UnitAutocompleteFilter 
-                  units={unitOptions} 
-                  selectedUnit={selectedUnitFilter} 
-                  onSelect={(u) => setSelectedUnitFilter(u)} 
-                />
-
-                {/* FILTER KEYAKINAN AI */}
-                <select
-                  value={selectedAiFilter}
-                  onChange={e => setSelectedAiFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-purple-50 border border-purple-300 text-xs font-bold text-purple-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
-                >
-                  <option value="ALL">🤖 Semua Evaluasi AI</option>
-                  <option value="HIGH_CONFIDENCE">🔥 AI Keyakinan Tinggi (≥ 75%)</option>
-                  <option value="PENDING_AI">⚡ Perlu Persetujuan AI</option>
-                  <option value="RULE_ONLY">📌 Master Rule (Reff)</option>
-                </select>
-
-                {/* FILTER STATUS (HANYA STATUS YANG ADA DI DATA) */}
-                <select
-                  value={selectedStatusFilter}
-                  onChange={e => setSelectedStatusFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                >
-                  <option value="ALL">📌 Semua Status</option>
-                  <option value="KUNCI">🔒 Terkunci (Y)</option>
-                  <option value="BEBAS">🔓 Bebas (N)</option>
-                  {availableStatusList.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-                
-                <Input 
-                  placeholder="Cari ID DB, akun, deskripsi..." 
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs"
-                />
-
+              <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => exportToExcelByTab('data')} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-bold h-9">
                   📥 Excel Detail
                 </Button>

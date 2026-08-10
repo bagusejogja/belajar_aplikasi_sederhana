@@ -15,20 +15,60 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
-// Autocomplete Filter Unit Kerja
+// Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const filteredUnits = units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  const filteredUnits = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['ALL', ...filteredUnits];
+  }, [filteredUnits]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onSelect(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative inline-block text-left" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[180px]"
+        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[200px]"
       >
         <span className="truncate">
           {selectedUnit === 'ALL' ? `🏢 Semua Unit (${units.length})` : selectedUnit}
@@ -39,10 +79,10 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-1 w-64 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute left-0 mt-1 w-72 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
-              placeholder="Cari Unit Kerja..."
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -56,28 +96,33 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
                   setQuery('');
                 }}
                 className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors flex items-center justify-between ${
-                  selectedUnit === 'ALL' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : selectedUnit === 'ALL' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
                 }`}
               >
                 <span>🏢 Semua Unit Kerja ({units.length})</span>
-                {selectedUnit === 'ALL' && <span className="text-indigo-600">✓</span>}
+                {selectedUnit === 'ALL' && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
               </div>
-              {filteredUnits.map((u) => (
-                <div
-                  key={u}
-                  onClick={() => {
-                    onSelect(u);
-                    setIsOpen(false);
-                    setQuery('');
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors flex items-center justify-between ${
-                    selectedUnit === u ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  <span className="truncate">{u}</span>
-                  {selectedUnit === u && <span className="text-indigo-600 font-bold">✓</span>}
-                </div>
-              ))}
+              {filteredUnits.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = selectedUnit === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onSelect(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors flex items-center justify-between ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <span className="truncate">{u}</span>
+                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                  </div>
+                );
+              })}
               {filteredUnits.length === 0 && (
                 <div className="p-2 text-gray-400 text-center">Unit tidak ditemukan</div>
               )}
@@ -337,38 +382,176 @@ export default function UnitKerjaDashboard() {
     return Math.ceil(filteredBudgets.length / Number(pageSize));
   }, [filteredBudgets, pageSize]);
 
-  const exportToExcelCSV = (data: any[], filename: string) => {
-    if (!data || data.length === 0) {
-      alert('Tidak ada data untuk diekspor.');
+  const handleExportExcel = () => {
+    if (!filteredBudgets || filteredBudgets.length === 0) {
+      alert('Tidak ada data usulan untuk diekspor.');
       return;
     }
-    const headers = ['ID DB', 'Unit Kerja', 'Kode Akun', 'Nama Komponen', 'Deskripsi Usulan', 'Lingkup', 'Maksud Tujuan', 'Vol', 'Tarif (Rp)', 'Total (Rp)', 'Status Kunci', 'Sumber Kunci', 'Label Status'];
-    const csvRows = [
-      headers.join('\t'),
-      ...data.map(b => [
-        `"${(b.id_db || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.unitkerja_nama || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.akun || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.komponen_nama || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.deskripsi || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.lingkup || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.maksud_tujuan || '').toString().replace(/"/g, '""')}"`,
-        b.vol || 1,
-        b.tarif || 0,
-        b.total || 0,
-        `"${b.kunci || 'N'}"`,
-        `"${b.kunci_by || '-'}"`,
-        `"${(b.custom_status || '').toString().replace(/"/g, '""')}"`
-      ].join('\t'))
-    ];
-    const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const exportData = filteredBudgets.map((b, idx) => ({
+      'No': idx + 1,
+      'ID DB': b.id_db || '',
+      'Unit Kerja': b.unitkerja_nama || '',
+      'Kode Akun': b.akun || '',
+      'Nama Komponen': b.komponen_nama || '',
+      'Deskripsi Usulan': b.deskripsi || '',
+      'Lingkup': b.lingkup || '',
+      'Maksud Tujuan': b.maksud_tujuan || '',
+      'Vol': b.vol || 1,
+      'Tarif (Rp)': b.tarif || 0,
+      'Total Nominal (Rp)': b.total || 0,
+      'Status Kunci': b.kunci || 'N',
+      'Sumber Kunci': b.kunci_by || '-',
+      'Label Status': b.custom_status || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Usulan Unit Kerja');
+    XLSX.writeFile(workbook, `Usulan_Anggaran_Unit_Kerja_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const generateFormattedPDFReport = () => {
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('Harap izinkan popup browser untuk membuka laporan PDF.');
+      return;
+    }
+
+    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+    const nowStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const totalUsulan = filteredBudgets.length;
+    const totalAnggaranSum = filteredBudgets.reduce((acc, b) => acc + (Number(b.total) || 0), 0);
+    const adaStatusItems = filteredBudgets.filter(b => b.kunci === 'Y' || (b.custom_status && b.custom_status.trim() !== ''));
+    const totalAdaStatusSum = adaStatusItems.reduce((acc, b) => acc + (Number(b.total) || 0), 0);
+    const tanpaStatusItems = filteredBudgets.filter(b => b.kunci !== 'Y' && (!b.custom_status || b.custom_status.trim() === ''));
+    const totalTanpaStatusSum = tanpaStatusItems.reduce((acc, b) => acc + (Number(b.total) || 0), 0);
+
+    const tableRowsHTML = filteredBudgets.slice(0, 500).map((b, idx) => {
+      const isKunci = b.kunci === 'Y' || (b.custom_status && b.custom_status.trim() !== '');
+      const badgeClass = isKunci ? 'badge-emerald' : 'badge-gray';
+      const label = b.custom_status || (b.kunci === 'Y' ? 'Wajib Ada' : 'Bebas (N)');
+      return `
+        <tr>
+          <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+          <td style="font-weight: 600; color: #1e293b;">${b.unitkerja_nama || '-'}</td>
+          <td style="font-family: monospace; font-weight: 700; color: #4338ca;">${b.akun || '-'}</td>
+          <td style="color: #334155;">${b.deskripsi || '-'}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 700;">Rp ${formatRp(Number(b.total) || 0)}</td>
+          <td style="text-align: center;"><span class="badge ${badgeClass}">${label}</span></td>
+          <td style="text-align: center; font-size: 10px; font-weight: 700; color: #64748b;">${b.kunci_by || '-'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan_Usulan_Anggaran_Unit_Kerja_${new Date().toISOString().slice(0,10)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm 15mm; }
+          body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #ffffff; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .header-bar { background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%); color: #ffffff; padding: 20px 24px; border-radius: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+          .header-title h1 { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; color: #ffffff; }
+          .header-title p { margin: 4px 0 0 0; font-size: 11px; color: #a5b4fc; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+          .header-badge { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 12px; font-size: 11px; font-weight: 700; color: #e0e7ff; text-align: right; }
+          .cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+          .card { border-radius: 14px; padding: 14px 16px; border: 1px solid #e2e8f0; background: #f8fafc; }
+          .card-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #64748b; margin-bottom: 6px; }
+          .card-value { font-size: 18px; font-weight: 900; color: #0f172a; font-family: monospace; }
+          .card-sub { font-size: 11px; font-weight: 700; color: #475569; margin-top: 2px; }
+          .card-emerald { background: #ecfdf5; border-color: #a7f3d0; }
+          .card-emerald .card-title { color: #047857; }
+          .card-emerald .card-value { color: #065f46; }
+          .card-indigo { background: #eef2ff; border-color: #c7d2fe; }
+          .card-indigo .card-title { color: #4338ca; }
+          .card-indigo .card-value { color: #3730a3; }
+          table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; font-size: 11px; }
+          th { background: #0f172a; color: #ffffff; padding: 10px 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+          td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          tr.total-row td { background: #e0e7ff !important; color: #1e1b4b; font-weight: 800; border-top: 2px solid #6366f1; }
+          .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+          .badge-emerald { background: #d1fae5; color: #065f46; }
+          .badge-gray { background: #f1f5f9; color: #475569; }
+          .footer { margin-top: 24px; padding-top: 12px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-weight: 600; }
+        </style>
+      </head>
+      <body>
+        <div class="header-bar">
+          <div class="header-title">
+            <p>UNIVERSITAS GADJAH MADA — PORTAL USULAN UNIT KERJA</p>
+            <h1>LAPORAN DETAIL USULAN ANGGARAN</h1>
+          </div>
+          <div class="header-badge">
+            <div>Unit: ${selectedUnitFilter === 'ALL' ? 'Semua Unit Kerja' : selectedUnitFilter}</div>
+            <div style="margin-top: 2px; opacity: 0.8;">Tanggal: ${nowStr}</div>
+          </div>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <div class="card-title">TOTAL USULAN ANGGARAN</div>
+            <div class="card-value">${formatRp(totalUsulan)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalAnggaranSum)}</div>
+          </div>
+          <div class="card card-emerald">
+            <div class="card-title">PAGU TERKUNCI (WAJIB)</div>
+            <div class="card-value">${formatRp(adaStatusItems.length)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalAdaStatusSum)}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">PAGU BEBAS (N)</div>
+            <div class="card-value">${formatRp(tanpaStatusItems.length)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalTanpaStatusSum)}</div>
+          </div>
+          <div class="card card-indigo">
+            <div class="card-title">COVERAGE PENGUNCIAN</div>
+            <div class="card-value">${totalUsulan > 0 ? ((adaStatusItems.length / totalUsulan) * 100).toFixed(1) + '%' : '0%'}</div>
+            <div class="card-sub">Hasil Penelaahan AI & Rule</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px; text-align: center;">No</th>
+              <th>Unit Kerja</th>
+              <th style="width: 80px;">Kode Akun</th>
+              <th>Deskripsi Usulan / Kegiatan</th>
+              <th style="text-align: right; width: 110px;">Total (Rp)</th>
+              <th style="text-align: center; width: 90px;">Status</th>
+              <th style="text-align: center; width: 70px;">Sumber</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHTML}
+            <tr class="total-row">
+              <td colspan="4" style="font-weight: 800;">TOTAL DATA (SAMPAI BARIS KE-${Math.min(filteredBudgets.length, 500)})</td>
+              <td style="text-align: right; font-family: monospace;">Rp ${formatRp(totalAnggaranSum)}</td>
+              <td colspan="2" style="text-align: center; font-weight: 700;">${totalUsulan} Item Terfilter</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <div>Dokumen Penelaahan Budget Review Engine — Universitas Gadjah Mada</div>
+          <div>Halaman 1 dari 1</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() { window.print(); }, 300);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
   };
 
   return (
@@ -388,13 +571,20 @@ export default function UnitKerjaDashboard() {
           <div className="flex gap-3">
             <Button 
               variant="outline"
-              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              onClick={() => exportToExcelCSV(filteredBudgets, 'Data_Usulan_Unit_Kerja')}
+              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold"
+              onClick={handleExportExcel}
             >
-              📥 Export ke Excel
+              📥 Export Excel (.xlsx)
             </Button>
             <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+              variant="outline"
+              className="border-rose-300 text-rose-700 hover:bg-rose-50 font-bold"
+              onClick={generateFormattedPDFReport}
+            >
+              📄 Export PDF Report
+            </Button>
+            <Button 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
               onClick={() => setDialogOpen(true)}
             >
               + Import Data (Paste Zone)
