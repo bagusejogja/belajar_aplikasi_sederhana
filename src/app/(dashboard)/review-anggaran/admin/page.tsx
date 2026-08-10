@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 // Autocomplete Filter Unit Kerja
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -306,10 +307,10 @@ export default function AdminDashboard() {
   const saranAi = displayBudgets.filter(b => b.kunci === 'Y' && b.kunci_by === 'AI').length;
 
   const groupedData = useMemo(() => {
-    if (groupBy.length === 0) return { "Total Keseluruhan": { count: budgets.length, sum: budgets.reduce((acc, b) => acc + (b.total || 0), 0) } };
+    if (groupBy.length === 0) return { "Total Keseluruhan": { count: filteredDetailBudgets.length, sum: filteredDetailBudgets.reduce((acc, b) => acc + (b.total || 0), 0) } };
     
     const result: any = {};
-    budgets.forEach(budget => {
+    filteredDetailBudgets.forEach(budget => {
       const keyParts = groupBy.map(f => {
         let val = budget[f];
         if (f === 'kunci' && val === 'Y') val = 'Terkunci (Y)';
@@ -324,9 +325,9 @@ export default function AdminDashboard() {
     });
     
     return Object.entries(result).sort((a: any, b: any) => b[1].sum - a[1].sum);
-  }, [budgets, groupBy]);
+  }, [filteredDetailBudgets, groupBy]);
 
-  // Summary per Unit Kerja computation
+  // Summary per Unit Kerja computation (REAKTIF SESUAI FILTER DATA DETAIL)
   const unitSummaryData = useMemo(() => {
     const map = new Map<string, {
       unit: string;
@@ -338,7 +339,7 @@ export default function AdminDashboard() {
       tanpaStatusAnggaran: number;
     }>();
 
-    budgets.forEach(b => {
+    filteredDetailBudgets.forEach(b => {
       const unit = b.unitkerja_nama || '(Belum Diisi)';
       if (!map.has(unit)) {
         map.set(unit, {
@@ -368,7 +369,7 @@ export default function AdminDashboard() {
     });
 
     return Array.from(map.values()).sort((a, b) => b.totalAnggaran - a.totalAnggaran);
-  }, [budgets]);
+  }, [filteredDetailBudgets]);
 
   const fetchBudgets = async () => {
     setLoading(true);
@@ -436,38 +437,407 @@ export default function AdminDashboard() {
     }
   };
 
-  const exportToExcelCSV = (data: any[], filename: string) => {
-    if (!data || data.length === 0) {
-      alert('Tidak ada data untuk diekspor.');
+  const exportToExcelByTab = (tab: 'summary' | 'data' | 'pivot') => {
+    const workbook = XLSX.utils.book_new();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    
+    if (tab === 'summary') {
+      if (!unitSummaryData || unitSummaryData.length === 0) {
+        alert('Tidak ada data summary unit untuk diekspor.');
+        return;
+      }
+      const dataToExport = unitSummaryData.map((item, idx) => {
+        const pct = item.totalCount > 0 ? ((item.adaStatusCount / item.totalCount) * 100).toFixed(1) + '%' : '0%';
+        return {
+          'No': idx + 1,
+          'Unit Kerja': item.unit,
+          'Total Usulan (Item)': item.totalCount,
+          'Total Nominal (Rp)': item.totalAnggaran,
+          'Usulan Terkunci (Item)': item.adaStatusCount,
+          'Pagu Terkunci (Rp)': item.adaStatusAnggaran,
+          'Usulan Bebas (Item)': item.tanpaStatusCount,
+          'Pagu Bebas (Rp)': item.tanpaStatusAnggaran,
+          '% Keterkuncian': pct
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      XLSX.utils.book_append_sheet(workbook, ws, 'Summary Unit');
+      XLSX.writeFile(workbook, `Rekap_Summary_Unit_Kerja_${dateStr}.xlsx`);
+
+    } else if (tab === 'data') {
+      if (!filteredDetailBudgets || filteredDetailBudgets.length === 0) {
+        alert('Tidak ada data detail untuk diekspor.');
+        return;
+      }
+      const dataToExport = filteredDetailBudgets.map((b, idx) => ({
+        'No': idx + 1,
+        'ID DB': b.id_db || '',
+        'Unit Kerja': b.unitkerja_nama || '',
+        'Kode Akun': b.akun || '',
+        'Nama Komponen': b.komponen_nama || '',
+        'Deskripsi Usulan': b.deskripsi || '',
+        'Lingkup': b.lingkup || '',
+        'Maksud Tujuan': b.maksud_tujuan || '',
+        'Vol': b.vol || 1,
+        'Tarif (Rp)': b.tarif || 0,
+        'Total Nominal (Rp)': b.total || 0,
+        'Status Kunci': b.kunci || 'N',
+        'Sumber Kunci': b.kunci_by || '-',
+        'Label Status': b.custom_status || ''
+      }));
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      XLSX.utils.book_append_sheet(workbook, ws, 'Detail Usulan');
+      XLSX.writeFile(workbook, `Detail_Usulan_Anggaran_${dateStr}.xlsx`);
+
+    } else if (tab === 'pivot') {
+      if (!groupedData || groupedData.length === 0) {
+        alert('Tidak ada data pivot untuk diekspor.');
+        return;
+      }
+      const dataToExport = groupedData.map(([key, val]: any, idx) => ({
+        'No': idx + 1,
+        'Dimensi Grouping': key,
+        'Jumlah Usulan (Item)': val.count,
+        'Total Nominal (Rp)': val.sum
+      }));
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      XLSX.utils.book_append_sheet(workbook, ws, 'Pivot Analysis');
+      XLSX.writeFile(workbook, `Pivot_Analysis_Anggaran_${dateStr}.xlsx`);
+    }
+  };
+
+  const generateFormattedPDFReport = (tab: 'summary' | 'data' | 'pivot') => {
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('Harap izinkan popup browser untuk membuka laporan PDF.');
       return;
     }
-    const headers = ['ID DB', 'Unit Kerja', 'Kode Akun', 'Nama Komponen', 'Deskripsi Usulan', 'Lingkup', 'Maksud Tujuan', 'Vol', 'Tarif (Rp)', 'Total (Rp)', 'Status Kunci', 'Sumber Kunci', 'Label Status'];
-    const csvRows = [
-      headers.join('\t'),
-      ...data.map(b => [
-        `"${(b.id_db || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.unitkerja_nama || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.akun || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.komponen_nama || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.deskripsi || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.lingkup || '').toString().replace(/"/g, '""')}"`,
-        `"${(b.maksud_tujuan || '').toString().replace(/"/g, '""')}"`,
-        b.vol || 1,
-        b.tarif || 0,
-        b.total || 0,
-        `"${b.kunci || 'N'}"`,
-        `"${b.kunci_by || '-'}"`,
-        `"${(b.custom_status || '').toString().replace(/"/g, '""')}"`
-      ].join('\t'))
-    ];
-    const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+    const nowStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    let tabTitle = 'SUMMARY REKAPITULASI PER UNIT KERJA';
+    if (tab === 'data') tabTitle = 'RINCIAN DETAIL USULAN ANGGARAN';
+    if (tab === 'pivot') tabTitle = 'ANALISIS MATRIX PIVOT UNTUK REVIEW ANGGARAN';
+
+    let tableHeaderHTML = '';
+    let tableRowsHTML = '';
+    let totalSummaryRowHTML = '';
+
+    if (tab === 'summary') {
+      tableHeaderHTML = `
+        <tr>
+          <th style="width: 40px; text-align: center;">No</th>
+          <th>Unit Kerja</th>
+          <th style="text-align: right;">Total Usulan</th>
+          <th style="text-align: right;">Total Pagu (Rp)</th>
+          <th style="text-align: right;">Pagu Terkunci (Rp)</th>
+          <th style="text-align: right;">Pagu Bebas (Rp)</th>
+          <th style="text-align: center;">% Coverage</th>
+        </tr>
+      `;
+      tableRowsHTML = unitSummaryData.map((item, idx) => {
+        const pct = item.totalCount > 0 ? ((item.adaStatusCount / item.totalCount) * 100).toFixed(1) + '%' : '0%';
+        return `
+          <tr>
+            <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="font-weight: 700; color: #0f172a;">${item.unit}</td>
+            <td style="text-align: right; font-family: monospace;">${formatRp(item.totalCount)} item</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700;">Rp ${formatRp(item.totalAnggaran)}</td>
+            <td style="text-align: right; font-family: monospace; color: #047857; font-weight: 700;">Rp ${formatRp(item.adaStatusAnggaran)}</td>
+            <td style="text-align: right; font-family: monospace; color: #64748b;">Rp ${formatRp(item.tanpaStatusAnggaran)}</td>
+            <td style="text-align: center;"><span class="badge badge-emerald">${pct}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      totalSummaryRowHTML = `
+        <tr class="total-row">
+          <td colspan="2" style="font-weight: 800;">TOTAL KESELURUHAN</td>
+          <td style="text-align: right; font-family: monospace;">${formatRp(totalUsulan)} item</td>
+          <td style="text-align: right; font-family: monospace;">Rp ${formatRp(totalAnggaranSum)}</td>
+          <td style="text-align: right; font-family: monospace; color: #047857;">Rp ${formatRp(totalAdaStatusSum)}</td>
+          <td style="text-align: right; font-family: monospace;">Rp ${formatRp(totalTanpaStatusSum)}</td>
+          <td style="text-align: center;">${totalUsulan > 0 ? ((adaStatusItems.length / totalUsulan) * 100).toFixed(1) + '%' : '0%'}</td>
+        </tr>
+      `;
+    } else if (tab === 'data') {
+      tableHeaderHTML = `
+        <tr>
+          <th style="width: 35px; text-align: center;">No</th>
+          <th>Unit Kerja</th>
+          <th style="width: 80px;">Kode Akun</th>
+          <th>Deskripsi Usulan / Kegiatan</th>
+          <th style="text-align: right; width: 110px;">Total (Rp)</th>
+          <th style="text-align: center; width: 90px;">Status</th>
+          <th style="text-align: center; width: 70px;">Sumber</th>
+        </tr>
+      `;
+      tableRowsHTML = filteredDetailBudgets.slice(0, 500).map((b, idx) => {
+        const isKunci = b.kunci === 'Y' || (b.custom_status && b.custom_status.trim() !== '');
+        const badgeClass = isKunci ? 'badge-emerald' : 'badge-gray';
+        const label = b.custom_status || (b.kunci === 'Y' ? 'Wajib Ada' : 'Bebas (N)');
+        return `
+          <tr>
+            <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="font-weight: 600; color: #1e293b;">${b.unitkerja_nama || '-'}</td>
+            <td style="font-family: monospace; font-weight: 700; color: #4338ca;">${b.akun || '-'}</td>
+            <td style="color: #334155;">${b.deskripsi || '-'}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700;">Rp ${formatRp(Number(b.total) || 0)}</td>
+            <td style="text-align: center;"><span class="badge ${badgeClass}">${label}</span></td>
+            <td style="text-align: center; font-size: 10px; font-weight: 700; color: #64748b;">${b.kunci_by || '-'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      totalSummaryRowHTML = `
+        <tr class="total-row">
+          <td colspan="4" style="font-weight: 800;">TOTAL DATA (SAMPAI BARIS KE-${Math.min(filteredDetailBudgets.length, 500)})</td>
+          <td style="text-align: right; font-family: monospace;">Rp ${formatRp(totalAnggaranSum)}</td>
+          <td colspan="2" style="text-align: center; font-weight: 700;">${totalUsulan} Item Terfilter</td>
+        </tr>
+      `;
+    } else { // pivot
+      tableHeaderHTML = `
+        <tr>
+          <th style="width: 40px; text-align: center;">No</th>
+          <th>Dimensi Kategori / Grouping</th>
+          <th style="text-align: right;">Jumlah Item Usulan</th>
+          <th style="text-align: right;">Total Nominal Anggaran (Rp)</th>
+          <th style="text-align: center;">% Share Nominal</th>
+        </tr>
+      `;
+      tableRowsHTML = groupedData.map(([key, val]: any, idx: number) => {
+        const sharePct = totalAnggaranSum > 0 ? ((val.sum / totalAnggaranSum) * 100).toFixed(1) + '%' : '0%';
+        return `
+          <tr>
+            <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+            <td style="font-weight: 700; color: #0f172a;">${key}</td>
+            <td style="text-align: right; font-family: monospace;">${formatRp(val.count)} item</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4338ca;">Rp ${formatRp(val.sum)}</td>
+            <td style="text-align: center;"><span class="badge badge-indigo">${sharePct}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      totalSummaryRowHTML = `
+        <tr class="total-row">
+          <td colspan="2" style="font-weight: 800;">TOTAL KESELURUHAN PIVOT</td>
+          <td style="text-align: right; font-family: monospace;">${formatRp(totalUsulan)} item</td>
+          <td style="text-align: right; font-family: monospace; color: #4338ca;">Rp ${formatRp(totalAnggaranSum)}</td>
+          <td style="text-align: center;">100%</td>
+        </tr>
+      `;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan_Review_Anggaran_${tab}_${new Date().toISOString().slice(0,10)}</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 12mm 15mm;
+          }
+          body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .header-bar {
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+            color: #ffffff;
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .header-title h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+          }
+          .header-title p {
+            margin: 4px 0 0 0;
+            font-size: 11px;
+            color: #a5b4fc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .header-badge {
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #e0e7ff;
+            text-align: right;
+          }
+          .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 20px;
+          }
+          .card {
+            border-radius: 14px;
+            padding: 14px 16px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+          }
+          .card-title {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #64748b;
+            margin-bottom: 6px;
+          }
+          .card-value {
+            font-size: 18px;
+            font-weight: 900;
+            color: #0f172a;
+            font-family: monospace;
+          }
+          .card-sub {
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            margin-top: 2px;
+          }
+          .card-emerald { background: #ecfdf5; border-color: #a7f3d0; }
+          .card-emerald .card-title { color: #047857; }
+          .card-emerald .card-value { color: #065f46; }
+          .card-indigo { background: #eef2ff; border-color: #c7d2fe; }
+          .card-indigo .card-title { color: #4338ca; }
+          .card-indigo .card-value { color: #3730a3; }
+          table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 10px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            font-size: 11px;
+          }
+          th {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 10px 12px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+          }
+          tr:nth-child(even) td { background: #f8fafc; }
+          tr.total-row td {
+            background: #e0e7ff !important;
+            color: #1e1b4b;
+            font-weight: 800;
+            border-top: 2px solid #6366f1;
+          }
+          .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 800;
+          }
+          .badge-emerald { background: #d1fae5; color: #065f46; }
+          .badge-indigo { background: #e0e7ff; color: #3730a3; }
+          .badge-gray { background: #f1f5f9; color: #475569; }
+          .footer {
+            margin-top: 24px;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 600;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header-bar">
+          <div class="header-title">
+            <p>UNIVERSITAS GADJAH MADA — DIREKTORAT KEUANGAN</p>
+            <h1>${tabTitle}</h1>
+          </div>
+          <div class="header-badge">
+            <div>Unit Filter: ${selectedUnitFilter === 'ALL' ? 'Semua Unit Kerja' : selectedUnitFilter}</div>
+            <div style="margin-top: 2px; opacity: 0.8;">Tanggal: ${nowStr}</div>
+          </div>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <div class="card-title">TOTAL USULAN ANGGARAN</div>
+            <div class="card-value">${formatRp(totalUsulan)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalAnggaranSum)}</div>
+          </div>
+          <div class="card card-emerald">
+            <div class="card-title">PAGU TERKUNCI (WAJIB)</div>
+            <div class="card-value">${formatRp(adaStatusItems.length)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalAdaStatusSum)}</div>
+          </div>
+          <div class="card">
+            <div class="card-title">PAGU BEBAS (N)</div>
+            <div class="card-value">${formatRp(tanpaStatusItems.length)} Item</div>
+            <div class="card-sub">Rp ${formatRp(totalTanpaStatusSum)}</div>
+          </div>
+          <div class="card card-indigo">
+            <div class="card-title">COVERAGE PENGUNCIAN</div>
+            <div class="card-value">${totalUsulan > 0 ? ((adaStatusItems.length / totalUsulan) * 100).toFixed(1) + '%' : '0%'}</div>
+            <div class="card-sub">${terkunciRule} Rule | ${saranAi} AI</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            ${tableHeaderHTML}
+          </thead>
+          <tbody>
+            ${tableRowsHTML}
+            ${totalSummaryRowHTML}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <div>Dokumen Resmi Penelaahan Budget Review Engine & AI — Universitas Gadjah Mada</div>
+          <div>Halaman 1 dari 1</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
   };
 
   return (
@@ -487,7 +857,7 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap gap-3">
             <Button 
               variant="outline"
-              className="border-purple-300 text-purple-700 hover:bg-purple-50"
+              className="border-purple-300 text-purple-700 hover:bg-purple-50 font-bold"
               onClick={handleReEvaluateRules}
               disabled={isEvaluatingRules}
             >
@@ -495,54 +865,42 @@ export default function AdminDashboard() {
             </Button>
             <Button 
               variant="outline"
-              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold"
+              onClick={() => exportToExcelByTab(activeTab)}
+            >
+              📥 Export Excel ({activeTab === 'summary' ? 'Summary' : activeTab === 'data' ? 'Detail' : 'Pivot'})
+            </Button>
+            <Button 
+              variant="outline"
+              className="border-rose-300 text-rose-700 hover:bg-rose-50 font-bold"
+              onClick={() => generateFormattedPDFReport(activeTab)}
+            >
+              📄 Export PDF Report
+            </Button>
+            <Button 
+              variant="outline"
+              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 font-bold"
               onClick={() => {
                 const liveUrl = `${window.location.origin}/api/budgets/export-excel`;
                 navigator.clipboard.writeText(liveUrl);
                 alert(`URL Live Power Query Excel disalin:\n${liveUrl}\n\nPetunjuk di Excel:\nBuka Excel -> Data -> From Web / Dari Web -> Paste URL ini -> Refresh Kapan Saja!`);
               }}
             >
-              🔗 Link Power Query Excel
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              onClick={() => exportToExcelCSV(filteredDetailBudgets, 'Data_Usulan_Anggaran')}
-            >
-              📥 Export ke Excel
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-rose-300 text-rose-700 hover:bg-rose-50"
-              onClick={async () => {
-                if (!confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH data usulan anggaran?')) return;
-                try {
-                  const res = await fetch('/api/budgets/list', { method: 'DELETE' });
-                  const json = await res.json();
-                  if (json.success) {
-                    alert('Tabel data usulan anggaran berhasil dibersihkan!');
-                    fetchBudgets();
-                  } else {
-                    alert('Gagal: ' + json.error);
-                  }
-                } catch (e) {
-                  alert('Terjadi kesalahan');
-                }
-              }}
-            >
-              🗑️ Bersihkan Data
+              🔗 Power Query
             </Button>
             <Link href="/review-anggaran/rules">
-              <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50 font-bold">
                 Kelola Master Aturan
               </Button>
             </Link>
             <Button 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm"
               onClick={handleBulkApprove}
             >
               Bulk Approve AI
             </Button>
+          </div>
+        </header>
           </div>
         </header>
 
@@ -637,9 +995,17 @@ export default function AdminDashboard() {
                   Perbandingan total usulan anggaran, anggaran yang berkategori Kunci (Ada Status), dan Bebas (Tanpa Status).
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50">
-                🔄 Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportToExcelByTab('summary')} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-bold">
+                  📥 Excel Summary
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => generateFormattedPDFReport('summary')} className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold">
+                  📄 PDF Laporan
+                </Button>
+                <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs">
+                  🔄 Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -747,6 +1113,13 @@ export default function AdminDashboard() {
                   onChange={e => setSearchTerm(e.target.value)}
                   className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs"
                 />
+
+                <Button variant="outline" size="sm" onClick={() => exportToExcelByTab('data')} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-bold h-9">
+                  📥 Excel Detail
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => generateFormattedPDFReport('data')} className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold h-9">
+                  📄 PDF Laporan
+                </Button>
                 <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50 h-9">
                   🔄 Refresh
                 </Button>
@@ -952,24 +1325,34 @@ export default function AdminDashboard() {
         {/* TAB 3: ANALISIS PIVOT */}
         {activeTab === 'pivot' && (
           <Card className="bg-white border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-xl text-gray-900">Analisis Pengelompokan Data (Pivot)</CardTitle>
-              <CardDescription className="text-gray-500">
-                Pilih kolom di bawah ini untuk mengelompokkan data dan melihat total anggarannya.
-              </CardDescription>
-              <div className="flex flex-wrap gap-2 mt-4">
-                {pivotFields.map(field => {
-                  const isActive = groupBy.includes(field.id);
-                  return (
-                    <Badge 
-                      key={field.id}
-                      onClick={() => toggleGroupBy(field.id)}
-                      className={`cursor-pointer px-3 py-1.5 text-sm transition-all ${isActive ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200'}`}
-                    >
-                      {field.label} {isActive && '✕'}
-                    </Badge>
-                  );
-                })}
+            <CardHeader className="flex flex-col md:flex-row justify-between md:items-start gap-4">
+              <div>
+                <CardTitle className="text-xl text-gray-900">Analisis Pengelompokan Data (Pivot)</CardTitle>
+                <CardDescription className="text-gray-500">
+                  Pilih kolom di bawah ini untuk mengelompokkan data dan melihat total anggarannya.
+                </CardDescription>
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {pivotFields.map(field => {
+                    const isActive = groupBy.includes(field.id);
+                    return (
+                      <Badge 
+                        key={field.id}
+                        onClick={() => toggleGroupBy(field.id)}
+                        className={`cursor-pointer px-3 py-1.5 text-sm transition-all ${isActive ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200'}`}
+                      >
+                        {field.label} {isActive && '✕'}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportToExcelByTab('pivot')} className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs font-bold">
+                  📥 Excel Pivot
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => generateFormattedPDFReport('pivot')} className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-bold">
+                  📄 PDF Laporan
+                </Button>
               </div>
             </CardHeader>
             <CardContent>

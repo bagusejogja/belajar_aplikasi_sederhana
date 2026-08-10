@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import Link from 'next/link';
 
+import * as XLSX from 'xlsx';
+
 // Autocomplete Input / Filter Unit Kerja untuk Rule Form & Filter
 function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / Ketik Unit Kerja..." }: { units: string[], value: string, onChange: (val: string) => void, placeholder?: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -329,6 +331,27 @@ export default function RulesPage() {
     return Math.ceil(filteredAndSortedRules.length / Number(pageSize));
   }, [filteredAndSortedRules, pageSize]);
 
+  const handleExportExcel = () => {
+    if (!filteredAndSortedRules || filteredAndSortedRules.length === 0) {
+      alert('Tidak ada data aturan untuk diekspor.');
+      return;
+    }
+
+    const exportData = filteredAndSortedRules.map((r, idx) => ({
+      'No': idx + 1,
+      'Unit Kerja': r.unitkerja_nama || '*',
+      'Kode Akun': r.akun || '*',
+      'Kata Kunci / Frasa Deskripsi': r.kata_kunci_deskripsi || '-',
+      'Level (Priority)': r.priority || 99,
+      'Status Final': r.custom_status || 'Wajib Ada'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Rules');
+    XLSX.writeFile(workbook, `Master_Aturan_Rule_Engine_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-300">
       <div className="w-full space-y-8">
@@ -345,6 +368,13 @@ export default function RulesPage() {
           </div>
           
           <div className="flex gap-3">
+            <Button 
+              variant="outline"
+              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold"
+              onClick={handleExportExcel}
+            >
+              📥 Export Excel (.xlsx)
+            </Button>
             <Button 
               className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
               onClick={() => setDialogOpen(true)}
