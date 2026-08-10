@@ -490,16 +490,21 @@ export default function AdminDashboard() {
       XLSX.writeFile(workbook, `Detail_Usulan_Anggaran_${dateStr}.xlsx`);
 
     } else if (tab === 'pivot') {
-      if (!groupedData || groupedData.length === 0) {
-        alert('Tidak ada data pivot untuk diekspor.');
-        return;
-      }
-      const dataToExport = groupedData.map(([key, val]: any, idx) => ({
-        'No': idx + 1,
-        'Dimensi Grouping': key,
-        'Jumlah Usulan (Item)': val.count,
-        'Total Nominal (Rp)': val.sum
-      }));
+      const isArray = Array.isArray(groupedData);
+      const dataToExport = isArray
+        ? (groupedData as [string, any][]).map(([key, val], idx) => ({
+            'No': idx + 1,
+            'Dimensi Grouping': key,
+            'Jumlah Usulan (Item)': val.count,
+            'Total Nominal (Rp)': val.sum
+          }))
+        : [{
+            'No': 1,
+            'Dimensi Grouping': 'Total Keseluruhan',
+            'Jumlah Usulan (Item)': (groupedData as any)["Total Keseluruhan"]?.count || 0,
+            'Total Nominal (Rp)': (groupedData as any)["Total Keseluruhan"]?.sum || 0
+          }];
+
       const ws = XLSX.utils.json_to_sheet(dataToExport);
       XLSX.utils.book_append_sheet(workbook, ws, 'Pivot Analysis');
       XLSX.writeFile(workbook, `Pivot_Analysis_Anggaran_${dateStr}.xlsx`);
@@ -607,14 +612,19 @@ export default function AdminDashboard() {
           <th style="text-align: center;">% Share Nominal</th>
         </tr>
       `;
-      tableRowsHTML = groupedData.map(([key, val]: any, idx: number) => {
-        const sharePct = totalAnggaranSum > 0 ? ((val.sum / totalAnggaranSum) * 100).toFixed(1) + '%' : '0%';
+      const pivotEntries = Array.isArray(groupedData) 
+        ? groupedData 
+        : Object.entries(groupedData);
+
+      tableRowsHTML = pivotEntries.map(([key, val]: any, idx: number) => {
+        const itemVal = val?.sum !== undefined ? val : { count: val?.count || 0, sum: val?.sum || 0 };
+        const sharePct = totalAnggaranSum > 0 ? ((itemVal.sum / totalAnggaranSum) * 100).toFixed(1) + '%' : '0%';
         return `
           <tr>
             <td style="text-align: center; color: #64748b;">${idx + 1}</td>
             <td style="font-weight: 700; color: #0f172a;">${key}</td>
-            <td style="text-align: right; font-family: monospace;">${formatRp(val.count)} item</td>
-            <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4338ca;">Rp ${formatRp(val.sum)}</td>
+            <td style="text-align: right; font-family: monospace;">${formatRp(itemVal.count)} item</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4338ca;">Rp ${formatRp(itemVal.sum)}</td>
             <td style="text-align: center;"><span class="badge badge-indigo">${sharePct}</span></td>
           </tr>
         `;
