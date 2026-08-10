@@ -901,8 +901,6 @@ export default function AdminDashboard() {
             </Button>
           </div>
         </header>
-          </div>
-        </header>
 
         {/* Global Summary Cards (REAKTIF SESUAI FILTER FILTERED DATA) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
