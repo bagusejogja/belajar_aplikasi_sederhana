@@ -55,6 +55,7 @@ export function formatTanggalIndo(dateStr: string) {
 export default function DataForm({ mainData, setMainData, isDetailMode, detailData = [], setDetailData, historisData = [], setHistorisData, section = 'all' }: any) {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [units, setUnits] = useState<any[]>([]);
+  const [riwayatUsulanUnit, setRiwayatUsulanUnit] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -63,6 +64,41 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     };
     fetchUnits();
   }, []);
+
+  // Auto-fetch pagu historis saat unit_pengirim terdeteksi dari OCR/AI
+  useEffect(() => {
+    if (mainData.unit_pengirim && units && units.length > 0) {
+      const matched = units.find((u: any) => 
+        u.nama_unit.toLowerCase() === mainData.unit_pengirim?.toLowerCase() ||
+        u.nama_unit.toLowerCase().includes(mainData.unit_pengirim?.toLowerCase()) ||
+        mainData.unit_pengirim?.toLowerCase()?.includes(u.nama_unit.toLowerCase())
+      );
+      if (matched && (!historisData || historisData.length === 0)) {
+        handleUnitChange({ value: matched.id, label: matched.nama_unit });
+      }
+    }
+  }, [mainData.unit_pengirim, units]);
+
+  // Fetch riwayat usulan surat terdahulu untuk unit pengirim
+  useEffect(() => {
+    const fetchRiwayatUnit = async () => {
+      if (!mainData.unit_pengirim) {
+        setRiwayatUsulanUnit([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at')
+        .ilike('unit_pengirim', `%${mainData.unit_pengirim}%`)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        const filtered = data.filter(d => d.id_analisis !== mainData.id_analisis);
+        setRiwayatUsulanUnit(filtered);
+      }
+    };
+    fetchRiwayatUnit();
+  }, [mainData.unit_pengirim, mainData.id_analisis]);
 
   const handleUnitChange = async (selectedOption: any) => {
     setMainData({ ...mainData, unit_pengirim: selectedOption?.label || '' });
@@ -475,7 +511,24 @@ ${mainData.ringkasan_ai}`;
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
               <Select 
                 options={units.map(u => ({ value: u.id, label: u.nama_unit }))}
-                value={units.find(u => u.nama_unit === mainData.unit_pengirim) ? { value: units.find(u => u.nama_unit === mainData.unit_pengirim).id, label: mainData.unit_pengirim } : null}
+                value={
+                  units.find(u => 
+                    u.nama_unit.toLowerCase() === mainData.unit_pengirim?.toLowerCase() ||
+                    u.nama_unit.toLowerCase().includes(mainData.unit_pengirim?.toLowerCase()) ||
+                    mainData.unit_pengirim?.toLowerCase()?.includes(u.nama_unit.toLowerCase())
+                  ) ? { 
+                    value: units.find(u => 
+                      u.nama_unit.toLowerCase() === mainData.unit_pengirim?.toLowerCase() ||
+                      u.nama_unit.toLowerCase().includes(mainData.unit_pengirim?.toLowerCase()) ||
+                      mainData.unit_pengirim?.toLowerCase()?.includes(u.nama_unit.toLowerCase())
+                    ).id, 
+                    label: units.find(u => 
+                      u.nama_unit.toLowerCase() === mainData.unit_pengirim?.toLowerCase() ||
+                      u.nama_unit.toLowerCase().includes(mainData.unit_pengirim?.toLowerCase()) ||
+                      mainData.unit_pengirim?.toLowerCase()?.includes(u.nama_unit.toLowerCase())
+                    ).nama_unit
+                  } : (mainData.unit_pengirim ? { value: 'custom', label: mainData.unit_pengirim } : null)
+                }
                 onChange={handleUnitChange}
                 placeholder="Cari atau pilih Unit Kerja..."
                 isClearable
@@ -617,23 +670,23 @@ ${mainData.ringkasan_ai}`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {historisData && historisData.filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat).length === 0 ? (
+                    {riwayatUsulanUnit.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">Belum ada riwayat usulan tambah pagu sebelumnya untuk unit ini.</td>
                       </tr>
                     ) : (
-                      historisData && historisData.filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat).map((h: any, i: number) => (
-                        <tr key={i} className="hover:bg-gray-50">
+                      riwayatUsulanUnit.map((h: any, i: number) => (
+                        <tr key={h.id_analisis || i} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5 text-center font-medium text-gray-600">{i + 1}</td>
                           <td className="px-4 py-2.5">
-                            <div className="font-bold text-gray-900">{h.perihal || h.hal_surat || mainData.perihal || '-'}</div>
+                            <div className="font-bold text-gray-900 line-clamp-1">{h.perihal || '-'}</div>
                             <div className="text-xs text-gray-400 font-mono">No: {h.no_surat || '-'}</div>
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
-                            Rp {formatRp(parseNum(h.total_anggaran || h.pengajuan || '0'))}
+                            Rp {formatRp(parseNum(h.total_anggaran || '0'))}
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono font-semibold text-emerald-700">
-                            Rp {formatRp(parseNum(h.nominal_disetujui || h.disetujui || '0'))}
+                            Rp {formatRp(parseNum(h.nominal_disetujui || '0'))}
                           </td>
                           <td className="px-4 py-2.5 text-center">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${

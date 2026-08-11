@@ -75,9 +75,9 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
 
   // 4. Parse Unit Pengirim (di atas TTE / Tanda tangan)
   const unitPatterns = [
-    /(?:a\.n\.\s*Rektor\s*\n)?((?:Kepala|Ketua|Dekan|Direktur|Wakil Rektor|Manajer|Koordinator|Sekretaris|Biro|Lembaga|Fakultas|Pusat|Badan)\s+[^\n,]+)/i,
+    /(?:a\.n\.\s*Rektor\s*\n)?((?:Kepala|Ketua|Dekan|Direktur|Wakil Rektor|Manajer|Koordinator|Sekretaris|Biro|Lembaga|Fakultas|Pusat|Badan|Direktorat)\s+[^\n,]+)/i,
     /(?:ttd|tte|tanda\s+tangan|ditandatangani)\s+oleh\s*:?\s*([^\n]+)/i,
-    /(?:UNIVERSITAS GADJAH MADA\s*\n)+([^\n]+)/i
+    /(?:Direktur|Dekan|Kepala|Ketua)\s+([^\n,]+)/i
   ];
 
   let rawUnit = '';
@@ -90,25 +90,77 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
   }
 
   if (availableUnits && availableUnits.length > 0) {
+    const acronyms: Record<string, string> = {
+      'ditmawa': 'kemahasiswaan',
+      'dit-kms': 'kemahasiswaan',
+      'pkm': 'pengabdian kepada masyarakat',
+      'dpkm': 'pengabdian kepada masyarakat',
+      'lit': 'penelitian',
+      'dit-lit': 'penelitian',
+      'fkkk': 'kedokteran',
+      'fkmk': 'kedokteran',
+      'fk-kmk': 'kedokteran',
+      'ft': 'teknik',
+      'feb': 'ekonomika',
+      'fh': 'hukum',
+      'fkt': 'kehutanan',
+      'fp': 'pertanian',
+      'faperta': 'pertanian',
+      'fkh': 'kedokteran hewan',
+      'fkg': 'kedokteran gigi',
+      'farmasi': 'farmasi',
+      'psikologi': 'psikologi',
+      'biologi': 'biologi',
+      'filsafat': 'filsafat',
+      'geografi': 'geografi',
+      'mipa': 'matematika',
+      'fisipol': 'sosial',
+      'fib': 'budaya',
+      'sv': 'vokasi',
+      'vokasi': 'vokasi',
+      'sdm': 'sumber daya manusia',
+      'keu': 'keuangan',
+      'dit-keu': 'keuangan'
+    };
+
+    const textLower = ocrText.toLowerCase();
+
+    // 4a. Cek Akronim jika rawUnit ditemukan
     if (rawUnit) {
-      const found = availableUnits.find(u => 
+      const foundDirect = availableUnits.find(u => 
         u.nama_unit.toLowerCase().includes(rawUnit.toLowerCase()) || 
         rawUnit.toLowerCase().includes(u.nama_unit.toLowerCase())
       );
-      if (found) {
-        unit_pengirim = found.nama_unit;
-      } else {
-        unit_pengirim = rawUnit;
+      if (foundDirect) {
+        unit_pengirim = foundDirect.nama_unit;
       }
     }
-    
+
+    // 4b. Cek dari teks surat lengkap
+    if (!unit_pengirim) {
+      for (const [acronym, keyword] of Object.entries(acronyms)) {
+        if (textLower.includes(acronym)) {
+          const found = availableUnits.find(u => u.nama_unit.toLowerCase().includes(keyword));
+          if (found) {
+            unit_pengirim = found.nama_unit;
+            break;
+          }
+        }
+      }
+    }
+
+    // 4c. Substring match langsung dari nama unit
     if (!unit_pengirim) {
       const matchedFromText = availableUnits.find(u => 
-        ocrText.toLowerCase().includes(u.nama_unit.toLowerCase())
+        textLower.includes(u.nama_unit.toLowerCase())
       );
       if (matchedFromText) {
         unit_pengirim = matchedFromText.nama_unit;
       }
+    }
+
+    if (!unit_pengirim && rawUnit) {
+      unit_pengirim = rawUnit;
     }
   } else if (rawUnit) {
     unit_pengirim = rawUnit;
@@ -131,8 +183,19 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
     });
 
     if (values.length > 0) {
-      // Jika ada beberapa nominal rincian, jumlahkan; jika hanya 1, pakai nominal tersebut
-      nominal_usulan = values.reduce((acc, curr) => acc + curr, 0);
+      // Ambil nilai terbesar yang mewakili TOTAL usulan, atau jumlahkan jika berupa rincian kecil
+      const maxVal = Math.max(...values);
+      const otherValues = values.filter(v => v !== maxVal);
+      const sumOthers = otherValues.reduce((acc, curr) => acc + curr, 0);
+
+      if (sumOthers > 0 && Math.abs(sumOthers - maxVal) < 1000) {
+        // Jika maxVal adalah total dari item lainnya, gunakan maxVal
+        nominal_usulan = maxVal;
+      } else if (maxVal > 1000000) {
+        nominal_usulan = maxVal;
+      } else {
+        nominal_usulan = values.reduce((acc, curr) => acc + curr, 0);
+      }
     }
   }
 

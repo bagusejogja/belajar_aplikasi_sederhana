@@ -4,16 +4,34 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { renderWysiwygToPdf } from '@/lib/pdfRenderer';
 import { Printer, Download, Eye } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function PdfPreview({ mainData, detailData, historisData, setActiveTab }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [riwayatUsulanUnit, setRiwayatUsulanUnit] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchRiwayat = async () => {
+       if (mainData?.unit_pengirim) {
+          const { data } = await supabase
+            .from('app_analisis_utama')
+            .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan')
+            .ilike('unit_pengirim', `%${mainData.unit_pengirim}%`)
+            .order('created_at', { ascending: false });
+          if (data) {
+             setRiwayatUsulanUnit(data.filter(d => d.id_analisis !== mainData.id_analisis));
+          }
+       }
+    };
+    fetchRiwayat();
+  }, [mainData?.unit_pengirim, mainData?.id_analisis]);
 
   // Auto generate on mount or when data changes significantly
   React.useEffect(() => {
      if (mainData?.no_surat || mainData?.analisis_html) {
         generatePDF();
      }
-  }, [mainData?.no_surat, mainData?.analisis_html]);
+  }, [mainData?.no_surat, mainData?.analisis_html, riwayatUsulanUnit]);
 
   const generatePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -220,17 +238,16 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     startY = (doc as any).lastAutoTable.finalY + 10;
 
     // 4b. HISTORI USULAN TAMBAH PAGU UNIT KERJA
-    const filterHistoriUnit = (historisData || []).filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat);
-    if (filterHistoriUnit.length > 0) {
+    if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
       startY = addSectionHeader(`HISTORI USULAN TAMBAH PAGU UNIT KERJA (${mainData.unit_pengirim || 'Unit'}):`, startY);
       autoTable(doc, {
         startY: startY,
         head: [['No', 'No / Hal Surat', 'Pengajuan (Rp)', 'Disetujui (Rp)', 'Status']],
-        body: filterHistoriUnit.map((h: any, i: number) => [
+        body: riwayatUsulanUnit.map((h: any, i: number) => [
           i + 1,
-          `${h.perihal || h.hal_surat || '-'}\nNo: ${h.no_surat || '-'}`,
-          `Rp ${formatRp(parseNum(h.total_anggaran || h.pengajuan || '0'))}`,
-          `Rp ${formatRp(parseNum(h.nominal_disetujui || h.disetujui || '0'))}`,
+          `${h.perihal || '-'}\nNo: ${h.no_surat || '-'}`,
+          `Rp ${formatRp(parseNum(h.total_anggaran || '0'))}`,
+          `Rp ${formatRp(parseNum(h.nominal_disetujui || '0'))}`,
           (h.keputusan || 'disetujui').toUpperCase()
         ]),
         theme: 'grid',
