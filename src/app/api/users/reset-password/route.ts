@@ -28,7 +28,18 @@ export async function POST(req: Request) {
       });
     }
 
-    // Mode 2: Reset directly to default password (e.g. UGM123456)
+    // Mode 2: Direct reset to default password (requires SUPABASE_SERVICE_ROLE_KEY)
+    const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+    if (!hasServiceKey) {
+      return NextResponse.json(
+        { 
+          error: 'Membutuhkan SUPABASE_SERVICE_ROLE_KEY pada Environment Variables Vercel untuk reset password langsung tanpa email. Silakan pasang SUPABASE_SERVICE_ROLE_KEY di Vercel atau gunakan opsi "Kirim Email Reset".' 
+        },
+        { status: 400 }
+      );
+    }
+
     const targetPassword = newPassword || 'UGM123456';
 
     if (!userId) {
@@ -37,6 +48,7 @@ export async function POST(req: Request) {
 
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: targetPassword,
+      email_confirm: true,
     });
 
     if (error) {
@@ -58,3 +70,4 @@ export async function POST(req: Request) {
     );
   }
 }
+
