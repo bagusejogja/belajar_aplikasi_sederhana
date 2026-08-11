@@ -516,6 +516,19 @@ ${mainData.ringkasan_ai}`;
                  />
               </div>
             </div>
+
+            {/* SUBYEK DI PERSURATAN SIMASTER (MANUAL) */}
+            <div className="col-span-full mt-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Subyek di Persuratan Simaster</label>
+              <input 
+                type="text" 
+                value={mainData.subyek_persuratan_simaster || ''} 
+                onChange={e => setMainData({...mainData, subyek_persuratan_simaster: e.target.value})} 
+                placeholder="Masukkan subyek persuratan Simaster (manual)..."
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white text-sm" 
+              />
+            </div>
+
           </div>
         </div>
       )}
@@ -580,6 +593,59 @@ ${mainData.ringkasan_ai}`;
                       <td className="px-4 py-2.5 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
                       <td className="px-4 py-2.5 text-right font-bold font-mono text-emerald-900">Rp {formatRp(sisaKapasitasAI)}</td>
                     </tr>
+                    <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
+                      <td className="px-4 py-2.5 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
+                      <td className="px-4 py-2.5 text-right font-bold font-mono text-amber-900">Rp {mainData.total_anggaran ? formatRp(parseNum(mainData.total_anggaran)) : '0'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 2. HISTORI TAMBAH PAGU UNIT KERJA */}
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Histori Usulan Tambah Pagu Unit Kerja ({mainData.unit_pengirim || 'Unit Kerja'})</label>
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 w-12 text-center">No</th>
+                      <th className="px-4 py-3">No / Hal Surat</th>
+                      <th className="px-4 py-3 text-right">Pengajuan (Rp)</th>
+                      <th className="px-4 py-3 text-right">Disetujui (Rp)</th>
+                      <th className="px-4 py-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {historisData && historisData.filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">Belum ada riwayat usulan tambah pagu sebelumnya untuk unit ini.</td>
+                      </tr>
+                    ) : (
+                      historisData && historisData.filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat).map((h: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-center font-medium text-gray-600">{i + 1}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="font-bold text-gray-900">{h.perihal || h.hal_surat || mainData.perihal || '-'}</div>
+                            <div className="text-xs text-gray-400 font-mono">No: {h.no_surat || '-'}</div>
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
+                            Rp {formatRp(parseNum(h.total_anggaran || h.pengajuan || '0'))}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-emerald-700">
+                            Rp {formatRp(parseNum(h.nominal_disetujui || h.disetujui || '0'))}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              (h.keputusan === 'disetujui semua' || h.keputusan === 'disetujui 100%') ? 'bg-emerald-100 text-emerald-800' :
+                              h.keputusan === 'disetujui sebagian' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {h.keputusan || 'disetujui'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

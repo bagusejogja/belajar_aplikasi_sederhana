@@ -75,8 +75,9 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
 
   // 4. Parse Unit Pengirim (di atas TTE / Tanda tangan)
   const unitPatterns = [
-    /(?:a\.n\.\s*Rektor\s*\n)?((?:Kepala|Ketua|Dekan|Direktur|Wakil Rektor|Manajer|Koordinator|Sekretaris|Biro|Lembaga|Fakultas)\s+[^\n,]+)/i,
-    /(?:ttd|tte|tanda\s+tangan|ditandatangani)\s+oleh\s*:?\s*([^\n]+)/i
+    /(?:a\.n\.\s*Rektor\s*\n)?((?:Kepala|Ketua|Dekan|Direktur|Wakil Rektor|Manajer|Koordinator|Sekretaris|Biro|Lembaga|Fakultas|Pusat|Badan)\s+[^\n,]+)/i,
+    /(?:ttd|tte|tanda\s+tangan|ditandatangani)\s+oleh\s*:?\s*([^\n]+)/i,
+    /(?:UNIVERSITAS GADJAH MADA\s*\n)+([^\n]+)/i
   ];
 
   let rawUnit = '';
@@ -113,11 +114,34 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
     unit_pengirim = rawUnit;
   }
 
+  // 5. Parse Nominal Usulan (Single atau Jumlahkan Beberapa Nominal)
+  let nominal_usulan = 0;
+  const rupiahMatches = Array.from(ocrText.matchAll(/(?:sebesar|sejumlah|nominal|usulan|tambah pagu|sebesar Rp|Rp\.?)\s*[:=]?\s*([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]+)?|[0-9]{5,})/gi));
+
+  if (rupiahMatches && rupiahMatches.length > 0) {
+    const values: number[] = [];
+    rupiahMatches.forEach(m => {
+      if (m[1]) {
+        const cleaned = m[1].replace(/\./g, '').replace(/,/g, '.');
+        const val = parseFloat(cleaned);
+        if (!isNaN(val) && val >= 100000) {
+          values.push(val);
+        }
+      }
+    });
+
+    if (values.length > 0) {
+      // Jika ada beberapa nominal rincian, jumlahkan; jika hanya 1, pakai nominal tersebut
+      nominal_usulan = values.reduce((acc, curr) => acc + curr, 0);
+    }
+  }
+
   return {
     no_surat,
     tanggal_surat,
     perihal,
-    unit_pengirim
+    unit_pengirim,
+    nominal_usulan
   };
 }
 
@@ -165,6 +189,15 @@ export default function OCRPanel({ mainData, setMainData }: any) {
       
       setIsUploading(true);
       try {
+        // Hapus file R2 lama jika sebelumnya sudah upload file sementara
+        if (mainData.link_lampiran) {
+          fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: mainData.link_lampiran })
+          }).catch(err => console.error("Temporary R2 deletion error:", err));
+        }
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folder', 'analisis');
@@ -248,18 +281,22 @@ export default function OCRPanel({ mainData, setMainData }: any) {
       return;
     }
     const parsed = parseOCRMetadata(targetText, units);
+    const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
     setMainData((prev: any) => ({
       ...prev,
       no_surat: parsed.no_surat || prev.no_surat,
       tanggal_surat: parsed.tanggal_surat || prev.tanggal_surat,
       perihal: parsed.perihal || prev.perihal,
       unit_pengirim: parsed.unit_pengirim || prev.unit_pengirim,
+      total_anggaran: parsed.nominal_usulan ? formatRp(parsed.nominal_usulan) : prev.total_anggaran
     }));
 
     let infoMsg = 'Berhasil memindahkan metadata ke Form Data Utama:\n';
     infoMsg += `- Tanggal Surat: ${parsed.tanggal_surat || '(Tidak terdeteksi)'}\n`;
     infoMsg += `- Perihal: ${parsed.perihal || '(Tidak terdeteksi)'}\n`;
     infoMsg += `- Unit Pengirim: ${parsed.unit_pengirim || '(Tidak terdeteksi)'}\n`;
+    infoMsg += `- Nominal Usulan: ${parsed.nominal_usulan ? 'Rp ' + formatRp(parsed.nominal_usulan) : '(Tidak terdeteksi)'}\n`;
     infoMsg += `- No Surat: ${parsed.no_surat || '(Tidak terdeteksi)'}`;
     alert(infoMsg);
   };
@@ -277,6 +314,7 @@ export default function OCRPanel({ mainData, setMainData }: any) {
       }
       
       const parsed = parseOCRMetadata(extractedText, units);
+      const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
       
       setMainData((prev: any) => ({ 
          ...prev, 
@@ -285,9 +323,10 @@ export default function OCRPanel({ mainData, setMainData }: any) {
          tanggal_surat: parsed.tanggal_surat || prev.tanggal_surat,
          perihal: parsed.perihal || prev.perihal,
          unit_pengirim: parsed.unit_pengirim || prev.unit_pengirim,
+         total_anggaran: parsed.nominal_usulan ? formatRp(parsed.nominal_usulan) : prev.total_anggaran
       }));
 
-      alert(`Ekstraksi teks selesai!\n\nMetadata otomatis terisi ke Form Data Utama:\n- Tanggal Surat: ${parsed.tanggal_surat || '-'}\n- Perihal: ${parsed.perihal || '-'}\n- Unit Pengirim: ${parsed.unit_pengirim || '-'}`);
+      alert(`Ekstraksi teks selesai!\n\nMetadata otomatis terisi ke Form Data Utama:\n- Tanggal Surat: ${parsed.tanggal_surat || '-'}\n- Perihal: ${parsed.perihal || '-'}\n- Unit Pengirim: ${parsed.unit_pengirim || '-'}\n- Nominal Usulan: ${parsed.nominal_usulan ? 'Rp ' + formatRp(parsed.nominal_usulan) : '-'}`);
     } catch (e) {
       console.error(e);
       alert('Ekstraksi Teks Gagal! Pastikan file tidak korup.');

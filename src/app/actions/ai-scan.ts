@@ -24,8 +24,8 @@ export async function scanSuratWithAI(formData: FormData) {
         "no_surat": "Isi dengan nomor surat lengkap",
         "tanggal_surat": "Isi dengan tanggal surat (Format WAJIB YYYY-MM-DD. Misal '15 Juli 2026' menjadi '2026-07-15')",
         "perihal_surat": "Isi HANYA perihal/hal surat saja. BERHENTI sebelum kata 'Yth', 'Kepada Yth', 'di Tempat', atau nama tujuan surat",
-        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat yang tertulis di kover surat atau di atas tanda tangan/TTE",
-        "nominal_usulan": "Isi dengan total nominal usulan anggaran/tambahan pagu yang diminta (hanya angka)"
+        "unit_kerja": "Isi dengan nama instansi/unit pengirim surat yang tertulis pada kop surat atau di bagian atas tanda tangan/TTE/penandatangan surat (contoh: Fakultas Kedokteran, Direktorat Kemahasiswaan, Biro Keuangan, dll)",
+        "nominal_usulan": "Isi dengan total nominal usulan anggaran/tambahan pagu yang diminta (hanya angka). Jika ada beberapa rincian usulan nominal di dalam surat, JUMLAHKAN SELURUH NOMINAL TERSEBUT menjadi satu angka total."
       }
       
       Jika ada informasi yang tidak ditemukan, kosongkan nilainya.

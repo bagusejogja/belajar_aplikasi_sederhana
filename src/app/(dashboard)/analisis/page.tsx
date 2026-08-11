@@ -38,6 +38,7 @@ export default function AnalisisPaguPage() {
     tanggal_surat: '',
     perihal: '',
     unit_pengirim: '',
+    subyek_persuratan_simaster: '',
     total_anggaran: '0',
     total_realisasi: '0',
     persen_serapan: '0',
@@ -64,6 +65,7 @@ export default function AnalisisPaguPage() {
        if (utama) {
           setMainData({
              ...utama,
+             subyek_persuratan_simaster: utama.subyek_persuratan_simaster || '',
              keputusan: utama.keputusan || 'disetujui semua',
              nominal_disetujui: utama.nominal_disetujui || '0'
           });
@@ -135,6 +137,7 @@ export default function AnalisisPaguPage() {
              const parsed = JSON.parse(utama.analisis_html);
              setMainData((prev: any) => ({
                 ...prev,
+                subyek_persuratan_simaster: utama.subyek_persuratan_simaster || parsed.subyek_persuratan_simaster || '',
                 analisis_html: parsed.analisis || '',
                 rekomendasi_html: parsed.rekomendasi || '',
                 pagu_berjalan: parsed.pagu_berjalan || {},
@@ -146,6 +149,7 @@ export default function AnalisisPaguPage() {
           } catch (e) {
              setMainData((prev: any) => ({
                 ...prev,
+                subyek_persuratan_simaster: utama.subyek_persuratan_simaster || '',
                 analisis_html: utama.analisis_html,
                 rekomendasi_html: '',
                 keputusan: utama.keputusan || 'disetujui semua',
@@ -189,7 +193,8 @@ export default function AnalisisPaguPage() {
            keputusan: mainData.keputusan || 'disetujui semua',
            nominal_disetujui: mainData.nominal_disetujui || '0',
            keterangan_keputusan: mainData.keterangan_keputusan || '',
-           surat_balasan_html: mainData.surat_balasan_html || ''
+           surat_balasan_html: mainData.surat_balasan_html || '',
+           subyek_persuratan_simaster: mainData.subyek_persuratan_simaster || ''
         }),
         file_lampiran: mainData.file_lampiran || '',
         link_lampiran: mainData.link_lampiran || ''

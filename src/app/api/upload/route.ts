@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { PutObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const r2 = new S3Client({
   region: 'auto',
@@ -37,9 +37,36 @@ export async function POST(req: NextRequest) {
     const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
     const publicUrl = `${domain}/${key}`;
 
-    return NextResponse.json({ success: true, publicUrl });
+    return NextResponse.json({ success: true, publicUrl, key });
   } catch (err: any) {
     console.error("Upload API Error:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { url, key } = await req.json();
+    let targetKey = key;
+
+    if (!targetKey && url) {
+      const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
+      targetKey = url.replace(`${domain}/`, '');
+    }
+
+    if (!targetKey) {
+      return NextResponse.json({ success: false, error: 'Key or URL required' }, { status: 400 });
+    }
+
+    await r2.send(new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME || 'lampiran-aplikasi',
+      Key: targetKey,
+    }));
+
+    return NextResponse.json({ success: true, message: 'File deleted from R2' });
+  } catch (err: any) {
+    console.error("Delete R2 Error:", err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+

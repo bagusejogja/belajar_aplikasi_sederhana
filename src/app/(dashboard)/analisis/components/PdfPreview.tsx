@@ -197,7 +197,7 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     bodyPagu.push(['Pagu Sampai Saat Ini', `Rp ${formatRp(cTotalPaguHistoris)}`]);
     bodyPagu.push(['Realisasi S.d. Saat Ini', `Rp ${formatRp(totalRealisasiDetail)}`]);
     bodyPagu.push(['Sisa Kapasitas Pagu', `Rp ${formatRp(sisaKapasitasHitung)}`]);
-    bodyPagu.push(['Usulan Tambahan (Surat)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
+    bodyPagu.push(['Nominal Usulan Tambahan Pagu (Diajukan)', `Rp ${formatRp(parseNum(mainData.total_anggaran)) || '0'}`]);
 
     startY = addSectionHeader(`4. POSISI PAGU TAHUN 2026:`, startY);
     autoTable(doc, {
@@ -218,6 +218,28 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       }
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
+
+    // 4b. HISTORI USULAN TAMBAH PAGU UNIT KERJA
+    const filterHistoriUnit = (historisData || []).filter((h: any) => h.no_surat && h.no_surat !== mainData.no_surat);
+    if (filterHistoriUnit.length > 0) {
+      startY = addSectionHeader(`HISTORI USULAN TAMBAH PAGU UNIT KERJA (${mainData.unit_pengirim || 'Unit'}):`, startY);
+      autoTable(doc, {
+        startY: startY,
+        head: [['No', 'No / Hal Surat', 'Pengajuan (Rp)', 'Disetujui (Rp)', 'Status']],
+        body: filterHistoriUnit.map((h: any, i: number) => [
+          i + 1,
+          `${h.perihal || h.hal_surat || '-'}\nNo: ${h.no_surat || '-'}`,
+          `Rp ${formatRp(parseNum(h.total_anggaran || h.pengajuan || '0'))}`,
+          `Rp ${formatRp(parseNum(h.nominal_disetujui || h.disetujui || '0'))}`,
+          (h.keputusan || 'disetujui').toUpperCase()
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0] },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+      });
+      startY = (doc as any).lastAutoTable.finalY + 10;
+    }
 
     // 5. DATA HISTORIS PAGU MULTI-TAHUN
     if (historisData && historisData.length > 0) {
@@ -452,23 +474,6 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
         fontSize: 10
       });
       startY = (doc as any).lastWysiwygY ? (doc as any).lastWysiwygY + 10 : startY + 30;
-    }
-
-    // 8. KEPUTUSAN & DRAFT SURAT BALASAN UGM
-    if (mainData.surat_balasan_html || mainData.keputusan) {
-      const statusTitle = (mainData.keputusan || 'disetujui semua').toUpperCase();
-      startY = addSectionHeader(`8. DRAFT SURAT BALASAN RESMI UGM (STATUS: ${statusTitle}):`, startY);
-      if (mainData.surat_balasan_html) {
-        renderWysiwygToPdf({
-          doc,
-          htmlString: mainData.surat_balasan_html,
-          x: 17,
-          y: startY + 2,
-          maxWidth: 176,
-          lineHeight: 5,
-          fontSize: 10
-        });
-      }
     }
 
     // Set preview
