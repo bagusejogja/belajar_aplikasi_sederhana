@@ -13,6 +13,7 @@ import {
   Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp
 } from 'lucide-react';
 import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
+import { scanSuratWithAI } from '@/app/actions/ai-scan';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -242,6 +243,11 @@ export default function TambahPaguFormPage() {
   };
 
   const handleSelectAnalisis = (item: any) => {
+    if (item.is_used) {
+      const confirmImport = confirm(`ℹ️ Surat (No: ${item.no_surat || '-'}) sudah pernah dicatat di Tambah Pagu.\n\nApakah Anda yakin ingin mengimpor ulang data surat ini untuk migrasi / perbaikan?`);
+      if (!confirmImport) return;
+    }
+
     // Match unit_pengirim to listUnit
     let matchedUnit = null;
     if (item.unit_pengirim && listUnit.length > 0) {
@@ -313,24 +319,50 @@ export default function TambahPaguFormPage() {
 
     setIsScanningTanggapan(true);
     try {
-      let extractedText = '';
+      let resultData: any = null;
+
       if (fileTanggapan) {
-        extractedText = `Surat Tanggapan ${fileTanggapan.name}`;
+        // 1. Ekstraksi Menggunakan Gemini AI Server Action
+        const scanFormData = new FormData();
+        scanFormData.append('file', fileTanggapan);
+        
+        const res = await scanSuratWithAI(scanFormData);
+        if (res.success && res.data) {
+          resultData = res.data;
+        } else {
+          throw new Error(res.error || "Gagal memproses file dengan AI");
+        }
       } else if (formData.link_surat_tanggapan) {
-        extractedText = `Surat Tanggapan dari ${formData.link_surat_tanggapan}`;
+        // Fallback parse jika berupa link
+        const textToParse = `Surat Tanggapan dari ${formData.link_surat_tanggapan}`;
+        const parsed = parseOCRMetadata(textToParse, listUnit);
+        resultData = {
+          no_surat: parsed.no_surat,
+          tanggal_surat: parsed.tanggal_surat,
+          perihal_surat: parsed.perihal,
+          nominal_usulan: parsed.nominal_usulan
+        };
       }
 
-      const parsed = parseOCRMetadata(extractedText, listUnit);
+      if (resultData) {
+        const numNominal = cleanNumericString(resultData.nominal_usulan || '0');
 
-      setFormData(prev => ({
-        ...prev,
-        no_surat_tanggapan: parsed.no_surat || prev.no_surat_tanggapan,
-        tanggal_surat_tanggapan: parsed.tanggal_surat || prev.tanggal_surat_tanggapan,
-        hal_surat_tanggapan: parsed.perihal || prev.hal_surat_tanggapan,
-        nominal_tanggapan: parsed.nominal_usulan ? parsed.nominal_usulan.toString() : prev.nominal_tanggapan
-      }));
+        setFormData(prev => ({
+          ...prev,
+          no_surat_tanggapan: resultData.no_surat || prev.no_surat_tanggapan,
+          tanggal_surat_tanggapan: resultData.tanggal_surat || prev.tanggal_surat_tanggapan,
+          hal_surat_tanggapan: resultData.perihal_surat || resultData.perihal || prev.hal_surat_tanggapan,
+          nominal_tanggapan: numNominal && numNominal !== '0' ? numNominal : prev.nominal_tanggapan,
+          status_pengajuan: resultData.no_surat ? 'Disetujui Semua' : prev.status_pengajuan
+        }));
 
-      alert("AI Ekstraksi Surat Tanggapan selesai! Data otomatis diisikan ke form.");
+        alert(`✨ AI Ekstraksi Surat Tanggapan Berhasil!\n\n` +
+          `• No Surat Tanggapan: ${resultData.no_surat || '-'}\n` +
+          `• Tanggal Tanggapan: ${resultData.tanggal_surat || '-'}\n` +
+          `• Hal / Perihal: ${resultData.perihal_surat || resultData.perihal || '-'}\n` +
+          `• Nominal Disetujui: Rp ${formatNumber(numNominal || '0')}`
+        );
+      }
     } catch (e: any) {
       alert("Gagal ekstraksi Tanggapan: " + e.message);
     } finally {
