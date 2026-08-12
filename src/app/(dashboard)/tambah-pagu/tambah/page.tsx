@@ -288,12 +288,21 @@ export default function TambahPaguFormPage() {
     setSelectedAnalisis(null);
   };
 
+  const formatPdfPreviewUrl = (rawUrl: string) => {
+    if (!rawUrl) return '';
+    if (rawUrl.includes('drive.google.com') && rawUrl.includes('/view')) {
+      return rawUrl.replace('/view', '/preview');
+    }
+    return rawUrl;
+  };
+
   const openPdfModal = (url: string) => {
-    if (!url) {
+    const formatted = formatPdfPreviewUrl(url);
+    if (!formatted) {
       alert("Link / File PDF belum tersedia.");
       return;
     }
-    setPdfPreviewUrl(url);
+    setPdfPreviewUrl(formatted);
     setIsPdfModalOpen(true);
   };
 
@@ -308,7 +317,6 @@ export default function TambahPaguFormPage() {
     try {
       let extractedText = '';
       if (fileTanggapan) {
-        // Mock / basic text extract from file name & prompt
         extractedText = `Surat Tanggapan ${fileTanggapan.name}`;
       } else if (formData.link_surat_tanggapan) {
         extractedText = `Surat Tanggapan dari ${formData.link_surat_tanggapan}`;
@@ -422,6 +430,8 @@ export default function TambahPaguFormPage() {
   const cTotalPagu = historis2026Row.total_pagu || (cPaguAwal + cPengalihan + cPenugasan + cInisiatif + cEfisiensi + cTalangan);
   const cRealisasi = historis2026Row.realisasi || 0;
   const cSisaKapasitas = cTotalPagu - cRealisasi;
+
+  const currentPengajuanLink = formData.link_surat_pengajuan || selectedAnalisis?.link_lampiran || '';
 
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
@@ -568,22 +578,23 @@ export default function TambahPaguFormPage() {
                   </div>
                 </div>
 
-                {/* PDF VIEW / DOWNLOAD ACTION BUTTON */}
-                {(formData.link_surat_pengajuan || filePengajuan) && (
+                {/* PDF VIEW / DOWNLOAD ACTION BUTTON HEADER */}
+                {(currentPengajuanLink || filePengajuan) && (
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => openPdfModal(formData.link_surat_pengajuan)}
+                      onClick={() => openPdfModal(currentPengajuanLink)}
                       className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm border border-indigo-200/60"
                       title="Preview PDF Surat Pengajuan"
                     >
                       <Eye size={16} /> Lihat PDF Pengajuan
                     </button>
-                    {formData.link_surat_pengajuan && (
+                    {currentPengajuanLink && (
                       <a
-                        href={formData.link_surat_pengajuan}
+                        href={currentPengajuanLink}
                         target="_blank"
                         rel="noreferrer"
+                        download
                         className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
                         title="Download File PDF"
                       >
@@ -593,6 +604,44 @@ export default function TambahPaguFormPage() {
                   </div>
                 )}
               </div>
+
+              {/* PROMINENT ATTACHMENT BOX IF PDF / LINK IS AVAILABLE */}
+              {(currentPengajuanLink || filePengajuan) && (
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-indigo-50/70 border border-indigo-200/80 rounded-3xl shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-sm shrink-0">
+                      <Paperclip size={20} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-black uppercase text-indigo-950 tracking-wider">Lampiran PDF Surat Pengajuan</div>
+                      <div className="text-xs text-indigo-700 font-medium truncate max-w-md font-mono mt-0.5">
+                        {filePengajuan ? filePengajuan.name : (currentPengajuanLink || 'Tersedia dokumen lampiran')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => openPdfModal(currentPengajuanLink)}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shrink-0"
+                    >
+                      <Eye size={16} /> Lihat PDF Pengajuan
+                    </button>
+                    {currentPengajuanLink && (
+                      <a
+                        href={currentPengajuanLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        download
+                        className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md shrink-0"
+                      >
+                        <Download size={16} /> Download PDF
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* GRID DATA UTAMA & PENGAJUAN */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -762,14 +811,14 @@ export default function TambahPaguFormPage() {
                   )}
                 </div>
 
-                {/* RINGKASAN SUBSTANSI (AI READ ONLY - FULL TEXT HEIGHT WITHOUT OVERFLOW SCROLLBARS) */}
+                {/* RINGKASAN SUBSTANSI (AI READ ONLY - FIXED CONTAINER WRAPPING & NO OVERFLOW OUTSIDE) */}
                 {formData.ringkasan_surat_pengajuan && (
-                  <div className="space-y-2 md:col-span-3 pt-6 border-t border-gray-100">
+                  <div className="space-y-2 md:col-span-3 pt-6 border-t border-gray-100 w-full overflow-hidden">
                     <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5 mb-2">
                       <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
                     </label>
                     <div 
-                      className="p-8 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom h-auto max-h-none overflow-visible shadow-inner"
+                      className="p-6 md:p-8 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-w-full overflow-hidden break-words [word-break:break-word] shadow-inner"
                       dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
                     />
                   </div>
@@ -1013,7 +1062,7 @@ export default function TambahPaguFormPage() {
           </div>
         )}
 
-        {/* ================= TAHAP 3: TANGGAPAN SURAT (SURAT KELUAR / APPROVAL) ================= */}
+        {/* ================= TAHAP 3: TANGGAPAN SURAT (RESTRUCTURED WITH UPLOAD AT BOTTOM) ================= */}
         {activeStep === 'step3' && (
           <div className="space-y-8 animate-in fade-in duration-300">
             {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
@@ -1025,25 +1074,13 @@ export default function TambahPaguFormPage() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
-                    <p className="text-xs text-gray-500 font-medium">Input nomor surat tanggapan, subyek simaster, dan nominal keputusan disetujui di bawah ini.</p>
+                    <p className="text-xs text-gray-500 font-medium">Input status keputusan pimpinan, nomor surat tanggapan, dan upload berkas tanggapan di bawah ini.</p>
                   </div>
                 </div>
-
-                {/* AI SCAN TANGGAPAN BUTTON */}
-                <button
-                  type="button"
-                  onClick={handleAutoExtractTanggapanAI}
-                  disabled={isScanningTanggapan}
-                  className="px-4 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
-                  title="Ekstraksi Data Surat Tanggapan dengan AI"
-                >
-                  {isScanningTanggapan ? <Loader2 size={16} className="animate-spin text-emerald-700" /> : <Wand2 size={16} className="text-emerald-700" />}
-                  Ekstraksi Tanggapan (AI)
-                </button>
               </div>
 
               <div className="space-y-8">
-                {/* Status Pengajuan Selector */}
+                {/* 1. Status Pengajuan Selector */}
                 <div className="bg-indigo-50/40 p-6 rounded-3xl border border-indigo-100 space-y-2">
                   <label className="text-xs font-black text-indigo-900 uppercase tracking-widest block">Status Keputusan Pimpinan Saat Ini *</label>
                   <select 
@@ -1060,6 +1097,7 @@ export default function TambahPaguFormPage() {
                   </select>
                 </div>
 
+                {/* 2. No Surat & Tanggal Tanggapan */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
@@ -1084,6 +1122,7 @@ export default function TambahPaguFormPage() {
                   </div>
                 </div>
 
+                {/* 3. Hal / Perihal Tanggapan */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Tanggapan</label>
                   <textarea 
@@ -1096,6 +1135,7 @@ export default function TambahPaguFormPage() {
                   />
                 </div>
 
+                {/* 4. Subyek Tanggapan di Simaster */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Tanggapan di Simaster</label>
                   <input 
@@ -1108,40 +1148,7 @@ export default function TambahPaguFormPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link Surat Tanggapan (GDrive / SharePoint)</label>
-                    <div className="relative">
-                      <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input 
-                        type="text" 
-                        name="link_surat_tanggapan"
-                        value={formData.link_surat_tanggapan}
-                        onChange={handleInputChange}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all text-sm italic text-indigo-600"
-                        placeholder="https://drive.google.com/..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload Surat Tanggapan (Max 10MB)</label>
-                    <div className="relative group">
-                      <input 
-                        type="file" 
-                        onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${fileTanggapan ? 'bg-indigo-50 border-indigo-400 text-indigo-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-indigo-300 group-hover:bg-indigo-50/30'}`}>
-                        <UploadCloud size={20} />
-                        <span className="text-sm font-bold truncate max-w-[200px]">
-                          {fileTanggapan ? fileTanggapan.name : "Pilih File Surat Tanggapan"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+                {/* 5. Nominal Disetujui Pimpinan */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui Pimpinan (Rp)</label>
                   <div className="relative">
@@ -1156,6 +1163,63 @@ export default function TambahPaguFormPage() {
                     />
                   </div>
                 </div>
+
+                {/* 6. UPLOAD & LAMPIRAN SURAT TANGGAPAN (PLACED AT THE BOTTOM) */}
+                <div className="pt-6 border-t border-gray-100 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Lampiran & Berkas Surat Tanggapan (Surat Keluar)</h3>
+                      <p className="text-xs text-gray-500 font-medium">Unggah file atau masukkan link GDrive surat tanggapan di bawah ini.</p>
+                    </div>
+
+                    {/* AI EXTRACTION BUTTON NEXT TO FILE UPLOAD */}
+                    <button
+                      type="button"
+                      onClick={handleAutoExtractTanggapanAI}
+                      disabled={isScanningTanggapan}
+                      className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-md disabled:opacity-50"
+                      title="Ekstraksi Data Surat Tanggapan dengan AI"
+                    >
+                      {isScanningTanggapan ? <Loader2 size={16} className="animate-spin text-slate-950" /> : <Wand2 size={16} className="text-slate-950" />}
+                      Ekstraksi Tanggapan (AI)
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link Surat Tanggapan (GDrive / SharePoint)</label>
+                      <div className="relative">
+                        <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input 
+                          type="text" 
+                          name="link_surat_tanggapan"
+                          value={formData.link_surat_tanggapan}
+                          onChange={handleInputChange}
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all text-sm italic text-indigo-600"
+                          placeholder="https://drive.google.com/..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File Surat Tanggapan (Max 10MB)</label>
+                      <div className="relative group">
+                        <input 
+                          type="file" 
+                          onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        />
+                        <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${fileTanggapan ? 'bg-indigo-50 border-indigo-400 text-indigo-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-indigo-300 group-hover:bg-indigo-50/30'}`}>
+                          <UploadCloud size={20} />
+                          <span className="text-sm font-bold truncate max-w-[200px]">
+                            {fileTanggapan ? fileTanggapan.name : "Pilih File Surat Tanggapan"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
 
