@@ -68,10 +68,14 @@ export default function TambahPaguFormPage() {
     setLoadingAnalisis(true);
     try {
       // 1. Fetch all records from app_analisis_utama
-      const { data: dataAnalisis } = await supabase
+      const { data: dataAnalisis, error: errAnalisis } = await supabase
         .from('app_analisis_utama')
-        .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, subyek_persuratan_simaster, analisis_html, created_at')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, analisis_html, created_at')
         .order('created_at', { ascending: false });
+
+      if (errAnalisis) {
+        console.error("Error fetching analisis:", errAnalisis);
+      }
 
       // 2. Fetch existing tambah_pagu to check used no_surat
       const { data: dataTambahPagu } = await supabase
@@ -91,7 +95,7 @@ export default function TambahPaguFormPage() {
           const cleanNoSurat = (item.no_surat || '').trim().toLowerCase();
           const isUsed = usedNoSuratSet.has(cleanNoSurat);
 
-          let subyekSimaster = item.subyek_persuratan_simaster || '';
+          let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
           let keputusan = item.keputusan || '';
           let nominalDisetujui = item.nominal_disetujui || '0';
 
