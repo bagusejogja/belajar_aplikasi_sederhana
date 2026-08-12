@@ -47,22 +47,51 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // 2. Upload Files
+    // 2. Upload Files jika ada file baru yang diunggah
     const filePengajuan = formData.get('file_surat_pengajuan') as any;
     const fileTanggapan = formData.get('file_surat_tanggapan') as any;
 
-    if (filePengajuan) {
+    if (filePengajuan && filePengajuan.size > 0) {
       rawData.file_surat_pengajuan = await uploadToR2(filePengajuan, 'tambah-pagu/pengajuan');
     }
-    if (fileTanggapan) {
+    if (fileTanggapan && fileTanggapan.size > 0) {
       rawData.file_surat_tanggapan = await uploadToR2(fileTanggapan, 'tambah-pagu/tanggapan');
     }
 
-    // 3. Database Insert
+    // 3. Cek apakah record dengan no_surat_pengajuan sudah ada (Mencegah duplikasi saat migrasi/re-import)
+    if (rawData.no_surat_pengajuan) {
+      const cleanNoSurat = rawData.no_surat_pengajuan.trim();
+      const { data: existing } = await supabase
+        .from('tambah_pagu')
+        .select('id, file_surat_tanggapan, link_surat_tanggapan')
+        .eq('no_surat_pengajuan', cleanNoSurat)
+        .maybeSingle();
+
+      if (existing) {
+        // Jika tidak mengunggah file_surat_tanggapan baru, pertahankan file_surat_tanggapan lama
+        if (!rawData.file_surat_tanggapan && existing.file_surat_tanggapan) {
+          delete rawData.file_surat_tanggapan;
+        }
+        if (!rawData.link_surat_tanggapan && existing.link_surat_tanggapan) {
+          delete rawData.link_surat_tanggapan;
+        }
+
+        const { data: updatedData, error: updateError } = await supabase
+          .from('tambah_pagu')
+          .update(rawData)
+          .eq('id', existing.id)
+          .select();
+
+        if (updateError) throw updateError;
+        return NextResponse.json({ success: true, isUpdate: true, data: updatedData });
+      }
+    }
+
+    // 4. Jika belum ada, buat record baru
     const { data, error } = await supabase.from('tambah_pagu').insert([rawData]).select();
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, isUpdate: false, data });
   } catch (err: any) {
     console.error("Tambah Pagu API Error:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

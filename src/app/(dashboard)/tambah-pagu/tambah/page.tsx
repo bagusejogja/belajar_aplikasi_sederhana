@@ -891,6 +891,13 @@ export default function TambahPaguFormPage() {
                     <div className="text-sm font-black font-mono text-rose-700 mt-1">Rp {formatNumber(cEfisiensi)}</div>
                   </div>
 
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Nominal Disetujui Pimpinan</div>
+                    <div className="text-sm font-black font-mono text-emerald-800 mt-1">
+                      Rp {formatNumber(formData.nominal_tanggapan || selectedAnalisis?.nominal_disetujui || '0')}
+                    </div>
+                  </div>
+
                   <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm">
                     <div className="text-[10px] uppercase font-black text-emerald-400 tracking-wider">Sisa Kapasitas Pagu</div>
                     <div className="text-base lg:text-lg font-black font-mono text-emerald-300 mt-1">Rp {formatNumber(cSisaKapasitas)}</div>
@@ -989,6 +996,10 @@ export default function TambahPaguFormPage() {
                       <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
                         <td className="px-5 py-3 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
                         <td className="px-5 py-3 text-right font-bold font-mono text-amber-900">Rp {formatNumber(formData.nominal_diajukan)}</td>
+                      </tr>
+                      <tr className="hover:bg-gray-50 bg-emerald-50/50 border-t border-emerald-200">
+                        <td className="px-5 py-3 font-bold text-emerald-900">Nominal Disetujui Pimpinan (Rp)</td>
+                        <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber(formData.nominal_tanggapan || selectedAnalisis?.nominal_disetujui || '0')}</td>
                       </tr>
                     </tbody>
                   </table>
