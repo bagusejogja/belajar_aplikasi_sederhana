@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { createTambahPagu } from '@/app/actions/tambah-pagu';
 import Select from 'react-select';
 import { 
   Save, ArrowLeft, FileText, Calendar, 
   Building2, Tag, DollarSign, MessageSquare, 
   UploadCloud, CheckCircle2, Loader2, Sparkles,
-  Link as LinkIcon, Info
+  Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle
 } from 'lucide-react';
 
 export default function TambahPaguFormPage() {
@@ -18,6 +17,13 @@ export default function TambahPaguFormPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [listUnit, setListUnit] = useState<any[]>([]);
   
+  // Analisis Riwayat Modal & Selection State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [listAnalisis, setListAnalisis] = useState<any[]>([]);
+  const [loadingAnalisis, setLoadingAnalisis] = useState(false);
+  const [searchAnalisis, setSearchAnalisis] = useState('');
+  const [selectedAnalisis, setSelectedAnalisis] = useState<any | null>(null);
+
   const [formData, setFormData] = useState({
     tahun_anggaran: 2026,
     unit_id: null as any,
@@ -39,7 +45,7 @@ export default function TambahPaguFormPage() {
     hal_surat_tanggapan: '',
     subyek_tanggapan_di_simaster_persuratan: '',
     link_surat_tanggapan: '',
-    nominal_tanggapan: '', // Point: Migrated from nominal_disetujui
+    nominal_tanggapan: '',
   });
 
   const [filePengajuan, setFilePengajuan] = useState<File | null>(null);
@@ -47,6 +53,7 @@ export default function TambahPaguFormPage() {
 
   useEffect(() => {
     fetchUnits();
+    fetchAnalisisAndUsed();
   }, []);
 
   const fetchUnits = async () => {
@@ -55,6 +62,125 @@ export default function TambahPaguFormPage() {
       setListUnit(data.map(u => ({ value: u.id, label: u.nama_unit })));
     }
     setIsLoading(false);
+  };
+
+  const fetchAnalisisAndUsed = async () => {
+    setLoadingAnalisis(true);
+    try {
+      // 1. Fetch all records from app_analisis_utama
+      const { data: dataAnalisis } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, subyek_persuratan_simaster, analisis_html, created_at')
+        .order('created_at', { ascending: false });
+
+      // 2. Fetch existing tambah_pagu to check used no_surat
+      const { data: dataTambahPagu } = await supabase
+        .from('tambah_pagu')
+        .select('no_surat_pengajuan, no_surat_tanggapan');
+
+      const usedNoSuratSet = new Set<string>();
+      if (dataTambahPagu) {
+        dataTambahPagu.forEach(tp => {
+          if (tp.no_surat_pengajuan) usedNoSuratSet.add(tp.no_surat_pengajuan.trim().toLowerCase());
+          if (tp.no_surat_tanggapan) usedNoSuratSet.add(tp.no_surat_tanggapan.trim().toLowerCase());
+        });
+      }
+
+      if (dataAnalisis) {
+        const processed = dataAnalisis.map(item => {
+          const cleanNoSurat = (item.no_surat || '').trim().toLowerCase();
+          const isUsed = usedNoSuratSet.has(cleanNoSurat);
+
+          let subyekSimaster = item.subyek_persuratan_simaster || '';
+          let keputusan = item.keputusan || '';
+          let nominalDisetujui = item.nominal_disetujui || '0';
+
+          if (item.analisis_html) {
+            try {
+              const parsed = JSON.parse(item.analisis_html);
+              if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
+              if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
+              if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+            } catch(e) {}
+          }
+
+          return {
+            ...item,
+            subyek_persuratan_simaster: subyekSimaster,
+            keputusan: keputusan || 'diajukan',
+            nominal_disetujui: nominalDisetujui,
+            is_used: isUsed
+          };
+        });
+
+        setListAnalisis(processed);
+      }
+    } catch (e) {
+      console.error("Gagal load data analisis:", e);
+    }
+    setLoadingAnalisis(false);
+  };
+
+  const cleanNumericString = (val: any) => {
+    if (!val) return '';
+    const s = val.toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 2 && parts[0].length > 3) {
+        return Math.round(parseFloat(s) || 0).toString();
+      }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return Math.round(parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0).toString();
+  };
+
+  const handleSelectAnalisis = (item: any) => {
+    if (item.is_used) {
+      alert(`⚠️ Surat ini (No: ${item.no_surat || '-'}) sudah pernah digunakan di Tambah Pagu! Silakan pilih surat lain atau input manual.`);
+      return;
+    }
+
+    // Match unit_pengirim to listUnit
+    let matchedUnit = null;
+    if (item.unit_pengirim && listUnit.length > 0) {
+      const rawUnitLower = item.unit_pengirim.toLowerCase();
+      matchedUnit = listUnit.find(u => 
+        u.label.toLowerCase() === rawUnitLower ||
+        u.label.toLowerCase().includes(rawUnitLower) ||
+        rawUnitLower.includes(u.label.toLowerCase())
+      );
+    }
+
+    // Map keputusan to status_pengajuan
+    let statusMapped = 'Draft';
+    const kep = (item.keputusan || '').toLowerCase();
+    if (kep === 'disetujui semua' || kep === 'disetujui 100%') statusMapped = 'Disetujui Semua';
+    else if (kep === 'disetujui sebagian') statusMapped = 'Disetujui Sebagian';
+    else if (kep === 'ditolak') statusMapped = 'Ditolak';
+    else statusMapped = 'Diajukan';
+
+    const numDiajukan = cleanNumericString(item.total_anggaran);
+    const numDisetujui = cleanNumericString(item.nominal_disetujui);
+
+    setFormData(prev => ({
+      ...prev,
+      unit_id: matchedUnit || prev.unit_id,
+      no_surat_pengajuan: item.no_surat || prev.no_surat_pengajuan,
+      tanggal_surat_pengajuan: item.tanggal_surat || prev.tanggal_surat_pengajuan,
+      hal_surat_pengajuan: item.perihal || prev.hal_surat_pengajuan,
+      subyek_pengajuan_di_simaster_persuratan: item.subyek_persuratan_simaster || prev.subyek_pengajuan_di_simaster_persuratan,
+      nominal_diajukan: numDiajukan || prev.nominal_diajukan,
+      nominal_tanggapan: numDisetujui !== '0' ? numDisetujui : prev.nominal_tanggapan,
+      status_pengajuan: statusMapped,
+      link_surat_pengajuan: item.link_lampiran || prev.link_surat_pengajuan
+    }));
+
+    setSelectedAnalisis(item);
+    setIsModalOpen(false);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedAnalisis(null);
   };
 
   const formatNumber = (num: string) => {
@@ -104,7 +230,7 @@ export default function TambahPaguFormPage() {
       if (filePengajuan) data.append('file_surat_pengajuan', filePengajuan);
       if (fileTanggapan) data.append('file_surat_tanggapan', fileTanggapan);
 
-      // Gunakan API Route (Lebih Stabil)
+      // Submit via API Route
       const response = await fetch('/api/tambah-pagu/tambah', {
         method: 'POST',
         body: data,
@@ -125,25 +251,99 @@ export default function TambahPaguFormPage() {
     }
   };
 
+  const filteredAnalisisList = listAnalisis.filter(item => {
+    if (!searchAnalisis) return true;
+    const lower = searchAnalisis.toLowerCase();
+    return (
+      (item.no_surat && item.no_surat.toLowerCase().includes(lower)) ||
+      (item.perihal && item.perihal.toLowerCase().includes(lower)) ||
+      (item.unit_pengirim && item.unit_pengirim.toLowerCase().includes(lower)) ||
+      (item.subyek_persuratan_simaster && item.subyek_persuratan_simaster.toLowerCase().includes(lower))
+    );
+  });
+
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
   return (
     <div className="max-w-5xl mx-auto pb-32 px-4">
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
           <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1">
             <Sparkles size={14} /> New Entry
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tambah Usulan Pagu</h1>
-          <p className="text-gray-500 font-medium mt-1">Lengkapi formulir di bawah untuk mencatat usulan anggaran baru.</p>
+          <p className="text-gray-500 font-medium mt-1">Impor dari hasil analisis AI atau ketik manual untuk mencatat usulan baru.</p>
         </div>
         <button 
           onClick={() => router.push('/tambah-pagu')}
-          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 text-xs"
         >
           <ArrowLeft size={18} /> KEMBALI
         </button>
+      </div>
+
+      {/* IMPORT BANNER SECTION */}
+      <div className="mb-10">
+        {!selectedAnalisis ? (
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-6 md:p-8 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
+            
+            <div className="relative z-10 space-y-1">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
+                <Sparkles size={14} /> Impor Data Otomatis
+              </div>
+              <h3 className="text-xl font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
+              <p className="text-slate-300 text-xs font-medium max-w-xl">
+                Pilih dokumen analisis surat yang sudah ada di modul /analisis agar tidak perlu mengetik ulang data pengajuan, unit, dan nominal.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="relative z-10 px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2 shrink-0"
+            >
+              <FileText size={16} /> Pilih Dari Riwayat Analisis
+            </button>
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-[2.5rem] p-6 text-emerald-950 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-emerald-500 text-white rounded-2xl shrink-0 shadow-sm">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-xs font-black uppercase text-emerald-700 tracking-wider">
+                  Data Terhubung Dengan Hasil Analisis
+                </div>
+                <h4 className="font-black text-base text-emerald-950">
+                  {selectedAnalisis.perihal || 'Dokumen Analisis'}
+                </h4>
+                <p className="text-xs text-emerald-800 font-medium">
+                  No Surat: <span className="font-mono font-bold">{selectedAnalisis.no_surat || '-'}</span> | Unit: <span className="font-bold">{selectedAnalisis.unit_pengirim || '-'}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="px-4 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all"
+              >
+                Ganti Pilihan
+              </button>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="px-4 py-2.5 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+              >
+                <X size={14} /> Lepas Link (Manual)
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-10">
@@ -316,58 +516,6 @@ export default function TambahPaguFormPage() {
                 </div>
               </div>
             </div>
-
-            {/* TEMPORARILY HIDDEN
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
-                Ringkasan Substansi Pengajuan <div className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[8px]">Rich Text Active</div>
-              </label>
-              <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm bg-white">
-                <div className="bg-gray-50 px-6 py-3 border-b border-gray-100 flex flex-wrap gap-4 text-gray-400">
-                  <div className="flex gap-1">
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all font-black">B</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all italic">I</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('underline', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all underline">U</button>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                  <div className="flex gap-1">
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyLeft', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-xs">Left</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyCenter', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-xs">Center</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyRight', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-xs">Right</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyFull', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-xs">Justify</button>
-                  </div>
-                  <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('insertUnorderedList', false); }} className="px-3 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-[10px] font-bold tracking-tighter">LIST •</button>
-                </div>
-                <div 
-                  contentEditable
-                  onInput={(e) => {
-                    formData.ringkasan_surat_pengajuan = e.currentTarget.innerHTML;
-                  }}
-                  className="w-full p-8 outline-none font-medium text-gray-700 leading-relaxed text-sm min-h-[300px] bg-white focus:bg-emerald-50/5 transition-colors prose-custom"
-                  dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
-                />
-                <style dangerouslySetInnerHTML={{ __html: `
-                  .prose-custom ul {
-                    list-style-type: disc !important;
-                    list-style-position: inside !important;
-                    padding-left: 1rem !important;
-                    display: block !important;
-                  }
-                  .prose-custom li {
-                    display: list-item !important;
-                    margin-bottom: 0.5rem;
-                  }
-                  .prose-custom ol {
-                    list-style-type: decimal !important;
-                    list-style-position: inside !important;
-                    padding-left: 1rem !important;
-                  }
-                `}} />
-              </div>
-              <p className="text-[9px] text-gray-400 px-4 italic">* Ketik teks, blok, lalu klik LIST • untuk membuat poin-poin.</p>
-            </div>
-            */}
           </div>
         </div>
 
@@ -480,7 +628,7 @@ export default function TambahPaguFormPage() {
         </div>
 
         {/* FLOATING ACTION BAR */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
           <div className="bg-gray-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
             <button 
               type="button"
@@ -500,6 +648,152 @@ export default function TambahPaguFormPage() {
           </div>
         </div>
       </form>
+
+      {/* MODAL PILIH ANALISIS */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 md:p-8 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest mb-1">
+                  <Sparkles size={14} className="text-amber-400" /> Database Riwayat Hasil Analisis AI (/analisis)
+                </div>
+                <h3 className="text-2xl font-black tracking-tight">Pilih Dokumen Analisis untuk Diimpor</h3>
+                <p className="text-slate-400 text-xs font-medium">Klik pada surat yang tersedia untuk mengisi form Tambah Pagu secara otomatis.</p>
+              </div>
+
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Search & Tools */}
+            <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text"
+                  placeholder="Cari perihal, no surat, subyek, unit..."
+                  value={searchAnalisis}
+                  onChange={e => setSearchAnalisis(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                onClick={fetchAnalisisAndUsed}
+                className="px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all"
+              >
+                <RefreshCw size={14} className={loadingAnalisis ? "animate-spin" : ""} /> Refresh Data
+              </button>
+            </div>
+
+            {/* Modal List Body */}
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+              {loadingAnalisis ? (
+                <div className="flex justify-center items-center py-16">
+                  <Loader2 className="animate-spin text-indigo-600 w-10 h-10" />
+                </div>
+              ) : filteredAnalisisList.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <FileText size={48} className="mx-auto opacity-20 mb-3" />
+                  <p className="font-bold text-gray-600">Tidak ada riwayat analisis yang cocok.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredAnalisisList.map((item, idx) => (
+                    <div 
+                      key={item.id_analisis || idx}
+                      className={`p-5 rounded-3xl border transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                        item.is_used 
+                          ? 'bg-gray-50 border-gray-200 opacity-60' 
+                          : 'bg-white border-gray-200 hover:border-indigo-400 hover:shadow-lg cursor-pointer'
+                      }`}
+                      onClick={() => !item.is_used && handleSelectAnalisis(item)}
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                            {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                          
+                          {item.is_used ? (
+                            <span className="flex items-center gap-1 px-3 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-rose-200">
+                              <Lock size={12}/> Sudah Digunakan di Tambah Pagu
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 px-3 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-emerald-200">
+                              <Sparkles size={12}/> Tersedia (Siap Diimpor)
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="font-black text-gray-900 text-base leading-snug">
+                          {item.perihal || 'Tanpa Perihal'}
+                        </h4>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-gray-500">
+                          <span>No Surat: <strong className="font-mono text-gray-700">{item.no_surat || '-'}</strong></span>
+                          <span>•</span>
+                          <span>Unit: <strong className="text-gray-700">{item.unit_pengirim || '-'}</strong></span>
+                          {item.subyek_persuratan_simaster && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-700 font-bold">Simaster: {item.subyek_persuratan_simaster}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Usulan:</span>
+                          <span className="text-sm font-black font-mono text-gray-900">
+                            Rp {formatNumber(item.total_anggaran || '0')}
+                          </span>
+                        </div>
+
+                        {item.is_used ? (
+                          <button
+                            disabled
+                            className="px-4 py-2 bg-gray-200 text-gray-400 text-xs font-bold rounded-xl flex items-center gap-1 cursor-not-allowed"
+                          >
+                            <Lock size={14}/> Tidak Bisa Dipilih
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectAnalisis(item)}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1"
+                          >
+                            Impor Data Ini <ArrowLeft size={14} className="rotate-180" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 text-center shrink-0">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition-all"
+              >
+                Tutup Modal
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
