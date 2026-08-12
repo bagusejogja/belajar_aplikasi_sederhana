@@ -115,17 +115,27 @@ export async function listAvailableModels() {
   }
 }
 
-export async function generateRingkasanFromText(ocrText: string) {
+export async function generateRingkasanFromText(ocrText: string, contextArsip?: string) {
   try {
-    const prompt = `
-      Anda adalah asisten administrasi di pemerintahan. Buatlah ringkasan substansi dari teks surat usulan anggaran berikut:
-      
-      === TEKS ===
-      ${ocrText}
-      === END TEKS ===
+    const contextArsipSection = contextArsip ? `
+      === RIWAYAT / ARSIP USULAN TAMBAH PAGU TERDAHULU UNTUK UNIT INI ===
+      ${contextArsip}
+      ====================================================================
+    ` : '';
 
-      Berikan ringkasan yang jelas, padat, dan langsung pada intinya terkait apa tujuan utama surat ini, rincian biaya yang diusulkan, dan mengapa ini penting.
-      Format dalam tag HTML ringan seperti <p>, <ul>, <li>, <strong> tanpa backtick markdown. Jangan berikan teks pembuka atau penutup selain HTML tersebut.
+    const prompt = `
+      Anda adalah asisten keuangan & administrasi pemerintahan/universitas. Buatlah ringkasan substansi dari teks surat usulan anggaran berikut:
+      
+      === TEKS SURAT ===
+      ${ocrText}
+      === END TEKS SURAT ===
+      ${contextArsipSection}
+
+      Instruksi Penyusunan Ringkasan:
+      1. Berikan ringkasan yang jelas, padat, dan formal tentang apa tujuan utama surat ini, rincian nominal biaya yang diusulkan, dan mengapa ini penting/mendesak.
+      2. Jika terdapat data riwayat/arsip pengajuan tambah pagu terdahulu di atas, sertakan 1 paragraf/sub-poin ringkas di bagian bawah yang merangkum rekam jejak usulan tambah pagu unit kerja ini sebelumnya (misal: "Catatan Rekam Jejak Usulan Terdahulu: Unit ini pernah mengajukan tambahan pagu pada... dengan status...").
+
+      Format hasil DALAM HTML RINGAN (menggunakan tag <p>, <ul>, <li>, <strong>) tanpa pembungkus backtick markdown. Langsung berikan isi HTML-nya saja tanpa kata pembuka/penutup.
     `;
 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };

@@ -228,14 +228,22 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
       return;
     }
     setIsGeneratingRingkasan(true);
+
+    let contextArsip = '';
+    if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
+      contextArsip = riwayatUsulanUnit.map((r: any) => 
+        `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatRp(parseNum(r.total_anggaran))}, Disetujui: Rp ${formatRp(parseNum(r.nominal_disetujui))}, Status Keputusan: ${r.keputusan || 'disetujui'}`
+      ).join('\n');
+    }
+
     try {
-      const res = await generateRingkasanFromText(mainData.ringkasan_ai);
+      const res = await generateRingkasanFromText(mainData.ringkasan_ai, contextArsip);
       if (res.success && res.data) {
         setMainData((prev: any) => ({
           ...prev,
           analisis_html: res.data.ringkasan_html || prev.analisis_html
         }));
-        alert("Berhasil membuat ringkasan via AI!");
+        alert("Berhasil membuat ringkasan via AI (termasuk rekam jejak arsip pengajuan terdahulu)!");
       } else {
         alert("Gagal generate AI: " + res.error);
       }
@@ -551,8 +559,20 @@ ${mainData.ringkasan_ai}`;
               />
             </div>
 
+            {/* SUBYEK DI PERSURATAN SIMASTER (MANUAL) */}
+            <div className="col-span-full mt-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Subyek di Persuratan Simaster</label>
+              <input 
+                type="text" 
+                value={mainData.subyek_persuratan_simaster || ''} 
+                onChange={e => setMainData({...mainData, subyek_persuratan_simaster: e.target.value})} 
+                placeholder="Masukkan subyek persuratan Simaster (manual)..."
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white text-sm" 
+              />
+            </div>
+
             {/* RINGKASAN SUBSTANSI (AI) */}
-            <div className="col-span-full mt-4">
+            <div className="col-span-full mt-2">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Ringkasan Substansi (Ringkasan Surat dengan AI)</label>
                 <button onClick={handleGenerateRingkasan} disabled={isGeneratingRingkasan} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
@@ -568,18 +588,6 @@ ${mainData.ringkasan_ai}`;
                     className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
                  />
               </div>
-            </div>
-
-            {/* SUBYEK DI PERSURATAN SIMASTER (MANUAL) */}
-            <div className="col-span-full mt-2">
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Subyek di Persuratan Simaster</label>
-              <input 
-                type="text" 
-                value={mainData.subyek_persuratan_simaster || ''} 
-                onChange={e => setMainData({...mainData, subyek_persuratan_simaster: e.target.value})} 
-                placeholder="Masukkan subyek persuratan Simaster (manual)..."
-                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 text-gray-900 focus:bg-white text-sm" 
-              />
             </div>
 
           </div>
