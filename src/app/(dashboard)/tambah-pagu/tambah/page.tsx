@@ -9,7 +9,7 @@ import {
   Building2, Tag, DollarSign, MessageSquare, 
   UploadCloud, CheckCircle2, Loader2, Sparkles,
   Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
-  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle
+  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck
 } from 'lucide-react';
 
 export default function TambahPaguFormPage() {
@@ -57,6 +57,8 @@ export default function TambahPaguFormPage() {
 
   const [filePengajuan, setFilePengajuan] = useState<File | null>(null);
   const [fileTanggapan, setFileTanggapan] = useState<File | null>(null);
+
+  const isReadOnlyPengajuan = !!selectedAnalisis;
 
   useEffect(() => {
     fetchUnits();
@@ -350,7 +352,7 @@ export default function TambahPaguFormPage() {
             <Sparkles size={14} /> New Entry Workflow
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tambah Usulan Pagu</h1>
-          <p className="text-gray-500 font-medium mt-1">Gunakan alur bertahap di bawah ini untuk melihat data pengajuan dan menginput keputusan tanggapan.</p>
+          <p className="text-gray-500 font-medium mt-1">Impor dari hasil analisis AI (/analisis) atau ketik manual untuk mencatat usulan baru.</p>
         </div>
         <button 
           onClick={() => router.push('/tambah-pagu')}
@@ -363,7 +365,7 @@ export default function TambahPaguFormPage() {
       {/* IMPORT BANNER SECTION */}
       <div className="mb-8">
         {!selectedAnalisis ? (
-          <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-6 md:p-8 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
             
             <div className="relative z-10 space-y-1">
@@ -372,7 +374,7 @@ export default function TambahPaguFormPage() {
               </div>
               <h3 className="text-xl font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
               <p className="text-slate-300 text-xs font-medium max-w-xl">
-                Pilih dokumen dari /analisis untuk melihat tahapan nota analisis dan otomatis mengisikan data pengajuan.
+                Pilih dokumen dari /analisis untuk melihat tahapan nota analisis dan otomatis mengisikan data pengajuan secara terkunci (read-only).
               </p>
             </div>
 
@@ -385,19 +387,19 @@ export default function TambahPaguFormPage() {
             </button>
           </div>
         ) : (
-          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-[2.5rem] p-6 text-emerald-950 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="bg-emerald-50 border-2 border-emerald-400/80 rounded-[2.5rem] p-6 text-emerald-950 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="p-3 bg-emerald-500 text-white rounded-2xl shrink-0 shadow-sm">
-                <CheckCircle2 size={20} />
+                <ShieldCheck size={22} />
               </div>
               <div>
                 <div className="flex items-center gap-2 text-xs font-black uppercase text-emerald-700 tracking-wider">
-                  Data Terhubung Dengan Hasil Analisis
+                  <Lock size={12} className="text-emerald-600" /> Data Pengajuan Terhubung & Terkunci (Read-Only)
                 </div>
                 <h4 className="font-black text-base text-emerald-950">
                   {selectedAnalisis.perihal || 'Dokumen Analisis'}
                 </h4>
-                <p className="text-xs text-emerald-800 font-medium">
+                <p className="text-xs text-emerald-800 font-medium mt-0.5">
                   No Surat: <span className="font-mono font-bold">{selectedAnalisis.no_surat || '-'}</span> | Unit: <span className="font-bold">{selectedAnalisis.unit_pengirim || '-'}</span>
                 </p>
               </div>
@@ -414,7 +416,7 @@ export default function TambahPaguFormPage() {
               <button
                 type="button"
                 onClick={handleClearSelection}
-                className="px-4 py-2.5 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                className="px-4 py-2.5 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
               >
                 <X size={14} /> Lepas Link (Manual)
               </button>
@@ -426,7 +428,7 @@ export default function TambahPaguFormPage() {
       {/* STEP NAVIGATION TABS */}
       <div className="flex justify-between items-center bg-white rounded-[2rem] p-2 shadow-sm border border-gray-200/80 mb-8 overflow-x-auto gap-2">
         {[
-          { id: 'step1', step: '1', title: 'Data Utama & Pengajuan', subtitle: 'Surat Masuk & Ringkasan', icon: FileText },
+          { id: 'step1', step: '1', title: 'Data Utama & Pengajuan', subtitle: 'Surat Masuk & Ringkasan AI', icon: FileText },
           { id: 'step2', step: '2', title: 'Posisi Pagu Unit', subtitle: 'Pagu 2026 & Multi-Tahun', icon: Landmark },
           { id: 'step3', step: '3', title: 'Tanggapan & Keputusan', subtitle: 'Input Surat Keluar & Simpan', icon: CheckCircle2 },
         ].map((tab) => {
@@ -462,6 +464,15 @@ export default function TambahPaguFormPage() {
         {/* ================= TAHAP 1: DATA UTAMA & PENGAJUAN (SURAT MASUK) ================= */}
         {activeStep === 'step1' && (
           <div className="space-y-8 animate-in fade-in duration-300">
+            
+            {/* Read-only Alert Banner if Imported */}
+            {isReadOnlyPengajuan && (
+              <div className="flex items-center gap-3 px-6 py-4 bg-indigo-50/80 border border-indigo-200 rounded-3xl text-indigo-900 text-xs font-bold shadow-sm">
+                <Lock size={16} className="text-indigo-600 shrink-0" />
+                <span>Mode Read-Only (Hanya Lihat): Data pengajuan terkunci karena diimpor langsung dari riwayat analisis. Untuk mengedit manual, klik <strong>"Lepas Link (Manual)"</strong> di banner atas.</span>
+              </div>
+            )}
+
             {/* CARD 1: INFORMASI DASAR */}
             <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 relative overflow-hidden">
               <div className="flex items-center gap-3 mb-8">
@@ -477,20 +488,32 @@ export default function TambahPaguFormPage() {
                   <input 
                     type="number" 
                     name="tahun_anggaran"
+                    disabled={isReadOnlyPengajuan}
                     value={formData.tahun_anggaran}
                     onChange={handleInputChange}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100'
+                    }`}
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
                   <Select 
                     options={listUnit} 
+                    isDisabled={isReadOnlyPengajuan}
                     value={formData.unit_id}
                     onChange={(val) => setFormData({...formData, unit_id: val})}
                     placeholder="Pilih Unit Kerja..."
                     styles={{
-                      control: (base) => ({ ...base, borderRadius: '1.25rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+                      control: (base) => ({ 
+                        ...base, 
+                        borderRadius: '1.25rem', 
+                        padding: '0.4rem', 
+                        border: '1px solid #f3f4f6', 
+                        backgroundColor: isReadOnlyPengajuan ? '#f1f5f9' : '#f9fafb', 
+                        fontWeight: 'bold',
+                        opacity: isReadOnlyPengajuan ? 0.9 : 1
+                      }),
                     }}
                   />
                 </div>
@@ -498,9 +521,12 @@ export default function TambahPaguFormPage() {
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
                   <select 
                     name="jenis_tambah_pagu"
+                    disabled={isReadOnlyPengajuan}
                     value={formData.jenis_tambah_pagu}
                     onChange={handleInputChange}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700 appearance-none cursor-pointer"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold appearance-none ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100 cursor-pointer'
+                    }`}
                   >
                     <option value="Penugasan">🚀 Penugasan</option>
                     <option value="Inisiatif Unit">💡 Inisiatif Unit</option>
@@ -512,10 +538,13 @@ export default function TambahPaguFormPage() {
                   <input 
                     type="text" 
                     name="nominal_diajukan"
+                    readOnly={isReadOnlyPengajuan}
                     value={formatNumber(formData.nominal_diajukan)}
                     onChange={handleInputChange}
                     placeholder="0"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-gray-900 text-lg"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-black text-lg ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-900 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-900 focus:ring-2 ring-indigo-100'
+                    }`}
                   />
                 </div>
               </div>
@@ -537,9 +566,12 @@ export default function TambahPaguFormPage() {
                     <input 
                       type="text" 
                       name="no_surat_pengajuan"
+                      readOnly={isReadOnlyPengajuan}
                       value={formData.no_surat_pengajuan}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
+                      className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                      }`}
                       placeholder="cth: 123/UN1/..."
                     />
                   </div>
@@ -548,9 +580,12 @@ export default function TambahPaguFormPage() {
                     <input 
                       type="date" 
                       name="tanggal_surat_pengajuan"
+                      readOnly={isReadOnlyPengajuan}
                       value={formData.tanggal_surat_pengajuan}
                       onChange={handleInputChange}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
+                      className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                      }`}
                     />
                   </div>
                 </div>
@@ -559,10 +594,13 @@ export default function TambahPaguFormPage() {
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
                   <textarea 
                     name="hal_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
                     value={formData.hal_surat_pengajuan}
                     onChange={handleInputChange}
                     rows={2}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-gray-700"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
                     placeholder="Tulis perihal surat pengajuan..."
                   />
                 </div>
@@ -572,9 +610,12 @@ export default function TambahPaguFormPage() {
                   <input 
                     type="text" 
                     name="subyek_pengajuan_di_simaster_persuratan"
+                    readOnly={isReadOnlyPengajuan}
                     value={formData.subyek_pengajuan_di_simaster_persuratan}
                     onChange={handleInputChange}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-xs italic text-gray-600"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium text-xs italic ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-600 focus:ring-2 ring-blue-100'
+                    }`}
                     placeholder="Salin subyek lengkap dari Simaster..."
                   />
                 </div>
@@ -587,29 +628,35 @@ export default function TambahPaguFormPage() {
                       <input 
                         type="text" 
                         name="link_surat_pengajuan"
+                        readOnly={isReadOnlyPengajuan}
                         value={formData.link_surat_pengajuan}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-blue-100 transition-all text-sm italic text-blue-600"
+                        className={`w-full border rounded-2xl pl-12 pr-4 py-4 outline-none transition-all text-sm italic ${
+                          isReadOnlyPengajuan ? 'bg-slate-100/80 text-blue-700 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-blue-600 focus:ring-2 ring-blue-100'
+                        }`}
                         placeholder="https://drive.google.com/..."
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File Surat Pengajuan (Max 10MB)</label>
-                    <div className="relative group">
-                      <input 
-                        type="file" 
-                        onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
-                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                      />
-                      <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${filePengajuan ? 'bg-blue-50 border-blue-400 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
-                        <UploadCloud size={20} />
-                        <span className="text-sm font-bold truncate max-w-[200px]">
-                          {filePengajuan ? filePengajuan.name : "Pilih File Surat Pengajuan"}
-                        </span>
+
+                  {!isReadOnlyPengajuan && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File Surat Pengajuan (Max 10MB)</label>
+                      <div className="relative group">
+                        <input 
+                          type="file" 
+                          onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
+                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                        />
+                        <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${filePengajuan ? 'bg-blue-50 border-blue-400 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
+                          <UploadCloud size={20} />
+                          <span className="text-sm font-bold truncate max-w-[200px]">
+                            {filePengajuan ? filePengajuan.name : "Pilih File Surat Pengajuan"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* RINGKASAN SUBSTANSI (AI READ ONLY / VIEW) */}
@@ -619,7 +666,7 @@ export default function TambahPaguFormPage() {
                       <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
                     </label>
                     <div 
-                      className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-h-[300px] overflow-y-auto"
+                      className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-h-[300px] overflow-y-auto shadow-inner"
                       dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
                     />
                   </div>
@@ -753,7 +800,7 @@ export default function TambahPaguFormPage() {
               <button
                 type="button"
                 onClick={() => setActiveStep('step1')}
-                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
               >
                 <ChevronLeft size={16} /> Kembali Ke Tahap 1
               </button>
@@ -778,7 +825,7 @@ export default function TambahPaguFormPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-gray-800 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">Input nomor surat tanggapan, subyek simaster, dan nominal keputusan disetujui di bawah ini.</p>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">Lengkapi data surat tanggapan, subyek simaster, dan nominal keputusan pimpinan di bawah ini.</p>
                 </div>
               </div>
 
@@ -903,7 +950,7 @@ export default function TambahPaguFormPage() {
               <button
                 type="button"
                 onClick={() => setActiveStep('step2')}
-                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
               >
                 <ChevronLeft size={16} /> Kembali Ke Tahap 2
               </button>
