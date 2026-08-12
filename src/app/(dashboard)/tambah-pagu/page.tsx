@@ -5,34 +5,167 @@ import { getTambahPagu } from '@/app/actions/tambah-pagu';
 import { getMyPermissions } from '@/app/actions/surat';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import { 
   Plus, Search, FileText, Calendar, Building2, 
   Tag, AlertCircle, CheckCircle2, Clock, Filter, 
   ChevronRight, MoreHorizontal, Download, Edit,
   ChevronUp, BarChart3, TrendingUp, LayoutGrid, ChevronDown,
   Wallet, CheckCircle, BarChart as ChartIcon, Eye,
-  ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet
+  ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet,
+  ExternalLink, X, RefreshCw, Maximize2, Zap, Landmark, Scale
 } from 'lucide-react';
-import Select from 'react-select';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+// Autocomplete Filter Unit Kerja Component (with Keyboard Navigation ↑ ↓ + Enter)
+function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const filteredUnits = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['ALL', ...filteredUnits];
+  }, [filteredUnits]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onSelect(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative inline-block text-left w-full" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-[42px] px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 shadow-sm flex items-center justify-between gap-2 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+      >
+        <span className="truncate font-bold">
+          {selectedUnit === 'ALL' ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
+        </span>
+        <span className="text-[10px] opacity-60">▼</span>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 mt-1 w-full min-w-[260px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
+            <input
+              type="text"
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="w-full px-3 py-2 mb-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+            />
+            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+              <div
+                onClick={() => {
+                  onSelect('ALL');
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                className={`px-3 py-2 rounded-xl cursor-pointer font-bold transition-colors flex items-center justify-between ${
+                  highlightedIndex === 0 ? 'bg-emerald-600 text-white font-bold' : selectedUnit === 'ALL' ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <span>🏢 Semua Unit Kerja ({units.length})</span>
+                {selectedUnit === 'ALL' && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-emerald-600 font-bold'}>✓</span>}
+              </div>
+              {filteredUnits.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = selectedUnit === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onSelect(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors flex items-center justify-between ${
+                      isHighlighted ? 'bg-emerald-600 text-white font-bold' : isSelected ? 'bg-emerald-50 text-emerald-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    <span className="truncate">{u}</span>
+                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-emerald-600 font-bold'}>✓</span>}
+                  </div>
+                );
+              })}
+              {filteredUnits.length === 0 && (
+                <div className="p-3 text-slate-400 text-center italic">Unit kerja tidak ditemukan</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function TambahPaguPage() {
+  const router = useRouter();
   const [data, setData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showStats, setShowStats] = useState(false);
+  const [activeTab, setActiveTab] = useState<'data' | 'summary' | 'chart'>('data');
+  
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedUnits, setSelectedUnits] = useState<any[]>([]);
-  const [unitOptions, setUnitOptions] = useState<any[]>([]);
+  const [selectedSingleUnit, setSelectedSingleUnit] = useState('ALL');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('ALL');
   const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [yearOptions, setYearOptions] = useState<string[]>([]);
   const [perms, setPerms] = useState<any>({ can_view: true, can_create: false });
 
+  // Pop Up Detail Dialog State
+  const [viewDetailData, setViewDetailData] = useState<any | null>(null);
+
+  // Accordion Expand State for Summary Per Unit
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchData();
@@ -50,15 +183,6 @@ export default function TambahPaguPage() {
       setPerms(myPerms);
       const rawData = result || [];
       setData(rawData);
-      
-      const units = rawData.reduce((acc: any[], item: any) => {
-        const unitName = item.gov_units?.nama_unit || 'Unknown';
-        if (!acc.find(u => u.label === unitName)) {
-          acc.push({ value: unitName, label: unitName });
-        }
-        return acc;
-      }, []) || [];
-      setUnitOptions(units);
 
       const years = Array.from(new Set(rawData.map((item: any) => item.tahun_anggaran?.toString()).filter(Boolean))).sort().reverse() as string[];
       setYearOptions(years.length > 0 ? years : ['2026', '2025']);
@@ -70,574 +194,931 @@ export default function TambahPaguPage() {
     }
   };
 
-  // LOGIKA TREN (YoY Apple-to-Apple)
-  const trends = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    
-    // Data Tahun Ini (Jan s/d Bulan Berjalan)
-    const thisYearRange = data.filter(d => {
-      const date = new Date(d.tanggal_surat_pengajuan);
-      return date.getFullYear() === currentYear && date.getMonth() <= currentMonth;
-    });
-    const totalThisYear = thisYearRange.reduce((acc, curr) => acc + (curr.nominal_diajukan || 0), 0);
+  const formatRp = (num: any) => {
+    if (!num) return '0';
+    const clean = num.toString().replace(/\D/g, '');
+    return new Intl.NumberFormat('id-ID').format(Number(clean) || 0);
+  };
 
-    // Data Tahun Lalu (Jan s/d Bulan Berjalan yang Sama)
-    const lastYearRange = data.filter(d => {
-      const date = new Date(d.tanggal_surat_pengajuan);
-      return date.getFullYear() === currentYear - 1 && date.getMonth() <= currentMonth;
+  // Extract all unique unit names for autocomplete filter dropdown
+  const allUnitNames = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach(item => {
+      const uName = item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul;
+      if (uName) set.add(uName);
     });
-    const totalLastYear = lastYearRange.reduce((acc, curr) => acc + (curr.nominal_diajukan || 0), 0);
-    
-    const diff = totalThisYear - totalLastYear;
-    const percent = totalLastYear > 0 ? (diff / totalLastYear) * 100 : 0;
-
-    return { diff, percent: Math.abs(percent).toFixed(1), isUp: diff >= 0 };
+    return Array.from(set).sort();
   }, [data]);
 
+  // Filtered Data Calculations
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      const q = searchTerm.toLowerCase();
+      const uName = item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || '';
+
+      const matchesSearch = 
+        !searchTerm ||
+        item.no_surat_pengajuan?.toLowerCase().includes(q) ||
+        item.hal_surat_pengajuan?.toLowerCase().includes(q) ||
+        uName.toLowerCase().includes(q);
+      
+      const matchesUnit = 
+        selectedSingleUnit === 'ALL' || 
+        uName.toLowerCase() === selectedSingleUnit.toLowerCase();
+
+      const matchesYear = 
+        selectedYear === 'Semua Tahun' || 
+        item.tahun_anggaran?.toString() === selectedYear;
+
+      const matchesStatus = 
+        selectedStatusFilter === 'ALL' ||
+        (item.status_pengajuan || '').toLowerCase() === selectedStatusFilter.toLowerCase();
+
+      return matchesSearch && matchesUnit && matchesYear && matchesStatus;
+    });
+  }, [data, searchTerm, selectedSingleUnit, selectedYear, selectedStatusFilter]);
+
+  // Top 4 KPI Cards Metrics (Calculated from filteredData)
+  const kpiMetrics = useMemo(() => {
+    const totalCount = filteredData.length;
+    const totalAnggaranUsulan = filteredData.reduce((acc, curr) => acc + Number(curr.nominal_diajukan || 0), 0);
+
+    const approvedSemuaItems = filteredData.filter(d => (d.status_pengajuan || '').toLowerCase().includes('semua') || (d.status_pengajuan || '').toLowerCase().includes('100'));
+    const approvedSemuaCount = approvedSemuaItems.length;
+    const approvedSemuaAnggaran = approvedSemuaItems.reduce((acc, curr) => acc + Number(curr.nominal_tanggapan || curr.nominal_disetujui || curr.nominal_diajukan || 0), 0);
+
+    const approvedSebagianItems = filteredData.filter(d => (d.status_pengajuan || '').toLowerCase().includes('sebagian'));
+    const approvedSebagianCount = approvedSebagianItems.length;
+    const approvedSebagianAnggaran = approvedSebagianItems.reduce((acc, curr) => acc + Number(curr.nominal_tanggapan || curr.nominal_disetujui || 0), 0);
+
+    const rejectedItems = filteredData.filter(d => (d.status_pengajuan || '').toLowerCase().includes('tolak') || (d.status_pengajuan || '').toLowerCase() === 'diajukan');
+    const rejectedCount = rejectedItems.length;
+    const rejectedAnggaran = rejectedItems.reduce((acc, curr) => acc + Number(curr.nominal_diajukan || 0), 0);
+
+    const approvedPct = totalCount > 0 ? Math.round((approvedSemuaCount / totalCount) * 100) : 0;
+
+    return {
+      totalCount,
+      totalAnggaranUsulan,
+      approvedSemuaCount,
+      approvedSemuaAnggaran,
+      approvedSebagianCount,
+      approvedSebagianAnggaran,
+      rejectedCount,
+      rejectedAnggaran,
+      approvedPct
+    };
+  }, [filteredData]);
+
+  // Unit Summary Aggregation Table Data with Items per Unit for Collapse/Accordion
+  const unitSummaryData = useMemo(() => {
+    const map: Record<string, { unit: string; groupOrg: string; totalUsulan: number; totalNominalDiajukan: number; totalNominalDisetujui: number; approvedCount: number; items: any[] }> = {};
+
+    filteredData.forEach(item => {
+      const uName = item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || 'Lainnya';
+      const gOrg = item.gov_units?.group_org || '-';
+
+      if (!map[uName]) {
+        map[uName] = { unit: uName, groupOrg: gOrg, totalUsulan: 0, totalNominalDiajukan: 0, totalNominalDisetujui: 0, approvedCount: 0, items: [] };
+      }
+      map[uName].totalUsulan += 1;
+      map[uName].totalNominalDiajukan += Number(item.nominal_diajukan || 0);
+      map[uName].totalNominalDisetujui += Number(item.nominal_tanggapan || item.nominal_disetujui || 0);
+      map[uName].items.push(item);
+      if ((item.status_pengajuan || '').toLowerCase().includes('disetujui')) {
+        map[uName].approvedCount += 1;
+      }
+    });
+
+    return Object.values(map).sort((a, b) => b.totalNominalDiajukan - a.totalNominalDiajukan);
+  }, [filteredData]);
+
+  // Recharts Monthly Stats Data
   const statsData = useMemo(() => {
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
     const monthlyCounts: any = {};
-    monthNames.forEach(m => monthlyCounts[m] = { name: m, count: 0, proposed: 0, approved: 0, unitMap: {} });
+    monthNames.forEach(m => monthlyCounts[m] = { name: m, count: 0, proposed: 0, approved: 0 });
 
-    data.filter(d => d.tahun_anggaran?.toString() === (selectedYear === 'Semua Tahun' ? '2026' : selectedYear)).forEach(item => {
+    filteredData.forEach(item => {
       if (item.tanggal_surat_pengajuan) {
         const date = new Date(item.tanggal_surat_pengajuan);
         const monthLabel = monthNames[date.getMonth()];
         if (monthlyCounts[monthLabel]) {
           monthlyCounts[monthLabel].count += 1;
-          monthlyCounts[monthLabel].proposed += (item.nominal_diajukan || 0);
-          monthlyCounts[monthLabel].approved += (item.nominal_tanggapan || 0);
-          const uName = item.gov_units?.nama_unit || 'Unknown';
-          if (!monthlyCounts[monthLabel].unitMap[uName]) {
-            monthlyCounts[monthLabel].unitMap[uName] = { count: 0, nominal: 0, approved: 0 };
-          }
-          monthlyCounts[monthLabel].unitMap[uName].count += 1;
-          monthlyCounts[monthLabel].unitMap[uName].nominal += (item.nominal_diajukan || 0);
-          monthlyCounts[monthLabel].unitMap[uName].approved += (item.nominal_tanggapan || 0);
+          monthlyCounts[monthLabel].proposed += Number(item.nominal_diajukan || 0);
+          monthlyCounts[monthLabel].approved += Number(item.nominal_tanggapan || 0);
         }
       }
     });
 
-    return Object.values(monthlyCounts).map((m: any) => ({
-      ...m,
-      unitList: Object.entries(m.unitMap)
-        .map(([name, val]: any) => ({ name, ...val }))
-        .sort((a: any, b: any) => b.nominal - a.nominal)
-    }));
-  }, [data, selectedYear]);
+    return Object.values(monthlyCounts);
+  }, [filteredData]);
 
-  const filteredData = data.filter(item => {
-    const matchesSearch = 
-      item.no_surat_pengajuan?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.hal_surat_pengajuan?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesUnit = 
-      selectedUnits.length === 0 || 
-      selectedUnits.some(u => u.value === item.gov_units?.nama_unit);
+  // Toggle Accordion Collapse for Summary Unit
+  const toggleUnitAccordion = (unitName: string) => {
+    setExpandedUnits(prev => ({ ...prev, [unitName]: !prev[unitName] }));
+  };
 
-    const matchesYear = 
-      selectedYear === 'Semua Tahun' || 
-      item.tahun_anggaran?.toString() === selectedYear;
-
-    return matchesSearch && matchesUnit && matchesYear;
-  });
-
-  // Logika Pagination
+  // Pagination Logic
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
 
-  const paginate = (pageNumber: number) => {
-    if (pageNumber < 1 || pageNumber > totalPages) return;
-    setCurrentPage(pageNumber);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const getPageNumbers = () => {
-    const pages = [];
-    if (totalPages <= 5) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('...');
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-      for (let i = start; i <= end; i++) if (!pages.includes(i)) pages.push(i);
-      if (currentPage < totalPages - 2) pages.push('...');
-      if (!pages.includes(totalPages)) pages.push(totalPages);
-    }
-    return pages;
-  };
-
-  const formatIDR = (val: number) => {
-    if (val >= 1000000000) return (val / 1000000000).toFixed(1) + ' M';
-    if (val >= 1000000) return (val / 1000000).toFixed(1) + ' jt';
-    return val.toLocaleString('id-ID');
-  };
-
+  // REAL NATIVE EXCEL (.XLSX) DOWNLOAD WITH DYNAMIC TAB AWARENESS
   const exportToExcel = () => {
-    if (filteredData.length === 0) return alert("Tidak ada data untuk di-export");
+    if (activeTab === 'summary') {
+      if (unitSummaryData.length === 0) return alert("Tidak ada data summary untuk di-export");
 
-    // Header Kolom
-    const headers = ["No", "No Surat Pengajuan", "Tanggal Pengajuan", "Unit Kerja", "Jenis Pagu", "Hal Pengajuan", "Nominal Usulan", "Nominal Disetujui", "Status", "Ringkasan Substansi"];
-    
-    // Data Baris
-    const csvContent = [
-      headers.join(","), // Baris header
-      ...filteredData.map((item, index) => {
-        const row = [
-          index + 1,
-          `"${item.no_surat_pengajuan?.replace(/"/g, '""') || ''}"`,
-          item.tanggal_surat_pengajuan || '',
-          `"${item.gov_units?.nama_unit || ''}"`,
-          `"${item.jenis_tambah_pagu || ''}"`,
-          `"${item.hal_surat_pengajuan?.replace(/"/g, '""') || ''}"`,
-          item.nominal_diajukan || 0,
-          item.nominal_tanggapan || 0,
-          `"${item.status_pengajuan || ''}"`,
-          `"${item.ringkasan_substansi?.replace(/"/g, '""') || ''}"`
-        ];
-        return row.join(",");
-      })
-    ].join("\n");
+      // 1. Mapped Summary Per Unit Kerja Data
+      const summaryRows = unitSummaryData.map((u, index) => {
+        const pct = u.totalNominalDiajukan > 0 
+          ? ((u.totalNominalDisetujui / u.totalNominalDiajukan) * 100).toFixed(1) + '%'
+          : '0.0%';
+        return {
+          'No': index + 1,
+          'Nama Unit Kerja': u.unit,
+          'Group Org': u.groupOrg,
+          'Total Usulan (Surat)': u.totalUsulan,
+          'Total Nominal Diajukan (Rp)': u.totalNominalDiajukan,
+          'Total Nominal Disetujui (Rp)': u.totalNominalDisetujui,
+          'Persentase Disetujui (%)': pct
+        };
+      });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `tambah_pagu_${selectedYear}_${new Date().getTime()}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const worksheetSummary = XLSX.utils.json_to_sheet(summaryRows);
+      worksheetSummary['!cols'] = [
+        { wch: 6 },  // No
+        { wch: 40 }, // Nama Unit
+        { wch: 18 }, // Group Org
+        { wch: 20 }, // Total Usulan
+        { wch: 26 }, // Total Diajukan
+        { wch: 26 }, // Total Disetujui
+        { wch: 22 }, // % Disetujui
+      ];
+
+      // 2. Mapped Detailed Usulan per Unit as 2nd Sheet
+      const detailedRows = filteredData.map((item, index) => ({
+        'No': index + 1,
+        'Tahun Anggaran': item.tahun_anggaran || '2026',
+        'Unit Kerja': item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || '-',
+        'Group Org': item.gov_units?.group_org || '-',
+        'No Surat Pengajuan': item.no_surat_pengajuan || '-',
+        'Tanggal Pengajuan': item.tanggal_surat_pengajuan || '-',
+        'Hal / Perihal Surat': item.hal_surat_pengajuan || '-',
+        'Nominal Diajukan (Rp)': Number(item.nominal_diajukan || 0),
+        'Nominal Disetujui (Rp)': Number(item.nominal_tanggapan || item.nominal_disetujui || 0),
+        'Jenis Tambah Pagu': item.jenis_tambah_pagu || 'Penugasan',
+        'Status Keputusan': item.status_pengajuan || 'Diajukan',
+      }));
+
+      const worksheetDetail = XLSX.utils.json_to_sheet(detailedRows);
+      worksheetDetail['!cols'] = [
+        { wch: 6 },  { wch: 14 }, { wch: 35 }, { wch: 16 }, { wch: 30 },
+        { wch: 16 }, { wch: 45 }, { wch: 22 }, { wch: 22 }, { wch: 18 }, { wch: 20 }
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheetSummary, "Summary Per Unit Kerja");
+      XLSX.utils.book_append_sheet(workbook, worksheetDetail, "Rincian Surat Per Unit");
+
+      const fileName = `Summary_Pagu_Per_Unit_${selectedYear}_${new Date().getTime()}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+    } else {
+      // DEFAULT: TAB DATA DETAIL (OR TAB CHART)
+      if (filteredData.length === 0) return alert("Tidak ada data untuk di-export");
+
+      const mappedExcelData = filteredData.map((item, index) => ({
+        'No': index + 1,
+        'Tahun Anggaran': item.tahun_anggaran || '2026',
+        'No Surat Pengajuan': item.no_surat_pengajuan || '-',
+        'Tanggal Pengajuan': item.tanggal_surat_pengajuan || '-',
+        'Unit Kerja': item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || '-',
+        'Group Org': item.gov_units?.group_org || '-',
+        'Jenis Tambah Pagu': item.jenis_tambah_pagu || 'Penugasan',
+        'Hal / Perihal Surat': item.hal_surat_pengajuan || '-',
+        'Subyek Simaster': item.subyek_pengajuan_di_simaster_persuratan || '-',
+        'Nominal Diajukan (Rp)': Number(item.nominal_diajukan || 0),
+        'No Surat Tanggapan': item.no_surat_tanggapan || '-',
+        'Tanggal Tanggapan': item.tanggal_surat_tanggapan || '-',
+        'Nominal Disetujui (Rp)': Number(item.nominal_tanggapan || item.nominal_disetujui || 0),
+        'Status Keputusan': item.status_pengajuan || 'Diajukan',
+        'Ringkasan AI': (item.ringkasan_substansi || '').replace(/<[^>]*>?/gm, '')
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(mappedExcelData);
+      
+      // Auto Column Widths for professional formatting
+      worksheet['!cols'] = [
+        { wch: 6 },  // No
+        { wch: 14 }, // Tahun
+        { wch: 30 }, // No Surat
+        { wch: 16 }, // Tgl Surat
+        { wch: 35 }, // Unit Kerja
+        { wch: 16 }, // Group Org
+        { wch: 18 }, // Jenis Pagu
+        { wch: 45 }, // Hal / Perihal
+        { wch: 30 }, // Subyek Simaster
+        { wch: 22 }, // Nominal Diajukan
+        { wch: 30 }, // No Surat Tanggapan
+        { wch: 16 }, // Tgl Tanggapan
+        { wch: 22 }, // Nominal Disetujui
+        { wch: 20 }, // Status Keputusan
+        { wch: 50 }, // Ringkasan AI
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Rincian Tambah Pagu");
+
+      const fileName = `Tambah_Pagu_Detail_${selectedYear}_${new Date().getTime()}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    }
+  };
+
+  const getStatusBadgeStyle = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('semua') || s.includes('100')) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (s.includes('sebagian')) return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+    if (s.includes('tolak')) return 'bg-rose-100 text-rose-800 border-rose-200';
+    return 'bg-amber-100 text-amber-800 border-amber-200';
   };
 
   if (isLoading) return (
-    <div className="h-screen flex flex-col justify-center items-center gap-4 bg-gray-50">
-      <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-emerald-600 font-black text-[10px] uppercase tracking-widest">Memuat Dashboard Pagu...</p>
+    <div className="h-screen flex flex-col justify-center items-center gap-4 bg-slate-50">
+      <RefreshCw className="animate-spin text-emerald-600 w-10 h-10" />
+      <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Memuat Dashboard Usulan Tambah Pagu...</p>
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 pt-8">
+    <div className="max-w-7xl mx-auto pb-32 px-4 pt-6 space-y-6">
+      {/* ROW 1: HEADER PAGE TITLE & ACTION BUTTONS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm">
         <div>
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-[10px] uppercase tracking-widest mb-2">
-            <Clock size={14} /> Anggaran & Pagu v2
+          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1.5">
+            <Sparkles size={16} className="text-amber-500" /> Portal Pengusulan Pagu Anggaran
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight italic">Tambah Pagu</h1>
-          <p className="text-gray-500 font-medium mt-2">Monitoring usulan penambahan anggaran {selectedYear !== 'Semua Tahun' ? selectedYear : ''}.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            Tambah Pagu Anggaran
+          </h1>
+          <p className="text-slate-500 font-medium text-xs md:text-sm mt-1">
+            Pantau status permohonan penambahan pagu anggaran unit kerja UGM ({selectedYear}).
+          </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button 
-            onClick={exportToExcel}
-            className="flex items-center gap-3 px-8 py-5 bg-emerald-50 text-emerald-700 rounded-[2rem] font-black shadow-sm hover:bg-emerald-100 transition-all active:scale-95 border border-emerald-100"
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/tambah-pagu/komparasi')}
+            className="rounded-2xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-xs shadow-sm h-11"
           >
-            <FileSpreadsheet size={20} /> EXPORT EXCEL
-          </button>
+            <Scale size={16} className="mr-2 text-indigo-600" /> Komparasi DB Pagu
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={exportToExcel}
+            className="rounded-2xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold text-xs shadow-sm h-11"
+          >
+            <FileSpreadsheet size={16} className="mr-2 text-emerald-600" /> Export Excel (.xlsx)
+          </Button>
+
           {perms.can_create && (
-            <Link 
-              href="/tambah-pagu/tambah" 
-              className="flex items-center gap-3 px-10 py-5 bg-gray-900 text-white rounded-[2rem] font-black shadow-2xl hover:bg-black transition-all active:scale-95 border-b-4 border-emerald-500"
+            <Button
+              onClick={() => router.push('/tambah-pagu/tambah')}
+              className="bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-2xl shadow-lg h-11 px-5 border-b-4 border-emerald-500 shrink-0"
             >
-              <Plus size={20} strokeWidth={4} /> TAMBAH USULAN
-            </Link>
+              <Plus size={16} className="mr-2" /> Tambah Usulan
+            </Button>
           )}
         </div>
       </div>
 
-      {/* Summary Cards Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <SummaryCard 
-          label="Total Nominal Usulan" 
-          value={`Rp ${statsData.reduce((acc: any, curr: any) => acc + curr.proposed, 0).toLocaleString('id-ID')}`} 
-          icon={<Wallet className="text-blue-600" />} 
-          bg="bg-blue-50/50" 
-          trend={`${trends.isUp ? '↑' : '↓'} ${trends.percent}% vs thn lalu (Jan-${new Date().toLocaleDateString('id-ID', { month: 'short' })})`}
-          isPositive={trends.isUp}
-        />
-        <SummaryCard 
-          label="Total Disetujui" 
-          value={`Rp ${statsData.reduce((acc: any, curr: any) => acc + curr.approved, 0).toLocaleString('id-ID')}`} 
-          icon={<CheckCircle className="text-emerald-600" />} 
-          bg="bg-emerald-50/50" 
-          trend={trends.diff >= 0 ? `↑ ${trends.percent}% bulan ini` : `↓ ${trends.percent}% bulan ini`}
-          isPositive={trends.diff >= 0}
-        />
-        <SummaryCard 
-          label="Volume Usulan" 
-          value={`${statsData.reduce((acc: any, curr: any) => acc + curr.count, 0)} Surat`} 
-          icon={<FileText className="text-amber-600" />} 
-          bg="bg-amber-50/50" 
-        />
+      {/* ROW 2: 4 SUMMARY KPI CARDS (EXACT MATCHING SCREENSHOT REVIEW-ANGGARAN/UNIT-KERJA) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* CARD 1: TOTAL USULAN ANGGARAN */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">TOTAL USULAN ANGGARAN</span>
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+              Rp {formatRp(kpiMetrics.totalAnggaranUsulan)}
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-slate-500 flex items-center justify-between">
+            <span>{kpiMetrics.totalCount} Usulan Item</span>
+            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">100%</span>
+          </div>
+        </div>
+
+        {/* CARD 2: DISETUJUI SEMUA (100%) */}
+        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">DISETUJUI SEMUA (100%)</span>
+            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
+              Rp {formatRp(kpiMetrics.approvedSemuaAnggaran)}
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-emerald-700 flex items-center justify-between">
+            <span>{kpiMetrics.approvedSemuaCount} Item</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono font-bold">
+              {kpiMetrics.approvedPct}%
+            </span>
+          </div>
+        </div>
+
+        {/* CARD 3: DISETUJUI SEBAGIAN */}
+        <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block mb-1">DISETUJUI SEBAGIAN</span>
+            <div className="text-2xl font-black text-indigo-700 font-mono tracking-tight">
+              Rp {formatRp(kpiMetrics.approvedSebagianAnggaran)}
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-indigo-700 flex items-center justify-between">
+            <span>{kpiMetrics.approvedSebagianCount} Item</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Sebagian</span>
+          </div>
+        </div>
+
+        {/* CARD 4: DITOLAK / DIAJUKAN */}
+        <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 block mb-1">DITOLAK / DIAJUKAN</span>
+            <div className="text-2xl font-black text-rose-700 font-mono tracking-tight">
+              Rp {formatRp(kpiMetrics.rejectedAnggaran)}
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-rose-700 flex items-center justify-between">
+            <span>{kpiMetrics.rejectedCount} Item</span>
+            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold">Proses/Tolak</span>
+          </div>
+        </div>
       </div>
 
-      {/* Action Toggle */}
-      <div className="mb-8">
-        <button 
-          onClick={() => setShowStats(!showStats)}
-          className="flex items-center gap-2 px-6 py-3 bg-white text-emerald-700 rounded-2xl text-xs font-black hover:bg-emerald-50 transition-all border border-emerald-100 shadow-sm"
+      {/* ROW 3: SEPARATE FILTER TOOLBAR WITH SEARCHABLE AUTOCOMPLETE UNIT FILTER */}
+      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center gap-4">
+        <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
+          <Zap size={16} className="text-amber-500" /> FILTER DATA:
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {/* Autocomplete Searchable Filter Unit Kerja */}
+          <div>
+            <UnitAutocompleteFilter 
+              units={allUnitNames}
+              selectedUnit={selectedSingleUnit}
+              onSelect={(u) => { setSelectedSingleUnit(u); setCurrentPage(1); }}
+            />
+          </div>
+
+          {/* Filter Tahun Dropdown */}
+          <div>
+            <select
+              value={selectedYear}
+              onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+            >
+              <option value="Semua Tahun">📅 Semua Tahun</option>
+              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          {/* Filter Status Dropdown */}
+          <div>
+            <select
+              value={selectedStatusFilter}
+              onChange={(e) => { setSelectedStatusFilter(e.target.value); setCurrentPage(1); }}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer font-bold"
+            >
+              <option value="ALL">✨ Semua Status</option>
+              <option value="Disetujui Semua">Disetujui Semua</option>
+              <option value="Disetujui Sebagian">Disetujui Sebagian</option>
+              <option value="Ditolak">Ditolak</option>
+              <option value="Diajukan">Diajukan</option>
+            </select>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari No Surat, Hal, Unit..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-emerald-500 font-medium"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 4: TAB NAVIGATION BAR (FULL WIDTH PAGE PILL NAVIGATION) */}
+      <div className="bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-2">
+        <button
+          onClick={() => setActiveTab('data')}
+          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'data' 
+              ? 'bg-white text-slate-900 shadow-sm font-black' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
         >
-          {showStats ? <ChevronUp size={16} /> : <ChartIcon size={16} />}
-          {showStats ? "TUTUP GRAFIK ANALISIS" : "BUKA GRAFIK ANALISIS & TREND"}
+          <FileText size={16} />
+          <span>📋 Tabel Data Detail ({filteredData.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('summary')}
+          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'summary' 
+              ? 'bg-white text-slate-900 shadow-sm font-black' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Building2 size={16} />
+          <span>🏢 Summary Per Unit Kerja ({unitSummaryData.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('chart')}
+          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'chart' 
+              ? 'bg-white text-slate-900 shadow-sm font-black' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <BarChart3 size={16} />
+          <span>📊 Visualisasi Tren & Grafis</span>
         </button>
       </div>
 
-      {/* Stats Section */}
-      {showStats && (
-        <div className="flex flex-col gap-8 mb-16 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-gray-100">
-            <div className="flex items-center justify-between mb-10">
+      {/* ROW 5: TAB CONTENT AREA */}
+
+      {/* TAB 1: TABEL DATA DETAIL (NO GROUP ORG BADGE - UNIT KERJA & DETAIL SURAT PENGAJUAN COMBINED) */}
+      {activeTab === 'data' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100 flex flex-row items-center justify-between">
               <div>
-                <h3 className="text-2xl font-black text-gray-900 tracking-tight">Tren Anggaran & Volume Usulan</h3>
-                <p className="text-gray-400 font-medium text-sm">Nominal anggaran (Bar - Kiri) dan jumlah surat (Garis - Kanan).</p>
+                <CardTitle className="text-base font-black text-slate-900">
+                  Rincian Usulan Tambah Pagu ({filteredData.length} Records)
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500 font-medium">
+                  Kolom Unit Kerja & Detail Surat Pengajuan digabung tanpa badge group unit untuk tampilan ultra-ramping
+                </CardDescription>
               </div>
-              <div className="flex items-center gap-2 text-emerald-600 font-black text-[10px] bg-emerald-50 px-4 py-2 rounded-full">
-                <TrendingUp size={14} /> TAHUN {selectedYear !== 'Semua Tahun' ? selectedYear : '2026'}
-              </div>
-            </div>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={statsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#9ca3af' }} />
-                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#d1d5db' }} tickFormatter={(val) => formatIDR(val)} />
-                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#fbbf24' }} />
-                  <Tooltip 
-                    cursor={{ fill: '#f9fafb' }}
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '1.5rem' }}
-                    formatter={(value: any, name: any) => {
-                      if (name === 'proposed' || name === 'approved') return ['Rp ' + value.toLocaleString('id-ID'), name === 'proposed' ? 'Usulan' : 'Disetujui'];
-                      return [value + ' Surat', 'Jumlah Usulan'];
-                    }}
-                  />
-                  <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{ paddingBottom: '20px', fontWeight: 'bold', fontSize: '12px' }} />
-                  <Bar yAxisId="left" dataKey="proposed" name="proposed" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25} />
-                  <Bar yAxisId="left" dataKey="approved" name="approved" fill="#10b981" radius={[4, 4, 0, 0]} barSize={25} />
-                  <Line yAxisId="right" type="monotone" dataKey="count" name="count" stroke="#fbbf24" strokeWidth={4} dot={{ r: 6, fill: '#fbbf24', strokeWidth: 3, stroke: '#fff' }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-gray-100 flex flex-col">
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-8 flex items-center gap-3">
-              <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600">
-                <LayoutGrid size={24} />
-              </div>
-              Rekap Unit Bulanan
-            </h3>
-            <div className="flex flex-col gap-4 overflow-y-auto max-h-[800px] pr-2 custom-scrollbar">
-              {statsData.filter((s: any) => s.count > 0).map((s: any, idx) => (
-                <MonthAccordion key={idx} data={s} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Area */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
-          <input 
-            type="text" 
-            placeholder="Cari No Surat atau Hal Pengajuan..." 
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-16 pr-8 py-5 bg-gray-50 border-none rounded-[1.5rem] outline-none focus:ring-4 ring-emerald-50 transition-all font-bold text-gray-700"
-          />
-        </div>
-        
-        <div className="w-full md:w-[180px]">
-          <select 
-            value={selectedYear}
-            onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-            className="w-full px-6 py-5 bg-gray-50 border-none rounded-[1.5rem] outline-none focus:ring-4 ring-emerald-50 transition-all font-black text-gray-700 appearance-none text-sm cursor-pointer text-center"
-          >
-            <option value="Semua Tahun">📅 Semua</option>
-            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-
-        <div className="w-full md:w-[320px]">
-          <Select
-            isMulti
-            options={unitOptions}
-            value={selectedUnits}
-            onChange={(val: any) => { setSelectedUnits(val || []); setCurrentPage(1); }}
-            placeholder="Filter Unit Kerja..."
-            styles={{
-              control: (base) => ({ ...base, borderRadius: '1.5rem', padding: '0.6rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
-            }}
-          />
-        </div>
-      </div>
-
-      {/* List Section */}
-      <div className="grid grid-cols-1 gap-8">
-        {currentItems.length > 0 ? currentItems.map((item) => (
-          <div key={item.id} className="bg-white/80 backdrop-blur-md p-8 rounded-[3.5rem] border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 group relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all duration-500"></div>
-            <div className="flex flex-col md:flex-row justify-between gap-10">
-              <div className="flex-1 space-y-6">
-                <div className="flex items-center gap-4">
-                  <span className="px-4 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-xl uppercase tracking-[0.15em] border border-emerald-100/50">
-                    {item.jenis_tambah_pagu}
-                  </span>
-                  <span className={`px-4 py-1.5 text-[10px] font-black rounded-xl uppercase tracking-[0.15em] border ${
-                    item.status_pengajuan === 'Disetujui Semua' ? 'bg-green-50 text-green-700 border-green-100/50' :
-                    item.status_pengajuan === 'Ditolak' ? 'bg-red-50 text-red-700 border-red-100/50' :
-                    'bg-amber-50 text-amber-700 border-amber-100/50'
-                  }`}>
-                    {item.status_pengajuan}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-xl font-black text-gray-900 leading-tight group-hover:text-emerald-600 transition-colors duration-300">{item.hal_surat_pengajuan}</h3>
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="h-px w-8 bg-emerald-100"></div>
-                    <p className="text-[10px] font-black text-emerald-500 tracking-[0.2em] uppercase">{item.no_surat_pengajuan}</p>
-                  </div>
-                </div>
-
-                {/* AI Insight Box (No 5) */}
-                <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-100/50 relative overflow-hidden group/insight">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 p-1 bg-amber-100 text-amber-600 rounded-lg">
-                      <Sparkles size={12} />
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">Ringkasan Cerdas</p>
-                      <p className="text-[11px] text-gray-500 leading-relaxed italic line-clamp-2">
-                        {item.ringkasan_substansi || "Analisis substansi sedang diproses oleh sistem untuk memberikan ringkasan usulan yang lebih akurat."}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-8 pt-2">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-gray-50 text-gray-400 rounded-2xl border border-gray-100">
-                      <Building2 size={16} />
-                    </div>
-                    <span className="text-xs font-black text-gray-600 uppercase tracking-tight">{item.gov_units?.nama_unit}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-gray-50 text-gray-400 rounded-2xl border border-gray-100">
-                      <Calendar size={16} />
-                    </div>
-                    <span className="text-xs font-bold text-gray-400 uppercase">{item.tanggal_surat_pengajuan}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="md:w-[320px] flex flex-col justify-between items-end bg-gray-50/50 rounded-[2.5rem] p-8 border border-gray-100/50 gap-8">
-                <div className="text-right space-y-5 w-full">
-                  <div className="relative">
-                    <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mb-1">Proposed</p>
-                    <p className="text-xl font-black text-gray-900 font-mono tracking-tighter">
-                      Rp {item.nominal_diajukan?.toLocaleString('id-ID')}
-                    </p>
-                  </div>
-                  {item.nominal_tanggapan > 0 && (
-                    <div className="relative pt-4 border-t border-dashed border-gray-200">
-                      <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-1">Approved</p>
-                      <p className="text-xl font-black text-emerald-600 font-mono tracking-tighter">
-                        Rp {item.nominal_tanggapan?.toLocaleString('id-ID')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-row md:flex-col lg:flex-row items-center gap-2 justify-end w-full">
-                  <div className="flex gap-2">
-                    {item.file_surat_pengajuan && (
-                      <a 
-                        href={item.file_surat_pengajuan} 
-                        target="_blank" 
-                        className="w-12 h-12 bg-white border border-gray-100 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center group/file"
-                        title="Surat Pengajuan"
-                      >
-                        <FileText size={18} className="group-hover/file:scale-110 transition-transform" />
-                      </a>
-                    )}
-                    {item.file_surat_tanggapan && (
-                      <a 
-                        href={item.file_surat_tanggapan} 
-                        target="_blank" 
-                        className="w-12 h-12 bg-white border border-gray-100 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center group/check"
-                        title="Surat Tanggapan"
-                      >
-                        <CheckCircle2 size={18} className="group-hover/check:scale-110 transition-transform" />
-                      </a>
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2 border-l border-gray-200 pl-2">
-                    <Link 
-                      href={`/tambah-pagu/view/${item.id}`}
-                      className="w-12 h-12 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center hover:-translate-y-1"
-                      title="View Detail & PDF"
-                    >
-                      <Eye size={18} />
-                    </Link>
-                    
-                    {perms.can_edit && (
-                      <Link 
-                        href={`/tambah-pagu/edit/${item.id}`}
-                        className="w-12 h-12 bg-gray-900 text-white rounded-2xl hover:bg-black transition-all shadow-xl shadow-gray-200 flex items-center justify-center hover:-translate-y-1"
-                        title="Edit Usulan"
-                      >
-                        <Edit size={18} className="text-emerald-400" />
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )) : (
-          <div className="py-32 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100 text-gray-400 font-bold italic">
-            Belum ada usulan tambah pagu yang ditemukan.
-          </div>
-        )}
-      </div>
-
-      {/* Pagination UI */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-16">
-          <button 
-            onClick={() => paginate(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white border border-gray-100 text-gray-400 disabled:opacity-20 hover:bg-gray-50 transition-all"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex items-center gap-2">
-            {getPageNumbers().map((page, idx) => (
-              page === '...' ? (
-                <div key={`dots-${idx}`} className="w-10 flex justify-center text-gray-300">
-                  <MoreHorizontal size={20} />
-                </div>
-              ) : (
-                <button
-                  key={`page-${page}`}
-                  onClick={() => paginate(page as number)}
-                  className={`w-12 h-12 rounded-2xl font-black transition-all ${
-                    currentPage === page ? 'bg-emerald-600 text-white shadow-xl scale-110' : 'bg-white text-gray-400 border border-gray-100 hover:border-emerald-200'
-                  }`}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 font-bold">Baris per halaman:</span>
+                <select 
+                  value={itemsPerPage} 
+                  onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold"
                 >
-                  {page}
-                </button>
-              )
-            ))}
-          </div>
-          <button 
-            onClick={() => paginate(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white border border-gray-100 text-gray-400 disabled:opacity-20 hover:bg-gray-50 transition-all"
-          >
-            <ChevronRight size={20} />
-          </button>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
+                  <TableRow>
+                    <TableHead className="w-10 text-center">No</TableHead>
+                    <TableHead>Unit Kerja & Detail Surat Pengajuan (No, Tanggal, & Hal)</TableHead>
+                    <TableHead className="w-56 text-right">Nominal Usulan & Disetujui</TableHead>
+                    <TableHead className="w-44 text-center">Jenis & Status</TableHead>
+                    <TableHead className="w-28 text-center">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12 text-slate-400 font-medium">
+                        Belum ada data usulan tambah pagu yang sesuai filter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentItems.map((item, idx) => {
+                      const uName = item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || '-';
+                      const rowNum = indexOfFirstItem + idx + 1;
+
+                      return (
+                        <TableRow key={item.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
+                          {/* 1. NO */}
+                          <TableCell className="text-center font-bold text-slate-400 text-xs align-top pt-3.5">{rowNum}</TableCell>
+
+                          {/* 2. COMBINED COLUMN: UNIT KERJA + DETAIL SURAT PENGAJUAN (TANPA GROUP ORG BADGE) */}
+                          <TableCell className="text-xs align-top pt-3 space-y-1">
+                            <div className="flex items-center gap-1.5 font-black text-slate-900 text-sm">
+                              <Building2 size={16} className="text-indigo-600 shrink-0" />
+                              <span>{uName}</span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                              <span className="font-bold text-slate-800 font-mono text-xs">📄 {item.no_surat_pengajuan || '-'}</span>
+                              <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                                📅 {item.tanggal_surat_pengajuan || '-'}
+                              </span>
+                            </div>
+
+                            <div className="text-slate-700 font-medium leading-snug line-clamp-2 max-w-2xl text-xs">
+                              {item.hal_surat_pengajuan || '-'}
+                            </div>
+                          </TableCell>
+
+                          {/* 3. NOMINAL DIAJUKAN & DISETUJUI DIJADIKAN SATU KOLOM */}
+                          <TableCell className="text-right align-top pt-3 space-y-1.5">
+                            <div className="px-2.5 py-1 bg-amber-50/80 border border-amber-200/60 rounded-xl">
+                              <span className="text-[9px] font-bold text-amber-700 uppercase block text-right">Nominal Diajukan</span>
+                              <span className="font-mono font-bold text-amber-900 text-xs">Rp {formatRp(item.nominal_diajukan)}</span>
+                            </div>
+                            <div className="px-2.5 py-1 bg-emerald-50/80 border border-emerald-200/60 rounded-xl">
+                              <span className="text-[9px] font-bold text-emerald-700 uppercase block text-right">Nominal Disetujui</span>
+                              <span className="font-mono font-black text-emerald-800 text-xs">Rp {formatRp(item.nominal_tanggapan || item.nominal_disetujui || 0)}</span>
+                            </div>
+                          </TableCell>
+
+                          {/* 4. JENIS & STATUS DIJADIKAN SATU KOLOM */}
+                          <TableCell className="text-center align-top pt-3 space-y-1.5">
+                            <div>
+                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[10px] font-bold">
+                                {item.jenis_tambah_pagu || 'Penugasan'}
+                              </Badge>
+                            </div>
+                            <div>
+                              <Badge className={`px-2.5 py-0.5 text-[10px] font-black uppercase ${getStatusBadgeStyle(item.status_pengajuan)}`}>
+                                {item.status_pengajuan || 'Diajukan'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+
+                          {/* 5. AKSI */}
+                          <TableCell className="text-center align-top pt-3">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={() => setViewDetailData(item)}
+                                title="Lihat Pop-up Detail"
+                                className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"
+                              >
+                                <Eye size={14} />
+                              </button>
+                              <button
+                                onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
+                                title="Buka Halaman Penuh"
+                                className="p-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-xl transition-all shadow-sm"
+                              >
+                                <ExternalLink size={14} />
+                              </button>
+                              {perms.can_create && (
+                                <button
+                                  onClick={() => router.push(`/tambah-pagu/edit/${item.id}`)}
+                                  title="Edit Data"
+                                  className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-xl transition-all shadow-sm"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-xs">
+              <span className="text-slate-500 font-medium">
+                Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredData.length)} dari {filteredData.length} records
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                  className="h-8 text-xs font-bold"
+                >
+                  <ChevronLeft size={14} /> Prev
+                </Button>
+                <span className="font-bold text-slate-700 px-2">Page {currentPage} of {totalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="h-8 text-xs font-bold"
+                >
+                  Next <ChevronRight size={14} />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
-    </div>
-  );
-}
 
-// Komponen Kartu Ringkasan
-function SummaryCard({ label, value, icon, bg, trend, isPositive }: { label: string, value: string, icon: React.ReactNode, bg: string, trend?: string, isPositive?: boolean }) {
-  return (
-    <div className={`p-8 rounded-[3rem] ${bg} border border-white shadow-sm flex items-center gap-6 group hover:shadow-xl transition-all duration-500 relative overflow-hidden`}>
-      <div className="p-4 bg-white rounded-2xl shadow-sm group-hover:scale-110 transition-transform">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-        <p className="text-xl font-black text-gray-900 tracking-tight">{value}</p>
-        {trend && (
-          <div className={`mt-2 flex items-center gap-1 text-[10px] font-black ${isPositive ? 'text-emerald-600' : 'text-rose-500'}`}>
-            {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-            {trend}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+      {/* TAB 2: SUMMARY PER UNIT KERJA (COLLAPSIBLE ACCORDION PER UNIT) */}
+      {activeTab === 'summary' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100">
+              <CardTitle className="text-base font-black text-slate-900">
+                Ringkasan Usulan Anggaran Per Unit Kerja (Collapsible Accordion)
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Klik pada baris unit kerja untuk memperluas (expand) rincian surat usulan di dalamnya
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
+                  <TableRow>
+                    <TableHead className="w-10 text-center"></TableHead>
+                    <TableHead>Nama Unit Kerja</TableHead>
+                    <TableHead className="text-center">Total Usulan Surat</TableHead>
+                    <TableHead className="text-right">Total Nominal Diajukan (Rp)</TableHead>
+                    <TableHead className="text-right text-emerald-700">Total Nominal Disetujui (Rp)</TableHead>
+                    <TableHead className="text-center">% Disetujui</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unitSummaryData.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-10 text-slate-400">Belum ada data usulan.</TableCell>
+                    </TableRow>
+                  ) : (
+                    unitSummaryData.map((u, idx) => {
+                      const isExpanded = !!expandedUnits[u.unit];
+                      const pct = u.totalNominalDiajukan > 0 
+                        ? ((u.totalNominalDisetujui / u.totalNominalDiajukan) * 100).toFixed(1) 
+                        : '0.0';
 
-// Komponen Accordion untuk Rekap Bulanan
-function MonthAccordion({ data }: { data: any }) {
-  const [isOpen, setIsOpen] = useState(false);
+                      return (
+                        <React.Fragment key={idx}>
+                          {/* PARENT ROW: UNIT SUMMARY */}
+                          <TableRow 
+                            onClick={() => toggleUnitAccordion(u.unit)}
+                            className={`cursor-pointer transition-colors border-b border-slate-100 text-xs ${
+                              isExpanded ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <TableCell className="text-center">
+                              <button className="p-1 rounded-md text-slate-400 hover:text-slate-800">
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                            </TableCell>
+                            <TableCell className="font-bold text-slate-900">
+                              <div className="flex items-center gap-2">
+                                <Building2 size={14} className="text-indigo-600" />
+                                <span>{u.unit}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center font-mono font-bold">{u.totalUsulan} Surat</TableCell>
+                            <TableCell className="text-right font-mono font-bold text-amber-900">Rp {formatRp(u.totalNominalDiajukan)}</TableCell>
+                            <TableCell className="text-right font-mono font-black text-emerald-700">Rp {formatRp(u.totalNominalDisetujui)}</TableCell>
+                            <TableCell className="text-center font-bold">
+                              <Badge className="bg-emerald-100 text-emerald-800 font-mono text-[10px]">
+                                {pct}%
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
 
-  const formatIDR = (val: number) => {
-    if (val >= 1000000000) return (val / 1000000000).toFixed(1) + ' M';
-    if (val >= 1000000) return (val / 1000000).toFixed(1) + ' jt';
-    return val.toLocaleString('id-ID');
-  };
+                          {/* ACCORDION CHILD ROW: DETAILED LETTERS FOR THIS UNIT */}
+                          {isExpanded && (
+                            <TableRow className="bg-slate-50/90 border-b border-slate-200">
+                              <TableCell colSpan={6} className="p-4 md:p-6">
+                                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-inner space-y-3">
+                                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                    <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                      <FileText size={14} className="text-emerald-600" />
+                                      Rincian Surat Usulan: {u.unit} ({u.items.length} Surat)
+                                    </h4>
+                                    <span className="text-[10px] text-slate-400 font-bold">Detail Pengajuan & Status</span>
+                                  </div>
 
-  return (
-    <div className="border border-gray-100 rounded-[2.5rem] overflow-hidden transition-all duration-300 shadow-sm bg-white">
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex justify-between items-center px-8 py-6 transition-colors ${isOpen ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-100' : 'bg-gray-50 text-gray-800 hover:bg-gray-100'}`}
-      >
-        <div className="flex items-center gap-6">
-          <span className={`text-xs font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full ${isOpen ? 'bg-white/20' : 'bg-emerald-100 text-emerald-600'}`}>
-            {data.name}
-          </span>
-          <div className="flex flex-col items-start">
-             <span className="text-sm font-black tracking-tight">{data.count} Usulan Surat</span>
-             <div className="flex gap-4 mt-1 opacity-70">
-                <span className="text-[10px] font-bold italic">Usul: Rp {formatIDR(data.proposed)}</span>
-                <span className="text-[10px] font-bold italic">Setuju: Rp {formatIDR(data.approved)}</span>
-             </div>
-          </div>
-        </div>
-        <ChevronDown size={20} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      
-      {isOpen && (
-        <div className="animate-in slide-in-from-top-2 duration-300 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-8 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">Unit Kerja</th>
-                  <th className="px-4 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Jumlah</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Nominal Usul</th>
-                  <th className="px-6 py-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Disetujui</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {data.unitList.map((u: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-emerald-50/20 transition-colors group">
-                    <td className="px-8 py-4">
-                      <span className="text-[11px] font-black text-gray-700 uppercase tracking-tight group-hover:text-emerald-600">{u.name}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-black rounded-md">{u.count}x</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-[11px] font-bold text-gray-600">Rp {formatIDR(u.nominal)}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-[11px] font-black text-emerald-600">Rp {formatIDR(u.approved)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                                  <div className="overflow-x-auto">
+                                    <Table>
+                                      <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                                        <TableRow>
+                                          <TableHead className="w-10">No</TableHead>
+                                          <TableHead>Surat Pengajuan (No, Tanggal, Hal)</TableHead>
+                                          <TableHead className="text-right">Nominal Diajukan (Rp)</TableHead>
+                                          <TableHead className="text-right text-emerald-700">Nominal Disetujui (Rp)</TableHead>
+                                          <TableHead className="text-center">Jenis & Status</TableHead>
+                                          <TableHead className="text-center w-20">Aksi</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {u.items.map((subItem: any, subIdx: number) => (
+                                          <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                                            <TableCell className="font-bold text-slate-400 text-center text-[11px]">{subIdx + 1}</TableCell>
+                                            <TableCell className="space-y-0.5">
+                                              <div className="font-bold text-slate-900 font-mono text-[11px]">{subItem.no_surat_pengajuan || '-'}</div>
+                                              <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
+                                              <div className="text-slate-600 text-[11px] truncate max-w-sm">{subItem.hal_surat_pengajuan || '-'}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono font-bold text-amber-900 text-xs">
+                                              Rp {formatRp(subItem.nominal_diajukan)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono font-black text-emerald-700 text-xs">
+                                              Rp {formatRp(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)}
+                                            </TableCell>
+                                            <TableCell className="text-center space-y-1">
+                                              <div>
+                                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px]">
+                                                  {subItem.jenis_tambah_pagu || 'Penugasan'}
+                                                </Badge>
+                                              </div>
+                                              <div>
+                                                <Badge className={`px-2 py-0.5 text-[9px] uppercase ${getStatusBadgeStyle(subItem.status_pengajuan)}`}>
+                                                  {subItem.status_pengajuan || 'Diajukan'}
+                                                </Badge>
+                                              </div>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setViewDetailData(subItem);
+                                                }}
+                                                className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-all"
+                                                title="Lihat Pop-up Detail"
+                                              >
+                                                <Eye size={14} />
+                                              </button>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       )}
+
+      {/* TAB 3: VISUALISASI TREN & GRAFIS */}
+      {activeTab === 'chart' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white p-6">
+            <CardHeader className="px-0 pt-0 pb-4">
+              <CardTitle className="text-base font-black text-slate-900">
+                Grafik Volume & Nominal Usulan Tambah Pagu ({selectedYear})
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500 font-medium">
+                Perbandingan nominal usulan diajukan vs disetujui per bulan
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0">
+              <div className="h-[380px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={statsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#475569' }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} tickFormatter={(val) => `Rp ${(val/1e6).toFixed(0)}M`} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#f59e0b' }} />
+                    <Tooltip formatter={(value: any, name: any) => [`Rp ${formatRp(value)}`, name === 'proposed' ? 'Nominal Diajukan' : 'Nominal Disetujui']} />
+                    <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px', fontWeight: 'bold', fontSize: '12px' }} />
+                    <Bar yAxisId="left" dataKey="proposed" name="Nominal Diajukan" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25} />
+                    <Bar yAxisId="left" dataKey="approved" name="Nominal Disetujui" fill="#10b981" radius={[4, 4, 0, 0]} barSize={25} />
+                    <Line yAxisId="right" type="monotone" dataKey="count" name="Jumlah Surat" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b' }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* POP-UP DETAIL DIALOG (WHEN EYE ICON CLICKED) */}
+      <Dialog open={!!viewDetailData} onOpenChange={(open) => !open && setViewDetailData(null)}>
+        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[750px] w-full max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl">
+          <DialogHeader className="border-b border-slate-100 pb-4">
+            <div className="flex justify-between items-center gap-2">
+              <div>
+                <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <FileText className="text-emerald-600" size={20} />
+                  Detail Usulan Tambah Pagu #{viewDetailData?.id}
+                </DialogTitle>
+                <DialogDescription className="text-slate-500 text-xs mt-0.5">
+                  {viewDetailData?.gov_units?.nama_unit || viewDetailData?.unit_kerja_nama || viewDetailData?.unit_pengusul} — Tahun {viewDetailData?.tahun_anggaran}
+                </DialogDescription>
+              </div>
+
+              <Badge className={`px-3 py-1 text-xs font-black uppercase ${getStatusBadgeStyle(viewDetailData?.status_pengajuan)}`}>
+                {viewDetailData?.status_pengajuan || 'Diajukan'}
+              </Badge>
+            </div>
+          </DialogHeader>
+
+          {viewDetailData && (
+            <div className="space-y-6 text-xs mt-4">
+              {/* TABEL PENGAJUAN */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2.5 font-black text-slate-800 text-xs border-b border-slate-200 flex items-center gap-2">
+                  <FileText size={14} className="text-indigo-600" /> I. Data Pengajuan Surat Masuk
+                </div>
+                <Table>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="w-36 bg-slate-50/50 font-bold text-slate-500">No Surat Pengajuan</TableCell>
+                      <TableCell className="font-mono font-bold text-slate-900">{viewDetailData.no_surat_pengajuan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Tanggal Pengajuan</TableCell>
+                      <TableCell className="font-bold text-slate-700">{viewDetailData.tanggal_surat_pengajuan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Hal / Perihal</TableCell>
+                      <TableCell className="font-medium text-slate-800">{viewDetailData.hal_surat_pengajuan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-amber-50/40">
+                      <TableCell className="bg-amber-100/50 font-bold text-amber-900">Nominal Diajukan</TableCell>
+                      <TableCell className="font-mono font-black text-amber-900 text-sm">
+                        Rp {formatRp(viewDetailData.nominal_diajukan)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* TABEL TANGGAPAN */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2.5 font-black text-slate-800 text-xs border-b border-slate-200 flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-600" /> II. Data Tanggapan Pimpinan
+                </div>
+                <Table>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="w-36 bg-slate-50/50 font-bold text-slate-500">No Surat Tanggapan</TableCell>
+                      <TableCell className="font-mono font-bold text-slate-900">{viewDetailData.no_surat_tanggapan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Tanggal Tanggapan</TableCell>
+                      <TableCell className="font-bold text-slate-700">{viewDetailData.tanggal_surat_tanggapan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-emerald-50/40">
+                      <TableCell className="bg-emerald-100/50 font-bold text-emerald-900">Nominal Disetujui</TableCell>
+                      <TableCell className="font-mono font-black text-emerald-800 text-sm">
+                        Rp {formatRp(viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* RINGKASAN AI */}
+              {viewDetailData.ringkasan_substansi && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
+                  <span className="font-black text-amber-900 uppercase text-[10px] flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-amber-600" /> Ringkasan Substansi AI
+                  </span>
+                  <div 
+                    className="text-slate-800 font-medium leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: viewDetailData.ringkasan_substansi }}
+                  />
+                </div>
+              )}
+
+              {/* FOOTER ACTIONS */}
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setViewDetailData(null)}
+                  className="rounded-xl font-bold text-xs"
+                >
+                  Tutup
+                </Button>
+                <Button 
+                  onClick={() => {
+                    const targetId = viewDetailData.id;
+                    setViewDetailData(null);
+                    router.push(`/tambah-pagu/view/${targetId}`);
+                  }}
+                  className="bg-slate-900 text-white rounded-xl font-bold text-xs"
+                >
+                  <ExternalLink size={14} className="mr-1.5" /> Buka Halaman Penuh
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

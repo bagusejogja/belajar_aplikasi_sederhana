@@ -246,7 +246,52 @@ export default function AnalisisPaguPage() {
          if (err3) throw err3;
       }
 
-      alert('Seluruh Data (Utama, Realisasi, Historis) berhasil disimpan!');
+      // ELEGANT SEAMLESS AUTO-SYNC TO TABEL tambah_pagu
+      if (mainData.no_surat) {
+         const cleanNum = (str: string) => {
+            const c = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+            return parseFloat(c.replace(/[^0-9.-]+/g, '')) || 0;
+         };
+
+         let unitId = null;
+         if (mainData.unit_pengirim) {
+            const { data: matchedUnit } = await supabase.from('gov_units')
+               .select('id')
+               .ilike('nama_unit', `%${mainData.unit_pengirim}%`)
+               .limit(1)
+               .maybeSingle();
+            if (matchedUnit) unitId = matchedUnit.id;
+         }
+
+         const targetYear = mainData.tanggal_surat ? new Date(mainData.tanggal_surat).getFullYear().toString() : '2026';
+         
+         const syncTambahPaguPayload = {
+            no_surat_pengajuan: mainData.no_surat,
+            tanggal_surat_pengajuan: mainData.tanggal_surat || null,
+            hal_surat_pengajuan: mainData.perihal || '',
+            unit_kerja_nama: mainData.unit_pengirim || '',
+            unit_id: unitId,
+            tahun_anggaran: targetYear,
+            nominal_diajukan: cleanNum(mainData.total_anggaran),
+            nominal_tanggapan: cleanNum(mainData.nominal_disetujui),
+            status_pengajuan: mainData.keputusan || 'disetujui semua',
+            ringkasan_substansi: mainData.analisis_html || mainData.ringkasan_ai || '',
+            subyek_pengajuan_di_simaster_persuratan: mainData.subyek_persuratan_simaster || ''
+         };
+
+         const { data: existingTp } = await supabase.from('tambah_pagu')
+            .select('id')
+            .eq('no_surat_pengajuan', mainData.no_surat)
+            .maybeSingle();
+
+         if (existingTp) {
+            await supabase.from('tambah_pagu').update(syncTambahPaguPayload).eq('id', existingTp.id);
+         } else {
+            await supabase.from('tambah_pagu').insert([syncTambahPaguPayload]);
+         }
+      }
+
+      alert('Seluruh Data Analisis & Rekomendasi Pagu berhasil disimpan & disinkronkan ke Tambah Pagu!');
     } catch (e: any) {
       alert('Gagal menyimpan: ' + e.message);
     }

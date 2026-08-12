@@ -1,0 +1,753 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { getTambahPagu } from '@/app/actions/tambah-pagu';
+import * as XLSX from 'xlsx';
+import { 
+  Scale, RefreshCw, CheckCircle2, AlertTriangle, 
+  XCircle, Building2, FileText, Search, Sparkles, Download, 
+  Zap, ChevronRight, ChevronDown, ChevronUp, Layers, ArrowUpRight, 
+  ArrowDownRight, ExternalLink, Check, Info
+} from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+export default function KomparasiTambahPaguPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState<string | null>(null);
+
+  // Filters
+  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedGroupOrg, setSelectedGroupOrg] = useState('ALL');
+  const [selectedAuditStatus, setSelectedAuditStatus] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Accordion Expand State
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
+
+  // Sync Confirmation Dialog State
+  const [syncTargetUnit, setSyncTargetUnit] = useState<any | null>(null);
+
+  // Raw Database Data
+  const [rawTambahPagu, setRawTambahPagu] = useState<any[]>([]);
+  const [rawGovPagu, setRawGovPagu] = useState<any[]>([]);
+  const [unitList, setUnitList] = useState<any[]>([]);
+  const [groupOrgOptions, setGroupOrgOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchAuditData();
+  }, [selectedYear]);
+
+  const fetchAuditData = async () => {
+    setIsLoading(true);
+    try {
+      // 1. Fetch Units
+      const { data: units } = await supabase
+        .from('gov_units')
+        .select('id, kode_unit, nama_unit, group_org')
+        .order('nama_unit');
+      
+      const unitsData = units || [];
+      setUnitList(unitsData);
+
+      const groups = Array.from(new Set(unitsData.map(u => u.group_org).filter(Boolean))) as string[];
+      setGroupOrgOptions(groups);
+
+      // 2. Fetch tambah_pagu letters via server action
+      const letters = await getTambahPagu();
+      setRawTambahPagu(letters || []);
+
+      // 3. Fetch gov_pagu_anggaran
+      const { data: govPagu } = await supabase
+        .from('gov_pagu_anggaran')
+        .select('*')
+        .eq('tahun_anggaran', selectedYear);
+      
+      setRawGovPagu(govPagu || []);
+
+    } catch (e: any) {
+      console.error("Gagal memuat data komparasi:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatRp = (num: any) => {
+    if (!num) return '0';
+    const clean = num.toString().replace(/\D/g, '');
+    return new Intl.NumberFormat('id-ID').format(Number(clean) || 0);
+  };
+
+  // AUDIT CALCULATION PER UNIT KERJA (EXCLUDING UNITS WITH 0 MUTATION)
+  const auditUnitComparison = useMemo(() => {
+    const calculated = unitList.map(u => {
+      const uName = u.nama_unit.toLowerCase();
+
+      // Surat-surat usulan tambah_pagu milik unit ini yang disetujui
+      const uLetters = rawTambahPagu.filter(l => {
+        const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || l.unit_pengusul || '').toLowerCase();
+        const matchesUnit = letterUnit === uName || l.unit_id === u.id;
+        const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
+        return matchesUnit && matchesYear;
+      });
+
+      const approvedLetters = uLetters.filter(l => 
+        (l.status_pengajuan || '').toLowerCase().includes('disetujui') || 
+        Number(l.nominal_tanggapan || l.nominal_disetujui || 0) > 0
+      );
+
+      const totalSuratNominalDiajukan = uLetters.reduce((a, b) => a + Number(b.nominal_diajukan || 0), 0);
+      const totalSuratNominalDisetujui = approvedLetters.reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+
+      // Breakdown Inisiatif & Penugasan dari tambah_pagu
+      const suratInisiatif = approvedLetters
+        .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
+        .reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+      
+      const suratPenugasan = approvedLetters
+        .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('penugasan') || !(l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
+        .reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+
+      // Data dari gov_pagu_anggaran milik unit ini
+      const uGovRows = rawGovPagu.filter(r => r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString()));
+
+      const govPaguInisiatif = uGovRows
+        .filter(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif'))
+        .reduce((a, b) => a + Number(b.nominal || 0), 0);
+
+      const govPaguPenugasan = uGovRows
+        .filter(r => (r.jenis_anggaran || '').toLowerCase().includes('penugasan'))
+        .reduce((a, b) => a + Number(b.nominal || 0), 0);
+
+      const totalGovPaguTambah = govPaguInisiatif + govPaguPenugasan;
+
+      const diff = totalSuratNominalDisetujui - totalGovPaguTambah;
+
+      let auditStatus: 'MATCH' | 'KELEWAT' | 'SELISIH' | 'KOSONG' = 'KOSONG';
+      if (totalSuratNominalDisetujui > 0 && totalGovPaguTambah === 0) {
+        auditStatus = 'KELEWAT';
+      } else if (diff === 0 && totalSuratNominalDisetujui > 0) {
+        auditStatus = 'MATCH';
+      } else if (diff !== 0) {
+        auditStatus = 'SELISIH';
+      }
+
+      return {
+        id: u.id,
+        kode_unit: u.kode_unit,
+        nama_unit: u.nama_unit,
+        group_org: u.group_org || '-',
+        total_surat_count: uLetters.length,
+        approved_surat_count: approvedLetters.length,
+        surat_nominal_diajukan: totalSuratNominalDiajukan,
+        surat_nominal_disetujui: totalSuratNominalDisetujui,
+        surat_inisiatif: suratInisiatif,
+        surat_penugasan: suratPenugasan,
+        gov_inisiatif: govPaguInisiatif,
+        gov_penugasan: govPaguPenugasan,
+        total_gov_tambah: totalGovPaguTambah,
+        selisih: diff,
+        audit_status: auditStatus,
+        letters: uLetters
+      };
+    });
+
+    // 🔴 REQUIREMENT 2: FILTER OUT UNITS WITH 0 MUTATION (Alias totalSuratNominalDisetujui === 0 && totalGovPaguTambah === 0)
+    return calculated.filter(u => u.surat_nominal_disetujui > 0 || u.total_gov_tambah > 0 || u.total_surat_count > 0);
+  }, [unitList, rawTambahPagu, rawGovPagu, selectedYear]);
+
+  // Filtered Audit Units
+  const filteredAuditUnits = useMemo(() => {
+    return auditUnitComparison.filter(u => {
+      const q = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || u.nama_unit.toLowerCase().includes(q) || (u.kode_unit && u.kode_unit.toLowerCase().includes(q));
+      const matchesGroup = selectedGroupOrg === 'ALL' || u.group_org === selectedGroupOrg;
+      const matchesStatus = selectedAuditStatus === 'ALL' || u.audit_status === selectedAuditStatus;
+      return matchesSearch && matchesGroup && matchesStatus;
+    });
+  }, [auditUnitComparison, searchTerm, selectedGroupOrg, selectedAuditStatus]);
+
+  // Overall KPI Summary
+  const kpiAuditSummary = useMemo(() => {
+    const totalUnits = auditUnitComparison.length;
+    const matchUnits = auditUnitComparison.filter(u => u.audit_status === 'MATCH').length;
+    const kelewatUnits = auditUnitComparison.filter(u => u.audit_status === 'KELEWAT');
+    const selisihUnits = auditUnitComparison.filter(u => u.audit_status === 'SELISIH');
+
+    const totalKelewatAnggaran = kelewatUnits.reduce((a, b) => a + b.surat_nominal_disetujui, 0);
+    const totalSelisihAnggaran = selisihUnits.reduce((a, b) => a + Math.abs(b.selisih), 0);
+
+    return {
+      totalUnits,
+      matchUnits,
+      kelewatCount: kelewatUnits.length,
+      kelewatAnggaran: totalKelewatAnggaran,
+      selisihCount: selisihUnits.length,
+      selisihAnggaran: totalSelisihAnggaran
+    };
+  }, [auditUnitComparison]);
+
+  // Toggle Accordion Expand per Unit
+  const toggleUnitAccordion = (unitId: string) => {
+    setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
+  };
+
+  // EXECUTE SYNC AFTER CONFIRMATION
+  const executeSync = async () => {
+    if (!syncTargetUnit) return;
+
+    const unitAudit = syncTargetUnit;
+    setIsSyncing(unitAudit.id);
+    setSyncTargetUnit(null);
+
+    try {
+      // 1. Check existing rows in gov_pagu_anggaran for inisiatif & penugasan
+      const { data: existingRows } = await supabase
+        .from('gov_pagu_anggaran')
+        .select('*')
+        .eq('unit_id', unitAudit.id)
+        .eq('tahun_anggaran', selectedYear);
+
+      const inisiatifRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif'));
+      const penugasanRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('penugasan'));
+
+      // Update / Insert Inisiatif
+      if (unitAudit.surat_inisiatif > 0) {
+        if (inisiatifRow) {
+          await supabase.from('gov_pagu_anggaran').update({ nominal: unitAudit.surat_inisiatif }).eq('id', inisiatifRow.id);
+        } else {
+          await supabase.from('gov_pagu_anggaran').insert([{
+            unit_id: unitAudit.id,
+            tahun_anggaran: selectedYear,
+            jenis_anggaran: 'tambah pagu - inisiatif',
+            nominal: unitAudit.surat_inisiatif
+          }]);
+        }
+      }
+
+      // Update / Insert Penugasan
+      if (unitAudit.surat_penugasan > 0) {
+        if (penugasanRow) {
+          await supabase.from('gov_pagu_anggaran').update({ nominal: unitAudit.surat_penugasan }).eq('id', penugasanRow.id);
+        } else {
+          await supabase.from('gov_pagu_anggaran').insert([{
+            unit_id: unitAudit.id,
+            tahun_anggaran: selectedYear,
+            jenis_anggaran: 'tambah pagu - penugasan',
+            nominal: unitAudit.surat_penugasan
+          }]);
+        }
+      }
+
+      await fetchAuditData();
+      alert(`✨ Berhasil menyinkronkan data Tambah Pagu ${unitAudit.nama_unit} ke database gov_pagu_anggaran! Status kini 🟢 MATCH!`);
+    } catch (err: any) {
+      alert("Gagal menyinkronkan data: " + err.message);
+    } finally {
+      setIsSyncing(null);
+    }
+  };
+
+  // Export Native Excel Audit Report (.xlsx)
+  const exportAuditExcel = () => {
+    const auditRows = filteredAuditUnits.map((u, idx) => ({
+      'No': idx + 1,
+      'Kode Unit': u.kode_unit || '-',
+      'Nama Unit Kerja': u.nama_unit,
+      'Group Org': u.group_org,
+      'Jumlah Surat Disetujui': u.approved_surat_count,
+      'Nominal Disetujui Surat (tambah_pagu)': u.surat_nominal_disetujui,
+      'Nominal Inisiatif Surat': u.surat_inisiatif,
+      'Nominal Penugasan Surat': u.surat_penugasan,
+      'Nominal Tercatat DB (gov_pagu_anggaran)': u.total_gov_tambah,
+      'Nominal Inisiatif DB': u.gov_inisiatif,
+      'Nominal Penugasan DB': u.gov_penugasan,
+      'Selisih / Diff (Rp)': u.selisih,
+      'Status Audit': u.audit_status === 'MATCH' ? '🟢 MATCH (Sesuai)' : u.audit_status === 'KELEWAT' ? '⚠️ KELEWAT (Belum Dicatat)' : u.audit_status === 'SELISIH' ? '🔴 SELISIH (Ada Beda)' : 'KOSONG'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(auditRows);
+    worksheet['!cols'] = [
+      { wch: 6 },  { wch: 12 }, { wch: 35 }, { wch: 16 }, { wch: 22 },
+      { wch: 32 }, { wch: 22 }, { wch: 22 }, { wch: 32 }, { wch: 20 },
+      { wch: 20 }, { wch: 20 }, { wch: 28 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Komparasi Tambah Pagu");
+
+    const fileName = `Audit_Komparasi_Tambah_Pagu_${selectedYear}_${new Date().getTime()}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  if (isLoading) return (
+    <div className="h-screen flex flex-col justify-center items-center gap-4 bg-slate-50">
+      <RefreshCw className="animate-spin text-emerald-600 w-10 h-10" />
+      <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest">Menghubungkan & Membandingkan Database tambah_pagu & gov_pagu_anggaran...</p>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto pb-32 px-4 pt-6 space-y-6">
+      {/* ROW 1: HEADER TITLE (🔴 REQUIREMENT 1: TOMBOL KEMBALI DIHILANGKAN) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm">
+        <div>
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest mb-1.5">
+            <Sparkles size={16} className="text-amber-500" /> Audit Integritas Data Pagu Anggaran
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+            Komparasi Audit Tambah Pagu
+          </h1>
+          <p className="text-slate-500 font-medium text-xs md:text-sm mt-1">
+            Mengecek dan mencocokkan nominal disetujui di <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">tambah_pagu</code> dengan database <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code> ({selectedYear}).
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <Button 
+            variant="outline" 
+            onClick={fetchAuditData}
+            className="rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-sm h-11"
+          >
+            <RefreshCw size={16} className="mr-2 text-indigo-600" /> Muat Ulang Data
+          </Button>
+
+          <Button 
+            onClick={exportAuditExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-md h-11 px-6"
+          >
+            <Download size={16} className="mr-2" /> Export Audit Excel (.xlsx)
+          </Button>
+        </div>
+      </div>
+
+      {/* ROW 2: 4 AUDIT SUMMARY KPI CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* CARD 1: MATCHING UNITS */}
+        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">🟢 DATA SAMA / MATCH</span>
+            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
+              {kpiAuditSummary.matchUnits} Unit Kerja
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-emerald-700 flex items-center justify-between">
+            <span>Data Terverifikasi Presisi</span>
+            <Badge className="bg-emerald-100 text-emerald-800 text-[10px] font-mono">Rp 0 Selisih</Badge>
+          </div>
+        </div>
+
+        {/* CARD 2: KELEWAT / BELUM DICATAT */}
+        <div className="bg-white rounded-3xl p-6 border border-amber-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 block mb-1">⚠️ KELEWAT / BELUM DICATAT</span>
+            <div className="text-2xl font-black text-amber-700 font-mono tracking-tight">
+              {kpiAuditSummary.kelewatCount} Unit Kerja
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-amber-700 flex items-center justify-between">
+            <span>Perlu Disinkronkan</span>
+            <Badge className="bg-amber-100 text-amber-900 text-[10px] font-mono">Rp {formatRp(kpiAuditSummary.kelewatAnggaran)}</Badge>
+          </div>
+        </div>
+
+        {/* CARD 3: SELISIH NOMINAL */}
+        <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 block mb-1">🔴 SELISIH NOMINAL</span>
+            <div className="text-2xl font-black text-rose-700 font-mono tracking-tight">
+              {kpiAuditSummary.selisihCount} Unit Kerja
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-rose-700 flex items-center justify-between">
+            <span>Total Bedab Nominal</span>
+            <Badge className="bg-rose-100 text-rose-800 text-[10px] font-mono">Rp {formatRp(kpiAuditSummary.selisihAnggaran)}</Badge>
+          </div>
+        </div>
+
+        {/* CARD 4: TOTAL UNIT TERPROSES */}
+        <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block mb-1">TOTAL UNIT DIAUDIT</span>
+            <div className="text-2xl font-black text-indigo-900 font-mono tracking-tight">
+              {kpiAuditSummary.totalUnits} Unit Memiliki Mutasi
+            </div>
+          </div>
+          <div className="mt-4 text-xs font-bold text-indigo-700 flex items-center justify-between">
+            <span>Tahun Anggaran {selectedYear}</span>
+            <Badge className="bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold">Audit Live</Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 3: FILTER TOOLBAR FOR AUDIT */}
+      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center gap-4">
+        <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
+          <Zap size={16} className="text-amber-500" /> FILTER AUDIT:
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
+          {/* Status Audit Dropdown */}
+          <div>
+            <select
+              value={selectedAuditStatus}
+              onChange={(e) => setSelectedAuditStatus(e.target.value)}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer font-bold"
+            >
+              <option value="ALL">✨ Semua Status Audit</option>
+              <option value="MATCH">🟢 MATCH (Sesuai)</option>
+              <option value="KELEWAT">⚠️ KELEWAT (Belum Dicatat)</option>
+              <option value="SELISIH">🔴 SELISIH (Ada Beda Nominal)</option>
+            </select>
+          </div>
+
+          {/* Group Org Filter Dropdown */}
+          <div>
+            <select
+              value={selectedGroupOrg}
+              onChange={(e) => setSelectedGroupOrg(e.target.value)}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+            >
+              <option value="ALL">🏢 Semua Group Org</option>
+              {groupOrgOptions.map((g, idx) => (
+                <option key={idx} value={g}>{g}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tahun Dropdown */}
+          <div>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+            >
+              <option value="2026">📅 Tahun 2026</option>
+              <option value="2025">📅 Tahun 2025</option>
+              <option value="2024">📅 Tahun 2024</option>
+            </select>
+          </div>
+
+          {/* Search Unit */}
+          <div className="relative">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari Unit Kerja..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-[42px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-emerald-500 font-medium"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ROW 4: TABEL AUDIT KOMPARASI PER UNIT KERJA (COLLAPSIBLE ACCORDION PER SURAT) */}
+      <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
+        <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-black text-slate-900">
+              Hasil Komparasi Audit: <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">tambah_pagu</code> VS <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code>
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500 font-medium">
+              Klik baris unit kerja untuk memperluas (expand) rincian surat usulan di dalamnya
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200 text-xs font-bold">
+            {filteredAuditUnits.length} Unit Active
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
+              <TableRow>
+                <TableHead className="w-10 text-center"></TableHead>
+                <TableHead className="w-10 text-center">No</TableHead>
+                <TableHead>Nama Unit Kerja & Group</TableHead>
+                <TableHead className="text-right text-amber-900">Surat Disetujui (tambah_pagu)</TableHead>
+                <TableHead className="text-right text-emerald-900">Tercatat DB (gov_pagu_anggaran)</TableHead>
+                <TableHead className="text-right">Selisih / Diff (Rp)</TableHead>
+                <TableHead className="text-center">Status Audit</TableHead>
+                <TableHead className="text-center w-36">Aksi Sinkronisasi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAuditUnits.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-12 text-slate-400 font-medium">
+                    Tidak ada unit kerja yang memiliki mutasi atau sesuai filter.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAuditUnits.map((u, idx) => {
+                  const isExpanded = !!expandedUnits[u.id];
+
+                  return (
+                    <React.Fragment key={u.id}>
+                      {/* PARENT ROW: UNIT AUDIT SUMMARY */}
+                      <TableRow 
+                        onClick={() => toggleUnitAccordion(u.id)}
+                        className={`cursor-pointer transition-colors border-b border-slate-100 text-xs ${
+                          isExpanded ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <TableCell className="text-center">
+                          <button className="p-1 rounded-md text-slate-400 hover:text-slate-800">
+                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-slate-400 align-top pt-3.5">{idx + 1}</TableCell>
+                        
+                        {/* UNIT NAME & GROUP */}
+                        <TableCell className="align-top pt-3 space-y-1">
+                          <div className="flex items-center gap-1.5 font-black text-slate-900">
+                            <Building2 size={14} className="text-indigo-600 shrink-0" />
+                            <span>{u.nama_unit}</span>
+                          </div>
+                          <span className="text-[10px] text-indigo-700 font-semibold px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md inline-block">
+                            {u.group_org}
+                          </span>
+                        </TableCell>
+
+                        {/* SURAT DISETUJUI NOMINAL */}
+                        <TableCell className="text-right align-top pt-3 space-y-1">
+                          <div className="font-mono font-bold text-amber-900">Rp {formatRp(u.surat_nominal_disetujui)}</div>
+                          <div className="text-[10px] text-slate-500 font-semibold">{u.approved_surat_count} Surat Disetujui</div>
+                        </TableCell>
+
+                        {/* GOV PAGU NOMINAL */}
+                        <TableCell className="text-right align-top pt-3 space-y-1">
+                          <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
+                          <div className="text-[10px] text-slate-400">
+                            Inisiatif: Rp {formatRp(u.gov_inisiatif)} | Penugasan: Rp {formatRp(u.gov_penugasan)}
+                          </div>
+                        </TableCell>
+
+                        {/* SELISIH / DIFF */}
+                        <TableCell className="text-right align-top pt-3 font-mono font-bold">
+                          <span className={u.selisih === 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-black"}>
+                            {u.selisih > 0 ? `+ Rp ${formatRp(u.selisih)}` : u.selisih < 0 ? `- Rp ${formatRp(Math.abs(u.selisih))}` : 'Rp 0'}
+                          </span>
+                        </TableCell>
+
+                        {/* AUDIT STATUS BADGE */}
+                        <TableCell className="text-center align-top pt-3">
+                          {u.audit_status === 'MATCH' && (
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                              🟢 MATCH (Sesuai)
+                            </Badge>
+                          )}
+                          {u.audit_status === 'KELEWAT' && (
+                            <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-black text-[10px] animate-pulse">
+                              ⚠️ KELEWAT (Belum Dicatat)
+                            </Badge>
+                          )}
+                          {u.audit_status === 'SELISIH' && (
+                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 font-black text-[10px]">
+                              🔴 SELISIH (Ada Beda)
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        {/* ACTION SINKRONISASI */}
+                        <TableCell className="text-center align-top pt-3">
+                          {u.audit_status === 'KELEWAT' || u.audit_status === 'SELISIH' ? (
+                            <Button
+                              size="sm"
+                              disabled={isSyncing === u.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSyncTargetUnit(u);
+                              }}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-xl h-8 px-3 shadow-sm"
+                            >
+                              {isSyncing === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} className="mr-1 text-amber-300" />}
+                              Sinkronkan
+                            </Button>
+                          ) : (
+                            <span className="text-[10px] text-emerald-600 font-bold flex items-center justify-center gap-1">
+                              <Check size={12} /> Terverifikasi
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+
+                      {/* 🔴 REQUIREMENT 3: ACCORDION CHILD ROW - DETAIL SURAT PENGAJUAN PER UNIT */}
+                      {isExpanded && (
+                        <TableRow className="bg-slate-50/90 border-b border-slate-200">
+                          <TableCell colSpan={8} className="p-4 md:p-6">
+                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-inner space-y-3">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                  <FileText size={14} className="text-indigo-600" />
+                                  Rincian Surat Usulan: {u.nama_unit} ({u.letters.length} Surat)
+                                </h4>
+                                <span className="text-[10px] text-slate-400 font-bold">Rincian Komparasi per Surat</span>
+                              </div>
+
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                                    <TableRow>
+                                      <TableHead className="w-10">No</TableHead>
+                                      <TableHead>Surat Pengajuan (No, Tanggal, Hal)</TableHead>
+                                      <TableHead className="text-right">Nominal Diajukan (Rp)</TableHead>
+                                      <TableHead className="text-right text-emerald-700">Nominal Disetujui (Rp)</TableHead>
+                                      <TableHead className="text-center">Jenis Tambah Pagu</TableHead>
+                                      <TableHead className="text-center">Status Keputusan</TableHead>
+                                      <TableHead className="text-center">Ref Database</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {u.letters.length === 0 ? (
+                                      <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-4 text-slate-400">Tidak ada rincian surat usulan untuk unit ini.</TableCell>
+                                      </TableRow>
+                                    ) : (
+                                      u.letters.map((subItem: any, subIdx: number) => {
+                                        const isApproved = (subItem.status_pengajuan || '').toLowerCase().includes('disetujui') || Number(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0) > 0;
+
+                                        return (
+                                          <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                                            <TableCell className="font-bold text-slate-400 text-center text-[11px]">{subIdx + 1}</TableCell>
+                                            <TableCell className="space-y-0.5">
+                                              <div className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</div>
+                                              <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
+                                              <div className="text-slate-600 text-[11px] truncate max-w-md">{subItem.hal_surat_pengajuan || '-'}</div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono font-bold text-amber-900 text-xs">
+                                              Rp {formatRp(subItem.nominal_diajukan)}
+                                            </TableCell>
+                                            <TableCell className="text-right font-mono font-black text-emerald-700 text-xs">
+                                              Rp {formatRp(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px] font-bold">
+                                                {subItem.jenis_tambah_pagu || 'Penugasan'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              <Badge className={`px-2 py-0.5 text-[9px] uppercase font-black ${
+                                                isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                              }`}>
+                                                {subItem.status_pengajuan || 'Diajukan'}
+                                              </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                              {isApproved ? (
+                                                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                                  Pagu Disetujui
+                                                </span>
+                                              ) : (
+                                                <span className="text-[10px] text-slate-400">Draft / Usulan</span>
+                                              )}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* 🔴 REQUIREMENT 4: DIALOG SINKRONISASI DATA */}
+      <Dialog open={!!syncTargetUnit} onOpenChange={(open) => !open && setSyncTargetUnit(null)}>
+        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[550px] w-full rounded-3xl p-6 shadow-2xl">
+          <DialogHeader className="border-b border-slate-100 pb-4">
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Zap className="text-amber-500" size={20} />
+              Konfirmasi Sinkronisasi Pagu Ke Database
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-xs mt-1">
+              Data nominal persetujuan surat dari <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono font-bold">tambah_pagu</code> akan dimasukkan/diperbarui langsung ke tabel database <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code>.
+            </DialogDescription>
+          </DialogHeader>
+
+          {syncTargetUnit && (
+            <div className="space-y-4 text-xs mt-2">
+              <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-100 space-y-2">
+                <div className="font-black text-indigo-900 text-sm flex items-center gap-2">
+                  <Building2 size={16} />
+                  {syncTargetUnit.nama_unit} ({syncTargetUnit.group_org})
+                </div>
+                <div className="text-slate-600 font-medium">
+                  Tahun Anggaran: <span className="font-bold text-slate-900">{selectedYear}</span>
+                </div>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-slate-50 px-4 py-2 font-bold text-slate-700 text-xs border-b border-slate-200">
+                  Rincian Nominal yang Akan Disimpan ke DB:
+                </div>
+                <Table>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-bold text-slate-600">Nominal Inisiatif (Rp)</TableCell>
+                      <TableCell className="text-right font-mono font-bold text-slate-900">
+                        Rp {formatRp(syncTargetUnit.surat_inisiatif)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-bold text-slate-600">Nominal Penugasan (Rp)</TableCell>
+                      <TableCell className="text-right font-mono font-bold text-slate-900">
+                        Rp {formatRp(syncTargetUnit.surat_penugasan)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="bg-emerald-50">
+                      <TableCell className="font-black text-emerald-900">TOTAL HASIL SINKRONISASI</TableCell>
+                      <TableCell className="text-right font-mono font-black text-emerald-800 text-sm">
+                        Rp {formatRp(syncTargetUnit.surat_nominal_disetujui)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-amber-900">
+                <Info size={16} className="shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  Proses ini akan mengubah status audit unit ini menjadi <strong>🟢 MATCH (Sesuai)</strong> secara real-time.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-slate-100 pt-4 flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setSyncTargetUnit(null)}
+              className="rounded-xl font-bold text-xs"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={executeSync}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md px-5"
+            >
+              <Zap size={14} className="mr-1.5 text-amber-300" />
+              Proses Sinkronisasi Sekarang
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
