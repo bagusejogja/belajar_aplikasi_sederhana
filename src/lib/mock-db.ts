@@ -84,6 +84,7 @@ export const menuList: MenuItem[] = [
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN ---
+  { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Anggaran' },
   { title: 'Laporan Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Analisis Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },

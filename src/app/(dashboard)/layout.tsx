@@ -99,6 +99,7 @@ export default function DashboardLayout({
       case '/menus': return 'Manajemen Menu';
       case '/gov-narrative': return 'Narrative Generator';
       case '/surat/convert-ai': return 'AI Convert Surat';
+      case '/potret-mutasi-pagu': return 'Potret Mutasi Pagu Keseluruhan';
       default: return 'Dashboard';
     }
   };
