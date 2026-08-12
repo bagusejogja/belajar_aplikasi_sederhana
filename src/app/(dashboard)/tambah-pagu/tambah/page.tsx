@@ -13,6 +13,9 @@ import {
   Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp
 } from 'lucide-react';
 import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
+import { 
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
 
 export default function TambahPaguFormPage() {
   const router = useRouter();
@@ -863,52 +866,45 @@ export default function TambahPaguFormPage() {
                 </div>
               </div>
 
-              {/* 2. INTERACTIVE BAR CHART / GRAFIK HISTORIS (TAB 2 ENHANCEMENT) */}
+              {/* 2. RECHARTS COMPOSED CHART (MATCHING /ANALISIS) */}
               {paguUnitHistory.length > 0 && (
                 <div className="space-y-4 pt-6 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                      <BarChart3 size={14} /> Grafik Tren Histori Pagu & Realisasi Unit (2019 - 2026)
+                      <BarChart3 size={14} /> Grafik Pagu vs Realisasi (Multi-Tahun 2019 - 2026)
                     </h3>
-                    <div className="flex items-center gap-4 text-[11px] font-bold">
-                      <span className="flex items-center gap-1 text-amber-600"><span className="w-3 h-3 rounded-full bg-amber-500 inline-block"/> Pagu Awal</span>
-                      <span className="flex items-center gap-1 text-indigo-600"><span className="w-3 h-3 rounded-full bg-indigo-600 inline-block"/> Total Pagu</span>
-                      <span className="flex items-center gap-1 text-emerald-600"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"/> Realisasi</span>
-                    </div>
                   </div>
 
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-6 shadow-inner">
-                    <div className="h-48 flex items-end gap-3 md:gap-6 pt-6 px-2 overflow-x-auto">
-                      {paguUnitHistory.map((item, idx) => {
-                        const maxVal = Math.max(...paguUnitHistory.map(h => h.total_pagu || 1));
-                        const hPaguAwal = maxVal > 0 ? (item.pagu_awal / maxVal) * 100 : 0;
-                        const hTotal = maxVal > 0 ? (item.total_pagu / maxVal) * 100 : 0;
-                        const hRealisasi = maxVal > 0 ? (item.realisasi / maxVal) * 100 : 0;
-
-                        return (
-                          <div key={idx} className="flex-1 flex flex-col items-center gap-2 min-w-[50px] group">
-                            <div className="w-full flex items-end justify-center gap-1 h-36">
-                              <div 
-                                style={{ height: `${Math.max(hPaguAwal, 5)}%` }} 
-                                className="w-2.5 md:w-3.5 bg-amber-400 rounded-t-md transition-all group-hover:bg-amber-500" 
-                                title={`Pagu Awal ${item.tahun}: Rp ${formatNumber(item.pagu_awal)}`}
-                              />
-                              <div 
-                                style={{ height: `${Math.max(hTotal, 5)}%` }} 
-                                className="w-2.5 md:w-3.5 bg-indigo-600 rounded-t-md transition-all group-hover:bg-indigo-700 shadow-sm" 
-                                title={`Total Pagu ${item.tahun}: Rp ${formatNumber(item.total_pagu)}`}
-                              />
-                              <div 
-                                style={{ height: `${Math.max(hRealisasi, 5)}%` }} 
-                                className="w-2.5 md:w-3.5 bg-emerald-500 rounded-t-md transition-all group-hover:bg-emerald-600 shadow-sm" 
-                                title={`Realisasi ${item.tahun}: Rp ${formatNumber(item.realisasi)}`}
-                              />
-                            </div>
-                            <div className="text-[10px] font-black text-slate-700 uppercase tracking-tighter">{item.tahun}</div>
-                            <div className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md">{item.persen_serapan}</div>
-                          </div>
-                        );
-                      })}
+                  <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
+                    <div className="w-full h-[320px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart
+                          data={paguUnitHistory.map((d: any) => ({
+                            tahun: d.tahun,
+                            PaguAwal: Number(d.pagu_awal || 0),
+                            Pengalihan: Number(d.pengalihan || 0),
+                            TambahPenugasan: Number(d.tambah_penugasan || 0),
+                            TambahInisiatif: Number(d.tambah_inisiatif || 0),
+                            Efisiensi: Number(d.efisiensi || 0),
+                            Talangan: Number(d.talangan || 0),
+                            total_pagu: Number(d.total_pagu || 0),
+                            Realisasi: Number(d.realisasi || 0),
+                          }))}
+                          margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                        >
+                          <CartesianGrid stroke="#f5f5f5" />
+                          <XAxis dataKey="tahun" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
+                          <YAxis tickFormatter={(value) => `Rp ${new Intl.NumberFormat('id-ID', {notation: 'compact'}).format(value)}`} axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} width={80} />
+                          <Tooltip formatter={(value: any) => `Rp ${new Intl.NumberFormat('id-ID').format(value)}`} />
+                          <Legend wrapperStyle={{fontSize: '12px'}} />
+                          <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tmbh Penugasan" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tmbh Inisiatif" radius={[4, 4, 0, 0]} />
+                          <Line type="monotone" dataKey="total_pagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 5, fill: '#06b6d4'}} activeDot={{r: 7}} />
+                          <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} name="Realisasi" dot={{r: 5, fill: '#f59e0b'}} activeDot={{r: 7}} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
                 </div>

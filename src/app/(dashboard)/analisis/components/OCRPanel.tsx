@@ -125,14 +125,17 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
 
     const textLower = ocrText.toLowerCase();
 
+    // Helper for unit name
+    const getUnitName = (u: any) => (u?.nama_unit || u?.label || '').toString();
+
     // 4a. Cek Akronim jika rawUnit ditemukan
     if (rawUnit) {
-      const foundDirect = availableUnits.find(u => 
-        u.nama_unit.toLowerCase().includes(rawUnit.toLowerCase()) || 
-        rawUnit.toLowerCase().includes(u.nama_unit.toLowerCase())
-      );
+      const foundDirect = availableUnits.find(u => {
+        const name = getUnitName(u).toLowerCase();
+        return name && (name.includes(rawUnit.toLowerCase()) || rawUnit.toLowerCase().includes(name));
+      });
       if (foundDirect) {
-        unit_pengirim = foundDirect.nama_unit;
+        unit_pengirim = getUnitName(foundDirect);
       }
     }
 
@@ -140,9 +143,9 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
     if (!unit_pengirim) {
       for (const [acronym, keyword] of Object.entries(acronyms)) {
         if (textLower.includes(acronym)) {
-          const found = availableUnits.find(u => u.nama_unit.toLowerCase().includes(keyword));
+          const found = availableUnits.find(u => getUnitName(u).toLowerCase().includes(keyword));
           if (found) {
-            unit_pengirim = found.nama_unit;
+            unit_pengirim = getUnitName(found);
             break;
           }
         }
@@ -151,11 +154,12 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
 
     // 4c. Substring match langsung dari nama unit
     if (!unit_pengirim) {
-      const matchedFromText = availableUnits.find(u => 
-        textLower.includes(u.nama_unit.toLowerCase())
-      );
+      const matchedFromText = availableUnits.find(u => {
+        const name = getUnitName(u).toLowerCase();
+        return name && textLower.includes(name);
+      });
       if (matchedFromText) {
-        unit_pengirim = matchedFromText.nama_unit;
+        unit_pengirim = getUnitName(matchedFromText);
       }
     }
 
