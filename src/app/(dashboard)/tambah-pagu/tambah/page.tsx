@@ -8,7 +8,8 @@ import {
   Save, ArrowLeft, FileText, Calendar, 
   Building2, Tag, DollarSign, MessageSquare, 
   UploadCloud, CheckCircle2, Loader2, Sparkles,
-  Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle
+  Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
+  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle
 } from 'lucide-react';
 
 export default function TambahPaguFormPage() {
@@ -17,12 +18,18 @@ export default function TambahPaguFormPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [listUnit, setListUnit] = useState<any[]>([]);
   
+  // Stepped Tab Navigation State
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3'>('step1');
+
   // Analisis Riwayat Modal & Selection State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [listAnalisis, setListAnalisis] = useState<any[]>([]);
   const [loadingAnalisis, setLoadingAnalisis] = useState(false);
   const [searchAnalisis, setSearchAnalisis] = useState('');
   const [selectedAnalisis, setSelectedAnalisis] = useState<any | null>(null);
+
+  // Unit History Pagu State
+  const [paguUnitHistory, setPaguUnitHistory] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     tahun_anggaran: 2026,
@@ -56,6 +63,14 @@ export default function TambahPaguFormPage() {
     fetchAnalisisAndUsed();
   }, []);
 
+  useEffect(() => {
+    if (formData.unit_id?.value) {
+      fetchUnitPaguHistory(formData.unit_id.value);
+    } else {
+      setPaguUnitHistory([]);
+    }
+  }, [formData.unit_id]);
+
   const fetchUnits = async () => {
     const { data } = await supabase.from('gov_units').select('id, nama_unit').order('nama_unit', { ascending: true });
     if (data) {
@@ -64,10 +79,60 @@ export default function TambahPaguFormPage() {
     setIsLoading(false);
   };
 
+  const fetchUnitPaguHistory = async (unitId: any) => {
+    if (!unitId) return;
+    try {
+      const { data: paguData } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
+      const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
+
+      if (paguData && realisasiData) {
+        const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
+        const filteredYears = years.filter(y => parseInt(y) >= 2019).sort();
+
+        const history = filteredYears.map(year => {
+          const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
+          const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
+
+          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguPengalihan = paguTambah + paguKurang;
+
+          const paguTambahPenugasan = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahInisiatif = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguEfisiensi = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'efisiensi') || (p.jenis_anggaran?.toLowerCase()?.includes('tambah pagu') && Number(p.nominal) < 0)).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
+
+          const totalPagu = paguAwal + paguPengalihan + paguTambahPenugasan + paguTambahInisiatif + paguEfisiensi + paguTalangan;
+          const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
+
+          let serapan = 0;
+          if (totalPagu > 0) serapan = (totalRealisasi / totalPagu) * 100;
+
+          return {
+            tahun: year,
+            pagu_awal: paguAwal,
+            pengalihan: paguPengalihan,
+            tambah_penugasan: paguTambahPenugasan,
+            tambah_inisiatif: paguTambahInisiatif,
+            efisiensi: paguEfisiensi,
+            talangan: paguTalangan,
+            total_pagu: totalPagu,
+            realisasi: totalRealisasi,
+            persen_serapan: serapan.toFixed(2) + '%'
+          };
+        });
+
+        setPaguUnitHistory(history);
+      }
+    } catch (e) {
+      console.error("Gagal load history unit:", e);
+    }
+  };
+
   const fetchAnalisisAndUsed = async () => {
     setLoadingAnalisis(true);
     try {
-      // 1. Fetch all records from app_analisis_utama
       const { data: dataAnalisis, error: errAnalisis } = await supabase
         .from('app_analisis_utama')
         .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, analisis_html, created_at')
@@ -77,7 +142,6 @@ export default function TambahPaguFormPage() {
         console.error("Error fetching analisis:", errAnalisis);
       }
 
-      // 2. Fetch existing tambah_pagu to check used no_surat
       const { data: dataTambahPagu } = await supabase
         .from('tambah_pagu')
         .select('no_surat_pengajuan, no_surat_tanggapan');
@@ -98,6 +162,7 @@ export default function TambahPaguFormPage() {
           let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
           let keputusan = item.keputusan || '';
           let nominalDisetujui = item.nominal_disetujui || '0';
+          let ringkasanHtml = '';
 
           if (item.analisis_html) {
             try {
@@ -105,7 +170,10 @@ export default function TambahPaguFormPage() {
               if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
               if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
               if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
-            } catch(e) {}
+              if (parsed.analisis) ringkasanHtml = parsed.analisis;
+            } catch(e) {
+              ringkasanHtml = item.analisis_html;
+            }
           }
 
           return {
@@ -113,6 +181,7 @@ export default function TambahPaguFormPage() {
             subyek_persuratan_simaster: subyekSimaster,
             keputusan: keputusan || 'diajukan',
             nominal_disetujui: nominalDisetujui,
+            ringkasan_html: ringkasanHtml,
             is_used: isUsed
           };
         });
@@ -176,7 +245,8 @@ export default function TambahPaguFormPage() {
       nominal_diajukan: numDiajukan || prev.nominal_diajukan,
       nominal_tanggapan: numDisetujui !== '0' ? numDisetujui : prev.nominal_tanggapan,
       status_pengajuan: statusMapped,
-      link_surat_pengajuan: item.link_lampiran || prev.link_surat_pengajuan
+      link_surat_pengajuan: item.link_lampiran || prev.link_surat_pengajuan,
+      ringkasan_surat_pengajuan: item.ringkasan_html || prev.ringkasan_surat_pengajuan
     }));
 
     setSelectedAnalisis(item);
@@ -187,8 +257,8 @@ export default function TambahPaguFormPage() {
     setSelectedAnalisis(null);
   };
 
-  const formatNumber = (num: string) => {
-    if (!num) return '';
+  const formatNumber = (num: string | number) => {
+    if (!num) return '0';
     const clean = num.toString().replace(/\D/g, '');
     return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
@@ -211,7 +281,8 @@ export default function TambahPaguFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.unit_id || !formData.no_surat_pengajuan) {
-      alert("Mohon lengkapi data wajib (Unit & No Surat Pengajuan)");
+      alert("Mohon lengkapi data wajib (Unit & No Surat Pengajuan) di Tahap 1!");
+      setActiveStep('step1');
       return;
     }
 
@@ -243,7 +314,7 @@ export default function TambahPaguFormPage() {
       const result = await response.json();
       
       if (result.success) {
-        alert("Data Tambah Pagu Berhasil Disimpan!");
+        alert("Data Usulan Tambah Pagu Berhasil Disimpan!");
         router.push('/tambah-pagu');
       } else {
         throw new Error(result.error || "Gagal simpan via API");
@@ -266,18 +337,20 @@ export default function TambahPaguFormPage() {
     );
   });
 
+  const historis2026Row = paguUnitHistory.find(d => d.tahun === '2026') || paguUnitHistory[paguUnitHistory.length - 1] || {};
+
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto pb-32 px-4">
+    <div className="max-w-5xl mx-auto pb-36 px-4">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
           <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1">
-            <Sparkles size={14} /> New Entry
+            <Sparkles size={14} /> New Entry Workflow
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tambah Usulan Pagu</h1>
-          <p className="text-gray-500 font-medium mt-1">Impor dari hasil analisis AI atau ketik manual untuk mencatat usulan baru.</p>
+          <p className="text-gray-500 font-medium mt-1">Gunakan alur bertahap di bawah ini untuk melihat data pengajuan dan menginput keputusan tanggapan.</p>
         </div>
         <button 
           onClick={() => router.push('/tambah-pagu')}
@@ -288,18 +361,18 @@ export default function TambahPaguFormPage() {
       </div>
 
       {/* IMPORT BANNER SECTION */}
-      <div className="mb-10">
+      <div className="mb-8">
         {!selectedAnalisis ? (
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] p-6 md:p-8 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
             
             <div className="relative z-10 space-y-1">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
-                <Sparkles size={14} /> Impor Data Otomatis
+                <Sparkles size={14} /> Impor Data Hasil Analisis AI
               </div>
               <h3 className="text-xl font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
               <p className="text-slate-300 text-xs font-medium max-w-xl">
-                Pilih dokumen analisis surat yang sudah ada di modul /analisis agar tidak perlu mengetik ulang data pengajuan, unit, dan nominal.
+                Pilih dokumen dari /analisis untuk melihat tahapan nota analisis dan otomatis mengisikan data pengajuan.
               </p>
             </div>
 
@@ -350,304 +423,511 @@ export default function TambahPaguFormPage() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-10">
+      {/* STEP NAVIGATION TABS */}
+      <div className="flex justify-between items-center bg-white rounded-[2rem] p-2 shadow-sm border border-gray-200/80 mb-8 overflow-x-auto gap-2">
+        {[
+          { id: 'step1', step: '1', title: 'Data Utama & Pengajuan', subtitle: 'Surat Masuk & Ringkasan', icon: FileText },
+          { id: 'step2', step: '2', title: 'Posisi Pagu Unit', subtitle: 'Pagu 2026 & Multi-Tahun', icon: Landmark },
+          { id: 'step3', step: '3', title: 'Tanggapan & Keputusan', subtitle: 'Input Surat Keluar & Simpan', icon: CheckCircle2 },
+        ].map((tab) => {
+          const IconComponent = tab.icon;
+          const isActive = activeStep === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveStep(tab.id as any)}
+              className={`flex-1 flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all min-w-[220px] ${
+                isActive
+                  ? 'bg-slate-900 text-white shadow-md font-black'
+                  : 'text-gray-500 hover:text-gray-900 font-bold hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                isActive ? 'bg-emerald-500 text-slate-950' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {tab.step}
+              </div>
+              <div className="text-left overflow-hidden">
+                <div className="text-xs font-black truncate">{tab.title}</div>
+                <div className={`text-[10px] truncate ${isActive ? 'text-slate-300' : 'text-gray-400'}`}>{tab.subtitle}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <form onSubmit={handleSubmit}>
         
-        {/* CARD 1: INFORMASI DASAR */}
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
-            <Building2 size={120} />
-          </div>
-          
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
-              <Info size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">Informasi Dasar</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
-              <input 
-                type="number" 
-                name="tahun_anggaran"
-                value={formData.tahun_anggaran}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700"
-              />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
-              <Select 
-                options={listUnit} 
-                value={formData.unit_id}
-                onChange={(val) => setFormData({...formData, unit_id: val})}
-                placeholder="Pilih Unit Kerja..."
-                styles={{
-                  control: (base) => ({ ...base, borderRadius: '1.25rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
-              <select 
-                name="jenis_tambah_pagu"
-                value={formData.jenis_tambah_pagu}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700 appearance-none cursor-pointer"
-              >
-                <option value="Penugasan">🚀 Penugasan</option>
-                <option value="Inisiatif Unit">💡 Inisiatif Unit</option>
-                <option value="Pindah Pagu">🔄 Pindah Pagu</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Status Saat Ini</label>
-              <select 
-                name="status_pengajuan"
-                value={formData.status_pengajuan}
-                onChange={handleInputChange}
-                className="w-full bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-indigo-700 appearance-none cursor-pointer"
-              >
-                <option value="Draft">Draft</option>
-                <option value="Diajukan">Diajukan</option>
-                <option value="Disetujui Sebagian">Disetujui Sebagian</option>
-                <option value="Disetujui Semua">Disetujui Semua</option>
-                <option value="Ditolak">Ditolak</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Rp)</label>
-              <input 
-                type="text" 
-                name="nominal_diajukan"
-                value={formatNumber(formData.nominal_diajukan)}
-                onChange={handleInputChange}
-                placeholder="0"
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-gray-700"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* CARD 2: DATA PENGAJUAN (SURAT MASUK) */}
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-blue-50 p-3 rounded-2xl text-blue-600 shadow-sm">
-              <FileText size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">I. Data Pengajuan (Surat Masuk)</h2>
-          </div>
-
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan</label>
-                <input 
-                  type="text" 
-                  name="no_surat_pengajuan"
-                  value={formData.no_surat_pengajuan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
-                  placeholder="cth: 123/UN1/..."
-                />
+        {/* ================= TAHAP 1: DATA UTAMA & PENGAJUAN (SURAT MASUK) ================= */}
+        {activeStep === 'step1' && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* CARD 1: INFORMASI DASAR */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 relative overflow-hidden">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
+                  <Info size={24} />
+                </div>
+                <h2 className="text-xl font-black text-gray-800 tracking-tight">Informasi Dasar Usulan</h2>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
-                <input 
-                  type="date" 
-                  name="tanggal_surat_pengajuan"
-                  value={formData.tanggal_surat_pengajuan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
-                />
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
-              <textarea 
-                name="hal_surat_pengajuan"
-                value={formData.hal_surat_pengajuan}
-                onChange={handleInputChange}
-                rows={2}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-gray-700"
-                placeholder="Tulis perihal surat pengajuan..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Pengajuan di Simaster</label>
-              <input 
-                type="text" 
-                name="subyek_pengajuan_di_simaster_persuratan"
-                value={formData.subyek_pengajuan_di_simaster_persuratan}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-xs italic text-gray-500"
-                placeholder="Salin subyek lengkap dari Simaster..."
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link GDrive / SharePoint</label>
-                <div className="relative">
-                  <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
+                  <input 
+                    type="number" 
+                    name="tahun_anggaran"
+                    value={formData.tahun_anggaran}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
+                  <Select 
+                    options={listUnit} 
+                    value={formData.unit_id}
+                    onChange={(val) => setFormData({...formData, unit_id: val})}
+                    placeholder="Pilih Unit Kerja..."
+                    styles={{
+                      control: (base) => ({ ...base, borderRadius: '1.25rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
+                  <select 
+                    name="jenis_tambah_pagu"
+                    value={formData.jenis_tambah_pagu}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-bold text-gray-700 appearance-none cursor-pointer"
+                  >
+                    <option value="Penugasan">🚀 Penugasan</option>
+                    <option value="Inisiatif Unit">💡 Inisiatif Unit</option>
+                    <option value="Pindah Pagu">🔄 Pindah Pagu</option>
+                  </select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Diajukan Rp)</label>
                   <input 
                     type="text" 
-                    name="link_surat_pengajuan"
-                    value={formData.link_surat_pengajuan}
+                    name="nominal_diajukan"
+                    value={formatNumber(formData.nominal_diajukan)}
                     onChange={handleInputChange}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-blue-100 transition-all text-sm italic text-blue-600"
-                    placeholder="https://drive.google.com/..."
+                    placeholder="0"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-gray-900 text-lg"
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File (Max 10MB)</label>
-                <div className="relative group">
-                  <input 
-                    type="file" 
-                    onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+            </div>
+
+            {/* CARD 2: DATA PENGAJUAN (SURAT MASUK) */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="bg-blue-50 p-3 rounded-2xl text-blue-600 shadow-sm">
+                  <FileText size={24} />
+                </div>
+                <h2 className="text-xl font-black text-gray-800 tracking-tight">I. Data Pengajuan (Surat Masuk)</h2>
+              </div>
+
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan *</label>
+                    <input 
+                      type="text" 
+                      name="no_surat_pengajuan"
+                      value={formData.no_surat_pengajuan}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
+                      placeholder="cth: 123/UN1/..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
+                    <input 
+                      type="date" 
+                      name="tanggal_surat_pengajuan"
+                      value={formData.tanggal_surat_pengajuan}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-bold text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
+                  <textarea 
+                    name="hal_surat_pengajuan"
+                    value={formData.hal_surat_pengajuan}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-gray-700"
+                    placeholder="Tulis perihal surat pengajuan..."
                   />
-                  <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${filePengajuan ? 'bg-blue-50 border-blue-400 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
-                    <UploadCloud size={20} />
-                    <span className="text-sm font-bold truncate max-w-[200px]">
-                      {filePengajuan ? filePengajuan.name : "Pilih File Surat Pengajuan"}
-                    </span>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Pengajuan di Simaster</label>
+                  <input 
+                    type="text" 
+                    name="subyek_pengajuan_di_simaster_persuratan"
+                    value={formData.subyek_pengajuan_di_simaster_persuratan}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-blue-100 transition-all font-medium text-xs italic text-gray-600"
+                    placeholder="Salin subyek lengkap dari Simaster..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link GDrive / SharePoint Lampiran</label>
+                    <div className="relative">
+                      <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" 
+                        name="link_surat_pengajuan"
+                        value={formData.link_surat_pengajuan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-blue-100 transition-all text-sm italic text-blue-600"
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File Surat Pengajuan (Max 10MB)</label>
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      />
+                      <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${filePengajuan ? 'bg-blue-50 border-blue-400 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
+                        <UploadCloud size={20} />
+                        <span className="text-sm font-bold truncate max-w-[200px]">
+                          {filePengajuan ? filePengajuan.name : "Pilih File Surat Pengajuan"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RINGKASAN SUBSTANSI (AI READ ONLY / VIEW) */}
+                {formData.ringkasan_surat_pengajuan && (
+                  <div className="space-y-2 pt-4 border-t border-gray-100">
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
+                    </label>
+                    <div 
+                      className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-h-[300px] overflow-y-auto"
+                      dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* STEP 1 NEXT BUTTON */}
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step2')}
+                className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+              >
+                Selanjutnya: Posisi Pagu Unit <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAHAP 2: POSISI PAGU UNIT KERJA (VIEW) ================= */}
+        {activeStep === 'step2' && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
+                    <Landmark size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-gray-800 tracking-tight">Posisi Pagu Unit Kerja</h2>
+                    <p className="text-xs text-gray-500 font-medium">Unit: <strong className="text-indigo-600 font-bold">{formData.unit_id?.label || 'Belum Dipilih'}</strong></p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block">Usulan Diajukan:</span>
+                  <span className="text-lg font-black font-mono text-emerald-600">Rp {formatNumber(formData.nominal_diajukan)}</span>
+                </div>
+              </div>
+
+              {/* TABLE POSISI PAGU TAHUN 2026 */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Tabel Ringkasan Posisi Pagu (Tahun 2026)</h3>
+                  <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                    <table className="w-full text-sm text-left">
+                      <tbody className="divide-y divide-gray-100">
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-gray-700">Pagu Awal</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.pagu_awal || 0)}</td>
+                        </tr>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-gray-700">Pengalihan (+/-)</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.pengalihan || 0)}</td>
+                        </tr>
+                        {historis2026Row.tambah_penugasan > 0 && (
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Penugasan</td>
+                            <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(historis2026Row.tambah_penugasan)}</td>
+                          </tr>
+                        )}
+                        {historis2026Row.tambah_inisiatif > 0 && (
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Inisiatif</td>
+                            <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(historis2026Row.tambah_inisiatif)}</td>
+                          </tr>
+                        )}
+                        {historis2026Row.efisiensi > 0 && (
+                          <tr className="hover:bg-gray-50">
+                            <td className="px-5 py-3 font-medium text-rose-700">- Efisiensi</td>
+                            <td className="px-5 py-3 text-right font-mono font-semibold text-rose-700">- Rp {formatNumber(historis2026Row.efisiensi)}</td>
+                          </tr>
+                        )}
+                        <tr className="hover:bg-gray-50 bg-indigo-50/50">
+                          <td className="px-5 py-3 font-bold text-indigo-900">Total Pagu Sampai Saat Ini</td>
+                          <td className="px-5 py-3 text-right font-bold font-mono text-indigo-900">Rp {formatNumber(historis2026Row.total_pagu || 0)}</td>
+                        </tr>
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.realisasi || 0)}</td>
+                        </tr>
+                        <tr className="hover:bg-gray-50 bg-emerald-50/50">
+                          <td className="px-5 py-3 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
+                          <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber((historis2026Row.total_pagu || 0) - (historis2026Row.realisasi || 0))}</td>
+                        </tr>
+                        <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
+                          <td className="px-5 py-3 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
+                          <td className="px-5 py-3 text-right font-bold font-mono text-amber-900">Rp {formatNumber(formData.nominal_diajukan)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* TABLE HISTORIS MULTI TAHUN */}
+                {paguUnitHistory.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Tabel Historis Pagu Multi-Tahun (2019 - 2026)</h3>
+                    <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto shadow-sm">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
+                          <tr>
+                            <th className="px-4 py-3 text-center">Tahun</th>
+                            <th className="px-4 py-3 text-right">Pagu Awal</th>
+                            <th className="px-4 py-3 text-right">Total Pagu</th>
+                            <th className="px-4 py-3 text-right">Realisasi</th>
+                            <th className="px-4 py-3 text-center">% Serapan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {paguUnitHistory.map((h, idx) => (
+                            <tr key={idx} className={`hover:bg-gray-50 ${h.tahun === '2026' ? 'bg-indigo-50/30 font-bold' : ''}`}>
+                              <td className="px-4 py-3 text-center font-bold">{h.tahun}</td>
+                              <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.pagu_awal)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-indigo-700 font-bold">Rp {formatNumber(h.total_pagu)}</td>
+                              <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.realisasi)}</td>
+                              <td className="px-4 py-3 text-center font-bold text-emerald-700">{h.persen_serapan}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* STEP 2 BUTTONS */}
+            <div className="flex justify-between items-center pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step1')}
+                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+              >
+                <ChevronLeft size={16} /> Kembali Ke Tahap 1
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveStep('step3')}
+                className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+              >
+                Selanjutnya: Tanggapan & Keputusan <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAHAP 3: TANGGAPAN SURAT (SURAT KELUAR / APPROVAL) ================= */}
+        {activeStep === 'step3' && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 border-l-8 border-l-indigo-600">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-gray-800 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">Input nomor surat tanggapan, subyek simaster, dan nominal keputusan disetujui di bawah ini.</p>
+                </div>
+              </div>
+
+              <div className="space-y-8">
+                {/* Status Pengajuan Selector */}
+                <div className="bg-indigo-50/40 p-6 rounded-3xl border border-indigo-100 space-y-2">
+                  <label className="text-xs font-black text-indigo-900 uppercase tracking-widest block">Status Keputusan Pimpinan Saat Ini *</label>
+                  <select 
+                    name="status_pengajuan"
+                    value={formData.status_pengajuan}
+                    onChange={handleInputChange}
+                    className="w-full bg-white border border-indigo-200 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-200 transition-all font-black text-indigo-900 text-base cursor-pointer shadow-sm"
+                  >
+                    <option value="Draft">Draft (Belum Ditanggapi)</option>
+                    <option value="Diajukan">Diajukan</option>
+                    <option value="Disetujui Sebagian">Disetujui Sebagian</option>
+                    <option value="Disetujui Semua">Disetujui Semua (100%)</option>
+                    <option value="Ditolak">Ditolak</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
+                    <input 
+                      type="text" 
+                      name="no_surat_tanggapan"
+                      value={formData.no_surat_tanggapan}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                      placeholder="Input jika usulan sudah ditanggapi..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Tanggapan</label>
+                    <input 
+                      type="date" 
+                      name="tanggal_surat_tanggapan"
+                      value={formData.tanggal_surat_tanggapan}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Tanggapan</label>
+                  <textarea 
+                    name="hal_surat_tanggapan"
+                    value={formData.hal_surat_tanggapan}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-gray-700"
+                    placeholder="Ringkasan keputusan dalam surat tanggapan..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Tanggapan di Simaster</label>
+                  <input 
+                    type="text" 
+                    name="subyek_tanggapan_di_simaster_persuratan"
+                    value={formData.subyek_tanggapan_di_simaster_persuratan}
+                    onChange={handleInputChange}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-xs italic text-gray-600"
+                    placeholder="Salin subyek lengkap tanggapan dari Simaster..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link Surat Tanggapan (GDrive / SharePoint)</label>
+                    <div className="relative">
+                      <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" 
+                        name="link_surat_tanggapan"
+                        value={formData.link_surat_tanggapan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all text-sm italic text-indigo-600"
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload Surat Tanggapan (Max 10MB)</label>
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
+                        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                      />
+                      <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${fileTanggapan ? 'bg-indigo-50 border-indigo-400 text-indigo-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-indigo-300 group-hover:bg-indigo-50/30'}`}>
+                        <UploadCloud size={20} />
+                        <span className="text-sm font-bold truncate max-w-[200px]">
+                          {fileTanggapan ? fileTanggapan.name : "Pilih File Surat Tanggapan"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui Pimpinan (Rp)</label>
+                  <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-indigo-500">Rp</span>
+                    <input 
+                      type="text" 
+                      name="nominal_tanggapan"
+                      value={formatNumber(formData.nominal_tanggapan)}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-indigo-800 text-lg"
+                    />
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* CARD 3: DATA TANGGAPAN (SURAT KELUAR / APPROVAL) */}
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 border-l-8 border-l-indigo-600">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-              <CheckCircle2 size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval)</h2>
-          </div>
-
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
-                <input 
-                  type="text" 
-                  name="no_surat_tanggapan"
-                  value={formData.no_surat_tanggapan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
-                  placeholder="Input jika usulan sudah ditanggapi..."
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Tanggapan</label>
-                <input 
-                  type="date" 
-                  name="tanggal_surat_tanggapan"
-                  value={formData.tanggal_surat_tanggapan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Tanggapan</label>
-              <textarea 
-                name="hal_surat_tanggapan"
-                value={formData.hal_surat_tanggapan}
-                onChange={handleInputChange}
-                rows={2}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-gray-700"
-                placeholder="Ringkasan keputusan dalam surat tanggapan..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Tanggapan di Simaster</label>
-              <input 
-                type="text" 
-                name="subyek_tanggapan_di_simaster_persuratan"
-                value={formData.subyek_tanggapan_di_simaster_persuratan}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-xs italic text-gray-500"
-                placeholder="Salin subyek lengkap dari Simaster..."
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link Surat Tanggapan</label>
-                <div className="relative">
-                  <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input 
-                    type="text" 
-                    name="link_surat_tanggapan"
-                    value={formData.link_surat_tanggapan}
-                    onChange={handleInputChange}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all text-sm italic text-indigo-600"
-                    placeholder="https://drive.google.com/..."
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload Surat Tanggapan</label>
-                <div className="relative group">
-                  <input 
-                    type="file" 
-                    onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                  />
-                  <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${fileTanggapan ? 'bg-indigo-50 border-indigo-400 text-indigo-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-indigo-300 group-hover:bg-indigo-50/30'}`}>
-                    <UploadCloud size={20} />
-                    <span className="text-sm font-bold truncate max-w-[200px]">
-                      {fileTanggapan ? fileTanggapan.name : "Pilih File Surat Tanggapan"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui (Rp)</label>
-              <div className="relative">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-indigo-500">Rp</span>
-                <input 
-                  type="text" 
-                  name="nominal_tanggapan"
-                  value={formatNumber(formData.nominal_tanggapan)}
-                  onChange={handleInputChange}
-                  placeholder="0"
-                  className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-indigo-800 text-lg"
-                />
-              </div>
+            {/* STEP 3 BUTTONS */}
+            <div className="flex justify-between items-center pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step2')}
+                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all"
+              >
+                <ChevronLeft size={16} /> Kembali Ke Tahap 2
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* FLOATING ACTION BAR */}
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
-          <div className="bg-gray-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
+          <div className="bg-slate-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
             <button 
               type="button"
               onClick={() => router.back()}
-              className="px-8 py-4 text-gray-400 hover:text-white font-bold text-sm transition-all uppercase tracking-widest"
+              className="px-8 py-4 text-gray-400 hover:text-white font-bold text-xs transition-all uppercase tracking-widest"
             >
               Batal
             </button>
             <button 
               type="submit" 
               disabled={isSaving}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-gray-900 py-4 rounded-[2rem] font-black text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-              {isSaving ? "SEDANG MENYIMPAN..." : "SIMPAN USULAN PAGU"}
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              {isSaving ? "MENYIMPAN..." : "SIMPAN USULAN PAGU"}
             </button>
           </div>
         </div>
