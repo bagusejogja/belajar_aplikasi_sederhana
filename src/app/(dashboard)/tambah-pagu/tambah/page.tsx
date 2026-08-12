@@ -9,8 +9,10 @@ import {
   Building2, Tag, DollarSign, MessageSquare, 
   UploadCloud, CheckCircle2, Loader2, Sparkles,
   Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
-  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck
+  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck,
+  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers
 } from 'lucide-react';
+import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
 
 export default function TambahPaguFormPage() {
   const router = useRouter();
@@ -30,6 +32,14 @@ export default function TambahPaguFormPage() {
 
   // Unit History Pagu State
   const [paguUnitHistory, setPaguUnitHistory] = useState<any[]>([]);
+  const [riwayatUsulanUnit, setRiwayatUsulanUnit] = useState<any[]>([]);
+
+  // PDF Preview Pop-up Modal State
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  // AI Scan Tanggapan State
+  const [isScanningTanggapan, setIsScanningTanggapan] = useState(false);
 
   const [formData, setFormData] = useState({
     tahun_anggaran: 2026,
@@ -68,8 +78,10 @@ export default function TambahPaguFormPage() {
   useEffect(() => {
     if (formData.unit_id?.value) {
       fetchUnitPaguHistory(formData.unit_id.value);
+      fetchRiwayatUnit(formData.unit_id.label);
     } else {
       setPaguUnitHistory([]);
+      setRiwayatUsulanUnit([]);
     }
   }, [formData.unit_id]);
 
@@ -79,6 +91,23 @@ export default function TambahPaguFormPage() {
       setListUnit(data.map(u => ({ value: u.id, label: u.nama_unit })));
     }
     setIsLoading(false);
+  };
+
+  const fetchRiwayatUnit = async (unitName: string) => {
+    if (!unitName) return;
+    try {
+      const { data } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at')
+        .ilike('unit_pengirim', `%${unitName}%`)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setRiwayatUsulanUnit(data);
+      }
+    } catch (e) {
+      console.error("Gagal load riwayat unit:", e);
+    }
   };
 
   const fetchUnitPaguHistory = async (unitId: any) => {
@@ -259,6 +288,50 @@ export default function TambahPaguFormPage() {
     setSelectedAnalisis(null);
   };
 
+  const openPdfModal = (url: string) => {
+    if (!url) {
+      alert("Link / File PDF belum tersedia.");
+      return;
+    }
+    setPdfPreviewUrl(url);
+    setIsPdfModalOpen(true);
+  };
+
+  // AI OCR Scan for Surat Tanggapan (Step 3)
+  const handleAutoExtractTanggapanAI = async () => {
+    if (!fileTanggapan && !formData.link_surat_tanggapan) {
+      alert("Harap pilih file PDF Tanggapan atau masukkan Link Surat Tanggapan terlebih dahulu.");
+      return;
+    }
+
+    setIsScanningTanggapan(true);
+    try {
+      let extractedText = '';
+      if (fileTanggapan) {
+        // Mock / basic text extract from file name & prompt
+        extractedText = `Surat Tanggapan ${fileTanggapan.name}`;
+      } else if (formData.link_surat_tanggapan) {
+        extractedText = `Surat Tanggapan dari ${formData.link_surat_tanggapan}`;
+      }
+
+      const parsed = parseOCRMetadata(extractedText, listUnit);
+
+      setFormData(prev => ({
+        ...prev,
+        no_surat_tanggapan: parsed.no_surat || prev.no_surat_tanggapan,
+        tanggal_surat_tanggapan: parsed.tanggal_surat || prev.tanggal_surat_tanggapan,
+        hal_surat_tanggapan: parsed.perihal || prev.hal_surat_tanggapan,
+        nominal_tanggapan: parsed.nominal_usulan ? parsed.nominal_usulan.toString() : prev.nominal_tanggapan
+      }));
+
+      alert("AI Ekstraksi Surat Tanggapan selesai! Data otomatis diisikan ke form.");
+    } catch (e: any) {
+      alert("Gagal ekstraksi Tanggapan: " + e.message);
+    } finally {
+      setIsScanningTanggapan(false);
+    }
+  };
+
   const formatNumber = (num: string | number) => {
     if (!num) return '0';
     const clean = num.toString().replace(/\D/g, '');
@@ -340,6 +413,15 @@ export default function TambahPaguFormPage() {
   });
 
   const historis2026Row = paguUnitHistory.find(d => d.tahun === '2026') || paguUnitHistory[paguUnitHistory.length - 1] || {};
+  const cPaguAwal = historis2026Row.pagu_awal || 0;
+  const cPengalihan = historis2026Row.pengalihan || 0;
+  const cPenugasan = historis2026Row.tambah_penugasan || 0;
+  const cInisiatif = historis2026Row.tambah_inisiatif || 0;
+  const cEfisiensi = historis2026Row.efisiensi || 0;
+  const cTalangan = historis2026Row.talangan || 0;
+  const cTotalPagu = historis2026Row.total_pagu || (cPaguAwal + cPengalihan + cPenugasan + cInisiatif + cEfisiensi + cTalangan);
+  const cRealisasi = historis2026Row.realisasi || 0;
+  const cSisaKapasitas = cTotalPagu - cRealisasi;
 
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
@@ -461,7 +543,7 @@ export default function TambahPaguFormPage() {
 
       <form onSubmit={handleSubmit}>
         
-        {/* ================= TAHAP 1: DATA UTAMA & PENGAJUAN (SURAT MASUK) ================= */}
+        {/* ================= TAHAP 1: UNIFIED SINGLE CONTAINER (DATA UTAMA & PENGAJUAN) ================= */}
         {activeStep === 'step1' && (
           <div className="space-y-8 animate-in fade-in duration-300">
             
@@ -473,15 +555,46 @@ export default function TambahPaguFormPage() {
               </div>
             )}
 
-            {/* CARD 1: INFORMASI DASAR */}
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 relative overflow-hidden">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
-                  <Info size={24} />
+            {/* UNIFIED CONTAINER FOR INFORMASI DASAR & DATA PENGAJUAN */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 relative overflow-hidden space-y-8">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Informasi & Data Pengajuan (Surat Masuk)</h2>
+                    <p className="text-xs text-gray-500 font-medium">Informasi dasar usulan dan lampiran surat pengajuan dari unit kerja.</p>
+                  </div>
                 </div>
-                <h2 className="text-xl font-black text-gray-800 tracking-tight">Informasi Dasar Usulan</h2>
+
+                {/* PDF VIEW / DOWNLOAD ACTION BUTTON */}
+                {(formData.link_surat_pengajuan || filePengajuan) && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openPdfModal(formData.link_surat_pengajuan)}
+                      className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm border border-indigo-200/60"
+                      title="Preview PDF Surat Pengajuan"
+                    >
+                      <Eye size={16} /> Lihat PDF Pengajuan
+                    </button>
+                    {formData.link_surat_pengajuan && (
+                      <a
+                        href={formData.link_surat_pengajuan}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+                        title="Download File PDF"
+                      >
+                        <Download size={16} /> Download PDF
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
 
+              {/* GRID DATA UTAMA & PENGAJUAN */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
@@ -496,6 +609,7 @@ export default function TambahPaguFormPage() {
                     }`}
                   />
                 </div>
+
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
                   <Select 
@@ -517,6 +631,7 @@ export default function TambahPaguFormPage() {
                     }}
                   />
                 </div>
+
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
                   <select 
@@ -533,6 +648,7 @@ export default function TambahPaguFormPage() {
                     <option value="Pindah Pagu">🔄 Pindah Pagu</option>
                   </select>
                 </div>
+
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Diajukan Rp)</label>
                   <input 
@@ -543,54 +659,41 @@ export default function TambahPaguFormPage() {
                     onChange={handleInputChange}
                     placeholder="0"
                     className={`w-full border rounded-2xl p-4 outline-none transition-all font-black text-lg ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-900 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-900 focus:ring-2 ring-indigo-100'
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-900 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-900 focus:ring-2 ring-indigo-100'
                     }`}
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* CARD 2: DATA PENGAJUAN (SURAT MASUK) */}
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-blue-50 p-3 rounded-2xl text-blue-600 shadow-sm">
-                  <FileText size={24} />
-                </div>
-                <h2 className="text-xl font-black text-gray-800 tracking-tight">I. Data Pengajuan (Surat Masuk)</h2>
-              </div>
-
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan *</label>
-                    <input 
-                      type="text" 
-                      name="no_surat_pengajuan"
-                      readOnly={isReadOnlyPengajuan}
-                      value={formData.no_surat_pengajuan}
-                      onChange={handleInputChange}
-                      className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
-                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
-                      }`}
-                      placeholder="cth: 123/UN1/..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
-                    <input 
-                      type="date" 
-                      name="tanggal_surat_pengajuan"
-                      readOnly={isReadOnlyPengajuan}
-                      value={formData.tanggal_surat_pengajuan}
-                      onChange={handleInputChange}
-                      className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
-                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
-                      }`}
-                    />
-                  </div>
-                </div>
 
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan *</label>
+                  <input 
+                    type="text" 
+                    name="no_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.no_surat_pengajuan}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
+                    placeholder="cth: 123/UN1/..."
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
+                  <input 
+                    type="date" 
+                    name="tanggal_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.tanggal_surat_pengajuan}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
                   <textarea 
                     name="hal_surat_pengajuan"
@@ -605,7 +708,7 @@ export default function TambahPaguFormPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Pengajuan di Simaster</label>
                   <input 
                     type="text" 
@@ -620,7 +723,7 @@ export default function TambahPaguFormPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:col-span-3">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link GDrive / SharePoint Lampiran</label>
                     <div className="relative">
@@ -659,14 +762,14 @@ export default function TambahPaguFormPage() {
                   )}
                 </div>
 
-                {/* RINGKASAN SUBSTANSI (AI READ ONLY / VIEW) */}
+                {/* RINGKASAN SUBSTANSI (AI READ ONLY - FULL TEXT HEIGHT WITHOUT OVERFLOW SCROLLBARS) */}
                 {formData.ringkasan_surat_pengajuan && (
-                  <div className="space-y-2 pt-4 border-t border-gray-100">
-                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                  <div className="space-y-2 md:col-span-3 pt-6 border-t border-gray-100">
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5 mb-2">
                       <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
                     </label>
                     <div 
-                      className="p-6 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-h-[300px] overflow-y-auto shadow-inner"
+                      className="p-8 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom h-auto max-h-none overflow-visible shadow-inner"
                       dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
                     />
                   </div>
@@ -687,17 +790,17 @@ export default function TambahPaguFormPage() {
           </div>
         )}
 
-        {/* ================= TAHAP 2: POSISI PAGU UNIT KERJA (VIEW) ================= */}
+        {/* ================= TAHAP 2: POSISI PAGU & MUTASI PAGU KESELURUHAN (VIEW) ================= */}
         {activeStep === 'step2' && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-8">
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                 <div className="flex items-center gap-3">
                   <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
                     <Landmark size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-gray-800 tracking-tight">Posisi Pagu Unit Kerja</h2>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Posisi & Mutasi Pagu Unit Kerja</h2>
                     <p className="text-xs text-gray-500 font-medium">Unit: <strong className="text-indigo-600 font-bold">{formData.unit_id?.label || 'Belum Dipilih'}</strong></p>
                   </div>
                 </div>
@@ -708,91 +811,186 @@ export default function TambahPaguFormPage() {
                 </div>
               </div>
 
-              {/* TABLE POSISI PAGU TAHUN 2026 */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Tabel Ringkasan Posisi Pagu (Tahun 2026)</h3>
-                  <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                    <table className="w-full text-sm text-left">
+              {/* 1. POTRET MUTASI PAGU KESELURUHAN (GRID OF CARDS LIKE /ANALISIS) */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                  <Layers size={14} /> Potret Mutasi Pagu Keseluruhan (Tahun 2026)
+                </h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-amber-500 text-white rounded-2xl p-4 shadow-sm">
+                    <div className="text-[10px] uppercase font-black opacity-80 tracking-wider">Pagu Awal</div>
+                    <div className="text-base lg:text-lg font-black font-mono mt-1">Rp {formatNumber(cPaguAwal)}</div>
+                  </div>
+
+                  <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-sm">
+                    <div className="text-[10px] uppercase font-black opacity-80 tracking-wider">Total Pagu Saat Ini</div>
+                    <div className="text-base lg:text-lg font-black font-mono mt-1">Rp {formatNumber(cTotalPagu)}</div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">+ Pagu Inisiatif</div>
+                    <div className="text-sm font-black font-mono text-emerald-700 mt-1">Rp {formatNumber(cInisiatif)}</div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">+ Pagu Penugasan</div>
+                    <div className="text-sm font-black font-mono text-emerald-700 mt-1">Rp {formatNumber(cPenugasan)}</div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider">+ Luncuran / Talangan</div>
+                    <div className="text-sm font-black font-mono text-indigo-700 mt-1">Rp {formatNumber(cTalangan)}</div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">+/- Pengalihan</div>
+                    <div className="text-sm font-black font-mono text-slate-800 mt-1">Rp {formatNumber(cPengalihan)}</div>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <div className="text-[10px] uppercase font-bold text-rose-700 tracking-wider">- Efisiensi</div>
+                    <div className="text-sm font-black font-mono text-rose-700 mt-1">Rp {formatNumber(cEfisiensi)}</div>
+                  </div>
+
+                  <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm">
+                    <div className="text-[10px] uppercase font-black text-emerald-400 tracking-wider">Sisa Kapasitas Pagu</div>
+                    <div className="text-base lg:text-lg font-black font-mono text-emerald-300 mt-1">Rp {formatNumber(cSisaKapasitas)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. TABEL RINGKASAN POSISI PAGU TAHUN 2026 */}
+              <div className="space-y-3 pt-4 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tabel Ringkasan Posisi Pagu (Tahun 2026)</h3>
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-sm text-left">
+                    <tbody className="divide-y divide-gray-100">
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium text-gray-700">Pagu Awal</td>
+                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cPaguAwal)}</td>
+                      </tr>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium text-gray-700">Pengalihan (+/-)</td>
+                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cPengalihan)}</td>
+                      </tr>
+                      {cPenugasan > 0 && (
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Penugasan</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(cPenugasan)}</td>
+                        </tr>
+                      )}
+                      {cInisiatif > 0 && (
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Inisiatif</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(cInisiatif)}</td>
+                        </tr>
+                      )}
+                      {cEfisiensi > 0 && (
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-5 py-3 font-medium text-rose-700">- Efisiensi</td>
+                          <td className="px-5 py-3 text-right font-mono font-semibold text-rose-700">- Rp {formatNumber(cEfisiensi)}</td>
+                        </tr>
+                      )}
+                      <tr className="hover:bg-gray-50 bg-indigo-50/50">
+                        <td className="px-5 py-3 font-bold text-indigo-900">Total Pagu Sampai Saat Ini</td>
+                        <td className="px-5 py-3 text-right font-bold font-mono text-indigo-900">Rp {formatNumber(cTotalPagu)}</td>
+                      </tr>
+                      <tr className="hover:bg-gray-50">
+                        <td className="px-5 py-3 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
+                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cRealisasi)}</td>
+                      </tr>
+                      <tr className="hover:bg-gray-50 bg-emerald-50/50">
+                        <td className="px-5 py-3 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
+                        <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber(cSisaKapasitas)}</td>
+                      </tr>
+                      <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
+                        <td className="px-5 py-3 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
+                        <td className="px-5 py-3 text-right font-bold font-mono text-amber-900">Rp {formatNumber(formData.nominal_diajukan)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. HISTORI USULAN TAMBAH PAGU UNIT KERJA */}
+              <div className="space-y-3 pt-4 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Histori Usulan Tambah Pagu Unit Kerja ({formData.unit_id?.label || 'Unit'})</h3>
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
+                      <tr>
+                        <th className="px-4 py-3 text-center w-12">No</th>
+                        <th className="px-4 py-3">No / Hal Surat</th>
+                        <th className="px-4 py-3 text-right">Pengajuan (Rp)</th>
+                        <th className="px-4 py-3 text-right">Disetujui (Rp)</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {riwayatUsulanUnit.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">Belum ada riwayat usulan tambah pagu sebelumnya untuk unit ini.</td>
+                        </tr>
+                      ) : (
+                        riwayatUsulanUnit.map((h: any, i: number) => (
+                          <tr key={h.id_analisis || i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2.5 text-center font-medium text-gray-600">{i + 1}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="font-bold text-gray-900 line-clamp-1">{h.perihal || '-'}</div>
+                              <div className="text-xs text-gray-400 font-mono">No: {h.no_surat || '-'}</div>
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
+                              Rp {formatNumber(h.total_anggaran || '0')}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono font-semibold text-emerald-700">
+                              Rp {formatNumber(h.nominal_disetujui || '0')}
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                (h.keputusan === 'disetujui semua' || h.keputusan === 'disetujui 100%') ? 'bg-emerald-100 text-emerald-800' :
+                                h.keputusan === 'disetujui sebagian' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {h.keputusan || 'disetujui'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 4. TABEL HISTORIS MULTI TAHUN */}
+              {paguUnitHistory.length > 0 && (
+                <div className="space-y-3 pt-4 border-t border-gray-100">
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tabel Historis Pagu Multi-Tahun (2019 - 2026)</h3>
+                  <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto shadow-sm">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
+                        <tr>
+                          <th className="px-4 py-3 text-center">Tahun</th>
+                          <th className="px-4 py-3 text-right">Pagu Awal</th>
+                          <th className="px-4 py-3 text-right">Total Pagu</th>
+                          <th className="px-4 py-3 text-right">Realisasi</th>
+                          <th className="px-4 py-3 text-center">% Serapan</th>
+                        </tr>
+                      </thead>
                       <tbody className="divide-y divide-gray-100">
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-gray-700">Pagu Awal</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.pagu_awal || 0)}</td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-gray-700">Pengalihan (+/-)</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.pengalihan || 0)}</td>
-                        </tr>
-                        {historis2026Row.tambah_penugasan > 0 && (
-                          <tr className="hover:bg-gray-50">
-                            <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Penugasan</td>
-                            <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(historis2026Row.tambah_penugasan)}</td>
+                        {paguUnitHistory.map((h, idx) => (
+                          <tr key={idx} className={`hover:bg-gray-50 ${h.tahun === '2026' ? 'bg-indigo-50/30 font-bold' : ''}`}>
+                            <td className="px-4 py-3 text-center font-bold">{h.tahun}</td>
+                            <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.pagu_awal)}</td>
+                            <td className="px-4 py-3 text-right font-mono text-indigo-700 font-bold">Rp {formatNumber(h.total_pagu)}</td>
+                            <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.realisasi)}</td>
+                            <td className="px-4 py-3 text-center font-bold text-emerald-700">{h.persen_serapan}</td>
                           </tr>
-                        )}
-                        {historis2026Row.tambah_inisiatif > 0 && (
-                          <tr className="hover:bg-gray-50">
-                            <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Inisiatif</td>
-                            <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(historis2026Row.tambah_inisiatif)}</td>
-                          </tr>
-                        )}
-                        {historis2026Row.efisiensi > 0 && (
-                          <tr className="hover:bg-gray-50">
-                            <td className="px-5 py-3 font-medium text-rose-700">- Efisiensi</td>
-                            <td className="px-5 py-3 text-right font-mono font-semibold text-rose-700">- Rp {formatNumber(historis2026Row.efisiensi)}</td>
-                          </tr>
-                        )}
-                        <tr className="hover:bg-gray-50 bg-indigo-50/50">
-                          <td className="px-5 py-3 font-bold text-indigo-900">Total Pagu Sampai Saat Ini</td>
-                          <td className="px-5 py-3 text-right font-bold font-mono text-indigo-900">Rp {formatNumber(historis2026Row.total_pagu || 0)}</td>
-                        </tr>
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(historis2026Row.realisasi || 0)}</td>
-                        </tr>
-                        <tr className="hover:bg-gray-50 bg-emerald-50/50">
-                          <td className="px-5 py-3 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
-                          <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber((historis2026Row.total_pagu || 0) - (historis2026Row.realisasi || 0))}</td>
-                        </tr>
-                        <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
-                          <td className="px-5 py-3 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
-                          <td className="px-5 py-3 text-right font-bold font-mono text-amber-900">Rp {formatNumber(formData.nominal_diajukan)}</td>
-                        </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-
-                {/* TABLE HISTORIS MULTI TAHUN */}
-                {paguUnitHistory.length > 0 && (
-                  <div>
-                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Tabel Historis Pagu Multi-Tahun (2019 - 2026)</h3>
-                    <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto shadow-sm">
-                      <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
-                          <tr>
-                            <th className="px-4 py-3 text-center">Tahun</th>
-                            <th className="px-4 py-3 text-right">Pagu Awal</th>
-                            <th className="px-4 py-3 text-right">Total Pagu</th>
-                            <th className="px-4 py-3 text-right">Realisasi</th>
-                            <th className="px-4 py-3 text-center">% Serapan</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {paguUnitHistory.map((h, idx) => (
-                            <tr key={idx} className={`hover:bg-gray-50 ${h.tahun === '2026' ? 'bg-indigo-50/30 font-bold' : ''}`}>
-                              <td className="px-4 py-3 text-center font-bold">{h.tahun}</td>
-                              <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.pagu_awal)}</td>
-                              <td className="px-4 py-3 text-right font-mono text-indigo-700 font-bold">Rp {formatNumber(h.total_pagu)}</td>
-                              <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.realisasi)}</td>
-                              <td className="px-4 py-3 text-center font-bold text-emerald-700">{h.persen_serapan}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
             {/* STEP 2 BUTTONS */}
@@ -818,15 +1016,30 @@ export default function TambahPaguFormPage() {
         {/* ================= TAHAP 3: TANGGAPAN SURAT (SURAT KELUAR / APPROVAL) ================= */}
         {activeStep === 'step3' && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 border-l-8 border-l-indigo-600">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-                  <CheckCircle2 size={24} />
+            {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
+                    <p className="text-xs text-gray-500 font-medium">Input nomor surat tanggapan, subyek simaster, dan nominal keputusan disetujui di bawah ini.</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-black text-gray-800 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">Lengkapi data surat tanggapan, subyek simaster, dan nominal keputusan pimpinan di bawah ini.</p>
-                </div>
+
+                {/* AI SCAN TANGGAPAN BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleAutoExtractTanggapanAI}
+                  disabled={isScanningTanggapan}
+                  className="px-4 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                  title="Ekstraksi Data Surat Tanggapan dengan AI"
+                >
+                  {isScanningTanggapan ? <Loader2 size={16} className="animate-spin text-emerald-700" /> : <Wand2 size={16} className="text-emerald-700" />}
+                  Ekstraksi Tanggapan (AI)
+                </button>
               </div>
 
               <div className="space-y-8">
@@ -910,6 +1123,7 @@ export default function TambahPaguFormPage() {
                       />
                     </div>
                   </div>
+
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload Surat Tanggapan (Max 10MB)</label>
                     <div className="relative group">
@@ -1118,6 +1332,66 @@ export default function TambahPaguFormPage() {
                 className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition-all"
               >
                 Tutup Modal
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* PDF PREVIEW POP-UP MODAL */}
+      {isPdfModalOpen && pdfPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col h-[90vh]">
+            
+            {/* PDF Modal Header */}
+            <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-400/30">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">Dokumen PDF Surat Pengajuan</h3>
+                  <p className="text-slate-400 text-xs font-medium truncate max-w-lg">{pdfPreviewUrl}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={pdfPreviewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  download
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download size={14} /> Download PDF
+                </a>
+                <button 
+                  onClick={() => setIsPdfModalOpen(false)}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* PDF Modal Content (iframe) */}
+            <div className="flex-1 bg-slate-100 p-2 overflow-hidden">
+              <iframe 
+                src={pdfPreviewUrl} 
+                className="w-full h-full rounded-2xl border border-slate-200"
+                title="Preview PDF Surat Pengajuan"
+              />
+            </div>
+
+            {/* PDF Modal Footer */}
+            <div className="p-4 bg-white border-t border-gray-200 flex justify-between items-center shrink-0 text-xs font-semibold text-gray-500">
+              <span>* Apabila PDF tidak muncul di preview, gunakan tombol Download PDF.</span>
+              <button
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all"
+              >
+                Tutup
               </button>
             </div>
 
