@@ -13,6 +13,7 @@ import {
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
+import { Badge } from '@/components/ui/badge';
 
 export default function PotretMutasiPaguPage() {
   const router = useRouter();
@@ -51,6 +52,7 @@ export default function PotretMutasiPaguPage() {
   const [unitBreakdownData, setUnitBreakdownData] = useState<any[]>([]);
   const [historisChartData, setHistorisChartData] = useState<any[]>([]);
   const [tambahPaguLetters, setTambahPaguLetters] = useState<any[]>([]);
+  const [govMutasiRows, setGovMutasiRows] = useState<any[]>([]);
 
   // Load Data Whenever Filters Change
   useEffect(() => {
@@ -164,31 +166,26 @@ export default function PotretMutasiPaguPage() {
         pengeluaran: sumRealisasi
       });
 
-      // 6. Fetch `tambah_pagu` letters via getTambahPagu Server Action
+      // 6. Fetch detailed mutasi records directly from `gov_pagu_anggaran` with `gov_units`
       try {
-        const rawLetters = await getTambahPagu();
-        let filteredLetters = rawLetters || [];
+        const { data: rawMutasi } = await supabase
+          .from('gov_pagu_anggaran')
+          .select('*, gov_units(nama_unit, group_org, kode_unit)')
+          .eq('tahun_anggaran', selectedYear)
+          .order('id', { ascending: true });
+
+        let filteredMutasi = rawMutasi || [];
         
         if (selectedGroupOrg !== 'ALL') {
-          const unitsInGroupNames = new Set(filteredUnits.map(u => u.nama_unit.toLowerCase()));
-          filteredLetters = filteredLetters.filter(l => {
-            const uName = (l.gov_units?.nama_unit || l.unit_kerja_nama || l.unit_pengusul || '').toLowerCase();
-            return unitsInGroupNames.has(uName);
-          });
+          filteredMutasi = filteredMutasi.filter(r => r.gov_units?.group_org === selectedGroupOrg);
         }
         if (selectedUnit !== 'ALL') {
-          const targetUnit = filteredUnits.find(u => u.id.toString() === selectedUnit.toString());
-          if (targetUnit) {
-            filteredLetters = filteredLetters.filter(l => {
-              const uName = (l.gov_units?.nama_unit || l.unit_kerja_nama || l.unit_pengusul || '').toLowerCase();
-              return uName === targetUnit.nama_unit.toLowerCase();
-            });
-          }
+          filteredMutasi = filteredMutasi.filter(r => r.unit_id?.toString() === selectedUnit.toString());
         }
 
-        setTambahPaguLetters(filteredLetters);
-      } catch (errLetters) {
-        console.error("Error fetching tambah_pagu letters:", errLetters);
+        setGovMutasiRows(filteredMutasi);
+      } catch (errMutasi) {
+        console.error("Error fetching gov_pagu_anggaran mutasi rows:", errMutasi);
       }
 
       // 7. Multi-Year Chart Data (2019-2026) with Smooth Extrapolation for Older Years
@@ -262,14 +259,20 @@ export default function PotretMutasiPaguPage() {
     : '0.0';
 
   const filteredUnits = unitBreakdownData.filter(u => {
-    if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      u.nama_unit.toLowerCase().includes(q) ||
-      (u.kode_unit && u.kode_unit.toLowerCase().includes(q)) ||
-      (u.group_org && u.group_org.toLowerCase().includes(q))
-    );
+    return !searchQuery || u.nama_unit.toLowerCase().includes(q) || u.group_org.toLowerCase().includes(q);
   });
+
+  // Filtered Mutasi Rows for Tab 3 (based on search query)
+  const filteredMutasiRows = useMemo(() => {
+    return govMutasiRows.filter(r => {
+      const q = searchQuery.toLowerCase();
+      const uName = (r.gov_units?.nama_unit || '').toLowerCase();
+      const ket = (r.keterangan || '').toLowerCase();
+      const jenis = (r.jenis_anggaran || '').toLowerCase();
+      return !searchQuery || uName.includes(q) || ket.includes(q) || jenis.includes(q);
+    });
+  }, [govMutasiRows, searchQuery]);
 
   const availableUnitsForDropdown = useMemo(() => {
     if (selectedGroupOrg === 'ALL') return unitList;
@@ -382,89 +385,172 @@ export default function PotretMutasiPaguPage() {
           </button>
         </div>
 
-        {/* 2-COLUMN DISPLAY CARDS MATCHING SCREENSHOT */}
+        {/* 2-COLUMN DISPLAY CARDS MATCHING SCREENSHOT (PREMIUM MODERN DESIGN) */}
         <div className="p-6 md:p-10 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
-            {/* ROW 1: PAGU AWAL & PENGALIHAN */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block px-1">
-                PAGU AWAL
-              </label>
-              <div className="w-full p-4 bg-slate-50/80 border border-slate-200 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-slate-800 shadow-inner">
-                {formatRp(mutasiData.pagu_awal)}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* 1. PAGU AWAL CARD */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-xl border border-slate-700/80 hover:border-indigo-500/50 transition-all group relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-indigo-300 border border-white/10 group-hover:scale-110 transition-transform">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest block">PAGU AWAL</span>
+                    <span className="text-[10px] text-slate-400">Pagu Dasar Penetapan RKAT {selectedYear}</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-slate-800 border border-slate-700 text-indigo-300 rounded-full text-[10px] font-bold font-mono">
+                  PAGU RESMI
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-white tracking-tight">
+                Rp {formatRp(mutasiData.pagu_awal)}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-slate-500 uppercase tracking-wider block px-1">
-                PENGALIHAN (+/-)
-              </label>
-              <div className="w-full p-4 bg-slate-50/80 border border-slate-200 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-slate-700 shadow-inner">
-                {formatRp(mutasiData.pengalihan)}
+            {/* 2. PENGALIHAN (+/-) CARD */}
+            <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-indigo-700/60 hover:border-indigo-400/60 transition-all group relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-500/20 backdrop-blur-md rounded-2xl text-indigo-300 border border-indigo-400/20 group-hover:scale-110 transition-transform">
+                    <RefreshCw size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-indigo-200 uppercase tracking-widest block">PENGALIHAN (+/-)</span>
+                    <span className="text-[10px] text-indigo-300/80">Pergeseran Anggaran Antar Unit</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-indigo-950/80 border border-indigo-500/30 text-indigo-300 rounded-full text-[10px] font-bold font-mono">
+                  MUTASI INTRA
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-indigo-200 tracking-tight">
+                {mutasiData.pengalihan > 0 ? `+ Rp ${formatRp(mutasiData.pengalihan)}` : mutasiData.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(mutasiData.pengalihan))}` : `Rp ${formatRp(mutasiData.pengalihan)}`}
               </div>
             </div>
 
-            {/* ROW 2: TAMBAH PAGU INISIATIF & EFISIENSI */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-emerald-600 uppercase tracking-wider block px-1 flex items-center justify-between">
-                <span>TAMBAH PAGU - INISIATIF (+)</span>
-                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Inisiatif</span>
-              </label>
-              <div 
-                onClick={() => setActiveModalCategory('inisiatif')}
-                className="w-full p-4 bg-emerald-50/30 border-2 border-emerald-300 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-emerald-800 shadow-sm cursor-pointer hover:bg-emerald-50 transition-all group"
-              >
-                <span className="group-hover:translate-x-[-4px] transition-transform">{formatRp(mutasiData.tambah_inisiatif)}</span>
+            {/* 3. TAMBAH PAGU - INISIATIF (+) CARD */}
+            <div 
+              onClick={() => setActiveModalCategory('inisiatif')}
+              className="bg-gradient-to-br from-emerald-950 via-teal-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-emerald-500/40 hover:border-emerald-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl text-emerald-300 border border-emerald-400/20 group-hover:scale-110 transition-transform">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest block flex items-center gap-1.5">
+                      TAMBAH PAGU - INISIATIF (+) <ArrowUpRight size={14} className="text-emerald-400" />
+                    </span>
+                    <span className="text-[10px] text-emerald-200/80">Klik untuk Rincian Usulan Inisiatif</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-bold">
+                  ⚡ INISIATIF UNIT
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-emerald-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+                + Rp {formatRp(mutasiData.tambah_inisiatif)}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-rose-600 uppercase tracking-wider block px-1 flex items-center justify-between">
-                <span>EFISIENSI (-)</span>
-                <span className="text-[9px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-bold">Pengurangan</span>
-              </label>
-              <div 
-                onClick={() => setActiveModalCategory('efisiensi')}
-                className="w-full p-4 bg-rose-50/30 border-2 border-rose-200 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-rose-600 shadow-sm cursor-pointer hover:bg-rose-50 transition-all group"
-              >
-                <span className="group-hover:translate-x-[-4px] transition-transform">{formatRp(mutasiData.efisiensi)}</span>
+            {/* 4. EFISIENSI (-) CARD */}
+            <div 
+              onClick={() => setActiveModalCategory('efisiensi')}
+              className="bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-rose-500/40 hover:border-rose-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-rose-500/20 backdrop-blur-md rounded-2xl text-rose-300 border border-rose-400/20 group-hover:scale-110 transition-transform">
+                    <ArrowDownRight size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-rose-300 uppercase tracking-widest block flex items-center gap-1.5">
+                      EFISIENSI (-) <ArrowDownRight size={14} className="text-rose-400" />
+                    </span>
+                    <span className="text-[10px] text-rose-200/80">Klik untuk Rincian Pengurangan Pagu</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-rose-900/80 border border-rose-500/40 text-rose-300 rounded-full text-[10px] font-bold">
+                  🔻 PENGURANGAN
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-rose-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+                {mutasiData.efisiensi !== 0 ? `Rp ${formatRp(mutasiData.efisiensi)}` : 'Rp 0'}
               </div>
             </div>
 
-            {/* ROW 3: TAMBAH PAGU PENUGASAN & LUNCURAN */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-emerald-600 uppercase tracking-wider block px-1 flex items-center justify-between">
-                <span>TAMBAH PAGU - PENUGASAN (+)</span>
-                <span className="text-[9px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">Penugasan</span>
-              </label>
-              <div 
-                onClick={() => setActiveModalCategory('penugasan')}
-                className="w-full p-4 bg-emerald-50/30 border-2 border-emerald-300 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-emerald-800 shadow-sm cursor-pointer hover:bg-emerald-50 transition-all group"
-              >
-                <span className="group-hover:translate-x-[-4px] transition-transform">{formatRp(mutasiData.tambah_penugasan)}</span>
+            {/* 5. TAMBAH PAGU - PENUGASAN (+) CARD */}
+            <div 
+              onClick={() => setActiveModalCategory('penugasan')}
+              className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-emerald-500/40 hover:border-emerald-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl text-emerald-300 border border-emerald-400/20 group-hover:scale-110 transition-transform">
+                    <Landmark size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest block flex items-center gap-1.5">
+                      TAMBAH PAGU - PENUGASAN (+) <ArrowUpRight size={14} className="text-emerald-400" />
+                    </span>
+                    <span className="text-[10px] text-emerald-200/80">Klik untuk Rincian Penugasan Pimpinan</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-bold">
+                  🏛️ PENUGASAN
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-emerald-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+                + Rp {formatRp(mutasiData.tambah_penugasan)}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-indigo-600 uppercase tracking-wider block px-1 flex items-center justify-between">
-                <span>LUNCURAN (+)</span>
-                <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Carry Over</span>
-              </label>
-              <div className="w-full p-4 bg-indigo-50/30 border-2 border-indigo-200 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-indigo-700 shadow-sm">
-                {formatRp(mutasiData.luncuran)}
+            {/* 6. LUNCURAN (+) CARD */}
+            <div className="bg-gradient-to-br from-cyan-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-cyan-700/60 hover:border-cyan-400/60 transition-all group relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-cyan-500/20 backdrop-blur-md rounded-2xl text-cyan-300 border border-cyan-400/20 group-hover:scale-110 transition-transform">
+                    <TrendingUp size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-cyan-200 uppercase tracking-widest block">LUNCURAN (+)</span>
+                    <span className="text-[10px] text-cyan-300/80">Carry Over Sisa Pagu Tahun Sebelumnya</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 rounded-full text-[10px] font-bold font-mono">
+                  CARRY OVER
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-cyan-200 tracking-tight">
+                + Rp {formatRp(mutasiData.luncuran)}
               </div>
             </div>
 
-            {/* ROW 4: TALANGAN PINDAH FAKULTAS (LEFT COLUMN) */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-black text-amber-600 uppercase tracking-wider block px-1 flex items-center justify-between">
-                <span>TALANGAN PINDAH FAKULTAS</span>
-                <span className="text-[9px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Talangan</span>
-              </label>
-              <div className="w-full p-4 bg-amber-50/30 border-2 border-amber-300 rounded-2xl flex items-center justify-end font-mono font-black text-lg md:text-xl text-amber-800 shadow-sm">
-                {formatRp(mutasiData.talangan_pindah)}
+            {/* 7. TALANGAN PINDAH FAKULTAS CARD */}
+            <div className="bg-gradient-to-br from-amber-950 via-amber-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-amber-700/60 hover:border-amber-400/60 transition-all group relative overflow-hidden col-span-1 md:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-500/20 backdrop-blur-md rounded-2xl text-amber-300 border border-amber-400/20 group-hover:scale-110 transition-transform">
+                    <DollarSign size={20} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black text-amber-200 uppercase tracking-widest block">TALANGAN PINDAH FAKULTAS</span>
+                    <span className="text-[10px] text-amber-300/80">Dana Talangan Transisi Pindah Fakultas/Unit</span>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-amber-950/80 border border-amber-500/30 text-amber-300 rounded-full text-[10px] font-bold font-mono">
+                  TALANGAN
+                </span>
+              </div>
+              <div className="text-right font-mono font-black text-2xl md:text-3xl text-amber-300 tracking-tight">
+                Rp {formatRp(mutasiData.talangan_pindah)}
               </div>
             </div>
+
           </div>
 
           {/* BIG SUMMARY TOTAL BANNER AT BOTTOM OF GRID */}
@@ -542,19 +628,19 @@ export default function PotretMutasiPaguPage() {
               onClick={() => setActiveTab('surat')}
               className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'surat' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              📄 Rincian Surat Mutasi ({tambahPaguLetters.length})
+              📄 Rincian Catatan Mutasi Pagu ({filteredMutasiRows.length})
             </button>
           </div>
 
-          {activeTab === 'unit' && (
-            <div className="relative w-full sm:w-64">
+          {(activeTab === 'unit' || activeTab === 'surat') && (
+            <div className="relative w-full sm:w-72">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari Unit / Group Org..."
+                placeholder={activeTab === 'unit' ? "Cari Unit / Group Org..." : "Cari Mutasi / Unit / Keterangan..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-emerald-500 font-medium"
               />
             </div>
           )}
@@ -593,58 +679,73 @@ export default function PotretMutasiPaguPage() {
           </div>
         )}
 
-        {/* TAB 2: BREAKDOWN PER UNIT KERJA */}
+        {/* TAB 2: BREAKDOWN PER UNIT KERJA (RAMPING & SLEEK TABLE) */}
         {activeTab === 'unit' && (
           <div className="space-y-4 animate-in fade-in duration-300">
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-black tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-4">Kode & Unit Kerja</th>
-                      <th className="px-6 py-4">Group Org</th>
-                      <th className="px-6 py-4 text-right">Pagu Awal (Rp)</th>
-                      <th className="px-6 py-4 text-right text-emerald-600">+ Inisiatif</th>
-                      <th className="px-6 py-4 text-right text-emerald-600">+ Penugasan</th>
-                      <th className="px-6 py-4 text-right text-rose-600">- Efisiensi</th>
-                      <th className="px-6 py-4 text-right font-black text-slate-800">Total Pagu (Rp)</th>
-                      <th className="px-6 py-4 text-right text-amber-600">Realisasi (Rp)</th>
-                      <th className="px-6 py-4 text-center">% Serapan</th>
+                      <th className="px-3 py-3 text-center w-10">No</th>
+                      <th className="px-4 py-3">Nama Unit Kerja & Group</th>
+                      <th className="px-3.5 py-3 text-right">Pagu Awal (Rp)</th>
+                      <th className="px-3.5 py-3 text-right text-indigo-600">Pengalihan (+/-)</th>
+                      <th className="px-3.5 py-3 text-right text-emerald-600">+ Inisiatif</th>
+                      <th className="px-3.5 py-3 text-right text-emerald-600">+ Penugasan</th>
+                      <th className="px-3.5 py-3 text-right text-rose-600">- Efisiensi</th>
+                      <th className="px-3.5 py-3 text-right font-black text-slate-800 bg-slate-100/50">Total Pagu (Rp)</th>
+                      <th className="px-3.5 py-3 text-right text-amber-600">Realisasi (Rp)</th>
+                      <th className="px-3 py-3 text-center w-24">% Serapan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredUnits.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-8 text-center text-slate-400 font-medium">
+                        <td colSpan={10} className="px-6 py-8 text-center text-slate-400 font-medium">
                           Tidak ada data unit yang sesuai filter.
                         </td>
                       </tr>
                     ) : (
                       filteredUnits.map((u, idx) => {
-                        const totalP = u.total_pagu || (u.pagu_awal + u.inisiatif + u.penugasan + u.efisiensi);
+                        const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi);
                         const pct = totalP > 0 ? ((u.realisasi / totalP) * 100).toFixed(1) : '0.0';
                         return (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-slate-800">
-                              <div className="flex items-center gap-2">
-                                <Building2 size={16} className="text-slate-400 shrink-0" />
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[11px]">
+                            <td className="px-3 py-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                            <td className="px-4 py-3 font-bold text-slate-800">
+                              <div className="flex items-center gap-1.5">
+                                <Building2 size={14} className="text-slate-400 shrink-0" />
                                 <span>{u.nama_unit}</span>
                               </div>
-                              <div className="text-[10px] text-slate-400 font-mono mt-0.5 ml-6">{u.kode_unit || '-'}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-bold text-indigo-700">
+                                  {u.group_org}
+                                </span>
+                                {u.kode_unit && (
+                                  <span className="text-[9px] text-slate-400 font-mono">
+                                    {u.kode_unit}
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-6 py-4 font-bold text-indigo-600">
-                              <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 rounded-lg text-[10px]">
-                                {u.group_org}
-                              </span>
+                            <td className="px-3.5 py-3 text-right font-mono text-slate-600 font-medium">Rp {formatRp(u.pagu_awal)}</td>
+                            <td className="px-3.5 py-3 text-right font-mono font-bold text-indigo-700">
+                              {u.pengalihan > 0 ? `+ Rp ${formatRp(u.pengalihan)}` : u.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(u.pengalihan))}` : 'Rp 0'}
                             </td>
-                            <td className="px-6 py-4 text-right font-mono text-slate-600 font-medium">Rp {formatRp(u.pagu_awal)}</td>
-                            <td className="px-6 py-4 text-right font-mono text-emerald-700 font-bold">+ Rp {formatRp(u.inisiatif)}</td>
-                            <td className="px-6 py-4 text-right font-mono text-emerald-700 font-bold">+ Rp {formatRp(u.penugasan)}</td>
-                            <td className="px-6 py-4 text-right font-mono text-rose-600 font-bold">Rp {formatRp(u.efisiensi)}</td>
-                            <td className="px-6 py-4 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(totalP)}</td>
-                            <td className="px-6 py-4 text-right font-mono font-bold text-amber-700">Rp {formatRp(u.realisasi)}</td>
-                            <td className="px-6 py-4 text-center font-bold">
-                              <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px]">
+                            <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">
+                              {u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}
+                            </td>
+                            <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">
+                              {u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}
+                            </td>
+                            <td className="px-3.5 py-3 text-right font-mono text-rose-600 font-bold">
+                              {u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}
+                            </td>
+                            <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(totalP)}</td>
+                            <td className="px-3.5 py-3 text-right font-mono font-bold text-amber-700">Rp {formatRp(u.realisasi)}</td>
+                            <td className="px-3 py-3 text-center font-bold">
+                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px]">
                                 {pct}%
                               </span>
                             </td>
@@ -659,46 +760,64 @@ export default function PotretMutasiPaguPage() {
           </div>
         )}
 
-        {/* TAB 3: RINCIAN SURAT MUTASI (DATABASE `tambah_pagu`) */}
+        {/* TAB 3: RINCIAN CATATAN MUTASI PAGU (DATABASE `gov_pagu_anggaran`) */}
         {activeTab === 'surat' && (
           <div className="space-y-4 animate-in fade-in duration-300">
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-black tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-4">No & Tanggal Surat Usulan</th>
-                      <th className="px-6 py-4">Unit Pengusul</th>
-                      <th className="px-6 py-4">Hal / Perihal Surat Usulan</th>
-                      <th className="px-6 py-4 text-right">Nominal Diajukan (Rp)</th>
-                      <th className="px-6 py-4 text-right text-emerald-600">Nominal Disetujui Pimpinan (Rp)</th>
-                      <th className="px-6 py-4 text-center">Status Keputusan</th>
+                      <th className="px-3 py-3 text-center w-10">No</th>
+                      <th className="px-4 py-3 w-56">Nama Unit Kerja & Group</th>
+                      <th className="px-3.5 py-3 text-center w-44">Jenis Mutasi / Anggaran</th>
+                      <th className="px-4 py-3 text-right w-44">Nominal Mutasi (Rp)</th>
+                      <th className="px-4 py-3">Rincian Catatan / Keterangan Mutasi Pagu</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {tambahPaguLetters.length === 0 ? (
+                    {filteredMutasiRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium">
-                          Belum ada catatan surat usulan tambah pagu di database <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded">tambah_pagu</code> untuk filter yang dipilih.
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-medium">
+                          Belum ada catatan rincian mutasi pagu di database <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded">gov_pagu_anggaran</code> untuk filter yang dipilih.
                         </td>
                       </tr>
                     ) : (
-                      tambahPaguLetters.map((l: any, idx: number) => {
-                        const unitName = l.gov_units?.nama_unit || l.unit_kerja_nama || l.unit_pengusul || '-';
+                      filteredMutasiRows.map((r: any, idx: number) => {
+                        const unitName = r.gov_units?.nama_unit || 'Unit Kerja';
+                        const groupOrg = r.gov_units?.group_org || '-';
+                        const nom = Number(r.nominal || 0);
+
                         return (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-slate-800">
-                              <div>{l.no_surat_pengajuan || l.no_surat || '-'}</div>
-                              <div className="text-[10px] text-slate-400 font-normal">{l.tanggal_surat_pengajuan || l.tanggal_surat || '-'}</div>
-                            </td>
-                            <td className="px-6 py-4 font-semibold text-slate-700">{unitName}</td>
-                            <td className="px-6 py-4 text-slate-600 max-w-xs truncate">{l.hal_surat_pengajuan || l.perihal || '-'}</td>
-                            <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">Rp {formatRp(Number(l.nominal_diajukan || l.total_anggaran || 0))}</td>
-                            <td className="px-6 py-4 text-right font-mono font-black text-emerald-600">Rp {formatRp(Number(l.nominal_tanggapan || l.nominal_disetujui || 0))}</td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
-                                {l.status_pengajuan || l.keputusan || 'Disetujui'}
+                          <tr key={r.id || idx} className="hover:bg-slate-50 transition-colors text-[11px]">
+                            <td className="px-3 py-3 text-center font-bold text-slate-400 align-top pt-3.5">{idx + 1}</td>
+                            <td className="px-4 py-3 font-bold text-slate-800 align-top pt-3 space-y-1">
+                              <div className="flex items-center gap-1.5 font-black text-slate-900">
+                                <Building2 size={14} className="text-indigo-600 shrink-0" />
+                                <span>{unitName}</span>
+                              </div>
+                              <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-bold text-indigo-700 inline-block">
+                                {groupOrg}
                               </span>
+                            </td>
+                            <td className="px-3.5 py-3 text-center align-top pt-3">
+                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[10px] font-bold">
+                                {r.jenis_anggaran || 'Mutasi Pagu'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold align-top pt-3">
+                              <span className={nom > 0 ? "text-emerald-700 font-black" : nom < 0 ? "text-rose-600 font-black" : "text-slate-700"}>
+                                {nom > 0 ? `+ Rp ${formatRp(nom)}` : nom < 0 ? `- Rp ${formatRp(Math.abs(nom))}` : `Rp ${formatRp(nom)}`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 font-medium leading-relaxed align-top pt-3">
+                              {r.keterangan ? (
+                                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-[11px] text-slate-800 font-sans">
+                                  {r.keterangan}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic text-[10px]">- Tidak ada catatan khusus -</span>
+                              )}
                             </td>
                           </tr>
                         );
