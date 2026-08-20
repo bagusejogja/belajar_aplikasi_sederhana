@@ -114,8 +114,11 @@ export default function KomparasiTambahPaguPage() {
         .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('penugasan') || !(l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
         .reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
 
-      // Data dari gov_pagu_anggaran milik unit ini
-      const uGovRows = rawGovPagu.filter(r => r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString()));
+      // Data dari gov_pagu_anggaran milik unit ini (hanya Tambah Pagu - Inisiatif dan Tambah Pagu - Penugasan)
+      const uGovRows = rawGovPagu.filter(r => 
+        (r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString())) &&
+        ((r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - inisiatif' || (r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - penugasan')
+      );
 
       const govPaguInisiatif = uGovRows
         .filter(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif'))
@@ -472,21 +475,22 @@ export default function KomparasiTambahPaguPage() {
                 <TableHead>Nama Unit Kerja & Group</TableHead>
                 <TableHead className="text-right text-amber-900">Surat Disetujui (tambah_pagu)</TableHead>
                 <TableHead className="text-right text-emerald-900">Tercatat DB (gov_pagu_anggaran)</TableHead>
-                <TableHead className="text-right">Selisih / Diff (Rp)</TableHead>
-                <TableHead className="text-center">Status Audit</TableHead>
-                <TableHead className="text-center w-36">Aksi Sinkronisasi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredAuditUnits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-slate-400 font-medium">
+                  <TableCell colSpan={5} className="text-center py-12 text-slate-400 font-medium">
                     Tidak ada unit kerja yang memiliki mutasi atau sesuai filter.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAuditUnits.map((u, idx) => {
                   const isExpanded = !!expandedUnits[u.id];
+                  const dbRows = rawGovPagu.filter(r => 
+                    (r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString())) &&
+                    ((r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - inisiatif' || (r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - penugasan')
+                  );
 
                   return (
                     <React.Fragment key={u.id}>
@@ -523,138 +527,134 @@ export default function KomparasiTambahPaguPage() {
 
                         {/* GOV PAGU NOMINAL */}
                         <TableCell className="text-right align-top pt-3 space-y-1">
-                          <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
+                          <div className="flex justify-end items-center gap-2">
+                            {u.selisih === 0 && u.surat_nominal_disetujui > 0 && (
+                              <CheckCircle2 size={16} className="text-emerald-500" />
+                            )}
+                            <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
+                          </div>
                           <div className="text-[10px] text-slate-400">
                             Inisiatif: Rp {formatRp(u.gov_inisiatif)} | Penugasan: Rp {formatRp(u.gov_penugasan)}
                           </div>
                         </TableCell>
 
-                        {/* SELISIH / DIFF */}
-                        <TableCell className="text-right align-top pt-3 font-mono font-bold">
-                          <span className={u.selisih === 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-black"}>
-                            {u.selisih > 0 ? `+ Rp ${formatRp(u.selisih)}` : u.selisih < 0 ? `- Rp ${formatRp(Math.abs(u.selisih))}` : 'Rp 0'}
-                          </span>
-                        </TableCell>
-
-                        {/* AUDIT STATUS BADGE */}
-                        <TableCell className="text-center align-top pt-3">
-                          {u.audit_status === 'MATCH' && (
-                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
-                              🟢 MATCH (Sesuai)
-                            </Badge>
-                          )}
-                          {u.audit_status === 'KELEWAT' && (
-                            <Badge className="bg-amber-100 text-amber-900 border-amber-300 font-black text-[10px] animate-pulse">
-                              ⚠️ KELEWAT (Belum Dicatat)
-                            </Badge>
-                          )}
-                          {u.audit_status === 'SELISIH' && (
-                            <Badge className="bg-rose-100 text-rose-800 border-rose-200 font-black text-[10px]">
-                              🔴 SELISIH (Ada Beda)
-                            </Badge>
-                          )}
-                        </TableCell>
-
-                        {/* ACTION SINKRONISASI */}
-                        <TableCell className="text-center align-top pt-3">
-                          {u.audit_status === 'KELEWAT' || u.audit_status === 'SELISIH' ? (
-                            <Button
-                              size="sm"
-                              disabled={isSyncing === u.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSyncTargetUnit(u);
-                              }}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-xl h-8 px-3 shadow-sm"
-                            >
-                              {isSyncing === u.id ? <RefreshCw size={12} className="animate-spin" /> : <Zap size={12} className="mr-1 text-amber-300" />}
-                              Sinkronkan
-                            </Button>
-                          ) : (
-                            <span className="text-[10px] text-emerald-600 font-bold flex items-center justify-center gap-1">
-                              <Check size={12} /> Terverifikasi
-                            </span>
-                          )}
-                        </TableCell>
                       </TableRow>
 
                       {/* 🔴 REQUIREMENT 3: ACCORDION CHILD ROW - DETAIL SURAT PENGAJUAN PER UNIT */}
                       {isExpanded && (
-                        <TableRow className="bg-slate-50/90 border-b border-slate-200">
-                          <TableCell colSpan={8} className="p-4 md:p-6">
-                            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-inner space-y-3">
-                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                                  <FileText size={14} className="text-indigo-600" />
-                                  Rincian Surat Usulan: {u.nama_unit} ({u.letters.length} Surat)
-                                </h4>
-                                <span className="text-[10px] text-slate-400 font-bold">Rincian Komparasi per Surat</span>
+                        <TableRow className="bg-indigo-50 border-b border-indigo-100 shadow-inner">
+                          <TableCell colSpan={5} className="p-4 md:p-6">
+                            <div className="space-y-6">
+                              
+                              {/* LEFT TABLE: Rincian Surat Usulan */}
+                              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-inner space-y-3">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <FileText size={14} className="text-indigo-600" />
+                                    Rincian Surat Usulan: {u.nama_unit} ({u.letters.length} Surat)
+                                  </h4>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <Table>
+                                    <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                                      <TableRow>
+                                        <TableHead className="w-10">No</TableHead>
+                                        <TableHead>Surat Pengajuan (No, Tanggal, Hal & Jenis)</TableHead>
+                                        <TableHead className="text-right text-emerald-700 w-[200px]">Nominal Disetujui (Rp)</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {u.letters.length === 0 ? (
+                                        <TableRow>
+                                          <TableCell colSpan={3} className="text-center py-4 text-slate-400">Tidak ada rincian surat usulan untuk unit ini.</TableCell>
+                                        </TableRow>
+                                      ) : (
+                                        u.letters.map((subItem: any, subIdx: number) => {
+                                          return (
+                                            <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                                              <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{subIdx + 1}</TableCell>
+                                              <TableCell className="space-y-1">
+                                                <div className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</div>
+                                                <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
+                                                <div className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-wrap">{subItem.hal_surat_pengajuan || '-'}</div>
+                                                <div className="pt-1">
+                                                  <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px] font-bold">
+                                                    {subItem.jenis_tambah_pagu || 'Penugasan'}
+                                                  </Badge>
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="text-right font-mono font-black text-emerald-700 text-xs align-top pt-3">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                  {dbRows.some(r => Number(r.nominal) === Number(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)) && (
+                                                    <CheckCircle2 size={16} className="text-emerald-500" />
+                                                  )}
+                                                  <span>Rp {formatRp(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)}</span>
+                                                </div>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })
+                                      )}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
 
-                              <div className="overflow-x-auto">
-                                <Table>
-                                  <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
-                                    <TableRow>
-                                      <TableHead className="w-10">No</TableHead>
-                                      <TableHead>Surat Pengajuan (No, Tanggal, Hal)</TableHead>
-                                      <TableHead className="text-right">Nominal Diajukan (Rp)</TableHead>
-                                      <TableHead className="text-right text-emerald-700">Nominal Disetujui (Rp)</TableHead>
-                                      <TableHead className="text-center">Jenis Tambah Pagu</TableHead>
-                                      <TableHead className="text-center">Status Keputusan</TableHead>
-                                      <TableHead className="text-center">Ref Database</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {u.letters.length === 0 ? (
+                              {/* RIGHT TABLE: Rincian Pagu Tercatat DB */}
+                              <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-inner space-y-3">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                                    <Layers size={14} className="text-emerald-600" />
+                                    Detail DB Pagu Tambahan: {u.nama_unit} ({rawGovPagu.filter(r => r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString())).length} Record)
+                                  </h4>
+                                </div>
+                                <div className="overflow-x-auto">
+                                  <Table>
+                                    <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
                                       <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-4 text-slate-400">Tidak ada rincian surat usulan untuk unit ini.</TableCell>
+                                        <TableHead className="w-10">No</TableHead>
+                                        <TableHead>Jenis Anggaran Pagu & Keterangan</TableHead>
+                                        <TableHead className="text-right w-[200px]">Nominal Tercatat DB (Rp)</TableHead>
                                       </TableRow>
-                                    ) : (
-                                      u.letters.map((subItem: any, subIdx: number) => {
-                                        const isApproved = (subItem.status_pengajuan || '').toLowerCase().includes('disetujui') || Number(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0) > 0;
-
-                                        return (
-                                          <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
-                                            <TableCell className="font-bold text-slate-400 text-center text-[11px]">{subIdx + 1}</TableCell>
-                                            <TableCell className="space-y-0.5">
-                                              <div className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</div>
-                                              <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
-                                              <div className="text-slate-600 text-[11px] truncate max-w-md">{subItem.hal_surat_pengajuan || '-'}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-amber-900 text-xs">
-                                              Rp {formatRp(subItem.nominal_diajukan)}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono font-black text-emerald-700 text-xs">
-                                              Rp {formatRp(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px] font-bold">
-                                                {subItem.jenis_tambah_pagu || 'Penugasan'}
-                                              </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                              <Badge className={`px-2 py-0.5 text-[9px] uppercase font-black ${
-                                                isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                              }`}>
-                                                {subItem.status_pengajuan || 'Diajukan'}
-                                              </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                              {isApproved ? (
-                                                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                                                  Pagu Disetujui
-                                                </span>
-                                              ) : (
-                                                <span className="text-[10px] text-slate-400">Draft / Usulan</span>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {(() => {
+                                        if (dbRows.length === 0) {
+                                          return (
+                                            <TableRow>
+                                              <TableCell colSpan={3} className="text-center py-4 text-slate-400">Tidak ada data pagu tambahan tercatat di DB.</TableCell>
+                                            </TableRow>
+                                          );
+                                        }
+                                        return dbRows.map((dbRow: any, dbIdx: number) => (
+                                          <TableRow key={dbRow.id || dbIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                                            <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{dbIdx + 1}</TableCell>
+                                            <TableCell className="space-y-1">
+                                              <div className="font-bold text-slate-900 font-mono text-[11px] capitalize">
+                                                {dbRow.jenis_anggaran || '-'}
+                                              </div>
+                                              {dbRow.keterangan && (
+                                                <div className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">
+                                                  Keterangan: {dbRow.keterangan}
+                                                </div>
                                               )}
                                             </TableCell>
+                                            <TableCell className="text-right font-mono font-black text-emerald-800 text-xs align-top pt-3">
+                                              <div className="flex items-center justify-end gap-1.5">
+                                                {u.letters.some((l: any) => Number(l.nominal_tanggapan || l.nominal_disetujui || 0) === Number(dbRow.nominal)) && (
+                                                  <CheckCircle2 size={16} className="text-emerald-500" />
+                                                )}
+                                                <span>Rp {formatRp(dbRow.nominal)}</span>
+                                              </div>
+                                            </TableCell>
                                           </TableRow>
-                                        );
-                                      })
-                                    )}
-                                  </TableBody>
-                                </Table>
+                                        ));
+                                      })()}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
+
                             </div>
                           </TableCell>
                         </TableRow>

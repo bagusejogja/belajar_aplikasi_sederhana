@@ -14,7 +14,7 @@ export async function scanSuratWithAI(formData: FormData) {
     const base64Data = Buffer.from(bytes).toString('base64');
 
     // 2. Inisialisasi Model Gemini Flash (Versi Paling Stabil)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // 3. Siapkan Prompt yang Sangat Spesifik
     const prompt = `
@@ -38,14 +38,20 @@ export async function scanSuratWithAI(formData: FormData) {
       generationConfig: { responseMimeType: "application/json" }
     };
     
+    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    
+    // Retry mechanism untuk 503
     let result;
     try {
-       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-       result = await model.generateContent(request);
-    } catch (err) {
-       console.log('Gemini 2.5 Flash error, fallback to gemini-2.0-flash', err);
-       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-       result = await fallbackModel.generateContent(request);
+      result = await model.generateContent(request);
+    } catch (e: any) {
+      if (e.message?.includes('503') || e.message?.includes('high demand')) {
+        console.log("Retry AI Generation due to 503...");
+        await new Promise(r => setTimeout(r, 2000));
+        result = await model.generateContent(request);
+      } else {
+        throw e;
+      }
     }
 
     const responseText = result.response.text();
@@ -73,7 +79,7 @@ export async function summarizeSubstanceWithAI(fileUrl: string) {
     const mimeType = response.headers.get('content-type') || 'application/pdf';
 
     // 2. Inisialisasi Model
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // 3. Prompt untuk Ringkasan Substansi
     const prompt = `
@@ -115,13 +121,17 @@ export async function listAvailableModels() {
   }
 }
 
-export async function generateRingkasanFromText(ocrText: string, contextArsip?: string) {
+export async function generateRingkasanFromText(ocrText: string, contextArsip?: string, includeRekamJejak: boolean = true) {
   try {
     const contextArsipSection = contextArsip ? `
       === RIWAYAT / ARSIP USULAN TAMBAH PAGU TERDAHULU UNTUK UNIT INI ===
       ${contextArsip}
       ====================================================================
     ` : '';
+
+    const rekamJejakInstruction = includeRekamJejak && contextArsip 
+      ? `2. Jika terdapat data riwayat/arsip pengajuan tambah pagu terdahulu di atas, sertakan 1 paragraf/sub-poin ringkas di bagian bawah yang merangkum rekam jejak usulan tambah pagu unit kerja ini sebelumnya (misal: "Catatan Rekam Jejak Usulan Terdahulu: Unit ini pernah mengajukan tambahan pagu pada... dengan status...").` 
+      : '';
 
     const prompt = `
       Anda adalah asisten keuangan & administrasi pemerintahan/universitas. Buatlah ringkasan substansi dari teks surat usulan anggaran berikut:
@@ -133,7 +143,7 @@ export async function generateRingkasanFromText(ocrText: string, contextArsip?: 
 
       Instruksi Penyusunan Ringkasan:
       1. Berikan ringkasan yang jelas, padat, dan formal tentang apa tujuan utama surat ini, rincian nominal biaya yang diusulkan, dan mengapa ini penting/mendesak.
-      2. Jika terdapat data riwayat/arsip pengajuan tambah pagu terdahulu di atas, sertakan 1 paragraf/sub-poin ringkas di bagian bawah yang merangkum rekam jejak usulan tambah pagu unit kerja ini sebelumnya (misal: "Catatan Rekam Jejak Usulan Terdahulu: Unit ini pernah mengajukan tambahan pagu pada... dengan status...").
+      ${rekamJejakInstruction}
 
       Format hasil DALAM HTML RINGAN (menggunakan tag <p>, <ul>, <li>, <strong>) tanpa pembungkus backtick markdown. Langsung berikan isi HTML-nya saja tanpa kata pembuka/penutup.
     `;
@@ -141,10 +151,10 @@ export async function generateRingkasanFromText(ocrText: string, contextArsip?: 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
     let result;
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       result = await model.generateContent(request);
     } catch (err) {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       result = await fallbackModel.generateContent(request);
     }
     
@@ -179,10 +189,10 @@ export async function generateAnalysisFromText(ocrText: string) {
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
     let result;
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       result = await model.generateContent(request);
     } catch (err) {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       result = await fallbackModel.generateContent(request);
     }
     
@@ -246,10 +256,10 @@ export async function convertSuratToTextWithAI(formData: FormData) {
     
     let result;
     try {
-       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+       var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
        result = await model.generateContent(request);
     } catch (err) {
-       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
        result = await fallbackModel.generateContent(request);
     }
 
@@ -264,3 +274,41 @@ export async function convertSuratToTextWithAI(formData: FormData) {
   }
 }
 
+export async function extractTanggapanFromText(ocrText: string) {
+  try {
+    const prompt = `
+      Anda adalah asisten AI yang bertugas mengekstrak metadata dari Surat Balasan / Surat Keputusan (Tanggapan).
+      Berikut adalah hasil OCR dari dokumen surat tersebut:
+      
+      === TEKS SURAT ===
+      ${ocrText}
+      === END TEKS SURAT ===
+
+      Tolong ekstrak informasi berikut:
+      1. no_surat_tanggapan (string)
+      2. tanggal_surat_tanggapan (format YYYY-MM-DD)
+      3. hal_surat_tanggapan (string)
+      4. nominal_tanggapan (number, contoh: 50000000)
+      5. status_pengajuan (string, pilih salah satu: "Disetujui Semua", "Disetujui Sebagian", atau "Ditolak")
+
+      Kembalikan HANYA format JSON valid tanpa backticks (markdown).
+    `;
+
+    const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+    let result;
+    try {
+      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+      result = await model.generateContent(request);
+    } catch (err) {
+      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+      result = await fallbackModel.generateContent(request);
+    }
+    
+    let jsonText = result.response.text().replace(/```json|```/g, "").trim();
+    const data = JSON.parse(jsonText);
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Error AI Ekstrak Tanggapan:", error);
+    return { success: false, error: error.message };
+  }
+}

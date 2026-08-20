@@ -8,7 +8,7 @@ export async function analyzeBudgetWithAI(budgetData: any) {
   if (geminiKey) {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       const prompt = `Kamu adalah sistem pakar Reviewer Anggaran (Budget Locking Engine).
 Tugasmu adalah menganalisis baris usulan anggaran dan menentukan apakah item tersebut bersifat MANDATORY (Wajib Ada, Kunci = 'Y') atau DISCRETIONARY (Bisa Disesuaikan, Kunci = 'N').
 

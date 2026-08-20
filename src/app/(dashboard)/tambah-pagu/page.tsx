@@ -14,7 +14,7 @@ import {
   ChevronUp, BarChart3, TrendingUp, LayoutGrid, ChevronDown,
   Wallet, CheckCircle, BarChart as ChartIcon, Eye,
   ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet,
-  ExternalLink, X, RefreshCw, Maximize2, Zap, Landmark, Scale
+  ExternalLink, X, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3
 } from 'lucide-react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
@@ -160,6 +160,9 @@ export default function TambahPaguPage() {
   // Pop Up Detail Dialog State
   const [viewDetailData, setViewDetailData] = useState<any | null>(null);
 
+  // Set of no_surat from app_analisis_utama for 100% accurate AI Import detection
+  const [analisisNoSuratSet, setAnalisisNoSuratSet] = useState<Set<string>>(new Set());
+
   // Accordion Expand State for Summary Per Unit
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
 
@@ -175,16 +178,40 @@ export default function TambahPaguPage() {
     setIsLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const [myPerms, result] = await Promise.all([
+      const [myPerms, { data: rawData }, { data: analisisList }] = await Promise.all([
         getMyPermissions('/tambah-pagu', session?.access_token, session?.user?.id, session?.user?.email),
-        getTambahPagu()
+        supabase.from('tambah_pagu').select('*, gov_units(nama_unit)').order('id', { ascending: false }),
+        supabase.from('app_analisis_utama').select('no_surat, analisis_html')
       ]);
       
       setPerms(myPerms);
-      const rawData = result || [];
-      setData(rawData);
+      setData(rawData || []);
 
-      const years = Array.from(new Set(rawData.map((item: any) => item.tahun_anggaran?.toString()).filter(Boolean))).sort().reverse() as string[];
+      const setAnalisisAI = new Set<string>();
+      const setAnalisisManual = new Set<string>();
+      
+      if (analisisList) {
+        analisisList.forEach((a: any) => {
+          if (a.no_surat) {
+             const key = a.no_surat.trim().toLowerCase();
+             let isManual = false;
+             if (a.analisis_html) {
+                 try {
+                    const parsed = JSON.parse(a.analisis_html);
+                    if (parsed.is_manual) isManual = true;
+                 } catch(e) {}
+             }
+             if (isManual) {
+                setAnalisisManual.add(key);
+             } else {
+                setAnalisisAI.add(key);
+             }
+          }
+        });
+      }
+      setAnalisisNoSuratSet(setAnalisisAI);
+
+      const years = Array.from(new Set(rawData?.map((item: any) => item.tahun_anggaran?.toString()).filter(Boolean))).sort().reverse() as string[];
       setYearOptions(years.length > 0 ? years : ['2026', '2025']);
       
     } catch (error: any) {
@@ -739,7 +766,7 @@ export default function TambahPaguPage() {
                             </div>
                           </TableCell>
 
-                          {/* 4. JENIS & STATUS DIJADIKAN SATU KOLOM */}
+                          {/* 4. JENIS & STATUS & SUMBER DATA */}
                           <TableCell className="text-center align-top pt-3 space-y-1.5">
                             <div>
                               <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[10px] font-bold">
@@ -750,6 +777,17 @@ export default function TambahPaguPage() {
                               <Badge className={`px-2.5 py-0.5 text-[10px] font-black uppercase ${getStatusBadgeStyle(item.status_pengajuan)}`}>
                                 {item.status_pengajuan || 'Diajukan'}
                               </Badge>
+                            </div>
+                            <div>
+                              {(item.id_analisis || (item.no_surat_pengajuan && analisisNoSuratSet.has(item.no_surat_pengajuan.trim().toLowerCase()))) ? (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full shadow-2xs" title="Bersumber dari halaman Analisis Pagu">
+                                  <Sparkles size={10} className="text-indigo-600" /> Impor Analisis AI
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-full" title="Data diinput manual">
+                                  <Edit3 size={10} className="text-slate-500" /> Input Manual
+                                </span>
+                              )}
                             </div>
                           </TableCell>
 
@@ -918,7 +956,9 @@ export default function TambahPaguPage() {
                                           <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
                                             <TableCell className="font-bold text-slate-400 text-center text-[11px]">{subIdx + 1}</TableCell>
                                             <TableCell className="space-y-0.5">
-                                              <div className="font-bold text-slate-900 font-mono text-[11px]">{subItem.no_surat_pengajuan || '-'}</div>
+                                               <div className="flex items-center gap-2">
+                                                 <span className="font-bold text-slate-900 font-mono text-[11px]">{subItem.no_surat_pengajuan || '-'}</span>
+                                               </div>
                                               <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
                                               <div className="text-slate-600 text-[11px] truncate max-w-sm">{subItem.hal_surat_pengajuan || '-'}</div>
                                             </TableCell>
@@ -938,6 +978,17 @@ export default function TambahPaguPage() {
                                                 <Badge className={`px-2 py-0.5 text-[9px] uppercase ${getStatusBadgeStyle(subItem.status_pengajuan)}`}>
                                                   {subItem.status_pengajuan || 'Diajukan'}
                                                 </Badge>
+                                              </div>
+                                              <div>
+                                                {subItem.id_analisis ? (
+                                                  <span className="inline-flex items-center gap-1 text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.2 rounded-full">
+                                                    <Sparkles size={9} className="text-indigo-600" /> AI
+                                                  </span>
+                                                ) : (
+                                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200/80 px-1.5 py-0.2 rounded-full">
+                                                    <Edit3 size={9} className="text-slate-500" /> Manual
+                                                  </span>
+                                                )}
                                               </div>
                                             </TableCell>
                                             <TableCell className="text-center">
@@ -1046,6 +1097,20 @@ export default function TambahPaguPage() {
                     <TableRow>
                       <TableCell className="bg-slate-50/50 font-bold text-slate-500">Hal / Perihal</TableCell>
                       <TableCell className="font-medium text-slate-800">{viewDetailData.hal_surat_pengajuan || '-'}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Sumber Entry Data</TableCell>
+                      <TableCell>
+                        {analisisNoSuratSet.has((viewDetailData.no_surat_pengajuan || '').trim().toLowerCase()) ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl">
+                            <Sparkles size={13} className="text-indigo-600" /> Impor Analisis AI (/analisis)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl">
+                            <Edit3 size={13} className="text-slate-500" /> Input Manual
+                          </span>
+                        )}
+                      </TableCell>
                     </TableRow>
                     <TableRow className="bg-amber-50/40">
                       <TableCell className="bg-amber-100/50 font-bold text-amber-900">Nominal Diajukan</TableCell>

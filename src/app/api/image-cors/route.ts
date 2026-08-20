@@ -1,4 +1,15 @@
 import { NextResponse } from 'next/server';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+  },
+});
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +20,26 @@ export async function GET(request: Request) {
   }
 
   try {
+    const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
+    
+    // Jika URL adalah R2, gunakan S3 Client untuk membypass blokir ISP
+    if (url.startsWith(domain)) {
+      const key = url.replace(`${domain}/`, '');
+      const data = await r2.send(new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME || 'lampiran-aplikasi',
+        Key: key,
+      }));
+      
+      const byteArray = await data.Body?.transformToByteArray();
+      return new NextResponse(byteArray, {
+        headers: {
+          'Content-Type': data.ContentType || 'application/pdf',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+
     const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch');
     const arrayBuffer = await response.arrayBuffer();

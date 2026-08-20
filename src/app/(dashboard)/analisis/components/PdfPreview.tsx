@@ -6,32 +6,47 @@ import { renderWysiwygToPdf } from '@/lib/pdfRenderer';
 import { Printer, Download, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-export default function PdfPreview({ mainData, detailData, historisData, setActiveTab }: any) {
+export default function PdfPreview({ mainData, detailData, historisData, setActiveTab, readOnly }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [riwayatUsulanUnit, setRiwayatUsulanUnit] = useState<any[]>([]);
+  const [detailInisiatif, setDetailInisiatif] = useState<any[]>([]);
+  const [detailPenugasan, setDetailPenugasan] = useState<any[]>([]);
 
   React.useEffect(() => {
-    const fetchRiwayat = async () => {
+    const fetchDetailPagu = async () => {
        if (mainData?.unit_pengirim) {
-          const { data } = await supabase
-            .from('app_analisis_utama')
-            .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan')
-            .ilike('unit_pengirim', `%${mainData.unit_pengirim}%`)
-            .order('created_at', { ascending: false });
-          if (data) {
-             setRiwayatUsulanUnit(data.filter(d => d.id_analisis !== mainData.id_analisis));
+          const { data: unitsData } = await supabase.from('gov_units').select('id').ilike('nama_unit', `%${mainData.unit_pengirim}%`).limit(1);
+          if (unitsData && unitsData.length > 0) {
+            const unitId = unitsData[0].id;
+            
+            const { data: inisiatifData } = await supabase
+              .from('gov_pagu_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+              .eq('unit_id', unitId)
+              .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
+              .eq('tahun_anggaran', '2026')
+              .order('tahun_anggaran', { ascending: false });
+            if (inisiatifData) setDetailInisiatif(inisiatifData);
+            
+            const { data: penugasanData } = await supabase
+              .from('gov_pagu_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+              .eq('unit_id', unitId)
+              .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
+              .eq('tahun_anggaran', '2026')
+              .order('tahun_anggaran', { ascending: false });
+            if (penugasanData) setDetailPenugasan(penugasanData);
           }
        }
     };
-    fetchRiwayat();
-  }, [mainData?.unit_pengirim, mainData?.id_analisis]);
+    fetchDetailPagu();
+  }, [mainData?.unit_pengirim]);
 
   // Auto generate on mount or when data changes significantly
   React.useEffect(() => {
      if (mainData?.no_surat || mainData?.analisis_html) {
         generatePDF();
      }
-  }, [mainData?.no_surat, mainData?.analisis_html, riwayatUsulanUnit]);
+  }, [mainData?.no_surat, mainData?.analisis_html, detailInisiatif, detailPenugasan]);
 
   const generatePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -196,11 +211,11 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       ['Pagu Awal', `Rp ${historisYearRow.pagu_awal || '0'}`],
       ['Pengalihan (+/-)', `Rp ${historisYearRow.pengalihan || '0'}`]
     ];
-    if (historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0') {
-       bodyPagu.push(['Tambah Pagu Penugasan +', `+ Rp ${historisYearRow.tambah_pagu_penugasan}`]);
-    }
     if (historisYearRow.tambah_pagu_inisiatif && historisYearRow.tambah_pagu_inisiatif !== '0') {
-       bodyPagu.push(['Tambah Pagu Inisiatif +', `+ Rp ${historisYearRow.tambah_pagu_inisiatif}`]);
+       bodyPagu.push(['Tambah Pagu Inisiatif +', `+ Rp ${formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_inisiatif)))}`]);
+    }
+    if (historisYearRow.tambah_pagu_penugasan && historisYearRow.tambah_pagu_penugasan !== '0') {
+       bodyPagu.push(['Tambah Pagu Penugasan +', `+ Rp ${formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_penugasan)))}`]);
     }
     if (historisYearRow.efisiensi && historisYearRow.efisiensi !== '0') {
        bodyPagu.push(['Efisiensi -', `- Rp ${historisYearRow.efisiensi}`]);
@@ -238,24 +253,53 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     startY = (doc as any).lastAutoTable.finalY + 10;
 
     // 4b. HISTORI USULAN TAMBAH PAGU UNIT KERJA
-    if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
-      startY = addSectionHeader(`HISTORI USULAN TAMBAH PAGU UNIT KERJA (${mainData.unit_pengirim || 'Unit'}):`, startY);
-      autoTable(doc, {
+    if (detailInisiatif.length > 0 || detailPenugasan.length > 0) {
+      startY = addSectionHeader(`HISTORI USULAN TAMBAH PAGU UNIT KERJA:`, startY);
+      
+      const historiBody: any[] = [];
+      let noInisiatif = 1;
+      
+      const inisiatifFiltered = detailInisiatif.filter(h => h.tahun_anggaran === '2026' || h.tahun_anggaran === 2026);
+      if (inisiatifFiltered.length > 0) {
+        historiBody.push([{ content: 'A. Tambah Pagu Inisiatif', colSpan: 3, styles: { fillColor: [224, 231, 255], fontStyle: 'bold' } }]);
+        inisiatifFiltered.forEach(h => {
+          historiBody.push([
+            noInisiatif++,
+            `${h.keterangan || '-'}\nTahun: ${h.tahun_anggaran || '-'} | Status: ${h.status_pagu || 'Disetujui'}`,
+            `Rp ${formatRp(parseNum(h.nominal || '0'))}`
+          ]);
+        });
+        const totalIni = inisiatifFiltered.reduce((acc, curr) => acc + parseNum(curr.nominal), 0);
+        historiBody.push([{ content: 'Total Tambah Pagu Inisiatif:', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }, `Rp ${formatRp(totalIni)}`]);
+      }
+
+      let noPenugasan = 1;
+      const penugasanFiltered = detailPenugasan.filter(h => h.tahun_anggaran === '2026' || h.tahun_anggaran === 2026);
+      if (penugasanFiltered.length > 0) {
+        historiBody.push([{ content: 'B. Tambah Pagu Penugasan', colSpan: 3, styles: { fillColor: [224, 231, 255], fontStyle: 'bold' } }]);
+        penugasanFiltered.forEach(h => {
+          historiBody.push([
+            noPenugasan++,
+            `${h.keterangan || '-'}\nTahun: ${h.tahun_anggaran || '-'} | Status: ${h.status_pagu || 'Disetujui'}`,
+            `Rp ${formatRp(parseNum(h.nominal || '0'))}`
+          ]);
+        });
+        const totalPenu = penugasanFiltered.reduce((acc, curr) => acc + parseNum(curr.nominal), 0);
+        historiBody.push([{ content: 'Total Tambah Pagu Penugasan:', colSpan: 2, styles: { halign: 'right', fontStyle: 'bold' } }, `Rp ${formatRp(totalPenu)}`]);
+      }
+
+      if (historiBody.length > 0) {
+        autoTable(doc, {
         startY: startY,
-        head: [['No', 'No / Hal Surat', 'Pengajuan (Rp)', 'Disetujui (Rp)', 'Status']],
-        body: riwayatUsulanUnit.map((h: any, i: number) => [
-          i + 1,
-          `${h.perihal || '-'}\nNo: ${h.no_surat || '-'}`,
-          `Rp ${formatRp(parseNum(h.total_anggaran || '0'))}`,
-          `Rp ${formatRp(parseNum(h.nominal_disetujui || '0'))}`,
-          (h.keputusan || 'disetujui').toUpperCase()
-        ]),
+        head: [['No', 'Uraian / Keterangan Tambah Pagu', 'Nominal (Rp)']],
+        body: historiBody,
         theme: 'grid',
         headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0] },
         styles: { fontSize: 8, cellPadding: 2 },
-        columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'center' } }
+        columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 2: { halign: 'right' } }
       });
       startY = (doc as any).lastAutoTable.finalY + 10;
+      }
     }
 
     // 5. DATA HISTORIS PAGU MULTI-TAHUN
@@ -522,12 +566,16 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
           <p className="text-gray-500 text-sm">Preview langsung hasil cetak dengan WYSIWYG Renderer khusus.</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setActiveTab && setActiveTab('main')} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
-            Kembali ke Form
-          </button>
-          <button onClick={generatePDF} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
-            <Eye size={16}/> Refresh Preview
-          </button>
+          {!readOnly && (
+            <>
+              <button onClick={() => setActiveTab && setActiveTab('main')} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+                Kembali ke Form
+              </button>
+              <button onClick={generatePDF} className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+                <Eye size={16}/> Refresh Preview
+              </button>
+            </>
+          )}
           <button onClick={handleDownload} disabled={!pdfUrl} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-md flex items-center gap-2 disabled:opacity-50">
             <Download size={16}/> Unduh PDF
           </button>

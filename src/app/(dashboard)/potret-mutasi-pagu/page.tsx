@@ -8,8 +8,10 @@ import {
   BarChart3, Layers, RefreshCw, Download, Filter, 
   Search, TrendingUp, DollarSign, Building2, CheckCircle2, 
   Sparkles, ArrowUpRight, ArrowDownRight, Eye, ChevronRight,
-  Landmark, Wallet, PieChart, FileText, X, AlertCircle
+  Landmark, Wallet, PieChart, FileText, X, AlertCircle,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -25,7 +27,12 @@ export default function PotretMutasiPaguPage() {
   const [selectedGroupOrg, setSelectedGroupOrg] = useState('ALL');
   const [selectedUnit, setSelectedUnit] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'chart' | 'unit' | 'surat'>('chart');
+  const [activeTab, setActiveTab] = useState<'chart' | 'unit-group' | 'unit-flat' | 'surat'>('chart');
+  const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
+  const [unitSearchText, setUnitSearchText] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
   
   // Modal State
   const [activeModalCategory, setActiveModalCategory] = useState<string | null>(null);
@@ -244,6 +251,55 @@ export default function PotretMutasiPaguPage() {
     return new Intl.NumberFormat('id-ID').format(num);
   };
 
+  const exportToExcel = () => {
+    // Sheet 1: Breakdown Pagu Unit
+    const excelDataUnit = filteredUnits.map((u, idx) => ({
+      'No': idx + 1,
+      'Group Org': u.group_org,
+      'Kode Unit': u.kode_unit || '-',
+      'Nama Unit Kerja': u.nama_unit,
+      'Pagu Awal (Rp)': u.pagu_awal,
+      'Pengalihan (+/-) (Rp)': u.pengalihan,
+      'Tambah Inisiatif (Rp)': u.inisiatif,
+      'Tambah Penugasan (Rp)': u.penugasan,
+      'Efisiensi (Rp)': u.efisiensi,
+      'Total Pagu (Rp)': u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi),
+      'Realisasi (Rp)': u.realisasi,
+      '% Serapan': (u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi)) > 0 
+        ? ((u.realisasi / (u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi))) * 100).toFixed(1) + '%' 
+        : '0.0%'
+    }));
+
+    const worksheet1 = XLSX.utils.json_to_sheet(excelDataUnit);
+    worksheet1['!cols'] = [
+      { wch: 5 }, { wch: 15 }, { wch: 15 }, { wch: 40 },
+      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 10 }
+    ];
+
+    // Sheet 2: Rincian Catatan Mutasi Pagu
+    const excelDataMutasi = filteredMutasiRows.map((r: any, idx: number) => ({
+      'No': idx + 1,
+      'Group Org': r.gov_units?.group_org || '-',
+      'Kode Unit': r.gov_units?.kode_unit || '-',
+      'Nama Unit Kerja': r.gov_units?.nama_unit || 'Unit Kerja',
+      'Jenis Mutasi / Anggaran': r.jenis_anggaran || 'Mutasi Pagu',
+      'Nominal Mutasi (Rp)': Number(r.nominal || 0),
+      'Rincian Catatan / Keterangan': r.keterangan || '- Tidak ada catatan khusus -'
+    }));
+
+    const worksheet2 = XLSX.utils.json_to_sheet(excelDataMutasi);
+    worksheet2['!cols'] = [
+      { wch: 5 }, { wch: 15 }, { wch: 15 }, { wch: 40 },
+      { wch: 25 }, { wch: 20 }, { wch: 50 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet1, "Breakdown Pagu Unit");
+    XLSX.utils.book_append_sheet(workbook, worksheet2, "Rincian Mutasi");
+    
+    XLSX.writeFile(workbook, `Data_Mutasi_Pagu_${selectedYear}.xlsx`);
+  };
+
   // Total Calculations
   const totalMutasiPaguKeseluruhan = 
     mutasiData.pagu_awal + 
@@ -339,19 +395,78 @@ export default function PotretMutasiPaguPage() {
             </select>
           </div>
 
-          {/* Unit Kerja Filter */}
-          <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
-            <span className="text-[10px] font-black uppercase text-slate-400 pl-1">Unit:</span>
-            <select 
-              value={selectedUnit} 
-              onChange={(e) => setSelectedUnit(e.target.value)}
-              className="bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer pr-1 max-w-[160px] truncate"
+          {/* Unit Kerja Filter (Autocomplete) */}
+          <div className="relative">
+            <div 
+              onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
+              className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200 cursor-pointer max-w-[200px]"
             >
-              <option value="ALL">SEMUA UNIT KERJA</option>
-              {availableUnitsForDropdown.map((u) => (
-                <option key={u.id} value={u.id}>[{u.kode_unit}] {u.nama_unit}</option>
-              ))}
-            </select>
+              <span className="text-[10px] font-black uppercase text-slate-400 pl-1 shrink-0">Unit:</span>
+              <span className="font-bold text-xs text-slate-700 truncate w-full pr-2">
+                {selectedUnit === 'ALL' ? 'SEMUA UNIT KERJA' : availableUnitsForDropdown.find(u => u.id.toString() === selectedUnit.toString())?.nama_unit}
+              </span>
+              <ChevronDown size={14} className="text-slate-400 shrink-0 pr-1" />
+            </div>
+            {isUnitDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col">
+                <div className="p-2 border-b border-slate-100">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Cari Unit..."
+                    value={unitSearchText}
+                    onChange={e => {
+                      setUnitSearchText(e.target.value);
+                      setHighlightedIndex(0);
+                    }}
+                    onKeyDown={e => {
+                      const filteredDropdownUnits = availableUnitsForDropdown.filter(u => u.nama_unit.toLowerCase().includes(unitSearchText.toLowerCase()) || (u.kode_unit && u.kode_unit.toLowerCase().includes(unitSearchText.toLowerCase())));
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setHighlightedIndex(prev => Math.min(prev + 1, filteredDropdownUnits.length));
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setHighlightedIndex(prev => Math.max(prev - 1, 0));
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (highlightedIndex === 0) {
+                          setSelectedUnit('ALL');
+                          setIsUnitDropdownOpen(false);
+                          setUnitSearchText('');
+                        } else if (highlightedIndex > 0 && highlightedIndex <= filteredDropdownUnits.length) {
+                          setSelectedUnit(filteredDropdownUnits[highlightedIndex - 1].id);
+                          setIsUnitDropdownOpen(false);
+                          setUnitSearchText('');
+                        }
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 text-xs font-medium p-2.5 rounded-lg outline-none focus:border-indigo-400"
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+                  <div 
+                    onMouseEnter={() => setHighlightedIndex(0)}
+                    onClick={() => { setSelectedUnit('ALL'); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
+                    className={`px-3 py-2 text-[11px] font-bold rounded-lg cursor-pointer transition-colors ${highlightedIndex === 0 ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    SEMUA UNIT KERJA
+                  </div>
+                  {(() => {
+                    const filteredDropdownUnits = availableUnitsForDropdown.filter(u => u.nama_unit.toLowerCase().includes(unitSearchText.toLowerCase()) || (u.kode_unit && u.kode_unit.toLowerCase().includes(unitSearchText.toLowerCase())));
+                    return filteredDropdownUnits.map((u, idx) => (
+                      <div 
+                        key={u.id}
+                        onMouseEnter={() => setHighlightedIndex(idx + 1)}
+                        onClick={() => { setSelectedUnit(u.id); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
+                        className={`px-3 py-2 text-[11px] font-medium rounded-lg cursor-pointer truncate transition-colors ${highlightedIndex === idx + 1 ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'}`}
+                      >
+                        [{u.kode_unit}] {u.nama_unit}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -374,15 +489,24 @@ export default function PotretMutasiPaguPage() {
             </div>
           </div>
 
-          {/* SINGLE TARIK DATA GLOBAL BUTTON */}
-          <button 
-            onClick={handleSyncGlobalData}
-            disabled={isSyncing}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-            {isSyncing ? "Menarik Data..." : "Tarik Data Global"}
-          </button>
+          {/* SINGLE TARIK DATA GLOBAL BUTTON & EXPORT EXCEL */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button 
+              onClick={handleSyncGlobalData}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
+              {isSyncing ? "Menarik Data..." : "Tarik Data Global"}
+            </button>
+            <button 
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs tracking-wide transition-all shadow-md active:scale-95"
+            >
+              <Download size={16} />
+              Export Excel
+            </button>
+          </div>
         </div>
 
         {/* 2-COLUMN DISPLAY CARDS MATCHING SCREENSHOT (PREMIUM MODERN DESIGN) */}
@@ -619,25 +743,25 @@ export default function PotretMutasiPaguPage() {
               📊 Visualisasi Chart
             </button>
             <button
-              onClick={() => setActiveTab('unit')}
-              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'unit' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              onClick={() => setActiveTab('unit-group')}
+              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'unit-group' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              🏢 Breakdown Per Unit Kerja ({unitBreakdownData.length})
+              📂 Terkelompok (Group Org)
             </button>
             <button
               onClick={() => setActiveTab('surat')}
               className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'surat' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              📄 Rincian Catatan Mutasi Pagu ({filteredMutasiRows.length})
+              📄 Rincian Mutasi Pagu ({filteredMutasiRows.length})
             </button>
           </div>
 
-          {(activeTab === 'unit' || activeTab === 'surat') && (
+          {(activeTab === 'unit-group' || activeTab === 'surat') && (
             <div className="relative w-full sm:w-72">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder={activeTab === 'unit' ? "Cari Unit / Group Org..." : "Cari Mutasi / Unit / Keterangan..."}
+                placeholder={activeTab === 'unit-group' ? "Cari Unit / Group Org..." : "Cari Mutasi / Unit / Keterangan..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-emerald-500 font-medium"
@@ -679,79 +803,169 @@ export default function PotretMutasiPaguPage() {
           </div>
         )}
 
-        {/* TAB 2: BREAKDOWN PER UNIT KERJA (RAMPING & SLEEK TABLE) */}
-        {activeTab === 'unit' && (
+        {/* TAB 2: BREAKDOWN PER UNIT KERJA (GROUP ORG COLLAPSE) */}
+        {activeTab === 'unit-group' && (
           <div className="space-y-4 animate-in fade-in duration-300">
             <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-3 text-center w-10">No</th>
-                      <th className="px-4 py-3">Nama Unit Kerja & Group</th>
+                      <th className="px-3 py-3 text-center w-10"></th>
+                      <th className="px-4 py-3">Group & Nama Unit Kerja</th>
                       <th className="px-3.5 py-3 text-right">Pagu Awal (Rp)</th>
                       <th className="px-3.5 py-3 text-right text-indigo-600">Pengalihan (+/-)</th>
                       <th className="px-3.5 py-3 text-right text-emerald-600">+ Inisiatif</th>
                       <th className="px-3.5 py-3 text-right text-emerald-600">+ Penugasan</th>
                       <th className="px-3.5 py-3 text-right text-rose-600">- Efisiensi</th>
                       <th className="px-3.5 py-3 text-right font-black text-slate-800 bg-slate-100/50">Total Pagu (Rp)</th>
-                      <th className="px-3.5 py-3 text-right text-amber-600">Realisasi (Rp)</th>
-                      <th className="px-3 py-3 text-center w-24">% Serapan</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredUnits.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-6 py-8 text-center text-slate-400 font-medium">
+                        <td colSpan={8} className="px-6 py-8 text-center text-slate-400 font-medium">
                           Tidak ada data unit yang sesuai filter.
                         </td>
                       </tr>
                     ) : (
-                      filteredUnits.map((u, idx) => {
-                        const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi);
-                        const pct = totalP > 0 ? ((u.realisasi / totalP) * 100).toFixed(1) : '0.0';
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[11px]">
-                            <td className="px-3 py-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                            <td className="px-4 py-3 font-bold text-slate-800">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 size={14} className="text-slate-400 shrink-0" />
-                                <span>{u.nama_unit}</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-bold text-indigo-700">
-                                  {u.group_org}
-                                </span>
-                                {u.kode_unit && (
-                                  <span className="text-[9px] text-slate-400 font-mono">
-                                    {u.kode_unit}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-3.5 py-3 text-right font-mono text-slate-600 font-medium">Rp {formatRp(u.pagu_awal)}</td>
-                            <td className="px-3.5 py-3 text-right font-mono font-bold text-indigo-700">
-                              {u.pengalihan > 0 ? `+ Rp ${formatRp(u.pengalihan)}` : u.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(u.pengalihan))}` : 'Rp 0'}
-                            </td>
-                            <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">
-                              {u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}
-                            </td>
-                            <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">
-                              {u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}
-                            </td>
-                            <td className="px-3.5 py-3 text-right font-mono text-rose-600 font-bold">
-                              {u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}
-                            </td>
-                            <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(totalP)}</td>
-                            <td className="px-3.5 py-3 text-right font-mono font-bold text-amber-700">Rp {formatRp(u.realisasi)}</td>
-                            <td className="px-3 py-3 text-center font-bold">
-                              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px]">
-                                {pct}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
+                      (() => {
+                        const groupedUnits: Record<string, typeof filteredUnits> = {};
+                        filteredUnits.forEach(u => {
+                          if (!groupedUnits[u.group_org]) groupedUnits[u.group_org] = [];
+                          groupedUnits[u.group_org].push(u);
+                        });
+                        return Object.entries(groupedUnits).map(([groupName, units]) => {
+                          const isExpanded = !!expandedGroups[groupName];
+                          const gPaguAwal = units.reduce((a, b) => a + b.pagu_awal, 0);
+                          const gPengalihan = units.reduce((a, b) => a + b.pengalihan, 0);
+                          const gInisiatif = units.reduce((a, b) => a + b.inisiatif, 0);
+                          const gPenugasan = units.reduce((a, b) => a + b.penugasan, 0);
+                          const gEfisiensi = units.reduce((a, b) => a + b.efisiensi, 0);
+                          const gTotalPagu = units.reduce((a, b) => a + (b.total_pagu || (b.pagu_awal + b.pengalihan + b.inisiatif + b.penugasan + b.efisiensi)), 0);
+
+                          return (
+                            <React.Fragment key={groupName}>
+                              <tr 
+                                onClick={() => setExpandedGroups(prev => ({...prev, [groupName]: !prev[groupName]}))} 
+                                className={`cursor-pointer transition-colors text-[11px] font-bold ${isExpanded ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}
+                              >
+                                <td className="px-3 py-3 text-center text-slate-400">
+                                   {isExpanded ? <ChevronUp size={16} className="mx-auto" /> : <ChevronDown size={16} className="mx-auto" />}
+                                </td>
+                                <td className="px-4 py-3 text-slate-900 flex items-center gap-2 font-black">
+                                   <Layers size={14} className="text-indigo-600" />
+                                   {groupName} ({units.length} Unit)
+                                </td>
+                                <td className="px-3.5 py-3 text-right font-mono text-slate-600">Rp {formatRp(gPaguAwal)}</td>
+                                <td className="px-3.5 py-3 text-right font-mono text-indigo-700">{gPengalihan > 0 ? `+ Rp ${formatRp(gPengalihan)}` : gPengalihan < 0 ? `- Rp ${formatRp(Math.abs(gPengalihan))}` : 'Rp 0'}</td>
+                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gInisiatif > 0 ? `+ Rp ${formatRp(gInisiatif)}` : 'Rp 0'}</td>
+                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gPenugasan > 0 ? `+ Rp ${formatRp(gPenugasan)}` : 'Rp 0'}</td>
+                                <td className="px-3.5 py-3 text-right font-mono text-rose-600">{gEfisiensi !== 0 ? `Rp ${formatRp(gEfisiensi)}` : 'Rp 0'}</td>
+                                <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(gTotalPagu)}</td>
+                              </tr>
+                              {isExpanded && units.map((u, uIdx) => {
+                                 const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi);
+                                 const isUnitExpanded = !!expandedUnits[u.id];
+                                 const uMutasi = filteredMutasiRows.filter((m: any) => m.unit_id === u.id || (m.unit_id && u.id && m.unit_id.toString() === u.id.toString()));
+
+                                 return (
+                                   <React.Fragment key={u.id}>
+                                     <tr 
+                                       onClick={() => setExpandedUnits(prev => ({...prev, [u.id]: !prev[u.id]}))}
+                                       className="bg-indigo-50/20 hover:bg-indigo-50/40 cursor-pointer transition-colors text-[11px] border-b border-slate-100"
+                                     >
+                                       <td className="px-3 py-3 text-center text-slate-400 font-medium">
+                                         {isUnitExpanded ? <ChevronUp size={14} className="mx-auto" /> : <ChevronDown size={14} className="mx-auto" />}
+                                       </td>
+                                       <td className="px-4 py-3 pl-8">
+                                         <div className="font-bold text-slate-800 flex items-center gap-1.5"><Building2 size={12} className="text-slate-400"/> {u.nama_unit}</div>
+                                         {u.kode_unit && <div className="text-[9px] text-slate-400 font-mono mt-0.5 ml-4">{u.kode_unit}</div>}
+                                       </td>
+                                       <td className="px-3.5 py-3 text-right font-mono text-slate-600 font-medium">Rp {formatRp(u.pagu_awal)}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono font-bold text-indigo-700">{u.pengalihan > 0 ? `+ Rp ${formatRp(u.pengalihan)}` : u.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(u.pengalihan))}` : 'Rp 0'}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono text-rose-600 font-bold">{u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/30">Rp {formatRp(totalP)}</td>
+                                     </tr>
+                                     {isUnitExpanded && uMutasi.length > 0 && (
+                                       <tr>
+                                         <td colSpan={8} className="p-0 border-b border-slate-200">
+                                           <div className="bg-slate-50 pl-14 pr-4 py-4 shadow-inner">
+                                             <table className="w-full text-[10px] text-left">
+                                               <thead className="text-slate-400 border-b border-slate-200 uppercase font-black tracking-wider">
+                                                 <tr>
+                                                   <th className="py-2 px-2 w-10 text-center">No</th>
+                                                   <th className="py-2 px-2 text-right w-40">Nominal (Rp)</th>
+                                                   <th className="py-2 px-2 pl-6">Keterangan / Catatan Transaksi</th>
+                                                 </tr>
+                                               </thead>
+                                               <tbody className="divide-y divide-slate-200/60">
+                                                 {(() => {
+                                                   const mutasiGrouped = uMutasi.reduce((acc: any, m: any) => {
+                                                     const jenis = m.jenis_anggaran || 'Mutasi Lainnya';
+                                                     if (!acc[jenis]) acc[jenis] = [];
+                                                     acc[jenis].push(m);
+                                                     return acc;
+                                                   }, {});
+
+                                                   return Object.entries(mutasiGrouped).map(([jenis, items]: [string, any], gIdx) => {
+                                                     const jLower = jenis.toLowerCase();
+                                                     let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
+                                                     if (jLower.includes('pengalihan') || jLower.includes('kurang') || jLower.includes('tambah pagu')) badgeClass = "bg-indigo-100 text-indigo-700 border-indigo-200";
+                                                     if (jLower.includes('inisiatif') || jLower.includes('penugasan')) badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
+                                                     if (jLower.includes('efisiensi')) badgeClass = "bg-rose-100 text-rose-700 border-rose-200";
+                                                     if (jLower.includes('realisasi')) badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
+                                                     if (jLower.includes('awal') || jLower.includes('dasar')) badgeClass = "bg-sky-100 text-sky-700 border-sky-200";
+                                                     if (jLower.includes('talangan') || jLower.includes('luncuran')) badgeClass = "bg-cyan-100 text-cyan-700 border-cyan-200";
+
+                                                     return (
+                                                       <React.Fragment key={jenis}>
+                                                         {/* Subheader Group Row */}
+                                                         <tr className="bg-slate-100/70 border-b border-slate-200/60">
+                                                           <td colSpan={3} className="py-2.5 px-3">
+                                                             <span className={`px-2.5 py-1 rounded-md border shadow-sm font-bold ${badgeClass}`}>{jenis}</span>
+                                                           </td>
+                                                         </tr>
+                                                         {/* Detail Rows */}
+                                                         {items.map((m: any, mIdx: number) => (
+                                                           <tr key={m.id || `${gIdx}-${mIdx}`} className="hover:bg-white transition-colors">
+                                                             <td className="py-2.5 px-2 text-slate-400 font-bold text-center">{mIdx + 1}</td>
+                                                             <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-700">Rp {formatRp(Number(m.nominal || 0))}</td>
+                                                             <td className="py-2.5 px-2 pl-6 text-slate-600 font-medium">
+                                                               {m.keterangan ? (
+                                                                  <span>{m.keterangan}</span>
+                                                               ) : (
+                                                                  <span className="italic text-slate-400">Tidak ada catatan</span>
+                                                               )}
+                                                             </td>
+                                                           </tr>
+                                                         ))}
+                                                       </React.Fragment>
+                                                     );
+                                                   });
+                                                 })()}
+                                               </tbody>
+                                             </table>
+                                           </div>
+                                         </td>
+                                       </tr>
+                                     )}
+                                     {isUnitExpanded && uMutasi.length === 0 && (
+                                       <tr>
+                                         <td colSpan={8} className="px-4 py-4 text-center text-xs font-bold text-slate-400 bg-slate-50 shadow-inner">
+                                           Tidak ada detail transaksi mutasi untuk unit ini.
+                                         </td>
+                                       </tr>
+                                     )}
+                                   </React.Fragment>
+                                 )
+                              })}
+                            </React.Fragment>
+                          );
+                        });
+                      })()
                     )}
                   </tbody>
                 </table>
@@ -759,6 +973,8 @@ export default function PotretMutasiPaguPage() {
             </div>
           </div>
         )}
+
+
 
         {/* TAB 3: RINCIAN CATATAN MUTASI PAGU (DATABASE `gov_pagu_anggaran`) */}
         {activeTab === 'surat' && (

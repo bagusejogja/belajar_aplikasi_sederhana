@@ -13,7 +13,14 @@ import {
   Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp
 } from 'lucide-react';
 import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
-import { scanSuratWithAI } from '@/app/actions/ai-scan';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
+import DataPendukung from '@/app/(dashboard)/analisis/components/DataPendukung';
+import DataForm from '@/app/(dashboard)/analisis/components/DataForm';
+import OCRPanelPengajuan from './components/OCRPanelPengajuan';
+import OCRPanelTanggapan from './components/OCRPanelTanggapan';
+import { scanSuratWithAI, generateRingkasanFromText } from '@/app/actions/ai-scan';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
@@ -25,7 +32,7 @@ export default function TambahPaguFormPage() {
   const [listUnit, setListUnit] = useState<any[]>([]);
   
   // Stepped Tab Navigation State
-  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3'>('step1');
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'step4'>('step1');
 
   // Analisis Riwayat Modal & Selection State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,12 +51,102 @@ export default function TambahPaguFormPage() {
 
   // AI Scan Tanggapan State
   const [isScanningTanggapan, setIsScanningTanggapan] = useState(false);
+  const [isScanningPengajuan, setIsScanningPengajuan] = useState(false);
+
+  const [ocrRawText, setOcrRawText] = useState('');
+  const [selectedAnalisisDetail, setSelectedAnalisisDetail] = useState<any[]>([]);
+  const [selectedAnalisisHistoris, setSelectedAnalisisHistoris] = useState<any[]>([]);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+
+  const triggerAiSummary = async (text: string) => {
+    if (!text) return;
+    setIsGeneratingSummary(true);
+    try {
+      let contextArsip = '';
+      if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
+        contextArsip = riwayatUsulanUnit.map((r: any) => 
+          `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatNumber(r.total_anggaran || 0)}, Disetujui: Rp ${formatNumber(r.nominal_disetujui || 0)}, Status Keputusan: ${r.keputusan || 'disetujui'}`
+        ).join('\n');
+      }
+
+      const res = await generateRingkasanFromText(text, contextArsip);
+      if (res.success && res.data?.ringkasan_html) {
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: res.data.ringkasan_html + '<!--imported-->'
+        }));
+      } else {
+        // Fallback local summary
+        const localFallback = `
+          <p><strong>Ringkasan Usulan (Sistem Fallback Lokal - AI Sedang Sibuk):</strong></p>
+          <ul>
+            <li><strong>Unit Pengusul:</strong> ${formData.unit_id?.label || '-'}</li>
+            <li><strong>No. Surat Usulan:</strong> ${formData.no_surat_pengajuan || '-'}</li>
+            <li><strong>Hal Surat:</strong> ${formData.hal_surat_pengajuan || '-'}</li>
+            <li><strong>Nominal yang Diajukan:</strong> Rp ${formatNumber(formData.nominal_diajukan || 0)}</li>
+          </ul>
+        `;
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: localFallback
+        }));
+      }
+    } catch (e: any) {
+      console.error("Auto AI Summary failed:", e);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateAiSummary = async () => {
+    if (!ocrRawText) {
+      alert("Harap jalankan Ekstraksi Teks (OCR) terlebih dahulu di atas agar AI dapat membaca isi surat!");
+      return;
+    }
+    setIsGeneratingSummary(true);
+    try {
+      let contextArsip = '';
+      if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
+        contextArsip = riwayatUsulanUnit.map((r: any) => 
+          `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatNumber(r.total_anggaran || 0)}, Disetujui: Rp ${formatNumber(r.nominal_disetujui || 0)}, Status Keputusan: ${r.keputusan || 'disetujui'}`
+        ).join('\n');
+      }
+
+      const res = await generateRingkasanFromText(ocrRawText, contextArsip);
+      if (res.success && res.data?.ringkasan_html) {
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: res.data.ringkasan_html + '<!--imported-->'
+        }));
+        alert("Berhasil membuat ringkasan AI (termasuk rekam jejak)!");
+      } else {
+        const localFallback = `
+          <p><strong>Ringkasan Usulan (Sistem Fallback Lokal - AI Sedang Sibuk):</strong></p>
+          <ul>
+            <li><strong>Unit Pengusul:</strong> ${formData.unit_id?.label || '-'}</li>
+            <li><strong>No. Surat Usulan:</strong> ${formData.no_surat_pengajuan || '-'}</li>
+            <li><strong>Hal Surat:</strong> ${formData.hal_surat_pengajuan || '-'}</li>
+            <li><strong>Nominal yang Diajukan:</strong> Rp ${formatNumber(formData.nominal_diajukan || 0)}</li>
+          </ul>
+        `;
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: localFallback
+        }));
+        alert("Gemini AI sedang mengalami lonjakan trafik (503). Sistem otomatis mengaktifkan Ringkasan Lokal Fallback agar Anda tetap bisa menyimpan data!");
+      }
+    } catch (e: any) {
+      alert("Terjadi kesalahan: " + e.message);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     tahun_anggaran: 2026,
     unit_id: null as any,
     jenis_tambah_pagu: 'Penugasan',
-    status_pengajuan: 'Draft',
+    status_pengajuan: 'Disetujui Semua',
     
     // Data Pengajuan
     no_surat_pengajuan: '',
@@ -102,12 +199,38 @@ export default function TambahPaguFormPage() {
     try {
       const { data } = await supabase
         .from('app_analisis_utama')
-        .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at')
+        .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, analisis_html, created_at')
         .ilike('unit_pengirim', `%${unitName}%`)
         .order('created_at', { ascending: false });
 
       if (data) {
-        setRiwayatUsulanUnit(data);
+        const processed = data.map(item => {
+          let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
+          let keputusan = item.keputusan || '';
+          let nominalDisetujui = item.nominal_disetujui || '0';
+          let ringkasanHtml = '';
+
+          if (item.analisis_html) {
+            try {
+              const parsed = JSON.parse(item.analisis_html);
+              if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
+              if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
+              if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+              if (parsed.analisis) ringkasanHtml = parsed.analisis;
+            } catch(e) {
+              ringkasanHtml = item.analisis_html;
+            }
+          }
+
+          return {
+            ...item,
+            subyek_persuratan_simaster: subyekSimaster,
+            keputusan: keputusan || 'diajukan',
+            nominal_disetujui: nominalDisetujui,
+            ringkasan_html: ringkasanHtml
+          };
+        });
+        setRiwayatUsulanUnit(processed);
       }
     } catch (e) {
       console.error("Gagal load riwayat unit:", e);
@@ -179,20 +302,24 @@ export default function TambahPaguFormPage() {
 
       const { data: dataTambahPagu } = await supabase
         .from('tambah_pagu')
-        .select('no_surat_pengajuan, no_surat_tanggapan');
+        .select('id_analisis, no_surat_pengajuan, no_surat_tanggapan');
 
       const usedNoSuratSet = new Set<string>();
+      const usedIdAnalisisSet = new Set<string>();
       if (dataTambahPagu) {
         dataTambahPagu.forEach(tp => {
-          if (tp.no_surat_pengajuan) usedNoSuratSet.add(tp.no_surat_pengajuan.trim().toLowerCase());
-          if (tp.no_surat_tanggapan) usedNoSuratSet.add(tp.no_surat_tanggapan.trim().toLowerCase());
+          if (tp.no_surat_pengajuan && tp.no_surat_pengajuan.trim()) usedNoSuratSet.add(tp.no_surat_pengajuan.trim().toLowerCase());
+          if (tp.no_surat_tanggapan && tp.no_surat_tanggapan.trim()) usedNoSuratSet.add(tp.no_surat_tanggapan.trim().toLowerCase());
+          if (tp.id_analisis) usedIdAnalisisSet.add(tp.id_analisis);
         });
       }
 
       if (dataAnalisis) {
         const processed = dataAnalisis.map(item => {
           const cleanNoSurat = (item.no_surat || '').trim().toLowerCase();
-          const isUsed = usedNoSuratSet.has(cleanNoSurat);
+          // Exclude checking current record if in edit page
+          const isCurrentRecord = false;
+          const isUsed = !isCurrentRecord && (usedIdAnalisisSet.has(item.id_analisis) || (cleanNoSurat && usedNoSuratSet.has(cleanNoSurat)));
 
           let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
           let keputusan = item.keputusan || '';
@@ -242,7 +369,7 @@ export default function TambahPaguFormPage() {
     return Math.round(parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0).toString();
   };
 
-  const handleSelectAnalisis = (item: any) => {
+  const handleSelectAnalisis = async (item: any) => {
     if (item.is_used) {
       const confirmImport = confirm(`ℹ️ Surat (No: ${item.no_surat || '-'}) sudah pernah dicatat di Tambah Pagu.\n\nApakah Anda yakin ingin mengimpor ulang data surat ini untuk migrasi / perbaikan?`);
       if (!confirmImport) return;
@@ -270,6 +397,14 @@ export default function TambahPaguFormPage() {
     const numDiajukan = cleanNumericString(item.total_anggaran);
     const numDisetujui = cleanNumericString(item.nominal_disetujui);
 
+    let paguBerjalan = {};
+    if (item.analisis_html) {
+      try {
+        const parsed = JSON.parse(item.analisis_html);
+        if (parsed.pagu_berjalan) paguBerjalan = parsed.pagu_berjalan;
+      } catch(e) {}
+    }
+
     setFormData(prev => ({
       ...prev,
       unit_id: matchedUnit || prev.unit_id,
@@ -281,15 +416,47 @@ export default function TambahPaguFormPage() {
       nominal_tanggapan: numDisetujui !== '0' ? numDisetujui : prev.nominal_tanggapan,
       status_pengajuan: statusMapped,
       link_surat_pengajuan: item.link_lampiran || prev.link_surat_pengajuan,
-      ringkasan_surat_pengajuan: item.ringkasan_html || prev.ringkasan_surat_pengajuan
+      ringkasan_surat_pengajuan: item.ringkasan_html ? (item.ringkasan_html + '<!--imported-->') : prev.ringkasan_surat_pengajuan,
+      id_analisis: item.id_analisis
     }));
 
-    setSelectedAnalisis(item);
+    // Fetch details
+    try {
+      const [ { data: detailData }, { data: histData } ] = await Promise.all([
+        supabase.from('app_detail_realisasi').select('*').eq('id_analisis', item.id_analisis).order('no_urut', { ascending: true }),
+        supabase.from('app_pagu_historis').select('*').eq('id_analisis', item.id_analisis).order('tahun', { ascending: true })
+      ]);
+      
+      if (detailData) setSelectedAnalisisDetail(detailData);
+      if (histData) setSelectedAnalisisHistoris(histData);
+    } catch (err) {
+      console.error("Error fetching analysis details:", err);
+    }
+
+    let pBerjalanItem = {};
+    if (item.analisis_html) {
+      try {
+        const parsed = JSON.parse(item.analisis_html);
+        if (parsed.pagu_berjalan) pBerjalanItem = parsed.pagu_berjalan;
+      } catch(e) {}
+    }
+    const selectedItem = {
+      ...item,
+      pagu_berjalan: pBerjalanItem,
+      rekomendasi_html: item.ringkasan_html || item.analisis_html || ''
+    };
+    setSelectedAnalisis(selectedItem);
     setIsModalOpen(false);
   };
 
   const handleClearSelection = () => {
     setSelectedAnalisis(null);
+    setSelectedAnalisisDetail([]);
+    setSelectedAnalisisHistoris([]);
+    setFormData((prev: any) => ({
+      ...prev,
+      id_analisis: null
+    }));
   };
 
   const formatPdfPreviewUrl = (rawUrl: string) => {
@@ -311,7 +478,37 @@ export default function TambahPaguFormPage() {
   };
 
   // AI OCR Scan for Surat Tanggapan (Step 3)
-  const handleAutoExtractTanggapanAI = async () => {
+  
+  const handlePengajuanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFilePengajuan(file);
+
+    setIsScanningPengajuan(true);
+    try {
+      const scanFormData = new FormData();
+      scanFormData.append('file', file);
+      const res = await scanSuratWithAI(scanFormData);
+      if (res.success && res.data) {
+        setFormData(prev => ({
+          ...prev,
+          no_surat_pengajuan: res.data.no_surat || prev.no_surat_pengajuan,
+          tanggal_surat_pengajuan: res.data.tanggal_surat || prev.tanggal_surat_pengajuan,
+          hal_surat_pengajuan: res.data.perihal_surat || prev.hal_surat_pengajuan,
+          nominal_diajukan: res.data.nominal_usulan || prev.nominal_diajukan
+        }));
+        alert('Ekstraksi AI Berhasil! Metadata surat pengajuan telah terisi otomatis.');
+      } else {
+        alert('Gagal mengekstrak metadata dari surat pengajuan.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat memindai surat pengajuan.');
+    } finally {
+      setIsScanningPengajuan(false);
+    }
+  };
+const handleAutoExtractTanggapanAI = async () => {
     if (!fileTanggapan && !formData.link_surat_tanggapan) {
       alert("Harap pilih file PDF Tanggapan atau masukkan Link Surat Tanggapan terlebih dahulu.");
       return;
@@ -373,7 +570,9 @@ export default function TambahPaguFormPage() {
   const formatNumber = (num: string | number) => {
     if (!num) return '0';
     const clean = num.toString().replace(/\D/g, '');
-    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const parsed = parseInt(clean, 10);
+    if (isNaN(parsed)) return '0';
+    return parsed.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   const parseNumber = (formatted: string) => {
@@ -407,6 +606,8 @@ export default function TambahPaguFormPage() {
       Object.entries(formData).forEach(([key, value]) => {
         if (key === 'unit_id') {
           data.append(key, value?.value || '');
+        } else if (key === 'id_analisis' && value) {
+          data.append(key, value.toString());
         } else if (key === 'nominal_diajukan' || key === 'nominal_tanggapan') {
           data.append(key, value || '0');
         } else if (value !== null && value !== undefined) {
@@ -440,6 +641,8 @@ export default function TambahPaguFormPage() {
   };
 
   const filteredAnalisisList = listAnalisis.filter(item => {
+    // Hide already imported/used items
+    if (item.is_used) return false;
     if (!searchAnalisis) return true;
     const lower = searchAnalisis.toLowerCase();
     return (
@@ -549,11 +752,18 @@ export default function TambahPaguFormPage() {
 
       {/* STEP NAVIGATION TABS */}
       <div className="flex justify-between items-center bg-white rounded-[2rem] p-2 shadow-sm border border-gray-200/80 mb-8 overflow-x-auto gap-2">
-        {[
-          { id: 'step1', step: '1', title: 'Data Utama & Pengajuan', subtitle: 'Surat Masuk & Ringkasan AI', icon: FileText },
-          { id: 'step2', step: '2', title: 'Posisi Pagu Unit', subtitle: 'Pagu 2026 & Multi-Tahun', icon: Landmark },
-          { id: 'step3', step: '3', title: 'Tanggapan & Keputusan', subtitle: 'Input Surat Keluar & Simpan', icon: CheckCircle2 },
-        ].map((tab) => {
+        {(selectedAnalisis 
+          ? [
+              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Data Surat Pengajuan', icon: FileText },
+              { id: 'step2', step: '2', title: '2. Rincian & Pagu', subtitle: 'Detail Kegiatan & Pagu', icon: Layers },
+              { id: 'step3', step: '3', title: '3. Ringkasan & Lampiran', subtitle: 'AI Summary & Surat Masuk', icon: Sparkles },
+              { id: 'step4', step: '4', title: '4. Tanggapan & Simpan', subtitle: 'Persetujuan & Surat Keluar', icon: CheckCircle2 },
+            ]
+          : [
+              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Upload Surat Pengajuan & AI', icon: FileText },
+              { id: 'step2', step: '2', title: '2. Tanggapan & Keputusan', subtitle: 'Status Akhir & Simpan', icon: CheckCircle2 },
+            ]
+        ).map((tab) => {
           const IconComponent = tab.icon;
           const isActive = activeStep === tab.id;
           return (
@@ -635,6 +845,22 @@ export default function TambahPaguFormPage() {
                 )}
               </div>
 
+              {/* LOCAL OCR PANEL PENGAJUAN (DI ATAS AGAR BISA MEMENUHI ISIAN DI BAWAHNYA) */}
+              {!isReadOnlyPengajuan && (
+                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                  <OCRPanelPengajuan 
+                    mainData={formData} 
+                    setMainData={setFormData} 
+                    setExternalFile={setFilePengajuan} 
+                    listUnit={listUnit}
+                    onOcrComplete={(text: string) => {
+                      setOcrRawText(text);
+                      triggerAiSummary(text);
+                    }}
+                  />
+                </div>
+              )}
+
               {/* GRID DATA UTAMA & PENGAJUAN (BALANCED COLUMN SPANS) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
@@ -659,6 +885,7 @@ export default function TambahPaguFormPage() {
                     value={formData.unit_id}
                     onChange={(val) => setFormData({...formData, unit_id: val})}
                     placeholder="Pilih Unit Kerja..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
                     styles={{
                       control: (base) => ({ 
                         ...base, 
@@ -669,6 +896,7 @@ export default function TambahPaguFormPage() {
                         fontWeight: 'bold',
                         opacity: isReadOnlyPengajuan ? 0.9 : 1
                       }),
+                      menuPortal: (base) => ({ ...base, zIndex: 9999 })
                     }}
                   />
                 </div>
@@ -765,350 +993,179 @@ export default function TambahPaguFormPage() {
                   />
                 </div>
 
-                {!isReadOnlyPengajuan && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:col-span-3">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Link GDrive / SharePoint Lampiran</label>
-                      <div className="relative">
-                        <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input 
-                          type="text" 
-                          name="link_surat_pengajuan"
-                          value={formData.link_surat_pengajuan}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-blue-100 transition-all text-sm italic text-blue-600"
-                          placeholder="https://drive.google.com/..."
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Upload File Surat Pengajuan (Max 10MB)</label>
-                      <div className="relative group">
-                        <input 
-                          type="file" 
-                          onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
-                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        />
-                        <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${filePengajuan ? 'bg-blue-50 border-blue-400 text-blue-600' : 'bg-gray-50 border-gray-200 text-gray-400 group-hover:border-blue-300 group-hover:bg-blue-50/30'}`}>
-                          <UploadCloud size={20} />
-                          <span className="text-sm font-bold truncate max-w-[200px]">
-                            {filePengajuan ? filePengajuan.name : "Pilih File Surat Pengajuan"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* RINGKASAN SUBSTANSI (AI READ ONLY - FIXED CONTAINER WRAPPING) */}
-                {formData.ringkasan_surat_pengajuan && (
-                  <div className="space-y-2 md:col-span-3 pt-6 border-t border-gray-100 w-full overflow-hidden">
-                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5 mb-2">
-                      <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
-                    </label>
-                    <div 
-                      className="p-6 md:p-8 bg-slate-50 border border-slate-200 rounded-3xl text-sm text-slate-800 leading-relaxed prose-custom max-w-full overflow-hidden break-words [word-break:break-word] shadow-inner"
-                      dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
+                {/* LINK SURAT PENGAJUAN (LINK DIBAWAH BEGAMBAR CLIP) */}
+                <div className="md:col-span-3 space-y-2 pt-6 border-t border-gray-100">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                    <Paperclip size={14} className="text-gray-400" /> Link GDrive / SharePoint Lampiran (Optional)
+                  </label>
+                  <div className="relative">
+                    <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      type="text" 
+                      name="link_surat_pengajuan"
+                      readOnly={isReadOnlyPengajuan}
+                      value={formData.link_surat_pengajuan}
+                      onChange={handleInputChange}
+                      className={`w-full border rounded-2xl pl-12 pr-4 py-4 outline-none transition-all text-sm italic shadow-sm ${
+                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-blue-600 focus:ring-2 ring-blue-100'
+                      }`}
+                      placeholder="https://drive.google.com/..."
                     />
                   </div>
-                )}
+                </div>
+
+
+
+                {/* RINGKASAN SUBSTANSI DENGAN AI EDITOR (SEPERTI DI ANALISIS) */}
+                <div className="space-y-4 md:col-span-3 pt-6 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
+                    </label>
+                    
+                    {!isReadOnlyPengajuan && (
+                      <button
+                        type="button"
+                        onClick={handleGenerateAiSummary}
+                        disabled={isGeneratingSummary}
+                        className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs border border-indigo-200/60 disabled:opacity-50"
+                      >
+                        {isGeneratingSummary ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Menganalisis...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={14} /> Jalankan Analisis AI
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-xs border border-gray-200">
+                    <ReactQuill 
+                      theme="snow"
+                      value={formData.ringkasan_surat_pengajuan || ''}
+                      onChange={(val) => setFormData((prev: any) => ({ ...prev, ringkasan_surat_pengajuan: val }))}
+                      className="h-[250px] pb-10 [&_.ql-editor_p]:text-justify"
+                      placeholder="Tulis ringkasan substansi di sini, atau jalankan Analisis AI setelah upload surat..."
+                      readOnly={isReadOnlyPengajuan}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* STEP 1 NEXT BUTTON */}
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-8">
+              {!selectedAnalisis ? (
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="px-8 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
+                >
+                  Batal
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 type="button"
-                onClick={() => setActiveStep('step2')}
+                onClick={() => setActiveStep(selectedAnalisis ? 'step2' : 'step2')}
                 className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
               >
-                Selanjutnya: Posisi Pagu Unit <ChevronRight size={16} />
+                Selanjutnya: {selectedAnalisis ? 'Rincian & Pagu' : 'Tanggapan & Keputusan'} <ChevronRight size={16} />
               </button>
             </div>
           </div>
         )}
 
-        {/* ================= TAHAP 2: POSISI PAGU & GRAFIK (VIEW) ================= */}
-        {activeStep === 'step2' && (
+        {/* ================= TAHAP 2 (IMPORTED): RINCIAN KEGIATAN & PAGU (EXACTLY LIKE ANALISIS) ================= */}
+        {activeStep === 'step2' && selectedAnalisis && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-                    <Landmark size={24} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Posisi & Mutasi Pagu Unit Kerja</h2>
-                    <p className="text-xs text-gray-500 font-medium">Unit: <strong className="text-indigo-600 font-bold">{formData.unit_id?.label || 'Belum Dipilih'}</strong></p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-gray-400 block">Usulan Diajukan:</span>
-                  <span className="text-lg font-black font-mono text-emerald-600">Rp {formatNumber(formData.nominal_diajukan)}</span>
-                </div>
-              </div>
-
-              {/* 1. POTRET MUTASI PAGU KESELURUHAN (GRID OF CARDS LIKE /ANALISIS) */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                  <Layers size={14} /> Potret Mutasi Pagu Keseluruhan (Tahun 2026)
-                </h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-amber-500 text-white rounded-2xl p-4 shadow-sm">
-                    <div className="text-[10px] uppercase font-black opacity-80 tracking-wider">Pagu Awal</div>
-                    <div className="text-base lg:text-lg font-black font-mono mt-1">Rp {formatNumber(cPaguAwal)}</div>
-                  </div>
-
-                  <div className="bg-emerald-600 text-white rounded-2xl p-4 shadow-sm">
-                    <div className="text-[10px] uppercase font-black opacity-80 tracking-wider">Total Pagu Saat Ini</div>
-                    <div className="text-base lg:text-lg font-black font-mono mt-1">Rp {formatNumber(cTotalPagu)}</div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">+ Pagu Inisiatif</div>
-                    <div className="text-sm font-black font-mono text-emerald-700 mt-1">Rp {formatNumber(cInisiatif)}</div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">+ Pagu Penugasan</div>
-                    <div className="text-sm font-black font-mono text-emerald-700 mt-1">Rp {formatNumber(cPenugasan)}</div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-indigo-700 tracking-wider">+ Luncuran / Talangan</div>
-                    <div className="text-sm font-black font-mono text-indigo-700 mt-1">Rp {formatNumber(cTalangan)}</div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">+/- Pengalihan</div>
-                    <div className="text-sm font-black font-mono text-slate-800 mt-1">Rp {formatNumber(cPengalihan)}</div>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-rose-700 tracking-wider">- Efisiensi</div>
-                    <div className="text-sm font-black font-mono text-rose-700 mt-1">Rp {formatNumber(cEfisiensi)}</div>
-                  </div>
-
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                    <div className="text-[10px] uppercase font-bold text-emerald-800 tracking-wider">Nominal Disetujui Pimpinan</div>
-                    <div className="text-sm font-black font-mono text-emerald-800 mt-1">
-                      Rp {formatNumber(formData.nominal_tanggapan || selectedAnalisis?.nominal_disetujui || '0')}
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm">
-                    <div className="text-[10px] uppercase font-black text-emerald-400 tracking-wider">Sisa Kapasitas Pagu</div>
-                    <div className="text-base lg:text-lg font-black font-mono text-emerald-300 mt-1">Rp {formatNumber(cSisaKapasitas)}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. RECHARTS COMPOSED CHART (MATCHING /ANALISIS) */}
-              {paguUnitHistory.length > 0 && (
-                <div className="space-y-4 pt-6 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                      <BarChart3 size={14} /> Grafik Pagu vs Realisasi (Multi-Tahun 2019 - 2026)
-                    </h3>
-                  </div>
-
-                  <div className="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm">
-                    <div className="w-full h-[320px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                          data={paguUnitHistory.map((d: any) => ({
-                            tahun: d.tahun,
-                            PaguAwal: Number(d.pagu_awal || 0),
-                            Pengalihan: Number(d.pengalihan || 0),
-                            TambahPenugasan: Number(d.tambah_penugasan || 0),
-                            TambahInisiatif: Number(d.tambah_inisiatif || 0),
-                            Efisiensi: Number(d.efisiensi || 0),
-                            Talangan: Number(d.talangan || 0),
-                            total_pagu: Number(d.total_pagu || 0),
-                            Realisasi: Number(d.realisasi || 0),
-                          }))}
-                          margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-                        >
-                          <CartesianGrid stroke="#f5f5f5" />
-                          <XAxis dataKey="tahun" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
-                          <YAxis tickFormatter={(value) => `Rp ${new Intl.NumberFormat('id-ID', {notation: 'compact'}).format(value)}`} axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} width={80} />
-                          <Tooltip formatter={(value: any) => `Rp ${new Intl.NumberFormat('id-ID').format(value)}`} />
-                          <Legend wrapperStyle={{fontSize: '12px'}} />
-                          <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tmbh Penugasan" radius={[0, 0, 0, 0]} />
-                          <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tmbh Inisiatif" radius={[4, 4, 0, 0]} />
-                          <Line type="monotone" dataKey="total_pagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 5, fill: '#06b6d4'}} activeDot={{r: 7}} />
-                          <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} name="Realisasi" dot={{r: 5, fill: '#f59e0b'}} activeDot={{r: 7}} />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. TABEL RINGKASAN POSISI PAGU TAHUN 2026 */}
-              <div className="space-y-3 pt-4 border-t border-gray-100">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tabel Ringkasan Posisi Pagu (Tahun 2026)</h3>
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <table className="w-full text-sm text-left">
-                    <tbody className="divide-y divide-gray-100">
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-gray-700">Pagu Awal</td>
-                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cPaguAwal)}</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-gray-700">Pengalihan (+/-)</td>
-                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cPengalihan)}</td>
-                      </tr>
-                      {cPenugasan > 0 && (
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Penugasan</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(cPenugasan)}</td>
-                        </tr>
-                      )}
-                      {cInisiatif > 0 && (
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-emerald-700">+ Pagu Inisiatif</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold text-emerald-700">+ Rp {formatNumber(cInisiatif)}</td>
-                        </tr>
-                      )}
-                      {cEfisiensi > 0 && (
-                        <tr className="hover:bg-gray-50">
-                          <td className="px-5 py-3 font-medium text-rose-700">- Efisiensi</td>
-                          <td className="px-5 py-3 text-right font-mono font-semibold text-rose-700">- Rp {formatNumber(cEfisiensi)}</td>
-                        </tr>
-                      )}
-                      <tr className="hover:bg-gray-50 bg-indigo-50/50">
-                        <td className="px-5 py-3 font-bold text-indigo-900">Total Pagu Sampai Saat Ini</td>
-                        <td className="px-5 py-3 text-right font-bold font-mono text-indigo-900">Rp {formatNumber(cTotalPagu)}</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-5 py-3 font-medium text-gray-700">Realisasi S.d. Saat Ini</td>
-                        <td className="px-5 py-3 text-right font-mono font-semibold">Rp {formatNumber(cRealisasi)}</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50 bg-emerald-50/50">
-                        <td className="px-5 py-3 font-bold text-emerald-900">Sisa Kapasitas Pagu</td>
-                        <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber(cSisaKapasitas)}</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50 bg-amber-50/50 border-t border-amber-200">
-                        <td className="px-5 py-3 font-bold text-amber-900">Nominal Usulan Tambahan Pagu (Diajukan)</td>
-                        <td className="px-5 py-3 text-right font-bold font-mono text-amber-900">Rp {formatNumber(formData.nominal_diajukan)}</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50 bg-emerald-50/50 border-t border-emerald-200">
-                        <td className="px-5 py-3 font-bold text-emerald-900">Nominal Disetujui Pimpinan (Rp)</td>
-                        <td className="px-5 py-3 text-right font-bold font-mono text-emerald-900">Rp {formatNumber(formData.nominal_tanggapan || selectedAnalisis?.nominal_disetujui || '0')}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 4. HISTORI USULAN TAMBAH PAGU UNIT KERJA */}
-              <div className="space-y-3 pt-4 border-t border-gray-100">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Histori Usulan Tambah Pagu Unit Kerja ({formData.unit_id?.label || 'Unit'})</h3>
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
-                      <tr>
-                        <th className="px-4 py-3 text-center w-12">No</th>
-                        <th className="px-4 py-3">No / Hal Surat</th>
-                        <th className="px-4 py-3 text-right">Pengajuan (Rp)</th>
-                        <th className="px-4 py-3 text-right">Disetujui (Rp)</th>
-                        <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {riwayatUsulanUnit.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic">Belum ada riwayat usulan tambah pagu sebelumnya untuk unit ini.</td>
-                        </tr>
-                      ) : (
-                        riwayatUsulanUnit.map((h: any, i: number) => (
-                          <tr key={h.id_analisis || i} className="hover:bg-gray-50">
-                            <td className="px-4 py-2.5 text-center font-medium text-gray-600">{i + 1}</td>
-                            <td className="px-4 py-2.5">
-                              <div className="font-bold text-gray-900 line-clamp-1">{h.perihal || '-'}</div>
-                              <div className="text-xs text-gray-400 font-mono">No: {h.no_surat || '-'}</div>
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
-                              Rp {formatNumber(h.total_anggaran || '0')}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-mono font-semibold text-emerald-700">
-                              Rp {formatNumber(h.nominal_disetujui || '0')}
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                (h.keputusan === 'disetujui semua' || h.keputusan === 'disetujui 100%') ? 'bg-emerald-100 text-emerald-800' :
-                                h.keputusan === 'disetujui sebagian' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                              }`}>
-                                {h.keputusan || 'disetujui'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 5. TABEL HISTORIS MULTI TAHUN */}
-              {paguUnitHistory.length > 0 && (
-                <div className="space-y-3 pt-4 border-t border-gray-100">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tabel Historis Pagu Multi-Tahun (2019 - 2026)</h3>
-                  <div className="bg-white border border-gray-200 rounded-2xl overflow-x-auto shadow-sm">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200 uppercase">
-                        <tr>
-                          <th className="px-4 py-3 text-center">Tahun</th>
-                          <th className="px-4 py-3 text-right">Pagu Awal</th>
-                          <th className="px-4 py-3 text-right">Total Pagu</th>
-                          <th className="px-4 py-3 text-right">Realisasi</th>
-                          <th className="px-4 py-3 text-center">% Serapan</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {paguUnitHistory.map((h, idx) => (
-                          <tr key={idx} className={`hover:bg-gray-50 ${h.tahun === '2026' ? 'bg-indigo-50/30 font-bold' : ''}`}>
-                            <td className="px-4 py-3 text-center font-bold">{h.tahun}</td>
-                            <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.pagu_awal)}</td>
-                            <td className="px-4 py-3 text-right font-mono text-indigo-700 font-bold">Rp {formatNumber(h.total_pagu)}</td>
-                            <td className="px-4 py-3 text-right font-mono">Rp {formatNumber(h.realisasi)}</td>
-                            <td className="px-4 py-3 text-center font-bold text-emerald-700">{h.persen_serapan}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+              <DataPendukung 
+                mainData={selectedAnalisis} 
+                setMainData={() => {}} 
+                detailData={selectedAnalisisDetail} 
+                setDetailData={() => {}} 
+                historisData={selectedAnalisisHistoris} 
+                setHistorisData={() => {}} 
+                renderMode="tabs" 
+                readOnly={true} 
+              />
             </div>
 
-            {/* STEP 2 BUTTONS */}
-            <div className="flex justify-between items-center pt-4">
+            {/* Navigation buttons */}
+            <div className="flex justify-end gap-3 pb-8">
               <button
                 type="button"
                 onClick={() => setActiveStep('step1')}
-                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
+                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
               >
-                <ChevronLeft size={16} /> Kembali Ke Tahap 1
+                Kembali
               </button>
               <button
                 type="button"
                 onClick={() => setActiveStep('step3')}
-                className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
               >
-                Selanjutnya: Tanggapan & Keputusan <ChevronRight size={16} />
+                Lanjutkan ke Posisi Pagu & AI
               </button>
             </div>
           </div>
         )}
 
-        {/* ================= TAHAP 3: TANGGAPAN SURAT (UPLOAD & AI SCAN AT THE TOP) ================= */}
-        {activeStep === 'step3' && (
+        {/* ================= TAHAP 3 (IMPORTED): POSISI PAGU & AI ANALYSIS (EXACTLY LIKE ANALISIS) ================= */}
+        {activeStep === 'step3' && selectedAnalisis && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+              <DataForm 
+                mainData={selectedAnalisis} 
+                setMainData={(newVal: any) => {
+                  if (newVal && newVal.rekomendasi_html) {
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      ringkasan_surat_pengajuan: newVal.rekomendasi_html
+                    }));
+                    setSelectedAnalisis((prev: any) => ({
+                      ...prev,
+                      rekomendasi_html: newVal.rekomendasi_html
+                    }));
+                  }
+                }} 
+                detailData={selectedAnalisisDetail} 
+                setDetailData={() => {}} 
+                historisData={selectedAnalisisHistoris} 
+                setHistorisData={() => {}} 
+                section="step3"
+                readOnly={true} 
+              />
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex justify-end gap-3 pb-8">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step2')}
+                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveStep('step4')}
+                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
+              >
+                Lanjutkan ke Tanggapan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAHAP 2/4: TANGGAPAN & KEPUTUSAN ================= */}
+        {((activeStep === 'step2' && !selectedAnalisis) || (activeStep === 'step4' && selectedAnalisis)) && (
           <div className="space-y-8 animate-in fade-in duration-300">
             {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
             <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
@@ -1125,60 +1182,13 @@ export default function TambahPaguFormPage() {
               </div>
 
               <div className="space-y-8">
-                {/* 1. TOP SECTION: UPLOAD FILE & LINK SURAT TANGGAPAN + AI SCAN BUTTON */}
-                <div className="bg-slate-900 text-white p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                    <div>
-                      <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
-                        <Sparkles size={14} /> Fitur Cerdas AI Ekstraksi Tanggapan
-                      </div>
-                      <h3 className="text-lg font-black text-white">Upload File / Link Surat Tanggapan</h3>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleAutoExtractTanggapanAI}
-                      disabled={isScanningTanggapan}
-                      className="px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg disabled:opacity-50 shrink-0"
-                    >
-                      {isScanningTanggapan ? <Loader2 size={16} className="animate-spin text-slate-950" /> : <Wand2 size={16} className="text-slate-950" />}
-                      Ekstraksi Tanggapan (AI)
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Upload File Surat Tanggapan (Max 10MB)</label>
-                      <div className="relative group">
-                        <input 
-                          type="file" 
-                          onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
-                          className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                        />
-                        <div className={`w-full py-3.5 px-6 rounded-2xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${fileTanggapan ? 'bg-indigo-900/80 border-indigo-400 text-indigo-300' : 'bg-slate-800/80 border-slate-700 text-slate-400 group-hover:border-indigo-400 group-hover:bg-slate-800'}`}>
-                          <UploadCloud size={20} />
-                          <span className="text-sm font-bold truncate max-w-[200px]">
-                            {fileTanggapan ? fileTanggapan.name : "Pilih File Surat Tanggapan"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Link Surat Tanggapan (GDrive / SharePoint)</label>
-                      <div className="relative">
-                        <LinkIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                        <input 
-                          type="text" 
-                          name="link_surat_tanggapan"
-                          value={formData.link_surat_tanggapan}
-                          onChange={handleInputChange}
-                          className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-2xl pl-12 pr-4 py-3.5 outline-none focus:ring-2 ring-indigo-500 transition-all text-sm italic placeholder-slate-500"
-                          placeholder="https://drive.google.com/..."
-                        />
-                      </div>
-                    </div>
-                  </div>
+                {/* 1. TOP SECTION: LOCAL OCR PANEL FOR TANGGAPAN */}
+                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                  <OCRPanelTanggapan 
+                    mainData={formData} 
+                    setMainData={setFormData} 
+                    setExternalFile={setFileTanggapan} 
+                  />
                 </div>
 
                 {/* 2. FORM ISIAN HASIL EKSTRAKSI TANGGAPAN BELOW */}
@@ -1192,10 +1202,8 @@ export default function TambahPaguFormPage() {
                       onChange={handleInputChange}
                       className="w-full bg-white border border-indigo-200 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-200 transition-all font-black text-indigo-900 text-base cursor-pointer shadow-sm"
                     >
-                      <option value="Draft">Draft (Belum Ditanggapi)</option>
-                      <option value="Diajukan">Diajukan</option>
-                      <option value="Disetujui Sebagian">Disetujui Sebagian</option>
                       <option value="Disetujui Semua">Disetujui Semua (100%)</option>
+                      <option value="Disetujui Sebagian">Disetujui Sebagian</option>
                       <option value="Ditolak">Ditolak</option>
                     </select>
                   </div>
@@ -1262,26 +1270,65 @@ export default function TambahPaguFormPage() {
                       />
                     </div>
                   </div>
+
+                  {/* LINK SURAT TANGGAPAN (LINK DIBAWAH BEGAMBAR CLIP) */}
+                  <div className="space-y-2 pt-6 border-t border-gray-100">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                      <Paperclip size={14} className="text-gray-400" /> Link Surat Tanggapan (GDrive / SharePoint - Optional)
+                    </label>
+                    <div className="relative">
+                      <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" 
+                        name="link_surat_tanggapan"
+                        value={formData.link_surat_tanggapan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-200 transition-all text-sm italic text-blue-600 shadow-sm"
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  </div>
                 </div>
 
               </div>
             </div>
 
-            {/* STEP 3 BUTTONS */}
-            <div className="flex justify-between items-center pt-4">
+            {/* STEP 2/4 BUTTONS */}
+            <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-8">
               <button
                 type="button"
-                onClick={() => setActiveStep('step2')}
+                onClick={() => setActiveStep(selectedAnalisis ? 'step3' : 'step1')}
                 className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
               >
-                <ChevronLeft size={16} /> Kembali Ke Tahap 2
+                <ChevronLeft size={16} /> Kembali ke {selectedAnalisis ? 'Ringkasan' : 'Tahap 1'}
               </button>
+
+              {!selectedAnalisis && (
+                <div className="flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => router.back()}
+                    className="px-8 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    {isSaving ? "MENYIMPAN..." : "SIMPAN USULAN PAGU"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* FLOATING ACTION BAR */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
+        {selectedAnalisis && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
           <div className="bg-slate-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
             <button 
               type="button"
@@ -1300,6 +1347,7 @@ export default function TambahPaguFormPage() {
             </button>
           </div>
         </div>
+        )}
       </form>
 
       {/* MODAL PILIH ANALISIS (UNLOCKED SELECTION BUTTON FOR ALL HISTORICAL PROPOSAL DATA) */}
@@ -1362,8 +1410,18 @@ export default function TambahPaguFormPage() {
                   {filteredAnalisisList.map((item, idx) => (
                     <div 
                       key={item.id_analisis || idx}
-                      className="p-5 bg-white border border-gray-200 hover:border-indigo-400 hover:shadow-lg rounded-3xl transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer"
-                      onClick={() => handleSelectAnalisis(item)}
+                      className={`p-5 bg-white border rounded-3xl transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                        item.is_used 
+                          ? 'border-gray-200 bg-slate-50/50 opacity-60 cursor-not-allowed' 
+                          : 'border-gray-200 hover:border-indigo-400 hover:shadow-lg cursor-pointer'
+                      }`}
+                      onClick={() => {
+                        if (item.is_used) {
+                          alert("Analisis ini sudah diimpor ke Tambah Pagu dan tidak dapat dipilih lagi.");
+                          return;
+                        }
+                        handleSelectAnalisis(item);
+                      }}
                     >
                       <div className="space-y-1.5 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1407,12 +1465,26 @@ export default function TambahPaguFormPage() {
                           </span>
                         </div>
 
-                        <button
-                          onClick={() => handleSelectAnalisis(item)}
-                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95"
-                        >
-                          Impor Data Ini <ArrowLeft size={14} className="rotate-180" />
-                        </button>
+                        {item.is_used ? (
+                          <button
+                            type="button"
+                            disabled
+                            className="px-5 py-2.5 bg-slate-200 text-slate-400 text-xs font-black uppercase tracking-wider rounded-xl cursor-not-allowed border border-slate-300"
+                          >
+                            Sudah Diimpor
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectAnalisis(item);
+                            }}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+                          >
+                            Impor Data Ini <ArrowLeft size={14} className="rotate-180" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

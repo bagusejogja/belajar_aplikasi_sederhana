@@ -7,6 +7,7 @@ import DataForm from './components/DataForm';
 import DataPendukung from './components/DataPendukung';
 import PdfPreview from './components/PdfPreview';
 import RiwayatList from './components/RiwayatList';
+import * as XLSX from 'xlsx';
 import { 
   FileText, 
   ScanLine, 
@@ -22,12 +23,13 @@ import {
   ArrowRight,
   BookmarkCheck,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
   // Step State: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'
-  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'>('step1');
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'>('riwayat');
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
@@ -63,14 +65,42 @@ export default function AnalisisPaguPage() {
     try {
        const { data: utama } = await supabase.from('app_analisis_utama').select('*').eq('id_analisis', id_analisis).single();
        if (utama) {
-          setMainData({
+          let parsed: any = {};
+          if (utama.analisis_html) {
+             try {
+                parsed = JSON.parse(utama.analisis_html);
+             } catch (e) {
+                parsed = { analisis: utama.analisis_html };
+             }
+          }
+
+          const loadedMainData = {
              ...utama,
-             subyek_persuratan_simaster: utama.subyek_persuratan_simaster || '',
-             keputusan: utama.keputusan || 'disetujui semua',
-             nominal_disetujui: utama.nominal_disetujui || '0'
-          });
+             id_analisis: utama.id_analisis,
+             no_surat: utama.no_surat || '',
+             tanggal_surat: utama.tanggal_surat || '',
+             perihal: utama.perihal || '',
+             unit_pengirim: utama.unit_pengirim || '',
+             subyek_persuratan_simaster: utama.subyek_persuratan_simaster || parsed.subyek_persuratan_simaster || '',
+             total_anggaran: utama.total_anggaran || '0',
+             total_realisasi: utama.total_realisasi || '0',
+             persen_serapan: utama.persen_serapan || '0',
+             ringkasan_ai: utama.ringkasan_ai || parsed.analisis || '',
+             analisis_html: parsed.analisis || utama.ringkasan_ai || '',
+             rekomendasi_html: parsed.rekomendasi || '',
+             pagu_berjalan: parsed.pagu_berjalan || {},
+             file_lampiran: utama.file_lampiran || '',
+             link_lampiran: utama.link_lampiran || '',
+             keputusan: utama.keputusan || parsed.keputusan || 'disetujui semua',
+             nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0',
+             keterangan_keputusan: parsed.keterangan_keputusan || '',
+             surat_balasan_html: parsed.surat_balasan_html || ''
+          };
+
+          setMainData(loadedMainData);
           setAnalisisId(id_analisis);
        }
+
        const { data: detail } = await supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id_analisis).order('no_urut', { ascending: true });
        if (detail) {
           const cleanedDetail = detail.map(d => {
@@ -102,10 +132,12 @@ export default function AnalisisPaguPage() {
           const finalDetail = sortedDetail.map((d, idx) => ({ ...d, no_urut: idx + 1 }));
           
           setDetailData(finalDetail);
+       } else {
+          setDetailData([]);
        }
 
        const { data: historis } = await supabase.from('app_pagu_historis').select('*').eq('id_analisis', id_analisis).order('tahun', { ascending: true });
-       if (historis) {
+       if (historis && historis.length > 0) {
           // Parse JSON dari kolom tambah untuk mengembalikan field ekstra
           const parsedHistoris = historis.map(h => {
              let parsed: any = {};
@@ -129,35 +161,8 @@ export default function AnalisisPaguPage() {
              };
           });
           setHistorisData(parsedHistoris);
-       }
-
-       // Parse kembali analisis_html yang menyimpan JSON rekomendasi
-       if (utama && utama.analisis_html) {
-          try {
-             const parsed = JSON.parse(utama.analisis_html);
-             setMainData((prev: any) => ({
-                ...prev,
-                subyek_persuratan_simaster: utama.subyek_persuratan_simaster || parsed.subyek_persuratan_simaster || '',
-                analisis_html: parsed.analisis || '',
-                rekomendasi_html: parsed.rekomendasi || '',
-                pagu_berjalan: parsed.pagu_berjalan || {},
-                keputusan: utama.keputusan || parsed.keputusan || 'disetujui semua',
-                nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0',
-                keterangan_keputusan: parsed.keterangan_keputusan || '',
-                surat_balasan_html: parsed.surat_balasan_html || ''
-             }));
-          } catch (e) {
-             setMainData((prev: any) => ({
-                ...prev,
-                subyek_persuratan_simaster: utama.subyek_persuratan_simaster || '',
-                analisis_html: utama.analisis_html,
-                rekomendasi_html: '',
-                keputusan: utama.keputusan || 'disetujui semua',
-                nominal_disetujui: utama.nominal_disetujui || '0',
-                keterangan_keputusan: '',
-                surat_balasan_html: ''
-             }));
-          }
+       } else {
+          setHistorisData([]);
        }
 
        setActiveStep('step1');
@@ -266,6 +271,7 @@ export default function AnalisisPaguPage() {
          const targetYear = mainData.tanggal_surat ? new Date(mainData.tanggal_surat).getFullYear().toString() : '2026';
          
          const syncTambahPaguPayload = {
+            id_analisis: targetId,
             no_surat_pengajuan: mainData.no_surat,
             tanggal_surat_pengajuan: mainData.tanggal_surat || null,
             hal_surat_pengajuan: mainData.perihal || '',
@@ -276,13 +282,25 @@ export default function AnalisisPaguPage() {
             nominal_tanggapan: cleanNum(mainData.nominal_disetujui),
             status_pengajuan: mainData.keputusan || 'disetujui semua',
             ringkasan_substansi: mainData.analisis_html || mainData.ringkasan_ai || '',
-            subyek_pengajuan_di_simaster_persuratan: mainData.subyek_persuratan_simaster || ''
+            subyek_pengajuan_di_simaster_persuratan: mainData.subyek_persuratan_simaster || '',
+            created_time: new Date().toISOString()
          };
 
-         const { data: existingTp } = await supabase.from('tambah_pagu')
+         let existingTp = null;
+         const { data: tpById } = await supabase.from('tambah_pagu')
             .select('id')
-            .eq('no_surat_pengajuan', mainData.no_surat)
+            .eq('id_analisis', targetId)
             .maybeSingle();
+
+         if (tpById) {
+            existingTp = tpById;
+         } else {
+            const { data: tpBySurat } = await supabase.from('tambah_pagu')
+               .select('id')
+               .eq('no_surat_pengajuan', mainData.no_surat)
+               .maybeSingle();
+            if (tpBySurat) existingTp = tpBySurat;
+         }
 
          if (existingTp) {
             await supabase.from('tambah_pagu').update(syncTambahPaguPayload).eq('id', existingTp.id);
@@ -292,10 +310,81 @@ export default function AnalisisPaguPage() {
       }
 
       alert('Seluruh Data Analisis & Rekomendasi Pagu berhasil disimpan & disinkronkan ke Tambah Pagu!');
+      setActiveStep('riwayat');
+      setResetKey(prev => prev + 1);
     } catch (e: any) {
       alert('Gagal menyimpan: ' + e.message);
     }
     setLoading(false);
+  };
+
+  const exportCurrentToExcel = () => {
+    if (!mainData.no_surat) return alert("Belum ada data surat untuk di-export");
+    
+    const parseNum = (str: string | number) => {
+      if (typeof str === 'number') return str;
+      let s = (str || '0').toString().trim();
+      const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+      return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+    };
+    
+    const p = mainData.pagu_berjalan || {};
+    const infoRows = [
+      { 'Kategori': 'No Surat Pengajuan', 'Nilai': mainData.no_surat },
+      { 'Kategori': 'Tanggal Surat', 'Nilai': mainData.tanggal_surat || '-' },
+      { 'Kategori': 'Unit Pengirim', 'Nilai': mainData.unit_pengirim || '-' },
+      { 'Kategori': 'Perihal', 'Nilai': mainData.perihal || '-' },
+      { 'Kategori': 'Total Anggaran Diajukan', 'Nilai': parseNum(mainData.total_anggaran) },
+      { 'Kategori': 'Keputusan', 'Nilai': mainData.keputusan || '-' },
+      { 'Kategori': 'Nominal Disetujui', 'Nilai': parseNum(mainData.nominal_disetujui) },
+      { 'Kategori': '', 'Nilai': '' },
+      { 'Kategori': 'MUTASI PAGU BERJALAN 2026', 'Nilai': '' },
+      { 'Kategori': 'Pagu Awal', 'Nilai': parseNum(p.pagu_awal) },
+      { 'Kategori': 'Pengalihan (+/-)', 'Nilai': parseNum(p.pengalihan) },
+      { 'Kategori': 'Tambah Inisiatif (+)', 'Nilai': parseNum(p.tambah_inisiatif) },
+      { 'Kategori': 'Tambah Penugasan (+)', 'Nilai': parseNum(p.tambah_penugasan) },
+      { 'Kategori': 'Efisiensi (-)', 'Nilai': parseNum(p.efisiensi) },
+      { 'Kategori': 'Luncuran (+)', 'Nilai': parseNum(p.luncuran) },
+      { 'Kategori': 'Talangan Pindah', 'Nilai': parseNum(p.talangan_pindah) },
+      { 'Kategori': 'Total Realisasi Pengeluaran', 'Nilai': parseNum(p.realisasi_keseluruhan) }
+    ];
+    
+    const worksheetInfo = XLSX.utils.json_to_sheet(infoRows);
+    worksheetInfo['!cols'] = [{ wch: 30 }, { wch: 45 }];
+
+    const detailRows = detailData.map((d, i) => ({
+      'No': d.no_urut || i + 1,
+      'Uraian Kegiatan / Belanja': d.uraian_kegiatan,
+      'Anggaran': parseNum(d.anggaran),
+      'Realisasi': parseNum(d.realisasi),
+      'Sisa Anggaran': parseNum(d.anggaran) - parseNum(d.realisasi),
+      'Persen Serapan': d.persen_serapan
+    }));
+    const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+    worksheetDetail['!cols'] = [{ wch: 6 }, { wch: 45 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }];
+
+    const historisRows = historisData.map(h => ({
+      'Tahun': h.tahun,
+      'Pagu Awal': parseNum(h.pagu_awal),
+      'Pengalihan': parseNum(h.pengalihan),
+      'Tambah Penugasan': parseNum(h.tambah_pagu_penugasan),
+      'Tambah Inisiatif': parseNum(h.tambah_pagu_inisiatif),
+      'Efisiensi': parseNum(h.efisiensi),
+      'Talangan': parseNum(h.talangan),
+      'Total Pagu': parseNum(h.total_pagu),
+      'Realisasi': parseNum(h.realisasi_historis),
+      'Serapan': h.persen_serapan
+    }));
+    const worksheetHistoris = XLSX.utils.json_to_sheet(historisRows);
+    worksheetHistoris['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheetInfo, "Informasi Ringkasan");
+    XLSX.utils.book_append_sheet(workbook, worksheetDetail, "Detail Realisasi Belanja");
+    XLSX.utils.book_append_sheet(workbook, worksheetHistoris, "Pagu Historis");
+
+    const cleanUnitName = (mainData.unit_pengirim || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
+    XLSX.writeFile(workbook, `Detail_Analisis_Pagu_${cleanUnitName}.xlsx`);
   };
 
   const handleBaru = () => {
@@ -313,7 +402,7 @@ export default function AnalisisPaguPage() {
   };
 
   const handleSetActiveTab = (tab: string) => {
-    if (tab === 'main') {
+    if (tab === 'main' || tab === 'form') {
       setActiveStep('step1');
     } else if (tab === 'pdf') {
       setActiveStep('pdf');
@@ -353,7 +442,7 @@ export default function AnalisisPaguPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-black tracking-tight text-gray-900">Analisis Pagu Anggaran</h1>
-                {analisisId && (
+                {analisisId && activeStep !== 'riwayat' && (
                   <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold font-mono">
                     <BookmarkCheck size={12} /> {mainData.no_surat || analisisId}
                   </span>
@@ -403,22 +492,34 @@ export default function AnalisisPaguPage() {
               <span>Baru</span>
             </button>
 
-            <button 
-              onClick={() => setActiveStep('pdf')} 
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-1.5 shrink-0"
-            >
-              <Printer size={14} />
-              <span>Cetak PDF</span>
-            </button>
+            {activeStep === 'riwayat' ? null : activeStep === 'pdf' ? (
+              <button 
+                onClick={exportCurrentToExcel} 
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-1.5 shrink-0"
+              >
+                <FileSpreadsheet size={14} />
+                <span>Convert to Excel</span>
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={() => setActiveStep('pdf')} 
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-200 flex items-center gap-1.5 shrink-0"
+                >
+                  <Printer size={14} />
+                  <span>Cetak PDF</span>
+                </button>
 
-            <button 
-              onClick={handleSave} 
-              disabled={loading} 
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-1.5 disabled:opacity-50 shrink-0"
-            >
-              {loading ? <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={14} />}
-              <span>Simpan</span>
-            </button>
+                <button 
+                  onClick={handleSave} 
+                  disabled={loading} 
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md shadow-indigo-200 flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                >
+                  {loading ? <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={14} />}
+                  <span>Simpan</span>
+                </button>
+              </>
+            )}
           </div>
 
         </div>
@@ -868,7 +969,7 @@ export default function AnalisisPaguPage() {
                 </div>
               </div>
               <button 
-                onClick={() => setActiveStep('step1')}
+                onClick={handleBaru}
                 className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
               >
                 <PlusCircle size={14} />
@@ -877,7 +978,7 @@ export default function AnalisisPaguPage() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-3xl p-6 lg:p-8 shadow-sm">
-              <RiwayatList onLoadAnalisis={loadRiwayatData} setActiveTab={handleSetActiveTab} />
+              <RiwayatList key={`riwayat-list-${resetKey}`} onLoadAnalisis={loadRiwayatData} setActiveTab={handleSetActiveTab} />
             </div>
           </div>
         )}

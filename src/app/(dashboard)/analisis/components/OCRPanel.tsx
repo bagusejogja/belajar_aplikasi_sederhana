@@ -142,7 +142,8 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
     // 4b. Cek dari teks surat lengkap
     if (!unit_pengirim) {
       for (const [acronym, keyword] of Object.entries(acronyms)) {
-        if (textLower.includes(acronym)) {
+        const regex = new RegExp(`\\b${acronym}\\b`, 'i');
+        if (regex.test(textLower)) {
           const found = availableUnits.find(u => getUnitName(u).toLowerCase().includes(keyword));
           if (found) {
             unit_pengirim = getUnitName(found);
@@ -156,10 +157,43 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
     if (!unit_pengirim) {
       const matchedFromText = availableUnits.find(u => {
         const name = getUnitName(u).toLowerCase();
-        return name && textLower.includes(name);
+        return name && name.length > 5 && textLower.includes(name);
       });
       if (matchedFromText) {
         unit_pengirim = getUnitName(matchedFromText);
+      }
+    }
+
+    // 4d. Cek agresif di 5 baris pertama (Kop Surat)
+    if (!unit_pengirim) {
+      const topLines = ocrText.split('\n').slice(0, 7);
+      for (const line of topLines) {
+        const lineLower = line.toLowerCase();
+        // Skip common headers
+        if (lineLower.includes('universitas gadjah mada') || lineLower.includes('kementerian') || lineLower.includes('pendidikan')) continue;
+        
+        // Cek nama lengkap
+        const found = availableUnits.find(u => {
+           const name = getUnitName(u).toLowerCase();
+           return name && name.length > 5 && lineLower.includes(name);
+        });
+        if (found) {
+           unit_pengirim = getUnitName(found);
+           break;
+        }
+
+        // Cek akronim di kop
+        for (const [acronym, keyword] of Object.entries(acronyms)) {
+          const regex = new RegExp(`\\b${acronym}\\b`, 'i');
+          if (regex.test(lineLower)) {
+            const foundAcr = availableUnits.find(u => getUnitName(u).toLowerCase().includes(keyword));
+            if (foundAcr) {
+              unit_pengirim = getUnitName(foundAcr);
+              break;
+            }
+          }
+        }
+        if (unit_pengirim) break;
       }
     }
 
@@ -214,6 +248,7 @@ export function parseOCRMetadata(ocrText: string, availableUnits: any[] = []) {
 
 export default function OCRPanel({ mainData, setMainData }: any) {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileType, setFileType] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -230,7 +265,12 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   }, []);
 
   useEffect(() => {
-    if (mainData?.link_lampiran && !fileUrl) {
+    if (!mainData?.link_lampiran) {
+      setFileUrl(null);
+      setSelectedFile(null);
+      setFileName(null);
+      setFileType(null);
+    } else if (!fileUrl || (!fileUrl.startsWith('blob:') && mainData.link_lampiran !== fileUrl)) {
       setFileUrl(mainData.link_lampiran);
       setFileName(mainData.file_lampiran || 'Document');
       if (mainData.link_lampiran.toLowerCase().endsWith('.pdf')) {
@@ -239,7 +279,7 @@ export default function OCRPanel({ mainData, setMainData }: any) {
          setFileType('image/png');
       }
     }
-  }, [mainData?.link_lampiran]);
+  }, [mainData?.link_lampiran, mainData?.file_lampiran, fileUrl]);
 
   const loadPdfJs = async () => {
     const pdfjsLib = await import('pdfjs-dist');
@@ -250,6 +290,7 @@ export default function OCRPanel({ mainData, setMainData }: any) {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      setSelectedFile(file);
       setFileName(file.name);
       setFileType(file.type);
       setFileUrl(URL.createObjectURL(file));
@@ -301,11 +342,12 @@ export default function OCRPanel({ mainData, setMainData }: any) {
     return result.data.text;
   };
 
-  const extractTextFromPdf = async (url: string) => {
+  const extractTextFromPdf = async (source: string | Uint8Array) => {
     try {
        setProgress(5);
        const pdfjsLib = await loadPdfJs();
-       const loadingTask = pdfjsLib.getDocument(url);
+       const documentOptions = typeof source === 'string' ? source : { data: source };
+       const loadingTask = pdfjsLib.getDocument(documentOptions);
        const pdf = await loadingTask.promise;
        
        let fullText = '';
@@ -370,14 +412,25 @@ export default function OCRPanel({ mainData, setMainData }: any) {
 
   const runOCR = async () => {
     if (!fileUrl) return;
-    setLoading(true);
-    setProgress(0);
     try {
+      setLoading(true);
+      setProgress(0);
       let extractedText = '';
+
+      let processUrl = fileUrl;
+      if (fileUrl.startsWith('http') && !fileUrl.startsWith('blob:') && !fileUrl.startsWith('localhost')) {
+         processUrl = `/api/image-cors?url=${encodeURIComponent(fileUrl)}`;
+      }
+
       if (fileType === 'application/pdf') {
-        extractedText = await extractTextFromPdf(fileUrl);
+        if (selectedFile) {
+           const arrayBuffer = await selectedFile.arrayBuffer();
+           extractedText = await extractTextFromPdf(new Uint8Array(arrayBuffer));
+        } else {
+           extractedText = await extractTextFromPdf(processUrl);
+        }
       } else {
-        extractedText = await extractTextFromImage(fileUrl);
+        extractedText = await extractTextFromImage(processUrl);
       }
       
       const parsed = parseOCRMetadata(extractedText, units);

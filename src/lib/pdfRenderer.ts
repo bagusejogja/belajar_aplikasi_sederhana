@@ -171,7 +171,7 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
               let indentLevel = listContext ? listContext.indent : 0;
               let listType = listContext?.type || 'ul';
               
-              let bulletStr = '•';
+              let bulletStr = '-';
               if (listType === 'ol') {
                   if (indentLevel === 1) {
                       bulletStr = `${String.fromCharCode(96 + (listContext?.index || 1))}.`;
@@ -182,9 +182,9 @@ export function renderWysiwygToPdf(options: RenderOptions): number {
                   }
               } else {
                   if (indentLevel === 1) {
-                      bulletStr = '◦';
+                      bulletStr = 'o';
                   } else if (indentLevel >= 2) {
-                      bulletStr = '▪';
+                      bulletStr = '-';
                   }
               }
               

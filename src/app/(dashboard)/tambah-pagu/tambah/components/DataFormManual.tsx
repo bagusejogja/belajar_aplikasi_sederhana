@@ -79,19 +79,13 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     }
   }, [mainData.unit_pengirim, units]);
 
-  const [detailInisiatif, setDetailInisiatif] = useState<any[]>([]);
-  const [detailPenugasan, setDetailPenugasan] = useState<any[]>([]);
-
   // Fetch riwayat usulan surat terdahulu untuk unit pengirim
   useEffect(() => {
     const fetchRiwayatUnit = async () => {
       if (!mainData.unit_pengirim) {
         setRiwayatUsulanUnit([]);
-        setDetailInisiatif([]);
-        setDetailPenugasan([]);
         return;
       }
-      
       const { data } = await supabase
         .from('app_analisis_utama')
         .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at')
@@ -101,29 +95,6 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
       if (data) {
         const filtered = data.filter(d => d.id_analisis !== mainData.id_analisis);
         setRiwayatUsulanUnit(filtered);
-      }
-
-      // Fetch Detail Inisiatif
-      const { data: unitsData } = await supabase.from('gov_units').select('id').ilike('nama_unit', `%${mainData.unit_pengirim}%`).limit(1);
-      if (unitsData && unitsData.length > 0) {
-        const unitId = unitsData[0].id;
-        const { data: inisiatifData } = await supabase
-          .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
-          .eq('unit_id', unitId)
-          .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
-          .eq('tahun_anggaran', '2026')
-          .order('tahun_anggaran', { ascending: false });
-        if (inisiatifData) setDetailInisiatif(inisiatifData);
-
-        const { data: penugasanData } = await supabase
-          .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
-          .eq('unit_id', unitId)
-          .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
-          .eq('tahun_anggaran', '2026')
-          .order('tahun_anggaran', { ascending: false });
-        if (penugasanData) setDetailPenugasan(penugasanData);
       }
     };
     fetchRiwayatUnit();
@@ -259,20 +230,15 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     setIsGeneratingRingkasan(true);
 
     let contextArsip = '';
-    if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
-      contextArsip = riwayatUsulanUnit.map((r: any) => 
-        `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatRp(parseNum(r.total_anggaran))}, Disetujui: Rp ${formatRp(parseNum(r.nominal_disetujui))}, Status Keputusan: ${r.keputusan || 'disetujui'}`
-      ).join('\n');
-    }
-
     try {
-      const res = await generateRingkasanFromText(mainData.ringkasan_ai, contextArsip);
+      // Di form manual, tidak perlu menyertakan contextArsip atau rekam jejak
+      const res = await generateRingkasanFromText(mainData.ringkasan_ai, '', false);
       if (res.success && res.data) {
         setMainData((prev: any) => ({
           ...prev,
           analisis_html: res.data.ringkasan_html || prev.analisis_html
         }));
-        alert("Berhasil membuat ringkasan via AI (termasuk rekam jejak arsip pengajuan terdahulu)!");
+        alert("Berhasil membuat ringkasan via AI!");
       } else {
         alert("Gagal generate AI: " + res.error);
       }
@@ -556,6 +522,7 @@ ${mainData.ringkasan_ai}`;
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Unit Pengirim</label>
               <Select 
+                isDisabled={readOnly}
                 options={units.map(u => ({ value: u.id, label: u.nama_unit }))}
                 value={
                   units.find(u => 
@@ -577,6 +544,27 @@ ${mainData.ringkasan_ai}`;
                 }
                 onChange={handleUnitChange}
                 placeholder="Cari atau pilih Unit Kerja..."
+                isClearable
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                className="text-sm"
+                styles={{ 
+                  control: (base) => ({ ...base, padding: '4px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }),
+                  menuPortal: base => ({ ...base, zIndex: 9999 })
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Jenis Usulan</label>
+              <Select 
+                isDisabled={readOnly}
+                options={[
+                   { value: 'Penugasan', label: 'Penugasan' },
+                   { value: 'Inisiatif Unit', label: 'Inisiatif Unit' },
+                   { value: 'Pindah Pagu', label: 'Pindah Pagu' }
+                ]}
+                value={mainData.jenis_usulan ? { value: mainData.jenis_usulan, label: mainData.jenis_usulan } : null}
+                onChange={(selected) => setMainData({...mainData, jenis_usulan: selected?.value || ''})}
+                placeholder="Pilih Jenis Usulan..."
                 isClearable
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                 className="text-sm"
@@ -617,6 +605,7 @@ ${mainData.ringkasan_ai}`;
                   {isGeneratingRingkasan ? <div className="w-3 h-3 border-2 border-emerald-400 border-t-emerald-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
                   Generate Ringkasan (AI)
                 </button>
+                
               </div>
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
                  <ReactQuill 
@@ -657,16 +646,16 @@ ${mainData.ringkasan_ai}`;
                       <td className="px-4 py-2.5 font-medium text-gray-700">Pengalihan (+/-)</td>
                       <td className="px-4 py-2.5 text-right font-mono">Rp {historisYearRow.pengalihan || '0'}</td>
                     </tr>
-                    {parseNum(historisYearRow.tambah_pagu_inisiatif) > 0 && (
-                      <tr className="hover:bg-gray-50 text-emerald-600">
-                        <td className="px-4 py-2.5 font-medium">Tambah Pagu Inisiatif +</td>
-                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_inisiatif)))}</td>
-                      </tr>
-                    )}
                     {parseNum(historisYearRow.tambah_pagu_penugasan) > 0 && (
                       <tr className="hover:bg-gray-50 text-emerald-600">
                         <td className="px-4 py-2.5 font-medium">Tambah Pagu Penugasan +</td>
                         <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_penugasan)))}</td>
+                      </tr>
+                    )}
+                    {parseNum(historisYearRow.tambah_pagu_inisiatif) > 0 && (
+                      <tr className="hover:bg-gray-50 text-emerald-600">
+                        <td className="px-4 py-2.5 font-medium">Tambah Pagu Inisiatif +</td>
+                        <td className="px-4 py-2.5 text-right font-mono">+ Rp {formatRp(Math.abs(parseNum(historisYearRow.tambah_pagu_inisiatif)))}</td>
                       </tr>
                     )}
                     {parseNum(historisYearRow.efisiensi) !== 0 && (
@@ -710,71 +699,42 @@ ${mainData.ringkasan_ai}`;
                   <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3 w-12 text-center whitespace-nowrap">No</th>
-                      <th className="px-4 py-3">Uraian / Keterangan Tambah Pagu</th>
-                      <th className="px-4 py-3 text-right whitespace-nowrap">Nominal (Rp)</th>
+                      <th className="px-4 py-3 whitespace-nowrap">No / Hal Surat</th>
+                      <th className="px-4 py-3 text-right whitespace-nowrap">Pengajuan (Rp)</th>
+                      <th className="px-4 py-3 text-right whitespace-nowrap">Disetujui (Rp)</th>
+                      <th className="px-4 py-3 text-center whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
-                  
-                  {/* GROUP INISIATIF */}
                   <tbody className="divide-y divide-gray-100">
-                    <tr className="bg-indigo-50/50">
-                      <td colSpan={3} className="px-4 py-2 font-bold text-indigo-900 text-xs uppercase tracking-wider">
-                        A. Tambah Pagu Inisiatif
-                      </td>
-                    </tr>
-                    {detailInisiatif.length === 0 ? (
+                    {riwayatUsulanUnit.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-gray-400 italic text-xs whitespace-nowrap">Belum ada detail Tambah Pagu Inisiatif untuk unit ini.</td>
+                        <td colSpan={5} className="px-4 py-6 text-center text-gray-400 italic whitespace-nowrap">Belum ada riwayat usulan tambah pagu sebelumnya untuk unit ini.</td>
                       </tr>
                     ) : (
-                      detailInisiatif.map((h: any, i: number) => (
-                        <tr key={h.id || i} className="hover:bg-gray-50">
+                      riwayatUsulanUnit.map((h: any, i: number) => (
+                        <tr key={h.id_analisis || i} className="hover:bg-gray-50">
                           <td className="px-4 py-2.5 text-center font-medium text-gray-600 whitespace-nowrap">{i + 1}</td>
-                          <td className="px-4 py-2.5">
-                            <div className="font-bold text-gray-900 leading-relaxed">{h.keterangan || '-'}</div>
-                            <div className="text-[11px] text-gray-500 font-medium mt-1">Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</span></div>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <div className="font-bold text-gray-900 whitespace-nowrap">{h.perihal || '-'}</div>
+                            <div className="text-xs text-gray-400 font-mono whitespace-nowrap">No: {h.no_surat || '-'}</div>
                           </td>
-                          <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                            Rp {formatRp(parseNum(h.nominal || '0'))}
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-gray-800">
+                            Rp {formatRp(parseNum(h.total_anggaran || '0'))}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-emerald-700">
+                            Rp {formatRp(parseNum(h.nominal_disetujui || '0'))}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              (h.keputusan === 'disetujui semua' || h.keputusan === 'disetujui 100%') ? 'bg-emerald-100 text-emerald-800' :
+                              h.keputusan === 'disetujui sebagian' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {h.keputusan || 'disetujui'}
+                            </span>
                           </td>
                         </tr>
                       ))
                     )}
-                    <tr className="bg-gray-50 font-bold">
-                      <td colSpan={2} className="px-4 py-2 text-right text-gray-700">Total Tambah Pagu Inisiatif:</td>
-                      <td className="px-4 py-2.5 text-right text-emerald-700 font-mono text-[13px]">Rp {formatRp(detailInisiatif.reduce((acc, curr) => acc + parseNum(curr.nominal), 0))}</td>
-                    </tr>
-                  </tbody>
-
-                  {/* GROUP PENUGASAN */}
-                  <tbody className="divide-y divide-gray-100 border-t-4 border-gray-200">
-                    <tr className="bg-indigo-50/50">
-                      <td colSpan={3} className="px-4 py-2 font-bold text-indigo-900 text-xs uppercase tracking-wider">
-                        B. Tambah Pagu Penugasan
-                      </td>
-                    </tr>
-                    {detailPenugasan.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-4 py-6 text-center text-gray-400 italic text-xs whitespace-nowrap">Belum ada detail Tambah Pagu Penugasan untuk unit ini.</td>
-                      </tr>
-                    ) : (
-                      detailPenugasan.map((h: any, i: number) => (
-                        <tr key={h.id || i} className="hover:bg-gray-50">
-                          <td className="px-4 py-2.5 text-center font-medium text-gray-600 whitespace-nowrap">{i + 1}</td>
-                          <td className="px-4 py-2.5">
-                            <div className="font-bold text-gray-900 leading-relaxed">{h.keterangan || '-'}</div>
-                            <div className="text-[11px] text-gray-500 font-medium mt-1">Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</span></div>
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                            Rp {formatRp(parseNum(h.nominal || '0'))}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                    <tr className="bg-gray-50 font-bold">
-                      <td colSpan={2} className="px-4 py-2 text-right text-gray-700">Total Tambah Pagu Penugasan:</td>
-                      <td className="px-4 py-2.5 text-right text-emerald-700 font-mono text-[13px]">Rp {formatRp(detailPenugasan.reduce((acc, curr) => acc + parseNum(curr.nominal), 0))}</td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -784,12 +744,11 @@ ${mainData.ringkasan_ai}`;
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-bold text-indigo-600 uppercase tracking-widest">Analisis & Rekomendasi (AI Analysis)</label>
-                {!readOnly && (
-                  <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
-                    {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
-                    Generate Rekomendasi (AI)
-                  </button>
-                )}
+                <button onClick={handleGenerateRekomendasi} disabled={isGeneratingAI} className="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1 shadow-sm disabled:opacity-50">
+                  {isGeneratingAI ? <div className="w-3 h-3 border-2 border-amber-400 border-t-amber-700 rounded-full animate-spin"/> : <Wand2 size={12}/>} 
+                  Generate Rekomendasi (AI)
+                </button>
+                
               </div>
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
                  <ReactQuill 
@@ -797,7 +756,6 @@ ${mainData.ringkasan_ai}`;
                     value={mainData.rekomendasi_html || ''} 
                     onChange={(val) => setMainData({...mainData, rekomendasi_html: val})} 
                     className="h-[350px] pb-10 [&_.ql-editor_p]:text-justify"
-                    readOnly={readOnly}
                  />
               </div>
             </div>
@@ -880,6 +838,7 @@ ${mainData.ringkasan_ai}`;
                 <button onClick={handleGenerateSuratBalasan} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1 rounded-lg font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm">
                   <Wand2 size={13}/> Generate Draft Surat Balasan (AI)
                 </button>
+                
               </div>
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200">
                  <ReactQuill 
@@ -887,7 +846,6 @@ ${mainData.ringkasan_ai}`;
                     value={mainData.surat_balasan_html || ''} 
                     onChange={(val) => setMainData({...mainData, surat_balasan_html: val})} 
                     className="h-[400px] pb-10 [&_.ql-editor_p]:text-justify"
-                    readOnly={readOnly}
                  />
               </div>
             </div>

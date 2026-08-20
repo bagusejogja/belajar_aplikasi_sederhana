@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { FileSpreadsheet, Plus, Trash2, History, Paperclip, ClipboardPaste, BarChart3 } from 'lucide-react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData, renderMode = 'tabs' }: any) {
+export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData, renderMode = 'tabs', readOnly = false }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
   const [parsedPreview, setParsedPreview] = useState<any[]>([]);
 
@@ -196,7 +196,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
 
 
-  const isVertical = renderMode === 'vertical';
+  const isVertical = renderMode === 'vertical' || readOnly;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
@@ -218,16 +218,18 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
       {(isVertical || activeSubTab === 'realisasi') && (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col">
-          <div className="p-4 bg-gray-50 flex justify-between gap-4 items-center flex-wrap">
-            <p className="text-xs text-gray-500 font-medium">
-              Unduh dari <a href="https://finance.simaster.ugm.ac.id/laporan/realisasi_detail_belanja/" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">SIMASTER UGM (Realisasi Detail Belanja)</a>
-            </p>
-            <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
-              <FileSpreadsheet size={16}/> Upload Excel SIMASTER
-              <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleExcelUpload} />
-            </label>
-          </div>
-          <div className="overflow-y-auto custom-scrollbar flex-1">
+          {!readOnly && (
+            <div className="p-4 bg-gray-50 flex justify-between gap-4 items-center flex-wrap">
+              <p className="text-xs text-gray-500 font-medium">
+                Unduh dari <a href="https://finance.simaster.ugm.ac.id/laporan/realisasi_detail_belanja/" target="_blank" rel="noreferrer" className="text-emerald-600 font-bold hover:underline">SIMASTER UGM (Realisasi Detail Belanja)</a>
+              </p>
+              <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-sm flex items-center gap-2">
+                <FileSpreadsheet size={16}/> Upload Excel SIMASTER
+                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleExcelUpload} />
+              </label>
+            </div>
+          )}
+          <fieldset disabled={readOnly} className="overflow-y-auto custom-scrollbar flex-1">
             <table className="w-full text-left text-sm text-gray-700">
               <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs sticky top-0 border-b border-gray-200">
                 <tr>
@@ -283,12 +285,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 )}
               </tbody>
             </table>
-          </div>
-          <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-             <button onClick={() => setDetailData([...(detailData||[]), { no_urut: (detailData?.length||0) + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
-               <Plus size={16}/> Tambah Baris Manual
-             </button>
-          </div>
+          </fieldset>
+          {!readOnly && (
+            <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
+               <button onClick={() => setDetailData([...(detailData||[]), { no_urut: (detailData?.length||0) + 1, uraian_kegiatan: '', anggaran: '0', realisasi: '0', persen_serapan: '0%' }])} className="text-emerald-600 hover:text-emerald-700 font-bold text-sm flex items-center gap-1">
+                 <Plus size={16}/> Tambah Baris Manual
+               </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -310,7 +314,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                           Pengalihan: parseNum(d.pengalihan),
                           TambahPenugasan: parseNum(d.tambah_pagu_penugasan),
                           TambahInisiatif: parseNum(d.tambah_pagu_inisiatif),
-                          Efisiensi: parseNum(d.efisiensi),
+                          Efisiensi: -Math.abs(parseNum(d.efisiensi)),
                           Talangan: parseNum(d.talangan),
                           total_pagu: d.total_pagu,
                           Realisasi: parseNum(d.realisasi_historis),
@@ -326,7 +330,8 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                       <Bar dataKey="PaguAwal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
                       <Bar dataKey="Pengalihan" stackId="a" fill="#8b5cf6" name="Pengalihan" radius={[0, 0, 0, 0]} />
                       {showTambahPaguPenugasan && <Bar dataKey="TambahPenugasan" stackId="a" fill="#10b981" name="Tmbh Penugasan" radius={[0, 0, 0, 0]} />}
-                      {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tmbh Inisiatif" radius={[4, 4, 0, 0]} />}
+                      {showTambahPaguInisiatif && <Bar dataKey="TambahInisiatif" stackId="a" fill="#34d399" name="Tmbh Inisiatif" radius={[0, 0, 0, 0]} />}
+                      <Bar dataKey="Efisiensi" stackId="a" fill="#ef4444" name="Efisiensi" radius={[4, 4, 0, 0]} />
                       <Line type="monotone" dataKey={(d: any) => parseNum(d.total_pagu)} stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 5, fill: '#06b6d4'}} activeDot={{r: 7}} />
                       <Line type="monotone" dataKey="Realisasi" stroke="#f59e0b" strokeWidth={3} name="Realisasi" dot={{r: 5, fill: '#f59e0b'}} activeDot={{r: 7}} />
                     </ComposedChart>
@@ -550,36 +555,38 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                        </div>
                     </div>
 
-                    <div className="mt-4 bg-gray-50 border border-gray-200 p-3 rounded-xl">
-                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><ClipboardPaste size={14}/> Paste Rekap Realisasi (Excel)</label>
-                      <textarea 
-                        className="w-full p-2 bg-white border border-gray-200 rounded-lg outline-none text-xs text-gray-700 focus:border-emerald-500 focus:bg-white transition-colors shadow-sm" 
-                        rows={2} 
-                        placeholder="Klik di sini lalu Paste (Ctrl+V) tabel dari Excel (Kolom 1: No, 2: Unit, 3: Anggaran, 4: Realisasi)" 
-                        onPaste={handlePasteRealisasi}
-                        value={""}
-                        onChange={() => {}}
-                      />
-                      {parsedPreview.length > 0 && (
-                        <div className="mt-3 bg-white rounded-lg border border-cyan-200 overflow-hidden text-xs max-h-60 overflow-y-auto shadow-inner">
-                          <div className="bg-cyan-50 p-2 font-bold text-cyan-800 border-b border-cyan-200 flex justify-between">
-                            <span>Data Terdeteksi ({parsedPreview.length} Unit)</span>
-                            <button onClick={() => setParsedPreview([])} className="text-gray-500 hover:text-red-500 underline text-[10px]">Tutup Preview</button>
+                    {!readOnly && (
+                      <div className="mt-4 bg-gray-50 border border-gray-200 p-3 rounded-xl">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1"><ClipboardPaste size={14}/> Paste Rekap Realisasi (Excel)</label>
+                        <textarea 
+                          className="w-full p-2 bg-white border border-gray-200 rounded-lg outline-none text-xs text-gray-700 focus:border-emerald-500 focus:bg-white transition-colors shadow-sm" 
+                          rows={2} 
+                          placeholder="Klik di sini lalu Paste (Ctrl+V) tabel dari Excel (Kolom 1: No, 2: Unit, 3: Anggaran, 4: Realisasi)" 
+                          onPaste={handlePasteRealisasi}
+                          value={""}
+                          onChange={() => {}}
+                        />
+                        {parsedPreview.length > 0 && (
+                          <div className="mt-3 bg-white rounded-lg border border-cyan-200 overflow-hidden text-xs max-h-60 overflow-y-auto shadow-inner">
+                            <div className="bg-cyan-50 p-2 font-bold text-cyan-800 border-b border-cyan-200 flex justify-between">
+                              <span>Data Terdeteksi ({parsedPreview.length} Unit)</span>
+                              <button onClick={() => setParsedPreview([])} className="text-gray-500 hover:text-red-500 underline text-[10px]">Tutup Preview</button>
+                            </div>
+                            <table className="w-full text-left">
+                              <tbody className="divide-y divide-gray-100">
+                                {parsedPreview.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="p-2 text-gray-500 w-16">{item.kode}</td>
+                                    <td className="p-2 text-gray-700">{item.nama}</td>
+                                    <td className="p-2 text-right font-bold text-emerald-600">Rp {formatRp(item.val)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                          <table className="w-full text-left">
-                            <tbody className="divide-y divide-gray-100">
-                              {parsedPreview.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                  <td className="p-2 text-gray-500 w-16">{item.kode}</td>
-                                  <td className="p-2 text-gray-700">{item.nama}</td>
-                                  <td className="p-2 text-right font-bold text-emerald-600">Rp {formatRp(item.val)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                </div>
             </div>
@@ -592,11 +599,35 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
           <div className="bg-white border border-gray-200 rounded-2xl p-6 max-w-2xl space-y-6 shadow-sm">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> File Lampiran Fisik</label>
-              <input type="text" value={mainData.file_lampiran || ''} onChange={e => setMainData({...mainData, file_lampiran: e.target.value})} placeholder="Misal: lampiran_01.pdf" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
+              {readOnly ? (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-2">
+                  {mainData.file_lampiran ? (
+                    <div className="text-emerald-600 font-bold flex items-center gap-2 cursor-pointer" onClick={() => alert("File lampiran fisik tidak bisa didownload secara langsung.")}>
+                      <Paperclip size={16}/> {mainData.file_lampiran}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 italic">Tidak ada file lampiran fisik</span>
+                  )}
+                </div>
+              ) : (
+                <input type="text" value={mainData.file_lampiran || ''} onChange={e => setMainData({...mainData, file_lampiran: e.target.value})} placeholder="Misal: lampiran_01.pdf" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Paperclip size={14}/> Link Dokumen (Google Drive / Cloud)</label>
-              <input type="text" value={mainData.link_lampiran || ''} onChange={e => setMainData({...mainData, link_lampiran: e.target.value})} placeholder="https://..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
+              {readOnly ? (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-2">
+                  {mainData.link_lampiran ? (
+                    <a href={mainData.link_lampiran} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-2">
+                      <Paperclip size={16}/> Lihat Dokumen Lampiran
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 italic">Tidak ada link dokumen</span>
+                  )}
+                </div>
+              ) : (
+                <input type="text" value={mainData.link_lampiran || ''} onChange={e => setMainData({...mainData, link_lampiran: e.target.value})} placeholder="https://..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-emerald-500 text-gray-900 focus:bg-white" />
+              )}
             </div>
           </div>
         </div>

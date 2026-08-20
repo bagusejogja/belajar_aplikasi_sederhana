@@ -18,7 +18,11 @@ import {
   Filter,
   Info,
   Check,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
@@ -66,7 +70,17 @@ export default function CopasPaguPage() {
   const [savedRecords, setSavedRecords] = useState<any[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
-  const [yearFilter, setYearFilter] = useState('ALL');
+  const [yearFilter, setYearFilter] = useState(new Date().getFullYear().toString());
+
+  // Unit autocomplete filter states
+  const [unitFilterSearch, setUnitFilterSearch] = useState('');
+  const [selectedUnitFilter, setSelectedUnitFilter] = useState('ALL');
+  const [isUnitDropdownOpen, setIsUnitDropdownOpen] = useState(false);
+  const [highlightedUnitIndex, setHighlightedUnitIndex] = useState(0);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Load Units from DB
   useEffect(() => {
@@ -219,11 +233,6 @@ export default function CopasPaguPage() {
     parseRawTextToRows(val);
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const pasted = e.clipboardData.getData('text');
-    setRawText(pasted);
-    parseRawTextToRows(pasted);
-  };
 
   // Excel Upload Handler
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -361,13 +370,58 @@ export default function CopasPaguPage() {
         r.keterangan?.toLowerCase().includes(searchFilter.toLowerCase());
       
       const matchYear = yearFilter === 'ALL' || r.tahun_anggaran === yearFilter;
-      return matchSearch && matchYear;
+      const matchUnit = selectedUnitFilter === 'ALL' || r.unit_id?.toString() === selectedUnitFilter.toString();
+      
+      return matchSearch && matchYear && matchUnit;
     });
-  }, [savedRecords, searchFilter, yearFilter]);
+  }, [savedRecords, searchFilter, yearFilter, selectedUnitFilter]);
 
   const uniqueYearsInDB = useMemo(() => {
     return Array.from(new Set(savedRecords.map(r => r.tahun_anggaran).filter(Boolean))).sort().reverse();
   }, [savedRecords]);
+
+  // Dropdown Logic
+  const availableUnitsForDropdown = useMemo(() => {
+    return [{ id: 'ALL', nama_unit: 'Semua Unit Kerja', kode_unit: '' }, ...units];
+  }, [units]);
+
+  const filteredUnitsDropdown = useMemo(() => {
+    return availableUnitsForDropdown.filter(u => 
+      u.nama_unit.toLowerCase().includes(unitFilterSearch.toLowerCase()) ||
+      (u.kode_unit && u.kode_unit.toLowerCase().includes(unitFilterSearch.toLowerCase()))
+    );
+  }, [availableUnitsForDropdown, unitFilterSearch]);
+
+  const handleUnitKeyDown = (e: React.KeyboardEvent) => {
+    if (!isUnitDropdownOpen) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedUnitIndex(prev => (prev < filteredUnitsDropdown.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedUnitIndex(prev => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredUnitsDropdown[highlightedUnitIndex]) {
+        setSelectedUnitFilter(filteredUnitsDropdown[highlightedUnitIndex].id.toString());
+        setUnitFilterSearch('');
+        setIsUnitDropdownOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      setIsUnitDropdownOpen(false);
+    }
+  };
+
+  // Pagination Logic
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchFilter, yearFilter, selectedUnitFilter]);
+
+  const totalPages = Math.ceil(filteredSavedRecords.length / itemsPerPage) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredSavedRecords.slice(start, start + itemsPerPage);
+  }, [filteredSavedRecords, currentPage]);
 
   return (
     <div className="p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
@@ -440,7 +494,6 @@ export default function CopasPaguPage() {
           <textarea
             value={rawText}
             onChange={handleTextChange}
-            onPaste={handlePaste}
             rows={6}
             placeholder="Tempelkan (Ctrl+V) baris data dari Excel di sini..."
             className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white font-mono text-xs text-gray-900 transition-colors leading-relaxed shadow-inner"
@@ -619,16 +672,67 @@ export default function CopasPaguPage() {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
             <input
               type="text"
-              placeholder="Cari unit, jenis anggaran, sumber dana..."
+              placeholder="Cari mutasi, keterangan, sumber dana..."
               value={searchFilter}
               onChange={e => setSearchFilter(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-500 focus:bg-white"
             />
+          </div>
+
+          <div className="relative z-20 min-w-[250px]">
+             <div 
+               className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 cursor-pointer hover:bg-gray-100 transition-colors"
+               onClick={() => {
+                 setIsUnitDropdownOpen(!isUnitDropdownOpen);
+                 setUnitFilterSearch('');
+                 setHighlightedUnitIndex(0);
+               }}
+             >
+               <span className="text-xs font-bold text-gray-800 truncate">
+                 {selectedUnitFilter === 'ALL' ? 'Semua Unit Kerja' : availableUnitsForDropdown.find(u => u.id.toString() === selectedUnitFilter)?.nama_unit || 'Pilih Unit'}
+               </span>
+               <ChevronDown size={14} className="text-gray-400 shrink-0 ml-2" />
+             </div>
+             {isUnitDropdownOpen && (
+               <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden">
+                 <div className="p-2 border-b border-gray-100">
+                   <input
+                     type="text"
+                     autoFocus
+                     placeholder="Ketik nama unit..."
+                     value={unitFilterSearch}
+                     onChange={e => { setUnitFilterSearch(e.target.value); setHighlightedUnitIndex(0); }}
+                     onKeyDown={handleUnitKeyDown}
+                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-indigo-500 font-medium"
+                   />
+                 </div>
+                 <div className="max-h-60 overflow-y-auto p-1">
+                   {filteredUnitsDropdown.length === 0 ? (
+                     <div className="p-3 text-center text-xs text-gray-400 italic">Unit tidak ditemukan</div>
+                   ) : (
+                     filteredUnitsDropdown.map((u, idx) => (
+                       <div
+                         key={u.id}
+                         onClick={() => {
+                           setSelectedUnitFilter(u.id.toString());
+                           setIsUnitDropdownOpen(false);
+                         }}
+                         className={`px-3 py-2 rounded-xl text-xs cursor-pointer flex flex-col gap-0.5 transition-colors ${
+                           idx === highlightedUnitIndex ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-gray-50 border border-transparent'
+                         }`}
+                       >
+                         <span className="font-bold text-gray-800">{u.nama_unit}</span>
+                       </div>
+                     ))
+                   )}
+                 </div>
+               </div>
+             )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -636,7 +740,7 @@ export default function CopasPaguPage() {
             <select
               value={yearFilter}
               onChange={e => setYearFilter(e.target.value)}
-              className="py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+              className="py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none hover:bg-gray-100 transition-colors"
             >
               <option value="ALL">Semua Tahun</option>
               {uniqueYearsInDB.map(y => (
@@ -651,68 +755,78 @@ export default function CopasPaguPage() {
           <table className="w-full text-left text-xs text-gray-700">
             <thead className="bg-gray-50 text-gray-500 font-black uppercase tracking-wider border-b border-gray-200">
               <tr>
-                <th className="p-3 w-12 text-center">ID</th>
-                <th className="p-3 w-20">Tahun</th>
-                <th className="p-3">Nama Unit (Unit ID)</th>
+                <th className="p-3 w-12 text-center">No</th>
+                <th className="p-3">Data Pagu Anggaran (Tahun, Unit, Jenis, Sumber, Status)</th>
                 <th className="p-3 text-right">Nominal (Rp)</th>
-                <th className="p-3">Jenis Anggaran</th>
-                <th className="p-3">Sumber Dana</th>
-                <th className="p-3">Status</th>
                 <th className="p-3">Keterangan</th>
-                <th className="p-3 w-12 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {loadingSaved ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-gray-500">
+                  <td colSpan={4} className="p-8 text-center text-gray-500">
                     <RefreshCw className="animate-spin inline-block mr-2" size={16} /> Memuat data database...
                   </td>
                 </tr>
-              ) : filteredSavedRecords.length === 0 ? (
+              ) : paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-gray-400 italic">
+                  <td colSpan={4} className="p-8 text-center text-gray-400 italic">
                     Belum ada data pagu di database. Gunakan Copas Zone di atas untuk memasukkan data.
                   </td>
                 </tr>
               ) : (
-                filteredSavedRecords.map(r => (
+                paginatedRecords.map((r, i) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-3 text-center font-mono text-gray-400">{r.id}</td>
-                    <td className="p-3 font-mono font-bold">{r.tahun_anggaran}</td>
-                    <td className="p-3 font-bold text-gray-900">
-                      {r.gov_units?.nama_unit || `Unit ID: ${r.unit_id}`}
+                    <td className="p-3 text-center font-bold text-gray-400">
+                      {(currentPage - 1) * itemsPerPage + i + 1}
+                    </td>
+                    <td className="p-3">
+                      <div className="font-bold text-gray-900">{r.gov_units?.nama_unit || `Unit ID: ${r.unit_id}`}</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 font-bold">
+                        <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[10px]">Thn {r.tahun_anggaran}</span>
+                        <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[10px] border border-indigo-100">{r.jenis_anggaran || '-'}</span>
+                        <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] border border-emerald-100">{r.status_pagu || 'Disetujui'}</span>
+                        <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] border border-amber-100">{r.sumber_dana || '-'}</span>
+                      </div>
                     </td>
                     <td className="p-3 text-right font-mono font-bold text-indigo-950">
                       Rp {formatRp(parseNum(r.nominal))}
                     </td>
-                    <td className="p-3">
-                      <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold text-[11px] border border-indigo-100">
-                        {r.jenis_anggaran || '-'}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-gray-600">{r.sumber_dana || '-'}</td>
-                    <td className="p-3">
-                      <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold text-[11px] border border-emerald-100">
-                        {r.status_pagu || 'Disetujui'}
-                      </span>
-                    </td>
-                    <td className="p-3 text-gray-600">{r.keterangan || '-'}</td>
-                    <td className="p-3 text-center">
-                      <button
-                        onClick={() => handleDeleteSavedRecord(r.id)}
-                        className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded"
-                        title="Hapus dari DB"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
+                    <td className="p-3 text-gray-600 font-medium">{r.keterangan || '-'}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination UI */}
+        {!loadingSaved && totalPages > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+            <div className="text-xs text-gray-500 font-medium">
+              Menampilkan <span className="font-bold text-gray-800">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-gray-800">{Math.min(currentPage * itemsPerPage, filteredSavedRecords.length)}</span> dari <span className="font-bold text-gray-800">{filteredSavedRecords.length}</span> data
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-bold text-gray-700 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                Halaman {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

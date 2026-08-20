@@ -87,8 +87,8 @@ export const menuList: MenuItem[] = [
   { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Komparasi Tambah Pagu', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Anggaran' },
-  { title: 'Laporan Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
-  { title: 'Analisis Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
+  { title: 'Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
+  { title: 'Analisis Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 

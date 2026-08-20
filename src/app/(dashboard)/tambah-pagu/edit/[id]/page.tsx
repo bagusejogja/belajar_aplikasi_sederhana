@@ -3,14 +3,27 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { updateTambahPagu } from '@/app/actions/tambah-pagu';
 import Select from 'react-select';
 import { 
   Save, ArrowLeft, FileText, Calendar, 
   Building2, Tag, DollarSign, MessageSquare, 
   UploadCloud, CheckCircle2, Loader2, Sparkles,
-  Link as LinkIcon, Info, ExternalLink
+  Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
+  Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck,
+  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp
 } from 'lucide-react';
+import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
+import DataPendukung from '@/app/(dashboard)/analisis/components/DataPendukung';
+import DataForm from '@/app/(dashboard)/analisis/components/DataForm';
+import OCRPanelPengajuan from '@/app/(dashboard)/tambah-pagu/tambah/components/OCRPanelPengajuan';
+import OCRPanelTanggapan from '@/app/(dashboard)/tambah-pagu/tambah/components/OCRPanelTanggapan';
+import { scanSuratWithAI, generateRingkasanFromText } from '@/app/actions/ai-scan';
+import { 
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+} from 'recharts';
 
 export default function EditPaguPage() {
   const router = useRouter();
@@ -19,37 +32,164 @@ export default function EditPaguPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [listUnit, setListUnit] = useState<any[]>([]);
   
-  const [formData, setFormData] = useState<any>({
-    tahun_anggaran: 2026,
-    unit_id: null,
-    jenis_tambah_pagu: 'Penugasan',
-    status_pengajuan: 'Draft',
-    no_surat_pengajuan: '',
-    tanggal_surat_pengajuan: '',
-    hal_surat_pengajuan: '',
-    subyek_pengajuan_di_simaster_persuratan: '',
-    nominal_diajukan: '',
-    link_surat_pengajuan: '',
-    ringkasan_surat_pengajuan: '',
-    no_surat_tanggapan: '',
-    tanggal_surat_tanggapan: '',
-    hal_surat_tanggapan: '',
-    subyek_tanggapan_di_simaster_persuratan: '',
-    link_surat_tanggapan: '',
-    nominal_tanggapan: '', // Point: Migrated from nominal_disetujui
-  });
+  // Stepped Tab Navigation State
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'step4'>('step1');
+
+  // Analisis Riwayat Modal & Selection State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [listAnalisis, setListAnalisis] = useState<any[]>([]);
+  const [loadingAnalisis, setLoadingAnalisis] = useState(false);
+  const [searchAnalisis, setSearchAnalisis] = useState('');
+  const [selectedAnalisis, setSelectedAnalisis] = useState<any | null>(null);
+
+  // Unit History Pagu State
+  const [paguUnitHistory, setPaguUnitHistory] = useState<any[]>([]);
+  const [riwayatUsulanUnit, setRiwayatUsulanUnit] = useState<any[]>([]);
+
+  // PDF Preview Pop-up Modal State
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  // AI Scan Tanggapan State
+  const [isScanningTanggapan, setIsScanningTanggapan] = useState(false);
+  const [isScanningPengajuan, setIsScanningPengajuan] = useState(false);
 
   const [existingFiles, setExistingFiles] = useState({
     pengajuan: '',
     tanggapan: ''
   });
 
+  const [ocrRawText, setOcrRawText] = useState('');
+  const [selectedAnalisisDetail, setSelectedAnalisisDetail] = useState<any[]>([]);
+  const [selectedAnalisisHistoris, setSelectedAnalisisHistoris] = useState<any[]>([]);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+
+  const triggerAiSummary = async (text: string) => {
+    if (!text) return;
+    setIsGeneratingSummary(true);
+    try {
+      let contextArsip = '';
+      if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
+        contextArsip = riwayatUsulanUnit.map((r: any) => 
+          `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatNumber(r.total_anggaran || 0)}, Disetujui: Rp ${formatNumber(r.nominal_disetujui || 0)}, Status Keputusan: ${r.keputusan || 'disetujui'}`
+        ).join('\n');
+      }
+
+      const res = await generateRingkasanFromText(text, contextArsip);
+      if (res.success && res.data?.ringkasan_html) {
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: res.data.ringkasan_html + '<!--imported-->'
+        }));
+      } else {
+        // Fallback local summary
+        const localFallback = `
+          <p><strong>Ringkasan Usulan (Sistem Fallback Lokal - AI Sedang Sibuk):</strong></p>
+          <ul>
+            <li><strong>Unit Pengusul:</strong> ${formData.unit_id?.label || '-'}</li>
+            <li><strong>No. Surat Usulan:</strong> ${formData.no_surat_pengajuan || '-'}</li>
+            <li><strong>Hal Surat:</strong> ${formData.hal_surat_pengajuan || '-'}</li>
+            <li><strong>Nominal yang Diajukan:</strong> Rp ${formatNumber(formData.nominal_diajukan || 0)}</li>
+          </ul>
+        `;
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: localFallback
+        }));
+      }
+    } catch (e: any) {
+      console.error("Auto AI Summary failed:", e);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateAiSummary = async () => {
+    if (!ocrRawText) {
+      alert("Harap jalankan Ekstraksi Teks (OCR) terlebih dahulu di atas agar AI dapat membaca isi surat!");
+      return;
+    }
+    setIsGeneratingSummary(true);
+    try {
+      let contextArsip = '';
+      if (riwayatUsulanUnit && riwayatUsulanUnit.length > 0) {
+        contextArsip = riwayatUsulanUnit.map((r: any) => 
+          `- Tanggal: ${r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-'}, No Surat: ${r.no_surat || '-'}, Perihal: ${r.perihal || '-'}, Pengajuan: Rp ${formatNumber(r.total_anggaran || 0)}, Disetujui: Rp ${formatNumber(r.nominal_disetujui || 0)}, Status Keputusan: ${r.keputusan || 'disetujui'}`
+        ).join('\n');
+      }
+
+      const res = await generateRingkasanFromText(ocrRawText, contextArsip);
+      if (res.success && res.data?.ringkasan_html) {
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: res.data.ringkasan_html + '<!--imported-->'
+        }));
+        alert("Berhasil membuat ringkasan AI (termasuk rekam jejak)!");
+      } else {
+        const localFallback = `
+          <p><strong>Ringkasan Usulan (Sistem Fallback Lokal - AI Sedang Sibuk):</strong></p>
+          <ul>
+            <li><strong>Unit Pengusul:</strong> ${formData.unit_id?.label || '-'}</li>
+            <li><strong>No. Surat Usulan:</strong> ${formData.no_surat_pengajuan || '-'}</li>
+            <li><strong>Hal Surat:</strong> ${formData.hal_surat_pengajuan || '-'}</li>
+            <li><strong>Nominal yang Diajukan:</strong> Rp ${formatNumber(formData.nominal_diajukan || 0)}</li>
+          </ul>
+        `;
+        setFormData((prev: any) => ({
+          ...prev,
+          ringkasan_surat_pengajuan: localFallback
+        }));
+        alert("Gemini AI sedang mengalami lonjakan trafik (503). Sistem otomatis mengaktifkan Ringkasan Lokal Fallback agar Anda tetap bisa menyimpan data!");
+      }
+    } catch (e: any) {
+      alert("Terjadi kesalahan: " + e.message);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
+  const [formData, setFormData] = useState({
+    tahun_anggaran: 2026,
+    unit_id: null as any,
+    jenis_tambah_pagu: 'Penugasan',
+    status_pengajuan: 'Disetujui Semua',
+    
+    // Data Pengajuan
+    no_surat_pengajuan: '',
+    tanggal_surat_pengajuan: new Date().toISOString().split('T')[0],
+    hal_surat_pengajuan: '',
+    subyek_pengajuan_di_simaster_persuratan: '',
+    nominal_diajukan: '',
+    link_surat_pengajuan: '',
+    ringkasan_surat_pengajuan: '',
+    
+    // Data Tanggapan
+    no_surat_tanggapan: '',
+    tanggal_surat_tanggapan: '',
+    hal_surat_tanggapan: '',
+    subyek_tanggapan_di_simaster_persuratan: '',
+    link_surat_tanggapan: '',
+    nominal_tanggapan: '',
+  });
+
   const [filePengajuan, setFilePengajuan] = useState<File | null>(null);
   const [fileTanggapan, setFileTanggapan] = useState<File | null>(null);
+
+  const isReadOnlyPengajuan = !!selectedAnalisis;
 
   useEffect(() => {
     fetchInitialData();
   }, [params.id]);
+
+  useEffect(() => {
+    if (formData.unit_id?.value) {
+      fetchUnitPaguHistory(formData.unit_id.value);
+      fetchRiwayatUnit(formData.unit_id.label);
+    } else {
+      setPaguUnitHistory([]);
+      setRiwayatUsulanUnit([]);
+    }
+  }, [formData.unit_id]);
 
   const fetchInitialData = async () => {
     try {
@@ -57,6 +197,52 @@ export default function EditPaguPage() {
       const unitOptions = units?.map(u => ({ value: u.id, label: u.nama_unit })) || [];
       setListUnit(unitOptions);
 
+      // Fetch used
+      const { data: used } = await supabase.from('tambah_pagu').select('no_surat_pengajuan');
+      const usedNoSurat = new Set(used?.map(u => u.no_surat_pengajuan).filter(Boolean) || []);
+
+      // Fetch analisis list (selecting analisis_html and processing fields)
+      const { data: dataAnalisis } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, analisis_html, created_at')
+        .order('created_at', { ascending: false });
+
+      let processedAnalisis: any[] = [];
+      if (dataAnalisis) {
+        processedAnalisis = dataAnalisis.map(item => {
+          const cleanNoSurat = (item.no_surat || '').trim().toLowerCase();
+          const isUsed = usedNoSurat.has(cleanNoSurat);
+
+          let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
+          let keputusan = item.keputusan || '';
+          let nominalDisetujui = item.nominal_disetujui || '0';
+          let ringkasanHtml = '';
+
+          if (item.analisis_html) {
+            try {
+              const parsed = JSON.parse(item.analisis_html);
+              if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
+              if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
+              if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+              if (parsed.analisis) ringkasanHtml = parsed.analisis;
+            } catch(e) {
+              ringkasanHtml = item.analisis_html;
+            }
+          }
+
+          return {
+            ...item,
+            subyek_persuratan_simaster: subyekSimaster,
+            keputusan: keputusan || 'diajukan',
+            nominal_disetujui: nominalDisetujui,
+            ringkasan_html: ringkasanHtml,
+            is_used: isUsed
+          };
+        });
+        setListAnalisis(processedAnalisis);
+      }
+
+      // Fetch edit record
       const { data: pagu, error } = await supabase
         .from('tambah_pagu')
         .select('*')
@@ -70,23 +256,434 @@ export default function EditPaguPage() {
           ...pagu,
           unit_id: unitOptions.find(u => u.value === pagu.unit_id) || null,
         });
+        
         setExistingFiles({
           pengajuan: pagu.file_surat_pengajuan || '',
           tanggapan: pagu.file_surat_tanggapan || ''
         });
+
+        // Also look up if this record is matching any of the analisis list to restore selection
+        if (processedAnalisis.length > 0) {
+          const cleanPaguNoSurat = (pagu.no_surat_pengajuan || '').trim().toLowerCase();
+          const matchedAnalisis = processedAnalisis.find(a => 
+            (pagu.id_analisis && a.id_analisis === pagu.id_analisis) || 
+            (cleanPaguNoSurat && a.no_surat && a.no_surat.trim().toLowerCase() === cleanPaguNoSurat)
+          );
+          if (matchedAnalisis) {
+            let pBerjalanItem = {};
+            if ((matchedAnalisis as any).analisis_html) {
+              try {
+                const parsed = JSON.parse((matchedAnalisis as any).analisis_html);
+                if (parsed.pagu_berjalan) pBerjalanItem = parsed.pagu_berjalan;
+              } catch(e) {}
+            }
+            const selectedItem = {
+              ...matchedAnalisis,
+              pagu_berjalan: pBerjalanItem,
+              rekomendasi_html: (matchedAnalisis as any).ringkasan_html || (matchedAnalisis as any).analisis_html || ''
+            };
+            setSelectedAnalisis(selectedItem);
+            
+            // Fetch details for edit page as well
+            Promise.all([
+              supabase.from('app_detail_realisasi').select('*').eq('id_analisis', matchedAnalisis.id_analisis).order('no_urut', { ascending: true }),
+              supabase.from('app_pagu_historis').select('*').eq('id_analisis', matchedAnalisis.id_analisis).order('tahun', { ascending: true })
+            ]).then(([ { data: detailData }, { data: histData } ]) => {
+              if (detailData) setSelectedAnalisisDetail(detailData);
+              if (histData) setSelectedAnalisisHistoris(histData);
+            }).catch(err => {
+              console.error("Error fetching analysis details in edit mode:", err);
+            });
+          }
+        }
       }
-    } catch (error: any) {
-      alert("Gagal memuat data: " + error.message);
+    } catch (e: any) {
+      alert("Gagal load data usulan: " + e.message);
       router.back();
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatNumber = (num: string) => {
-    if (!num) return '';
+  const fetchRiwayatUnit = async (unitName: string) => {
+    if (!unitName) return;
+    try {
+      const { data } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, analisis_html, created_at')
+        .ilike('unit_pengirim', `%${unitName}%`)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        const processed = data.map(item => {
+          let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
+          let keputusan = item.keputusan || '';
+          let nominalDisetujui = item.nominal_disetujui || '0';
+          let ringkasanHtml = '';
+
+          if (item.analisis_html) {
+            try {
+              const parsed = JSON.parse(item.analisis_html);
+              if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
+              if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
+              if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+              if (parsed.analisis) ringkasanHtml = parsed.analisis;
+            } catch(e) {
+              ringkasanHtml = item.analisis_html;
+            }
+          }
+
+          return {
+            ...item,
+            subyek_persuratan_simaster: subyekSimaster,
+            keputusan: keputusan || 'diajukan',
+            nominal_disetujui: nominalDisetujui,
+            ringkasan_html: ringkasanHtml
+          };
+        });
+        setRiwayatUsulanUnit(processed);
+      }
+    } catch (e) {
+      console.error("Gagal load riwayat unit:", e);
+    }
+  };
+
+  const fetchUnitPaguHistory = async (unitId: any) => {
+    if (!unitId) return;
+    try {
+      const { data: paguData } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
+      const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
+
+      if (paguData && realisasiData) {
+        const years = Array.from(new Set([...paguData.map(p => p.tahun_anggaran), ...realisasiData.map(r => r.tahun_anggaran)]));
+        const filteredYears = years.filter(y => parseInt(y) >= 2019).sort();
+
+        const history = filteredYears.map(year => {
+          const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
+          const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
+
+          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguPengalihan = paguTambah + paguKurang;
+
+          const paguTambahPenugasan = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahInisiatif = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguEfisiensi = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'efisiensi') || (p.jenis_anggaran?.toLowerCase()?.includes('tambah pagu') && Number(p.nominal) < 0)).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
+
+          const totalPagu = paguAwal + paguPengalihan + paguTambahPenugasan + paguTambahInisiatif + paguEfisiensi + paguTalangan;
+          const totalRealisasi = realisasiTahun.reduce((acc, r) => acc + Number(r.realisasi), 0);
+
+          let serapan = 0;
+          if (totalPagu > 0) serapan = (totalRealisasi / totalPagu) * 100;
+
+          return {
+            tahun: year,
+            pagu_awal: paguAwal,
+            pengalihan: paguPengalihan,
+            tambah_penugasan: paguTambahPenugasan,
+            tambah_inisiatif: paguTambahInisiatif,
+            efisiensi: paguEfisiensi,
+            talangan: paguTalangan,
+            total_pagu: totalPagu,
+            realisasi: totalRealisasi,
+            persen_serapan: serapan.toFixed(2) + '%'
+          };
+        });
+
+        setPaguUnitHistory(history);
+      }
+    } catch (e) {
+      console.error("Gagal load history unit:", e);
+    }
+  };
+
+  const fetchAnalisisAndUsed = async () => {
+    setLoadingAnalisis(true);
+    try {
+      const { data: dataAnalisis, error: errAnalisis } = await supabase
+        .from('app_analisis_utama')
+        .select('id_analisis, no_surat, tanggal_surat, perihal, unit_pengirim, total_anggaran, nominal_disetujui, keputusan, link_lampiran, analisis_html, created_at')
+        .order('created_at', { ascending: false });
+
+      if (errAnalisis) {
+        console.error("Error fetching analisis:", errAnalisis);
+      }
+
+      const { data: dataTambahPagu } = await supabase
+        .from('tambah_pagu')
+        .select('id_analisis, no_surat_pengajuan, no_surat_tanggapan');
+
+      const usedNoSuratSet = new Set<string>();
+      const usedIdAnalisisSet = new Set<string>();
+      if (dataTambahPagu) {
+        dataTambahPagu.forEach(tp => {
+          if (tp.no_surat_pengajuan && tp.no_surat_pengajuan.trim()) usedNoSuratSet.add(tp.no_surat_pengajuan.trim().toLowerCase());
+          if (tp.no_surat_tanggapan && tp.no_surat_tanggapan.trim()) usedNoSuratSet.add(tp.no_surat_tanggapan.trim().toLowerCase());
+          if (tp.id_analisis) usedIdAnalisisSet.add(tp.id_analisis);
+        });
+      }
+
+      if (dataAnalisis) {
+        const processed = dataAnalisis.map(item => {
+          const cleanNoSurat = (item.no_surat || '').trim().toLowerCase();
+          // Exclude checking current record if in edit page
+          const isCurrentRecord = !!(formData as any)?.id_analisis && (formData as any).id_analisis === item.id_analisis;
+          const isUsed = !isCurrentRecord && (usedIdAnalisisSet.has(item.id_analisis) || (cleanNoSurat && usedNoSuratSet.has(cleanNoSurat)));
+
+          let subyekSimaster = (item as any).subyek_persuratan_simaster || '';
+          let keputusan = item.keputusan || '';
+          let nominalDisetujui = item.nominal_disetujui || '0';
+          let ringkasanHtml = '';
+
+          if (item.analisis_html) {
+            try {
+              const parsed = JSON.parse(item.analisis_html);
+              if (!subyekSimaster && parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
+              if (!keputusan && parsed.keputusan) keputusan = parsed.keputusan;
+              if (nominalDisetujui === '0' && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
+              if (parsed.analisis) ringkasanHtml = parsed.analisis;
+            } catch(e) {
+              ringkasanHtml = item.analisis_html;
+            }
+          }
+
+          return {
+            ...item,
+            subyek_persuratan_simaster: subyekSimaster,
+            keputusan: keputusan || 'diajukan',
+            nominal_disetujui: nominalDisetujui,
+            ringkasan_html: ringkasanHtml,
+            is_used: isUsed
+          };
+        });
+
+        setListAnalisis(processed);
+      }
+    } catch (e) {
+      console.error("Gagal load data analisis:", e);
+    }
+    setLoadingAnalisis(false);
+  };
+
+  const cleanNumericString = (val: any) => {
+    if (!val) return '';
+    const s = val.toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 2 && parts[0].length > 3) {
+        return Math.round(parseFloat(s) || 0).toString();
+      }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return Math.round(parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0).toString();
+  };
+
+  const handleSelectAnalisis = async (item: any) => {
+    if (item.is_used) {
+      const confirmImport = confirm(`ℹ️ Surat (No: ${item.no_surat || '-'}) sudah pernah dicatat di Tambah Pagu.\n\nApakah Anda yakin ingin mengimpor ulang data surat ini untuk migrasi / perbaikan?`);
+      if (!confirmImport) return;
+    }
+
+    // Match unit_pengirim to listUnit
+    let matchedUnit = null;
+    if (item.unit_pengirim && listUnit.length > 0) {
+      const rawUnitLower = item.unit_pengirim.toLowerCase();
+      matchedUnit = listUnit.find(u => 
+        u.label.toLowerCase() === rawUnitLower ||
+        u.label.toLowerCase().includes(rawUnitLower) ||
+        rawUnitLower.includes(u.label.toLowerCase())
+      );
+    }
+
+    // Map keputusan to status_pengajuan
+    let statusMapped = 'Draft';
+    const kep = (item.keputusan || '').toLowerCase();
+    if (kep === 'disetujui semua' || kep === 'disetujui 100%') statusMapped = 'Disetujui Semua';
+    else if (kep === 'disetujui sebagian') statusMapped = 'Disetujui Sebagian';
+    else if (kep === 'ditolak') statusMapped = 'Ditolak';
+    else statusMapped = 'Diajukan';
+
+    const numDiajukan = cleanNumericString(item.total_anggaran);
+    const numDisetujui = cleanNumericString(item.nominal_disetujui);
+
+    let paguBerjalan = {};
+    if (item.analisis_html) {
+      try {
+        const parsed = JSON.parse(item.analisis_html);
+        if (parsed.pagu_berjalan) paguBerjalan = parsed.pagu_berjalan;
+      } catch(e) {}
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      unit_id: matchedUnit || prev.unit_id,
+      no_surat_pengajuan: item.no_surat || prev.no_surat_pengajuan,
+      tanggal_surat_pengajuan: item.tanggal_surat || prev.tanggal_surat_pengajuan,
+      hal_surat_pengajuan: item.perihal || prev.hal_surat_pengajuan,
+      subyek_pengajuan_di_simaster_persuratan: item.subyek_persuratan_simaster || prev.subyek_pengajuan_di_simaster_persuratan,
+      nominal_diajukan: numDiajukan || prev.nominal_diajukan,
+      nominal_tanggapan: numDisetujui !== '0' ? numDisetujui : prev.nominal_tanggapan,
+      status_pengajuan: statusMapped,
+      link_surat_pengajuan: item.link_lampiran || prev.link_surat_pengajuan,
+      ringkasan_surat_pengajuan: item.ringkasan_html ? (item.ringkasan_html + '<!--imported-->') : prev.ringkasan_surat_pengajuan,
+      id_analisis: item.id_analisis
+    }));
+
+    // Fetch details
+    try {
+      const [ { data: detailData }, { data: histData } ] = await Promise.all([
+        supabase.from('app_detail_realisasi').select('*').eq('id_analisis', item.id_analisis).order('no_urut', { ascending: true }),
+        supabase.from('app_pagu_historis').select('*').eq('id_analisis', item.id_analisis).order('tahun', { ascending: true })
+      ]);
+      
+      if (detailData) setSelectedAnalisisDetail(detailData);
+      if (histData) setSelectedAnalisisHistoris(histData);
+    } catch (err) {
+      console.error("Error fetching analysis details:", err);
+    }
+
+    let pBerjalanItem = {};
+    if (item.analisis_html) {
+      try {
+        const parsed = JSON.parse(item.analisis_html);
+        if (parsed.pagu_berjalan) pBerjalanItem = parsed.pagu_berjalan;
+      } catch(e) {}
+    }
+    const selectedItem = {
+      ...item,
+      pagu_berjalan: pBerjalanItem,
+      rekomendasi_html: item.ringkasan_html || item.analisis_html || ''
+    };
+    setSelectedAnalisis(selectedItem);
+    setIsModalOpen(false);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedAnalisis(null);
+    setSelectedAnalisisDetail([]);
+    setSelectedAnalisisHistoris([]);
+    setFormData((prev: any) => ({
+      ...prev,
+      id_analisis: null
+    }));
+  };
+
+  const formatPdfPreviewUrl = (rawUrl: string) => {
+    if (!rawUrl) return '';
+    if (rawUrl.includes('drive.google.com') && rawUrl.includes('/view')) {
+      return rawUrl.replace('/view', '/preview');
+    }
+    return rawUrl;
+  };
+
+  const openPdfModal = (url: string) => {
+    const formatted = formatPdfPreviewUrl(url);
+    if (!formatted) {
+      alert("Link / File PDF belum tersedia.");
+      return;
+    }
+    setPdfPreviewUrl(formatted);
+    setIsPdfModalOpen(true);
+  };
+
+  // AI OCR Scan for Surat Tanggapan (Step 3)
+  
+  const handlePengajuanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFilePengajuan(file);
+
+    setIsScanningPengajuan(true);
+    try {
+      const scanFormData = new FormData();
+      scanFormData.append('file', file);
+      const res = await scanSuratWithAI(scanFormData);
+      if (res.success && res.data) {
+        setFormData(prev => ({
+          ...prev,
+          no_surat_pengajuan: res.data.no_surat || prev.no_surat_pengajuan,
+          tanggal_surat_pengajuan: res.data.tanggal_surat || prev.tanggal_surat_pengajuan,
+          hal_surat_pengajuan: res.data.perihal_surat || prev.hal_surat_pengajuan,
+          nominal_diajukan: res.data.nominal_usulan || prev.nominal_diajukan
+        }));
+        alert('Ekstraksi AI Berhasil! Metadata surat pengajuan telah terisi otomatis.');
+      } else {
+        alert('Gagal mengekstrak metadata dari surat pengajuan.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Terjadi kesalahan saat memindai surat pengajuan.');
+    } finally {
+      setIsScanningPengajuan(false);
+    }
+  };
+const handleAutoExtractTanggapanAI = async () => {
+    if (!fileTanggapan && !formData.link_surat_tanggapan) {
+      alert("Harap pilih file PDF Tanggapan atau masukkan Link Surat Tanggapan terlebih dahulu.");
+      return;
+    }
+
+    setIsScanningTanggapan(true);
+    try {
+      let resultData: any = null;
+
+      if (fileTanggapan) {
+        // 1. Ekstraksi Menggunakan Gemini AI Server Action
+        const scanFormData = new FormData();
+        scanFormData.append('file', fileTanggapan);
+        
+        const res = await scanSuratWithAI(scanFormData);
+        if (res.success && res.data) {
+          resultData = res.data;
+        } else {
+          throw new Error(res.error || "Gagal memproses file dengan AI");
+        }
+      } else if (formData.link_surat_tanggapan) {
+        // Fallback parse jika berupa link
+        const textToParse = `Surat Tanggapan dari ${formData.link_surat_tanggapan}`;
+        const parsed = parseOCRMetadata(textToParse, listUnit);
+        resultData = {
+          no_surat: parsed.no_surat,
+          tanggal_surat: parsed.tanggal_surat,
+          perihal_surat: parsed.perihal,
+          nominal_usulan: parsed.nominal_usulan
+        };
+      }
+
+      if (resultData) {
+        const numNominal = cleanNumericString(resultData.nominal_usulan || '0');
+
+        setFormData(prev => ({
+          ...prev,
+          no_surat_tanggapan: resultData.no_surat || prev.no_surat_tanggapan,
+          tanggal_surat_tanggapan: resultData.tanggal_surat || prev.tanggal_surat_tanggapan,
+          hal_surat_tanggapan: resultData.perihal_surat || resultData.perihal || prev.hal_surat_tanggapan,
+          nominal_tanggapan: numNominal && numNominal !== '0' ? numNominal : prev.nominal_tanggapan,
+          status_pengajuan: resultData.no_surat ? 'Disetujui Semua' : prev.status_pengajuan
+        }));
+
+        alert(`✨ AI Ekstraksi Surat Tanggapan Berhasil!\n\n` +
+          `• No Surat Tanggapan: ${resultData.no_surat || '-'}\n` +
+          `• Tanggal Tanggapan: ${resultData.tanggal_surat || '-'}\n` +
+          `• Hal / Perihal: ${resultData.perihal_surat || resultData.perihal || '-'}\n` +
+          `• Nominal Disetujui: Rp ${formatNumber(numNominal || '0')}`
+        );
+      }
+    } catch (e: any) {
+      alert("Gagal ekstraksi Tanggapan: " + e.message);
+    } finally {
+      setIsScanningTanggapan(false);
+    }
+  };
+
+  const formatNumber = (num: string | number) => {
+    if (!num) return '0';
     const clean = num.toString().replace(/\D/g, '');
-    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const parsed = parseInt(clean, 10);
+    if (isNaN(parsed)) return '0';
+    return parsed.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   };
 
   const parseNumber = (formatted: string) => {
@@ -106,25 +703,38 @@ export default function EditPaguPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.unit_id || !formData.no_surat_pengajuan) {
+      alert("Mohon lengkapi data wajib (Unit & No Surat Pengajuan) di Tahap 1!");
+      setActiveStep('step1');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const data = new FormData();
-      data.append('id', params.id as string);
       
-      const payload = { ...formData, unit_id: formData.unit_id?.value };
-      
-      Object.entries(payload).forEach(([key, value]) => {
-        if (key === 'nominal_diajukan' || key === 'nominal_tanggapan') {
-          data.append(key, (value || '0').toString());
+      // Map form data
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'unit_id') {
+          data.append(key, value?.value || '');
+        } else if (key === 'id_analisis' && value) {
+          data.append(key, value.toString());
+        } else if (key === 'nominal_diajukan' || key === 'nominal_tanggapan') {
+          data.append(key, value || '0');
+        } else if (key === 'ringkasan_surat_pengajuan' && selectedAnalisis) {
+          const valStr = (value || '').toString();
+          data.append(key, valStr.includes('<!--imported-->') ? valStr : valStr + '<!--imported-->');
         } else if (value !== null && value !== undefined) {
           data.append(key, value.toString());
         }
       });
 
+      // Files
       if (filePengajuan) data.append('file_surat_pengajuan', filePengajuan);
       if (fileTanggapan) data.append('file_surat_tanggapan', fileTanggapan);
 
-      const response = await fetch('/api/tambah-pagu/edit', {
+      // Submit via API Route
+      const response = await fetch('/api/tambah-pagu/tambah', {
         method: 'POST',
         body: data,
       });
@@ -132,327 +742,911 @@ export default function EditPaguPage() {
       const result = await response.json();
       
       if (result.success) {
-        alert("Perubahan Berhasil Disimpan!");
+        alert("Data Usulan Tambah Pagu Berhasil Disimpan!");
         router.push('/tambah-pagu');
       } else {
-        throw new Error(result.error || "Gagal melakukan pembaruan data.");
+        throw new Error(result.error || "Gagal simpan via API");
       }
     } catch (err: any) {
-      alert("Gagal update: " + err.message);
+      alert("Gagal menyimpan: " + err.message);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const filteredAnalisisList = listAnalisis.filter(item => {
+    // Hide already imported/used items
+    if (item.is_used) return false;
+    if (!searchAnalisis) return true;
+    const lower = searchAnalisis.toLowerCase();
+    return (
+      (item.no_surat && item.no_surat.toLowerCase().includes(lower)) ||
+      (item.perihal && item.perihal.toLowerCase().includes(lower)) ||
+      (item.unit_pengirim && item.unit_pengirim.toLowerCase().includes(lower)) ||
+      (item.subyek_persuratan_simaster && item.subyek_persuratan_simaster.toLowerCase().includes(lower))
+    );
+  });
+
+  const historis2026Row = paguUnitHistory.find(d => d.tahun === '2026') || paguUnitHistory[paguUnitHistory.length - 1] || {};
+  const cPaguAwal = historis2026Row.pagu_awal || 0;
+  const cPengalihan = historis2026Row.pengalihan || 0;
+  const cPenugasan = historis2026Row.tambah_penugasan || 0;
+  const cInisiatif = historis2026Row.tambah_inisiatif || 0;
+  const cEfisiensi = historis2026Row.efisiensi || 0;
+  const cTalangan = historis2026Row.talangan || 0;
+  const cTotalPagu = historis2026Row.total_pagu || (cPaguAwal + cPengalihan + cPenugasan + cInisiatif + cEfisiensi + cTalangan);
+  const cRealisasi = historis2026Row.realisasi || 0;
+  const cSisaKapasitas = cTotalPagu - cRealisasi;
+
+  const currentPengajuanLink = formData.link_surat_pengajuan || (existingFiles.pengajuan && existingFiles.pengajuan.startsWith('http') ? existingFiles.pengajuan : '') || selectedAnalisis?.link_lampiran || '';
+
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto pb-32 px-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+    <div className="max-w-5xl mx-auto pb-36 px-4">
+      {/* Header Area */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
         <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest mb-1">
-            <Sparkles size={14} /> Update Entry
+          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1">
+            <Sparkles size={14} /> New Entry Workflow
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Edit Usulan Pagu</h1>
-          <p className="text-gray-500 font-medium mt-1">Perbarui data usulan atau status persetujuan pagu.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tambah Usulan Pagu</h1>
+          <p className="text-gray-500 font-medium mt-1">Impor dari hasil analisis AI (/analisis) atau ketik manual untuk mencatat usulan baru.</p>
         </div>
         <button 
-          onClick={() => router.back()}
-          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+          onClick={() => router.push('/tambah-pagu')}
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 text-xs"
         >
           <ArrowLeft size={18} /> KEMBALI
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-10">
+      {/* IMPORT BANNER SECTION */}
+      <div className="mb-8">
+        {!selectedAnalisis ? (
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
+            
+            <div className="relative z-10 space-y-1">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
+                <Sparkles size={14} /> Impor Data Hasil Analisis AI
+              </div>
+              <h3 className="text-xl font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
+              <p className="text-slate-300 text-xs font-medium max-w-xl">
+                Pilih dokumen dari /analisis untuk melihat tahapan nota analisis dan otomatis mengisikan data pengajuan secara terkunci (read-only).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="relative z-10 px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2 shrink-0"
+            >
+              <FileText size={16} /> Pilih Dari Riwayat Analisis
+            </button>
+          </div>
+        ) : (
+          <div className="bg-emerald-50 border-2 border-emerald-400/80 rounded-[2.5rem] p-6 text-emerald-950 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-emerald-500 text-white rounded-2xl shrink-0 shadow-sm">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-xs font-black uppercase text-emerald-700 tracking-wider">
+                  <Lock size={12} className="text-emerald-600" /> Data Pengajuan Terhubung & Terkunci (Read-Only)
+                </div>
+                <h4 className="font-black text-base text-emerald-950">
+                  {selectedAnalisis.perihal || 'Dokumen Analisis'}
+                </h4>
+                <p className="text-xs text-emerald-800 font-medium mt-0.5">
+                  No Surat: <span className="font-mono font-bold">{selectedAnalisis.no_surat || '-'}</span> | Unit: <span className="font-bold">{selectedAnalisis.unit_pengirim || '-'}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="px-4 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all"
+              >
+                Ganti Pilihan
+              </button>
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="px-4 py-2.5 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+              >
+                <X size={14} /> Lepas Link (Manual)
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* STEP NAVIGATION TABS */}
+      <div className="flex justify-between items-center bg-white rounded-[2rem] p-2 shadow-sm border border-gray-200/80 mb-8 overflow-x-auto gap-2">
+        {(selectedAnalisis 
+          ? [
+              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Data Surat Pengajuan', icon: FileText },
+              { id: 'step2', step: '2', title: '2. Rincian & Pagu', subtitle: 'Detail Kegiatan & Pagu', icon: Layers },
+              { id: 'step3', step: '3', title: '3. Ringkasan & Lampiran', subtitle: 'AI Summary & Surat Masuk', icon: Sparkles },
+              { id: 'step4', step: '4', title: '4. Tanggapan & Simpan', subtitle: 'Persetujuan & Surat Keluar', icon: CheckCircle2 },
+            ]
+          : [
+              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Upload Surat Pengajuan & AI', icon: FileText },
+              { id: 'step2', step: '2', title: '2. Tanggapan & Keputusan', subtitle: 'Status Akhir & Simpan', icon: CheckCircle2 },
+            ]
+        ).map((tab) => {
+          const IconComponent = tab.icon;
+          const isActive = activeStep === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveStep(tab.id as any)}
+              className={`flex-1 flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all min-w-[220px] ${
+                isActive
+                  ? 'bg-slate-900 text-white shadow-md font-black'
+                  : 'text-gray-500 hover:text-gray-900 font-bold hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+                isActive ? 'bg-emerald-500 text-slate-950' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {tab.step}
+              </div>
+              <div className="text-left overflow-hidden">
+                <div className="text-xs font-black truncate">{tab.title}</div>
+                <div className={`text-[10px] truncate ${isActive ? 'text-slate-300' : 'text-gray-400'}`}>{tab.subtitle}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <form onSubmit={handleSubmit}>
         
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 relative overflow-hidden">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-              <Info size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">Informasi Dasar</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
-              <input 
-                type="number" 
-                name="tahun_anggaran"
-                value={formData.tahun_anggaran}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
-              />
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
-              <Select 
-                options={listUnit} 
-                value={formData.unit_id}
-                onChange={(val) => setFormData({...formData, unit_id: val})}
-                placeholder="Pilih Unit Kerja..."
-                styles={{
-                  control: (base) => ({ ...base, borderRadius: '1.25rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
-              <select 
-                name="jenis_tambah_pagu"
-                value={formData.jenis_tambah_pagu}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700 appearance-none cursor-pointer"
-              >
-                <option value="Penugasan">🚀 Penugasan</option>
-                <option value="Inisiatif Unit">💡 Inisiatif Unit</option>
-                <option value="Pindah Pagu">🔄 Pindah Pagu</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Status Pengajuan</label>
-              <select 
-                name="status_pengajuan"
-                value={formData.status_pengajuan}
-                onChange={handleInputChange}
-                className="w-full bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-black text-emerald-700 appearance-none cursor-pointer"
-              >
-                <option value="Draft">Draft</option>
-                <option value="Diajukan">Diajukan</option>
-                <option value="Disetujui Sebagian">Disetujui Sebagian</option>
-                <option value="Disetujui Semua">Disetujui Semua</option>
-                <option value="Ditolak">Ditolak</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Rp)</label>
-              <input 
-                type="text" 
-                name="nominal_diajukan"
-                value={formatNumber(formData.nominal_diajukan)}
-                onChange={handleInputChange}
-                placeholder="0"
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-gray-700"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-blue-50 p-3 rounded-2xl text-blue-600 shadow-sm">
-              <FileText size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">I. Data Pengajuan (Surat Masuk)</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan</label>
-                <input 
-                  type="text" 
-                  name="no_surat_pengajuan"
-                  value={formData.no_surat_pengajuan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold"
-                />
+        {/* ================= TAHAP 1: UNIFIED SINGLE CONTAINER (DATA UTAMA & PENGAJUAN) ================= */}
+        {activeStep === 'step1' && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            
+            {/* Read-only Alert Banner if Imported */}
+            {isReadOnlyPengajuan && (
+              <div className="flex items-center gap-3 px-6 py-4 bg-indigo-50/80 border border-indigo-200 rounded-3xl text-indigo-900 text-xs font-bold shadow-sm">
+                <Lock size={16} className="text-indigo-600 shrink-0" />
+                <span>Mode Read-Only (Hanya Lihat): Data pengajuan terkunci karena diimpor langsung dari riwayat analisis. Untuk mengedit manual, klik <strong>"Lepas Link (Manual)"</strong> di banner atas.</span>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
-                <input 
-                  type="date" 
-                  name="tanggal_surat_pengajuan"
-                  value={formData.tanggal_surat_pengajuan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold"
-                />
-              </div>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal Surat Pengajuan</label>
-              <textarea 
-                name="hal_surat_pengajuan"
-                value={formData.hal_surat_pengajuan}
-                onChange={handleInputChange}
-                rows={2}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Pengajuan (Baru)</label>
-              <div className="relative group">
-                <input 
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => setFilePengajuan(e.target.files?.[0] || null)}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div className="w-full bg-indigo-50/50 border-2 border-dashed border-indigo-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group-hover:bg-indigo-50 transition-all">
-                  <UploadCloud size={28} className="text-indigo-400 group-hover:scale-110 transition-transform" />
-                  <p className="text-sm font-bold text-indigo-700">
-                    {filePengajuan ? filePengajuan.name : "Upload File Pengajuan Baru"}
-                  </p>
-                  {!filePengajuan && <p className="text-xs text-indigo-400/80 font-medium">Kosongkan jika tidak ingin mengubah file</p>}
-                </div>
-              </div>
-              
-              {existingFiles.pengajuan && (
-                <div className="mt-3">
-                  <a 
-                    href={existingFiles.pengajuan} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 p-3 bg-white text-blue-600 rounded-xl border border-blue-100 font-bold hover:bg-blue-50 transition-all text-xs"
-                  >
-                    <ExternalLink size={16} /> LIHAT FILE SAAT INI
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* TEMPORARILY HIDDEN
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
-                Ringkasan Substansi Pengajuan <div className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[8px]">Rich Text Active</div>
-              </label>
-              <div className="border border-gray-100 rounded-3xl overflow-hidden shadow-sm bg-white">
-                <div className="bg-gray-50 px-6 py-3 border-b border-gray-100 flex flex-wrap gap-4 text-gray-400">
-                  <div className="flex gap-1">
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all font-black">B</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all italic">I</button>
-                    <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('underline', false); }} className="w-8 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all underline">U</button>
+            {/* UNIFIED CONTAINER FOR INFORMASI DASAR & DATA PENGAJUAN */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 relative overflow-hidden space-y-8">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
+                    <FileText size={24} />
                   </div>
-                  <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); document.execCommand('insertUnorderedList', false); }} className="px-3 h-8 flex items-center justify-center hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all text-[10px] font-bold tracking-tighter">LIST •</button>
-                </div>
-                <div 
-                  contentEditable
-                  onInput={(e) => {
-                    formData.ringkasan_surat_pengajuan = e.currentTarget.innerHTML;
-                  }}
-                  className="w-full p-8 outline-none font-medium text-gray-700 leading-relaxed text-sm min-h-[250px] prose-custom"
-                  dangerouslySetInnerHTML={{ __html: formData.ringkasan_surat_pengajuan }}
-                />
-                <style dangerouslySetInnerHTML={{ __html: `
-                  .prose-custom ul { list-style-type: disc !important; list-style-position: inside !important; padding-left: 1rem !important; }
-                  .prose-custom li { display: list-item !important; margin-bottom: 0.5rem; }
-                `}} />
-              </div>
-            </div>
-            */}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-100 border-l-8 border-l-indigo-600">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-              <CheckCircle2 size={24} />
-            </div>
-            <h2 className="text-xl font-black text-gray-800 tracking-tight">II. Data Tanggapan (Approval)</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
-                <input 
-                  type="text" 
-                  name="no_surat_tanggapan"
-                  value={formData.no_surat_tanggapan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Tanggapan</label>
-                <input 
-                  type="date" 
-                  name="tanggal_surat_tanggapan"
-                  value={formData.tanggal_surat_tanggapan}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui (Rp)</label>
-                <div className="relative">
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-indigo-500">Rp</span>
-                  <input 
-                    type="text" 
-                    name="nominal_tanggapan"
-                    value={formatNumber(formData.nominal_tanggapan)}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none font-black text-indigo-800 text-lg"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">File Tanggapan (Baru)</label>
-                <div className="relative group">
-                  <input 
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => setFileTanggapan(e.target.files?.[0] || null)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <div className="w-full bg-emerald-50/50 border-2 border-dashed border-emerald-200 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 group-hover:bg-emerald-50 transition-all">
-                    <UploadCloud size={28} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-bold text-emerald-700">
-                      {fileTanggapan ? fileTanggapan.name : "Upload File Tanggapan Baru"}
-                    </p>
-                    {!fileTanggapan && <p className="text-xs text-emerald-400/80 font-medium">Kosongkan jika tidak ingin mengubah file</p>}
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Informasi & Data Pengajuan (Surat Masuk)</h2>
+                    <p className="text-xs text-gray-500 font-medium">Informasi dasar usulan dan lampiran surat pengajuan dari unit kerja.</p>
                   </div>
                 </div>
 
-                {existingFiles.tanggapan && (
-                  <div className="mt-3">
-                    <a 
-                      href={existingFiles.tanggapan} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 p-3 bg-white text-emerald-600 rounded-xl border border-emerald-100 font-bold hover:bg-emerald-50 transition-all text-xs"
+                {/* SINGLE TOP HEADER PDF ACTION BUTTONS */}
+                {(currentPengajuanLink || filePengajuan) && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openPdfModal(currentPengajuanLink)}
+                      className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm border border-indigo-200/60"
+                      title="Preview PDF Surat Pengajuan"
                     >
-                      <ExternalLink size={16} /> LIHAT FILE SAAT INI
-                    </a>
+                      <Eye size={16} /> Lihat PDF Pengajuan
+                    </button>
+                    {currentPengajuanLink && (
+                      <a
+                        href={currentPengajuanLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        download
+                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+                        title="Download File PDF"
+                      >
+                        <Download size={16} /> Download PDF
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* LOCAL OCR PANEL PENGAJUAN (DI ATAS AGAR BISA MEMENUHI ISIAN DI BAWAHNYA) */}
+              {!isReadOnlyPengajuan && (
+                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                  <OCRPanelPengajuan 
+                    mainData={formData} 
+                    setMainData={setFormData} 
+                    setExternalFile={setFilePengajuan} 
+                    listUnit={listUnit}
+                    onOcrComplete={(text: string) => {
+                      setOcrRawText(text);
+                      triggerAiSummary(text);
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* GRID DATA UTAMA & PENGAJUAN (BALANCED COLUMN SPANS) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
+                  <input 
+                    type="number" 
+                    name="tahun_anggaran"
+                    disabled={isReadOnlyPengajuan}
+                    value={formData.tahun_anggaran}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100'
+                    }`}
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
+                  <Select 
+                    options={listUnit} 
+                    isDisabled={isReadOnlyPengajuan}
+                    value={formData.unit_id}
+                    onChange={(val) => setFormData({...formData, unit_id: val})}
+                    placeholder="Pilih Unit Kerja..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={{
+                      control: (base) => ({ 
+                        ...base, 
+                        borderRadius: '1.25rem', 
+                        padding: '0.4rem', 
+                        border: '1px solid #f3f4f6', 
+                        backgroundColor: isReadOnlyPengajuan ? '#f1f5f9' : '#f9fafb', 
+                        fontWeight: 'bold',
+                        opacity: isReadOnlyPengajuan ? 0.9 : 1
+                      }),
+                      menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
+                  <select 
+                    name="jenis_tambah_pagu"
+                    disabled={isReadOnlyPengajuan}
+                    value={formData.jenis_tambah_pagu}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold appearance-none ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100 cursor-pointer'
+                    }`}
+                  >
+                    <option value="Penugasan">🚀 Penugasan</option>
+                    <option value="Inisiatif Unit">💡 Inisiatif Unit</option>
+                    <option value="Pindah Pagu">🔄 Pindah Pagu</option>
+                  </select>
+                </div>
+
+                {/* NOMINAL USULAN & TANGGAL SURAT - COMPACT SPANS */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Diajukan Rp)</label>
+                  <input 
+                    type="text" 
+                    name="nominal_diajukan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formatNumber(formData.nominal_diajukan)}
+                    onChange={handleInputChange}
+                    placeholder="0"
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-black text-base ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-900 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-900 focus:ring-2 ring-indigo-100'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
+                  <input 
+                    type="date" 
+                    name="tanggal_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.tanggal_surat_pengajuan}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan *</label>
+                  <input 
+                    type="text" 
+                    name="no_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.no_surat_pengajuan}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
+                    placeholder="cth: 123/UN1/..."
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
+                  <textarea 
+                    name="hal_surat_pengajuan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.hal_surat_pengajuan}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    }`}
+                    placeholder="Tulis perihal surat pengajuan..."
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Pengajuan di Simaster</label>
+                  <input 
+                    type="text" 
+                    name="subyek_pengajuan_di_simaster_persuratan"
+                    readOnly={isReadOnlyPengajuan}
+                    value={formData.subyek_pengajuan_di_simaster_persuratan}
+                    onChange={handleInputChange}
+                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium text-xs italic ${
+                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-600 focus:ring-2 ring-blue-100'
+                    }`}
+                    placeholder="Salin subyek lengkap dari Simaster..."
+                  />
+                </div>
+
+                {/* LINK SURAT PENGAJUAN (LINK DIBAWAH BEGAMBAR CLIP) */}
+                <div className="md:col-span-3 space-y-2 pt-6 border-t border-gray-100">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                    <Paperclip size={14} className="text-gray-400" /> Link GDrive / SharePoint Lampiran (Optional)
+                  </label>
+                  <div className="relative">
+                    <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input 
+                      type="text" 
+                      name="link_surat_pengajuan"
+                      readOnly={isReadOnlyPengajuan}
+                      value={formData.link_surat_pengajuan}
+                      onChange={handleInputChange}
+                      className={`w-full border rounded-2xl pl-12 pr-4 py-4 outline-none transition-all text-sm italic shadow-sm ${
+                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-blue-600 focus:ring-2 ring-blue-100'
+                      }`}
+                      placeholder="https://drive.google.com/..."
+                    />
+                  </div>
+                </div>
+
+
+
+                {/* RINGKASAN SUBSTANSI DENGAN AI EDITOR (SEPERTI DI ANALISIS) */}
+                <div className="space-y-4 md:col-span-3 pt-6 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
+                    </label>
+                    
+                    {!isReadOnlyPengajuan && (
+                      <button
+                        type="button"
+                        onClick={handleGenerateAiSummary}
+                        disabled={isGeneratingSummary}
+                        className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs border border-indigo-200/60 disabled:opacity-50"
+                      >
+                        {isGeneratingSummary ? (
+                          <>
+                            <Loader2 size={14} className="animate-spin" /> Menganalisis...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={14} /> Jalankan Analisis AI
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-xs border border-gray-200">
+                    <ReactQuill 
+                      theme="snow"
+                      value={formData.ringkasan_surat_pengajuan || ''}
+                      onChange={(val) => setFormData((prev: any) => ({ ...prev, ringkasan_surat_pengajuan: val }))}
+                      className="h-[250px] pb-10 [&_.ql-editor_p]:text-justify"
+                      placeholder="Tulis ringkasan substansi di sini, atau jalankan Analisis AI setelah upload surat..."
+                      readOnly={isReadOnlyPengajuan}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* STEP 1 NEXT BUTTON */}
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveStep(selectedAnalisis ? 'step2' : 'step2')}
+                className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+              >
+                Selanjutnya: {selectedAnalisis ? 'Rincian & Pagu' : 'Tanggapan & Keputusan'} <ChevronRight size={16} />
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50">
-          <div className="bg-gray-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-2xl border border-white/10 flex items-center justify-between gap-4">
+        {/* ================= TAHAP 2 (IMPORTED): RINCIAN KEGIATAN & PAGU (EXACTLY LIKE ANALISIS) ================= */}
+        {activeStep === 'step2' && selectedAnalisis && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+              <DataPendukung 
+                mainData={selectedAnalisis} 
+                setMainData={() => {}} 
+                detailData={selectedAnalisisDetail} 
+                setDetailData={() => {}} 
+                historisData={selectedAnalisisHistoris} 
+                setHistorisData={() => {}} 
+                renderMode="tabs" 
+                readOnly={true} 
+              />
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex justify-end gap-3 pb-8">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step1')}
+                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveStep('step3')}
+                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
+              >
+                Lanjutkan ke Posisi Pagu & AI
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAHAP 3 (IMPORTED): POSISI PAGU & AI ANALYSIS (EXACTLY LIKE ANALISIS) ================= */}
+        {activeStep === 'step3' && selectedAnalisis && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+              <DataForm 
+                mainData={selectedAnalisis} 
+                setMainData={(newVal: any) => {
+                  if (newVal && newVal.rekomendasi_html) {
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      ringkasan_surat_pengajuan: newVal.rekomendasi_html
+                    }));
+                    setSelectedAnalisis((prev: any) => ({
+                      ...prev,
+                      rekomendasi_html: newVal.rekomendasi_html
+                    }));
+                  }
+                }} 
+                detailData={selectedAnalisisDetail} 
+                setDetailData={() => {}} 
+                historisData={selectedAnalisisHistoris} 
+                setHistorisData={() => {}} 
+                section="step3"
+                readOnly={true} 
+              />
+            </div>
+
+            {/* Navigation buttons */}
+            <div className="flex justify-end gap-3 pb-8">
+              <button
+                type="button"
+                onClick={() => setActiveStep('step2')}
+                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveStep('step4')}
+                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
+              >
+                Lanjutkan ke Tanggapan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAHAP 2/4: TANGGAPAN & KEPUTUSAN ================= */}
+        {((activeStep === 'step2' && !selectedAnalisis) || (activeStep === 'step4' && selectedAnalisis)) && (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
+                    <p className="text-xs text-gray-500 font-medium">Upload file tanggapan atau masukkan link di atas, lalu jalankan AI Ekstraksi untuk mengisikan form di bawahnya secara otomatis.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-8">
+                {/* 1. TOP SECTION: LOCAL OCR PANEL FOR TANGGAPAN */}
+                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                  <OCRPanelTanggapan 
+                    mainData={formData} 
+                    setMainData={setFormData} 
+                    setExternalFile={setFileTanggapan} 
+                  />
+                </div>
+
+                {/* 2. FORM ISIAN HASIL EKSTRAKSI TANGGAPAN BELOW */}
+                <div className="space-y-8 pt-4">
+                  {/* Status Pengajuan Selector */}
+                  <div className="bg-indigo-50/40 p-6 rounded-3xl border border-indigo-100 space-y-2">
+                    <label className="text-xs font-black text-indigo-900 uppercase tracking-widest block">Status Keputusan Pimpinan Saat Ini *</label>
+                    <select 
+                      name="status_pengajuan"
+                      value={formData.status_pengajuan}
+                      onChange={handleInputChange}
+                      className="w-full bg-white border border-indigo-200 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-200 transition-all font-black text-indigo-900 text-base cursor-pointer shadow-sm"
+                    >
+                      <option value="Disetujui Semua">Disetujui Semua (100%)</option>
+                      <option value="Disetujui Sebagian">Disetujui Sebagian</option>
+                      <option value="Ditolak">Ditolak</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
+                      <input 
+                        type="text" 
+                        name="no_surat_tanggapan"
+                        value={formData.no_surat_tanggapan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                        placeholder="Input jika usulan sudah ditanggapi..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Tanggapan</label>
+                      <input 
+                        type="date" 
+                        name="tanggal_surat_tanggapan"
+                        value={formData.tanggal_surat_tanggapan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Tanggapan</label>
+                    <textarea 
+                      name="hal_surat_tanggapan"
+                      value={formData.hal_surat_tanggapan}
+                      onChange={handleInputChange}
+                      rows={2}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-gray-700"
+                      placeholder="Ringkasan keputusan dalam surat tanggapan..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Tanggapan di Simaster</label>
+                    <input 
+                      type="text" 
+                      name="subyek_tanggapan_di_simaster_persuratan"
+                      value={formData.subyek_tanggapan_di_simaster_persuratan}
+                      onChange={handleInputChange}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-xs italic text-gray-600"
+                      placeholder="Salin subyek lengkap tanggapan dari Simaster..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui Pimpinan (Rp)</label>
+                    <div className="relative">
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-indigo-500">Rp</span>
+                      <input 
+                        type="text" 
+                        name="nominal_tanggapan"
+                        value={formatNumber(formData.nominal_tanggapan)}
+                        onChange={handleInputChange}
+                        placeholder="0"
+                        className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-indigo-800 text-lg"
+                      />
+                    </div>
+                  </div>
+
+                  {/* LINK SURAT TANGGAPAN (LINK DIBAWAH BEGAMBAR CLIP) */}
+                  <div className="space-y-2 pt-6 border-t border-gray-100">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                      <Paperclip size={14} className="text-gray-400" /> Link Surat Tanggapan (GDrive / SharePoint - Optional)
+                    </label>
+                    <div className="relative">
+                      <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" 
+                        name="link_surat_tanggapan"
+                        value={formData.link_surat_tanggapan}
+                        onChange={handleInputChange}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-200 transition-all text-sm italic text-blue-600 shadow-sm"
+                        placeholder="https://drive.google.com/..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* STEP 2/4 BUTTONS */}
+            <div className="flex justify-between items-center pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveStep(selectedAnalisis ? 'step3' : 'step1')}
+                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
+              >
+                <ChevronLeft size={16} /> Kembali ke {selectedAnalisis ? 'Ringkasan' : 'Tahap 1'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* FLOATING ACTION BAR */}
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
+          <div className="bg-slate-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
             <button 
               type="button"
               onClick={() => router.back()}
-              className="px-8 py-4 text-gray-400 hover:text-white font-bold text-sm transition-all"
+              className="px-8 py-4 text-gray-400 hover:text-white font-bold text-xs transition-all uppercase tracking-widest"
             >
               Batal
             </button>
             <button 
               type="submit" 
               disabled={isSaving}
-              className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white py-4 rounded-[2rem] font-black text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
-              {isSaving ? "MENYIMPAN..." : "UPDATE DATA PAGU"}
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+              {isSaving ? "MENYIMPAN..." : "SIMPAN USULAN PAGU"}
             </button>
           </div>
         </div>
       </form>
+
+      {/* MODAL PILIH ANALISIS (UNLOCKED SELECTION BUTTON FOR ALL HISTORICAL PROPOSAL DATA) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 md:p-8 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest mb-1">
+                  <Sparkles size={14} className="text-amber-400" /> Database Riwayat Hasil Analisis AI (/analisis)
+                </div>
+                <h3 className="text-2xl font-black tracking-tight">Pilih Dokumen Analisis untuk Diimpor</h3>
+                <p className="text-slate-400 text-xs font-medium">Klik pada dokumen surat mana pun untuk mengisikan data pengajuan secara otomatis ke form Tambah Pagu.</p>
+              </div>
+
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Search & Tools */}
+            <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+              <div className="relative w-full md:w-96">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                  type="text"
+                  placeholder="Cari perihal, no surat, subyek, unit..."
+                  value={searchAnalisis}
+                  onChange={e => setSearchAnalisis(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                onClick={fetchAnalisisAndUsed}
+                className="px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all"
+              >
+                <RefreshCw size={14} className={loadingAnalisis ? "animate-spin" : ""} /> Refresh Data
+              </button>
+            </div>
+
+            {/* Modal List Body */}
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+              {loadingAnalisis ? (
+                <div className="flex justify-center items-center py-16">
+                  <Loader2 className="animate-spin text-indigo-600 w-10 h-10" />
+                </div>
+              ) : filteredAnalisisList.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <FileText size={48} className="mx-auto opacity-20 mb-3" />
+                  <p className="font-bold text-gray-600">Tidak ada riwayat analisis yang cocok.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredAnalisisList.map((item, idx) => (
+                    <div 
+                      key={item.id_analisis || idx}
+                      className={`p-5 bg-white border rounded-3xl transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                        item.is_used 
+                          ? 'border-gray-200 bg-slate-50/50 opacity-60 cursor-not-allowed' 
+                          : 'border-gray-200 hover:border-indigo-400 hover:shadow-lg cursor-pointer'
+                      }`}
+                      onClick={() => {
+                        if (item.is_used) {
+                          alert("Analisis ini sudah diimpor ke Tambah Pagu dan tidak dapat dipilih lagi.");
+                          return;
+                        }
+                        handleSelectAnalisis(item);
+                      }}
+                    >
+                      <div className="space-y-1.5 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                            {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                          
+                          {item.is_used ? (
+                            <span className="flex items-center gap-1 px-3 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-amber-200">
+                              <Info size={12}/> Pernah Dicatat di Tambah Pagu
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 px-3 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-emerald-200">
+                              <Sparkles size={12}/> Tersedia (Siap Diimpor)
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="font-black text-gray-900 text-base leading-snug">
+                          {item.perihal || 'Tanpa Perihal'}
+                        </h4>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-gray-500">
+                          <span>No Surat: <strong className="font-mono text-gray-700">{item.no_surat || '-'}</strong></span>
+                          <span>•</span>
+                          <span>Unit: <strong className="text-gray-700">{item.unit_pengirim || '-'}</strong></span>
+                          {item.subyek_persuratan_simaster && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-700 font-bold">Simaster: {item.subyek_persuratan_simaster}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase font-bold text-gray-400 block">Usulan:</span>
+                          <span className="text-sm font-black font-mono text-gray-900">
+                            Rp {formatNumber(item.total_anggaran || '0')}
+                          </span>
+                        </div>
+
+                        {item.is_used ? (
+                          <button
+                            type="button"
+                            disabled
+                            className="px-5 py-2.5 bg-slate-200 text-slate-400 text-xs font-black uppercase tracking-wider rounded-xl cursor-not-allowed border border-slate-300"
+                          >
+                            Sudah Diimpor
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectAnalisis(item);
+                            }}
+                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+                          >
+                            Impor Data Ini <ArrowLeft size={14} className="rotate-180" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-200 text-center shrink-0">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition-all"
+              >
+                Tutup Modal
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* PDF PREVIEW POP-UP MODAL */}
+      {isPdfModalOpen && pdfPreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col h-[90vh]">
+            
+            {/* PDF Modal Header */}
+            <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-400/30">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight">Dokumen PDF Surat Pengajuan</h3>
+                  <p className="text-slate-400 text-xs font-medium truncate max-w-lg">{pdfPreviewUrl}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={pdfPreviewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  download
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download size={14} /> Download PDF
+                </a>
+                <button 
+                  onClick={() => setIsPdfModalOpen(false)}
+                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* PDF Modal Content (iframe) */}
+            <div className="flex-1 bg-slate-100 p-2 overflow-hidden">
+              <iframe 
+                src={pdfPreviewUrl} 
+                className="w-full h-full rounded-2xl border border-slate-200"
+                title="Preview PDF Surat Pengajuan"
+              />
+            </div>
+
+            {/* PDF Modal Footer */}
+            <div className="p-4 bg-white border-t border-gray-200 flex justify-between items-center shrink-0 text-xs font-semibold text-gray-500">
+              <span>* Apabila PDF tidak muncul di preview, gunakan tombol Download PDF.</span>
+              <button
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
-}
-
-function Edit2(props: any) {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>;
 }
