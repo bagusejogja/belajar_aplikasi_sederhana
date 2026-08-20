@@ -31,7 +31,9 @@ export async function GET(request: Request) {
       }));
       
       const byteArray = await data.Body?.transformToByteArray();
-      return new NextResponse(byteArray, {
+      if (!byteArray) throw new Error('Empty S3 body');
+
+      return new NextResponse(byteArray as Uint8Array, {
         headers: {
           'Content-Type': data.ContentType || 'application/pdf',
           'Access-Control-Allow-Origin': '*',
