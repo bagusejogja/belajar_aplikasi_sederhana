@@ -20,21 +20,26 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
             
             const { data: inisiatifData } = await supabase
               .from('gov_pagu_anggaran')
-              .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
               .eq('unit_id', unitId)
               .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
               .eq('tahun_anggaran', '2026')
               .order('tahun_anggaran', { ascending: false });
-            if (inisiatifData) setDetailInisiatif(inisiatifData);
+            
+            let tsAnalisis = 0;
+            if (mainData?.id_analisis?.startsWith('ANL-')) tsAnalisis = parseInt(mainData.id_analisis.split('-')[1]) || 0;
+            const maxTime = tsAnalisis > 0 ? tsAnalisis + 86400000 : Date.now();
+            
+            if (inisiatifData) setDetailInisiatif(inisiatifData.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime));
             
             const { data: penugasanData } = await supabase
               .from('gov_pagu_anggaran')
-              .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
               .eq('unit_id', unitId)
               .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
               .eq('tahun_anggaran', '2026')
               .order('tahun_anggaran', { ascending: false });
-            if (penugasanData) setDetailPenugasan(penugasanData);
+            if (penugasanData) setDetailPenugasan(penugasanData.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime));
           }
        }
     };

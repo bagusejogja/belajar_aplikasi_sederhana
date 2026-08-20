@@ -109,21 +109,26 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         const unitId = unitsData[0].id;
         const { data: inisiatifData } = await supabase
           .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+          .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
           .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
           .eq('tahun_anggaran', '2026')
           .order('tahun_anggaran', { ascending: false });
-        if (inisiatifData) setDetailInisiatif(inisiatifData);
+          
+        let tsAnalisis = 0;
+        if (mainData?.id_analisis?.startsWith('ANL-')) tsAnalisis = parseInt(mainData.id_analisis.split('-')[1]) || 0;
+        const maxTime = tsAnalisis > 0 ? tsAnalisis + 86400000 : Date.now(); // +1 day buffer
+
+        if (inisiatifData) setDetailInisiatif(inisiatifData.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime));
 
         const { data: penugasanData } = await supabase
           .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran')
+          .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
           .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
           .eq('tahun_anggaran', '2026')
           .order('tahun_anggaran', { ascending: false });
-        if (penugasanData) setDetailPenugasan(penugasanData);
+        if (penugasanData) setDetailPenugasan(penugasanData.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime));
       }
     };
     fetchRiwayatUnit();
@@ -137,8 +142,15 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
     // Fetch riwayat pagu & realisasi
     try {
       const unitId = selectedOption.value;
-      const { data: paguData } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
-      const { data: realisasiData } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
+      const { data: paguDataAll } = await supabase.from('gov_pagu_anggaran').select('*').eq('unit_id', unitId);
+      const { data: realisasiDataAll } = await supabase.from('gov_realisasi_anggaran').select('*').eq('unit_id', unitId);
+      
+      let tsAnalisis = 0;
+      if (mainData?.id_analisis?.startsWith('ANL-')) tsAnalisis = parseInt(mainData.id_analisis.split('-')[1]) || 0;
+      const maxTime = tsAnalisis > 0 ? tsAnalisis + 86400000 : Date.now();
+      
+      const paguData = paguDataAll ? paguDataAll.filter(p => !p.created_at || new Date(p.created_at).getTime() <= maxTime) : [];
+      const realisasiData = realisasiDataAll ? realisasiDataAll.filter(r => !r.created_at || new Date(r.created_at).getTime() <= maxTime) : [];
       
       if (paguData && realisasiData && setHistorisData) {
         // Group by year (filter tahun >= 2019)
