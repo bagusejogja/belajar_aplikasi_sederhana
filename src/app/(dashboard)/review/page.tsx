@@ -5,7 +5,7 @@ import {
   CheckSquare, Filter, Search, ChevronDown, ChevronRight, 
   ChevronUp, RotateCcw, Download, Sparkles, Edit3, CheckCircle2, 
   AlertCircle, Building2, Layers, BookOpen, FileText, ArrowRight,
-  Plus, Minus, X, Save, RefreshCw
+  Plus, Minus, X, Save, RefreshCw, ShieldCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -286,7 +286,8 @@ export default function ReviewPage() {
   const [selectedYear, setSelectedYear] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Expand / Collapse Groups
+  // Expand / Collapse State (Posisi default: SEMUA TERTUTUP)
+  const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Dialog State for "Direvisi"
@@ -325,35 +326,87 @@ export default function ReviewPage() {
     fetchBudgets();
   }, []);
 
-  // Filter Options Extraction
+  // Scoped budgets based on Unit Kerja and Year (if selected)
+  const scopedBudgetsForFilters = useMemo(() => {
+    return budgets.filter(b => {
+      if (selectedUnit !== 'ALL' && b.unitkerja_nama !== selectedUnit) return false;
+      if (selectedYear !== 'ALL' && String(b.tahun) !== String(selectedYear)) return false;
+      return true;
+    });
+  }, [budgets, selectedUnit, selectedYear]);
+
+  // Filter Options Extraction (Cascading & Focused)
   const unitOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.unitkerja_nama).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    const list = selectedYear !== 'ALL' 
+      ? budgets.filter(b => String(b.tahun) === String(selectedYear))
+      : budgets;
+    return Array.from(new Set(list.map(b => b.unitkerja_nama).filter(Boolean))).sort() as string[];
+  }, [budgets, selectedYear]);
 
   const statusOptions = useMemo(() => {
-    const statuses = budgets.map(b => b.custom_status || (b.kunci === 'Y' ? 'Wajib' : 'N')).filter(Boolean);
+    const statuses = scopedBudgetsForFilters.map(b => b.custom_status || (b.kunci === 'Y' ? 'Wajib' : 'N')).filter(Boolean);
     return Array.from(new Set(statuses)).sort() as string[];
-  }, [budgets]);
+  }, [scopedBudgetsForFilters]);
 
   const indikatorOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.kode_nama_indikator).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    return Array.from(new Set(scopedBudgetsForFilters.map(b => b.kode_nama_indikator).filter(Boolean))).sort() as string[];
+  }, [scopedBudgetsForFilters]);
 
   const kegiatanOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.kode_nama_kegiatan).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    const list = selectedIndikator !== 'ALL'
+      ? scopedBudgetsForFilters.filter(b => b.kode_nama_indikator === selectedIndikator)
+      : scopedBudgetsForFilters;
+    return Array.from(new Set(list.map(b => b.kode_nama_kegiatan).filter(Boolean))).sort() as string[];
+  }, [scopedBudgetsForFilters, selectedIndikator]);
 
   const lingkupOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.lingkup).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    const list = selectedKegiatan !== 'ALL'
+      ? scopedBudgetsForFilters.filter(b => b.kode_nama_kegiatan === selectedKegiatan)
+      : scopedBudgetsForFilters;
+    return Array.from(new Set(list.map(b => b.lingkup).filter(Boolean))).sort() as string[];
+  }, [scopedBudgetsForFilters, selectedKegiatan]);
 
   const maksudOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.maksud_tujuan).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    return Array.from(new Set(scopedBudgetsForFilters.map(b => b.maksud_tujuan).filter(Boolean))).sort() as string[];
+  }, [scopedBudgetsForFilters]);
 
   const yearOptions = useMemo(() => {
-    return Array.from(new Set(budgets.map(b => b.tahun).filter(Boolean))).sort() as string[];
-  }, [budgets]);
+    const list = selectedUnit !== 'ALL'
+      ? budgets.filter(b => b.unitkerja_nama === selectedUnit)
+      : budgets;
+    return Array.from(new Set(list.map(b => b.tahun).filter(Boolean))).sort() as string[];
+  }, [budgets, selectedUnit]);
+
+  // Auto-reset child filters if their current value is no longer in scoped options
+  useEffect(() => {
+    if (selectedStatus !== 'ALL' && !statusOptions.includes(selectedStatus)) {
+      setSelectedStatus('ALL');
+    }
+  }, [statusOptions, selectedStatus]);
+
+  useEffect(() => {
+    if (selectedIndikator !== 'ALL' && !indikatorOptions.includes(selectedIndikator)) {
+      setSelectedIndikator('ALL');
+    }
+  }, [indikatorOptions, selectedIndikator]);
+
+  useEffect(() => {
+    if (selectedKegiatan !== 'ALL' && !kegiatanOptions.includes(selectedKegiatan)) {
+      setSelectedKegiatan('ALL');
+    }
+  }, [kegiatanOptions, selectedKegiatan]);
+
+  useEffect(() => {
+    if (selectedLingkup !== 'ALL' && !lingkupOptions.includes(selectedLingkup)) {
+      setSelectedLingkup('ALL');
+    }
+  }, [lingkupOptions, selectedLingkup]);
+
+  useEffect(() => {
+    if (selectedMaksud !== 'ALL' && !maksudOptions.includes(selectedMaksud)) {
+      setSelectedMaksud('ALL');
+    }
+  }, [maksudOptions, selectedMaksud]);
 
   // Reset Filters
   const handleResetFilters = () => {
@@ -391,9 +444,10 @@ export default function ReviewPage() {
     });
   }, [budgets, selectedUnit, selectedStatus, selectedIndikator, selectedKegiatan, selectedLingkup, selectedMaksud, selectedYear, searchTerm]);
 
-  // Calculate Groupings (Hierarchical as in Screenshot)
-  interface GroupedData {
+  // Calculate Groupings: LEVEL 1 (UNIT KERJA) -> LEVEL 2 (INDIKATOR / KEGIATAN KELOMPOK)
+  interface GroupedIndikatorData {
     groupKey: string;
+    unitKerja: string;
     indikator: string;
     kegiatan: string;
     lingkup: string;
@@ -404,36 +458,50 @@ export default function ReviewPage() {
     totalSetelahPenyesuaian: number;
   }
 
-  const groupedData = useMemo(() => {
-    const map = new Map<string, GroupedData>();
+  interface UnitGroupedData {
+    unitName: string;
+    groups: GroupedIndikatorData[];
+    totalItems: number;
+    totalUsulan: number;
+    totalPenyesuaian: number;
+    totalSetelahPenyesuaian: number;
+  }
+
+  const unitGroupedData = useMemo<UnitGroupedData[]>(() => {
+    const unitMap = new Map<string, {
+      unitName: string;
+      groupMap: Map<string, GroupedIndikatorData>;
+      totalItems: number;
+      totalUsulan: number;
+      totalPenyesuaian: number;
+      totalSetelahPenyesuaian: number;
+    }>();
 
     filteredBudgets.forEach(b => {
+      const unit = b.unitkerja_nama || 'Tanpa Unit Kerja';
       const ind = b.kode_nama_indikator || 'Tanpa Indikator Program';
       const keg = b.kode_nama_kegiatan || 'Tanpa Kegiatan';
       const ling = b.lingkup || '-';
       const maks = b.maksud_tujuan || '-';
 
-      const key = `${ind}___${keg}___${ling}___${maks}`;
+      const groupKey = `${unit}___${ind}___${keg}___${ling}___${maks}`;
 
-      if (!map.has(key)) {
-        map.set(key, {
-          groupKey: key,
-          indikator: ind,
-          kegiatan: keg,
-          lingkup: ling,
-          maksud: maks,
-          items: [],
+      if (!unitMap.has(unit)) {
+        unitMap.set(unit, {
+          unitName: unit,
+          groupMap: new Map(),
+          totalItems: 0,
           totalUsulan: 0,
           totalPenyesuaian: 0,
           totalSetelahPenyesuaian: 0
         });
       }
 
-      const grp = map.get(key)!;
-      grp.items.push(b);
+      const unitEntry = unitMap.get(unit)!;
+      unitEntry.totalItems += 1;
 
       const usulanNominal = Number(b.total) || 0;
-      grp.totalUsulan += usulanNominal;
+      unitEntry.totalUsulan += usulanNominal;
 
       // Check if item has approval formula (penyesuaian)
       let penyesuaianItem = 0;
@@ -447,21 +515,53 @@ export default function ReviewPage() {
         }
       }
 
+      unitEntry.totalPenyesuaian += penyesuaianItem;
+      unitEntry.totalSetelahPenyesuaian += (usulanNominal + penyesuaianItem);
+
+      if (!unitEntry.groupMap.has(groupKey)) {
+        unitEntry.groupMap.set(groupKey, {
+          groupKey,
+          unitKerja: unit,
+          indikator: ind,
+          kegiatan: keg,
+          lingkup: ling,
+          maksud: maks,
+          items: [],
+          totalUsulan: 0,
+          totalPenyesuaian: 0,
+          totalSetelahPenyesuaian: 0
+        });
+      }
+
+      const grp = unitEntry.groupMap.get(groupKey)!;
+      grp.items.push(b);
+      grp.totalUsulan += usulanNominal;
       grp.totalPenyesuaian += penyesuaianItem;
       grp.totalSetelahPenyesuaian += (usulanNominal + penyesuaianItem);
     });
 
-    return Array.from(map.values());
+    return Array.from(unitMap.values()).map(u => ({
+      unitName: u.unitName,
+      groups: Array.from(u.groupMap.values()),
+      totalItems: u.totalItems,
+      totalUsulan: u.totalUsulan,
+      totalPenyesuaian: u.totalPenyesuaian,
+      totalSetelahPenyesuaian: u.totalSetelahPenyesuaian
+    }));
   }, [filteredBudgets]);
+
+  const totalGroupsCount = useMemo(() => {
+    return unitGroupedData.reduce((acc, u) => acc + u.groups.length, 0);
+  }, [unitGroupedData]);
 
   // Overall KPI Cards (REQUIREMENT 2)
   const overallKPI = useMemo(() => {
     let totalDiajukan = 0;
     let totalPenyesuaian = 0;
 
-    groupedData.forEach(g => {
-      totalDiajukan += g.totalUsulan;
-      totalPenyesuaian += g.totalPenyesuaian;
+    unitGroupedData.forEach(u => {
+      totalDiajukan += u.totalUsulan;
+      totalPenyesuaian += u.totalPenyesuaian;
     });
 
     const totalSetelahPenyesuaian = totalDiajukan + totalPenyesuaian;
@@ -471,9 +571,16 @@ export default function ReviewPage() {
       totalPenyesuaian,
       totalSetelahPenyesuaian
     };
-  }, [groupedData]);
+  }, [unitGroupedData]);
 
-  // Default: All groups collapsed (tertutup) as requested
+  // Toggle unit and group
+  const toggleUnit = (unitName: string) => {
+    setExpandedUnits(prev => ({
+      ...prev,
+      [unitName]: !prev[unitName]
+    }));
+  };
+
   const toggleGroup = (key: string) => {
     setExpandedGroups(prev => ({
       ...prev,
@@ -482,11 +589,18 @@ export default function ReviewPage() {
   };
 
   const handleExpandAll = (expanded: boolean) => {
-    const updated: Record<string, boolean> = {};
-    groupedData.forEach(g => {
-      updated[g.groupKey] = expanded;
+    const updatedUnits: Record<string, boolean> = {};
+    const updatedGroups: Record<string, boolean> = {};
+
+    unitGroupedData.forEach(u => {
+      updatedUnits[u.unitName] = expanded;
+      u.groups.forEach(g => {
+        updatedGroups[g.groupKey] = expanded;
+      });
     });
-    setExpandedGroups(updated);
+
+    setExpandedUnits(updatedUnits);
+    setExpandedGroups(updatedGroups);
   };
 
   const formatRp = (num: any) => {
@@ -673,34 +787,13 @@ export default function ReviewPage() {
       ]
     ];
 
-    groupedData.forEach(grp => {
-      grp.items.forEach(item => {
-        const usulanParsed = parsePhpFormula(item.usulan_pagu_indikatif_anggaran_rumus);
-        const apprParsed = parsePhpFormula(item.approval_pagu_indikatif_anggaran_rumus);
+    unitGroupedData.forEach(u => {
+      u.groups.forEach(grp => {
+        grp.items.forEach(item => {
+          const usulanParsed = parsePhpFormula(item.usulan_pagu_indikatif_anggaran_rumus);
+          const apprParsed = parsePhpFormula(item.approval_pagu_indikatif_anggaran_rumus);
 
-        // Usulan Row
-        rows.push([
-          grp.indikator,
-          grp.kegiatan,
-          grp.lingkup,
-          grp.maksud,
-          item.akun || item.komponen_nama,
-          item.deskripsi,
-          'Usulan',
-          usulanParsed ? usulanParsed.lines.map(l => l.text).join(' x ') : `${item.vol} ${item.satuan}`,
-          usulanParsed ? usulanParsed.finalHasil : item.vol,
-          item.tarif,
-          item.total,
-          0,
-          item.ai_reason || ''
-        ]);
-
-        // Direvisi Row if exists
-        if (apprParsed) {
-          const qtyAppr = parseFloat(apprParsed.totalQty) || 0;
-          const totalAppr = qtyAppr * (Number(item.tarif) || 0);
-          const penyesuaian = totalAppr - (Number(item.total) || 0);
-
+          // Usulan Row
           rows.push([
             grp.indikator,
             grp.kegiatan,
@@ -708,15 +801,38 @@ export default function ReviewPage() {
             grp.maksud,
             item.akun || item.komponen_nama,
             item.deskripsi,
-            'Direvisi',
-            apprParsed.lines.map(l => l.text).join(' x '),
-            apprParsed.finalHasil,
+            'Usulan',
+            usulanParsed ? usulanParsed.lines.map(l => l.text).join(' x ') : `${item.vol} ${item.satuan}`,
+            usulanParsed ? usulanParsed.finalHasil : item.vol,
             item.tarif,
-            totalAppr,
-            penyesuaian,
+            item.total,
+            0,
             item.ai_reason || ''
           ]);
-        }
+
+          // Direvisi Row if exists
+          if (apprParsed) {
+            const qtyAppr = parseFloat(apprParsed.totalQty) || 0;
+            const totalAppr = qtyAppr * (Number(item.tarif) || 0);
+            const penyesuaian = totalAppr - (Number(item.total) || 0);
+
+            rows.push([
+              grp.indikator,
+              grp.kegiatan,
+              grp.lingkup,
+              grp.maksud,
+              item.akun || item.komponen_nama,
+              item.deskripsi,
+              'Direvisi',
+              apprParsed.lines.map(l => l.text).join(' x '),
+              apprParsed.finalHasil,
+              item.tarif,
+              totalAppr,
+              penyesuaian,
+              item.ai_reason || ''
+            ]);
+          }
+        });
       });
     });
 
@@ -754,22 +870,6 @@ export default function ReviewPage() {
             className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-9 font-semibold"
           >
             <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-          <Button
-            onClick={() => handleExpandAll(true)}
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-9 font-semibold"
-          >
-            <Plus size={14} className="mr-1.5" /> Buka Semua
-          </Button>
-          <Button
-            onClick={() => handleExpandAll(false)}
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-9 font-semibold"
-          >
-            <Minus size={14} className="mr-1.5" /> Tutup Semua
           </Button>
           <Button
             onClick={handleExportExcel}
@@ -964,26 +1064,35 @@ export default function ReviewPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80 gap-3">
         <div className="text-xs font-bold text-gray-700 flex items-center gap-2">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600" />
-          <span>Menampilkan <strong>{groupedData.length}</strong> Kelompok Usulan (<strong>{filteredBudgets.length}</strong> baris detail)</span>
+          <span>Menampilkan <strong>{unitGroupedData.length}</strong> Unit Kerja (<strong>{totalGroupsCount}</strong> Kelompok Usulan, <strong>{filteredBudgets.length}</strong> baris detail)</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => handleExpandAll(true)}
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-8 text-xs font-bold shadow-xs"
-          >
-            <Plus size={13} className="mr-1 text-indigo-600" /> Buka Semua
-          </Button>
-          <Button
-            onClick={() => handleExpandAll(false)}
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-8 text-xs font-bold shadow-xs"
-          >
-            <Minus size={13} className="mr-1 text-rose-600" /> Tutup Semua
-          </Button>
+          {(() => {
+            const isAllExpanded = unitGroupedData.length > 0 && unitGroupedData.every(u => expandedUnits[u.unitName]);
+            return (
+              <Button
+                onClick={() => handleExpandAll(!isAllExpanded)}
+                variant="outline"
+                size="sm"
+                className={`rounded-xl h-8 text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all ${
+                  isAllExpanded 
+                    ? 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100' 
+                    : 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+                }`}
+              >
+                {isAllExpanded ? (
+                  <>
+                    <Minus size={13} className="text-rose-600" /> Tutup Semua Unit & Detail
+                  </>
+                ) : (
+                  <>
+                    <Plus size={13} className="text-indigo-600" /> Buka Semua Unit & Detail
+                  </>
+                )}
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
@@ -994,7 +1103,7 @@ export default function ReviewPage() {
             <RefreshCw size={28} className="animate-spin text-indigo-600" />
             <span>Memuat data review usulan anggaran...</span>
           </div>
-        ) : groupedData.length === 0 ? (
+        ) : unitGroupedData.length === 0 ? (
           <div className="p-16 text-center text-gray-500 font-medium">
             <AlertCircle size={32} className="mx-auto text-gray-400 mb-2" />
             <p className="text-base font-bold text-gray-700">Tidak ada data usulan anggaran yang sesuai filter.</p>
@@ -1004,288 +1113,412 @@ export default function ReviewPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left border-collapse">
               
-              {/* PRIMARY GROUP TABLE HEADER (COMPACT 4-IN-1 COLUMN) */}
+              {/* PRIMARY TABLE HEADER */}
               <thead>
-                <tr className="bg-[#2878a5] text-white font-bold text-[13px] border-b border-[#1b628b]">
-                  <th className="px-3 py-3 w-10 text-center">
-                    <button
-                      type="button"
-                      title="Buka / Tutup Semua"
-                      onClick={() => {
-                        const allOpen = groupedData.every(g => expandedGroups[g.groupKey]);
-                        handleExpandAll(!allOpen);
-                      }}
-                      className="w-5 h-5 rounded flex items-center justify-center bg-white/20 hover:bg-white/30 text-white transition-colors"
-                    >
-                      {groupedData.every(g => expandedGroups[g.groupKey]) ? <Minus size={12} /> : <Plus size={12} />}
-                    </button>
+                <tr className="bg-[#1e4b75] text-white font-bold text-[13px] border-b border-[#163a5c]">
+                  <th className="px-3 py-3 w-10 text-center text-white/75">
+                    #
                   </th>
                   <th className="px-4 py-3 min-w-[380px]">
-                    Indikator Program / Kegiatan / Lingkup / Maksud dan Tujuan
+                    Unit Kerja / Indikator Program / Kegiatan / Lingkup / Maksud dan Tujuan
                   </th>
-                  <th className="px-4 py-3 text-right w-36 whitespace-nowrap">Total Anggaran</th>
-                  <th className="px-4 py-3 text-right w-32 whitespace-nowrap">Penyesuaian</th>
-                  <th className="px-4 py-3 text-right w-36 whitespace-normal break-words leading-tight">
+                  <th className="px-4 py-3 text-right w-40 whitespace-nowrap">Total Anggaran</th>
+                  <th className="px-4 py-3 text-right w-36 whitespace-nowrap">Penyesuaian</th>
+                  <th className="px-4 py-3 text-right w-44 whitespace-normal break-words leading-tight">
                     Jumlah Biaya Setelah Penyesuaian
                   </th>
                 </tr>
               </thead>
 
               <tbody>
-                {groupedData.map((group, gIdx) => {
-                  const isExpanded = expandedGroups[group.groupKey] !== false;
+                {unitGroupedData.map((unit, uIdx) => {
+                  const isUnitExpanded = expandedUnits[unit.unitName] === true;
 
                   return (
-                    <React.Fragment key={group.groupKey + gIdx}>
+                    <React.Fragment key={unit.unitName + uIdx}>
                       
-                      {/* GROUP HEADER ROW */}
+                      {/* LEVEL 1: UNIT KERJA GROUP HEADER ROW (DEFAULT CLOSED) */}
                       <tr 
-                        onClick={() => toggleGroup(group.groupKey)}
-                        className="bg-[#f0f7fb] hover:bg-[#e2eff7] border-b border-gray-200 cursor-pointer transition-colors font-medium text-gray-900"
+                        onClick={() => toggleUnit(unit.unitName)}
+                        className="bg-[#1e3a8a] text-white hover:bg-[#1e40af] border-b-2 border-indigo-950 cursor-pointer transition-colors select-none font-bold"
                       >
-                        <td className="px-3 py-3 text-center align-top pt-3.5">
+                        <td className="px-3 py-3.5 text-center align-middle">
                           <button 
                             type="button" 
-                            className="w-5 h-5 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold transition-colors"
+                            className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/20 hover:bg-white/30 text-white text-xs font-black transition-colors"
                           >
-                            {isExpanded ? <Minus size={12} /> : <Plus size={12} />}
+                            {isUnitExpanded ? <Minus size={13} /> : <Plus size={13} />}
                           </button>
                         </td>
                         
-                        {/* COMBINED 4-LINE INDIKATOR / KEGIATAN / LINGKUP / MAKSUD */}
-                        <td className="px-4 py-3 space-y-1">
-                          <div className="font-bold text-indigo-950 text-xs flex items-start gap-1.5 leading-snug">
-                            <span className="text-blue-600 shrink-0">📑</span>
-                            <span>{group.indikator}</span>
+                        <td className="px-4 py-3.5 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2 text-sm lg:text-base font-black tracking-tight text-white">
+                            <Building2 size={18} className="text-amber-400 shrink-0" />
+                            <span>{unit.unitName}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-indigo-100 border border-white/20">
+                              {unit.groups.length} Kelompok ({unit.totalItems} baris)
+                            </span>
                           </div>
-                          <div className="text-gray-800 text-[11px] font-semibold pl-2 border-l-2 border-indigo-400 mt-1 leading-snug">
-                            🎯 {group.kegiatan}
-                          </div>
-                          <div className="text-gray-600 text-[11px] italic pl-2 border-l-2 border-amber-400 mt-0.5 leading-snug">
-                            📌 Lingkup: {group.lingkup}
-                          </div>
-                          <div className="text-gray-500 text-[11px] pl-2 border-l-2 border-emerald-400 mt-0.5 leading-snug">
-                            💡 Maksud: {group.maksud}
+
+                          {/* MINI METRICS FOR UNIT KERJA */}
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white/10 text-white font-bold border border-white/20">
+                              Usulan: Rp {formatRp(unit.totalUsulan)}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md font-bold border ${
+                              unit.totalPenyesuaian > 0
+                                ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'
+                                : unit.totalPenyesuaian < 0
+                                ? 'bg-rose-500/20 text-rose-200 border-rose-400/30'
+                                : 'bg-white/10 text-gray-200 border-white/20'
+                            }`}>
+                              Penyesuaian: {unit.totalPenyesuaian > 0 ? '+' : ''}Rp {formatRp(unit.totalPenyesuaian)}
+                              {unit.totalUsulan > 0 && unit.totalPenyesuaian !== 0 && (
+                                <span className="font-mono opacity-90 ml-0.5">
+                                  ({((unit.totalPenyesuaian / unit.totalUsulan) * 100).toFixed(1)}%)
+                                </span>
+                              )}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-400/20 text-amber-200 font-extrabold border border-amber-400/30">
+                              Setelah Penyesuaian: Rp {formatRp(unit.totalSetelahPenyesuaian)}
+                              {overallKPI.totalSetelahPenyesuaian > 0 && (
+                                <span className="text-amber-300 font-black ml-1">
+                                  ({((unit.totalSetelahPenyesuaian / overallKPI.totalSetelahPenyesuaian) * 100).toFixed(1)}% dari Total Seluruh Unit)
+                                </span>
+                              )}
+                            </span>
                           </div>
                         </td>
 
-                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
-                          {formatRp(group.totalUsulan)}
+                        <td className="px-4 py-3.5 text-right font-mono font-bold text-white whitespace-nowrap align-middle text-sm">
+                          Rp {formatRp(unit.totalUsulan)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
-                          {formatRp(group.totalPenyesuaian)}
+                        <td className="px-4 py-3.5 text-right font-mono font-bold text-white whitespace-nowrap align-middle text-sm">
+                          <div>{unit.totalPenyesuaian > 0 ? '+' : ''}Rp {formatRp(unit.totalPenyesuaian)}</div>
+                          {unit.totalUsulan > 0 && unit.totalPenyesuaian !== 0 && (
+                            <div className={`text-[10px] font-bold mt-0.5 ${unit.totalPenyesuaian > 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                              {((unit.totalPenyesuaian / unit.totalUsulan) * 100).toFixed(1)}%
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
-                          {formatRp(group.totalSetelahPenyesuaian)}
+                        <td className="px-4 py-3.5 text-right font-mono font-bold text-white whitespace-nowrap align-middle text-sm">
+                          <div>Rp {formatRp(unit.totalSetelahPenyesuaian)}</div>
+                          {overallKPI.totalSetelahPenyesuaian > 0 && (
+                            <div className="text-[11px] font-black text-amber-300 bg-black/25 px-2 py-0.5 rounded-md inline-block mt-1 border border-amber-300/30">
+                              {((unit.totalSetelahPenyesuaian / overallKPI.totalSetelahPenyesuaian) * 100).toFixed(1)}% dari Total
+                            </div>
+                          )}
                         </td>
                       </tr>
 
-                      {/* SUB-TABLE ITEMS (ACCORDION EXPANDED) */}
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={5} className="p-0 border-b border-gray-300">
-                            <div className="w-full">
+                      {/* LEVEL 2: INDIKATOR / KEGIATAN KELOMPOK (RENDERED WHEN UNIT IS EXPANDED) */}
+                      {isUnitExpanded && unit.groups.map((group, gIdx) => {
+                        const isGroupExpanded = expandedGroups[group.groupKey] === true;
+
+                        return (
+                          <React.Fragment key={group.groupKey + gIdx}>
+                            
+                            {/* GROUP HEADER ROW */}
+                            <tr 
+                              onClick={() => toggleGroup(group.groupKey)}
+                              className="bg-[#f0f7fb] hover:bg-[#e2eff7] border-b border-gray-200 cursor-pointer transition-colors font-medium text-gray-900"
+                            >
+                              <td className="px-3 py-3 text-center align-top pt-3.5 pl-4">
+                                <button 
+                                  type="button" 
+                                  className="w-5 h-5 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold transition-colors"
+                                >
+                                  {isGroupExpanded ? <Minus size={12} /> : <Plus size={12} />}
+                                </button>
+                              </td>
                               
-                              <table className="w-full text-xs text-left border-collapse">
-                                {/* SUB-TABLE HEADER (DARK BLUE IN SCREENSHOT) */}
-                                <thead>
-                                  <tr className="bg-[#1f73a5] text-white font-bold text-[12px] border-y border-[#185c84]">
-                                    <th className="px-5 py-2.5 text-left w-1/3">Akun/SBU/Deskripsi;</th>
-                                    <th className="px-2 py-2.5 text-center w-12"></th>
-                                    <th className="px-4 py-2.5 text-center w-36">Kuantitas</th>
-                                    <th className="px-4 py-2.5 text-right w-36">Harga Satuan</th>
-                                    <th className="px-4 py-2.5 text-right w-36">Jumlah Biaya</th>
-                                    <th className="px-4 py-2.5 text-right w-32">Penyesuaian</th>
-                                    <th className="px-4 py-2.5 text-left min-w-[200px]">Keterangan Review</th>
-                                  </tr>
-                                </thead>
+                              {/* COMBINED 4-LINE INDIKATOR / KEGIATAN / LINGKUP / MAKSUD */}
+                              <td className="px-4 py-3 space-y-1">
+                                <div className="font-bold text-indigo-950 text-xs flex items-start gap-1.5 leading-snug">
+                                  <span className="text-blue-600 shrink-0">📑</span>
+                                  <span>{group.indikator}</span>
+                                </div>
+                                <div className="text-gray-800 text-[11px] font-semibold pl-2 border-l-2 border-indigo-400 mt-1 leading-snug">
+                                  🎯 {group.kegiatan}
+                                </div>
+                                <div className="text-gray-600 text-[11px] italic pl-2 border-l-2 border-amber-400 mt-0.5 leading-snug">
+                                  📌 Lingkup: {group.lingkup}
+                                </div>
+                                <div className="text-gray-500 text-[11px] pl-2 border-l-2 border-emerald-400 mt-0.5 leading-snug">
+                                  💡 Maksud: {group.maksud}
+                                </div>
 
-                                <tbody className="divide-y divide-gray-200">
-                                  {group.items.map((item, itemIdx) => {
-                                    const usulanFormula = parsePhpFormula(item.usulan_pagu_indikatif_anggaran_rumus);
-                                    const apprFormula = parsePhpFormula(item.approval_pagu_indikatif_anggaran_rumus);
+                                {/* RINGKASAN ANGKA DAN % DI HEADER KELOMPOK */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-2 mt-1 border-t border-blue-100/60 text-[10px]">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50/80 border border-blue-200/80 font-bold text-blue-900">
+                                    Usulan: Rp {formatRp(group.totalUsulan)}
+                                  </span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold border ${
+                                    group.totalPenyesuaian > 0 
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                                      : group.totalPenyesuaian < 0 
+                                      ? 'bg-rose-50 border-rose-200 text-rose-800' 
+                                      : 'bg-gray-50 border-gray-200 text-gray-600'
+                                  }`}>
+                                    Penyesuaian: {group.totalPenyesuaian > 0 ? '+' : ''}Rp {formatRp(group.totalPenyesuaian)}
+                                    {group.totalUsulan > 0 && group.totalPenyesuaian !== 0 && (
+                                      <span className="opacity-90 font-mono ml-0.5">
+                                        ({((group.totalPenyesuaian / group.totalUsulan) * 100).toFixed(1)}%)
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 font-bold text-indigo-900">
+                                    Setelah Penyesuaian: Rp {formatRp(group.totalSetelahPenyesuaian)}
+                                    {unit.totalSetelahPenyesuaian > 0 && (
+                                      <span className="text-indigo-600 font-extrabold ml-1">
+                                        ({((group.totalSetelahPenyesuaian / unit.totalSetelahPenyesuaian) * 100).toFixed(1)}% dari Unit)
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
+                                {formatRp(group.totalUsulan)}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
+                                <div>{group.totalPenyesuaian > 0 ? '+' : ''}{formatRp(group.totalPenyesuaian)}</div>
+                                {group.totalUsulan > 0 && group.totalPenyesuaian !== 0 && (
+                                  <div className={`text-[10px] font-bold mt-0.5 ${group.totalPenyesuaian > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {((group.totalPenyesuaian / group.totalUsulan) * 100).toFixed(1)}%
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-gray-900 whitespace-nowrap align-top pt-3.5">
+                                <div>Rp {formatRp(group.totalSetelahPenyesuaian)}</div>
+                                {overallKPI.totalSetelahPenyesuaian > 0 && (
+                                  <div className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded inline-block mt-0.5 border border-indigo-200">
+                                    {((group.totalSetelahPenyesuaian / overallKPI.totalSetelahPenyesuaian) * 100).toFixed(1)}% dari Total
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* LEVEL 3: SUB-TABLE ITEMS (ACCORDION EXPANDED) */}
+                            {isGroupExpanded && (
+                              <tr>
+                                <td colSpan={5} className="p-0 border-b border-gray-300">
+                                  <div className="w-full">
                                     
-                                    const hasRevisi = !!item.approval_pagu_indikatif_anggaran_rumus;
-
-                                    let revisiQty = 0;
-                                    let revisiTotal = 0;
-                                    let revisiPenyesuaian = 0;
-
-                                    if (apprFormula) {
-                                      revisiQty = parseFloat(apprFormula.totalQty) || 0;
-                                      revisiTotal = revisiQty * (Number(item.tarif) || 0);
-                                      revisiPenyesuaian = revisiTotal - (Number(item.total) || 0);
-                                    }
-
-                                    return (
-                                      <React.Fragment key={item.id || itemIdx}>
-                                        
-                                        {/* 1. USULAN ROW (BLUE BADGE) */}
-                                        <tr className="hover:bg-gray-50/70 transition-colors bg-white">
-                                          {/* Akun / SBU / Deskripsi (3 Lines) */}
-                                          <td className="px-5 py-3 align-top">
-                                            <div className="font-bold text-gray-900 text-xs">
-                                              {item.akun || item.komponen_nama}
-                                            </div>
-                                            <div className="text-[11px] text-gray-500 mt-0.5">
-                                              {item.tahun ? `${item.tahun}.${item.akun || item.komponen_nama}` : (item.akun || item.komponen_nama)}
-                                            </div>
-                                            <div className="italic text-[11px] text-gray-600 mt-1 leading-snug">
-                                              {item.deskripsi}
-                                            </div>
-                                          </td>
-
-                                          {/* Vertical Badge Usulan (Blue in screenshot) */}
-                                          <td className="p-0 text-center align-middle bg-[#a8cdf0] border-r border-[#92bbe2] w-10">
-                                            <div className="font-bold text-[11px] text-indigo-950 tracking-widest py-3 [writing-mode:vertical-lr] rotate-180 select-none">
-                                              Usulan
-                                            </div>
-                                          </td>
-
-                                          {/* Kuantitas Multi-baris (Rumus Usulan) */}
-                                          <td className="px-4 py-3 align-top font-mono text-gray-800">
-                                            {usulanFormula && usulanFormula.lines.length > 0 ? (
-                                              <div className="space-y-0.5">
-                                                {usulanFormula.lines.map((l, lIdx) => (
-                                                  <div key={lIdx} className="flex justify-between items-center text-xs">
-                                                    <span>{l.text}</span>
-                                                    <span className="text-gray-400 pl-2">x</span>
-                                                  </div>
-                                                ))}
-                                                <div className="pt-2 font-bold text-xs text-gray-900 border-t border-gray-100 mt-1">
-                                                  {usulanFormula.finalHasil || `${item.vol} ${item.satuan || ''}`}
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div className="font-bold text-xs">
-                                                {item.vol} {item.satuan || 'Paket'}
-                                              </div>
-                                            )}
-                                          </td>
-
-                                          {/* Harga Satuan */}
-                                          <td className="px-4 py-3 align-top text-right font-mono text-gray-800 text-xs">
-                                            {formatRp(item.tarif)}
-                                          </td>
-
-                                          {/* Jumlah Biaya */}
-                                          <td className="px-4 py-3 align-top text-right font-mono font-bold text-gray-900 text-xs">
-                                            {formatRp(item.total)}
-                                          </td>
-
-                                          {/* Penyesuaian (Blank / 0 for usulan) */}
-                                          <td className="px-4 py-3 align-top text-right font-mono text-gray-400 text-xs">
-                                            -
-                                          </td>
-
-                                          {/* Keterangan Review & Action */}
-                                          <td className="px-4 py-3 align-top text-gray-600 text-xs">
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className="truncate max-w-[200px]" title={item.ai_reason || '-'}>
-                                                {item.ai_reason || '-'}
-                                              </span>
-                                              {!hasRevisi && (
-                                                <Button
-                                                  type="button"
-                                                  onClick={() => handleOpenRevisi(item)}
-                                                  size="sm"
-                                                  variant="outline"
-                                                  className="h-7 px-2.5 text-[11px] rounded-lg border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 font-bold shadow-xs shrink-0"
-                                                >
-                                                  <Edit3 size={11} className="mr-1 text-amber-700" /> Direvisi
-                                                </Button>
-                                              )}
-                                            </div>
-                                          </td>
+                                    <table className="w-full text-xs text-left border-collapse">
+                                      {/* SUB-TABLE HEADER (DARK BLUE IN SCREENSHOT) */}
+                                      <thead>
+                                        <tr className="bg-[#1f73a5] text-white font-bold text-[12px] border-y border-[#185c84]">
+                                          <th className="px-5 py-2.5 text-left w-1/3">Akun/SBU/Deskripsi;</th>
+                                          <th className="px-2 py-2.5 text-center w-12"></th>
+                                          <th className="px-4 py-2.5 text-center w-36">Kuantitas</th>
+                                          <th className="px-4 py-2.5 text-right w-36">Harga Satuan</th>
+                                          <th className="px-4 py-2.5 text-right w-36">Jumlah Biaya</th>
+                                          <th className="px-4 py-2.5 text-right w-32">Penyesuaian</th>
+                                          <th className="px-4 py-2.5 text-left min-w-[200px]">Keterangan Review</th>
                                         </tr>
+                                      </thead>
 
-                                        {/* 2. DIREVISI ROW (YELLOW BACKGROUND IN SCREENSHOT) */}
-                                        {hasRevisi && apprFormula && (
-                                          <tr className="bg-[#fefde8] hover:bg-[#fef9c3] transition-colors border-t border-amber-200/80">
-                                            {/* Empty/Linked Account Column */}
-                                            <td className="px-5 py-3 align-top">
-                                              <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
-                                                <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                                                <span>Hasil Penyesuaian / Revisi Anggaran:</span>
-                                              </div>
-                                            </td>
+                                      <tbody className="divide-y divide-gray-200">
+                                        {group.items.map((item, itemIdx) => {
+                                          const usulanFormula = parsePhpFormula(item.usulan_pagu_indikatif_anggaran_rumus);
+                                          const apprFormula = parsePhpFormula(item.approval_pagu_indikatif_anggaran_rumus);
+                                          
+                                          const hasRevisi = !!item.approval_pagu_indikatif_anggaran_rumus;
 
-                                            {/* Vertical Badge Direvisi (Yellow) */}
-                                            <td className="p-0 text-center align-middle bg-[#fef08a] border-r border-amber-300 w-10">
-                                              <div className="font-bold text-[11px] text-amber-950 tracking-widest py-3 [writing-mode:vertical-lr] rotate-180 select-none">
-                                                Direvisi
-                                              </div>
-                                            </td>
+                                          let revisiQty = 0;
+                                          let revisiTotal = 0;
+                                          let revisiPenyesuaian = 0;
 
-                                            {/* Kuantitas Direvisi (Rumus Approval) */}
-                                            <td className="px-4 py-3 align-top font-mono text-gray-800">
-                                              {apprFormula.lines.length > 0 ? (
-                                                <div className="space-y-0.5">
-                                                  {apprFormula.lines.map((l, lIdx) => (
-                                                    <div key={lIdx} className="flex justify-between items-center text-xs">
-                                                      <span>{l.text}</span>
-                                                      <span className="text-amber-500 pl-2">x</span>
+                                          if (apprFormula) {
+                                            revisiQty = parseFloat(apprFormula.totalQty) || 0;
+                                            revisiTotal = revisiQty * (Number(item.tarif) || 0);
+                                            revisiPenyesuaian = revisiTotal - (Number(item.total) || 0);
+                                          }
+
+                                          const isWajib = (item.custom_status || '').toLowerCase().includes('wajib') || (item.kunci || '').toUpperCase() === 'Y';
+
+                                          return (
+                                            <React.Fragment key={item.id || itemIdx}>
+                                              
+                                              {/* 1. USULAN ROW (BLUE BADGE OR AMBER IF WAJIB ADA) */}
+                                              <tr className={`transition-colors ${
+                                                isWajib 
+                                                  ? 'bg-amber-50/60 hover:bg-amber-100/60 border-l-4 border-l-amber-500' 
+                                                  : 'hover:bg-gray-50/70 bg-white'
+                                              }`}>
+                                                {/* Akun / SBU / Deskripsi (3 Lines) */}
+                                                <td className="px-5 py-3 align-top">
+                                                  {isWajib && (
+                                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500 text-white font-extrabold text-[10px] tracking-wider mb-1.5 shadow-xs">
+                                                      <ShieldCheck size={11} /> WAJIB ADA
                                                     </div>
-                                                  ))}
-                                                  <div className="pt-2 font-bold text-xs text-amber-950 border-t border-amber-200 mt-1">
-                                                    {apprFormula.finalHasil || `${revisiQty} ${item.satuan || ''}`}
+                                                  )}
+                                                  <div className="font-bold text-gray-900 text-xs">
+                                                    {item.akun || item.komponen_nama}
                                                   </div>
-                                                </div>
-                                              ) : (
-                                                <div className="font-bold text-xs text-amber-950">
-                                                  {revisiQty} {item.satuan || 'Paket'}
-                                                </div>
+                                                  <div className="text-[11px] text-gray-500 mt-0.5">
+                                                    {item.tahun ? `${item.tahun}.${item.akun || item.komponen_nama}` : (item.akun || item.komponen_nama)}
+                                                  </div>
+                                                  <div className="italic text-[11px] text-gray-600 mt-1 leading-snug">
+                                                    {item.deskripsi}
+                                                  </div>
+                                                </td>
+
+                                                {/* Vertical Badge Usulan (Blue in screenshot) */}
+                                                <td className="p-0 text-center align-middle bg-[#a8cdf0] border-r border-[#92bbe2] w-10">
+                                                  <div className="font-bold text-[11px] text-indigo-950 tracking-widest py-3 [writing-mode:vertical-lr] rotate-180 select-none">
+                                                    Usulan
+                                                  </div>
+                                                </td>
+
+                                                {/* Kuantitas Multi-baris (Rumus Usulan) */}
+                                                <td className="px-4 py-3 align-top font-mono text-gray-800">
+                                                  {usulanFormula && usulanFormula.lines.length > 0 ? (
+                                                    <div className="space-y-0.5">
+                                                      {usulanFormula.lines.map((l, lIdx) => (
+                                                        <div key={lIdx} className="flex justify-between items-center text-xs">
+                                                          <span>{l.text}</span>
+                                                          <span className="text-gray-400 pl-2">x</span>
+                                                        </div>
+                                                      ))}
+                                                      <div className="pt-2 font-bold text-xs text-gray-900 border-t border-gray-100 mt-1">
+                                                        {usulanFormula.finalHasil || `${item.vol} ${item.satuan || ''}`}
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <div className="font-bold text-xs">
+                                                      {item.vol} {item.satuan || 'Paket'}
+                                                    </div>
+                                                  )}
+                                                </td>
+
+                                                {/* Harga Satuan */}
+                                                <td className="px-4 py-3 align-top text-right font-mono text-gray-800 text-xs">
+                                                  {formatRp(item.tarif)}
+                                                </td>
+
+                                                {/* Jumlah Biaya */}
+                                                <td className="px-4 py-3 align-top text-right font-mono font-bold text-gray-900 text-xs">
+                                                  {formatRp(item.total)}
+                                                </td>
+
+                                                {/* Penyesuaian (Blank / 0 for usulan) */}
+                                                <td className="px-4 py-3 align-top text-right font-mono text-gray-400 text-xs">
+                                                  -
+                                                </td>
+
+                                                {/* Keterangan Review & Action */}
+                                                <td className="px-4 py-3 align-top text-gray-600 text-xs">
+                                                  <div className="flex items-center justify-between gap-2">
+                                                    <span className="truncate max-w-[200px]" title={item.ai_reason || '-'}>
+                                                      {item.ai_reason || '-'}
+                                                    </span>
+                                                    {!hasRevisi && (
+                                                      <Button
+                                                        type="button"
+                                                        onClick={() => handleOpenRevisi(item)}
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 px-2.5 text-[11px] rounded-lg border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 font-bold shadow-xs shrink-0"
+                                                      >
+                                                        <Edit3 size={11} className="mr-1 text-amber-700" /> Direvisi
+                                                      </Button>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                              </tr>
+
+                                              {/* 2. DIREVISI ROW (YELLOW BACKGROUND IN SCREENSHOT) */}
+                                              {hasRevisi && apprFormula && (
+                                                <tr className="bg-[#fefde8] hover:bg-[#fef9c3] transition-colors border-t border-amber-200/80">
+                                                  {/* Empty/Linked Account Column */}
+                                                  <td className="px-5 py-3 align-top">
+                                                    <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
+                                                      <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                                                      <span>Hasil Penyesuaian / Revisi Anggaran:</span>
+                                                    </div>
+                                                  </td>
+
+                                                  {/* Vertical Badge Direvisi (Yellow) */}
+                                                  <td className="p-0 text-center align-middle bg-[#fef08a] border-r border-amber-300 w-10">
+                                                    <div className="font-bold text-[11px] text-amber-950 tracking-widest py-3 [writing-mode:vertical-lr] rotate-180 select-none">
+                                                      Direvisi
+                                                    </div>
+                                                  </td>
+
+                                                  {/* Kuantitas Direvisi (Rumus Approval) */}
+                                                  <td className="px-4 py-3 align-top font-mono text-gray-800">
+                                                    {apprFormula.lines.length > 0 ? (
+                                                      <div className="space-y-0.5">
+                                                        {apprFormula.lines.map((l, lIdx) => (
+                                                          <div key={lIdx} className="flex justify-between items-center text-xs">
+                                                            <span>{l.text}</span>
+                                                            <span className="text-amber-500 pl-2">x</span>
+                                                          </div>
+                                                        ))}
+                                                        <div className="pt-2 font-bold text-xs text-amber-950 border-t border-amber-200 mt-1">
+                                                          {apprFormula.finalHasil || `${revisiQty} ${item.satuan || ''}`}
+                                                        </div>
+                                                      </div>
+                                                    ) : (
+                                                      <div className="font-bold text-xs text-amber-950">
+                                                        {revisiQty} {item.satuan || 'Paket'}
+                                                      </div>
+                                                    )}
+                                                  </td>
+
+                                                  {/* Harga Satuan Direvisi */}
+                                                  <td className="px-4 py-3 align-top text-right font-mono text-gray-800 text-xs">
+                                                    {formatRp(item.tarif)}
+                                                  </td>
+
+                                                  {/* Jumlah Biaya Direvisi */}
+                                                  <td className="px-4 py-3 align-top text-right font-mono font-bold text-amber-950 text-xs">
+                                                    {formatRp(revisiTotal)}
+                                                  </td>
+
+                                                  {/* Penyesuaian Nominal */}
+                                                  <td className="px-4 py-3 align-top text-right font-mono font-bold text-xs">
+                                                    <span className={revisiPenyesuaian > 0 ? 'text-emerald-700 font-bold' : revisiPenyesuaian < 0 ? 'text-rose-700 font-bold' : 'text-gray-500'}>
+                                                      {revisiPenyesuaian > 0 ? '+' : ''}{formatRp(revisiPenyesuaian)}
+                                                    </span>
+                                                  </td>
+
+                                                  {/* Action Buttons for Revisi */}
+                                                  <td className="px-4 py-3 align-top text-gray-600 text-xs">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                      <span className="truncate max-w-[200px] text-amber-900 font-medium" title={item.ai_reason || '-'}>
+                                                        {item.ai_reason || 'Disetujui Penyesuaian'}
+                                                      </span>
+                                                      <div className="flex items-center gap-1 shrink-0">
+                                                        <Button
+                                                          type="button"
+                                                          onClick={() => handleOpenRevisi(item)}
+                                                          size="sm"
+                                                          variant="outline"
+                                                          className="h-7 px-2 text-[11px] rounded-lg border-amber-300 text-amber-900 bg-amber-100 hover:bg-amber-200 font-bold shadow-xs"
+                                                          title="Edit Penyesuaian"
+                                                        >
+                                                          <Edit3 size={11} className="mr-1 text-amber-800" /> Edit
+                                                        </Button>
+                                                      </div>
+                                                    </div>
+                                                  </td>
+                                                </tr>
                                               )}
-                                            </td>
-
-                                            {/* Harga Satuan Direvisi */}
-                                            <td className="px-4 py-3 align-top text-right font-mono text-gray-800 text-xs">
-                                              {formatRp(item.tarif)}
-                                            </td>
-
-                                            {/* Jumlah Biaya Direvisi */}
-                                            <td className="px-4 py-3 align-top text-right font-mono font-bold text-amber-950 text-xs">
-                                              {formatRp(revisiTotal)}
-                                            </td>
-
-                                            {/* Penyesuaian (e.g. -3.600.000 in screenshot) */}
-                                            <td className="px-4 py-3 align-top text-right font-mono font-bold text-xs whitespace-nowrap">
-                                              <span className={revisiPenyesuaian < 0 ? 'text-rose-700' : revisiPenyesuaian > 0 ? 'text-emerald-700' : 'text-gray-700'}>
-                                                {revisiPenyesuaian > 0 ? '+' : ''}{formatRp(revisiPenyesuaian)}
-                                              </span>
-                                            </td>
-
-                                            {/* Keterangan Review & Edit Action */}
-                                            <td className="px-4 py-3 align-top text-gray-700 text-xs">
-                                              <div className="flex items-center justify-between gap-2">
-                                                <span className="italic font-medium text-amber-900 truncate max-w-[200px]" title={item.ai_reason || '-'}>
-                                                  {item.ai_reason || 'Telah disesuaikan oleh penelaah.'}
-                                                </span>
-                                                <Button
-                                                  type="button"
-                                                  onClick={() => handleOpenRevisi(item)}
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  className="h-7 px-2 text-[11px] rounded-lg text-amber-800 hover:bg-amber-200 font-bold shrink-0"
-                                                >
-                                                  <Edit3 size={11} className="mr-1" /> Ubah
-                                                </Button>
-                                              </div>
-                                            </td>
-                                          </tr>
-                                        )}
-
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </React.Fragment>
                   );
                 })}
