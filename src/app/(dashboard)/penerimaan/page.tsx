@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle, ChevronDown, ChevronUp, Award } from 'lucide-react';
 import Select from 'react-select';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 
@@ -232,6 +233,10 @@ export default function DashboardPenerimaan() {
            <p className="text-sm text-gray-500 font-medium">Pantau ringkasan dan detail penerimaan institusi.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+           <Link href="/penerimaan/komparasi" className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-2xl border border-indigo-100 transition-colors shrink-0">
+             <Target size={18}/>
+             Komparasi Tahunan
+           </Link>
            <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200 w-full md:w-[350px]">
               <Filter size={18} className="text-indigo-600 shrink-0"/>
               <Select 

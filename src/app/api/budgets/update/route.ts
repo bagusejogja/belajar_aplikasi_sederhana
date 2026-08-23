@@ -6,7 +6,13 @@ import { analyzeBudgetWithAI } from '@/lib/aiReview';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { id, id_db, unitkerja_nama, akun, komponen_nama, deskripsi, lingkup, maksud_tujuan, vol, tarif, total, kunci, custom_status, kunci_by } = body;
+    const { 
+      id, id_db, unitkerja_nama, akun, komponen_nama, deskripsi, lingkup, maksud_tujuan, 
+      vol, tarif, total, kunci, custom_status, kunci_by,
+      tahun, kode_nama_indikator, kode_nama_kegiatan, satuan,
+      usulan_pagu_indikatif_anggaran_rumus, approval_pagu_indikatif_anggaran_rumus,
+      ai_reason
+    } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
@@ -31,6 +37,15 @@ export async function POST(request: Request) {
     if (vol !== undefined) updatePayload.vol = volNum;
     if (tarif !== undefined) updatePayload.tarif = tarifNum;
     if (total !== undefined) updatePayload.total = totalNum;
+
+    // Tambahan field baru
+    if (tahun !== undefined) updatePayload.tahun = tahun;
+    if (kode_nama_indikator !== undefined) updatePayload.kode_nama_indikator = kode_nama_indikator;
+    if (kode_nama_kegiatan !== undefined) updatePayload.kode_nama_kegiatan = kode_nama_kegiatan;
+    if (satuan !== undefined) updatePayload.satuan = satuan;
+    if (usulan_pagu_indikatif_anggaran_rumus !== undefined) updatePayload.usulan_pagu_indikatif_anggaran_rumus = usulan_pagu_indikatif_anggaran_rumus;
+    if (approval_pagu_indikatif_anggaran_rumus !== undefined) updatePayload.approval_pagu_indikatif_anggaran_rumus = approval_pagu_indikatif_anggaran_rumus;
+    if (ai_reason !== undefined) updatePayload.ai_reason = ai_reason;
 
     // Jika status dikirim secara eksplisit (misal dari Combo Box Status), langsung simpan!
     if (kunci !== undefined) updatePayload.kunci = kunci;

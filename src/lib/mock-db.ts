@@ -57,6 +57,7 @@ export const menuList: MenuItem[] = [
   { title: 'Laporan Komparasi', path: '/komparasi-laporan', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
 
   // --- REVIEW ANGGARAN ---
+  { title: 'Review Detail Anggaran', path: '/review', icon: 'CheckSquare', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
   { title: 'Smart Review Landing', path: '/review-anggaran', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
   { title: 'Admin Review & Pivot', path: '/review-anggaran/admin', icon: 'Layers', roles: ['ADMIN', 'MANAGER'], group: 'Review Anggaran' },
   { title: 'Master Aturan (Rule Engine)', path: '/review-anggaran/rules', icon: 'Wand2', roles: ['ADMIN', 'MANAGER'], group: 'Review Anggaran' },

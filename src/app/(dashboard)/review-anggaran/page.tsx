@@ -28,7 +28,27 @@ export default function ReviewAnggaranLanding() {
       </div>
 
       {/* Portal Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Review Detail Anggaran */}
+        <Card className="bg-white border-gray-200 hover:border-indigo-500/50 hover:shadow-lg transition-all group ring-2 ring-indigo-500/10">
+          <CardHeader className="space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+              <CheckSquare size={24} />
+            </div>
+            <CardTitle className="text-2xl text-gray-900">Review Usulan</CardTitle>
+            <CardDescription className="text-gray-500">
+              Review detail hierarkis berjenjang, hitung rumus penyesuaian (Direvisi), dan filter keyboard autocomplete.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/review">
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 shadow-sm font-bold">
+                Buka Review Detail <ArrowRight size={16} />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* Admin Review & Pivot */}
         <Card className="bg-white border-gray-200 hover:border-indigo-500/50 hover:shadow-lg transition-all group">
           <CardHeader className="space-y-3">
