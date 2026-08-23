@@ -130,7 +130,7 @@ export default function KomparasiPenerimaan() {
 
       // Constants
       const headerFill: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } }; // blue-900
-      const headerFont: ExcelJS.Font = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Calibri', size: 11 };
+      const headerFont: Partial<ExcelJS.Font> = { color: { argb: 'FFFFFFFF' }, bold: true, name: 'Calibri', size: 11 };
       const subHeaderFillBlue: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; // blue-100
       const subHeaderFillIndigo: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } }; // indigo-100
       const subHeaderFillEmerald: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // emerald-100

@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 // --- PHP FORMULA PARSER & SERIALIZER ---
-export interface PhpFormulaData {
+interface PhpFormulaData {
   calcs: string[];
   units: string[];
   lines: { val: string; unit: string; text: string }[];
@@ -24,7 +24,7 @@ export interface PhpFormulaData {
   finalHasil: string;
 }
 
-export function parsePhpFormula(str: string | null | undefined): PhpFormulaData | null {
+function parsePhpFormula(str: string | null | undefined): PhpFormulaData | null {
   if (!str || typeof str !== 'string') return null;
   try {
     const calcMatch = str.match(/"perhitungan";a:10:\{([^}]+)\}/);
@@ -80,7 +80,7 @@ export function parsePhpFormula(str: string | null | undefined): PhpFormulaData 
   }
 }
 
-export function serializePhpFormula(calcs: string[], units: string[], totalQty: string | number, totalUnit: string): string {
+function serializePhpFormula(calcs: string[], units: string[], totalQty: string | number, totalUnit: string): string {
   let perhStr = '';
   for (let i = 0; i < 5; i++) {
     const val = calcs[i] !== undefined && calcs[i] !== null ? String(calcs[i]).trim() : '';

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ShieldCheck, Layers, FileEdit, Wand2, Sparkles, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Layers, FileEdit, Wand2, Sparkles, ArrowRight, CheckSquare } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
