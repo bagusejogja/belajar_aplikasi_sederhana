@@ -33,6 +33,7 @@ export default function PotretMutasiPaguPage() {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
+  const [includeLuncuran, setIncludeLuncuran] = useState(false);
   
   // Modal State
   const [activeModalCategory, setActiveModalCategory] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export default function PotretMutasiPaguPage() {
   // Load Data Whenever Filters Change
   useEffect(() => {
     fetchGlobalMutasiData();
-  }, [selectedYear, selectedGroupOrg, selectedUnit]);
+  }, [selectedYear, selectedGroupOrg, selectedUnit, includeLuncuran]);
 
   const fetchGlobalMutasiData = async () => {
     setIsLoading(true);
@@ -104,16 +105,31 @@ export default function PotretMutasiPaguPage() {
       const unitMap = filteredUnits.map(u => {
         const uRows = rows.filter(r => r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString()));
         
-        const uPaguAwal = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('pagu awal')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uInisiatif = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uPenugasan = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('penugasan')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uEfisiensi = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('efisiensi')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uPengalihan = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('tambah') || (r.jenis_anggaran || '').toLowerCase().includes('kurang')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uTalangan = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('talangan')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uLuncuran = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('luncuran')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        const uRealisasi = uRows.filter(r => (r.jenis_anggaran || '').toLowerCase().includes('realisasi')).reduce((a, b) => a + Number(b.nominal || 0), 0);
-        
-        const uTotal = uPaguAwal + uInisiatif + uPenugasan + uEfisiensi + uPengalihan + uTalangan + uLuncuran;
+        let uPaguAwal = 0, uInisiatif = 0, uPenugasan = 0, uEfisiensi = 0, uPengalihan = 0, uTalangan = 0, uLuncuran = 0, uRealisasi = 0;
+
+        uRows.forEach(r => {
+          const j = (r.jenis_anggaran || '').toLowerCase().trim();
+          const nom = Number(r.nominal || 0);
+
+          if (j.includes('awal') || j.includes('dasar')) {
+            uPaguAwal += nom;
+          } else if (j.includes('inisiatif')) {
+            uInisiatif += nom;
+          } else if (j.includes('penugasan')) {
+            uPenugasan += nom;
+          } else if (j.includes('efisiensi')) {
+            uEfisiensi += nom;
+          } else if (j.includes('talangan') || j.includes('luncuran') || j.includes('carry over')) {
+            uLuncuran += nom;
+            uTalangan += nom;
+          } else if (j.includes('realisasi')) {
+            uRealisasi += nom;
+          } else if (j.includes('pengalihan') || j.includes('pergeseran') || j.includes('tambah') || j.includes('kurang')) {
+            uPengalihan += nom;
+          }
+        });
+
+        const uTotal = uPaguAwal + uInisiatif + uPenugasan + uEfisiensi + uPengalihan + (includeLuncuran ? uLuncuran : 0);
         return {
           id: u.id,
           kode_unit: u.kode_unit,
@@ -734,40 +750,66 @@ export default function PotretMutasiPaguPage() {
 
       {/* 3. TAB NAVIGATION FOR BREAKDOWNS */}
       <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-100 pb-6">
-          <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-full sm:w-auto">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          {/* Left: Tab Switcher */}
+          <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setActiveTab('chart')}
-              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'chart' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'chart' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              📊 Visualisasi Chart
+              📊 <span>Visualisasi Chart</span>
             </button>
             <button
               onClick={() => setActiveTab('unit-group')}
-              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'unit-group' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'unit-group' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              📂 Terkelompok (Group Org)
+              📂 <span>Terkelompok (Group Org)</span>
             </button>
             <button
               onClick={() => setActiveTab('surat')}
-              className={`flex-1 sm:flex-none px-5 py-2.5 rounded-xl font-bold text-xs transition-all ${activeTab === 'surat' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'surat' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
             >
-              📄 Rincian Mutasi Pagu ({filteredMutasiRows.length})
+              📄 <span>Rincian Mutasi ({filteredMutasiRows.length})</span>
             </button>
           </div>
 
-          {(activeTab === 'unit-group' || activeTab === 'surat') && (
-            <div className="relative w-full sm:w-72">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder={activeTab === 'unit-group' ? "Cari Unit / Group Org..." : "Cari Mutasi / Unit / Keterangan..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-emerald-500 font-medium"
-              />
-            </div>
-          )}
+          {/* Right: Toggle Switch & Search Bar */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
+            {/* LUNCURAN / TALANGAN TOGGLE SWITCH */}
+            <button 
+              type="button"
+              onClick={() => setIncludeLuncuran(!includeLuncuran)}
+              className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+                includeLuncuran 
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-sm' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <div className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
+                includeLuncuran ? 'bg-indigo-400' : 'bg-slate-200'
+              }`}>
+                <span className={`inline-block h-3 w-3 m-0.5 transform rounded-full bg-white transition duration-200 shadow-xs ${
+                  includeLuncuran ? 'translate-x-3' : 'translate-x-0'
+                }`} />
+              </div>
+              <span className="text-[11px] tracking-tight">
+                {includeLuncuran ? '✓ Termasuk Luncuran/Talangan' : 'Tanpa Luncuran/Talangan'}
+              </span>
+            </button>
+
+            {(activeTab === 'unit-group' || activeTab === 'surat') && (
+              <div className="relative w-full sm:w-56">
+                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder={activeTab === 'unit-group' ? "Cari unit / group..." : "Cari catatan mutasi..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white transition-all font-medium"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* TAB 1: VISUALISASI CHART (RECHARTS COMPOSED CHART MULTI-TAHUN) */}
@@ -818,13 +860,14 @@ export default function PotretMutasiPaguPage() {
                       <th className="px-3.5 py-3 text-right text-emerald-600">+ Inisiatif</th>
                       <th className="px-3.5 py-3 text-right text-emerald-600">+ Penugasan</th>
                       <th className="px-3.5 py-3 text-right text-rose-600">- Efisiensi</th>
+                      <th className="px-3.5 py-3 text-right text-cyan-600">+ Luncuran / Talangan</th>
                       <th className="px-3.5 py-3 text-right font-black text-slate-800 bg-slate-100/50">Total Pagu (Rp)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredUnits.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-slate-400 font-medium">
+                        <td colSpan={9} className="px-6 py-8 text-center text-slate-400 font-medium">
                           Tidak ada data unit yang sesuai filter.
                         </td>
                       </tr>
@@ -842,7 +885,8 @@ export default function PotretMutasiPaguPage() {
                           const gInisiatif = units.reduce((a, b) => a + b.inisiatif, 0);
                           const gPenugasan = units.reduce((a, b) => a + b.penugasan, 0);
                           const gEfisiensi = units.reduce((a, b) => a + b.efisiensi, 0);
-                          const gTotalPagu = units.reduce((a, b) => a + (b.total_pagu || (b.pagu_awal + b.pengalihan + b.inisiatif + b.penugasan + b.efisiensi)), 0);
+                          const gLuncuran = units.reduce((a, b) => a + b.luncuran, 0);
+                          const gTotalPagu = units.reduce((a, b) => a + (b.total_pagu || (b.pagu_awal + b.pengalihan + b.inisiatif + b.penugasan + b.efisiensi + (includeLuncuran ? b.luncuran : 0))), 0);
 
                           return (
                             <React.Fragment key={groupName}>
@@ -862,10 +906,17 @@ export default function PotretMutasiPaguPage() {
                                 <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gInisiatif > 0 ? `+ Rp ${formatRp(gInisiatif)}` : 'Rp 0'}</td>
                                 <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gPenugasan > 0 ? `+ Rp ${formatRp(gPenugasan)}` : 'Rp 0'}</td>
                                 <td className="px-3.5 py-3 text-right font-mono text-rose-600">{gEfisiensi !== 0 ? `Rp ${formatRp(gEfisiensi)}` : 'Rp 0'}</td>
+                                <td className="px-3.5 py-3 text-right font-mono">
+                                  {includeLuncuran ? (
+                                    <span className="text-cyan-700 font-bold">{gLuncuran > 0 ? `+ Rp ${formatRp(gLuncuran)}` : 'Rp 0'}</span>
+                                  ) : (
+                                    <span className="text-slate-300 font-medium line-through text-[10px]" title="Tidak dihitung ke Total Pagu">Rp {formatRp(gLuncuran)}</span>
+                                  )}
+                                </td>
                                 <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(gTotalPagu)}</td>
                               </tr>
                               {isExpanded && units.map((u, uIdx) => {
-                                 const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi);
+                                 const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi + (includeLuncuran ? u.luncuran : 0));
                                  const isUnitExpanded = !!expandedUnits[u.id];
                                  const uMutasi = filteredMutasiRows.filter((m: any) => m.unit_id === u.id || (m.unit_id && u.id && m.unit_id.toString() === u.id.toString()));
 
@@ -887,11 +938,18 @@ export default function PotretMutasiPaguPage() {
                                        <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}</td>
                                        <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}</td>
                                        <td className="px-3.5 py-3 text-right font-mono text-rose-600 font-bold">{u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}</td>
+                                       <td className="px-3.5 py-3 text-right font-mono">
+                                         {includeLuncuran ? (
+                                           <span className="text-cyan-700 font-bold">{u.luncuran > 0 ? `+ Rp ${formatRp(u.luncuran)}` : 'Rp 0'}</span>
+                                         ) : (
+                                           <span className="text-slate-300 font-medium line-through text-[10px]" title="Tidak dihitung ke Total Pagu">Rp {formatRp(u.luncuran)}</span>
+                                         )}
+                                       </td>
                                        <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/30">Rp {formatRp(totalP)}</td>
                                      </tr>
                                      {isUnitExpanded && uMutasi.length > 0 && (
                                        <tr>
-                                         <td colSpan={8} className="p-0 border-b border-slate-200">
+                                         <td colSpan={9} className="p-0 border-b border-slate-200">
                                            <div className="bg-slate-50 pl-14 pr-4 py-4 shadow-inner">
                                              <table className="w-full text-[10px] text-left">
                                                <thead className="text-slate-400 border-b border-slate-200 uppercase font-black tracking-wider">
