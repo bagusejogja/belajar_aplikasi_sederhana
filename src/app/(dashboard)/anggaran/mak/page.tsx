@@ -185,12 +185,13 @@ export default function MonitoringMakPage() {
       // 2. Deteksi ekstensi asli secara presisi dari URL terlebih dahulu, fallback ke originalName
       const cleanUrl = url.split('?')[0];
       const urlExt = cleanUrl.split('.').pop()?.toLowerCase();
+      const validExts = ['xls', 'xlsx', 'csv', 'pdf', 'docx', 'doc', 'zip', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
       let ext = 'xlsx';
-      if (urlExt && ['xls', 'xlsx', 'csv', 'pdf', 'docx', 'doc', 'zip'].includes(urlExt)) {
+      if (urlExt && validExts.includes(urlExt)) {
         ext = urlExt;
       } else {
         const nameExt = originalName.split('.').pop()?.toLowerCase();
-        if (nameExt && ['xls', 'xlsx', 'csv', 'pdf', 'docx', 'doc', 'zip'].includes(nameExt)) {
+        if (nameExt && validExts.includes(nameExt)) {
           ext = nameExt;
         }
       }
@@ -201,20 +202,39 @@ export default function MonitoringMakPage() {
       const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
       const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
       
-      const response = await window.fetch(url);
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      let response: Response;
+      try {
+        response = await window.fetch(url);
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      } catch {
+        // Fallback to proxy if CORS fails
+        const proxyUrl = `/api/image-cors?url=${encodeURIComponent(url)}`;
+        response = await window.fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy HTTP Error ${response.status}`);
+      }
       
       const contentType = response.headers.get('content-type') || '';
-      // Jika yang di-return adalah HTML error page, jangan simpan sebagai binary xls/xlsx
       if (contentType.includes('text/html')) {
         window.open(url, '_blank');
         return;
       }
 
       const arrayBuf = await response.arrayBuffer();
-      const mimeType = ext === 'xls' ? 'application/vnd.ms-excel' 
-                     : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                     : (contentType || 'application/octet-stream');
+      const mimeMap: Record<string, string> = {
+        xls: 'application/vnd.ms-excel',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        pdf: 'application/pdf',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        png: 'image/png',
+        webp: 'image/webp',
+        gif: 'image/gif',
+        csv: 'text/csv',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        zip: 'application/zip'
+      };
+      const mimeType = mimeMap[ext] || contentType || 'application/octet-stream';
       
       const blob = new Blob([arrayBuf], { type: mimeType });
       const blobUrl = URL.createObjectURL(blob);
@@ -227,62 +247,72 @@ export default function MonitoringMakPage() {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (err) {
       console.error("Gagal download blob, fallback buka tab:", err);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = originalName;
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      window.open(url, '_blank');
     }
   };
 
   const renderFileLinks = (val: any, unitVal: string, uploadTime: string) => {
     const files = extractFilesFromValue(val);
-    if (files.length === 0) return <span>-</span>;
-    if (files.length === 1) {
-      return (
-        <div className="flex items-center gap-1.5 justify-center">
-          <button 
-            onClick={() => handleDownloadCustomName(files[0].url, files[0].name, unitVal, uploadTime)}
-            className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-sm"
-            title={`Download: ${files[0].name}`}
-          >
-            <Download size={14} strokeWidth={2.5} />
-            <span className="text-[11px] font-black uppercase tracking-wider">Download</span>
-          </button>
-          <a
-            href={files[0].url}
-            target="_blank"
-            rel="noreferrer"
-            className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-lg transition-colors"
-            title="Buka File Asli Direct"
-          >
-            <ExternalLink size={14} />
-          </a>
-        </div>
-      );
-    }
+    if (files.length === 0) return <span className="text-gray-300 font-bold text-xs">-</span>;
+
+    const getFileMeta = (file: { url: string; name: string }) => {
+      const cleanUrl = (file.url || '').split('?')[0];
+      const ext = (cleanUrl.split('.').pop() || file.name.split('.').pop() || '').toLowerCase();
+      
+      if (['xlsx', 'xls', 'csv'].includes(ext)) {
+        return { 
+          label: 'Matrik', 
+          icon: '📊', 
+          color: 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400' 
+        };
+      }
+      if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
+        return { 
+          label: 'Lampiran', 
+          icon: '🖼️', 
+          color: 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 hover:border-amber-400' 
+        };
+      }
+      if (['pdf'].includes(ext)) {
+        return { 
+          label: 'Lampiran', 
+          icon: '📄', 
+          color: 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100 hover:border-rose-400' 
+        };
+      }
+      if (['doc', 'docx'].includes(ext)) {
+        return { 
+          label: 'Lampiran', 
+          icon: '📝', 
+          color: 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100 hover:border-sky-400' 
+        };
+      }
+      return { 
+        label: 'Lampiran', 
+        icon: '📁', 
+        color: 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100 hover:border-indigo-400' 
+      };
+    };
+
     return (
-      <div className="relative inline-block">
-        <select 
-          onChange={(e) => {
-            if(e.target.value !== "") {
-              const file = files[parseInt(e.target.value)];
-              handleDownloadCustomName(file.url, file.name, unitVal, uploadTime);
-              e.target.value = "";
-            }
-          }}
-          className="appearance-none pr-8 pl-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] border border-indigo-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors w-36 shadow-sm truncate uppercase tracking-wider"
-        >
-          <option value="">{files.length} Lampiran</option>
-          {files.map((file, i) => (
-            <option key={i} value={String(i)}>⬇ {file.name}</option>
-          ))}
-        </select>
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500">
-          <Download size={14} strokeWidth={2.5} />
-        </div>
+      <div className="flex flex-col gap-1.5 items-start">
+        {files.map((file, i) => {
+          const meta = getFileMeta(file);
+          return (
+            <a
+              key={i}
+              href={file.url}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-lg border shadow-xs transition-all hover:scale-105 active:scale-95 select-none ${meta.color}`}
+              title={`Klik untuk buka: ${file.name || meta.label}`}
+            >
+              <span>{meta.icon}</span>
+              <span>{meta.label}</span>
+              <ExternalLink size={10} className="opacity-60 shrink-0 ml-0.5" />
+            </a>
+          );
+        })}
       </div>
     );
   };

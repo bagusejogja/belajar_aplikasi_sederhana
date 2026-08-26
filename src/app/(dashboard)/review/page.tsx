@@ -968,13 +968,25 @@ export default function ReviewPage() {
     });
 
     const totalSetelahPenyesuaian = totalDiajukan + totalPenyesuaian;
+    const pctPenyesuaian = totalDiajukan > 0 ? (totalPenyesuaian / totalDiajukan) * 100 : 0;
+    const pctSetelahPenyesuaian = totalDiajukan > 0 ? (totalSetelahPenyesuaian / totalDiajukan) * 100 : 0;
+
+    // Growth vs 2026 Pagu
+    const pagu2026 = komparasiGrandTotals.pagu2026;
+    const selisihVs2026 = totalSetelahPenyesuaian - pagu2026;
+    const growthVs2026 = pagu2026 > 0 ? ((selisihVs2026 / pagu2026) * 100) : 0;
 
     return {
       totalDiajukan,
       totalPenyesuaian,
-      totalSetelahPenyesuaian
+      totalSetelahPenyesuaian,
+      pctPenyesuaian,
+      pctSetelahPenyesuaian,
+      pagu2026,
+      selisihVs2026,
+      growthVs2026
     };
-  }, [unitGroupedData]);
+  }, [unitGroupedData, komparasiGrandTotals]);
 
   // Toggle Handlers
   const toggleUnit = (unitName: string) => {
@@ -1746,7 +1758,7 @@ export default function ReviewPage() {
         </div>
       </div>
 
-      {/* 3 KPI SUMMARY CARDS */}
+      {/* 3 KPI SUMMARY CARDS WITH PERCENTAGE INDICATORS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card className="bg-gradient-to-br from-blue-700 to-indigo-900 text-white rounded-2xl shadow-md border-0 overflow-hidden relative">
           <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
@@ -1760,9 +1772,12 @@ export default function ReviewPage() {
             <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
               Rp {formatRp(overallKPI.totalDiajukan)}
             </div>
-            <p className="text-[11px] text-blue-200/80 mt-1 font-medium">
-              Akumulasi usulan awal dari {filteredBudgets.length} baris anggaran
-            </p>
+            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-blue-100">
+              <span className="font-medium">Akumulasi {filteredBudgets.length} usulan</span>
+              <span className="font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-white text-[11px]">
+                100% Usulan
+              </span>
+            </div>
           </CardContent>
         </Card>
 
@@ -1778,9 +1793,18 @@ export default function ReviewPage() {
             <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
               {overallKPI.totalPenyesuaian > 0 ? '+' : ''}Rp {formatRp(overallKPI.totalPenyesuaian)}
             </div>
-            <p className="text-[11px] text-amber-100/80 mt-1 font-medium">
-              Selisih nominal penyesuaian hasil review
-            </p>
+            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-amber-100">
+              <span className="font-medium">Hasil Koreksi / Verif</span>
+              <span className={`font-bold px-2.5 py-0.5 rounded-full text-[11px] ${
+                overallKPI.totalPenyesuaian > 0 
+                  ? 'bg-emerald-400/30 text-white border border-emerald-300/40' 
+                  : overallKPI.totalPenyesuaian < 0 
+                  ? 'bg-rose-400/30 text-white border border-rose-300/40' 
+                  : 'bg-white/20 text-white'
+              }`}>
+                {overallKPI.pctPenyesuaian > 0 ? '+' : ''}{overallKPI.pctPenyesuaian.toFixed(2)}%
+              </span>
+            </div>
           </CardContent>
         </Card>
 
@@ -1796,9 +1820,18 @@ export default function ReviewPage() {
             <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
               Rp {formatRp(overallKPI.totalSetelahPenyesuaian)}
             </div>
-            <p className="text-[11px] text-emerald-100/80 mt-1 font-medium">
-              Total pagu usulan 2027 setelah penelaahan
-            </p>
+            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-emerald-100">
+              <span className="font-medium">
+                {overallKPI.pagu2026 > 0 ? (
+                  <span>vs Pagu 2026: <strong className="text-white">{overallKPI.growthVs2026 > 0 ? '+' : ''}{overallKPI.growthVs2026.toFixed(1)}%</strong></span>
+                ) : (
+                  <span>Total Final Usulan</span>
+                )}
+              </span>
+              <span className="font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-white text-[11px]">
+                {overallKPI.pctSetelahPenyesuaian.toFixed(1)}% Terakomodir
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
