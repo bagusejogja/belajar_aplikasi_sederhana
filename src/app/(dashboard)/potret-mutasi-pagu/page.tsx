@@ -62,7 +62,6 @@ export default function PotretMutasiPaguPage() {
   const [tambahPaguLetters, setTambahPaguLetters] = useState<any[]>([]);
   const [govMutasiRows, setGovMutasiRows] = useState<any[]>([]);
 
-  // Load Data Whenever Filters Change
   useEffect(() => {
     fetchGlobalMutasiData();
   }, [selectedYear, selectedGroupOrg, selectedUnit, includeLuncuran]);
@@ -70,7 +69,6 @@ export default function PotretMutasiPaguPage() {
   const fetchGlobalMutasiData = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch units with group_org
       const { data: unitsData } = await supabase
         .from('gov_units')
         .select('id, kode_unit, nama_unit, group_org')
@@ -79,11 +77,9 @@ export default function PotretMutasiPaguPage() {
       const units = unitsData || [];
       setUnitList(units);
 
-      // Extract unique group_org options
       const groups = Array.from(new Set(units.map(u => u.group_org).filter(Boolean)));
       setGroupOrgOptions(groups);
 
-      // Filter units based on selectedGroupOrg & selectedUnit
       let filteredUnits = units;
       if (selectedGroupOrg !== 'ALL') {
         filteredUnits = filteredUnits.filter(u => u.group_org === selectedGroupOrg);
@@ -92,165 +88,174 @@ export default function PotretMutasiPaguPage() {
         filteredUnits = filteredUnits.filter(u => u.id.toString() === selectedUnit.toString());
       }
 
-      // 2. Query `gov_pagu_anggaran` for selectedYear
       const { data: paguRows, error: errPagu } = await supabase
         .from('gov_pagu_anggaran')
         .select('*')
         .eq('tahun_anggaran', selectedYear);
 
       if (errPagu) console.error("Error fetching gov_pagu_anggaran:", errPagu);
-      const rows = paguRows || [];
 
-      // 3. Build Unit Breakdown table data matching exact filteredUnits
-      const unitMap = filteredUnits.map(u => {
-        const uRows = rows.filter(r => r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString()));
-        
-        let uPaguAwal = 0, uInisiatif = 0, uPenugasan = 0, uEfisiensi = 0, uPengalihan = 0, uTalangan = 0, uLuncuran = 0, uRealisasi = 0;
+      const filteredUnitIds = new Set(filteredUnits.map(u => u.id));
+      const activePaguRows = (paguRows || []).filter(r => filteredUnitIds.has(r.unit_id));
 
-        uRows.forEach(r => {
-          const j = (r.jenis_anggaran || '').toLowerCase().trim();
-          const nom = Number(r.nominal || 0);
+      let totalPaguAwal = 0;
+      let totalPengalihan = 0;
+      let totalInisiatif = 0;
+      let totalEfisiensi = 0;
+      let totalPenugasan = 0;
+      let totalLuncuran = 0;
+      let totalTalangan = 0;
 
-          if (j.includes('awal') || j.includes('dasar')) {
-            uPaguAwal += nom;
-          } else if (j.includes('inisiatif')) {
-            uInisiatif += nom;
-          } else if (j.includes('penugasan')) {
-            uPenugasan += nom;
-          } else if (j.includes('efisiensi')) {
-            uEfisiensi += nom;
-          } else if (j.includes('talangan') || j.includes('luncuran') || j.includes('carry over')) {
-            uLuncuran += nom;
-            uTalangan += nom;
-          } else if (j.includes('realisasi')) {
-            uRealisasi += nom;
-          } else if (j.includes('pengalihan') || j.includes('pergeseran') || j.includes('tambah') || j.includes('kurang')) {
-            uPengalihan += nom;
-          }
-        });
-
-        const uTotal = uPaguAwal + uInisiatif + uPenugasan + uEfisiensi + uPengalihan + (includeLuncuran ? uLuncuran : 0);
-        return {
+      const unitMap: Record<number, any> = {};
+      filteredUnits.forEach(u => {
+        unitMap[u.id] = {
           id: u.id,
           kode_unit: u.kode_unit,
           nama_unit: u.nama_unit,
-          group_org: u.group_org || '-',
-          pagu_awal: uPaguAwal,
-          inisiatif: uInisiatif,
-          penugasan: uPenugasan,
-          efisiensi: uEfisiensi,
-          pengalihan: uPengalihan,
-          talangan: uTalangan,
-          luncuran: uLuncuran,
-          total_pagu: uTotal,
-          realisasi: uRealisasi
+          group_org: u.group_org || 'Lainnya',
+          pagu_awal: 0,
+          pengalihan: 0,
+          inisiatif: 0,
+          efisiensi: 0,
+          penugasan: 0,
+          luncuran: 0,
+          talangan: 0,
+          total_pagu: 0
         };
       });
 
-      setUnitBreakdownData(unitMap);
+      activePaguRows.forEach(row => {
+        const nom = Number(row.nominal || 0);
+        const jenis = (row.jenis_anggaran || '').toLowerCase();
+        const ket = (row.keterangan || '').toLowerCase();
+        const uId = row.unit_id;
 
-      // 4. Calculate Mutasi Cards & Banner Totals DIRECTLY from unitMap sum for 100% Filter Consistency
-      const sumPaguAwal = unitMap.reduce((a, b) => a + b.pagu_awal, 0);
-      const sumInisiatif = unitMap.reduce((a, b) => a + b.inisiatif, 0);
-      const sumPenugasan = unitMap.reduce((a, b) => a + b.penugasan, 0);
-      const sumEfisiensi = unitMap.reduce((a, b) => a + b.efisiensi, 0);
-      const sumPengalihan = unitMap.reduce((a, b) => a + b.pengalihan, 0);
-      const sumTalangan = unitMap.reduce((a, b) => a + b.talangan, 0);
-      const sumLuncuran = unitMap.reduce((a, b) => a + b.luncuran, 0);
-      const sumRealisasi = unitMap.reduce((a, b) => a + b.realisasi, 0);
+        if (jenis.includes('pagu awal') || jenis === 'awal' || ket.includes('pagu awal')) {
+          totalPaguAwal += nom;
+          if (unitMap[uId]) unitMap[uId].pagu_awal += nom;
+        } else if (jenis.includes('pengalihan') || jenis.includes('kurang') || jenis.includes('tambah pagu')) {
+          totalPengalihan += nom;
+          if (unitMap[uId]) unitMap[uId].pengalihan += nom;
+        } else if (jenis.includes('inisiatif')) {
+          totalInisiatif += nom;
+          if (unitMap[uId]) unitMap[uId].inisiatif += nom;
+        } else if (jenis.includes('efisiensi')) {
+          totalEfisiensi += nom;
+          if (unitMap[uId]) unitMap[uId].efisiensi += nom;
+        } else if (jenis.includes('penugasan')) {
+          totalPenugasan += nom;
+          if (unitMap[uId]) unitMap[uId].penugasan += nom;
+        } else if (jenis.includes('luncuran') || ket.includes('luncuran')) {
+          totalLuncuran += nom;
+          if (unitMap[uId]) unitMap[uId].luncuran += nom;
+        } else if (jenis.includes('talangan') || ket.includes('talangan')) {
+          totalTalangan += nom;
+          if (unitMap[uId]) unitMap[uId].talangan += nom;
+        } else {
+          totalPengalihan += nom;
+          if (unitMap[uId]) unitMap[uId].pengalihan += nom;
+        }
+      });
+
+      Object.values(unitMap).forEach(u => {
+        u.total_pagu = u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi + (includeLuncuran ? u.luncuran : 0);
+      });
 
       setMutasiData({
-        pagu_awal: sumPaguAwal,
-        pengalihan: sumPengalihan,
-        tambah_inisiatif: sumInisiatif,
-        efisiensi: sumEfisiensi,
-        tambah_penugasan: sumPenugasan,
-        luncuran: sumLuncuran,
-        talangan_pindah: sumTalangan
+        pagu_awal: totalPaguAwal,
+        pengalihan: totalPengalihan,
+        tambah_inisiatif: totalInisiatif,
+        efisiensi: totalEfisiensi,
+        tambah_penugasan: totalPenugasan,
+        luncuran: totalLuncuran,
+        talangan_pindah: totalTalangan
       });
 
-      // 5. Query `data_penerimaan` for Rencana & Realisasi
-      const { data: penerimaanRows } = await supabase
-        .from('data_penerimaan')
-        .select('nominal, tipe_data')
-        .eq('tahun', selectedYear);
+      setUnitBreakdownData(Object.values(unitMap));
 
-      const penList = penerimaanRows || [];
-      const cRencanaPenerimaan = penList
-        .filter(p => p.tipe_data === 'RENCANA')
-        .reduce((acc, p) => acc + Number(p.nominal || 0), 0);
-      const cRealisasiPenerimaan = penList
-        .filter(p => p.tipe_data === 'REALISASI')
-        .reduce((acc, p) => acc + Number(p.nominal || 0), 0);
+      // Fetch Surat Tambah Pagu Data
+      const tambahPaguData = await getTambahPagu();
+      setTambahPaguLetters(tambahPaguData || []);
 
-      setPenerimaanData({
-        rencana: cRencanaPenerimaan,
-        realisasi: cRealisasiPenerimaan,
-        pengeluaran: sumRealisasi
-      });
-
-      // 6. Fetch detailed mutasi records directly from `gov_pagu_anggaran` with `gov_units`
-      try {
-        const { data: rawMutasi } = await supabase
-          .from('gov_pagu_anggaran')
-          .select('*, gov_units(nama_unit, group_org, kode_unit)')
-          .eq('tahun_anggaran', selectedYear)
-          .order('id', { ascending: true });
-
-        let filteredMutasi = rawMutasi || [];
-        
-        if (selectedGroupOrg !== 'ALL') {
-          filteredMutasi = filteredMutasi.filter(r => r.gov_units?.group_org === selectedGroupOrg);
-        }
-        if (selectedUnit !== 'ALL') {
-          filteredMutasi = filteredMutasi.filter(r => r.unit_id?.toString() === selectedUnit.toString());
-        }
-
-        setGovMutasiRows(filteredMutasi);
-      } catch (errMutasi) {
-        console.error("Error fetching gov_pagu_anggaran mutasi rows:", errMutasi);
-      }
-
-      // 7. Multi-Year Chart Data (2019-2026) with Smooth Extrapolation for Older Years
-      const { data: allYearsPagu } = await supabase
+      // Fetch Rincian Catatan Mutasi Pagu
+      const { data: allGovMutasi } = await supabase
         .from('gov_pagu_anggaran')
-        .select('tahun_anggaran, jenis_anggaran, nominal');
+        .select('*, gov_units(nama_unit, kode_unit, group_org)')
+        .eq('tahun_anggaran', selectedYear)
+        .order('id', { ascending: false });
 
-      const yearsList = ['2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026'];
-      const total2026Pagu = sumPaguAwal + sumInisiatif + sumPenugasan;
+      setGovMutasiRows(allGovMutasi || []);
 
-      const chartDataMapped = yearsList.map((yr, idx) => {
-        const yRows = (allYearsPagu || []).filter((r: any) => r.tahun_anggaran === yr);
-        let yPaguAwal = yRows.filter((r: any) => (r.jenis_anggaran || '').toLowerCase().includes('pagu awal')).reduce((a: number, b: any) => a + Number(b.nominal || 0), 0);
-        let yPenugasan = yRows.filter((r: any) => (r.jenis_anggaran || '').toLowerCase().includes('penugasan')).reduce((a: number, b: any) => a + Number(b.nominal || 0), 0);
-        let yInisiatif = yRows.filter((r: any) => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif')).reduce((a: number, b: any) => a + Number(b.nominal || 0), 0);
-        let yRealisasi = yRows.filter((r: any) => (r.jenis_anggaran || '').toLowerCase().includes('realisasi')).reduce((a: number, b: any) => a + Number(b.nominal || 0), 0);
-        
-        // If older year rows are 0 in DB, scale relative to 2026 baseline for a smooth multi-year growth curve
-        if (yPaguAwal === 0 && total2026Pagu > 0) {
-          const factor = 0.6 + (idx * 0.057); // 2019: 60%, 2020: 65.7%, ..., 2026: 100%
-          yPaguAwal = Math.round(sumPaguAwal * factor);
-          yInisiatif = Math.round(sumInisiatif * factor);
-          yPenugasan = Math.round(sumPenugasan * factor);
-          yRealisasi = Math.round((sumPaguAwal + sumInisiatif) * factor * 0.88);
-        }
+      // Fetch penerimaan statis
+      const { data: statisData } = await supabase
+        .from('app_laporan_statis')
+        .select('*, app_laporan_akun(kode_sistem, keterangan)')
+        .eq('tahun', Number(selectedYear));
 
-        const yTotal = yPaguAwal + yPenugasan + yInisiatif;
-
-        return {
-          tahun: yr,
-          pagu_awal: yPaguAwal,
-          tambah_penugasan: yPenugasan,
-          tambah_inisiatif: yInisiatif,
-          total_pagu: yTotal,
-          realisasi: yRealisasi
-        };
+      let renc = 0;
+      let real = 0;
+      let peng = 0;
+      if (statisData) {
+        statisData.forEach((s: any) => {
+          const ks = Array.isArray(s.app_laporan_akun) ? s.app_laporan_akun[0]?.kode_sistem : s.app_laporan_akun?.kode_sistem;
+          if (ks === 'JML_PEN') {
+            renc += Number(s.anggaran || 0);
+            real += Number(s.realisasi || 0);
+          } else if (ks === 'JML_PENG') {
+            peng += Number(s.realisasi || 0);
+          }
+        });
+      }
+      setPenerimaanData({
+        rencana: renc,
+        realisasi: real,
+        pengeluaran: peng
       });
 
-      setHistorisChartData(chartDataMapped);
+      // Historis Chart Multi-Tahun
+      const { data: multiPagu } = await supabase
+        .from('gov_pagu_anggaran')
+        .select('tahun_anggaran, jenis_anggaran, nominal, unit_id');
 
-    } catch (e) {
-      console.error("Error fetching mutasi data:", e);
+      const chartMap: Record<string, any> = {
+        '2019': { tahun: '2019', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2020': { tahun: '2020', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2021': { tahun: '2021', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2022': { tahun: '2022', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2023': { tahun: '2023', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2024': { tahun: '2024', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2025': { tahun: '2025', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+        '2026': { tahun: '2026', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
+      };
+
+      (multiPagu || []).forEach(mp => {
+        if (!filteredUnitIds.has(mp.unit_id)) return;
+        const thn = mp.tahun_anggaran;
+        if (chartMap[thn]) {
+          const nom = Number(mp.nominal || 0);
+          const j = (mp.jenis_anggaran || '').toLowerCase();
+          if (j.includes('pagu awal') || j === 'awal') chartMap[thn].pagu_awal += nom;
+          else if (j.includes('penugasan')) chartMap[thn].tambah_penugasan += nom;
+          else if (j.includes('inisiatif')) chartMap[thn].tambah_inisiatif += nom;
+          chartMap[thn].total_pagu += nom;
+        }
+      });
+
+      const { data: allStatis } = await supabase
+        .from('app_laporan_statis')
+        .select('tahun, realisasi, app_laporan_akun(kode_sistem)');
+
+      (allStatis || []).forEach((st: any) => {
+        const thn = st.tahun?.toString();
+        const ks = Array.isArray(st.app_laporan_akun) ? st.app_laporan_akun[0]?.kode_sistem : st.app_laporan_akun?.kode_sistem;
+        if (chartMap[thn] && ks === 'JML_PENG') {
+          chartMap[thn].realisasi += Number(st.realisasi || 0);
+        }
+      });
+
+      setHistorisChartData(Object.values(chartMap));
+    } catch (err: any) {
+      console.error("Error loading potret mutasi pagu data:", err);
     } finally {
       setIsLoading(false);
     }
@@ -260,91 +265,85 @@ export default function PotretMutasiPaguPage() {
     setIsSyncing(true);
     await fetchGlobalMutasiData();
     setIsSyncing(false);
-    alert("✨ Tarik Data Global Berhasil!\nData mutasi pagu langsung ditarik dari tabel database 'gov_pagu_anggaran', 'gov_units', & 'tambah_pagu'.");
   };
 
   const formatRp = (num: number) => {
-    return new Intl.NumberFormat('id-ID').format(num);
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num || 0);
   };
 
-  const exportToExcel = () => {
-    // Sheet 1: Breakdown Pagu Unit
-    const excelDataUnit = filteredUnits.map((u, idx) => ({
-      'No': idx + 1,
-      'Group Org': u.group_org,
-      'Kode Unit': u.kode_unit || '-',
-      'Nama Unit Kerja': u.nama_unit,
-      'Pagu Awal (Rp)': u.pagu_awal,
-      'Pengalihan (+/-) (Rp)': u.pengalihan,
-      'Tambah Inisiatif (Rp)': u.inisiatif,
-      'Tambah Penugasan (Rp)': u.penugasan,
-      'Efisiensi (Rp)': u.efisiensi,
-      'Total Pagu (Rp)': u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi),
-      'Realisasi (Rp)': u.realisasi,
-      '% Serapan': (u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi)) > 0 
-        ? ((u.realisasi / (u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi))) * 100).toFixed(1) + '%' 
-        : '0.0%'
-    }));
+  const totalMutasiPaguKeseluruhan = useMemo(() => {
+    return (
+      mutasiData.pagu_awal +
+      mutasiData.pengalihan +
+      mutasiData.tambah_inisiatif +
+      mutasiData.tambah_penugasan +
+      mutasiData.efisiensi +
+      (includeLuncuran ? mutasiData.luncuran : 0) +
+      mutasiData.talangan_pindah
+    );
+  }, [mutasiData, includeLuncuran]);
 
-    const worksheet1 = XLSX.utils.json_to_sheet(excelDataUnit);
-    worksheet1['!cols'] = [
-      { wch: 5 }, { wch: 15 }, { wch: 15 }, { wch: 40 },
-      { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 10 }
-    ];
+  const persenSerapan = useMemo(() => {
+    if (totalMutasiPaguKeseluruhan === 0) return 0;
+    return ((penerimaanData.pengeluaran / totalMutasiPaguKeseluruhan) * 100).toFixed(1);
+  }, [penerimaanData.pengeluaran, totalMutasiPaguKeseluruhan]);
 
-    // Sheet 2: Rincian Catatan Mutasi Pagu
-    const excelDataMutasi = filteredMutasiRows.map((r: any, idx: number) => ({
-      'No': idx + 1,
-      'Group Org': r.gov_units?.group_org || '-',
-      'Kode Unit': r.gov_units?.kode_unit || '-',
-      'Nama Unit Kerja': r.gov_units?.nama_unit || 'Unit Kerja',
-      'Jenis Mutasi / Anggaran': r.jenis_anggaran || 'Mutasi Pagu',
-      'Nominal Mutasi (Rp)': Number(r.nominal || 0),
-      'Rincian Catatan / Keterangan': r.keterangan || '- Tidak ada catatan khusus -'
-    }));
+  const filteredUnits = useMemo(() => {
+    return unitBreakdownData.filter(u => {
+      const matchSearch = searchQuery === '' || 
+        u.nama_unit.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.kode_unit.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.group_org.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchSearch;
+    });
+  }, [unitBreakdownData, searchQuery]);
 
-    const worksheet2 = XLSX.utils.json_to_sheet(excelDataMutasi);
-    worksheet2['!cols'] = [
-      { wch: 5 }, { wch: 15 }, { wch: 15 }, { wch: 40 },
-      { wch: 25 }, { wch: 20 }, { wch: 50 }
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet1, "Breakdown Pagu Unit");
-    XLSX.utils.book_append_sheet(workbook, worksheet2, "Rincian Mutasi");
-    
-    XLSX.writeFile(workbook, `Data_Mutasi_Pagu_${selectedYear}.xlsx`);
-  };
-
-  // Total Calculations
-  const totalMutasiPaguKeseluruhan = 
-    mutasiData.pagu_awal + 
-    mutasiData.tambah_inisiatif + 
-    mutasiData.tambah_penugasan + 
-    mutasiData.talangan_pindah + 
-    mutasiData.luncuran + 
-    mutasiData.pengalihan + 
-    mutasiData.efisiensi;
-
-  const persenSerapan = totalMutasiPaguKeseluruhan > 0 
-    ? ((penerimaanData.pengeluaran / totalMutasiPaguKeseluruhan) * 100).toFixed(1) 
-    : '0.0';
-
-  const filteredUnits = unitBreakdownData.filter(u => {
-    const q = searchQuery.toLowerCase();
-    return !searchQuery || u.nama_unit.toLowerCase().includes(q) || u.group_org.toLowerCase().includes(q);
-  });
-
-  // Filtered Mutasi Rows for Tab 3 (based on search query)
   const filteredMutasiRows = useMemo(() => {
     return govMutasiRows.filter(r => {
-      const q = searchQuery.toLowerCase();
-      const uName = (r.gov_units?.nama_unit || '').toLowerCase();
-      const ket = (r.keterangan || '').toLowerCase();
-      const jenis = (r.jenis_anggaran || '').toLowerCase();
-      return !searchQuery || uName.includes(q) || ket.includes(q) || jenis.includes(q);
+      const unitName = r.gov_units?.nama_unit || '';
+      const groupOrg = r.gov_units?.group_org || '';
+      const ket = r.keterangan || '';
+      const jenis = r.jenis_anggaran || '';
+
+      const matchGroup = selectedGroupOrg === 'ALL' || groupOrg === selectedGroupOrg;
+      const matchUnit = selectedUnit === 'ALL' || r.unit_id?.toString() === selectedUnit.toString();
+      const matchSearch = searchQuery === '' ||
+        unitName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ket.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        jenis.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchGroup && matchUnit && matchSearch;
     });
-  }, [govMutasiRows, searchQuery]);
+  }, [govMutasiRows, selectedGroupOrg, selectedUnit, searchQuery]);
+
+  const exportToExcel = () => {
+    const wsData = [
+      ['POTRET MUTASI PAGU ANGGARAN KESELURUHAN'],
+      [`Tahun Anggaran: ${selectedYear}`, `Group Org: ${selectedGroupOrg}`, `Unit: ${selectedUnit === 'ALL' ? 'Semua Unit' : selectedUnit}`],
+      [''],
+      ['No', 'Kode Unit', 'Group Org', 'Nama Unit Kerja', 'Pagu Awal (Rp)', 'Pengalihan (+/-)', 'Tambah Inisiatif (+)', 'Tambah Penugasan (+)', 'Efisiensi (-)', 'Luncuran (+)', 'Total Pagu Akhir (Rp)'],
+      ...filteredUnits.map((u, i) => [
+        i + 1,
+        u.kode_unit,
+        u.group_org,
+        u.nama_unit,
+        u.pagu_awal,
+        u.pengalihan,
+        u.inisiatif,
+        u.penugasan,
+        u.efisiensi,
+        u.luncuran,
+        u.total_pagu
+      ]),
+      [''],
+      ['TOTAL KESELURUHAN', '', '', '', mutasiData.pagu_awal, mutasiData.pengalihan, mutasiData.tambah_inisiatif, mutasiData.tambah_penugasan, mutasiData.efisiensi, mutasiData.luncuran, totalMutasiPaguKeseluruhan]
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Mutasi_Pagu');
+    XLSX.writeFile(wb, `Potret_Mutasi_Pagu_${selectedYear}_${Date.now()}.xlsx`);
+  };
 
   const availableUnitsForDropdown = useMemo(() => {
     if (selectedGroupOrg === 'ALL') return unitList;
@@ -353,19 +352,19 @@ export default function PotretMutasiPaguPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex flex-col justify-center items-center bg-slate-50 gap-3">
-        <RefreshCw className="animate-spin text-emerald-600 w-10 h-10" />
-        <p className="font-bold text-slate-600 text-sm">Menghubungkan Database gov_pagu_anggaran & tambah_pagu...</p>
+      <div className="h-96 flex flex-col justify-center items-center gap-3">
+        <RefreshCw className="animate-spin text-indigo-600 w-8 h-8" />
+        <p className="font-bold text-gray-500 text-xs">Menghubungkan Database gov_pagu_anggaran & tambah_pagu...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
       {/* 1. SLIM & UNIFIED TOP TOOLBAR WITH FILTERS */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-2 rounded-xl text-white shadow-xs">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
             <BarChart3 size={20} />
           </div>
           <div>
@@ -373,12 +372,12 @@ export default function PotretMutasiPaguPage() {
               <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
                 Potret Mutasi Pagu Keseluruhan
               </h1>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 TA {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group' : selectedGroupOrg}
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Data dikalkulasi dari tabel database <span className="font-mono text-indigo-700 font-bold">gov_pagu_anggaran</span>, <span className="font-mono text-indigo-700 font-bold">gov_units</span>, & <span className="font-mono text-indigo-700 font-bold">tambah_pagu</span>.
+              Konsolidasi mutasi pagu resmi, inisiatif, penugasan, luncuran & realisasi serapan
             </p>
           </div>
         </div>
@@ -431,7 +430,7 @@ export default function PotretMutasiPaguPage() {
               <ChevronDown size={13} className="text-gray-400 shrink-0" />
             </div>
             {isUnitDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
                 <div className="p-2 border-b border-gray-100">
                   <input
                     autoFocus
@@ -463,14 +462,14 @@ export default function PotretMutasiPaguPage() {
                         }
                       }
                     }}
-                    className="w-full bg-gray-50 border border-gray-200 text-xs font-medium p-2 rounded-lg outline-none focus:border-indigo-500"
+                    className="w-full bg-gray-50 border border-gray-200 text-xs font-medium p-2 rounded-xl outline-none focus:border-indigo-500"
                   />
                 </div>
-                <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
+                <div className="max-h-60 overflow-y-auto p-1 space-y-0.5">
                   <div 
                     onMouseEnter={() => setHighlightedIndex(0)}
                     onClick={() => { setSelectedUnit('ALL'); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
-                    className={`px-3 py-1.5 text-[11px] font-bold rounded-lg cursor-pointer transition-colors ${highlightedIndex === 0 ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xl cursor-pointer transition-colors ${highlightedIndex === 0 ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
                   >
                     SEMUA UNIT KERJA
                   </div>
@@ -481,7 +480,7 @@ export default function PotretMutasiPaguPage() {
                         key={u.id}
                         onMouseEnter={() => setHighlightedIndex(idx + 1)}
                         onClick={() => { setSelectedUnit(u.id); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
-                        className={`px-3 py-1.5 text-[11px] font-medium rounded-lg cursor-pointer truncate transition-colors ${highlightedIndex === idx + 1 ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-xl cursor-pointer truncate transition-colors ${highlightedIndex === idx + 1 ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-gray-700 hover:bg-gray-50'}`}
                       >
                         [{u.kode_unit}] {u.nama_unit}
                       </div>
@@ -495,15 +494,16 @@ export default function PotretMutasiPaguPage() {
           <button 
             onClick={handleSyncGlobalData}
             disabled={isSyncing}
-            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+            className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl font-semibold text-xs transition-all shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+            title="Tarik & Hitung Ulang Data"
           >
-            <RefreshCw size={13} className={isSyncing ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={isSyncing ? "animate-spin text-indigo-600" : "text-gray-500"} />
             <span>{isSyncing ? "Menarik..." : "Tarik Data"}</span>
           </button>
           
           <button 
             onClick={exportToExcel}
-            className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs transition-all shadow-xs flex items-center gap-1.5"
           >
             <Download size={13} />
             <span>Excel</span>
@@ -514,14 +514,14 @@ export default function PotretMutasiPaguPage() {
       {/* 2. POTRET MUTASI PAGU KESELURUHAN CONTAINER */}
       <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
         {/* Container Header */}
-        <div className="p-4 px-5 bg-gray-50/80 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div className="p-3.5 px-5 bg-gray-50/80 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <div className="bg-emerald-600 text-white p-1.5 rounded-lg shadow-2xs">
-              <BarChart3 size={16} />
+            <div className="bg-indigo-600 text-white p-1.5 rounded-lg shadow-2xs">
+              <BarChart3 size={15} />
             </div>
             <div>
-              <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
-                Ringkasan Pagu & Mutasi
+              <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                Ringkasan Pagu & Komponen Mutasi
               </h2>
               <p className="text-[10px] text-gray-500 font-medium">
                 Tahun Anggaran {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group Org' : `Group: ${selectedGroupOrg}`}
@@ -530,48 +530,38 @@ export default function PotretMutasiPaguPage() {
           </div>
         </div>
 
-        {/* 2-COLUMN DISPLAY CARDS MATCHING SCREENSHOT (PREMIUM MODERN DESIGN) */}
-        <div className="p-6 md:p-10 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 2-COLUMN DISPLAY CARDS */}
+        <div className="p-4 md:p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             
             {/* 1. PAGU AWAL CARD */}
-            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-xl border border-slate-700/80 hover:border-indigo-500/50 transition-all group relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl text-indigo-300 border border-white/10 group-hover:scale-110 transition-transform">
-                    <Wallet size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest block">PAGU AWAL</span>
-                    <span className="text-[10px] text-slate-400">Pagu Dasar Penetapan RKAT {selectedYear}</span>
-                  </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
+                  <Wallet size={18} />
                 </div>
-                <span className="px-3 py-1 bg-slate-800 border border-slate-700 text-indigo-300 rounded-full text-[10px] font-bold font-mono">
-                  PAGU RESMI
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PAGU AWAL</span>
+                  <span className="text-[10px] text-gray-500 font-medium">Pagu Dasar Penetapan RKAT {selectedYear}</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-white tracking-tight">
+              <div className="text-right font-mono font-bold text-lg text-gray-900">
                 Rp {formatRp(mutasiData.pagu_awal)}
               </div>
             </div>
 
             {/* 2. PENGALIHAN (+/-) CARD */}
-            <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-indigo-700/60 hover:border-indigo-400/60 transition-all group relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-indigo-500/20 backdrop-blur-md rounded-2xl text-indigo-300 border border-indigo-400/20 group-hover:scale-110 transition-transform">
-                    <RefreshCw size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-indigo-200 uppercase tracking-widest block">PENGALIHAN (+/-)</span>
-                    <span className="text-[10px] text-indigo-300/80">Pergeseran Anggaran Antar Unit</span>
-                  </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
+                  <RefreshCw size={18} />
                 </div>
-                <span className="px-3 py-1 bg-indigo-950/80 border border-indigo-500/30 text-indigo-300 rounded-full text-[10px] font-bold font-mono">
-                  MUTASI INTRA
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PENGALIHAN (+/-)</span>
+                  <span className="text-[10px] text-gray-500 font-medium">Pergeseran Anggaran Antar Unit</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-indigo-200 tracking-tight">
+              <div className="text-right font-mono font-bold text-lg text-indigo-700">
                 {mutasiData.pengalihan > 0 ? `+ Rp ${formatRp(mutasiData.pengalihan)}` : mutasiData.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(mutasiData.pengalihan))}` : `Rp ${formatRp(mutasiData.pengalihan)}`}
               </div>
             </div>
@@ -579,25 +569,20 @@ export default function PotretMutasiPaguPage() {
             {/* 3. TAMBAH PAGU - INISIATIF (+) CARD */}
             <div 
               onClick={() => setActiveModalCategory('inisiatif')}
-              className="bg-gradient-to-br from-emerald-950 via-teal-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-emerald-500/40 hover:border-emerald-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl text-emerald-300 border border-emerald-400/20 group-hover:scale-110 transition-transform">
-                    <Sparkles size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest block flex items-center gap-1.5">
-                      TAMBAH PAGU - INISIATIF (+) <ArrowUpRight size={14} className="text-emerald-400" />
-                    </span>
-                    <span className="text-[10px] text-emerald-200/80">Klik untuk Rincian Usulan Inisiatif</span>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                  <Sparkles size={18} />
                 </div>
-                <span className="px-3 py-1 bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-bold">
-                  ⚡ INISIATIF UNIT
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
+                    TAMBAH PAGU - INISIATIF (+) <ArrowUpRight size={12} className="text-emerald-500" />
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium">Klik untuk Rincian Usulan Inisiatif</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-emerald-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+              <div className="text-right font-mono font-bold text-lg text-emerald-700">
                 + Rp {formatRp(mutasiData.tambah_inisiatif)}
               </div>
             </div>
@@ -605,25 +590,20 @@ export default function PotretMutasiPaguPage() {
             {/* 4. EFISIENSI (-) CARD */}
             <div 
               onClick={() => setActiveModalCategory('efisiensi')}
-              className="bg-gradient-to-br from-rose-950 via-rose-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-rose-500/40 hover:border-rose-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+              className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex items-center justify-between hover:border-rose-400 transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-rose-500/20 backdrop-blur-md rounded-2xl text-rose-300 border border-rose-400/20 group-hover:scale-110 transition-transform">
-                    <ArrowDownRight size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-rose-300 uppercase tracking-widest block flex items-center gap-1.5">
-                      EFISIENSI (-) <ArrowDownRight size={14} className="text-rose-400" />
-                    </span>
-                    <span className="text-[10px] text-rose-200/80">Klik untuk Rincian Pengurangan Pagu</span>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600">
+                  <ArrowDownRight size={18} />
                 </div>
-                <span className="px-3 py-1 bg-rose-900/80 border border-rose-500/40 text-rose-300 rounded-full text-[10px] font-bold">
-                  🔻 PENGURANGAN
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block flex items-center gap-1">
+                    EFISIENSI (-) <ArrowDownRight size={12} className="text-rose-500" />
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium">Klik untuk Rincian Pengurangan Pagu</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-rose-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+              <div className="text-right font-mono font-bold text-lg text-rose-600">
                 {mutasiData.efisiensi !== 0 ? `Rp ${formatRp(mutasiData.efisiensi)}` : 'Rp 0'}
               </div>
             </div>
@@ -631,122 +611,112 @@ export default function PotretMutasiPaguPage() {
             {/* 5. TAMBAH PAGU - PENUGASAN (+) CARD */}
             <div 
               onClick={() => setActiveModalCategory('penugasan')}
-              className="bg-gradient-to-br from-emerald-900 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border-2 border-emerald-500/40 hover:border-emerald-400 transition-all group relative overflow-hidden cursor-pointer active:scale-[0.99]"
+              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-500/20 backdrop-blur-md rounded-2xl text-emerald-300 border border-emerald-400/20 group-hover:scale-110 transition-transform">
-                    <Landmark size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-emerald-300 uppercase tracking-widest block flex items-center gap-1.5">
-                      TAMBAH PAGU - PENUGASAN (+) <ArrowUpRight size={14} className="text-emerald-400" />
-                    </span>
-                    <span className="text-[10px] text-emerald-200/80">Klik untuk Rincian Penugasan Pimpinan</span>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
+                  <Landmark size={18} />
                 </div>
-                <span className="px-3 py-1 bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 rounded-full text-[10px] font-bold">
-                  🏛️ PENUGASAN
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
+                    TAMBAH PAGU - PENUGASAN (+) <ArrowUpRight size={12} className="text-emerald-500" />
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-medium">Klik untuk Rincian Penugasan Pimpinan</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-emerald-300 tracking-tight group-hover:translate-x-[-4px] transition-transform">
+              <div className="text-right font-mono font-bold text-lg text-emerald-700">
                 + Rp {formatRp(mutasiData.tambah_penugasan)}
               </div>
             </div>
 
             {/* 6. LUNCURAN (+) CARD */}
-            <div className="bg-gradient-to-br from-cyan-950 via-teal-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-cyan-700/60 hover:border-cyan-400/60 transition-all group relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-cyan-500/20 backdrop-blur-md rounded-2xl text-cyan-300 border border-cyan-400/20 group-hover:scale-110 transition-transform">
-                    <TrendingUp size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-cyan-200 uppercase tracking-widest block">LUNCURAN (+)</span>
-                    <span className="text-[10px] text-cyan-300/80">Carry Over Sisa Pagu Tahun Sebelumnya</span>
-                  </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-cyan-50 rounded-xl text-cyan-600">
+                  <TrendingUp size={18} />
                 </div>
-                <span className="px-3 py-1 bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 rounded-full text-[10px] font-bold font-mono">
-                  CARRY OVER
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">LUNCURAN (+)</span>
+                  <span className="text-[10px] text-gray-500 font-medium">Carry Over Sisa Pagu Tahun Sebelumnya</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-cyan-200 tracking-tight">
+              <div className="text-right font-mono font-bold text-lg text-cyan-700">
                 + Rp {formatRp(mutasiData.luncuran)}
               </div>
             </div>
 
             {/* 7. TALANGAN PINDAH FAKULTAS CARD */}
-            <div className="bg-gradient-to-br from-amber-950 via-amber-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-amber-700/60 hover:border-amber-400/60 transition-all group relative overflow-hidden col-span-1 md:col-span-2">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-amber-500/20 backdrop-blur-md rounded-2xl text-amber-300 border border-amber-400/20 group-hover:scale-110 transition-transform">
-                    <DollarSign size={20} />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-amber-200 uppercase tracking-widest block">TALANGAN PINDAH FAKULTAS</span>
-                    <span className="text-[10px] text-amber-300/80">Dana Talangan Transisi Pindah Fakultas/Unit</span>
-                  </div>
+            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between col-span-1 md:col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
+                  <DollarSign size={18} />
                 </div>
-                <span className="px-3 py-1 bg-amber-950/80 border border-amber-500/30 text-amber-300 rounded-full text-[10px] font-bold font-mono">
-                  TALANGAN
-                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TALANGAN PINDAH FAKULTAS</span>
+                  <span className="text-[10px] text-gray-500 font-medium">Dana Talangan Transisi Pindah Fakultas/Unit</span>
+                </div>
               </div>
-              <div className="text-right font-mono font-black text-2xl md:text-3xl text-amber-300 tracking-tight">
+              <div className="text-right font-mono font-bold text-lg text-amber-700">
                 Rp {formatRp(mutasiData.talangan_pindah)}
               </div>
             </div>
 
           </div>
 
-          {/* BIG SUMMARY TOTAL BANNER AT BOTTOM OF GRID */}
-          <div className="pt-6 border-t border-slate-100 space-y-4">
-            <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 rounded-3xl p-6 md:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-              <div className="relative z-10">
-                <span className="text-[11px] font-black uppercase tracking-widest text-emerald-200 block mb-1">
+          {/* TOTAL BANNER & 3 RECEIPT CARDS */}
+          <div className="pt-2 space-y-3">
+            <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-sky-900 rounded-2xl p-5 text-white shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-200 block">
                   TOTAL MUTASI PAGU KESELURUHAN ({selectedYear})
                 </span>
-                <h3 className="text-2xl md:text-4xl font-black font-mono tracking-tight text-white">
+                <h3 className="text-xl md:text-2xl font-black font-mono tracking-tight text-white mt-0.5">
                   Rp {formatRp(totalMutasiPaguKeseluruhan)}
                 </h3>
-                <p className="text-xs text-emerald-100 font-medium mt-1">
+                <p className="text-[11px] text-indigo-200 font-medium mt-0.5">
                   Pagu Awal + Inisiatif + Penugasan + Talangan + Luncuran + Pengalihan - Efisiensi
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 relative z-10 self-end md:self-auto">
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 px-5 py-3 rounded-2xl text-right">
-                  <span className="text-[10px] uppercase font-bold text-emerald-200 block">Persentase Realisasi</span>
-                  <span className="text-xl font-black font-mono text-amber-300">{persenSerapan}%</span>
-                </div>
+              <div className="bg-white/10 border border-white/20 px-4 py-2 rounded-xl text-right">
+                <span className="text-[10px] uppercase font-bold text-indigo-200 block">Persentase Serapan</span>
+                <span className="text-base font-black font-mono text-amber-300">{persenSerapan}% Terpakai</span>
               </div>
-
-              <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
             </div>
 
-            {/* 3 HIGH IMPACT RECEIPT CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-indigo-600 text-white rounded-3xl p-6 shadow-lg shadow-indigo-600/15 flex flex-col justify-between">
+            {/* 3 KPI RECEIPT CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-indigo-200 block mb-1">Rencana Penerimaan</span>
-                  <div className="text-xl md:text-2xl font-black font-mono">Rp {formatRp(penerimaanData.rencana)}</div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-gray-400 block">Rencana Penerimaan</span>
+                  <div className="text-base font-black font-mono text-gray-900 mt-0.5">Rp {formatRp(penerimaanData.rencana)}</div>
+                  <div className="text-[10px] text-indigo-600 font-semibold">Target Penerimaan TA {selectedYear}</div>
                 </div>
-                <div className="mt-4 text-[10px] text-indigo-200 font-medium">Target Penerimaan Tahun {selectedYear}</div>
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Wallet size={18} />
+                </div>
               </div>
 
-              <div className="bg-sky-600 text-white rounded-3xl p-6 shadow-lg shadow-sky-600/15 flex flex-col justify-between">
+              <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-sky-200 block mb-1">Realisasi Penerimaan</span>
-                  <div className="text-xl md:text-2xl font-black font-mono">Rp {formatRp(penerimaanData.realisasi)}</div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-gray-400 block">Realisasi Penerimaan</span>
+                  <div className="text-base font-black font-mono text-emerald-700 mt-0.5">Rp {formatRp(penerimaanData.realisasi)}</div>
+                  <div className="text-[10px] text-emerald-600 font-semibold">Capaian Penerimaan Terbukti</div>
                 </div>
-                <div className="mt-4 text-[10px] text-sky-200 font-medium">Capaian Penerimaan Terbukti</div>
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <TrendingUp size={18} />
+                </div>
               </div>
 
-              <div className="bg-cyan-600 text-white rounded-3xl p-6 shadow-lg shadow-cyan-600/15 flex flex-col justify-between">
+              <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-cyan-200 block mb-1">Total Realisasi Pengeluaran ({selectedYear})</span>
-                  <div className="text-xl md:text-2xl font-black font-mono">Rp {formatRp(penerimaanData.pengeluaran)}</div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-gray-400 block">Realisasi Pengeluaran</span>
+                  <div className="text-base font-black font-mono text-rose-600 mt-0.5">Rp {formatRp(penerimaanData.pengeluaran)}</div>
+                  <div className="text-[10px] text-rose-600 font-semibold">Penyerapan Anggaran TA {selectedYear}</div>
                 </div>
-                <div className="mt-4 text-[10px] text-cyan-200 font-medium">Penyerapan Anggaran s.d. Saat Ini</div>
+                <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+                  <ArrowDownRight size={18} />
+                </div>
               </div>
             </div>
           </div>
@@ -754,95 +724,92 @@ export default function PotretMutasiPaguPage() {
       </div>
 
       {/* 3. TAB NAVIGATION FOR BREAKDOWNS */}
-      <div className="bg-white rounded-[2.5rem] p-6 md:p-8 border border-slate-200/80 shadow-sm space-y-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+      <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs space-y-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 border-b border-gray-100 pb-3">
           {/* Left: Tab Switcher */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl w-full sm:w-auto overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setActiveTab('chart')}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'chart' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'chart' ? 'bg-white text-indigo-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              📊 <span>Visualisasi Chart</span>
+              <BarChart3 size={14} /> <span>Visualisasi Chart</span>
             </button>
             <button
               onClick={() => setActiveTab('unit-group')}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'unit-group' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'unit-group' ? 'bg-white text-indigo-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              📂 <span>Terkelompok (Group Org)</span>
+              <Layers size={14} /> <span>Terkelompok (Group Org)</span>
             </button>
             <button
               onClick={() => setActiveTab('surat')}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'surat' ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5 ${activeTab === 'surat' ? 'bg-white text-indigo-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              📄 <span>Rincian Mutasi ({filteredMutasiRows.length})</span>
+              <FileText size={14} /> <span>Rincian Mutasi ({filteredMutasiRows.length})</span>
             </button>
           </div>
 
           {/* Right: Toggle Switch & Search Bar */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
-            {/* LUNCURAN / TALANGAN TOGGLE SWITCH */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
             <button 
               type="button"
               onClick={() => setIncludeLuncuran(!includeLuncuran)}
-              className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer ${
+              className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-semibold transition-all shadow-2xs shrink-0 cursor-pointer ${
                 includeLuncuran 
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-sm' 
-                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <div className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
-                includeLuncuran ? 'bg-indigo-400' : 'bg-slate-200'
+              <div className={`relative inline-flex h-3.5 w-6 shrink-0 rounded-full transition-colors duration-200 ${
+                includeLuncuran ? 'bg-indigo-600' : 'bg-gray-300'
               }`}>
-                <span className={`inline-block h-3 w-3 m-0.5 transform rounded-full bg-white transition duration-200 shadow-xs ${
-                  includeLuncuran ? 'translate-x-3' : 'translate-x-0'
+                <span className={`inline-block h-2.5 w-2.5 m-0.5 transform rounded-full bg-white transition duration-200 ${
+                  includeLuncuran ? 'translate-x-2.5' : 'translate-x-0'
                 }`} />
               </div>
-              <span className="text-[11px] tracking-tight">
-                {includeLuncuran ? '✓ Termasuk Luncuran/Talangan' : 'Tanpa Luncuran/Talangan'}
+              <span className="text-[11px]">
+                {includeLuncuran ? 'Termasuk Luncuran' : 'Tanpa Luncuran'}
               </span>
             </button>
 
             {(activeTab === 'unit-group' || activeTab === 'surat') && (
               <div className="relative w-full sm:w-56">
-                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   placeholder={activeTab === 'unit-group' ? "Cari unit / group..." : "Cari catatan mutasi..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-9 pr-3 py-2 text-xs outline-none focus:border-emerald-500 focus:bg-white transition-all font-medium"
+                  className="w-full h-9 bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 text-xs outline-none focus:border-indigo-500 focus:bg-white transition-all font-semibold"
                 />
               </div>
             )}
           </div>
         </div>
 
-        {/* TAB 1: VISUALISASI CHART (RECHARTS COMPOSED CHART MULTI-TAHUN) */}
+        {/* TAB 1: VISUALISASI CHART */}
         {activeTab === 'chart' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                <BarChart3 size={16} className="text-emerald-600" /> Grafik Tren Posisi Pagu & Realisasi Multi-Tahun (2019 - 2026)
-              </h3>
-            </div>
+          <div className="space-y-3 animate-in fade-in duration-300">
+            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+              <BarChart3 size={15} className="text-indigo-600" /> Tren Posisi Pagu & Realisasi Multi-Tahun (2019 - 2026)
+            </h3>
 
-            <div className="bg-slate-50 border border-slate-200/80 rounded-3xl p-6 shadow-inner">
-              <div className="w-full h-[360px]">
+            <div className="bg-gray-50/50 border border-gray-200/80 rounded-2xl p-4">
+              <div className="w-full h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
                     data={historisChartData}
                     margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
                   >
-                    <CartesianGrid stroke="#f1f5f9" />
-                    <XAxis dataKey="tahun" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 12, fontWeight: 700}} />
-                    <YAxis tickFormatter={(val) => `Rp ${(val / 1e9).toFixed(0)}M`} axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 12}} width={80} />
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="tahun" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11, fontWeight: 700}} />
+                    <YAxis tickFormatter={(val) => `Rp ${(val / 1e9).toFixed(0)}M`} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} width={70} />
                     <Tooltip formatter={(value: any) => `Rp ${formatRp(Number(value))}`} />
-                    <Legend wrapperStyle={{fontSize: '12px', fontWeight: 600}} />
-                    <Bar dataKey="pagu_awal" stackId="a" fill="#3b82f6" name="Pagu Awal" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="tambah_penugasan" stackId="a" fill="#10b981" name="Pagu Penugasan" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="tambah_inisiatif" stackId="a" fill="#34d399" name="Pagu Inisiatif" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="total_pagu" stroke="#06b6d4" strokeWidth={3} name="Total Pagu" dot={{r: 5, fill: '#06b6d4'}} activeDot={{r: 7}} />
-                    <Line type="monotone" dataKey="realisasi" stroke="#f59e0b" strokeWidth={3} name="Realisasi" dot={{r: 5, fill: '#f59e0b'}} activeDot={{r: 7}} />
+                    <Legend wrapperStyle={{fontSize: '11px', fontWeight: 600}} />
+                    <Bar dataKey="pagu_awal" stackId="a" fill="#4f46e5" name="Pagu Awal" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="tambah_penugasan" stackId="a" fill="#059669" name="Pagu Penugasan" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="tambah_inisiatif" stackId="a" fill="#10b981" name="Pagu Inisiatif" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="total_pagu" stroke="#0284c7" strokeWidth={2.5} name="Total Pagu" dot={{r: 4, fill: '#0284c7'}} activeDot={{r: 6}} />
+                    <Line type="monotone" dataKey="realisasi" stroke="#f59e0b" strokeWidth={2.5} name="Realisasi" dot={{r: 4, fill: '#f59e0b'}} activeDot={{r: 6}} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -852,293 +819,233 @@ export default function PotretMutasiPaguPage() {
 
         {/* TAB 2: BREAKDOWN PER UNIT KERJA (GROUP ORG COLLAPSE) */}
         {activeTab === 'unit-group' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-3 py-3 text-center w-10"></th>
-                      <th className="px-4 py-3">Group & Nama Unit Kerja</th>
-                      <th className="px-3.5 py-3 text-right">Pagu Awal (Rp)</th>
-                      <th className="px-3.5 py-3 text-right text-indigo-600">Pengalihan (+/-)</th>
-                      <th className="px-3.5 py-3 text-right text-emerald-600">+ Inisiatif</th>
-                      <th className="px-3.5 py-3 text-right text-emerald-600">+ Penugasan</th>
-                      <th className="px-3.5 py-3 text-right text-rose-600">- Efisiensi</th>
-                      <th className="px-3.5 py-3 text-right text-cyan-600">+ Luncuran / Talangan</th>
-                      <th className="px-3.5 py-3 text-right font-black text-slate-800 bg-slate-100/50">Total Pagu (Rp)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredUnits.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="px-6 py-8 text-center text-slate-400 font-medium">
-                          Tidak ada data unit yang sesuai filter.
-                        </td>
-                      </tr>
-                    ) : (
-                      (() => {
-                        const groupedUnits: Record<string, typeof filteredUnits> = {};
-                        filteredUnits.forEach(u => {
-                          if (!groupedUnits[u.group_org]) groupedUnits[u.group_org] = [];
-                          groupedUnits[u.group_org].push(u);
-                        });
-                        return Object.entries(groupedUnits).map(([groupName, units]) => {
-                          const isExpanded = !!expandedGroups[groupName];
-                          const gPaguAwal = units.reduce((a, b) => a + b.pagu_awal, 0);
-                          const gPengalihan = units.reduce((a, b) => a + b.pengalihan, 0);
-                          const gInisiatif = units.reduce((a, b) => a + b.inisiatif, 0);
-                          const gPenugasan = units.reduce((a, b) => a + b.penugasan, 0);
-                          const gEfisiensi = units.reduce((a, b) => a + b.efisiensi, 0);
-                          const gLuncuran = units.reduce((a, b) => a + b.luncuran, 0);
-                          const gTotalPagu = units.reduce((a, b) => a + (b.total_pagu || (b.pagu_awal + b.pengalihan + b.inisiatif + b.penugasan + b.efisiensi + (includeLuncuran ? b.luncuran : 0))), 0);
+          <div className="overflow-x-auto border border-gray-200 rounded-xl animate-in fade-in duration-300">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-gray-50/80 text-gray-400 uppercase font-black text-[10px] tracking-wider border-b border-gray-200">
+                <tr>
+                  <th className="py-2.5 px-3 text-center w-8"></th>
+                  <th className="py-2.5 px-4">Group & Nama Unit Kerja</th>
+                  <th className="py-2.5 px-3 text-right">Pagu Awal</th>
+                  <th className="py-2.5 px-3 text-right text-indigo-600">Pengalihan</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-600">+ Inisiatif</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-600">+ Penugasan</th>
+                  <th className="py-2.5 px-3 text-right text-rose-600">- Efisiensi</th>
+                  <th className="py-2.5 px-3 text-right text-cyan-600">+ Luncuran</th>
+                  <th className="py-2.5 px-3 text-right font-black text-gray-900 bg-gray-100/50">Total Pagu</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredUnits.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-gray-400 italic">
+                      Tidak ada data unit yang sesuai filter.
+                    </td>
+                  </tr>
+                ) : (
+                  (() => {
+                    const groupedUnits: Record<string, typeof filteredUnits> = {};
+                    filteredUnits.forEach(u => {
+                      if (!groupedUnits[u.group_org]) groupedUnits[u.group_org] = [];
+                      groupedUnits[u.group_org].push(u);
+                    });
+                    return Object.entries(groupedUnits).map(([groupName, units]) => {
+                      const isExpanded = !!expandedGroups[groupName];
+                      const gPaguAwal = units.reduce((a, b) => a + b.pagu_awal, 0);
+                      const gPengalihan = units.reduce((a, b) => a + b.pengalihan, 0);
+                      const gInisiatif = units.reduce((a, b) => a + b.inisiatif, 0);
+                      const gPenugasan = units.reduce((a, b) => a + b.penugasan, 0);
+                      const gEfisiensi = units.reduce((a, b) => a + b.efisiensi, 0);
+                      const gLuncuran = units.reduce((a, b) => a + b.luncuran, 0);
+                      const gTotalPagu = units.reduce((a, b) => a + (b.total_pagu || (b.pagu_awal + b.pengalihan + b.inisiatif + b.penugasan + b.efisiensi + (includeLuncuran ? b.luncuran : 0))), 0);
 
-                          return (
-                            <React.Fragment key={groupName}>
-                              <tr 
-                                onClick={() => setExpandedGroups(prev => ({...prev, [groupName]: !prev[groupName]}))} 
-                                className={`cursor-pointer transition-colors text-[11px] font-bold ${isExpanded ? 'bg-indigo-50/50' : 'hover:bg-slate-50'}`}
-                              >
-                                <td className="px-3 py-3 text-center text-slate-400">
-                                   {isExpanded ? <ChevronUp size={16} className="mx-auto" /> : <ChevronDown size={16} className="mx-auto" />}
-                                </td>
-                                <td className="px-4 py-3 text-slate-900 flex items-center gap-2 font-black">
-                                   <Layers size={14} className="text-indigo-600" />
-                                   {groupName} ({units.length} Unit)
-                                </td>
-                                <td className="px-3.5 py-3 text-right font-mono text-slate-600">Rp {formatRp(gPaguAwal)}</td>
-                                <td className="px-3.5 py-3 text-right font-mono text-indigo-700">{gPengalihan > 0 ? `+ Rp ${formatRp(gPengalihan)}` : gPengalihan < 0 ? `- Rp ${formatRp(Math.abs(gPengalihan))}` : 'Rp 0'}</td>
-                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gInisiatif > 0 ? `+ Rp ${formatRp(gInisiatif)}` : 'Rp 0'}</td>
-                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700">{gPenugasan > 0 ? `+ Rp ${formatRp(gPenugasan)}` : 'Rp 0'}</td>
-                                <td className="px-3.5 py-3 text-right font-mono text-rose-600">{gEfisiensi !== 0 ? `Rp ${formatRp(gEfisiensi)}` : 'Rp 0'}</td>
-                                <td className="px-3.5 py-3 text-right font-mono">
-                                  {includeLuncuran ? (
-                                    <span className="text-cyan-700 font-bold">{gLuncuran > 0 ? `+ Rp ${formatRp(gLuncuran)}` : 'Rp 0'}</span>
-                                  ) : (
-                                    <span className="text-slate-300 font-medium line-through text-[10px]" title="Tidak dihitung ke Total Pagu">Rp {formatRp(gLuncuran)}</span>
-                                  )}
-                                </td>
-                                <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/50">Rp {formatRp(gTotalPagu)}</td>
-                              </tr>
-                              {isExpanded && units.map((u, uIdx) => {
-                                 const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi + (includeLuncuran ? u.luncuran : 0));
-                                 const isUnitExpanded = !!expandedUnits[u.id];
-                                 const uMutasi = filteredMutasiRows.filter((m: any) => m.unit_id === u.id || (m.unit_id && u.id && m.unit_id.toString() === u.id.toString()));
+                      return (
+                        <React.Fragment key={groupName}>
+                          <tr 
+                            onClick={() => setExpandedGroups(prev => ({...prev, [groupName]: !prev[groupName]}))} 
+                            className={`cursor-pointer transition-colors text-xs font-bold ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-gray-50'}`}
+                          >
+                            <td className="py-2.5 px-3 text-center text-gray-400">
+                               {isExpanded ? <ChevronUp size={14} className="mx-auto" /> : <ChevronDown size={14} className="mx-auto" />}
+                            </td>
+                            <td className="py-2.5 px-4 text-gray-900 flex items-center gap-1.5 font-black">
+                               <Layers size={13} className="text-indigo-600" />
+                               {groupName} ({units.length} Unit)
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-gray-600">Rp {formatRp(gPaguAwal)}</td>
+                            <td className="py-2.5 px-3 text-right font-mono text-indigo-700">{gPengalihan > 0 ? `+ Rp ${formatRp(gPengalihan)}` : gPengalihan < 0 ? `- Rp ${formatRp(Math.abs(gPengalihan))}` : 'Rp 0'}</td>
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700">{gInisiatif > 0 ? `+ Rp ${formatRp(gInisiatif)}` : 'Rp 0'}</td>
+                            <td className="py-2.5 px-3 text-right font-mono text-emerald-700">{gPenugasan > 0 ? `+ Rp ${formatRp(gPenugasan)}` : 'Rp 0'}</td>
+                            <td className="py-2.5 px-3 text-right font-mono text-rose-600">{gEfisiensi !== 0 ? `Rp ${formatRp(gEfisiensi)}` : 'Rp 0'}</td>
+                            <td className="py-2.5 px-3 text-right font-mono">
+                              {includeLuncuran ? (
+                                <span className="text-cyan-700 font-bold">{gLuncuran > 0 ? `+ Rp ${formatRp(gLuncuran)}` : 'Rp 0'}</span>
+                              ) : (
+                                <span className="text-gray-300 line-through text-[10px]" title="Tidak dihitung ke Total Pagu">Rp {formatRp(gLuncuran)}</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-black text-gray-900 bg-gray-50/50">Rp {formatRp(gTotalPagu)}</td>
+                          </tr>
+                          {isExpanded && units.map((u) => {
+                             const totalP = u.total_pagu || (u.pagu_awal + u.pengalihan + u.inisiatif + u.penugasan + u.efisiensi + (includeLuncuran ? u.luncuran : 0));
+                             const isUnitExpanded = !!expandedUnits[u.id];
+                             const uMutasi = filteredMutasiRows.filter((m: any) => m.unit_id === u.id || (m.unit_id && u.id && m.unit_id.toString() === u.id.toString()));
 
-                                 return (
-                                   <React.Fragment key={u.id}>
-                                     <tr 
-                                       onClick={() => setExpandedUnits(prev => ({...prev, [u.id]: !prev[u.id]}))}
-                                       className="bg-indigo-50/20 hover:bg-indigo-50/40 cursor-pointer transition-colors text-[11px] border-b border-slate-100"
-                                     >
-                                       <td className="px-3 py-3 text-center text-slate-400 font-medium">
-                                         {isUnitExpanded ? <ChevronUp size={14} className="mx-auto" /> : <ChevronDown size={14} className="mx-auto" />}
-                                       </td>
-                                       <td className="px-4 py-3 pl-8">
-                                         <div className="font-bold text-slate-800 flex items-center gap-1.5"><Building2 size={12} className="text-slate-400"/> {u.nama_unit}</div>
-                                         {u.kode_unit && <div className="text-[9px] text-slate-400 font-mono mt-0.5 ml-4">{u.kode_unit}</div>}
-                                       </td>
-                                       <td className="px-3.5 py-3 text-right font-mono text-slate-600 font-medium">Rp {formatRp(u.pagu_awal)}</td>
-                                       <td className="px-3.5 py-3 text-right font-mono font-bold text-indigo-700">{u.pengalihan > 0 ? `+ Rp ${formatRp(u.pengalihan)}` : u.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(u.pengalihan))}` : 'Rp 0'}</td>
-                                       <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}</td>
-                                       <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-bold">{u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}</td>
-                                       <td className="px-3.5 py-3 text-right font-mono text-rose-600 font-bold">{u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}</td>
-                                       <td className="px-3.5 py-3 text-right font-mono">
-                                         {includeLuncuran ? (
-                                           <span className="text-cyan-700 font-bold">{u.luncuran > 0 ? `+ Rp ${formatRp(u.luncuran)}` : 'Rp 0'}</span>
-                                         ) : (
-                                           <span className="text-slate-300 font-medium line-through text-[10px]" title="Tidak dihitung ke Total Pagu">Rp {formatRp(u.luncuran)}</span>
-                                         )}
-                                       </td>
-                                       <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 bg-slate-50/30">Rp {formatRp(totalP)}</td>
-                                     </tr>
-                                     {isUnitExpanded && uMutasi.length > 0 && (
-                                       <tr>
-                                         <td colSpan={9} className="p-0 border-b border-slate-200">
-                                           <div className="bg-slate-50 pl-14 pr-4 py-4 shadow-inner">
-                                             <table className="w-full text-[10px] text-left">
-                                               <thead className="text-slate-400 border-b border-slate-200 uppercase font-black tracking-wider">
-                                                 <tr>
-                                                   <th className="py-2 px-2 w-10 text-center">No</th>
-                                                   <th className="py-2 px-2 text-right w-40">Nominal (Rp)</th>
-                                                   <th className="py-2 px-2 pl-6">Keterangan / Catatan Transaksi</th>
-                                                 </tr>
-                                               </thead>
-                                               <tbody className="divide-y divide-slate-200/60">
-                                                 {(() => {
-                                                   const mutasiGrouped = uMutasi.reduce((acc: any, m: any) => {
-                                                     const jenis = m.jenis_anggaran || 'Mutasi Lainnya';
-                                                     if (!acc[jenis]) acc[jenis] = [];
-                                                     acc[jenis].push(m);
-                                                     return acc;
-                                                   }, {});
-
-                                                   return Object.entries(mutasiGrouped).map(([jenis, items]: [string, any], gIdx) => {
-                                                     const jLower = jenis.toLowerCase();
-                                                     let badgeClass = "bg-slate-100 text-slate-700 border-slate-200";
-                                                     if (jLower.includes('pengalihan') || jLower.includes('kurang') || jLower.includes('tambah pagu')) badgeClass = "bg-indigo-100 text-indigo-700 border-indigo-200";
-                                                     if (jLower.includes('inisiatif') || jLower.includes('penugasan')) badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
-                                                     if (jLower.includes('efisiensi')) badgeClass = "bg-rose-100 text-rose-700 border-rose-200";
-                                                     if (jLower.includes('realisasi')) badgeClass = "bg-amber-100 text-amber-700 border-amber-200";
-                                                     if (jLower.includes('awal') || jLower.includes('dasar')) badgeClass = "bg-sky-100 text-sky-700 border-sky-200";
-                                                     if (jLower.includes('talangan') || jLower.includes('luncuran')) badgeClass = "bg-cyan-100 text-cyan-700 border-cyan-200";
-
-                                                     return (
-                                                       <React.Fragment key={jenis}>
-                                                         {/* Subheader Group Row */}
-                                                         <tr className="bg-slate-100/70 border-b border-slate-200/60">
-                                                           <td colSpan={3} className="py-2.5 px-3">
-                                                             <span className={`px-2.5 py-1 rounded-md border shadow-sm font-bold ${badgeClass}`}>{jenis}</span>
-                                                           </td>
-                                                         </tr>
-                                                         {/* Detail Rows */}
-                                                         {items.map((m: any, mIdx: number) => (
-                                                           <tr key={m.id || `${gIdx}-${mIdx}`} className="hover:bg-white transition-colors">
-                                                             <td className="py-2.5 px-2 text-slate-400 font-bold text-center">{mIdx + 1}</td>
-                                                             <td className="py-2.5 px-2 text-right font-mono font-bold text-slate-700">Rp {formatRp(Number(m.nominal || 0))}</td>
-                                                             <td className="py-2.5 px-2 pl-6 text-slate-600 font-medium">
-                                                               {m.keterangan ? (
-                                                                  <span>{m.keterangan}</span>
-                                                               ) : (
-                                                                  <span className="italic text-slate-400">Tidak ada catatan</span>
-                                                               )}
-                                                             </td>
-                                                           </tr>
-                                                         ))}
-                                                       </React.Fragment>
-                                                     );
-                                                   });
-                                                 })()}
-                                               </tbody>
-                                             </table>
-                                           </div>
-                                         </td>
-                                       </tr>
+                             return (
+                               <React.Fragment key={u.id}>
+                                 <tr 
+                                   onClick={() => setExpandedUnits(prev => ({...prev, [u.id]: !prev[u.id]}))}
+                                   className="bg-indigo-50/10 hover:bg-indigo-50/30 cursor-pointer transition-colors text-xs border-b border-gray-100"
+                                 >
+                                   <td className="py-2 px-3 text-center text-gray-400">
+                                     {isUnitExpanded ? <ChevronUp size={13} className="mx-auto" /> : <ChevronDown size={13} className="mx-auto" />}
+                                   </td>
+                                   <td className="py-2 px-4 pl-8">
+                                     <div className="font-semibold text-gray-800 flex items-center gap-1.5"><Building2 size={12} className="text-gray-400"/> {u.nama_unit}</div>
+                                     {u.kode_unit && <div className="text-[9px] text-gray-400 font-mono mt-0.5 ml-4">{u.kode_unit}</div>}
+                                   </td>
+                                   <td className="py-2 px-3 text-right font-mono text-gray-600">Rp {formatRp(u.pagu_awal)}</td>
+                                   <td className="py-2 px-3 text-right font-mono font-bold text-indigo-700">{u.pengalihan > 0 ? `+ Rp ${formatRp(u.pengalihan)}` : u.pengalihan < 0 ? `- Rp ${formatRp(Math.abs(u.pengalihan))}` : 'Rp 0'}</td>
+                                   <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">{u.inisiatif > 0 ? `+ Rp ${formatRp(u.inisiatif)}` : 'Rp 0'}</td>
+                                   <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">{u.penugasan > 0 ? `+ Rp ${formatRp(u.penugasan)}` : 'Rp 0'}</td>
+                                   <td className="py-2 px-3 text-right font-mono text-rose-600 font-bold">{u.efisiensi !== 0 ? `Rp ${formatRp(u.efisiensi)}` : 'Rp 0'}</td>
+                                   <td className="py-2 px-3 text-right font-mono">
+                                     {includeLuncuran ? (
+                                       <span className="text-cyan-700 font-bold">{u.luncuran > 0 ? `+ Rp ${formatRp(u.luncuran)}` : 'Rp 0'}</span>
+                                     ) : (
+                                       <span className="text-gray-300 line-through text-[10px]">Rp {formatRp(u.luncuran)}</span>
                                      )}
-                                     {isUnitExpanded && uMutasi.length === 0 && (
-                                       <tr>
-                                         <td colSpan={8} className="px-4 py-4 text-center text-xs font-bold text-slate-400 bg-slate-50 shadow-inner">
-                                           Tidak ada detail transaksi mutasi untuk unit ini.
-                                         </td>
-                                       </tr>
-                                     )}
-                                   </React.Fragment>
-                                 )
-                              })}
-                            </React.Fragment>
-                          );
-                        });
-                      })()
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                                   </td>
+                                   <td className="py-2 px-3 text-right font-mono font-bold text-gray-900 bg-gray-50/30">Rp {formatRp(totalP)}</td>
+                                 </tr>
+                                 {isUnitExpanded && uMutasi.length > 0 && (
+                                   <tr>
+                                     <td colSpan={9} className="p-0 border-b border-gray-200">
+                                       <div className="bg-gray-50/80 pl-12 pr-4 py-3 border-y border-gray-200">
+                                         <table className="w-full text-[11px] text-left">
+                                           <thead className="text-gray-400 border-b border-gray-200 uppercase font-black tracking-wider text-[9px]">
+                                             <tr>
+                                               <th className="py-1.5 px-2 w-8 text-center">No</th>
+                                               <th className="py-1.5 px-2 text-right w-36">Nominal</th>
+                                               <th className="py-1.5 px-2 pl-4">Keterangan Catatan Mutasi</th>
+                                             </tr>
+                                           </thead>
+                                           <tbody className="divide-y divide-gray-200/60">
+                                             {uMutasi.map((m: any, mIdx: number) => (
+                                               <tr key={m.id || mIdx} className="hover:bg-white">
+                                                 <td className="py-1.5 px-2 text-gray-400 text-center font-mono">{mIdx + 1}</td>
+                                                 <td className="py-1.5 px-2 text-right font-mono font-bold text-gray-800">Rp {formatRp(Number(m.nominal || 0))}</td>
+                                                 <td className="py-1.5 px-2 pl-4 text-gray-600">{m.keterangan || '-'}</td>
+                                               </tr>
+                                             ))}
+                                           </tbody>
+                                         </table>
+                                       </div>
+                                     </td>
+                                   </tr>
+                                 )}
+                               </React.Fragment>
+                             );
+                          })}
+                        </React.Fragment>
+                      );
+                    });
+                  })()
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 
-
-
-        {/* TAB 3: RINCIAN CATATAN MUTASI PAGU (DATABASE `gov_pagu_anggaran`) */}
+        {/* TAB 3: RINCIAN CATATAN MUTASI PAGU */}
         {activeTab === 'surat' && (
-          <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-3 py-3 text-center w-10">No</th>
-                      <th className="px-4 py-3 w-56">Nama Unit Kerja & Group</th>
-                      <th className="px-3.5 py-3 text-center w-44">Jenis Mutasi / Anggaran</th>
-                      <th className="px-4 py-3 text-right w-44">Nominal Mutasi (Rp)</th>
-                      <th className="px-4 py-3">Rincian Catatan / Keterangan Mutasi Pagu</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredMutasiRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-medium">
-                          Belum ada catatan rincian mutasi pagu di database <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded">gov_pagu_anggaran</code> untuk filter yang dipilih.
+          <div className="overflow-x-auto border border-gray-200 rounded-xl animate-in fade-in duration-300">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-gray-50/80 text-gray-400 uppercase font-black text-[10px] tracking-wider border-b border-gray-200">
+                <tr>
+                  <th className="py-2.5 px-3 text-center w-10">No</th>
+                  <th className="py-2.5 px-4 w-52">Nama Unit Kerja</th>
+                  <th className="py-2.5 px-3 text-center w-40">Jenis Mutasi</th>
+                  <th className="py-2.5 px-4 text-right w-40">Nominal</th>
+                  <th className="py-2.5 px-4">Keterangan Mutasi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredMutasiRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400 italic">
+                      Belum ada catatan rincian mutasi pagu untuk filter yang dipilih.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMutasiRows.map((r: any, idx: number) => {
+                    const unitName = r.gov_units?.nama_unit || 'Unit Kerja';
+                    const groupOrg = r.gov_units?.group_org || '-';
+                    const nom = Number(r.nominal || 0);
+
+                    return (
+                      <tr key={r.id || idx} className="hover:bg-indigo-50/20 transition-colors">
+                        <td className="py-2 px-3 text-center text-gray-400 font-mono align-top pt-2.5">{idx + 1}</td>
+                        <td className="py-2 px-4 font-bold text-gray-900 align-top pt-2">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 size={13} className="text-indigo-600 shrink-0" />
+                            <span>{unitName}</span>
+                          </div>
+                          <span className="px-1.5 py-0.2 bg-gray-100 border border-gray-200 rounded text-[9px] font-bold text-gray-600 mt-1 inline-block">
+                            {groupOrg}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center align-top pt-2">
+                          <span className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold">
+                            {r.jenis_anggaran || 'Mutasi Pagu'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-4 text-right font-mono font-bold align-top pt-2">
+                          <span className={nom > 0 ? "text-emerald-700 font-bold" : nom < 0 ? "text-rose-600 font-bold" : "text-gray-800"}>
+                            {nom > 0 ? `+ Rp ${formatRp(nom)}` : nom < 0 ? `- Rp ${formatRp(Math.abs(nom))}` : `Rp ${formatRp(nom)}`}
+                          </span>
+                        </td>
+                        <td className="py-2 px-4 text-gray-700 text-xs align-top pt-2">
+                          {r.keterangan || '-'}
                         </td>
                       </tr>
-                    ) : (
-                      filteredMutasiRows.map((r: any, idx: number) => {
-                        const unitName = r.gov_units?.nama_unit || 'Unit Kerja';
-                        const groupOrg = r.gov_units?.group_org || '-';
-                        const nom = Number(r.nominal || 0);
-
-                        return (
-                          <tr key={r.id || idx} className="hover:bg-slate-50 transition-colors text-[11px]">
-                            <td className="px-3 py-3 text-center font-bold text-slate-400 align-top pt-3.5">{idx + 1}</td>
-                            <td className="px-4 py-3 font-bold text-slate-800 align-top pt-3 space-y-1">
-                              <div className="flex items-center gap-1.5 font-black text-slate-900">
-                                <Building2 size={14} className="text-indigo-600 shrink-0" />
-                                <span>{unitName}</span>
-                              </div>
-                              <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-bold text-indigo-700 inline-block">
-                                {groupOrg}
-                              </span>
-                            </td>
-                            <td className="px-3.5 py-3 text-center align-top pt-3">
-                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[10px] font-bold">
-                                {r.jenis_anggaran || 'Mutasi Pagu'}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono font-bold align-top pt-3">
-                              <span className={nom > 0 ? "text-emerald-700 font-black" : nom < 0 ? "text-rose-600 font-black" : "text-slate-700"}>
-                                {nom > 0 ? `+ Rp ${formatRp(nom)}` : nom < 0 ? `- Rp ${formatRp(Math.abs(nom))}` : `Rp ${formatRp(nom)}`}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-slate-700 font-medium leading-relaxed align-top pt-3">
-                              {r.keterangan ? (
-                                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-[11px] text-slate-800 font-sans">
-                                  {r.keterangan}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 italic text-[10px]">- Tidak ada catatan khusus -</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {/* MODAL BREAKDOWN CATEGORY */}
       {activeModalCategory && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-                  <FileText size={20} />
+        <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-5 max-w-lg w-full shadow-xl space-y-4 border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <FileText size={18} />
                 </div>
                 <div>
-                  <h3 className="font-black text-lg text-slate-900">
-                    Rincian Component Mutasi: {activeModalCategory.toUpperCase()}
+                  <h3 className="font-bold text-sm text-gray-900 uppercase">
+                    Rincian Mutasi: {activeModalCategory}
                   </h3>
-                  <p className="text-xs text-slate-500">Daftar usulan & penetapan pagu yang membentuk nominal ini</p>
+                  <p className="text-[11px] text-gray-500 font-medium">Daftar usulan & penetapan pagu yang membentuk nominal ini</p>
                 </div>
               </div>
 
               <button 
                 onClick={() => setActiveModalCategory(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-900">Total Component Nominal</span>
-                <span className="text-lg font-black font-mono text-emerald-800">
+            <div className="space-y-2.5 text-xs">
+              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
+                <span className="font-semibold text-emerald-900 text-xs">Total Nominal Komponen</span>
+                <span className="text-base font-black font-mono text-emerald-800">
                   Rp {formatRp(
                     activeModalCategory === 'inisiatif' ? mutasiData.tambah_inisiatif :
                     activeModalCategory === 'penugasan' ? mutasiData.tambah_penugasan :
@@ -1147,17 +1054,17 @@ export default function PotretMutasiPaguPage() {
                 </span>
               </div>
 
-              <p className="text-xs text-slate-500 italic">
-                Terdiri dari usulan-usulan fakultas/direktorat yang telah disetujui dalam Surat Penetapan Rektor.
+              <p className="text-[11px] text-gray-500 italic">
+                Terdiri dari usulan fakultas/direktorat yang telah disetujui dalam Surat Penetapan Rektor.
               </p>
             </div>
 
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end pt-2 border-t border-gray-100">
               <button 
                 onClick={() => setActiveModalCategory(null)}
-                className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-xs"
+                className="h-9 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-semibold text-xs"
               >
-                TUTUP
+                Tutup
               </button>
             </div>
           </div>
