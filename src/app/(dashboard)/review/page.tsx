@@ -206,23 +206,23 @@ function KeyboardAutocompleteFilter({ label, icon, options, selectedValue, onSel
 
   return (
     <div className="relative flex flex-col gap-1 w-full" onKeyDown={handleKeyDown}>
-      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1">
+      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
         {icon}
         <span>{label}</span>
       </label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`h-10 px-3 rounded-xl border text-xs font-semibold shadow-sm flex items-center justify-between gap-2 transition-all text-left bg-white ${
+        className={`h-9 px-3 rounded-xl border text-xs font-semibold shadow-2xs flex items-center justify-between gap-2 transition-all text-left bg-white ${
           selectedValue !== 'ALL' && selectedValue !== '' 
             ? 'border-indigo-500 ring-2 ring-indigo-100 text-indigo-950 font-bold bg-indigo-50/20' 
-            : 'border-gray-300 text-gray-800 hover:bg-gray-50'
+            : 'border-gray-200 text-gray-800 hover:bg-gray-50'
         }`}
       >
         <span className="truncate flex-1" title={getDisplayText()}>
           {getDisplayText()}
         </span>
-        <ChevronDown size={14} className={`shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+        <ChevronDown size={13} className={`shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180 text-indigo-600' : ''}`} />
       </button>
 
       {isOpen && (
@@ -236,7 +236,7 @@ function KeyboardAutocompleteFilter({ label, icon, options, selectedValue, onSel
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 autoFocus
-                className="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
+                className="w-full pl-8 pr-3 h-9 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
               />
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
               {query && (
@@ -1602,47 +1602,51 @@ export default function ReviewPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 w-full space-y-6 animate-in fade-in duration-300 min-h-screen pb-28">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700 mb-2">
-            <Sparkles size={13} /> Penelaahan Usulan Anggaran Cerdas
+    <div className="max-w-7xl mx-auto space-y-4 pb-24 font-sans text-gray-900 animate-in fade-in duration-300">
+      {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <CheckSquare size={20} />
           </div>
-          <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight">
-            Review Anggaran (Rule Engine + AI)
-          </h1>
-          <p className="text-xs lg:text-sm text-gray-500 mt-1 font-medium">
-            Telaah usulan rencana belanja per unit kerja, rekapitulasi akun induk, dan komparasi pagu 2027 vs 2026.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Review Usulan Anggaran</h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Rule Engine + AI • {filteredBudgets.length} Usulan
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Telaah usulan rencana belanja per unit kerja, rekapitulasi akun induk, dan komparasi pagu 2027 vs 2026
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button
             onClick={fetchBudgets}
-            variant="outline"
-            size="sm"
-            className="rounded-xl border-gray-300 text-gray-700 hover:bg-gray-100 h-9 font-semibold"
+            className="h-9 px-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            title="Muat ulang data review"
           >
-            <RefreshCw size={14} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-          <Button
+            <RefreshCw size={13} className={loading ? 'animate-spin text-indigo-600' : ''} />
+            <span>Refresh</span>
+          </button>
+          <button
             onClick={handleExportExcel}
             disabled={exporting || loading}
-            size="sm"
-            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white h-9 font-bold shadow-sm"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
           >
-            {exporting ? <RefreshCw size={14} className="mr-1.5 animate-spin" /> : <Download size={14} className="mr-1.5" />} 
-            Export Excel (4 Sheet Lengkap)
-          </Button>
+            {exporting ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
+            <span>Export Excel (4 Sheet)</span>
+          </button>
         </div>
       </div>
 
-      {/* FILTER BAR SECTION */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/80 space-y-4">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
-            <Filter size={16} className="text-indigo-600" />
+      {/* 2. FILTER BAR SECTION */}
+      <div className="bg-white p-4 px-5 rounded-2xl shadow-xs border border-gray-200/80 space-y-3">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-800">
+            <Filter size={14} className="text-indigo-600" />
             <span>Filter Data Cerdas (Keyboard Autocomplete ↑ ↓ + Enter)</span>
           </div>
           {(selectedUnit !== 'ALL' || selectedStatus !== 'ALL' || selectedIndikator !== 'ALL' || selectedKegiatan !== 'ALL' || selectedLingkup !== 'ALL' || selectedMaksud !== 'ALL' || selectedYear !== 'ALL' || searchTerm) && (
@@ -1657,17 +1661,17 @@ export default function ReviewPage() {
                 setSelectedYear('ALL');
                 setSearchTerm('');
               }}
-              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 hover:underline"
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 hover:underline cursor-pointer"
             >
-              <RotateCcw size={12} /> Reset Semua Filter
+              <RotateCcw size={11} /> Reset Filter
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <KeyboardAutocompleteFilter
             label="Unit Kerja"
-            icon={<Building2 size={12} className="text-indigo-600" />}
+            icon={<Building2 size={11} className="text-indigo-600" />}
             options={unitOptions}
             selectedValue={selectedUnit}
             onSelect={setSelectedUnit}
@@ -1676,7 +1680,7 @@ export default function ReviewPage() {
 
           <KeyboardAutocompleteFilter
             label="Status Anggaran"
-            icon={<CheckCircle2 size={12} className="text-emerald-600" />}
+            icon={<CheckCircle2 size={11} className="text-emerald-600" />}
             options={statusOptions}
             selectedValue={selectedStatus}
             onSelect={setSelectedStatus}
@@ -1685,7 +1689,7 @@ export default function ReviewPage() {
 
           <KeyboardAutocompleteFilter
             label="Indikator Program"
-            icon={<Layers size={12} className="text-blue-600" />}
+            icon={<Layers size={11} className="text-blue-600" />}
             options={indikatorOptions}
             selectedValue={selectedIndikator}
             onSelect={setSelectedIndikator}
@@ -1694,7 +1698,7 @@ export default function ReviewPage() {
 
           <KeyboardAutocompleteFilter
             label="Kegiatan"
-            icon={<BookOpen size={12} className="text-indigo-600" />}
+            icon={<BookOpen size={11} className="text-indigo-600" />}
             options={kegiatanOptions}
             selectedValue={selectedKegiatan}
             onSelect={setSelectedKegiatan}
@@ -1703,7 +1707,7 @@ export default function ReviewPage() {
 
           <KeyboardAutocompleteFilter
             label="Lingkup Kegiatan"
-            icon={<FileText size={12} className="text-amber-600" />}
+            icon={<FileText size={11} className="text-amber-600" />}
             options={lingkupOptions}
             selectedValue={selectedLingkup}
             onSelect={setSelectedLingkup}
@@ -1712,7 +1716,7 @@ export default function ReviewPage() {
 
           <KeyboardAutocompleteFilter
             label="Maksud dan Tujuan"
-            icon={<Sparkles size={12} className="text-purple-600" />}
+            icon={<Sparkles size={11} className="text-purple-600" />}
             options={maksudOptions}
             selectedValue={selectedMaksud}
             onSelect={setSelectedMaksud}
@@ -1720,13 +1724,13 @@ export default function ReviewPage() {
           />
 
           <div className="flex flex-col gap-1 w-full">
-            <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Tahun Anggaran
             </label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="h-10 px-3 rounded-xl border border-gray-300 text-xs font-semibold bg-white text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              className="h-9 px-3 rounded-xl border border-gray-200 text-xs font-semibold bg-white text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-600"
             >
               <option value="ALL">Semua Tahun</option>
               {yearOptions.map(y => (
@@ -1736,20 +1740,20 @@ export default function ReviewPage() {
           </div>
 
           <div className="flex flex-col gap-1 w-full">
-            <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Pencarian Teks Bebas
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Cari kata kunci deskripsi/akun..."
+                placeholder="Cari deskripsi/akun..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-10 w-full pl-8 pr-3 rounded-xl border border-gray-300 text-xs font-semibold bg-white text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                className="h-9 w-full pl-8 pr-3 rounded-xl border border-gray-200 text-xs font-semibold bg-white text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-600"
               />
-              <Search size={14} className="absolute left-2.5 top-3 text-gray-400" />
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-3 text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X size={12} />
                 </button>
               )}
@@ -1758,188 +1762,147 @@ export default function ReviewPage() {
         </div>
       </div>
 
-      {/* 3 KPI SUMMARY CARDS WITH PERCENTAGE INDICATORS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Card className="bg-gradient-to-br from-blue-700 to-indigo-900 text-white rounded-2xl shadow-md border-0 overflow-hidden relative">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-widest text-blue-200 flex items-center justify-between">
-              <span>Total Anggaran Diajukan (2027)</span>
-              <span className="p-1 rounded-lg bg-white/10 text-white">📋</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
+      {/* 3. KPI SUMMARY CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Card 1: Total Diajukan */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Usulan Diajukan (2027)</p>
+            <h3 className="text-base lg:text-lg font-black text-gray-900 mt-0.5 font-mono truncate">
               Rp {formatRp(overallKPI.totalDiajukan)}
-            </div>
-            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-blue-100">
-              <span className="font-medium">Akumulasi {filteredBudgets.length} usulan</span>
-              <span className="font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-white text-[11px]">
-                100% Usulan
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            </h3>
+            <span className="text-[10px] font-semibold text-indigo-600">
+              Akumulasi {filteredBudgets.length} usulan rencana belanja
+            </span>
+          </div>
+          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+            <FileText size={20} />
+          </div>
+        </div>
 
-        <Card className="bg-gradient-to-br from-amber-500 to-rose-700 text-white rounded-2xl shadow-md border-0 overflow-hidden relative">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-widest text-amber-100 flex items-center justify-between">
-              <span>TOTAL PENYESUAIAN (2027)</span>
-              <span className="p-1 rounded-lg bg-white/10 text-white">⚡</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
+        {/* Card 2: Total Penyesuaian */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Penyesuaian Koreksi (2027)</p>
+            <h3 className={`text-base lg:text-lg font-black mt-0.5 font-mono truncate ${overallKPI.totalPenyesuaian < 0 ? 'text-rose-600' : overallKPI.totalPenyesuaian > 0 ? 'text-emerald-600' : 'text-gray-900'}`}>
               {overallKPI.totalPenyesuaian > 0 ? '+' : ''}Rp {formatRp(overallKPI.totalPenyesuaian)}
-            </div>
-            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-amber-100">
-              <span className="font-medium">Hasil Koreksi / Verif</span>
-              <span className={`font-bold px-2.5 py-0.5 rounded-full text-[11px] ${
-                overallKPI.totalPenyesuaian > 0 
-                  ? 'bg-emerald-400/30 text-white border border-emerald-300/40' 
-                  : overallKPI.totalPenyesuaian < 0 
-                  ? 'bg-rose-400/30 text-white border border-rose-300/40' 
-                  : 'bg-white/20 text-white'
-              }`}>
-                {overallKPI.pctPenyesuaian > 0 ? '+' : ''}{overallKPI.pctPenyesuaian.toFixed(2)}%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            </h3>
+            <span className={`text-[10px] font-semibold ${overallKPI.totalPenyesuaian < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {overallKPI.pctPenyesuaian > 0 ? '+' : ''}{overallKPI.pctPenyesuaian.toFixed(2)}% dari total usulan diajukan
+            </span>
+          </div>
+          <div className={`p-2.5 rounded-xl shrink-0 ${overallKPI.totalPenyesuaian < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+            <Sparkles size={20} />
+          </div>
+        </div>
 
-        <Card className="bg-gradient-to-br from-emerald-600 to-teal-900 text-white rounded-2xl shadow-md border-0 overflow-hidden relative">
-          <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none" />
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-extrabold uppercase tracking-widest text-emerald-100 flex items-center justify-between">
-              <span>TOTAL SETELAH PENYESUAIAN (2027)</span>
-              <span className="p-1 rounded-lg bg-white/10 text-white">✅</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl lg:text-3xl font-black tracking-tight font-mono">
+        {/* Card 3: Setelah Penyesuaian */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 pr-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Setelah Penyesuaian (2027)</p>
+            <h3 className="text-base lg:text-lg font-black text-gray-900 mt-0.5 font-mono truncate">
               Rp {formatRp(overallKPI.totalSetelahPenyesuaian)}
-            </div>
-            <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-white/15 text-[11px] text-emerald-100">
-              <span className="font-medium">
-                {overallKPI.pagu2026 > 0 ? (
-                  <span>vs Pagu 2026: <strong className="text-white">{overallKPI.growthVs2026 > 0 ? '+' : ''}{overallKPI.growthVs2026.toFixed(1)}%</strong></span>
-                ) : (
-                  <span>Total Final Usulan</span>
-                )}
-              </span>
-              <span className="font-bold bg-white/20 px-2.5 py-0.5 rounded-full text-white text-[11px]">
-                {overallKPI.pctSetelahPenyesuaian.toFixed(1)}% Terakomodir
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            </h3>
+            <span className="text-[10px] font-semibold text-emerald-600">
+              {overallKPI.pctSetelahPenyesuaian.toFixed(1)}% terakomodir {overallKPI.pagu2026 > 0 ? `(vs Pagu '26: ${overallKPI.growthVs2026 > 0 ? '+' : ''}${overallKPI.growthVs2026.toFixed(1)}%)` : ''}
+            </span>
+          </div>
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+            <CheckCircle2 size={20} />
+          </div>
+        </div>
       </div>
 
-      {/* VIEW TABS & TOOLBAR SECTION (3 TABS) */}
-      {/* VIEW TABS & TOOLBAR SECTION (3 TABS) */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 px-6 rounded-2xl shadow-xs border border-gray-200/80 gap-4">
-        {/* Left Column: 3 Tab Buttons + Info Count Below */}
-        <div className="flex flex-col gap-2.5">
-          {/* 3 Tab Switcher Buttons */}
-          <div className="flex items-center gap-1.5 p-1.5 bg-gray-100/90 rounded-2xl border border-gray-200/80 flex-wrap sm:flex-nowrap">
+      {/* 4. VIEW TABS & TOOLBAR SECTION (3 TABS) */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80 gap-3">
+        {/* Left Column: 3 Tab Buttons + Info Count */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex bg-gray-100 p-1 rounded-xl shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('unit')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'unit'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  ? 'bg-white shadow-2xs text-indigo-700'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <Building2 size={14} />
-              <span>🏢 Review per Unit Kerja</span>
+              <Building2 size={12} />
+              <span>Per Unit Kerja</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('akun')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'akun'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  ? 'bg-white shadow-2xs text-indigo-700'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <PieChart size={14} />
-              <span>📊 Summary Rekap per Akun (2 Digit)</span>
+              <PieChart size={12} />
+              <span>Summary Akun (2 Digit)</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('komparasi')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'komparasi'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                  ? 'bg-white shadow-2xs text-indigo-700'
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              <BarChart3 size={14} />
-              <span>⚖️ Komparasi Usulan 2027 vs Pagu 2026</span>
+              <BarChart3 size={12} />
+              <span>Komparasi 2027 vs 2026</span>
             </button>
           </div>
 
-          {/* Info Count Placed Directly Below the 3 Buttons */}
-          <div className="text-xs font-bold text-gray-700 flex items-center gap-2 pl-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 shrink-0" />
+          {/* Info Count */}
+          <div className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
             {activeTab === 'unit' ? (
-              <span>Menampilkan <strong>{unitGroupedData.length}</strong> Unit Kerja (<strong>{totalGroupsCount}</strong> Kelompok, <strong>{filteredBudgets.length}</strong> baris detail)</span>
+              <span><strong>{unitGroupedData.length}</strong> Unit Kerja (<strong>{totalGroupsCount}</strong> Kelompok, <strong>{filteredBudgets.length}</strong> baris)</span>
             ) : activeTab === 'akun' ? (
-              <span>Menampilkan <strong>{akunGroupedData.length}</strong> Akun Induk (<strong>{totalAkunDetailCount}</strong> Detail Akun, <strong>{filteredBudgets.length}</strong> baris detail)</span>
+              <span><strong>{akunGroupedData.length}</strong> Akun Induk (<strong>{totalAkunDetailCount}</strong> Detail Akun)</span>
             ) : (
-              <span>Menampilkan <strong>{komparasiGroupedData.length}</strong> Kelompok Organisasi (<strong>{komparasiTotalUnitsCount}</strong> Unit Kerja)</span>
+              <span><strong>{komparasiGroupedData.length}</strong> Kelompok (<strong>{komparasiTotalUnitsCount}</strong> Unit Kerja)</span>
             )}
           </div>
         </div>
 
-        {/* Right Actions Column: Buka/Tutup Detail Button (Top) + Luncuran Switch (Below) */}
-        <div className="flex flex-col items-start lg:items-end gap-2 w-full lg:w-auto self-start lg:self-center">
-          <Button
-            onClick={() => handleExpandAll(!isAllExpanded)}
-            variant="outline"
-            size="sm"
-            className={`rounded-xl h-8 text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all ${
-              isAllExpanded 
-                ? 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100' 
-                : 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
-            }`}
-          >
-            {isAllExpanded ? (
-              <>
-                <Minus size={13} className="text-rose-600" /> Tutup Semua Detail
-              </>
-            ) : (
-              <>
-                <Plus size={13} className="text-indigo-600" /> Buka Semua Detail
-              </>
-            )}
-          </Button>
-
-          {/* Luncuran Switch Option for Tab 3 (Placed directly below Buka/Tutup button) */}
+        {/* Right Actions Column */}
+        <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
           {activeTab === 'komparasi' && (
             <button 
               type="button"
               onClick={() => setIncludeLuncuran2026(!includeLuncuran2026)}
-              className={`group flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+              className={`h-8 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer ${
                 includeLuncuran2026 
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200 shadow-sm' 
-                  : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <div className={`relative inline-flex h-3.5 w-6 shrink-0 rounded-full transition-colors duration-200 ${
-                includeLuncuran2026 ? 'bg-indigo-400' : 'bg-gray-200'
-              }`}>
-                <span className={`inline-block h-2.5 w-2.5 m-0.5 transform rounded-full bg-white transition duration-200 shadow-xs ${
-                  includeLuncuran2026 ? 'translate-x-2.5' : 'translate-x-0'
-                }`} />
-              </div>
-              <span className="text-[11px] tracking-tight">
-                {includeLuncuran2026 ? '✓ Termasuk Luncuran/Talangan 2026' : 'Tanpa Luncuran/Talangan 2026'}
-              </span>
+              <span>{includeLuncuran2026 ? '✓ Termasuk Luncuran 2026' : 'Tanpa Luncuran 2026'}</span>
             </button>
           )}
+
+          <button
+            onClick={() => handleExpandAll(!isAllExpanded)}
+            className={`h-8 px-3 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5 transition-all border cursor-pointer ${
+              isAllExpanded 
+                ? 'border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100' 
+                : 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
+            }`}
+          >
+            {isAllExpanded ? (
+              <>
+                <Minus size={12} className="text-rose-600" /> <span>Tutup Semua</span>
+              </>
+            ) : (
+              <>
+                <Plus size={12} className="text-indigo-600" /> <span>Buka Semua</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
