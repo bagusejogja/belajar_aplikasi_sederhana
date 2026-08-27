@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
-  FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, 
+  FolderTree, Plus, Search, Edit2, Edit3, Trash2, Folder, FileText, Upload, 
   Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronUp, ChevronRight, File, 
   Archive, Settings, Globe, FileSpreadsheet, Image as ImageIcon, ExternalLink,
-  Layers, CheckCircle2, Calendar, Sparkles, FolderOpen, Info, HelpCircle
+  Layers, CheckCircle2, Calendar, Sparkles, FolderOpen, Info, HelpCircle, Download,
+  Database
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
@@ -323,14 +324,14 @@ export default function ArsipKegiatanPage() {
       if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
         return {
           label: 'GDrive',
-          icon: <Globe size={14} className="text-emerald-600 shrink-0" />,
+          icon: <Globe size={13} className="text-emerald-600 shrink-0" />,
           badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
           cardBg: 'hover:bg-emerald-50/30 hover:border-emerald-300'
         };
       }
       return {
         label: 'Link Web',
-        icon: <LinkIcon size={14} className="text-sky-600 shrink-0" />,
+        icon: <LinkIcon size={13} className="text-sky-600 shrink-0" />,
         badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
         cardBg: 'hover:bg-sky-50/30 hover:border-sky-300'
       };
@@ -339,7 +340,7 @@ export default function ArsipKegiatanPage() {
     if (['xlsx', 'xls', 'csv'].includes(ext)) {
       return {
         label: 'Excel',
-        icon: <FileSpreadsheet size={14} className="text-emerald-600 shrink-0" />,
+        icon: <FileSpreadsheet size={13} className="text-emerald-600 shrink-0" />,
         badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         cardBg: 'hover:bg-emerald-50/30 hover:border-emerald-300'
       };
@@ -348,7 +349,7 @@ export default function ArsipKegiatanPage() {
     if (['pdf'].includes(ext)) {
       return {
         label: 'PDF',
-        icon: <FileText size={14} className="text-rose-600 shrink-0" />,
+        icon: <FileText size={13} className="text-rose-600 shrink-0" />,
         badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
         cardBg: 'hover:bg-rose-50/30 hover:border-rose-300'
       };
@@ -357,7 +358,7 @@ export default function ArsipKegiatanPage() {
     if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
       return {
         label: 'Foto',
-        icon: <ImageIcon size={14} className="text-amber-600 shrink-0" />,
+        icon: <ImageIcon size={13} className="text-amber-600 shrink-0" />,
         badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
         cardBg: 'hover:bg-amber-50/30 hover:border-amber-300'
       };
@@ -366,7 +367,7 @@ export default function ArsipKegiatanPage() {
     if (['doc', 'docx'].includes(ext)) {
       return {
         label: 'Word',
-        icon: <FileText size={14} className="text-blue-600 shrink-0" />,
+        icon: <FileText size={13} className="text-blue-600 shrink-0" />,
         badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
         cardBg: 'hover:bg-blue-50/30 hover:border-blue-300'
       };
@@ -374,7 +375,7 @@ export default function ArsipKegiatanPage() {
 
     return {
       label: ext.toUpperCase() || 'File',
-      icon: <File size={14} className="text-indigo-600 shrink-0" />,
+      icon: <File size={13} className="text-indigo-600 shrink-0" />,
       badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
       cardBg: 'hover:bg-indigo-50/30 hover:border-indigo-300'
     };
@@ -475,9 +476,21 @@ export default function ArsipKegiatanPage() {
       const newPhases = normalizePhases(phases);
       newPhases[phaseIdx].files = newPhases[phaseIdx].files.filter((_: any, i: number) => i !== fileIdx);
       await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
-      toast.success('File dicabut');
+      toast.success('File berhasil dicabut');
       fetchData();
     });
+  };
+
+  const renameFile = async (arcId: number, phaseIdx: number, fileIdx: number, phases: any[]) => {
+    const newPhases = normalizePhases(phases);
+    const currentName = newPhases[phaseIdx]?.files?.[fileIdx]?.name || '';
+    const newName = prompt('Ubah nama tampilan file/lampiran:', currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+    newPhases[phaseIdx].files[fileIdx].name = newName.trim();
+    await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+    toast.success('Nama file berhasil diperbarui!');
+    fetchData();
   };
 
   const editPhaseNote = async (arcId: number, phaseIdx: number, phases: any[]) => {
@@ -517,7 +530,7 @@ export default function ArsipKegiatanPage() {
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Pusat repositori dokumen, tahapan fase statis, dan matriks sanding tahunan
+              Pusat repositori dokumen, tahapan fase statis, dan matriks perbandingan tahunan
             </p>
           </div>
         </div>
@@ -540,6 +553,18 @@ export default function ArsipKegiatanPage() {
                <span>Daftar Folder</span>
              </button>
           </div>
+
+          {/* Backup Database Download Button */}
+          <a
+            href="/api/backup"
+            target="_blank"
+            rel="noreferrer"
+            className="h-9 px-3 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+            title="Download Backup Lengkap Seluruh Database (.SQL)"
+          >
+            <Database size={13} className="text-indigo-600" />
+            <span>Backup DB</span>
+          </a>
 
           <button 
             onClick={() => { 
@@ -874,13 +899,29 @@ export default function ArsipKegiatanPage() {
                                                       </div>
                                                     </div>
                                                   </a>
-                                                  <button 
-                                                    onClick={() => removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases)} 
-                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded transition-all shrink-0 cursor-pointer" 
-                                                    title="Hapus File Lampiran"
-                                                  >
-                                                    <Trash2 size={11} />
-                                                  </button>
+
+                                                  <div className="flex items-center gap-0.5 shrink-0">
+                                                    <button 
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        renameFile(arc.id, arcPhaseIdx, fIdx, arcPhases);
+                                                      }}
+                                                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                      title="Ubah Nama Tampilan File"
+                                                    >
+                                                      <Edit3 size={11} />
+                                                    </button>
+                                                    <button 
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases);
+                                                      }} 
+                                                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded transition-all cursor-pointer" 
+                                                      title="Hapus File Lampiran"
+                                                    >
+                                                      <Trash2 size={11} />
+                                                    </button>
+                                                  </div>
                                                 </li>
                                               );
                                             })}
@@ -1194,13 +1235,29 @@ export default function ArsipKegiatanPage() {
                                                     </div>
                                                   </div>
                                                 </a>
-                                                <button 
-                                                  onClick={() => removeFile(activeArc.id, pIdx, fIdx, phases)} 
-                                                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded transition-all shrink-0 cursor-pointer"
-                                                  title="Cabut File"
-                                                >
-                                                  <Trash2 size={11} />
-                                                </button>
+
+                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                  <button 
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      renameFile(activeArc.id, pIdx, fIdx, phases);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                    title="Ubah Nama Tampilan File"
+                                                  >
+                                                    <Edit3 size={11} />
+                                                  </button>
+                                                  <button 
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      removeFile(activeArc.id, pIdx, fIdx, phases);
+                                                    }} 
+                                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded transition-all cursor-pointer"
+                                                    title="Cabut File"
+                                                  >
+                                                    <Trash2 size={11} />
+                                                  </button>
+                                                </div>
                                               </li>
                                             );
                                           })}
