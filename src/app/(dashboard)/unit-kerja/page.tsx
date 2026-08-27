@@ -193,7 +193,7 @@ export default function UnitKerjaDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Pagination State
-  const [pageSize, setPageSize] = useState<number | 'ALL'>(100);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchBudgets = async () => {
@@ -338,27 +338,39 @@ export default function UnitKerjaDashboard() {
   }, [filteredBudgets, pageSize]);
 
   return (
-    <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-300">
-      <div className="w-full space-y-8">
-        
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <Link href="/review-anggaran">
-              <Button variant="ghost" className="text-gray-500 hover:text-gray-900 px-0 w-fit">&larr; Kembali ke Overview</Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-gray-900">Usulan Anggaran Unit Kerja</h1>
-              <p className="text-gray-500 font-medium">Lakukan import usulan dari TSV Excel, ubah status final via combobox, atau lihat detail rincian usulan.</p>
-            </div>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <span className="text-lg">🏢</span>
           </div>
-          <div className="flex gap-3">
-            <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              onClick={() => setDialogOpen(true)}
-            >
-              + Paste Zone (Import Data Usulan)
-            </Button>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Usulan Anggaran Unit Kerja
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {filteredBudgets.length} Usulan Data
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Import usulan TSV Excel, ubah status final via combobox, & tinjau rincian.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+            onClick={() => setDialogOpen(true)}
+          >
+            <span>+ Import Data Usulan</span>
+          </button>
+        </div>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[700px] w-full max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <div className="flex justify-between items-center gap-2">
@@ -398,8 +410,6 @@ export default function UnitKerjaDashboard() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
-        </header>
 
         {/* MODAL VIEW DETAIL USULAN ANGGARAN (READ-ONLY) */}
         <Dialog open={!!viewDetailData} onOpenChange={() => setViewDetailData(null)}>
@@ -505,12 +515,12 @@ export default function UnitKerjaDashboard() {
         </Dialog>
 
         {/* TABEL DATA USULAN UNIT KERJA */}
-        <Card className="bg-white border-gray-200">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <Card className="bg-white border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+          <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100">
+            <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
               <div>
-                <CardTitle className="text-xl text-gray-900">Daftar Usulan Anggaran ({filteredBudgets.length} Data)</CardTitle>
-                <CardDescription className="text-gray-500">
+                <CardTitle className="text-sm font-black text-gray-900">Daftar Usulan Anggaran ({filteredBudgets.length} Data)</CardTitle>
+                <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
                   Ubah status final secara instan via combobox atau klik 👁️ Lihat Detail untuk meninjau rincian.
                 </CardDescription>
               </div>
@@ -527,7 +537,7 @@ export default function UnitKerjaDashboard() {
                 <select
                   value={selectedAiFilter}
                   onChange={e => setSelectedAiFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-purple-50 border border-purple-300 text-xs font-bold text-purple-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
+                  className="h-9 px-3 rounded-xl bg-purple-50 hover:bg-purple-100/60 border border-purple-200 text-xs font-bold text-purple-900 shadow-2xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 cursor-pointer"
                 >
                   <option value="ALL">🤖 Semua Evaluasi AI</option>
                   <option value="HIGH_CONFIDENCE">🔥 AI Keyakinan Tinggi (≥ 75%)</option>
@@ -535,11 +545,11 @@ export default function UnitKerjaDashboard() {
                   <option value="RULE_ONLY">📌 Master Rule (Reff)</option>
                 </select>
 
-                {/* FILTER STATUS (HANYA STATUS YANG ADA DI DATA) */}
+                {/* FILTER STATUS */}
                 <select
                   value={selectedStatusFilter}
                   onChange={e => setSelectedStatusFilter(e.target.value)}
-                  className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                  className="h-9 px-3 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
                 >
                   <option value="ALL">📌 Semua Status</option>
                   <option value="KUNCI">🔒 Terkunci (Y)</option>
@@ -553,17 +563,17 @@ export default function UnitKerjaDashboard() {
                   placeholder="Cari ID DB, akun, deskripsi..." 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs"
+                  className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs rounded-xl"
                 />
-                <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50 h-9">
+                <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-200 text-gray-700 hover:bg-gray-50 h-9 rounded-xl text-xs font-bold">
                   🔄 Refresh
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-gray-50 border-b border-gray-200">
+              <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-gray-500 text-xs uppercase font-bold">ID DB</TableHead>
                   <TableHead className="text-gray-500 text-xs uppercase font-bold">Rincian Usulan (Unit | Lingkup | Akun | Deskripsi)</TableHead>
@@ -703,73 +713,82 @@ export default function UnitKerjaDashboard() {
               </TableBody>
             </Table>
 
-            {/* CONTROLLER PAGINATION 100 - 250 - 500 */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-2 border-t border-gray-100 text-xs text-gray-600">
-              <div className="flex items-center gap-2">
-                <span>Tampilkan:</span>
-                <select
-                  value={pageSize}
-                  onChange={e => setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
-                  className="h-8 px-2 rounded-lg bg-white border border-gray-300 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                >
-                  <option value={100}>100 Per Halaman</option>
-                  <option value={250}>250 Per Halaman</option>
-                  <option value={500}>500 Per Halaman</option>
-                  <option value="ALL">Semua ({filteredBudgets.length} Data)</option>
-                </select>
-                <span>
-                  | Menampilkan {pageSize === 'ALL' ? filteredBudgets.length : Math.min(filteredBudgets.length, (currentPage - 1) * Number(pageSize) + 1)} - {pageSize === 'ALL' ? filteredBudgets.length : Math.min(filteredBudgets.length, currentPage * Number(pageSize))} dari {filteredBudgets.length} data
-                </span>
-              </div>
-
-              {pageSize !== 'ALL' && totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(1)} 
-                    disabled={currentPage === 1}
-                  >
-                    &laquo; Pertama
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                    disabled={currentPage === 1}
-                  >
-                    &lsaquo; Sblm
-                  </Button>
-                  <span className="px-2 font-bold text-gray-800">
-                    Halaman {currentPage} dari {totalPages}
+            {/* PAGINATION FOOTER */}
+            {filteredBudgets.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+                {/* Left: Info */}
+                <div className="flex items-center gap-2">
+                  <span>
+                    Menampilkan <strong className="text-gray-900">{pageSize === 'ALL' ? 1 : (currentPage - 1) * Number(pageSize) + 1}</strong> - <strong className="text-gray-900">{pageSize === 'ALL' ? filteredBudgets.length : Math.min(currentPage * Number(pageSize), filteredBudgets.length)}</strong> dari <strong className="text-gray-900">{filteredBudgets.length}</strong> data
                   </span>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                    disabled={currentPage === totalPages}
-                  >
-                    Lanjut &rsaquo;
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(totalPages)} 
-                    disabled={currentPage === totalPages}
-                  >
-                    Akhir &raquo;
-                  </Button>
                 </div>
-              )}
-            </div>
+
+                {/* Center: Rows per page */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+                  <select
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                    <option value={500}>500</option>
+                    <option value="ALL">Semua</option>
+                  </select>
+                </div>
+
+                {/* Right: Page Navigation */}
+                {pageSize !== 'ALL' && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Pertama"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Sebelumnya"
+                    >
+                      ‹ Prev
+                    </button>
+                    
+                    <span className="px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                      Hal {currentPage} / {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Selanjutnya"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Terakhir"
+                    >
+                      »
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
-
       </div>
-    </div>
-  );
+    );
 }

@@ -549,33 +549,42 @@ export default function KomparasiPenerimaan() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen pb-24 space-y-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header Banner */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 gap-4">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-bold text-blue-700 mb-2">
-              <BarChart3 size={13} /> Analisis Tren & Pertumbuhan
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight">Komparasi Penerimaan</h1>
-            <p className="text-xs lg:text-sm text-gray-500 mt-1">Perbandingan Rencana & Realisasi Multi-Tahun dengan Selisih Pertumbuhan</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <BarChart3 size={20} />
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-             <Link href="/penerimaan" className="inline-flex items-center justify-center px-4 py-2.5 text-xs font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-xs">
-                <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-                Kembali ke Dashboard
-             </Link>
-             <button
-               onClick={handleExportExcel}
-               disabled={loading || activeYears.length === 0 || exporting}
-               className="inline-flex items-center justify-center px-4 py-2.5 text-xs font-bold text-white bg-emerald-600 border border-transparent rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-sm"
-             >
-               {exporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
-               Export Excel ({comparisonMode === 'ALL' ? 'Semua' : comparisonMode === 'RENCANA' ? 'Anggaran' : 'Realisasi'})
-             </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Komparasi Penerimaan</h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Multi-Tahun
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Perbandingan Rencana & Realisasi Multi-Tahun dengan Selisih Pertumbuhan</p>
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          <Link 
+            href="/penerimaan" 
+            className="h-9 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+          >
+            <ArrowLeft size={14} />
+            <span>Dashboard</span>
+          </Link>
+          <button
+            onClick={handleExportExcel}
+            disabled={loading || activeYears.length === 0 || exporting}
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            <span>Export Excel</span>
+          </button>
+        </div>
+      </div>
 
         {/* Filter Bar with Mode Selector & Multi-Year Select */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/80 space-y-4">
@@ -897,12 +906,10 @@ export default function KomparasiPenerimaan() {
                          )}
                       </tr>
                    </tfoot>
-                </table>
-             </div>
+                 </table>
+              </div>
            )}
         </div>
-
-      </div>
     </div>
   );
 }

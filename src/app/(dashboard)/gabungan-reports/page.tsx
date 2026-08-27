@@ -195,131 +195,170 @@ export default function GabunganReportsPage() {
   const currentTransactions = allFilteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-         <div className="flex items-center gap-4">
-            <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-100">
-               <Building2 size={28} />
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+         <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+               <Building2 size={20} />
             </div>
             <div>
-               <h2 className="text-2xl font-black text-gray-900">Laporan Gabungan (Bank + Kas)</h2>
-               <p className="text-sm font-medium text-gray-500 mt-1">Konsolidasi seluruh transaksi dengan sistem paging.</p>
+               <div className="flex items-center gap-2">
+                  <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                     Laporan Gabungan (Bank + Kas)
+                  </h1>
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                     {allFilteredTransactions.length} Transaksi
+                  </span>
+               </div>
+               <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                  Konsolidasi mutasi kas kecil dan transaksi rekening bank dengan paging terpadu.
+               </p>
             </div>
          </div>
-         <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-            <select value={rekeningPilih} onChange={(e) => setRekeningPilih(e.target.value)} className="px-4 py-2 border rounded-xl font-bold bg-indigo-50 text-indigo-700 outline-none">
+
+         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            <select value={rekeningPilih} onChange={(e) => setRekeningPilih(e.target.value)} className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer">
                <option value="ALL">Semua Sumber Dana</option>
                <option value="KAS">Hanya Kas Tunai (BKU)</option>
                <option value="1">Bank Rekening 1</option>
                <option value="2">Bank Rekening 2</option>
                <option value="3">Bank Rekening 3</option>
             </select>
-            <select value={bulanPilih} onChange={(e) => setBulanPilih(Number(e.target.value))} className="px-4 py-2 border rounded-xl font-bold bg-gray-50 outline-none">
+            <select value={bulanPilih} onChange={(e) => setBulanPilih(Number(e.target.value))} className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer">
                {BULAN.map((b, i) => <option key={i} value={i+1}>{b}</option>)}
             </select>
-            <input type="number" value={tahunPilih} onChange={(e) => setTahunPilih(Number(e.target.value))} className="px-4 py-2 border w-24 rounded-xl font-bold bg-gray-50 outline-none" min={2000} max={2100} />
+            <input type="number" value={tahunPilih} onChange={(e) => setTahunPilih(Number(e.target.value))} className="h-9 px-3 border border-gray-200 w-20 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" min={2000} max={2100} />
             
-            <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-md font-bold text-sm print:hidden hover:bg-indigo-700 transition-colors">
-               <Download size={16} /> Cetak
+            <button onClick={() => window.print()} className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 print:hidden">
+               <Download size={13} /> <span>Cetak PDF</span>
             </button>
          </div>
       </div>
 
       {loading ? (
          <div className="h-64 flex flex-col items-center justify-center text-indigo-600">
-            <Loader2 size={40} className="animate-spin mb-4" />
+            <Loader2 size={32} className="animate-spin mb-2" />
+            <p className="text-xs font-medium text-gray-500">Menggabungkan data kas dan bank...</p>
          </div>
       ) : (
          <>
-            {/* Statistik Atas */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-               <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-                  <p className="text-gray-400 font-bold text-[10px] uppercase mb-1">Saldo Awal Bulan</p>
-                  <h3 className="text-xl font-black text-gray-700">Rp {dataStats.initialBalance.toLocaleString('id-ID')}</h3>
+            {/* STATISTIK KPI CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Saldo Awal Bulan</p>
+                     <p className="text-lg font-black text-gray-900 leading-none">Rp {dataStats.initialBalance.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">1 {BULAN[bulanPilih - 1]} {tahunPilih}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 text-slate-600">
+                     <Building2 size={18} />
+                  </div>
                </div>
-               <div className="bg-emerald-50 p-5 rounded-3xl shadow-sm">
-                  <p className="text-emerald-700/70 font-bold text-[10px] uppercase mb-1 flex items-center gap-1"><TrendingUp size={12}/> Masuk Bulan Ini</p>
-                  <h3 className="text-xl font-black text-emerald-700">Rp {dataStats.income.toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Total Masuk</p>
+                     <p className="text-lg font-black text-emerald-700 leading-none">Rp {dataStats.income.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Kas & Bank (+)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+                     <TrendingUp size={18} />
+                  </div>
                </div>
-               <div className="bg-red-50 p-5 rounded-3xl shadow-sm">
-                  <p className="text-red-700/70 font-bold text-[10px] uppercase mb-1 flex items-center gap-1"><TrendingDown size={12}/> Keluar Bulan Ini</p>
-                  <h3 className="text-xl font-black text-red-700">Rp {dataStats.expense.toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Total Keluar</p>
+                     <p className="text-lg font-black text-rose-700 leading-none">Rp {dataStats.expense.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Kas & Bank (-)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600">
+                     <TrendingDown size={18} />
+                  </div>
                </div>
-               <div className="bg-indigo-600 p-5 rounded-3xl shadow-sm text-white">
-                  <p className="text-indigo-200 font-bold text-[10px] uppercase mb-1">Sisa Saldo Akhir</p>
-                  <h3 className="text-xl font-black">Rp {(dataStats.initialBalance + dataStats.balance).toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Sisa Saldo Akhir</p>
+                     <p className="text-lg font-black text-indigo-700 leading-none">Rp {(dataStats.initialBalance + dataStats.balance).toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Posisi Gabungan</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                     <Building2 size={18} />
+                  </div>
                </div>
             </div>
 
-            {/* Tabel Transaksi */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* TABEL TRANSAKSI */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                     <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider font-bold">
+                  <table className="w-full text-left text-xs border-collapse">
+                     <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                         <tr>
-                           <th className="p-4 w-10">Sumber</th>
-                           <th className="p-4 w-24">Tanggal</th>
-                           <th className="p-4 w-1/3">Uraian / Deskripsi</th>
-                           <th className="p-4 text-right">Nominal (Rupiah)</th>
-                           <th className="p-4 text-right bg-indigo-50/50">Saldo Berjalan</th>
-                           <th className="p-4 text-center print:hidden">Bukti</th>
+                           <th className="py-3 px-4 w-20 text-center">Sumber</th>
+                           <th className="py-3 px-4 w-28">Tanggal</th>
+                           <th className="py-3 px-4">Uraian / Deskripsi</th>
+                           <th className="py-3 px-4 text-right">Nominal</th>
+                           <th className="py-3 px-4 text-right bg-indigo-50/50">Saldo Berjalan</th>
+                           <th className="py-3 px-4 text-center print:hidden">Bukti</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-100">
+                     <tbody className="divide-y divide-gray-100 font-medium">
                         {currentTransactions.length === 0 ? (
-                           <tr><td colSpan={6} className="p-8 text-center text-gray-400 font-medium">Bulan ini belum ada transaksi di sumber dana terpilih.</td></tr>
+                           <tr><td colSpan={6} className="py-12 text-center text-gray-400 font-medium">Bulan ini belum ada transaksi di sumber dana terpilih.</td></tr>
                         ) : currentTransactions.map((trx) => {
                            const isExpanded = expandedRow === trx.uid;
                            const isPemasukan = trx.masuk > 0;
                            const nominal = isPemasukan ? trx.masuk : trx.keluar;
                            const isSah = trx.status === 'Selesai' || trx.status === 'Disetujui';
-                           const rowBgClass = isSah ? 'hover:bg-gray-50' : 'bg-red-50/40 hover:bg-red-50'; 
+                           const rowBgClass = isSah ? 'hover:bg-indigo-50/20' : 'bg-rose-50/30 hover:bg-rose-50/50'; 
 
                            return (
                               <React.Fragment key={trx.uid}>
-                                 <tr className={`transition-colors group ${rowBgClass}`}>
-                                    <td className="p-4 text-center">
-                                       <span className={`px-2 py-1 rounded text-[9px] font-black uppercase ${trx.tipe === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                          {trx.tipe === 'BANK' ? `BANK ${trx.rekening_id}` : 'KAS'}
+                                 <tr className={`transition-colors ${rowBgClass}`}>
+                                    <td className="py-3 px-4 text-center">
+                                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${trx.tipe === 'BANK' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                                          {trx.tipe === 'BANK' ? `Bank ${trx.rekening_id}` : 'Kas'}
                                        </span>
                                     </td>
-                                    <td className="p-4 whitespace-nowrap font-medium text-xs">{trx.tanggal.toLocaleDateString('id-ID')}</td>
-                                    <td className="p-4">
+                                    <td className="py-3 px-4 whitespace-nowrap font-semibold text-gray-700">{trx.tanggal.toLocaleDateString('id-ID')}</td>
+                                    <td className="py-3 px-4">
                                        <div className="flex items-center gap-2">
-                                          <p className={`font-bold ${isSah ? 'text-gray-900' : 'text-red-900'} uppercase text-xs leading-tight`}>{trx.uraian}</p>
-                                          {!isSah && <span className="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full uppercase shadow-sm animate-pulse">{trx.status}</span>}
+                                          <p className={`font-bold ${isSah ? 'text-gray-900' : 'text-rose-900'}`}>{trx.uraian}</p>
+                                          {!isSah && <span className="text-[9px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase border border-rose-200">{trx.status}</span>}
                                        </div>
-                                       <p className="text-[9px] text-gray-500 flex gap-2 mt-1 flex-wrap font-mono uppercase">
-                                          <span className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">ACC: {trx.nama_akun}</span>
-                                          <span className="bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{trx.keterangan_tambahan}</span>
-                                       </p>
+                                       <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px] text-gray-500 font-semibold">
+                                          <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200">🏷️ {trx.nama_akun}</span>
+                                          <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200">{trx.keterangan_tambahan}</span>
+                                       </div>
                                     </td>
-                                    <td className="p-4 text-right font-black">
-                                       <span className={`px-2 py-1 rounded-lg text-xs ${isPemasukan ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                    <td className="py-3 px-4 text-right font-black font-mono">
+                                       <span className={`px-2 py-0.5 rounded-md text-xs ${isPemasukan ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
                                           {isPemasukan ? '+' : '-'} Rp {nominal.toLocaleString('id-ID')}
                                        </span>
                                     </td>
-                                    <td className="p-4 text-right font-black text-indigo-700 bg-indigo-50/20 whitespace-nowrap text-xs">
+                                    <td className="py-3 px-4 text-right font-black text-indigo-700 bg-indigo-50/30 whitespace-nowrap font-mono">
                                        Rp {trx._saldo_berjalan.toLocaleString('id-ID')}
                                     </td>
-                                    <td className="p-4 text-center print:hidden pb-4">
-                                       <button onClick={() => setExpandedRow(isExpanded ? null : trx.uid)} className={`px-3 py-1.5 rounded-lg font-bold text-[10px] flex items-center gap-1 mx-auto transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} mb-1`}>
-                                          CEK {isExpanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
+                                    <td className="py-3 px-4 text-center print:hidden">
+                                       <button onClick={() => setExpandedRow(isExpanded ? null : trx.uid)} className={`h-7 px-2.5 rounded-lg font-bold text-[11px] inline-flex items-center gap-1 transition-all ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700'}`}>
+                                          <span>Bukti</span> {isExpanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
                                        </button>
                                        {trx.foto && !isExpanded && (
-                                          <span className="text-[8px] font-black text-amber-600 bg-amber-100 px-1 py-0.5 rounded-full mt-1 uppercase">Ada Bukti</span>
+                                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 ml-1"></span>
                                        )}
                                     </td>
                                  </tr>
 
                                  {/* Panel Collapsible Foto */}
                                  {isExpanded && (
-                                    <tr className="bg-gray-50 border-t-0 shadow-inner print:hidden">
+                                    <tr className="bg-gray-50/50 border-t border-gray-100 print:hidden">
                                        <td colSpan={6} className="p-4">
-                                          <div className="col-span-12 bg-white/50 p-6 rounded-2xl border border-indigo-50 shadow-inner mt-4">
-                                             <h4 className="font-black text-indigo-900 mb-6 border-b border-indigo-100 pb-2 uppercase text-sm tracking-widest">📂 Lampiran Fisik Transaksi ({trx.uid})</h4>
-                                             {trx.foto ? renderLampiranLinks("BUKTI LAMPIRAN", trx.foto) : (
-                                                <div className="text-center py-6 text-gray-400 font-bold italic text-sm">Tidak ada lampiran fisik tersimpan.</div>
+                                          <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs space-y-3">
+                                             <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-2 uppercase text-[11px] tracking-wider">📂 Lampiran Fisik Transaksi ({trx.uid})</h4>
+                                             {trx.foto ? renderLampiranLinks("Bukti Lampiran", trx.foto) : (
+                                                <div className="text-center py-4 text-gray-400 font-semibold italic text-xs">Tidak ada lampiran fisik tersimpan.</div>
                                              )}
                                           </div>
                                        </td>
@@ -334,19 +373,19 @@ export default function GabunganReportsPage() {
                
                {/* Kontrol Pagination */}
                {totalPages > 1 && (
-                  <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between print:hidden">
-                     <p className="text-xs font-bold text-gray-500">
+                  <div className="p-3 px-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between print:hidden">
+                     <p className="text-xs font-semibold text-gray-500">
                         Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, allFilteredTransactions.length)} dari {allFilteredTransactions.length} transaksi
                      </p>
-                     <div className="flex gap-2">
-                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-50">
-                           <ChevronLeft size={16} />
+                     <div className="flex items-center gap-1.5">
+                        <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-50 transition-colors">
+                           <ChevronLeft size={14} />
                         </button>
-                        <span className="px-4 py-2 text-sm font-black text-gray-700 bg-white border border-gray-200 rounded-lg">
-                           Halaman {currentPage} / {totalPages}
+                        <span className="px-3 h-8 flex items-center text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-lg">
+                           {currentPage} / {totalPages}
                         </span>
-                        <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-50">
-                           <ChevronRight size={16} />
+                        <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 flex items-center justify-center bg-white border border-gray-200 rounded-lg hover:bg-gray-100 disabled:opacity-50 transition-colors">
+                           <ChevronRight size={14} />
                         </button>
                      </div>
                   </div>

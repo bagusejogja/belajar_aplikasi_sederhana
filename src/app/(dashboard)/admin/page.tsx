@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import { Wallet, CheckCircle2, Clock, Shield, Building2, FileText, BarChart3 } from 'lucide-react';
 
 // Autocomplete Filter Unit Kerja
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -184,7 +185,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Pagination State
-  const [pageSize, setPageSize] = useState<number | 'ALL'>(100);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
   const [currentPage, setCurrentPage] = useState(1);
   const [isEvaluatingRules, setIsEvaluatingRules] = useState(false);
 
@@ -471,179 +472,197 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-300">
-      <div className="w-full space-y-8">
-        
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <Link href="/review-anggaran">
-              <Button variant="ghost" className="text-gray-500 hover:text-gray-900 px-0 w-fit">&larr; Kembali ke Overview</Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-gray-900">Dashboard Admin Review</h1>
-              <p className="text-gray-500 font-medium">Saran AI keyakinan tinggi disorot mencolok dengan tombol ⚡ Setujui AI 1-Klik.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <span className="text-lg">🛡️</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Dashboard Admin Review Anggaran
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {filteredDetailBudgets.length} Usulan Item
+              </span>
             </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Saran AI keyakinan tinggi disorot mencolok dengan aksi Setujui AI 1-Klik.
+            </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button 
-              variant="outline"
-              className="border-purple-300 text-purple-700 hover:bg-purple-50"
-              onClick={handleReEvaluateRules}
-              disabled={isEvaluatingRules}
-            >
-              {isEvaluatingRules ? 'Memproses Rule...' : '⚡ Re-Evaluasi Rules'}
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              onClick={() => {
-                const liveUrl = `${window.location.origin}/api/budgets/export-excel`;
-                navigator.clipboard.writeText(liveUrl);
-                alert(`URL Live Power Query Excel disalin:\n${liveUrl}\n\nPetunjuk di Excel:\nBuka Excel -> Data -> From Web / Dari Web -> Paste URL ini -> Refresh Kapan Saja!`);
-              }}
-            >
-              🔗 Link Power Query Excel
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              onClick={() => exportToExcelCSV(filteredDetailBudgets, 'Data_Usulan_Anggaran')}
-            >
-              📥 Export ke Excel
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-rose-300 text-rose-700 hover:bg-rose-50"
-              onClick={async () => {
-                if (!confirm('Apakah Anda yakin ingin MENGHAPUS SELURUH data usulan anggaran?')) return;
-                try {
-                  const res = await fetch('/api/budgets/list', { method: 'DELETE' });
-                  const json = await res.json();
-                  if (json.success) {
-                    alert('Tabel data usulan anggaran berhasil dibersihkan!');
-                    fetchBudgets();
-                  } else {
-                    alert('Gagal: ' + json.error);
-                  }
-                } catch (e) {
-                  alert('Terjadi kesalahan');
-                }
-              }}
-            >
-              🗑️ Bersihkan Data
-            </Button>
-            <Link href="/review-anggaran/rules">
-              <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50">
-                Kelola Master Aturan
-              </Button>
-            </Link>
-            <Button 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-              onClick={handleBulkApprove}
-            >
-              Bulk Approve AI
-            </Button>
-          </div>
-        </header>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
+          <button 
+            onClick={handleReEvaluateRules}
+            disabled={isEvaluatingRules}
+            className="h-9 px-3 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+          >
+            <span>{isEvaluatingRules ? 'Memproses...' : '⚡ Re-Evaluasi Rules'}</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              const liveUrl = `${window.location.origin}/api/budgets/export-excel`;
+              navigator.clipboard.writeText(liveUrl);
+              alert(`URL Live Power Query Excel disalin:\n${liveUrl}`);
+            }}
+            className="h-9 px-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <span>🔗 Power Query</span>
+          </button>
+
+          <button 
+            onClick={() => exportToExcelCSV(filteredDetailBudgets, 'Data_Usulan_Anggaran')}
+            className="h-9 px-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <span>📥 Export Excel</span>
+          </button>
+
+          <Link href="/review-anggaran/rules">
+            <button className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95">
+              <span>Master Aturan</span>
+            </button>
+          </Link>
+
+          <button 
+            onClick={handleBulkApprove}
+            className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <span>Bulk Approve AI</span>
+          </button>
+        </div>
+      </div>
 
         {/* Global Summary Cards (REAKTIF SESUAI FILTER FILTERED DATA) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-white border-gray-200">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Anggaran</CardTitle>
-                {selectedUnitFilter !== 'ALL' && <Badge variant="secondary" className="text-[10px]">{selectedUnitFilter}</Badge>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Total Anggaran */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">TOTAL ANGGARAN</span>
+                <div className="text-xl font-black text-gray-900 font-mono tracking-tight">
+                  Rp {new Intl.NumberFormat('id-ID').format(totalAnggaranSum)}
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-gray-900 font-mono">
-                Rp {new Intl.NumberFormat('id-ID').format(totalAnggaranSum)}
+              <div className="p-2 rounded-xl bg-gray-50 text-gray-600 border border-gray-100">
+                <Wallet size={18} />
               </div>
-              <p className="text-xs text-gray-500 mt-1 font-medium">{totalUsulan} Usulan Item</p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">
+              <span>{totalUsulan} Usulan Item</span>
+              {selectedUnitFilter !== 'ALL' ? (
+                <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold truncate max-w-[100px]">{selectedUnitFilter}</span>
+              ) : (
+                <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-mono font-bold">100%</span>
+              )}
+            </div>
+          </div>
           
-          <Card className="bg-white border-emerald-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Ada Status (Kunci)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-emerald-600 font-mono">
-                Rp {new Intl.NumberFormat('id-ID').format(totalAdaStatusSum)}
+          {/* Ada Status (Kunci) */}
+          <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">ADA STATUS (KUNCI)</span>
+                <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
+                  Rp {new Intl.NumberFormat('id-ID').format(totalAdaStatusSum)}
+                </div>
               </div>
-              <p className="text-xs text-emerald-700 mt-1 font-medium">
-                {adaStatusItems.length} Item ({totalAnggaranSum > 0 ? Math.round((totalAdaStatusSum / totalAnggaranSum) * 100) : 0}%)
-              </p>
-            </CardContent>
-          </Card>
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <CheckCircle2 size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
+              <span>{adaStatusItems.length} Item Terkunci</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-mono font-bold">
+                {totalAnggaranSum > 0 ? Math.round((totalAdaStatusSum / totalAnggaranSum) * 100) : 0}%
+              </span>
+            </div>
+          </div>
           
-          <Card className="bg-white border-amber-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-amber-600 uppercase tracking-wider">Tanpa Status (Bebas)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-amber-600 font-mono">
-                Rp {new Intl.NumberFormat('id-ID').format(totalTanpaStatusSum)}
+          {/* Tanpa Status (Bebas) */}
+          <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">TANPA STATUS (BEBAS)</span>
+                <div className="text-xl font-black text-amber-700 font-mono tracking-tight">
+                  Rp {new Intl.NumberFormat('id-ID').format(totalTanpaStatusSum)}
+                </div>
               </div>
-              <p className="text-xs text-amber-700 mt-1 font-medium">
-                {tanpaStatusItems.length} Item ({totalAnggaranSum > 0 ? Math.round((totalTanpaStatusSum / totalAnggaranSum) * 100) : 0}%)
-              </p>
-            </CardContent>
-          </Card>
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+                <Clock size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
+              <span>{tanpaStatusItems.length} Item Bebas</span>
+              <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-mono font-bold">
+                {totalAnggaranSum > 0 ? Math.round((totalTanpaStatusSum / totalAnggaranSum) * 100) : 0}%
+              </span>
+            </div>
+          </div>
 
-          <Card className="bg-white border-indigo-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Sumber Kunci (Rule vs AI)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center text-sm font-bold text-gray-800">
-                <span className="text-indigo-700">RULE: {terkunciRule}</span>
-                <span className="text-purple-700">AI: {saranAi}</span>
+          {/* Sumber Kunci */}
+          <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">SUMBER KUNCI</span>
+                <div className="text-sm font-black text-gray-900 flex items-center gap-2 mt-1">
+                  <span className="text-indigo-700 font-mono">RULE: {terkunciRule}</span>
+                  <span className="text-purple-700 font-mono">AI: {saranAi}</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2 font-medium">Otomatis Dievaluasi</p>
-            </CardContent>
-          </Card>
+              <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <Shield size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-100/60 pt-2">
+              <span>Evaluasi Otomatis</span>
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Auto</span>
+            </div>
+          </div>
         </div>
 
         {/* Tab Selection */}
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-max mb-6 border border-gray-200">
+        <div className="flex flex-wrap gap-1.5 bg-gray-100 p-1.5 rounded-2xl border border-gray-200 w-max mb-4">
           <button 
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'summary' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'}`}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${activeTab === 'summary' ? 'bg-white text-gray-900 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'}`}
             onClick={() => setActiveTab('summary')}
           >
-            🏢 Summary Per Unit Kerja
+            <Building2 size={14} /> Summary Unit Kerja
           </button>
           <button 
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'data' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'}`}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${activeTab === 'data' ? 'bg-white text-gray-900 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'}`}
             onClick={() => setActiveTab('data')}
           >
-            📋 Tabel Data Detail ({filteredDetailBudgets.length})
+            <FileText size={14} /> Tabel Data Detail ({filteredDetailBudgets.length})
           </button>
           <button 
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab === 'pivot' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'}`}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${activeTab === 'pivot' ? 'bg-white text-gray-900 shadow-xs font-black' : 'text-gray-600 hover:text-gray-900'}`}
             onClick={() => setActiveTab('pivot')}
           >
-            📊 Analisis Pivot Multi-Dimensi
+            <BarChart3 size={14} /> Analisis Pivot Multi-Dimensi
           </button>
         </div>
 
         {/* TAB 1: SUMMARY PER UNIT KERJA */}
         {activeTab === 'summary' && (
-          <Card className="bg-white border-gray-200">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="bg-white border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-xl text-gray-900">Ringkasan Anggaran Per Unit Kerja</CardTitle>
-                <CardDescription className="text-gray-500">
-                  Perbandingan total usulan anggaran, anggaran yang berkategori Kunci (Ada Status), dan Bebas (Tanpa Status).
+                <CardTitle className="text-sm font-black text-gray-900">Ringkasan Anggaran Per Unit Kerja</CardTitle>
+                <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                  Perbandingan total usulan anggaran, anggaran berkategori Kunci (Ada Status), dan Bebas (Tanpa Status).
                 </CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50">
+              <Button variant="outline" size="sm" onClick={fetchBudgets} className="h-8 text-xs font-bold border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl">
                 🔄 Refresh
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-gray-50 border-b border-gray-200">
+                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="text-gray-500 text-xs uppercase font-bold">Unit Kerja</TableHead>
                     <TableHead className="text-gray-500 text-center text-xs uppercase font-bold">Total Item</TableHead>
@@ -882,69 +901,80 @@ export default function AdminDashboard() {
               </TableBody>
             </Table>
 
-            {/* CONTROLLER PAGINATION 100 - 250 - 500 */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-2 border-t border-gray-100 text-xs text-gray-600">
-              <div className="flex items-center gap-2">
-                <span>Tampilkan:</span>
-                <select
-                  value={pageSize}
-                  onChange={e => setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
-                  className="h-8 px-2 rounded-lg bg-white border border-gray-300 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-600"
-                >
-                  <option value={100}>100 Per Halaman</option>
-                  <option value={250}>250 Per Halaman</option>
-                  <option value={500}>500 Per Halaman</option>
-                  <option value="ALL">Semua ({filteredDetailBudgets.length} Data)</option>
-                </select>
-                <span>
-                  | Menampilkan {pageSize === 'ALL' ? filteredDetailBudgets.length : Math.min(filteredDetailBudgets.length, (currentPage - 1) * Number(pageSize) + 1)} - {pageSize === 'ALL' ? filteredDetailBudgets.length : Math.min(filteredDetailBudgets.length, currentPage * Number(pageSize))} dari {filteredDetailBudgets.length} data
-                </span>
-              </div>
-
-              {pageSize !== 'ALL' && totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(1)} 
-                    disabled={currentPage === 1}
-                  >
-                    &laquo; Pertama
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                    disabled={currentPage === 1}
-                  >
-                    &lsaquo; Sblm
-                  </Button>
-                  <span className="px-2 font-bold text-gray-800">
-                    Halaman {currentPage} dari {totalPages}
+            {/* PAGINATION FOOTER */}
+            {filteredDetailBudgets.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+                {/* Left: Info */}
+                <div className="flex items-center gap-2">
+                  <span>
+                    Menampilkan <strong className="text-gray-900">{pageSize === 'ALL' ? 1 : (currentPage - 1) * Number(pageSize) + 1}</strong> - <strong className="text-gray-900">{pageSize === 'ALL' ? filteredDetailBudgets.length : Math.min(currentPage * Number(pageSize), filteredDetailBudgets.length)}</strong> dari <strong className="text-gray-900">{filteredDetailBudgets.length}</strong> data
                   </span>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                    disabled={currentPage === totalPages}
-                  >
-                    Lanjut &rsaquo;
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-8 px-2 text-xs" 
-                    onClick={() => setCurrentPage(totalPages)} 
-                    disabled={currentPage === totalPages}
-                  >
-                    Akhir &raquo;
-                  </Button>
                 </div>
-              )}
-            </div>
+
+                {/* Center: Rows per page */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+                  <select
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                    <option value={500}>500</option>
+                    <option value="ALL">Semua</option>
+                  </select>
+                </div>
+
+                {/* Right: Page Navigation */}
+                {pageSize !== 'ALL' && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Pertama"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Sebelumnya"
+                    >
+                      ‹ Prev
+                    </button>
+                    
+                    <span className="px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                      Hal {currentPage} / {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Selanjutnya"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Terakhir"
+                    >
+                      »
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
         )}
@@ -1009,6 +1039,5 @@ export default function AdminDashboard() {
           </Card>
         )}
       </div>
-    </div>
-  );
+    );
 }

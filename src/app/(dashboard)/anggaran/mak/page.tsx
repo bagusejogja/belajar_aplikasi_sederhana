@@ -23,7 +23,7 @@ export default function MonitoringMakPage() {
   
   // Paging
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   
   // Process State
   const [processingId, setProcessingId] = useState<number | null>(null);
@@ -137,11 +137,15 @@ export default function MonitoringMakPage() {
   const availablePICs = Array.from(new Set(data.map(d => d.pic).filter(Boolean))).sort();
 
   // Pagination Logic
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const currentData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(filtered.length / itemsPerPage) || 1;
+  const currentData = useMemo(() => {
+    if (itemsPerPage === -1) return filtered;
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage, itemsPerPage]);
 
   // Reset page when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC, itemsPerPage]);
 
   const total = filtered.length;
   const selesai = filtered.filter(d => d.status === 'Selesai').length;
@@ -318,70 +322,123 @@ export default function MonitoringMakPage() {
   };
 
   return (
-    <div className="space-y-8 pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-800 to-sky-700 rounded-[3rem] p-10 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute -bottom-10 -right-10 opacity-[0.07]"><ClipboardList size={200} /></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 text-indigo-200 font-bold text-[10px] uppercase tracking-widest mb-3">
-            <FileText size={14} /> Anggaran • Tolakan Verif
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-rose-600 to-indigo-700 p-2 rounded-xl text-white shadow-xs">
+            <ClipboardList size={20} />
           </div>
-          <h1 className="text-4xl font-black tracking-tight leading-none mb-3">Revisi Anggaran Tolakan dari Verifikator</h1>
-          <p className="text-indigo-100 font-medium text-sm max-w-md">
-            Daftar pengajuan perubahan Tolakan Verifikator. Tandai sebagai selesai dan kirimkan notifikasi email ke pengaju.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Revisi Tolakan dari Verifikator
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
+                {filtered.length} Pengajuan ({filterTahun || 'Semua Tahun'})
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Daftar perubahan tolakan verifikator, pemrosesan status, & notifikasi email pengaju.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={fetchData}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Pengajuan', value: total, color: 'from-indigo-500 to-indigo-600', icon: <ClipboardList size={24} /> },
-          { label: 'Proses Revisi',   value: proses,  color: 'from-amber-400 to-amber-500',   icon: <Clock size={24} /> },
-          { label: 'Selesai',         value: selesai, color: 'from-emerald-500 to-emerald-600', icon: <CheckCircle2 size={24} /> },
-        ].map((s, i) => (
-          <div key={i} className={`bg-gradient-to-br ${s.color} text-white rounded-3xl p-6 shadow-sm`}>
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">{s.label}</p>
-                <p className="text-4xl font-black">{s.value}</p>
-              </div>
-              <div className="opacity-30">{s.icon}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Total Pengajuan */}
+        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">TOTAL PENGAJUAN</span>
+              <div className="text-2xl font-black text-indigo-900 font-mono tracking-tight">{total}</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <ClipboardList size={18} />
             </div>
           </div>
-        ))}
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-100/60 pt-2">
+            <span>Seluruh Usulan Tolakan</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">100%</span>
+          </div>
+        </div>
+
+        {/* Proses Revisi */}
+        <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">PROSES REVISI</span>
+              <div className="text-2xl font-black text-amber-700 font-mono tracking-tight">{proses}</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <Clock size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
+            <span>Menunggu Verifikasi</span>
+            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold">Pending</span>
+          </div>
+        </div>
+
+        {/* Selesai */}
+        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">SELESAI</span>
+              <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">{selesai}</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <CheckCircle2 size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
+            <span>Telah Ditindaklanjuti</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">Selesai</span>
+          </div>
+        </div>
       </div>
 
       {/* Alert Messages */}
       {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl flex items-center gap-3">
-          <CheckCircle2 size={18} className="shrink-0" />
-          <p className="font-bold text-sm">{successMsg}</p>
+        <div className="p-3.5 px-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-3 text-xs font-bold">
+          <CheckCircle2 size={16} className="shrink-0" />
+          <p>{successMsg}</p>
         </div>
       )}
       {errorMsg && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-2xl flex items-center gap-3">
-          <div className="shrink-0 font-bold text-lg">!</div>
-          <p className="font-bold text-sm">{errorMsg}</p>
+        <div className="p-3.5 px-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-3 text-xs font-bold">
+          <div className="shrink-0 font-black">!</div>
+          <p>{errorMsg}</p>
         </div>
       )}
 
-      {/* Dashboard Gambaran Revisi (Like Usulan) */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-          <h2 className="text-xl font-black text-gray-800 flex items-center gap-2">
-            <BarChart3 className="text-indigo-600" /> Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}
+      {/* Dashboard Gambaran Revisi */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
+          <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
+            <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}
           </h2>
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button 
               onClick={() => setActiveTab('table')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Tabel Frekuensi
             </button>
             <button 
               onClick={() => setActiveTab('chart')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Grafik Batang
             </button>
@@ -390,44 +447,44 @@ export default function MonitoringMakPage() {
 
         {activeTab === 'table' ? (
           dashboardData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-50">
+            <div className="overflow-x-auto rounded-xl border border-gray-100">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="p-4 border-b text-xs uppercase tracking-widest text-gray-500 font-bold">Unit (Frekuensi Sama)</th>
-                    <th className="p-4 border-b text-center text-xs uppercase tracking-widest text-gray-500 font-bold">Frekuensi Revisi</th>
+                    <th className="px-4 py-3">Unit (Frekuensi Sama)</th>
+                    <th className="px-4 py-3 text-center w-36">Frekuensi Revisi</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-gray-100">
                   {dashboardData.map((d, i) => {
                     const getGroupColor = (group?: string) => {
                       switch(group) {
-                         case 'Fakultas': return 'bg-sky-100 text-sky-700 border border-sky-200';
-                         case 'KPTU': return 'bg-amber-100 text-amber-700 border border-amber-200';
-                         case 'Pusat Studi': return 'bg-violet-100 text-violet-700 border border-violet-200';
-                         case 'Tempat Ibadah': return 'bg-rose-100 text-rose-700 border border-rose-200';
-                         default: return 'bg-gray-100 text-gray-700 border border-gray-200';
+                         case 'Fakultas': return 'bg-sky-50 text-sky-700 border border-sky-200';
+                         case 'KPTU': return 'bg-amber-50 text-amber-700 border border-amber-200';
+                         case 'Pusat Studi': return 'bg-violet-50 text-violet-700 border border-violet-200';
+                         case 'Tempat Ibadah': return 'bg-rose-50 text-rose-700 border border-rose-200';
+                         default: return 'bg-gray-50 text-gray-700 border border-gray-200';
                       }
                     };
                     const units = d.name.split(', ');
                     return (
-                      <tr key={i} className="border-b hover:bg-gray-50/50 transition-colors">
-                        <td className="p-4">
-                          <div className="flex flex-wrap gap-2">
+                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1.5">
                             {units.map((unit: string, ui: number) => {
                               const cleanUnit = unit.trim();
                               const groupOrg = unitGroups[cleanUnit];
                               return (
-                                <span key={ui} className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getGroupColor(groupOrg)} shadow-sm`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
+                                <span key={ui} className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${getGroupColor(groupOrg)}`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
                                   {cleanUnit}
                                 </span>
                               );
                             })}
                           </div>
                         </td>
-                        <td className="p-4 text-center">
-                          <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-lg shadow-sm shadow-indigo-200">
-                            {d.Total}
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono">
+                            {d.Total} kali
                           </span>
                         </td>
                       </tr>
@@ -437,14 +494,14 @@ export default function MonitoringMakPage() {
               </table>
             </div>
           ) : (
-            <div className="h-40 flex flex-col items-center justify-center text-gray-400">
-              <BarChart3 size={32} className="opacity-20 mb-3" />
-              <p className="font-bold text-sm">Belum ada data revisi untuk ditampilkan</p>
+            <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+              <BarChart3 size={28} className="opacity-20 mb-2" />
+              <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
             </div>
           )
         ) : (
           chartData.length > 0 ? (
-            <div className="h-[400px] w-full pt-4">
+            <div className="h-[280px] w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
@@ -460,9 +517,9 @@ export default function MonitoringMakPage() {
                   <YAxis tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} allowDecimals={false} />
                   <Tooltip 
                     cursor={{ fill: '#f9fafb' }}
-                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '0.75rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
-                  <Bar dataKey="Total" radius={[6, 6, 0, 0]} maxBarSize={50} animationDuration={1000}>
+                  <Bar dataKey="Total" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={1000}>
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill="#4f46e5" />
                     ))}
@@ -471,62 +528,59 @@ export default function MonitoringMakPage() {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-40 flex flex-col items-center justify-center text-gray-400">
-              <BarChart3 size={32} className="opacity-20 mb-3" />
-              <p className="font-bold text-sm">Belum ada data revisi untuk ditampilkan</p>
+            <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+              <BarChart3 size={28} className="opacity-20 mb-2" />
+              <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
             </div>
           )
         )}
       </div>
 
       {/* Main Table Section */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
         
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-3 items-center">
+          <div className="flex-1 relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             <input 
               type="text" 
               placeholder="Cari kata kunci..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-9 pl-8 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
           
-          <div className="w-full md:w-48 relative">
-            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <div className="w-full md:w-44">
             <select 
               value={filterTahun}
               onChange={(e) => setFilterTahun(e.target.value)}
-              className="w-full pl-12 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
             >
               <option value="">Semua Tahun</option>
               {availableTahun.map((t, idx) => <option key={idx} value={t}>{t}</option>)}
             </select>
           </div>
 
-          <div className="w-full md:w-48 relative">
-            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <div className="w-full md:w-56">
             <input 
               list="unit-options"
               placeholder="Pilih/Ketik Unit..."
               value={filterUnit}
               onChange={(e) => setFilterUnit(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
             <datalist id="unit-options">
               {availableUnits.map((u, idx) => <option key={idx} value={u} />)}
             </datalist>
           </div>
 
-          <div className="w-full md:w-48 relative">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <div className="w-full md:w-44">
             <select 
               value={filterPIC}
               onChange={(e) => setFilterPIC(e.target.value)}
-              className="w-full pl-12 pr-10 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold text-gray-700 focus:ring-2 focus:ring-indigo-500/20 appearance-none cursor-pointer"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
             >
               <option value="">Semua PIC</option>
               {availablePICs.map((pic, idx) => <option key={idx} value={pic}>{pic}</option>)}
@@ -535,21 +589,21 @@ export default function MonitoringMakPage() {
         </div>
 
         {/* Table Content */}
-        <div className="overflow-x-auto rounded-2xl border border-gray-50">
+        <div className="overflow-x-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
               <Loader2 className="animate-spin mb-4" size={32} />
               <p className="text-sm font-bold">Memuat Data...</p>
             </div>
           ) : currentData.length > 0 ? (
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-900 shadow-md">
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 w-12 text-center">NO</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 min-w-[250px]">Unit Kerja & Email</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">PIC & Status</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800">Lampiran</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-gray-300 uppercase tracking-widest border-b border-gray-800 text-center w-24">Aksi</th>
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                <tr>
+                  <th className="px-5 py-3 text-center w-12">NO</th>
+                  <th className="px-5 py-3 min-w-[250px]">Unit Kerja & Email</th>
+                  <th className="px-5 py-3">PIC & Status</th>
+                  <th className="px-5 py-3">Lampiran</th>
+                  <th className="px-5 py-3 text-center w-24">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -650,31 +704,76 @@ export default function MonitoringMakPage() {
           )}
         </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} Data
-            </span>
-            <div className="flex gap-2">
-              <button 
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => p - 1)}
-                className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-100 disabled:opacity-50"
-              >
-                Sebelumnya
-              </button>
-              <span className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black">
-                Hal {currentPage} dari {totalPages}
+        {/* PAGINATION FOOTER */}
+        {filtered.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+            {/* Left: Info */}
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan <strong className="text-gray-900">{itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1}</strong> - <strong className="text-gray-900">{itemsPerPage === -1 ? filtered.length : Math.min(currentPage * itemsPerPage, filtered.length)}</strong> dari <strong className="text-gray-900">{filtered.length}</strong> data
               </span>
-              <button 
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => p + 1)}
-                className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-100 disabled:opacity-50"
-              >
-                Berikutnya
-              </button>
             </div>
+
+            {/* Center: Rows per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-rose-500/20 cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={-1}>Semua</option>
+              </select>
+            </div>
+
+            {/* Right: Page Navigation */}
+            {itemsPerPage !== -1 && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Pertama"
+                >
+                  «
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Sebelumnya"
+                >
+                  ‹ Prev
+                </button>
+                
+                <span className="px-2 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-black">
+                  Hal {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Selanjutnya"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

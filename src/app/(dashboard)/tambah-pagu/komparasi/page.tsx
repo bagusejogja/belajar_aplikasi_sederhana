@@ -165,6 +165,10 @@ export default function KomparasiTambahPaguPage() {
     return calculated.filter(u => u.surat_nominal_disetujui > 0 || u.total_gov_tambah > 0 || u.total_surat_count > 0);
   }, [unitList, rawTambahPagu, rawGovPagu, selectedYear]);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
+
   // Filtered Audit Units
   const filteredAuditUnits = useMemo(() => {
     return auditUnitComparison.filter(u => {
@@ -175,6 +179,22 @@ export default function KomparasiTambahPaguPage() {
       return matchesSearch && matchesGroup && matchesStatus;
     });
   }, [auditUnitComparison, searchTerm, selectedGroupOrg, selectedAuditStatus]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedGroupOrg, selectedAuditStatus, selectedYear, pageSize]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'ALL' || filteredAuditUnits.length === 0) return 1;
+    return Math.ceil(filteredAuditUnits.length / Number(pageSize));
+  }, [filteredAuditUnits, pageSize]);
+
+  const paginatedAuditUnits = useMemo(() => {
+    if (pageSize === 'ALL') return filteredAuditUnits;
+    const start = (currentPage - 1) * Number(pageSize);
+    return filteredAuditUnits.slice(start, start + Number(pageSize));
+  }, [filteredAuditUnits, currentPage, pageSize]);
 
   // Overall KPI Summary
   const kpiAuditSummary = useMemo(() => {
@@ -297,102 +317,130 @@ export default function KomparasiTambahPaguPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto pb-32 px-4 pt-6 space-y-6">
-      {/* ROW 1: HEADER TITLE (🔴 REQUIREMENT 1: TOMBOL KEMBALI DIHILANGKAN) */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest mb-1.5">
-            <Sparkles size={16} className="text-amber-500" /> Audit Integritas Data Pagu Anggaran
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* ROW 1: SLIM & UNIFIED TOP TOOLBAR & ACTIONS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Scale size={20} />
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-            Komparasi Audit Tambah Pagu
-          </h1>
-          <p className="text-slate-500 font-medium text-xs md:text-sm mt-1">
-            Mengecek dan mencocokkan nominal disetujui di <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">tambah_pagu</code> dengan database <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code> ({selectedYear}).
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Komparasi Audit Tambah Pagu
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                TA {selectedYear} • {filteredAuditUnits.length} Unit
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Mencocokkan nominal disetujui di <span className="font-mono text-indigo-700 font-bold">tambah_pagu</span> dengan tabel <span className="font-mono text-indigo-700 font-bold">gov_pagu_anggaran</span>.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <Button 
-            variant="outline" 
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
             onClick={fetchAuditData}
-            className="rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs shadow-sm h-11"
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
           >
-            <RefreshCw size={16} className="mr-2 text-indigo-600" /> Muat Ulang Data
-          </Button>
+            <RefreshCw size={13} className="text-indigo-600" />
+            <span>Muat Ulang</span>
+          </button>
 
-          <Button 
+          <button 
             onClick={exportAuditExcel}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-md h-11 px-6"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
           >
-            <Download size={16} className="mr-2" /> Export Audit Excel (.xlsx)
-          </Button>
+            <Download size={14} />
+            <span>Export Audit Excel</span>
+          </button>
         </div>
       </div>
 
       {/* ROW 2: 4 AUDIT SUMMARY KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* CARD 1: MATCHING UNITS */}
-        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">🟢 DATA SAMA / MATCH</span>
-            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
-              {kpiAuditSummary.matchUnits} Unit Kerja
+        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">DATA SAMA / MATCH</span>
+              <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
+                {kpiAuditSummary.matchUnits} Unit Kerja
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <CheckCircle2 size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-emerald-700 flex items-center justify-between">
-            <span>Data Terverifikasi Presisi</span>
-            <Badge className="bg-emerald-100 text-emerald-800 text-[10px] font-mono">Rp 0 Selisih</Badge>
+          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
+            <span>Data Sesuai</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-mono font-bold">Rp 0 Selisih</span>
           </div>
         </div>
 
         {/* CARD 2: KELEWAT / BELUM DICATAT */}
-        <div className="bg-white rounded-3xl p-6 border border-amber-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 block mb-1">⚠️ KELEWAT / BELUM DICATAT</span>
-            <div className="text-2xl font-black text-amber-700 font-mono tracking-tight">
-              {kpiAuditSummary.kelewatCount} Unit Kerja
+        <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">KELEWAT / BELUM DICATAT</span>
+              <div className="text-xl font-black text-amber-700 font-mono tracking-tight">
+                {kpiAuditSummary.kelewatCount} Unit Kerja
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <AlertTriangle size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-amber-700 flex items-center justify-between">
+          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
             <span>Perlu Disinkronkan</span>
-            <Badge className="bg-amber-100 text-amber-900 text-[10px] font-mono">Rp {formatRp(kpiAuditSummary.kelewatAnggaran)}</Badge>
+            <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-mono font-bold">Rp {formatRp(kpiAuditSummary.kelewatAnggaran)}</span>
           </div>
         </div>
 
         {/* CARD 3: SELISIH NOMINAL */}
-        <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 block mb-1">🔴 SELISIH NOMINAL</span>
-            <div className="text-2xl font-black text-rose-700 font-mono tracking-tight">
-              {kpiAuditSummary.selisihCount} Unit Kerja
+        <div className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">SELISIH NOMINAL</span>
+              <div className="text-xl font-black text-rose-700 font-mono tracking-tight">
+                {kpiAuditSummary.selisihCount} Unit Kerja
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+              <Scale size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-rose-700 flex items-center justify-between">
-            <span>Total Bedab Nominal</span>
-            <Badge className="bg-rose-100 text-rose-800 text-[10px] font-mono">Rp {formatRp(kpiAuditSummary.selisihAnggaran)}</Badge>
+          <div className="mt-3 text-xs font-bold text-rose-700 flex items-center justify-between border-t border-rose-100/60 pt-2">
+            <span>Total Beda Nominal</span>
+            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-md font-mono font-bold">Rp {formatRp(kpiAuditSummary.selisihAnggaran)}</span>
           </div>
         </div>
 
         {/* CARD 4: TOTAL UNIT TERPROSES */}
-        <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block mb-1">TOTAL UNIT DIAUDIT</span>
-            <div className="text-2xl font-black text-indigo-900 font-mono tracking-tight">
-              {kpiAuditSummary.totalUnits} Unit Memiliki Mutasi
+        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">TOTAL UNIT DIAUDIT</span>
+              <div className="text-xl font-black text-indigo-900 font-mono tracking-tight">
+                {kpiAuditSummary.totalUnits} Unit Memiliki Mutasi
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Building2 size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-indigo-700 flex items-center justify-between">
-            <span>Tahun Anggaran {selectedYear}</span>
-            <Badge className="bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold">Audit Live</Badge>
+          <div className="mt-3 text-xs font-bold text-indigo-700 flex items-center justify-between border-t border-indigo-100/60 pt-2">
+            <span>TA {selectedYear}</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Audit Live</span>
           </div>
         </div>
       </div>
 
       {/* ROW 3: FILTER TOOLBAR FOR AUDIT */}
-      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center gap-4">
-        <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
-          <Zap size={16} className="text-amber-500" /> FILTER AUDIT:
+      <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
+        <div className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-wider shrink-0">
+          <Zap size={14} className="text-amber-500" /> FILTER AUDIT:
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
@@ -401,7 +449,7 @@ export default function KomparasiTambahPaguPage() {
             <select
               value={selectedAuditStatus}
               onChange={(e) => setSelectedAuditStatus(e.target.value)}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer font-bold"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="ALL">✨ Semua Status Audit</option>
               <option value="MATCH">🟢 MATCH (Sesuai)</option>
@@ -415,7 +463,7 @@ export default function KomparasiTambahPaguPage() {
             <select
               value={selectedGroupOrg}
               onChange={(e) => setSelectedGroupOrg(e.target.value)}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="ALL">🏢 Semua Group Org</option>
               {groupOrgOptions.map((g, idx) => (
@@ -429,7 +477,7 @@ export default function KomparasiTambahPaguPage() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="2026">📅 Tahun 2026</option>
               <option value="2025">📅 Tahun 2025</option>
@@ -439,36 +487,36 @@ export default function KomparasiTambahPaguPage() {
 
           {/* Search Unit */}
           <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Cari Unit Kerja..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-emerald-500 font-medium"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
             />
           </div>
         </div>
       </div>
 
       {/* ROW 4: TABEL AUDIT KOMPARASI PER UNIT KERJA (COLLAPSIBLE ACCORDION PER SURAT) */}
-      <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
-        <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100 flex flex-row items-center justify-between">
+      <Card className="border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden bg-white">
+        <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-base font-black text-slate-900">
-              Hasil Komparasi Audit: <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">tambah_pagu</code> VS <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code>
+            <CardTitle className="text-sm font-black text-gray-900">
+              Hasil Komparasi Audit: <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">tambah_pagu</code> VS <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">gov_pagu_anggaran</code>
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500 font-medium">
+            <CardDescription className="text-[11px] text-gray-500 font-medium">
               Klik baris unit kerja untuk memperluas (expand) rincian surat usulan di dalamnya
             </CardDescription>
           </div>
-          <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200 text-xs font-bold">
-            {filteredAuditUnits.length} Unit Active
+          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-bold">
+            {filteredAuditUnits.length} Unit
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
+            <TableHeader className="bg-gray-50/80 text-gray-400 font-black text-[10px] uppercase tracking-wider border-b border-gray-200">
               <TableRow>
                 <TableHead className="w-10 text-center"></TableHead>
                 <TableHead className="w-10 text-center">No</TableHead>
@@ -480,13 +528,14 @@ export default function KomparasiTambahPaguPage() {
             <TableBody>
               {filteredAuditUnits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-slate-400 font-medium">
+                  <TableCell colSpan={5} className="text-center py-12 text-gray-400 font-medium">
                     Tidak ada unit kerja yang memiliki mutasi atau sesuai filter.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAuditUnits.map((u, idx) => {
+                paginatedAuditUnits.map((u, idx) => {
                   const isExpanded = !!expandedUnits[u.id];
+                  const rowNumber = (pageSize === 'ALL' ? 0 : (currentPage - 1) * Number(pageSize)) + idx + 1;
                   const dbRows = rawGovPagu.filter(r => 
                     (r.unit_id === u.id || (r.unit_id && u.id && r.unit_id.toString() === u.id.toString())) &&
                     ((r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - inisiatif' || (r.jenis_anggaran || '').toLowerCase() === 'tambah pagu - penugasan')
@@ -506,7 +555,7 @@ export default function KomparasiTambahPaguPage() {
                             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>
                         </TableCell>
-                        <TableCell className="text-center font-bold text-slate-400 align-top pt-3.5">{idx + 1}</TableCell>
+                        <TableCell className="text-center font-bold text-gray-400 align-top pt-3.5">{rowNumber}</TableCell>
                         
                         {/* UNIT NAME & GROUP */}
                         <TableCell className="align-top pt-3 space-y-1">
@@ -666,6 +715,79 @@ export default function KomparasiTambahPaguPage() {
             </TableBody>
           </Table>
         </CardContent>
+
+        {/* PAGINATION FOOTER */}
+        {filteredAuditUnits.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+            {/* Left: Info */}
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan <strong className="text-gray-900">{pageSize === 'ALL' ? 1 : (currentPage - 1) * Number(pageSize) + 1}</strong> - <strong className="text-gray-900">{pageSize === 'ALL' ? filteredAuditUnits.length : Math.min(currentPage * Number(pageSize), filteredAuditUnits.length)}</strong> dari <strong className="text-gray-900">{filteredAuditUnits.length}</strong> unit
+              </span>
+            </div>
+
+            {/* Center: Rows per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+              <select
+                value={pageSize}
+                onChange={e => {
+                  setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="ALL">Semua</option>
+              </select>
+            </div>
+
+            {/* Right: Page Navigation */}
+            {pageSize !== 'ALL' && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Pertama"
+                >
+                  «
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Sebelumnya"
+                >
+                  ‹ Prev
+                </button>
+                
+                <span className="px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                  Hal {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Selanjutnya"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* 🔴 REQUIREMENT 4: DIALOG SINKRONISASI DATA */}

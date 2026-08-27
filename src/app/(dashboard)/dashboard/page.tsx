@@ -446,7 +446,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
       {/* FORCE LANDSCAPE & STYLING KHUSUS CETAK PDF */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
@@ -495,41 +495,41 @@ export default function DashboardPage() {
           table { width: 100%; border-collapse: collapse !important; }
           table tr { background-color: transparent !important; }
           th, td { 
-             border: 1px solid #64748b !important; /* Garis seragam abu-abu gelap agar jelas (slate-500) */
+             border: 1px solid #64748b !important;
              color: #000000 !important; 
              background-color: #ffffff !important; 
              box-shadow: none !important;
-             padding: 4px 6px !important; /* Sedikit dilonggarkan agar lebih cantik tapi tetap ringkas */
+             padding: 4px 6px !important;
              font-size: 10px !important;
              line-height: 1.2 !important;
-             opacity: 1 !important; /* Menghilangkan efek transparan (opacity) dari class Tailwind web */
+             opacity: 1 !important;
           }
           th { 
-             background-color: #e2e8f0 !important; /* Header abu-abu cantik (slate-200) */
+             background-color: #e2e8f0 !important;
              font-weight: 900 !important; 
              text-align: center !important;
           }
           
           /* PENERIMAAN (4xxxx) */
           tr.print-induk-masuk td {
-             background-color: #bbf7d0 !important; /* Hijau tua soft (green-200) */
+             background-color: #bbf7d0 !important;
              font-weight: bold !important;
              color: #000000 !important;
           }
           tr.print-kel-masuk td {
-             background-color: #dcfce7 !important; /* Hijau muda soft (green-100) */
+             background-color: #dcfce7 !important;
              font-weight: 600 !important;
              color: #000000 !important;
           }
 
           /* PENGELUARAN (5xxxx) */
           tr.print-induk-keluar td {
-             background-color: #fecaca !important; /* Merah tua soft (red-200) */
+             background-color: #fecaca !important;
              font-weight: bold !important;
              color: #000000 !important;
           }
           tr.print-kel-keluar td {
-             background-color: #fee2e2 !important; /* Merah muda soft (red-100) */
+             background-color: #fee2e2 !important;
              font-weight: 600 !important;
              color: #000000 !important;
           }
@@ -554,40 +554,55 @@ export default function DashboardPage() {
           
           /* Hilangkan elemen web yang tidak perlu di kertas */
           svg.lucide-chevron-right, svg.lucide-chevron-down { display: none !important; }
-          .sticky { position: static !important; } /* Cegah bug print berantakan */
+          .sticky { position: static !important; }
           
-          /* Pastikan teks tidak putih jika sebelumnya putih */
           .text-white, .text-sky-100, .text-sky-200, .text-sky-300, .text-sky-400, .text-cyan-200, .text-cyan-400 {
              color: #000000 !important;
           }
           
-          /* Otomatis Buka Semua Rincian Saat Cetak */
           .print-expand { display: table-row !important; }
         }
       `}} />
 
-      {/* HEADER */}
-      <div className="print:hidden bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-3xl p-8 text-white shadow-2xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
-              <BarChart2 size={36} /> Dashboard Keuangan Masjid
-            </h2>
-            <p className="text-indigo-200 mt-1 font-medium">Gabungan Transaksi Kas + Mutasi Bank • Laporan Interaktif</p>
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <BarChart2 size={20} />
           </div>
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur rounded-2xl p-3">
-            <Filter size={18} className="text-indigo-200" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Dashboard Keuangan Masjid
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Tahun {tahun}
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Konsolidasi transaksi kas masjid & mutasi bank secara interaktif.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
+            <Filter size={13} className="text-gray-400" />
             <select
               value={tahun}
               onChange={e => setTahun(Number(e.target.value))}
-              className="bg-transparent text-white font-black text-lg outline-none cursor-pointer"
+              className="bg-transparent text-gray-800 font-bold text-xs outline-none cursor-pointer"
             >
               {tahunList.map(y => <option key={y} value={y} className="text-gray-900">{y}</option>)}
             </select>
-            <button onClick={() => window.print()} className="ml-4 bg-white text-indigo-600 hover:bg-gray-100 px-6 py-2 rounded-xl font-black transition-transform hover:scale-105 flex items-center gap-2 shadow-md">
-               <Printer size={18} /> CETAK PDF
-            </button>
           </div>
+          <button 
+            onClick={() => window.print()} 
+            className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Printer size={13} />
+            <span>Cetak PDF</span>
+          </button>
         </div>
       </div>
 
@@ -597,50 +612,56 @@ export default function DashboardPage() {
           <p className="font-bold text-gray-700 mt-2">Periode Data: Tahun {tahun}</p>
       </div>
 
-      {/* SUMMARY CARDS GRID - SOFT BRIGHT COLORS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 print:flex print-card-container">
-        <SummaryCard 
-          label="Saldo Awal" 
-          value={summary.saldoAwal} 
-          icon={<Wallet size={80} />} 
-          color="bg-slate-500" 
-          subLabel="1 Jan"
-          subValue={summary.saldoAwal}
-        />
-        <SummaryCard 
-          label="Uang Masuk" 
-          value={summary.masuk} 
-          icon={<TrendingDown size={80} />} 
-          color="bg-emerald-400" 
-          subLabel="Penerimaan"
-          subValue={summary.masuk}
-          hideOnPrint={true}
-        />
-        <SummaryCard 
-          label="Uang Keluar" 
-          value={summary.keluar} 
-          icon={<TrendingUp size={80} />} 
-          color="bg-rose-400" 
-          subLabel="Pengeluaran"
-          subValue={summary.keluar}
-          hideOnPrint={true}
-        />
-        <SummaryCard 
-          label="Saldo Akhir" 
-          value={summary.saldoAkhir} 
-          icon={<PiggyBank size={80} />} 
-          color="bg-sky-500" 
-          subLabel="Sisa Dana"
-          subValue={summary.saldoAkhir}
-        />
+      {/* SUMMARY CARDS GRID */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:flex print-card-container">
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Saldo Awal</p>
+            <p className="text-lg font-black text-gray-900 leading-none">Rp {fmt(summary.saldoAwal).split(',')[0]}</p>
+            <p className="text-[10px] text-gray-500 font-semibold">1 Januari {tahun}</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-slate-50 text-slate-600">
+            <Wallet size={18} />
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Total Uang Masuk</p>
+            <p className="text-lg font-black text-emerald-700 leading-none">Rp {fmt(summary.masuk).split(',')[0]}</p>
+            <p className="text-[10px] text-gray-500 font-semibold">Penerimaan & Infaq</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+            <TrendingDown size={18} />
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Total Uang Keluar</p>
+            <p className="text-lg font-black text-rose-700 leading-none">Rp {fmt(summary.keluar).split(',')[0]}</p>
+            <p className="text-[10px] text-gray-500 font-semibold">Pengeluaran & Belanja</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600">
+            <TrendingUp size={18} />
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase text-sky-600 tracking-wider">Saldo Akhir</p>
+            <p className="text-lg font-black text-sky-700 leading-none">Rp {fmt(summary.saldoAkhir).split(',')[0]}</p>
+            <p className="text-[10px] text-gray-500 font-semibold">Sisa Dana Kas + Bank</p>
+          </div>
+          <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600">
+            <PiggyBank size={18} />
+          </div>
+        </div>
       </div>
 
-      {/* CHART BULANAN - IMPROVED */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-8">
+      {/* CHART BULANAN */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 md:p-6">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="font-black text-gray-800 text-lg uppercase tracking-tight">Tren Arus Kas Bulanan</h3>
-            <p className="text-xs text-gray-400 mt-1">Pergerakan Saldo dan Surplus per Bulan</p>
+            <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">Tren Arus Kas Bulanan</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">Pergerakan Saldo dan Surplus per Bulan</p>
           </div>
         </div>
         <div className="h-[400px]">
@@ -678,13 +699,13 @@ export default function DashboardPage() {
       </div>
 
       {/* COA MONTH TABLE - DYNAMIC TREE ENHANCED */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+        <div className="p-4 px-5 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
           <div>
-            <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-700 to-sky-500 text-2xl flex items-center gap-3">
-              <BarChart2 size={28} className="text-indigo-600" /> Group COA Induk/Kelompok — Mutasi Per Bulan
+            <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-2">
+              <BarChart2 size={16} className="text-indigo-600" /> Group COA Induk / Kelompok — Mutasi Per Bulan
             </h3>
-            <p className="text-sm font-semibold text-gray-500 mt-2 italic">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
+            <p className="text-[11px] font-medium text-gray-500 mt-0.5">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
           </div>
         </div>
         <div className="overflow-x-auto">

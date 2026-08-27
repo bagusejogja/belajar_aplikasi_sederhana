@@ -1,6 +1,11 @@
 'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Save, ClipboardPaste, AlertCircle, Info, ListFilter } from 'lucide-react';
+import { 
+  Save, ClipboardPaste, AlertCircle, Info, 
+  ListFilter, FileEdit, CheckCircle2, RefreshCw, 
+  Calendar, Layers, Sparkles
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function InputPenerimaan() {
@@ -12,6 +17,7 @@ export default function InputPenerimaan() {
   const [tipeInput, setTipeInput] = useState<'RENCANA' | 'REALISASI'>('REALISASI');
   const [pasteData, setPasteData] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchMasterAndData = async () => {
     setLoading(true);
@@ -46,7 +52,7 @@ export default function InputPenerimaan() {
 
       setDataInput(merged);
     } catch (e) {
-      toast.error('Gagal mengambil data referensi');
+      toast.error('Gagal mengambil data referensi penerimaan');
     }
     setLoading(false);
   };
@@ -136,11 +142,12 @@ export default function InputPenerimaan() {
         toast.error('Error saat paste: ' + e.message);
       }
     } else {
-      toast.error('Tidak ada data valid yang bisa dibaca. Pastikan format: ID | TIPE | BULAN | NOMINAL');
+      toast.error('Tidak ada data valid yang bisa dibaca. Pastikan format: ID | TIPE | TAHUN | BULAN | NOMINAL');
     }
   };
 
   const handleSaveAll = async () => {
+    setSaving(true);
     try {
       const payload = dataInput.map(d => ({
         jenis_penerimaan_id: d.jenis_penerimaan_id,
@@ -164,96 +171,233 @@ export default function InputPenerimaan() {
       }
     } catch (e: any) {
       toast.error('Terjadi kesalahan: ' + e.message);
+    } finally {
+      setSaving(false);
     }
   };
 
+  const totalNominalInput = dataInput.reduce((acc, curr) => acc + (Number(curr.nominal) || 0), 0);
+
   return (
-    <div className="space-y-6 max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row justify-between md:items-end gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Input Data Penerimaan</h1>
-          <p className="text-gray-500 mt-1">Isi nominal Rencana (Target) atau Realisasi per bulan.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <FileEdit size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Input Data Penerimaan</h1>
+              <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${
+                tipeInput === 'RENCANA' 
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}>
+                {tipeInput}
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Input nominal target rencana atau realisasi bulanan penerimaan</p>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-200">
-           <div className="flex items-center gap-2 pl-3 border-r border-gray-200 pr-3">
-              <select value={tipeInput} onChange={e => setTipeInput(e.target.value as any)} className="bg-transparent font-bold text-indigo-700 outline-none uppercase">
-                 <option value="REALISASI">Realisasi</option>
-                 <option value="RENCANA">Rencana</option>
-              </select>
-           </div>
-           <div className="flex items-center gap-2 pl-3 border-r border-gray-200 pr-3">
-              <ListFilter size={18} className="text-indigo-600"/>
-              <select value={tahun} onChange={e => setTahun(e.target.value)} className="bg-transparent font-bold text-gray-800 outline-none">
-                 {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-           </div>
-           <div className="pr-2">
-              <select value={bulan} onChange={e => setBulan(e.target.value)} className="bg-transparent font-bold text-gray-800 outline-none w-24">
-                 {[...Array(12)].map((_, i) => (
-                    <option key={i+1} value={i+1}>Bulan {i+1}</option>
-                 ))}
-              </select>
-           </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          {/* Toggle Tipe Input */}
+          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-0.5 h-9">
+            <button
+              onClick={() => setTipeInput('REALISASI')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                tipeInput === 'REALISASI' 
+                  ? 'bg-white text-emerald-700 shadow-2xs' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Realisasi
+            </button>
+            <button
+              onClick={() => setTipeInput('RENCANA')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                tipeInput === 'RENCANA' 
+                  ? 'bg-white text-indigo-700 shadow-2xs' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Rencana
+            </button>
+          </div>
+
+          {/* Filter Tahun */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 shrink-0">
+            <ListFilter size={14} className="text-gray-400" />
+            <select 
+              value={tahun} 
+              onChange={e => setTahun(e.target.value)} 
+              className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
+            >
+              {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          {/* Filter Bulan */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 shrink-0">
+            <Calendar size={14} className="text-gray-400" />
+            <select 
+              value={bulan} 
+              onChange={e => setBulan(e.target.value)} 
+              className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
+            >
+              {[...Array(12)].map((_, i) => (
+                <option key={i+1} value={i+1}>Bulan {i+1}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={fetchMasterAndData}
+            disabled={loading}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Muat Ulang Form"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
+          </button>
+
+          {dataInput.length > 0 && (
+            <button
+              onClick={handleSaveAll}
+              disabled={saving || loading}
+              className={`h-9 px-4 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50 ${
+                tipeInput === 'RENCANA' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+              <Save size={14} />
+              <span>{saving ? 'Menyimpan...' : `Simpan ${tipeInput}`}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm flex flex-col">
+      {/* TABLE INPUT CARD */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+        <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Layers size={16} className="text-indigo-600" />
+            <h3 className="font-bold text-gray-900 text-xs">
+              Form Input {tipeInput} — Bulan {bulan} / Tahun {tahun}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total {tipeInput}:</span>
+            <span className="font-mono font-black text-xs text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
+              Rp {totalNominalInput.toLocaleString('id-ID')}
+            </span>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-4 w-20 text-center">ID</th>
-                <th className="px-4 py-4">Nama Penerimaan</th>
-                <th className="px-4 py-4 text-right w-64 text-indigo-600">Nominal {tipeInput}</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200">
+                <th className="py-3 px-4 text-gray-400 font-black uppercase text-[10px] tracking-wider w-20 text-center">ID</th>
+                <th className="py-3 px-4 text-gray-400 font-black uppercase text-[10px] tracking-wider">Nama Jenis Penerimaan</th>
+                <th className="py-3 px-4 text-gray-400 font-black uppercase text-[10px] tracking-wider text-right w-72">
+                  Nominal {tipeInput} (Rp)
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={3} className="p-8 text-center text-gray-400">Loading...</td></tr>
-              ) : dataInput.length === 0 ? (
-                <tr><td colSpan={3} className="p-8 text-center text-gray-500 italic">Tidak ada Master Jenis Penerimaan yang aktif. Silakan tambah di menu Master.</td></tr>
-              ) : dataInput.map((row) => (
-                <tr key={row.jenis_penerimaan_id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono font-bold text-gray-900 text-center">{row.id}</td>
-                  <td className="px-4 py-3 font-medium text-gray-700">{row.nama}</td>
-                  <td className="px-4 py-3">
-                    <input 
-                       type="text" 
-                       value={row.nominal.toLocaleString('id-ID')} 
-                       onChange={(e) => handleInputChange(row.jenis_penerimaan_id, e.target.value)}
-                       className={`w-full bg-white border border-gray-200 rounded-xl p-2.5 text-right font-bold focus:outline-none focus:ring-2 ${tipeInput === 'RENCANA' ? 'text-indigo-600 focus:border-indigo-500 focus:ring-indigo-100' : 'text-emerald-600 focus:border-emerald-500 focus:ring-emerald-100'}`}
-                    />
+                <tr>
+                  <td colSpan={3} className="py-12 text-center text-gray-400 text-xs">
+                    <RefreshCw size={20} className="animate-spin inline-block text-indigo-600 mr-2" />
+                    Memuat jenis penerimaan...
                   </td>
                 </tr>
-              ))}
+              ) : dataInput.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-12 text-center text-gray-400 text-xs italic">
+                    Belum ada Master Jenis Penerimaan yang aktif. Silakan tambah pada menu Master Penerimaan.
+                  </td>
+                </tr>
+              ) : (
+                dataInput.map((row) => (
+                  <tr key={row.jenis_penerimaan_id} className="hover:bg-indigo-50/20 transition-colors">
+                    <td className="py-2 px-4 font-mono font-bold text-gray-500 text-xs text-center">{row.id}</td>
+                    <td className="py-2 px-4 font-bold text-gray-800 text-xs">{row.nama}</td>
+                    <td className="py-2 px-4">
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
+                        <input 
+                           type="text" 
+                           value={row.nominal ? row.nominal.toLocaleString('id-ID') : '0'} 
+                           onChange={(e) => handleInputChange(row.jenis_penerimaan_id, e.target.value)}
+                           className={`w-full bg-white border border-gray-200 rounded-xl h-9 pl-9 pr-3 text-right font-mono font-bold text-xs focus:outline-none focus:ring-2 transition-all ${
+                             tipeInput === 'RENCANA' 
+                               ? 'text-indigo-700 focus:border-indigo-500 focus:ring-indigo-100' 
+                               : 'text-emerald-700 focus:border-emerald-500 focus:ring-emerald-100'
+                           }`}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
         
         {dataInput.length > 0 && (
-          <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-            <button onClick={handleSaveAll} className={`text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-md flex items-center gap-2 ${tipeInput === 'RENCANA' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-               <Save size={18}/> Simpan {tipeInput} (Bulan {bulan})
+          <div className="p-3 px-5 bg-gray-50/80 border-t border-gray-200 flex justify-between items-center">
+            <span className="text-[11px] text-gray-500 font-medium">
+              *Klik Simpan untuk menyimpan seluruh perubahan form di atas ke database.
+            </span>
+            <button 
+              onClick={handleSaveAll} 
+              disabled={saving || loading}
+              className={`h-9 px-5 rounded-xl text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 ${
+                tipeInput === 'RENCANA' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-emerald-600 hover:bg-emerald-700'
+              }`}
+            >
+               <Save size={14}/> 
+               <span>{saving ? 'Menyimpan...' : `Simpan ${tipeInput} (Bulan ${bulan})`}</span>
             </button>
           </div>
         )}
       </div>
 
-      <div className="bg-indigo-50/50 border border-indigo-100 rounded-[2rem] p-6 shadow-sm">
-         <div className="flex items-center gap-2 text-indigo-800 font-black mb-2"><ClipboardPaste size={20}/> Bulk Upload Multi-Bulan (Paste Zone)</div>
-         <p className="text-sm text-indigo-600/80 mb-4 font-medium flex items-center gap-1.5"><Info size={16}/> Copy data dari Excel (tanpa header) dengan urutan 10 kolom: <b>ID PENERIMAAN | TIPE | TAHUN | BULAN | NOMINAL | NAMA UNIT | KODE UNIT | TGL BAYAR | TRX ID | PAYMENT CODE</b>. Kolom ke-6 s.d. 10 bersifat opsional (bisa dikosongkan/di-skip di Excel).</p>
+      {/* BULK UPLOAD MULTI-BULAN PASTE ZONE CARD */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 space-y-3">
+         <div className="flex items-center gap-2 text-indigo-800">
+           <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">
+             <ClipboardPaste size={16} />
+           </div>
+           <div>
+             <h3 className="font-bold text-gray-900 text-xs">Bulk Upload Multi-Bulan (Paste Zone)</h3>
+             <p className="text-[11px] text-gray-500">Impor data sekaligus dengan copy-paste tabel Excel langsung ke kolom di bawah.</p>
+           </div>
+         </div>
+
+         <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-900 font-medium flex items-start gap-2">
+           <Info size={15} className="text-indigo-600 shrink-0 mt-0.5" />
+           <div>
+             Format Excel (10 kolom dipisahkan Tab): <span className="font-mono font-bold">ID PENERIMAAN | TIPE | TAHUN | BULAN | NOMINAL | NAMA UNIT | KODE UNIT | TGL BAYAR | TRX ID | PAYMENT CODE</span>.
+             <span className="text-indigo-600 block mt-0.5">Contoh: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-[10px]">1  REALISASI  2024  1  45000000</span></span>
+           </div>
+         </div>
          
-         <div className="flex gap-4">
+         <div className="flex flex-col sm:flex-row gap-3">
             <textarea 
                value={pasteData}
                onChange={(e) => setPasteData(e.target.value)}
-               placeholder="1    RENCANA      2024    1    500000000&#10;1    REALISASI    2024    1    45000000    Unit A    001    2024-01-05    TRX-998    PAY-554"
-               className="flex-1 bg-white border border-indigo-200 rounded-2xl p-4 font-mono text-sm focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 min-h-[120px] resize-none"
+               placeholder="Paste baris Excel Anda di sini..."
+               className="flex-1 bg-gray-50/50 border border-gray-200 rounded-xl p-3 font-mono text-xs focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 min-h-[90px] resize-none"
             />
-            <button onClick={handlePasteProcess} disabled={!pasteData.trim() || loading} className="bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-500 text-white px-6 rounded-2xl font-bold transition-all shadow-md flex flex-col items-center justify-center gap-2 min-w-[140px]">
-               <ClipboardPaste size={24}/>
-               Simpan Paste
+            <button 
+              onClick={handlePasteProcess} 
+              disabled={!pasteData.trim() || loading} 
+              className="h-auto sm:w-36 bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs flex sm:flex-col items-center justify-center gap-1.5 p-3 shrink-0"
+            >
+               <ClipboardPaste size={18}/>
+               <span>Simpan Paste</span>
             </button>
          </div>
       </div>

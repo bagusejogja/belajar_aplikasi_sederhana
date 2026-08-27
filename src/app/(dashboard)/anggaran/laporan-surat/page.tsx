@@ -31,7 +31,7 @@ export default function DaftarSuratPage() {
   const [perms, setPerms] = useState<any>({ can_view: true, can_create: false, can_edit: true, can_delete: false });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchData();
@@ -136,10 +136,12 @@ export default function DaftarSuratPage() {
       .slice(0, 10);
   }, [filteredData]);
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const currentItems = useMemo(() => {
+    if (itemsPerPage === -1) return filteredData;
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
 
   const paginate = (pageNumber: number) => {
     if (pageNumber < 1 || pageNumber > totalPages) return;
@@ -208,30 +210,41 @@ export default function DaftarSuratPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 px-4">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 pt-8">
-        <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest mb-2">
-            <Clock size={14} /> Repository Dokumen
+    <div className="max-w-7xl mx-auto pb-20 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-2 rounded-xl text-white shadow-xs">
+            <FileText size={20} />
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight italic">Arsip Surat</h1>
-          <p className="text-gray-500 font-medium mt-2">Database revisi anggaran {selectedYear !== 'Semua Tahun' ? selectedYear : ''}.</p>
-          
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Arsip Surat & Laporan</h2>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {filteredData.length} Surat ({selectedYear !== 'Semua Tahun' ? selectedYear : 'Semua Tahun'})
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Database surat revisi anggaran, perihal, klasifikasi, & rekapitulasi unit kerja.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={() => setShowStats(!showStats)}
-            className="mt-4 flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-black hover:bg-indigo-100 transition-all border border-indigo-100"
+            className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
           >
-            {showStats ? <ChevronUp size={16} /> : <BarChart3 size={16} />}
-            {showStats ? "TUTUP STATISTIK" : "LIHAT STATISTIK & REKAP"}
+            {showStats ? <ChevronUp size={14} /> : <BarChart3 size={14} />}
+            <span>{showStats ? "Tutup Statistik" : "Lihat Statistik"}</span>
           </button>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+
           <button 
             onClick={exportToExcel}
-            className="flex items-center gap-3 px-8 py-5 bg-emerald-50 text-emerald-700 rounded-[2rem] font-black shadow-sm hover:bg-emerald-100 transition-all active:scale-95 border border-emerald-100"
+            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
           >
-            <FileSpreadsheet size={20} /> EXPORT EXCEL
+            <FileSpreadsheet size={14} />
+            <span>Export Excel</span>
           </button>
         </div>
       </div>
@@ -239,15 +252,15 @@ export default function DaftarSuratPage() {
       {/* Stats Section */}
       {showStats && (
         <>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="lg:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 h-[450px]">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-lg font-black text-gray-800 tracking-tight">Tren Surat Masuk Bulanan</h3>
-              <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] bg-indigo-50 px-3 py-1 rounded-full">
-                <TrendingUp size={12} /> {selectedYear !== 'Semua Tahun' ? selectedYear : '2026'}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-xs border border-gray-200/80 h-[380px]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Tren Surat Masuk Bulanan</h3>
+              <div className="flex items-center gap-1 text-indigo-700 font-black text-[10px] bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                <TrendingUp size={11} /> {selectedYear !== 'Semua Tahun' ? selectedYear : '2026'}
               </div>
             </div>
-            <div className="h-[300px] w-full pr-4">
+            <div className="h-[280px] w-full pr-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={statsData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
@@ -255,12 +268,12 @@ export default function DaftarSuratPage() {
                     dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: '900', fill: '#9ca3af' }} 
+                    tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} 
                   />
                   <YAxis 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 'bold', fill: '#d1d5db' }}
+                    tick={{ fontSize: 10, fontWeight: 'bold', fill: '#9ca3af' }}
                   />
                   <Tooltip 
                     cursor={{ fill: '#f9fafb' }}
@@ -268,13 +281,13 @@ export default function DaftarSuratPage() {
                       if (active && payload && payload.length) {
                         const mData = payload[0].payload;
                         return (
-                          <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 min-w-[200px]">
-                            <p className="font-bold text-gray-800 mb-3 border-b border-gray-50 pb-2">{label} : {mData.total} Surat</p>
-                            <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-2">
+                          <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-100 min-w-[180px] text-xs">
+                            <p className="font-bold text-gray-800 mb-2 border-b border-gray-100 pb-1">{label} : {mData.total} Surat</p>
+                            <div className="space-y-1 max-h-[140px] overflow-y-auto custom-scrollbar pr-1">
                               {mData.unitList.map((u: any, i: number) => (
-                                <div key={i} className="flex justify-between items-center gap-4 text-[10px]">
-                                   <span className="text-gray-500 truncate max-w-[150px]">{u.name}</span>
-                                   <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{u.count}</span>
+                                <div key={i} className="flex justify-between items-center gap-2 text-[10px]">
+                                   <span className="text-gray-600 truncate max-w-[130px]">{u.name}</span>
+                                   <span className="font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">{u.count}</span>
                                 </div>
                               ))}
                               {mData.unitList.length === 0 && <span className="text-[10px] text-gray-400">Belum ada surat</span>}
@@ -285,7 +298,7 @@ export default function DaftarSuratPage() {
                       return null;
                     }}
                   />
-                  <Bar dataKey="total" radius={[6, 6, 0, 0]} barSize={32}>
+                  <Bar dataKey="total" radius={[4, 4, 0, 0]} barSize={24}>
                     {statsData.map((entry: any, index) => (
                       <Cell key={`cell-${index}`} fill={entry.total > 0 ? '#4f46e5' : '#f3f4f6'} />
                     ))}
@@ -295,155 +308,133 @@ export default function DaftarSuratPage() {
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 h-[450px] flex flex-col">
-            <h3 className="text-lg font-black text-gray-800 tracking-tight mb-6 flex items-center gap-2">
-              <LayoutGrid size={20} className="text-indigo-600" /> Rekap Unit Bulanan
+          <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200/80 h-[380px] flex flex-col">
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+              <LayoutGrid size={14} className="text-indigo-600" /> Rekap Unit Bulanan
             </h3>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
               {statsData.filter((s: any) => s.total > 0).map((s: any, idx) => (
                 <MonthAccordion key={idx} data={s} />
               ))}
               {statsData.filter((s: any) => s.total > 0).length === 0 && (
                 <div className="h-full flex flex-col items-center justify-center text-gray-300 italic py-10">
-                   <LayoutGrid size={32} strokeWidth={1} />
+                   <LayoutGrid size={24} strokeWidth={1} />
                    <p className="text-xs mt-2">Belum ada data untuk direkap.</p>
                 </div>
               )}
             </div>
           </div>
         </div>
-        
-        <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 mb-12 h-[400px] animate-in fade-in slide-in-from-top-4 duration-500 delay-150">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-lg font-black text-gray-800 tracking-tight flex items-center gap-2">
-                <Building2 size={20} className="text-indigo-600" /> Distribusi Surat per Unit Kerja (Top 10)
-              </h3>
-            </div>
-            <div className="h-[280px] w-full pr-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={unitStatsData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#d1d5db' }} />
-                  <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '900', fill: '#6b7280' }} width={180} />
-                  <Tooltip 
-                    cursor={{ fill: '#f9fafb' }} 
-                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }} 
-                  />
-                  <Bar dataKey="count" radius={[0, 6, 6, 0]} barSize={24} fill="#10b981">
-                    {unitStatsData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#34d399'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-        </div>
         </>
       )}
 
-      {/* Filter Area */}
-      <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 mb-8 flex flex-col md:flex-row gap-4 items-center">
+      {/* FILTER AREA */}
+      <div className="bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80 flex flex-col md:flex-row gap-3 items-center">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
           <input 
             type="text" 
             placeholder="Cari No Surat atau Perihal..." 
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-16 pr-8 py-5 bg-gray-50 border-none rounded-[1.5rem] outline-none focus:ring-4 ring-indigo-50 transition-all font-bold text-gray-700"
+            className="w-full h-9 pl-8 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-xs font-semibold text-gray-700"
           />
         </div>
         
-        <div className="w-full md:w-[180px]">
+        <div className="w-full md:w-[140px]">
           <select 
             value={selectedYear}
             onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-            className="w-full px-6 py-5 bg-gray-50 border-none rounded-[1.5rem] outline-none focus:ring-4 ring-indigo-50 transition-all font-black text-gray-700 appearance-none text-sm cursor-pointer text-center"
+            className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold text-gray-700 cursor-pointer"
           >
-            <option value="Semua Tahun">📅 Semua</option>
+            <option value="Semua Tahun">Semua Tahun</option>
             {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
 
-        <div className="w-full md:w-[250px]">
+        <div className="w-full md:w-[220px]">
           <Select
             isMulti
             options={unitOptions}
             value={selectedUnits}
             onChange={(val: any) => { setSelectedUnits(val || []); setCurrentPage(1); }}
             placeholder="Filter Unit Kerja..."
+            className="text-xs font-bold"
             styles={{
-              control: (base) => ({ ...base, borderRadius: '1.5rem', padding: '0.6rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+              control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+              valueContainer: (base) => ({ ...base, padding: '0 6px' })
             }}
           />
         </div>
 
-        <div className="w-full md:w-[250px]">
+        <div className="w-full md:w-[220px]">
           <Select
             isMulti
             options={klasifikasiOptions}
             value={selectedKlasifikasi}
             onChange={(val: any) => { setSelectedKlasifikasi(val || []); setCurrentPage(1); }}
             placeholder="Filter Klasifikasi..."
+            className="text-xs font-bold"
             styles={{
-              control: (base) => ({ ...base, borderRadius: '1.5rem', padding: '0.6rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+              control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+              valueContainer: (base) => ({ ...base, padding: '0 6px' })
             }}
           />
         </div>
       </div>
 
       {/* Table Section */}
-      <div className="bg-white rounded-[3rem] shadow-sm border border-gray-100 overflow-hidden relative">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden relative">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-100">
-                <th className="px-10 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Info & Perihal Dokumen</th>
-                <th className="px-10 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Unit & PIC</th>
-                <th className="px-10 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Klasifikasi</th>
-                <th className="px-10 py-8 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Aksi</th>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                <th className="px-5 py-3">Info & Perihal Dokumen</th>
+                <th className="px-5 py-3">Unit & PIC</th>
+                <th className="px-5 py-3">Klasifikasi</th>
+                <th className="px-5 py-3 text-center w-24">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-100">
               {currentItems.length > 0 ? currentItems.map((item) => (
-                <tr key={item.id} className="hover:bg-indigo-50/10 transition-all group">
-                  <td className="px-10 py-8">
-                    <div className="flex flex-col gap-2 max-w-[350px]">
+                <tr key={item.id} className="hover:bg-indigo-50/30 transition-colors group">
+                  <td className="px-5 py-3">
+                    <div className="flex flex-col gap-1 max-w-[380px]">
                       <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-md">{item.no_surat}</span>
-                        {item.tanggal_selesai && <div className="w-2 h-2 bg-emerald-500 rounded-full" title="Selesai"></div>}
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10px] font-mono font-bold rounded-md">{item.no_surat}</span>
+                        {item.tanggal_selesai && <span className="w-2 h-2 bg-emerald-500 rounded-full" title="Selesai"></span>}
                       </div>
-                      <span className="text-[15px] font-black text-gray-800 leading-tight group-hover:text-indigo-600 transition-colors">{item.perihal_surat}</span>
-                      <div className="flex items-center gap-2 mt-1 opacity-40">
-                        <Calendar size={12} />
-                        <span className="text-[10px] font-bold">
+                      <span className="text-xs md:text-sm font-black text-gray-900 leading-snug group-hover:text-indigo-700 transition-colors">{item.perihal_surat}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                        <Calendar size={11} />
+                        <span>
                           {item.tanggal_surat ? new Date(item.tanggal_surat).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}
                         </span>
                       </div>
                     </div>
                   </td>
-                  <td className="px-10 py-8">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 text-emerald-700">
-                         <Building2 size={14} strokeWidth={3} />
-                         <span className="text-[11px] font-black uppercase tracking-tight">{item.gov_units?.nama_unit || 'Unknown'}</span>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-emerald-800">
+                         <Building2 size={12} strokeWidth={2.5} />
+                         <span className="text-xs font-bold tracking-tight">{item.gov_units?.nama_unit || 'Unknown'}</span>
                       </div>
-                      <div className="flex items-center gap-2 ml-1">
-                        <User size={12} className="text-gray-400" />
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">{item.pic || 'Anonim'}</span>
+                      <div className="flex items-center gap-1.5 text-gray-500 text-[11px]">
+                        <User size={11} className="text-gray-400" />
+                        <span>{item.pic || 'Anonim'}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="px-10 py-8">
-                    <div className="flex flex-wrap gap-1.5">
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-1">
                       {Array.isArray(item.jenis_json) && item.jenis_json.length > 0 ? (
                         item.jenis_json.map((j: string, idx: number) => (
-                          <span key={idx} className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full uppercase tracking-tighter border border-amber-100 shadow-sm">
+                          <span key={idx} className="px-2 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md border border-amber-200">
                             {j}
                           </span>
                         ))
                       ) : (
-                        <span className="text-gray-300 italic text-[11px]">Umum</span>
+                        <span className="text-gray-300 italic text-[10px]">Umum</span>
                       )}
                     </div>
                   </td>
@@ -476,46 +467,80 @@ export default function DaftarSuratPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-12">
-          <button 
-            onClick={() => paginate(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white border border-gray-100 text-gray-400 disabled:opacity-20 hover:bg-gray-50 transition-all"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex items-center gap-2">
-            {getPageNumbers().map((page, idx) => (
-              page === '...' ? (
-                <div key={`dots-${idx}`} className="w-10 flex justify-center text-gray-300">
-                  <MoreHorizontal size={20} />
-                </div>
-              ) : (
+        {/* PAGINATION FOOTER */}
+        {filteredData.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+            {/* Left: Info */}
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan <strong className="text-gray-900">{itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1}</strong> - <strong className="text-gray-900">{itemsPerPage === -1 ? filteredData.length : Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> dari <strong className="text-gray-900">{filteredData.length}</strong> surat
+              </span>
+            </div>
+
+            {/* Center: Rows per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={-1}>Semua</option>
+              </select>
+            </div>
+
+            {/* Right: Page Navigation */}
+            {itemsPerPage !== -1 && totalPages > 1 && (
+              <div className="flex items-center gap-1">
                 <button
-                  key={`page-${page}`}
-                  onClick={() => paginate(page as number)}
-                  className={`w-12 h-12 rounded-2xl font-black transition-all ${
-                    currentPage === page ? 'bg-indigo-600 text-white shadow-xl scale-110' : 'bg-white text-gray-400 border border-gray-100 hover:border-indigo-200'
-                  }`}
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Pertama"
                 >
-                  {page}
+                  «
                 </button>
-              )
-            ))}
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Sebelumnya"
+                >
+                  ‹ Prev
+                </button>
+                
+                <span className="px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                  Hal {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Selanjutnya"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            )}
           </div>
-          <button 
-            onClick={() => paginate(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white border border-gray-100 text-gray-400 disabled:opacity-20 hover:bg-gray-50 transition-all"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

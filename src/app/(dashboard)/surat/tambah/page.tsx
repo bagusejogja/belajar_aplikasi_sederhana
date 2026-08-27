@@ -212,46 +212,64 @@ export default function TambahSuratPage() {
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-indigo-600 w-10 h-10" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Tambah Arsip Surat</h1>
-          <p className="text-gray-500 font-medium mt-1">Pencatatan revisi RKAT menggunakan data unit pemerintah.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <FileEdit size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Tambah Arsip Surat
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Revisi RKAT
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Pencatatan arsip surat usulan revisi RKAT menggunakan data unit kerja pemerintah.
+            </p>
+          </div>
         </div>
-        <button 
-          onClick={() => router.back()}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm"
-        >
-          <ArrowLeft size={18} /> Kembali
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            type="button"
+            onClick={() => router.back()}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali</span>
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         
         {/* Card 0: Scan AI Zone */}
-        <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2.5rem] p-8 shadow-xl text-white relative overflow-hidden group">
-          <div className="absolute right-0 top-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-md border border-white/30">
-                <Sparkles size={32} className="text-amber-300 animate-pulse" />
+        <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 rounded-2xl p-5 md:p-6 shadow-xs text-white relative overflow-hidden">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-2.5 rounded-xl backdrop-blur-md border border-white/20 text-amber-300">
+                <Sparkles size={22} className="animate-pulse" />
               </div>
               <div>
-                <h3 className="text-xl font-black tracking-tight">Smart Scan AI</h3>
-                <p className="text-indigo-100 text-sm font-medium opacity-80">Upload surat Anda, biar AI yang mengisi form untuk Anda.</p>
+                <h3 className="text-sm md:text-base font-black tracking-tight text-white">Smart Scan AI</h3>
+                <p className="text-indigo-200 text-xs font-medium">Upload surat (PDF/Gambar), biarkan AI mengekstrak data form otomatis.</p>
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+              <div className="relative w-full sm:w-auto">
                 <input 
                   type="file" 
                   accept="image/*,application/pdf"
                   onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
-                <div className="bg-white/10 border border-white/20 px-6 py-3 rounded-2xl font-bold text-sm backdrop-blur-sm text-center truncate max-w-[200px]">
+                <div className="h-9 bg-white/10 hover:bg-white/15 border border-white/20 px-3.5 rounded-xl font-bold text-xs backdrop-blur-sm text-center truncate max-w-[200px] flex items-center justify-center">
                   {selectedFile ? selectedFile.name : "Pilih File Surat..."}
                 </div>
               </div>
@@ -259,125 +277,134 @@ export default function TambahSuratPage() {
                 type="button"
                 onClick={handleScanAI}
                 disabled={isScanning || !selectedFile}
-                className="bg-amber-400 hover:bg-amber-500 text-amber-950 px-8 py-3 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="h-9 bg-amber-400 hover:bg-amber-500 text-amber-950 px-4 rounded-xl font-black text-xs shadow-xs transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 shrink-0"
               >
-                {isScanning ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                {isScanning ? "MEMPROSES..." : "SCAN DENGAN AI"}
+                {isScanning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                <span>{isScanning ? "MEMPROSES..." : "SCAN DENGAN AI"}</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Card 1: Informasi Dasar */}
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-50 pb-4 mb-2">
-            <div className="bg-indigo-50 p-2 rounded-xl text-indigo-600"><FileEdit size={20}/></div>
-            <h2 className="font-bold text-gray-800">Informasi Surat</h2>
+        <div className="bg-white rounded-2xl p-5 md:p-6 shadow-xs border border-gray-200/80 space-y-4">
+          <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
+            <div className="bg-indigo-50 p-1.5 rounded-lg text-indigo-600"><FileEdit size={16}/></div>
+            <h2 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Informasi Surat</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran *</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Tahun Anggaran *</label>
               <input 
                 type="number" 
                 name="tahun_anggaran" 
                 value={formData.tahun_anggaran} 
                 onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-bold text-xs text-gray-700"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pemerintah *</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Unit Kerja Pemerintah *</label>
               <Select 
                 options={listUnit} 
                 value={formData.unit_id} 
                 onChange={(val: any) => {
-                  // AUTO-FILL PIC saat Unit dipilih
                   const defaultPIC = val?.pic ? { value: val.pic, label: val.pic } : formData.pic;
                   setFormData({
                     ...formData, 
                     unit_id: val,
-                    pic: defaultPIC // Isi otomatis PIC-nya
+                    pic: defaultPIC
                   });
                 }}
                 placeholder="Pilih Unit (gov_unit)..."
-                className="react-select-container"
-                classNamePrefix="react-select"
+                className="text-xs"
                 styles={{
-                  control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }),
+                  control: (base) => ({ 
+                    ...base, 
+                    minHeight: '36px', 
+                    height: '36px', 
+                    borderRadius: '0.75rem', 
+                    borderColor: '#e5e7eb', 
+                    backgroundColor: '#f9fafb',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }),
+                  valueContainer: (base) => ({ ...base, padding: '0 8px' }),
+                  input: (base) => ({ ...base, margin: 0, padding: 0 }),
                 }}
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Nomor Surat *</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Nomor Surat *</label>
               <input 
                 type="text" 
                 name="no_surat" 
                 value={formData.no_surat} 
                 onChange={handleInputChange}
                 placeholder="cth: 3025/UN1/FA.1/..."
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Tanggal Surat *</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Tanggal Surat *</label>
               <input 
                 type="date" 
                 name="tanggal_surat" 
                 value={formData.tanggal_surat} 
                 onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Perihal Surat *</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Perihal Surat *</label>
             <input 
               type="text" 
               name="perihal_surat" 
               value={formData.perihal_surat} 
               onChange={handleInputChange}
               placeholder="Isi perihal surat secara lengkap..."
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Subyek di Persuratan Simaster</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Subyek di Persuratan Simaster</label>
             <input 
               type="text" 
               name="subyek_simaster" 
               value={formData.subyek_simaster} 
               onChange={handleInputChange}
               placeholder="Salin subyek dari Simaster..."
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
             />
           </div>
         </div>
 
         {/* Card 2: Detail Proses */}
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-50 pb-4 mb-2">
-            <div className="bg-emerald-50 p-2 rounded-xl text-emerald-600"><CheckCircle2 size={20}/></div>
-            <h2 className="font-bold text-gray-800">Detail Proses & Jenis</h2>
+        <div className="bg-white rounded-2xl p-5 md:p-6 shadow-xs border border-gray-200/80 space-y-4">
+          <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
+            <div className="bg-emerald-50 p-1.5 rounded-lg text-emerald-600"><CheckCircle2 size={16}/></div>
+            <h2 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Detail Proses & Jenis</h2>
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Jenis Revisi (Bisa pilih lebih dari 1)</label>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Jenis Revisi (Bisa pilih lebih dari 1)</label>
+            <div className="flex flex-wrap gap-1.5">
               {jenisOptions.map(option => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => toggleJenis(option)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                  className={`h-8 px-3 rounded-lg text-xs font-bold border transition-all ${
                     jenisSelected.includes(option)
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-indigo-300 hover:bg-white'
                   }`}
                 >
                   {option}
@@ -386,107 +413,119 @@ export default function TambahSuratPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">PIC *</label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">PIC *</label>
               <Select 
                 options={listPIC} 
                 value={formData.pic} 
                 onChange={(val) => setFormData({...formData, pic: val})}
                 placeholder="Pilih PIC..."
+                className="text-xs"
                 styles={{
-                  control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.4rem', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }),
+                  control: (base) => ({ 
+                    ...base, 
+                    minHeight: '36px', 
+                    height: '36px', 
+                    borderRadius: '0.75rem', 
+                    borderColor: '#e5e7eb', 
+                    backgroundColor: '#f9fafb',
+                    fontSize: '0.75rem',
+                    fontWeight: '600'
+                  }),
+                  valueContainer: (base) => ({ ...base, padding: '0 8px' }),
+                  input: (base) => ({ ...base, margin: 0, padding: 0 }),
                 }}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Tgl Disposisi</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Tgl Disposisi</label>
               <input 
                 type="date" 
                 name="tanggal_disposisi" 
                 value={formData.tanggal_disposisi} 
                 onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-medium"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-emerald-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Tgl Selesai</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Tgl Selesai</label>
               <input 
                 type="date" 
                 name="tanggal_selesai" 
                 value={formData.tanggal_selesai} 
                 onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-emerald-100 transition-all font-medium"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-emerald-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
               />
             </div>
           </div>
         </div>
 
         {/* Card 3: Budget & Lampiran */}
-        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 space-y-6">
-          <div className="flex items-center gap-3 border-b border-gray-50 pb-4 mb-2">
-            <div className="bg-amber-50 p-2 rounded-xl text-amber-600"><UploadCloud size={20}/></div>
-            <h2 className="font-bold text-gray-800">Budget & Dokumen Pendukung</h2>
+        <div className="bg-white rounded-2xl p-5 md:p-6 shadow-xs border border-gray-200/80 space-y-4">
+          <div className="flex items-center gap-2.5 border-b border-gray-100 pb-3">
+            <div className="bg-amber-50 p-1.5 rounded-lg text-amber-600"><UploadCloud size={16}/></div>
+            <h2 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Budget & Dokumen Pendukung</h2>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Baris RKAT yang Dirubah</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Baris RKAT yang Dirubah</label>
             <input 
               type="text" 
               name="baris_rkat_dirubah" 
               value={formData.baris_rkat_dirubah} 
               onChange={handleInputChange}
               placeholder="cth: 521211 - Belanja Bahan Operasional..."
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-amber-100 transition-all font-medium"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-amber-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Nominal Semula</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Nominal Semula</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-gray-400">Rp</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-gray-400">Rp</span>
                 <input 
                   type="text" 
                   name="nominal_semula" 
                   value={formatNumber(formData.nominal_semula)} 
                   onChange={handleInputChange}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-amber-100 transition-all font-bold text-gray-700"
+                  className="w-full h-9 pl-9 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-amber-500/20 focus:bg-white transition-all font-bold text-xs text-gray-700"
                   placeholder="0"
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Nominal Menjadi</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Nominal Menjadi</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-indigo-400">Rp</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-indigo-500">Rp</span>
                 <input 
                   type="text" 
                   name="nominal_menjadi" 
                   value={formatNumber(formData.nominal_menjadi)} 
                   onChange={handleInputChange}
-                  className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-indigo-700"
+                  className="w-full h-9 pl-9 pr-3 bg-indigo-50/30 hover:bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-bold text-xs text-indigo-700"
                   placeholder="0"
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-            <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2"><LinkIcon size={12}/> Link Google Drive</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5 flex items-center gap-1.5"><LinkIcon size={11}/> Link Google Drive</label>
               <input 
                 type="text" 
                 name="link_google_drive" 
                 value={formData.link_google_drive} 
                 onChange={handleInputChange}
                 placeholder="https://drive.google.com/..."
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all text-sm italic"
+                className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all text-xs font-mono"
               />
             </div>
 
-            <div className="space-y-3">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2"><UploadCloud size={12}/> Dokumen Terpilih</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5 flex items-center gap-1.5"><UploadCloud size={11}/> Dokumen Terpilih</label>
               <div className="relative group/upload">
                 <input 
                   type="file" 
@@ -494,15 +533,15 @@ export default function TambahSuratPage() {
                   onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
-                <div className="w-full bg-indigo-50/50 border border-indigo-100 border-dashed border-2 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 group-hover/upload:bg-indigo-100/50 transition-all">
-                  <div className={`p-3 rounded-full ${selectedFile ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                    {selectedFile ? <CheckCircle2 size={24} /> : <UploadCloud size={24} />}
+                <div className="w-full h-16 bg-gray-50 border border-gray-200 border-dashed rounded-xl px-4 flex items-center justify-center gap-2.5 group-hover/upload:bg-gray-100 transition-all">
+                  <div className={`p-1.5 rounded-lg ${selectedFile ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-600'}`}>
+                    {selectedFile ? <CheckCircle2 size={16} /> : <UploadCloud size={16} />}
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-black text-gray-700">
-                      {selectedFile ? selectedFile.name : "Klik atau seret file ke sini"}
+                  <div className="text-left overflow-hidden">
+                    <p className="text-xs font-bold text-gray-700 truncate max-w-[240px]">
+                      {selectedFile ? selectedFile.name : "Klik / seret file ke sini"}
                     </p>
-                    <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">PDF atau Gambar (Maks 10MB)</p>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">PDF / Gambar (Maks 10MB)</p>
                   </div>
                 </div>
               </div>
@@ -511,14 +550,14 @@ export default function TambahSuratPage() {
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-center pt-6">
+        <div className="flex justify-end pt-2">
           <button 
             type="submit" 
             disabled={isSaving}
-            className="w-full md:w-[400px] bg-gray-900 text-white py-5 rounded-[2rem] font-black text-xl shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="h-10 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed active:scale-95"
           >
-            {isSaving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-            {isSaving ? "SEDANG MENYIMPAN..." : "SIMPAN ARSIP SURAT"}
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            <span>{isSaving ? "SEDANG MENYIMPAN..." : "SIMPAN ARSIP SURAT"}</span>
           </button>
         </div>
       </form>

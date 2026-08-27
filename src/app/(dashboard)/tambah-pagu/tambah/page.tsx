@@ -10,7 +10,7 @@ import {
   UploadCloud, CheckCircle2, Loader2, Sparkles,
   Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
   Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck,
-  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp
+  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp, Plus
 } from 'lucide-react';
 import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
 import dynamic from 'next/dynamic';
@@ -669,35 +669,49 @@ const handleAutoExtractTanggapanAI = async () => {
   if (isLoading) return <div className="h-screen flex justify-center items-center"><Loader2 className="animate-spin text-emerald-600 w-10 h-10" /></div>;
 
   return (
-    <div className="max-w-5xl mx-auto pb-36 px-4">
-      {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1">
-            <Sparkles size={14} /> New Entry Workflow
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Plus size={20} />
           </div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Tambah Usulan Pagu</h1>
-          <p className="text-gray-500 font-medium mt-1">Impor dari hasil analisis AI (/analisis) atau ketik manual untuk mencatat usulan baru.</p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Tambah Usulan Pagu
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                New Entry Workflow
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Impor dari hasil analisis AI (/analisis) atau ketik manual untuk mencatat usulan baru.
+            </p>
+          </div>
         </div>
-        <button 
-          onClick={() => router.push('/tambah-pagu')}
-          className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-2xl text-gray-600 font-bold hover:bg-gray-50 transition-all shadow-sm active:scale-95 text-xs"
-        >
-          <ArrowLeft size={18} /> KEMBALI
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            type="button"
+            onClick={() => router.push('/tambah-pagu')}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <ArrowLeft size={13} />
+            <span>Kembali</span>
+          </button>
+        </div>
       </div>
 
       {/* IMPORT BANNER SECTION */}
-      <div className="mb-8">
+      <div>
         {!selectedAnalisis ? (
-          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-[2.5rem] p-6 md:p-8 text-white shadow-2xl border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
-            
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-5 md:p-6 text-white shadow-xs border border-indigo-500/20 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="relative z-10 space-y-1">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-widest">
-                <Sparkles size={14} /> Impor Data Hasil Analisis AI
+              <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px] uppercase tracking-wider">
+                <Sparkles size={13} /> Impor Data Hasil Analisis AI
               </div>
-              <h3 className="text-xl font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
+              <h3 className="text-sm md:text-base font-black text-white">Impor dari Hasil Analisis Pagu (/analisis)</h3>
               <p className="text-slate-300 text-xs font-medium max-w-xl">
                 Pilih dokumen dari /analisis untuk melihat tahapan nota analisis dan otomatis mengisikan data pengajuan secara terkunci (read-only).
               </p>
@@ -706,22 +720,22 @@ const handleAutoExtractTanggapanAI = async () => {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="relative z-10 px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg transition-all active:scale-95 flex items-center gap-2 shrink-0"
+              className="relative z-10 h-9 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
             >
-              <FileText size={16} /> Pilih Dari Riwayat Analisis
+              <FileText size={14} /> <span>Pilih Dari Riwayat Analisis</span>
             </button>
           </div>
         ) : (
-          <div className="bg-emerald-50 border-2 border-emerald-400/80 rounded-[2.5rem] p-6 text-emerald-950 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="bg-emerald-50 border border-emerald-300/80 rounded-2xl p-4 px-5 text-emerald-950 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
-              <div className="p-3 bg-emerald-500 text-white rounded-2xl shrink-0 shadow-sm">
-                <ShieldCheck size={22} />
+              <div className="p-2 bg-emerald-500 text-white rounded-xl shrink-0 shadow-2xs">
+                <ShieldCheck size={18} />
               </div>
               <div>
-                <div className="flex items-center gap-2 text-xs font-black uppercase text-emerald-700 tracking-wider">
-                  <Lock size={12} className="text-emerald-600" /> Data Pengajuan Terhubung & Terkunci (Read-Only)
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-emerald-700 tracking-wider">
+                  <Lock size={11} className="text-emerald-600" /> Data Pengajuan Terhubung & Terkunci (Read-Only)
                 </div>
-                <h4 className="font-black text-base text-emerald-950">
+                <h4 className="font-black text-sm text-emerald-950">
                   {selectedAnalisis.perihal || 'Dokumen Analisis'}
                 </h4>
                 <p className="text-xs text-emerald-800 font-medium mt-0.5">
@@ -730,20 +744,20 @@ const handleAutoExtractTanggapanAI = async () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
-                className="px-4 py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-bold transition-all"
+                className="h-8 px-3 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition-all"
               >
                 Ganti Pilihan
               </button>
               <button
                 type="button"
                 onClick={handleClearSelection}
-                className="px-4 py-2.5 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm"
+                className="h-8 px-3 bg-white border border-emerald-300 hover:bg-rose-50 text-slate-700 hover:text-rose-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow-2xs"
               >
-                <X size={14} /> Lepas Link (Manual)
+                <X size={13} /> <span>Lepas Link</span>
               </button>
             </div>
           </div>
@@ -751,7 +765,7 @@ const handleAutoExtractTanggapanAI = async () => {
       </div>
 
       {/* STEP NAVIGATION TABS */}
-      <div className="flex justify-between items-center bg-white rounded-[2rem] p-2 shadow-sm border border-gray-200/80 mb-8 overflow-x-auto gap-2">
+      <div className="flex justify-between items-center bg-white rounded-2xl p-1.5 shadow-xs border border-gray-200/80 overflow-x-auto gap-1.5">
         {(selectedAnalisis 
           ? [
               { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Data Surat Pengajuan', icon: FileText },
@@ -771,13 +785,13 @@ const handleAutoExtractTanggapanAI = async () => {
               key={tab.id}
               type="button"
               onClick={() => setActiveStep(tab.id as any)}
-              className={`flex-1 flex items-center gap-3 px-5 py-3.5 rounded-2xl transition-all min-w-[220px] ${
+              className={`flex-1 flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all min-w-[200px] ${
                 isActive
-                  ? 'bg-slate-900 text-white shadow-md font-black'
+                  ? 'bg-slate-900 text-white shadow-xs font-black'
                   : 'text-gray-500 hover:text-gray-900 font-bold hover:bg-gray-50'
               }`}
             >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
                 isActive ? 'bg-emerald-500 text-slate-950' : 'bg-gray-100 text-gray-600'
               }`}>
                 {tab.step}

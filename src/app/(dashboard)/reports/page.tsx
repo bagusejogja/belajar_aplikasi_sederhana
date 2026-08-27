@@ -159,134 +159,184 @@ export default function ReportsPage() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-         <div className="flex items-center gap-4">
-            <div className="bg-indigo-600 p-3 rounded-2xl text-white shadow-lg shadow-indigo-100">
-               <PieChart size={28} />
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <PieChart size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Mutasi Detail Kas Kecil
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {BULAN[bulanPilih - 1]} {tahunPilih}
+              </span>
             </div>
-            <div>
-               <h2 className="text-2xl font-black text-gray-900">Laporan Kas Kecil</h2>
-            </div>
-         </div>
-         <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            {/* Filter Bulan dan Tahun */}
-            <select value={bulanPilih} onChange={(e) => setBulanPilih(Number(e.target.value))} className="px-4 py-2 border rounded-xl font-bold bg-gray-50 outline-none">
-               {BULAN.map((b, i) => <option key={i} value={i+1}>{b}</option>)}
-            </select>
-            <input type="number" value={tahunPilih} onChange={(e) => setTahunPilih(Number(e.target.value))} className="px-4 py-2 border w-24 rounded-xl font-bold bg-gray-50 outline-none" min={2000} max={2100} />
-            
-            <button onClick={() => window.print()} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-xl shadow-md font-bold text-sm ml-auto print:hidden hover:bg-indigo-700 transition-colors">
-               <Download size={16} /> Cetak & Download PDF
-            </button>
-         </div>
-      </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Rincian mutasi kas kecil harian, saldo berjalan, dan verifikasi bukti nota.
+            </p>
+          </div>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <select 
+            value={bulanPilih} 
+            onChange={(e) => setBulanPilih(Number(e.target.value))} 
+            className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+          >
+            {BULAN.map((b, i) => <option key={i} value={i+1}>{b}</option>)}
+          </select>
+          <input 
+            type="number" 
+            value={tahunPilih} 
+            onChange={(e) => setTahunPilih(Number(e.target.value))} 
+            className="h-9 px-3 border border-gray-200 w-20 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" 
+            min={2000} 
+            max={2100} 
+          />
+          <button 
+            onClick={() => window.print()} 
+            className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 print:hidden"
+          >
+            <Download size={13} />
+            <span>Cetak PDF</span>
+          </button>
+        </div>
+      </div>
 
       {loading ? (
          <div className="h-64 flex flex-col items-center justify-center text-indigo-600">
-            <Loader2 size={40} className="animate-spin mb-4" />
+            <Loader2 size={32} className="animate-spin mb-2" />
+            <p className="text-xs font-medium text-gray-500">Memuat laporan kas kecil...</p>
          </div>
       ) : (
          <>
-            {/* Statistik Atas */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-               <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-                  <p className="text-gray-400 font-bold text-[10px] uppercase mb-1">Saldo Awal Bulan</p>
-                  <h3 className="text-xl font-black text-gray-700">Rp {dataStats.initialBalance.toLocaleString('id-ID')}</h3>
+            {/* STATISTIK KPI CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Saldo Awal Bulan</p>
+                     <p className="text-lg font-black text-gray-900 leading-none">Rp {dataStats.initialBalance.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">1 {BULAN[bulanPilih - 1]} {tahunPilih}</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 text-slate-600">
+                     <PieChart size={18} />
+                  </div>
                </div>
-               <div className="bg-emerald-50 p-5 rounded-3xl shadow-sm">
-                  <p className="text-emerald-700/70 font-bold text-[10px] uppercase mb-1 flex items-center gap-1"><TrendingUp size={12}/> Pemasukan Bulan Ini</p>
-                  <h3 className="text-xl font-black text-emerald-700">Rp {dataStats.income.toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Pemasukan Bulan Ini</p>
+                     <p className="text-lg font-black text-emerald-700 leading-none">Rp {dataStats.income.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Total Debit (+)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+                     <TrendingUp size={18} />
+                  </div>
                </div>
-               <div className="bg-red-50 p-5 rounded-3xl shadow-sm">
-                  <p className="text-red-700/70 font-bold text-[10px] uppercase mb-1 flex items-center gap-1"><TrendingDown size={12}/> Pengeluaran Bulan Ini</p>
-                  <h3 className="text-xl font-black text-red-700">Rp {dataStats.expense.toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Pengeluaran Bulan Ini</p>
+                     <p className="text-lg font-black text-rose-700 leading-none">Rp {dataStats.expense.toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Total Kredit (-)</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600">
+                     <TrendingDown size={18} />
+                  </div>
                </div>
-               <div className="bg-indigo-600 p-5 rounded-3xl shadow-sm text-white">
-                  <p className="text-indigo-200 font-bold text-[10px] uppercase mb-1">Sisa Kas Akhir Bulan Ini</p>
-                  <h3 className="text-xl font-black">Rp {(dataStats.initialBalance + dataStats.balance).toLocaleString('id-ID')}</h3>
+
+               <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Sisa Kas Akhir Bulan</p>
+                     <p className="text-lg font-black text-indigo-700 leading-none">Rp {(dataStats.initialBalance + dataStats.balance).toLocaleString('id-ID')}</p>
+                     <p className="text-[10px] text-gray-500 font-semibold">Posisi Saldo Berjalan</p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                     <PieChart size={18} />
+                  </div>
                </div>
             </div>
 
-            {/* Tabel Detail Transaksi Tembus Pandang */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* TABEL DETAIL TRANSAKSI */}
+            <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                     <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 text-xs uppercase tracking-wider font-bold">
+                  <table className="w-full text-left text-xs border-collapse">
+                     <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                         <tr>
-                           <th className="p-4 w-10">Id</th>
-                           <th className="p-4 w-24">Tanggal</th>
-                           <th className="p-4 w-1/3">Uraian & Keterangan</th>
-                           <th className="p-4 text-right">Nominal (Rupiah)</th>
-                           <th className="p-4 text-right bg-indigo-50/50">Saldo Berjalan</th>
-                           <th className="p-4 text-center print:hidden">Aksi / Foto</th>
+                           <th className="py-3 px-4 w-12 text-center">ID</th>
+                           <th className="py-3 px-4 w-28">Tanggal</th>
+                           <th className="py-3 px-4">Uraian & Keterangan</th>
+                           <th className="py-3 px-4 text-right">Nominal</th>
+                           <th className="py-3 px-4 text-right bg-indigo-50/50">Saldo Berjalan</th>
+                           <th className="py-3 px-4 text-center print:hidden">Aksi / Foto</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-100">
+                     <tbody className="divide-y divide-gray-100 font-medium">
                         {transactions.length === 0 ? (
-                           <tr><td colSpan={6} className="p-8 text-center text-gray-400 font-medium">Bulan ini belum ada transaksi tercatat.</td></tr>
-                        ) : transactions.map((trx, idx) => {
+                           <tr><td colSpan={6} className="py-12 text-center text-gray-400 font-medium">Bulan ini belum ada transaksi tercatat.</td></tr>
+                        ) : transactions.map((trx) => {
                            const isExpanded = expandedRow === trx.id;
                            const isPemasukan = Number(trx.uang_masuk) > 0;
                            const nominal = isPemasukan ? Number(trx.uang_masuk) : Number(trx.uang_keluar);
                            
-                           // Pengecekan status untuk warna tabel
                            const isSah = trx.disetujui === 'Disetujui';
                            const rowBgClass = isSah 
-                               ? 'hover:bg-gray-50' 
-                               : 'bg-red-50/40 hover:bg-red-50'; // Background merah tipis untuk yang belum sah
+                               ? 'hover:bg-indigo-50/20' 
+                               : 'bg-rose-50/30 hover:bg-rose-50/50';
 
                            return (
                               <React.Fragment key={trx.id}>
-                                 <tr className={`transition-colors group ${rowBgClass}`}>
-                                    <td className="p-4 text-gray-400 font-medium text-xs whitespace-nowrap">{trx.id}</td>
-                                    <td className="p-4 whitespace-nowrap font-medium">{new Date(trx.tanggal).toLocaleDateString('id-ID')}</td>
-                                    <td className="p-4">
+                                 <tr className={`transition-colors ${rowBgClass}`}>
+                                    <td className="py-3 px-4 text-gray-400 font-mono text-[11px] text-center">{trx.id}</td>
+                                    <td className="py-3 px-4 whitespace-nowrap font-semibold text-gray-700">{new Date(trx.tanggal).toLocaleDateString('id-ID')}</td>
+                                    <td className="py-3 px-4">
                                        <div className="flex items-center gap-2">
-                                          <p className={`font-bold ${isSah ? 'text-gray-900' : 'text-red-900'}`}>{trx.uraian}</p>
-                                          {!isSah && <span className="text-[9px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full uppercase shadow-sm animate-pulse">{trx.disetujui || 'Menunggu'}</span>}
+                                          <p className={`font-bold ${isSah ? 'text-gray-900' : 'text-rose-900'}`}>{trx.uraian}</p>
+                                          {!isSah && <span className="text-[9px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase border border-rose-200">{trx.disetujui || 'Menunggu'}</span>}
                                        </div>
-                                       <p className="text-[10px] text-gray-500 flex gap-2 mt-1 flex-wrap">
-                                          <span className="bg-gray-100 px-2 py-0.5 rounded">🧑 {trx.ref_personel?.nama_orang || '?'}</span>
-                                          <span className="bg-gray-100 px-2 py-0.5 rounded border border-gray-200">🏷️ {trx.ref_akun?.nama_akun || '?'}</span>
-                                          <span className="bg-gray-100 px-2 py-0.5 rounded">🛒 {trx.toko || 'Tanpa Toko'}</span>
-                                       </p>
+                                       <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px] text-gray-500 font-semibold">
+                                          <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200">🧑 {trx.ref_personel?.nama_orang || '-'}</span>
+                                          <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200">🏷️ {trx.ref_akun?.nama_akun || '-'}</span>
+                                          {trx.toko && <span className="bg-gray-50 px-2 py-0.5 rounded border border-gray-200">🛒 {trx.toko}</span>}
+                                       </div>
                                     </td>
 
-                                    <td className="p-4 text-right font-black">
-                                       <span className={`px-2 py-1 rounded-lg text-xs ${isPemasukan ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                    <td className="py-3 px-4 text-right font-black font-mono">
+                                       <span className={`px-2 py-0.5 rounded-md text-xs ${isPemasukan ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
                                           {isPemasukan ? '+' : '-'} Rp {nominal.toLocaleString('id-ID')}
                                        </span>
                                     </td>
-                                    <td className="p-4 text-right font-black text-indigo-700 bg-indigo-50/20 whitespace-nowrap">
+                                    <td className="py-3 px-4 text-right font-black text-indigo-700 bg-indigo-50/30 whitespace-nowrap font-mono">
                                        Rp {trx._saldo_berjalan.toLocaleString('id-ID')}
                                     </td>
-                                    <td className="p-4 text-center print:hidden pb-4">
-                                       <button onClick={() => setExpandedRow(isExpanded ? null : trx.id)} className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1 mx-auto transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} mb-1`}>
-                                          FOTO {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                                    <td className="py-3 px-4 text-center print:hidden">
+                                       <button onClick={() => setExpandedRow(isExpanded ? null : trx.id)} className={`h-7 px-2.5 rounded-lg font-bold text-[11px] inline-flex items-center gap-1 transition-all ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700'}`}>
+                                          <span>Foto</span> {isExpanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
                                        </button>
                                        {((trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && !isExpanded) && (
-                                          <span className="text-[9px] font-bold text-amber-600 bg-amber-100 px-1 py-0.5 rounded-full mt-1">Ada Foto</span>
+                                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 ml-1"></span>
                                        )}
                                     </td>
                                  </tr>
 
-                                 
                                  {/* Panel Collapsible untuk melihat Foto/Lampiran */}
                                  {isExpanded && (
-                                    <tr className="bg-gray-50 border-t-0 shadow-inner print:hidden">
+                                    <tr className="bg-gray-50/50 border-t border-gray-100 print:hidden">
                                        <td colSpan={6} className="p-4">
-                                          <div className="col-span-12 bg-white/50 p-6 rounded-2xl border border-indigo-50 shadow-inner mt-4">
-                                             <h4 className="font-black text-indigo-900 mb-6 border-b border-indigo-100 pb-2 uppercase text-sm tracking-widest">📂 Lampiran Fisik Transaksi</h4>
-                                             <div className="flex flex-col gap-8">
-                                                {renderLampiranLinks("BUKTI NOTA / KWITANSI", trx.foto_nota)}
-                                                {renderLampiranLinks("DOKUMENTASI KEGIATAN", trx.foto_kegiatan)}
-                                                {renderLampiranLinks("FOTO BARANG / ASET", trx.foto_barang)}
-                                                {renderLampiranLinks("BUKTI TRANSFER", trx.foto_bukti_transfer)}
+                                          <div className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-2xs space-y-3">
+                                             <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-2 uppercase text-[11px] tracking-wider">📂 Lampiran Fisik Transaksi</h4>
+                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                {renderLampiranLinks("Bukti Nota / Kwitansi", trx.foto_nota)}
+                                                {renderLampiranLinks("Dokumentasi Kegiatan", trx.foto_kegiatan)}
+                                                {renderLampiranLinks("Foto Barang / Aset", trx.foto_barang)}
+                                                {renderLampiranLinks("Bukti Transfer", trx.foto_bukti_transfer)}
                                              </div>
                                              {!(trx.foto_nota || trx.foto_kegiatan || trx.foto_barang || trx.foto_bukti_transfer) && (
-                                                <div className="text-center py-6 text-gray-400 font-bold italic text-sm">Tidak ada lampiran fisik.</div>
+                                                <div className="text-center py-4 text-gray-400 font-semibold italic text-xs">Tidak ada lampiran fisik.</div>
                                              )}
                                           </div>
                                        </td>

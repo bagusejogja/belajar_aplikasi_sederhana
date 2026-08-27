@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Building2, PieChart, TrendingDown, TrendingUp, Filter, Loader2, Download, ChevronRight, ArrowUpRight, ArrowDownRight, Wallet, Activity, CreditCard, Scale, Percent, ExternalLink
+  Building2, PieChart, TrendingDown, TrendingUp, Filter, Loader2, Download, 
+  ChevronRight, ArrowUpRight, ArrowDownRight, Wallet, Activity, CreditCard, 
+  Scale, Percent, ExternalLink, RefreshCw, Calendar
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -31,7 +33,7 @@ const accountLinks: Record<string, string> = {
 
 export default function UsulanAnggaranPage() {
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(2025); // Realisasi Acuan
+  const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedUnit, setSelectedUnit] = useState('all');
 
   const [units, setUnits] = useState<any[]>([]);
@@ -134,7 +136,7 @@ export default function UsulanAnggaranPage() {
             }
             const totalBulanFungs = detailFungs.filter(Boolean).length;
             
-            // Semua Tunjangan Fungsional (PNS & Non-PNS) digabung ke 511124
+            // Semua Tunjangan Fungsional digabung ke 511124
             usulan['511124'] = (usulan['511124'] || 0) + (p.tunjangan_fungsional || 0) * totalBulanFungs;
 
             const totalBulanSerdos = detailFungs.filter(Boolean).length;
@@ -182,7 +184,6 @@ export default function UsulanAnggaranPage() {
          }
       });
 
-
       if (uData && aData && tData) {
         setUnits(uData);
         setAccounts(aData);
@@ -208,7 +209,6 @@ export default function UsulanAnggaranPage() {
            });
 
            const totalRealization = accTrxs.filter(t => t.jenis === 'realisasi').reduce((s, t) => s + Number(t.nominal), 0);
-           
            const usulanTA2026 = usulan[acc.account_code] || 0;
            
            sumRealisasi += totalRealization;
@@ -289,130 +289,212 @@ export default function UsulanAnggaranPage() {
     } catch (e) { alert("Error mengekspor ke Excel."); }
   };
 
-  const formatIDR = (val: number) => val.toLocaleString('id-ID');
-
-  if (loading) return (
-    <div className="p-40 flex flex-col items-center justify-center gap-6">
-       <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
-       <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Menghitung Data Finansial...</p>
-    </div>
-  );
+  const formatIDR = (val: number) => (Number(val) || 0).toLocaleString('id-ID');
+  const totalGrowth = stats.totalRealisasi > 0 ? ((stats.totalUsulan - stats.totalRealisasi) / stats.totalRealisasi) * 100 : 0;
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-1000 pb-20 max-w-[1600px] mx-auto">
-      {/* 1. FILTER BAR */}
-      <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 flex flex-col lg:flex-row justify-between lg:items-center gap-6">
-         <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase flex items-center gap-3">
-               <Scale size={24} className="text-indigo-600" /> Perbandingan Anggaran
-            </h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Usulan TA 2026 vs Realisasi Acuan</p>
-         </div>
-         <div className="flex gap-4 flex-wrap">
-            <div className="space-y-1">
-               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Realisasi Acuan</label>
-               <select 
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(Number(e.target.value))}
-                  className="w-40 bg-slate-50 border-2 border-slate-100 rounded-xl p-3 font-bold text-sm outline-none focus:border-indigo-500"
-               >
-                  <option value={2024}>Tahun 2024</option>
-                  <option value={2025}>Tahun 2025</option>
-                  <option value={2026}>Tahun 2026</option>
-               </select>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Scale size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Perbandingan Anggaran</h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Usulan TA 2026 vs TA {selectedYear}
+              </span>
             </div>
-            <div className="space-y-1">
-               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Unit Kerja</label>
-               <select value={selectedUnit} onChange={e => setSelectedUnit(e.target.value)} className="w-64 bg-slate-50 border-2 border-slate-100 rounded-xl p-3 font-bold text-sm outline-none focus:border-indigo-500">
-                  <option value="all">Semua Unit</option>
-                  {units.map(u => <option key={u.id} value={u.id}>{u.nama_unit}</option>)}
-               </select>
-            </div>
-         </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Komparasi hasil kalkulasi proyeksi pegawai TA 2026 dengan realisasi acuan</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          {/* Realisasi Acuan */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 shrink-0">
+            <Calendar size={14} className="text-gray-400" />
+            <select 
+              value={selectedYear}
+              onChange={e => setSelectedYear(Number(e.target.value))}
+              className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
+            >
+              <option value={2024}>Acuan: 2024</option>
+              <option value={2025}>Acuan: 2025</option>
+              <option value={2026}>Acuan: 2026</option>
+            </select>
+          </div>
+
+          {/* Unit Kerja */}
+          <div className="w-48">
+            <select 
+              value={selectedUnit} 
+              onChange={e => setSelectedUnit(e.target.value)} 
+              className="w-full h-9 bg-gray-50 border border-gray-200 rounded-xl px-2.5 text-xs font-semibold text-gray-800 outline-none cursor-pointer truncate"
+            >
+              <option value="all">Semua Unit Kerja</option>
+              {units.map(u => <option key={u.id} value={u.id}>{u.nama_unit}</option>)}
+            </select>
+          </div>
+
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Muat Ulang Data"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
+          </button>
+
+          <button 
+            onClick={handleExport}
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+          >
+            <Download size={14} />
+            <span>Export Excel</span>
+          </button>
+        </div>
       </div>
 
-      {/* 2. KPI SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4 md:px-0">
-         <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between group">
-            <div className="min-w-0 flex-1">
-               <p className="text-[12px] font-bold text-emerald-100/60 uppercase tracking-widest mb-1 truncate">Total Usulan TA 2026</p>
-               <h4 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalUsulan)}</h4>
-               <p className="text-[10px] mt-2 bg-white/10 inline-block px-3 py-1 rounded-full font-bold uppercase tracking-widest truncate">Hasil Kalkulasi Pegawai</p>
-            </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><TrendingUp size={40} className="text-white/60" /></div>
-         </div>
+      {/* KPI SUMMARY CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Total Usulan TA 2026 */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Usulan TA 2026</p>
+            <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalUsulan)}`}>
+              Rp {formatIDR(stats.totalUsulan)}
+            </h3>
+            <span className="text-[10px] font-semibold text-emerald-600">Hasil Kalkulasi Pegawai</span>
+          </div>
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+            <TrendingUp size={20} />
+          </div>
+        </div>
 
-         <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-xl flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-               <p className="text-[12px] font-bold text-blue-200/60 uppercase tracking-widest mb-1 truncate">Total Realisasi {selectedYear}</p>
-               <h4 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter italic break-all leading-tight">IDR {formatIDR(stats.totalRealisasi)}</h4>
-               <p className="text-[10px] mt-2 bg-white/10 inline-block px-3 py-1 rounded-full font-bold uppercase tracking-widest truncate">Dana Terserap Tahun Lalu</p>
-            </div>
-            <div className="bg-white/10 p-4 rounded-3xl backdrop-blur-xl border border-white/20 ml-4 shrink-0"><Wallet size={40} className="text-white/60" /></div>
-         </div>
+        {/* Total Realisasi Acuan */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Realisasi TA {selectedYear}</p>
+            <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalRealisasi)}`}>
+              Rp {formatIDR(stats.totalRealisasi)}
+            </h3>
+            <span className="text-[10px] font-semibold text-blue-600">Dana Terserap Tahun Lalu</span>
+          </div>
+          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+            <Wallet size={20} />
+          </div>
+        </div>
+
+        {/* Pertumbuhan / Selisih */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selisih Pertumbuhan</p>
+            <h3 className={`text-base font-black mt-0.5 font-mono truncate ${totalGrowth >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+              {totalGrowth > 0 ? '+' : ''}{totalGrowth.toFixed(1)}%
+            </h3>
+            <span className="text-[10px] font-semibold text-gray-500">
+              Rp {formatIDR(Math.abs(stats.totalUsulan - stats.totalRealisasi))} ({stats.totalUsulan >= stats.totalRealisasi ? 'Kenaikan' : 'Penurunan'})
+            </span>
+          </div>
+          <div className={`p-2.5 rounded-xl ${totalGrowth >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+            {totalGrowth >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+          </div>
+        </div>
       </div>
 
-      {/* 3. PERBANDINGAN TABLE */}
-      <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden mt-12">
-         <div className="p-10 border-b bg-indigo-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-               <h4 className="text-lg font-black uppercase italic tracking-tighter">Detail Perbandingan Akun</h4>
-               <p className="text-[10px] opacity-60 font-bold uppercase tracking-widest mt-1">
-                  Klik icon link pada akun untuk melihat detail kalkulasi pegawai.
-               </p>
-            </div>
-            <button onClick={handleExport} className="bg-white text-indigo-900 px-6 py-3 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-black/20 flex items-center gap-2">
-               <Download size={14} /> EXPORT CSV
-            </button>
-         </div>
-         <div className="overflow-x-auto">
-            <table className="w-full text-left border-separate border-spacing-0">
-               <thead className="bg-slate-50 sticky top-0 z-10">
-                  <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                     <th className="p-6 border-b border-r text-left w-96">Mata Anggaran (Akun)</th>
-                     <th className="p-6 border-b border-r text-right w-48">Pagu TA {selectedYear}</th>
-                     <th className="p-6 border-b border-r text-right w-48 text-indigo-600">Realisasi TA {selectedYear}</th>
-                     <th className="p-6 border-b text-right w-48 bg-amber-50 text-amber-800">Usulan TA 2026</th>
-                     <th className="p-6 border-b text-right w-48">Pertumbuhan (%)</th>
-                     <th className="p-6 border-b text-center w-24">Aksi</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-100">
-                  {pivotData.map((d, i) => {
-                     const linkTarget = accountLinks[d.account_code];
-                     const growth = d.totalSpent > 0 ? ((d.usulanTA2026 - d.totalSpent) / d.totalSpent) * 100 : 0;
-                     
-                     return (
-                        <tr key={i} className="hover:bg-slate-50 transition-all text-xs group">
-                           <td className="p-6 border-r flex flex-col gap-1">
-                              <span className="font-black text-slate-800 uppercase tracking-tighter text-sm">[{d.account_code}]</span>
-                              <span className="text-[10px] font-bold text-slate-500">{d.account_name}</span>
-                           </td>
-                           <td className="p-6 border-r text-right font-medium text-slate-500">{d.totalPagu > 0 ? d.totalPagu.toLocaleString('id-ID') : '-'}</td>
-                           <td className="p-6 border-r text-right font-black text-indigo-700 bg-indigo-50/30">{d.totalSpent > 0 ? d.totalSpent.toLocaleString('id-ID') : '-'}</td>
-                           <td className="p-6 text-right font-black text-amber-700 bg-amber-50">{d.usulanTA2026 > 0 ? d.usulanTA2026.toLocaleString('id-ID') : '-'}</td>
-                           <td className="p-6 text-right font-bold">
-                              {d.usulanTA2026 > 0 && d.totalSpent > 0 ? (
-                                 <span className={growth > 0 ? 'text-emerald-600' : growth < 0 ? 'text-red-500' : 'text-slate-400'}>
-                                    {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
-                                 </span>
-                              ) : '-'}
-                           </td>
-                           <td className="p-6 text-center">
-                              {linkTarget ? (
-                                 <Link href={linkTarget} className="inline-flex items-center justify-center p-2 rounded-xl bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 text-slate-400 transition-colors tooltip-trigger" title="Lihat Detail Kalkulasi Pegawai">
-                                    <ExternalLink size={16} />
-                                 </Link>
-                              ) : (
-                                 <span className="text-[10px] text-slate-300 italic font-medium">-</span>
-                              )}
-                           </td>
-                        </tr>
-                     );
-                  })}
-               </tbody>
-            </table>
-         </div>
+      {/* TABLE: PERBANDINGAN AKUN */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+        <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-gray-900 text-xs">Detail Perbandingan Akun Anggaran</h3>
+            <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+              Klik ikon link untuk membuka modul kalkulasi detail pegawai
+            </p>
+          </div>
+          <span className="text-[11px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
+            {pivotData.length} Mata Anggaran
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                <th className="py-3 px-4">Mata Anggaran (Akun)</th>
+                <th className="py-3 px-4 text-right w-44">Pagu TA {selectedYear}</th>
+                <th className="py-3 px-4 text-right w-44 text-indigo-700">Realisasi TA {selectedYear}</th>
+                <th className="py-3 px-4 text-right w-44 bg-amber-50/50 text-amber-900">Usulan TA 2026</th>
+                <th className="py-3 px-4 text-right w-36">Pertumbuhan</th>
+                <th className="py-3 px-4 text-center w-20">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-gray-400 text-xs">
+                    <RefreshCw size={20} className="animate-spin inline-block text-indigo-600 mr-2" />
+                    Menghitung kalkulasi usulan anggaran...
+                  </td>
+                </tr>
+              ) : pivotData.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-gray-400 text-xs italic">
+                    Tidak ada data anggaran untuk kriteria ini.
+                  </td>
+                </tr>
+              ) : (
+                pivotData.map((d, i) => {
+                  const linkTarget = accountLinks[d.account_code];
+                  const growth = d.totalSpent > 0 ? ((d.usulanTA2026 - d.totalSpent) / d.totalSpent) * 100 : 0;
+                  
+                  return (
+                    <tr key={i} className="hover:bg-indigo-50/20 transition-colors">
+                      <td className="py-2.5 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-bold text-gray-900 text-xs">[{d.account_code}]</span>
+                          <span className="text-[10px] text-gray-500 font-semibold">{d.account_name}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-4 font-mono font-bold text-gray-800 text-xs text-right">
+                        {d.totalPagu > 0 ? `Rp ${formatIDR(d.totalPagu)}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono font-bold text-indigo-700 bg-indigo-50/10 text-xs text-right">
+                        {d.totalSpent > 0 ? `Rp ${formatIDR(d.totalSpent)}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono font-bold text-amber-700 bg-amber-50/30 text-xs text-right">
+                        {d.usulanTA2026 > 0 ? `Rp ${formatIDR(d.usulanTA2026)}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        {d.usulanTA2026 > 0 && d.totalSpent > 0 ? (
+                          <span className={`font-mono font-bold text-xs ${growth > 0 ? 'text-emerald-600' : growth < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                            {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-center">
+                        {linkTarget ? (
+                          <Link 
+                            href={linkTarget} 
+                            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800 inline-flex items-center justify-center transition-colors border border-indigo-100" 
+                            title="Buka Modul Detail Pegawai"
+                          >
+                            <ExternalLink size={13} />
+                          </Link>
+                        ) : (
+                          <span className="text-gray-300 text-xs">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

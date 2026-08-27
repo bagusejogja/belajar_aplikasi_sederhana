@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save, Edit, Folder, Layers, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save, 
+  Edit, Folder, Layers, ChevronDown, ChevronRight, Search, RefreshCw, Check, AlertTriangle
+} from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefAkun, RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
+import toast from 'react-hot-toast';
 
 export default function ReferencesPage() {
   const [activeTab, setActiveTab] = useState<'akun' | 'personel' | 'belanja'>('akun');
@@ -15,16 +19,39 @@ export default function ReferencesPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Filter lists based on searchTerm
-  const filteredAkun = listAkun.filter(a => a.nama_akun.toLowerCase().includes(searchTerm.toLowerCase()) || a.nomor_akun.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredPersonel = listPersonel.filter(p => p.nama_orang.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredBelanja = listBelanja.filter(b => b.nama_belanja.toLowerCase().includes(searchTerm.toLowerCase()) || b.ref_akun?.nama_akun.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredAkun = useMemo(() => {
+    return listAkun.filter(a => 
+      (a.nama_akun || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (a.nomor_akun || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [listAkun, searchTerm]);
+
+  const filteredPersonel = useMemo(() => {
+    return listPersonel.filter(p => 
+      (p.nama_orang || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [listPersonel, searchTerm]);
+
+  const filteredBelanja = useMemo(() => {
+    return listBelanja.filter(b => 
+      (b.nama_belanja || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (b.ref_akun?.nama_akun || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [listBelanja, searchTerm]);
 
   // Tree Collapsible State
   const [expandedInduk, setExpandedInduk] = useState<Record<string, boolean>>({});
   const [expandedKel, setExpandedKel] = useState<Record<string, boolean>>({});
 
-  const toggleInduk = (id: string, e: any) => { e.stopPropagation(); setExpandedInduk(p => ({...p, [id]: !p[id]})); };
-  const toggleKel = (id: string, e: any) => { e.stopPropagation(); setExpandedKel(p => ({...p, [id]: !p[id]})); };
+  const toggleInduk = (id: string, e: any) => { 
+    e.stopPropagation(); 
+    setExpandedInduk(p => ({ ...p, [id]: !p[id] })); 
+  };
+  
+  const toggleKel = (id: string, e: any) => { 
+    e.stopPropagation(); 
+    setExpandedKel(p => ({ ...p, [id]: !p[id] })); 
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,8 +69,9 @@ export default function ReferencesPage() {
         if (akunRes.data) setListAkun(akunRes.data);
         if (personelRes.data) setListPersonel(personelRes.data);
         if (belanjaRes.data) setListBelanja(belanjaRes.data as (RefJenisBelanja & { ref_akun: { nama_akun: string }})[]);
-     } catch (err) {
+     } catch (err: any) {
         console.error("Gagal menarik referensi", err);
+        toast.error('Gagal memuat data: ' + err.message);
      } finally {
         setLoading(false);
      }
@@ -68,40 +96,59 @@ export default function ReferencesPage() {
         const isEdit = !!formData.id;
         
         if (activeTab === 'akun') {
-           if (!formData.nomor_akun || !formData.nama_akun) return alert("Lengkapi data!");
+           if (!formData.nomor_akun?.trim() || !formData.nama_akun?.trim()) {
+             toast.error("Lengkapi Nomor Akun dan Nama Akun!");
+             setIsSaving(false);
+             return;
+           }
            if (isEdit) {
-              await supabase.from('ref_akun').update({ nomor_akun: formData.nomor_akun, nama_akun: formData.nama_akun, status: formData.status }).eq('id', formData.id);
+              await supabase.from('ref_akun').update({ nomor_akun: formData.nomor_akun.trim(), nama_akun: formData.nama_akun.trim(), status: formData.status }).eq('id', formData.id);
            } else {
-              await supabase.from('ref_akun').insert([{ nomor_akun: formData.nomor_akun, nama_akun: formData.nama_akun, status: formData.status }]);
+              await supabase.from('ref_akun').insert([{ nomor_akun: formData.nomor_akun.trim(), nama_akun: formData.nama_akun.trim(), status: formData.status }]);
            }
         } else if (activeTab === 'personel') {
-           if (!formData.nama_orang) return alert("Lengkapi nama!");
+           if (!formData.nama_orang?.trim()) {
+             toast.error("Lengkapi Nama Personel!");
+             setIsSaving(false);
+             return;
+           }
            if (isEdit) {
-              await supabase.from('ref_personel').update({ nama_orang: formData.nama_orang, status: formData.status }).eq('id', formData.id);
+              await supabase.from('ref_personel').update({ nama_orang: formData.nama_orang.trim(), status: formData.status }).eq('id', formData.id);
            } else {
-              await supabase.from('ref_personel').insert([{ nama_orang: formData.nama_orang, status: formData.status }]);
+              await supabase.from('ref_personel').insert([{ nama_orang: formData.nama_orang.trim(), status: formData.status }]);
            }
         } else {
-           if (!formData.nama_belanja || !formData.akun_id) return alert("Lengkapi nama dan pilih akun!");
+           if (!formData.nama_belanja?.trim() || !formData.akun_id) {
+             toast.error("Lengkapi Nama Belanja dan Pilih Kategori Akun!");
+             setIsSaving(false);
+             return;
+           }
            if (isEdit) {
-              await supabase.from('ref_jenis_belanja').update({ nama_belanja: formData.nama_belanja, akun_id: formData.akun_id, status: formData.status }).eq('id', formData.id);
+              await supabase.from('ref_jenis_belanja').update({ nama_belanja: formData.nama_belanja.trim(), akun_id: formData.akun_id, status: formData.status }).eq('id', formData.id);
            } else {
-              await supabase.from('ref_jenis_belanja').insert([{ nama_belanja: formData.nama_belanja, akun_id: formData.akun_id, status: formData.status }]);
+              await supabase.from('ref_jenis_belanja').insert([{ nama_belanja: formData.nama_belanja.trim(), akun_id: formData.akun_id, status: formData.status }]);
            }
         }
+        toast.success('Data referensi berhasil disimpan!');
         setIsModalOpen(false);
         fetchData();
      } catch (err: any) {
-        alert("Gagal: " + err.message);
+        toast.error("Gagal: " + err.message);
      } finally {
         setIsSaving(false);
      }
   };
 
   const handleDelete = async (id: string | number, table: string) => {
-     if (!confirm("Yakin ingin menghapus referensi ini? Transaksi yang memakai ini mungkin error.")) return;
-     await supabase.from(table).delete().eq('id', id);
-     fetchData();
+     if (!confirm("Yakin ingin menghapus referensi ini?")) return;
+     try {
+       const { error } = await supabase.from(table).delete().eq('id', id);
+       if (error) throw error;
+       toast.success('Data referensi berhasil dihapus!');
+       fetchData();
+     } catch (err: any) {
+       toast.error('Gagal menghapus: ' + err.message);
+     }
   };
 
   // BUILD TREE UNTUK AKUN COA
@@ -111,7 +158,7 @@ export default function ReferencesPage() {
 
      // 1. Induk
      filteredAkun.forEach(item => {
-        const no = String(item.nomor_akun);
+        const no = String(item.nomor_akun || '');
         if (no.endsWith('0000') && !no.includes('.')) {
            tree[no] = { ...item, kelompoks: {} };
         }
@@ -119,9 +166,8 @@ export default function ReferencesPage() {
 
      // 2. Kelompok
      filteredAkun.forEach(item => {
-        const no = String(item.nomor_akun);
+        const no = String(item.nomor_akun || '');
         if (!no.endsWith('0000') && !no.includes('.')) {
-           // Induknya adalah digit pertama + 0000 (contoh: 43010 -> 40000)
            const parentInduk = no.substring(0, 1) + '0000';
            if (tree[parentInduk]) {
               tree[parentInduk].kelompoks[no] = { ...item, anaks: [] };
@@ -133,7 +179,7 @@ export default function ReferencesPage() {
 
      // 3. Anak
      filteredAkun.forEach(item => {
-        const no = String(item.nomor_akun);
+        const no = String(item.nomor_akun || '');
         if (no.includes('.')) {
            const parentKelompok = no.split('.')[0];
            const parentInduk = parentKelompok.substring(0, 1) + '0000';
@@ -145,9 +191,9 @@ export default function ReferencesPage() {
         }
      });
 
-     // Sisanya (Jika tidak ikut format 5 digit / dot)
+     // Sisanya
      filteredAkun.forEach(item => {
-        const no = String(item.nomor_akun);
+        const no = String(item.nomor_akun || '');
         const isInduk = no.endsWith('0000') && !no.includes('.');
         const isKel = !no.endsWith('0000') && !no.includes('.') && tree[no.substring(0, 1) + '0000'];
         const isAnak = no.includes('.') && tree[no.split('.')[0].substring(0, 1) + '0000']?.kelompoks[no.split('.')[0]];
@@ -162,161 +208,268 @@ export default function ReferencesPage() {
   const { tree, unassigned } = buildTree();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-3xl shadow-sm border border-gray-100 gap-6">
-        <div className="flex items-center gap-4">
-           <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner border border-indigo-100">
-              <Database size={24} />
+    <div className="max-w-7xl mx-auto space-y-4 pb-20">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
+        <div className="flex items-center gap-3">
+           <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-2 rounded-xl text-white shadow-xs">
+              <Database size={20} />
            </div>
            <div>
-              <h2 className="text-2xl font-black text-gray-900">Data Referensi (Master)</h2>
-              <p className="text-gray-500 font-medium">Pengaturan Opsi Kategori Akun & Jenis Belanja</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Data Referensi Master</h2>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                  {activeTab === 'akun' ? `${listAkun.length} Akun COA` : activeTab === 'personel' ? `${listPersonel.length} Personel` : `${listBelanja.length} Belanja`}
+                </span>
+              </div>
+              <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                Pengaturan kategori akun (COA), daftar personel, dan nama jenis belanja.
+              </p>
            </div>
         </div>
-         <div className="relative w-full md:w-72 mt-4 md:mt-0">
-             <input
-                 type="text"
-                 placeholder="Cari Referensi..."
-                 value={searchTerm}
-                 onChange={(e) => setSearchTerm(e.target.value)}
-                 className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition-all font-medium text-sm"
-             />
-         </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+           <div className="relative flex-1 md:w-56">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                  type="text"
+                  placeholder="Cari referensi..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-9 pl-7 pr-7 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-xs font-semibold"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X size={12} />
+                </button>
+              )}
+           </div>
+
+           <button
+             onClick={fetchData}
+             className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-1.5 transition-colors shadow-2xs"
+             title="Refresh Data"
+           >
+             <RefreshCw size={13} />
+             <span className="hidden sm:inline">Refresh</span>
+           </button>
+
+           <button 
+             onClick={() => openModal()} 
+             className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+           >
+             <Plus size={15} />
+             <span>Tambah {activeTab === 'akun' ? 'Akun' : activeTab === 'personel' ? 'Personel' : 'Belanja'}</span>
+           </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-[500px]">
-         <div className="flex overflow-x-auto border-b border-gray-100 hide-scrollbar bg-gray-50/50 rounded-t-3xl">
-            <button onClick={() => setActiveTab('akun')} className={`flex-1 flex items-center justify-center gap-2 p-5 font-bold whitespace-nowrap border-b-4 transition-all ${activeTab === 'akun' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-400 hover:text-indigo-500'}`}>
-               <Tags size={18} /> Daftar Kategori Tipe (Akun)
+      {/* TABS NAVIGATION & CONTENT CONTAINER */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden flex flex-col min-h-[500px]">
+         
+         {/* TAB BUTTONS */}
+         <div className="flex border-b border-gray-200/80 bg-gray-50/60 px-3 pt-2 gap-1 overflow-x-auto">
+            <button 
+              onClick={() => { setActiveTab('akun'); setSearchTerm(''); }} 
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-t-xl transition-all border-t border-x ${
+                activeTab === 'akun' 
+                  ? 'bg-white border-gray-200/80 text-indigo-700 shadow-2xs -mb-px' 
+                  : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
+              }`}
+            >
+               <Tags size={14} className={activeTab === 'akun' ? 'text-indigo-600' : 'text-gray-400'} />
+               <span>Kategori Akun (COA)</span>
+               <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-gray-100 text-gray-600 font-mono font-bold">
+                 {listAkun.length}
+               </span>
             </button>
-            <button onClick={() => setActiveTab('personel')} className={`flex-1 flex items-center justify-center gap-2 p-5 font-bold whitespace-nowrap border-b-4 transition-all ${activeTab === 'personel' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-400 hover:text-indigo-500'}`}>
-               <Users size={18} /> Daftar Personel
+
+            <button 
+              onClick={() => { setActiveTab('personel'); setSearchTerm(''); }} 
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-t-xl transition-all border-t border-x ${
+                activeTab === 'personel' 
+                  ? 'bg-white border-gray-200/80 text-indigo-700 shadow-2xs -mb-px' 
+                  : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
+              }`}
+            >
+               <Users size={14} className={activeTab === 'personel' ? 'text-indigo-600' : 'text-gray-400'} />
+               <span>Daftar Personel</span>
+               <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-gray-100 text-gray-600 font-mono font-bold">
+                 {listPersonel.length}
+               </span>
             </button>
-            <button onClick={() => setActiveTab('belanja')} className={`flex-1 flex items-center justify-center gap-2 p-5 font-bold whitespace-nowrap border-b-4 transition-all ${activeTab === 'belanja' ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-400 hover:text-indigo-500'}`}>
-               <ShoppingBag size={18} /> Nama Barang / Belanja
+
+            <button 
+              onClick={() => { setActiveTab('belanja'); setSearchTerm(''); }} 
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-t-xl transition-all border-t border-x ${
+                activeTab === 'belanja' 
+                  ? 'bg-white border-gray-200/80 text-indigo-700 shadow-2xs -mb-px' 
+                  : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-100/60'
+              }`}
+            >
+               <ShoppingBag size={14} className={activeTab === 'belanja' ? 'text-indigo-600' : 'text-gray-400'} />
+               <span>Nama Jenis Belanja</span>
+               <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-gray-100 text-gray-600 font-mono font-bold">
+                 {listBelanja.length}
+               </span>
             </button>
          </div>
 
-         <div className="p-6 flex-1 bg-gray-50/20">
+         {/* TAB CONTENT */}
+         <div className="p-4 md:p-6 flex-1 bg-white">
             {loading ? (
                <div className="h-64 flex flex-col items-center justify-center text-indigo-600 gap-3">
                   <Loader2 size={32} className="animate-spin" />
-                  <span className="font-bold text-sm">Menarik data dari database...</span>
+                  <span className="font-bold text-xs text-gray-500">Memuat data referensi...</span>
                </div>
             ) : (
                <>
                   {/* TAB: AKUN (COA TREE) */}
                   {activeTab === 'akun' && (
-                     <div className="space-y-4 max-w-5xl mx-auto">
-                        <div className="mb-4">
-                           <h3 className="font-bold text-gray-500 uppercase tracking-widest text-sm mb-1">COA Anak (Detail/Selectable)</h3>
+                     <div className="space-y-3 max-w-5xl mx-auto">
+                        <div className="flex items-center justify-between pb-1">
+                           <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider">
+                             Struktur Hirarki Chart of Accounts (COA)
+                           </span>
+                           <span className="text-[11px] font-bold text-gray-500">
+                             {filteredAkun.length} akun ditemukan
+                           </span>
                         </div>
 
                         {Object.values(tree).map((induk: any) => {
                            let totalAnak = 0;
                            Object.values(induk.kelompoks).forEach((k: any) => { totalAnak += k.anaks.length; });
+                           const isIndukExpanded = expandedInduk[induk.id];
 
                            return (
-                             <div key={induk.id} className="border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+                             <div key={induk.id} className="border border-gray-200/80 rounded-2xl bg-white shadow-2xs overflow-hidden transition-all">
                                 {/* BARIS INDUK */}
-                                <div onClick={(e) => toggleInduk(induk.id, e)} className="p-4 border-b flex justify-between items-center bg-gray-50 hover:bg-indigo-50/50 transition-colors cursor-pointer">
-                                   <div className="flex items-center gap-3">
+                                <div 
+                                  onClick={(e) => toggleInduk(induk.id, e)} 
+                                  className="p-3 px-4 flex justify-between items-center bg-gray-50/80 hover:bg-indigo-50/40 transition-colors cursor-pointer border-b border-gray-100"
+                                >
+                                   <div className="flex items-center gap-2.5">
                                       <button className="text-gray-400 hover:text-indigo-600 transition-colors">
-                                         {expandedInduk[induk.id] ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                         {isIndukExpanded ? <ChevronDown size={16} className="text-indigo-600" /> : <ChevronRight size={16} />}
                                       </button>
-                                      <Folder className="text-blue-500" size={18} fill="currentColor"/>
-                                      <span className="font-black text-blue-600">{induk.nomor_akun}</span>
-                                      <span className="text-gray-400">—</span>
-                                      <span className="font-bold text-blue-500">{induk.nama_akun}</span>
-                                      <span className="text-[10px] font-bold bg-gray-600 text-white px-2 py-0.5 rounded ml-2">{Object.keys(induk.kelompoks).length} kelompok</span>
-                                      <span className="text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded">{totalAnak} anak</span>
+                                      <Folder className="text-blue-500" size={16} fill="currentColor"/>
+                                      <span className="font-mono font-black text-blue-700 text-xs px-2 py-0.5 bg-blue-50 rounded-md border border-blue-200">
+                                        {induk.nomor_akun}
+                                      </span>
+                                      <span className="font-bold text-gray-900 text-xs md:text-sm">{induk.nama_akun}</span>
+                                      <span className="text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.2 rounded-full">
+                                        {Object.keys(induk.kelompoks).length} kelompok
+                                      </span>
+                                      <span className="text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.2 rounded-full">
+                                        {totalAnak} anak
+                                      </span>
                                    </div>
-                                   <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                                      <button onClick={() => openModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 text-xs font-bold rounded shadow-sm flex items-center gap-1">
-                                         + Tambah Kelompok Baru
+
+                                   <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                      <button 
+                                        onClick={() => openModal(undefined, { nomor_akun: `${induk.nomor_akun.substring(0, 1)}` })} 
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
+                                      >
+                                         <Plus size={12}/> + Kelompok
                                       </button>
                                    </div>
                                 </div>
 
                                 {/* LIST KELOMPOK DALAM INDUK */}
-                                {expandedInduk[induk.id] && (
-                                 <div className="p-4 space-y-3">
-                                   <div className="flex justify-between items-center mb-2 px-2">
-                                      <span className="text-xs font-bold text-gray-400 uppercase">Daftar Kelompok</span>
-                                   </div>
+                                {isIndukExpanded && (
+                                 <div className="p-3 md:p-4 space-y-2.5 bg-gray-50/30">
+                                    {Object.values(induk.kelompoks).map((kel: any) => {
+                                      const isKelExpanded = expandedKel[kel.id];
+                                      return (
+                                       <div key={kel.id} className="border border-gray-200/70 rounded-xl bg-white overflow-hidden shadow-2xs">
+                                          {/* BARIS KELOMPOK */}
+                                          <div 
+                                            onClick={(e) => toggleKel(kel.id, e)} 
+                                            className="p-2.5 px-3.5 bg-white flex justify-between items-center border-b border-gray-100 hover:bg-indigo-50/30 transition-colors cursor-pointer"
+                                          >
+                                             <div className="flex items-center gap-2.5">
+                                                <button className="text-gray-400 hover:text-indigo-600 transition-colors">
+                                                   {isKelExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                                </button>
+                                                <Layers className="text-sky-500" size={14} />
+                                                <span className="font-mono font-bold text-sky-800 text-xs px-1.5 py-0.2 bg-sky-50 rounded border border-sky-100">
+                                                  {kel.nomor_akun}
+                                                </span>
+                                                <span className="font-bold text-gray-800 text-xs">{kel.nama_akun}</span>
+                                                <span className="text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.2 rounded-full">
+                                                  {kel.anaks.length} anak
+                                                </span>
+                                             </div>
+                                             
+                                             <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                                <button 
+                                                  onClick={() => openModal(kel)} 
+                                                  className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1"
+                                                >
+                                                   <Edit size={10}/> Edit
+                                                </button>
+                                                <button 
+                                                  onClick={() => openModal(undefined, { nomor_akun: `${kel.nomor_akun}.` })} 
+                                                  className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1"
+                                                >
+                                                   <Plus size={10}/> + Anak
+                                                </button>
+                                             </div>
+                                          </div>
 
-                                   {Object.values(induk.kelompoks).map((kel: any) => (
-                                      <div key={kel.id} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                                         {/* BARIS KELOMPOK */}
-                                         <div onClick={(e) => toggleKel(kel.id, e)} className="p-3 bg-gray-50 flex justify-between items-center border-b border-gray-100 hover:bg-indigo-50/50 transition-colors cursor-pointer">
-                                            <div className="flex items-center gap-3 pl-2">
-                                               <button className="text-gray-400 hover:text-indigo-600 transition-colors">
-                                                  {expandedKel[kel.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                                               </button>
-                                               <Layers className="text-blue-400" size={16} />
-                                               <span className="font-black text-blue-600 text-sm">{kel.nomor_akun}</span>
-                                               <span className="text-gray-400 text-sm">—</span>
-                                               <span className="font-bold text-blue-500 text-sm">{kel.nama_akun}</span>
-                                               <span className="text-[10px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded ml-2">{kel.anaks.length} anak</span>
-                                            </div>
-                                            <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                                               <button onClick={() => openModal(kel)} className="bg-amber-400 hover:bg-amber-500 text-white px-3 py-1 text-xs font-bold rounded shadow-sm flex items-center gap-1">
-                                                  <Edit size={12}/> Edit
-                                               </button>
-                                               <button onClick={() => openModal(undefined, { nomor_akun: `${kel.nomor_akun}.` })} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 text-xs font-bold rounded shadow-sm flex items-center gap-1">
-                                                  <Plus size={12}/> Anak
-                                               </button>
-                                            </div>
-                                         </div>
-
-                                         {/* DATA ANAK */}
-                                         {expandedKel[kel.id] && kel.anaks.length > 0 && (
-                                            <table className="w-full text-left text-sm">
-                                               <thead className="border-b border-gray-100 text-gray-500 font-bold bg-white text-xs">
-                                                  <tr>
-                                                     <th className="p-3 pl-8 w-32 border-r border-gray-50">Kode Full</th>
-                                                     <th className="p-3 pl-4">Nama Anak</th>
-                                                     <th className="p-3 w-24 text-center border-l border-gray-50">Aksi</th>
-                                                  </tr>
-                                               </thead>
-                                               <tbody className="divide-y divide-gray-50 text-xs">
-                                                  {kel.anaks.map((anak: any) => (
-                                                     <tr key={anak.id} className="hover:bg-blue-50/30 transition-colors">
-                                                        <td className="p-3 pl-8 border-r border-gray-50">
-                                                           <span className="bg-teal-500 text-white font-black px-2 py-1 rounded tracking-wide shadow-sm">{anak.nomor_akun}</span>
-                                                        </td>
-                                                        <td className="p-3 font-semibold text-gray-700 pl-4">{anak.nama_akun}</td>
-                                                        <td className="p-3 flex items-center justify-center gap-2 border-l border-gray-50">
-                                                           <button onClick={()=>openModal(anak)} className="bg-amber-400 hover:bg-amber-500 text-white p-1.5 rounded shadow-sm"><Edit size={12}/></button>
-                                                           <button onClick={()=>handleDelete(anak.id, 'ref_akun')} className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded shadow-sm"><Trash2 size={12}/></button>
-                                                        </td>
-                                                     </tr>
-                                                  ))}
-                                               </tbody>
-                                            </table>
-                                         )}
-                                      </div>
-                                    ))}
+                                          {/* DATA ANAK */}
+                                          {isKelExpanded && kel.anaks.length > 0 && (
+                                             <table className="w-full text-left text-xs">
+                                                <thead className="border-b border-gray-100 text-gray-400 font-bold bg-gray-50/50 text-[10px] uppercase">
+                                                   <tr>
+                                                      <th className="p-2.5 pl-9 w-36">Kode Detail</th>
+                                                      <th className="p-2.5">Nama Akun Anak</th>
+                                                      <th className="p-2.5 w-24 text-center">Aksi</th>
+                                                   </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                   {kel.anaks.map((anak: any) => (
+                                                      <tr key={anak.id} className="hover:bg-indigo-50/20 transition-colors group">
+                                                         <td className="p-2.5 pl-9 font-mono">
+                                                            <span className="bg-teal-50 text-teal-800 font-bold px-2 py-0.5 rounded border border-teal-200">
+                                                              {anak.nomor_akun}
+                                                            </span>
+                                                         </td>
+                                                         <td className="p-2.5 font-bold text-gray-800">{anak.nama_akun}</td>
+                                                         <td className="p-2.5 flex items-center justify-center gap-1">
+                                                            <button onClick={() => openModal(anak)} className="p-1 text-amber-700 hover:bg-amber-50 rounded" title="Edit"><Edit size={12}/></button>
+                                                            <button onClick={() => handleDelete(anak.id, 'ref_akun')} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Hapus"><Trash2 size={12}/></button>
+                                                         </td>
+                                                      </tr>
+                                                   ))}
+                                                </tbody>
+                                             </table>
+                                          )}
+                                       </div>
+                                      );
+                                    })}
                                  </div>
                                 )}
                              </div>
-                           )
+                           );
                         })}
 
                         {/* DATA YANG TIDAK MASUK KELOMPOK */}
                         {unassigned.length > 0 && (
-                           <div className="border border-red-200 rounded-xl bg-red-50 p-4 mt-8">
-                              <h4 className="font-bold text-red-600 flex items-center gap-2 mb-4">⚠️ Akun Tanpa Klasifikasi (Di Luar Struktur Induk)</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                           <div className="border border-rose-200 rounded-2xl bg-rose-50/40 p-4 mt-6">
+                              <h4 className="font-bold text-rose-700 text-xs flex items-center gap-1.5 mb-3">
+                                <AlertTriangle size={14} /> Akun Tanpa Klasifikasi Induk ({unassigned.length})
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                                  {unassigned.map(ua => (
-                                    <div key={ua.id} className="bg-white p-3 rounded-lg flex items-center justify-between border border-red-100 shadow-sm">
-                                       <div>
-                                          <p className="font-black text-red-500 text-sm">{ua.nomor_akun}</p>
-                                          <p className="font-bold text-gray-600 text-xs">{ua.nama_akun}</p>
+                                    <div key={ua.id} className="bg-white p-2.5 px-3 rounded-xl flex items-center justify-between border border-rose-200 shadow-2xs">
+                                       <div className="min-w-0 pr-2">
+                                          <p className="font-mono font-bold text-rose-600 text-xs">{ua.nomor_akun}</p>
+                                          <p className="font-bold text-gray-800 text-xs truncate">{ua.nama_akun}</p>
                                        </div>
                                        <div className="flex gap-1 shrink-0">
-                                          <button onClick={()=>openModal(ua)} className="text-amber-500 p-1 hover:bg-amber-50 rounded"><Edit size={14}/></button>
-                                          <button onClick={()=>handleDelete(ua.id, 'ref_akun')} className="text-red-500 p-1 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
+                                          <button onClick={() => openModal(ua)} className="text-amber-600 p-1 hover:bg-amber-50 rounded" title="Edit"><Edit size={12}/></button>
+                                          <button onClick={() => handleDelete(ua.id, 'ref_akun')} className="text-rose-600 p-1 hover:bg-rose-50 rounded" title="Hapus"><Trash2 size={12}/></button>
                                        </div>
                                     </div>
                                  ))}
@@ -328,26 +481,43 @@ export default function ReferencesPage() {
 
                   {/* TAB: PERSONEL */}
                   {activeTab === 'personel' && (
-                     <div className="bg-white border rounded-2xl border-gray-200 overflow-hidden shadow-sm max-w-4xl mx-auto">
-                        <table className="w-full text-left border-collapse">
-                           <thead className="bg-gray-100 text-gray-500 text-xs uppercase tracking-wider font-bold">
+                     <div className="bg-white border rounded-2xl border-gray-200/80 overflow-hidden shadow-xs max-w-4xl mx-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                           <thead className="bg-gray-50/80 text-gray-400 text-[10px] uppercase tracking-wider font-black border-b border-gray-200">
                               <tr>
-                                 <th className="p-4 border-b">Nama Personel</th>
-                                 <th className="p-4 border-b text-center w-32">Status</th>
-                                 <th className="p-4 border-b text-center w-32">Aksi</th>
+                                 <th className="p-3.5 px-5">Nama Personel</th>
+                                 <th className="p-3.5 px-5 text-center w-32">Status</th>
+                                 <th className="p-3.5 px-5 text-center w-28">Aksi</th>
                               </tr>
                            </thead>
-                           <tbody>
+                           <tbody className="divide-y divide-gray-100">
                               {filteredPersonel.map((p, i) => (
-                                 <tr key={p.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
-                                    <td className="p-4 font-bold text-gray-900">{p.nama_orang}</td>
-                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${p.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span></td>
-                                    <td className="p-4 text-center flex justify-center gap-2">
-                                       <button onClick={() => openModal(p)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
-                                       <button onClick={() => handleDelete(p.id, 'ref_personel')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                 <tr key={p.id || i} className="hover:bg-gray-50/70 transition-colors">
+                                    <td className="p-3.5 px-5 font-bold text-gray-900 text-xs md:text-sm">{p.nama_orang}</td>
+                                    <td className="p-3.5 px-5 text-center">
+                                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                         p.status === 'Aktif' 
+                                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                           : 'bg-rose-50 text-rose-700 border-rose-200'
+                                       }`}>
+                                         {p.status}
+                                       </span>
+                                    </td>
+                                    <td className="p-3.5 px-5 text-center">
+                                       <div className="flex items-center justify-center gap-1.5">
+                                          <button onClick={() => openModal(p)} className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors" title="Edit"><Edit size={12}/></button>
+                                          <button onClick={() => handleDelete(p.id, 'ref_personel')} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors" title="Hapus"><Trash2 size={12}/></button>
+                                       </div>
                                     </td>
                                  </tr>
                               ))}
+                              {filteredPersonel.length === 0 && (
+                                <tr>
+                                  <td colSpan={3} className="p-8 text-center text-gray-400 font-bold">
+                                    Tidak ada data personel yang cocok dengan pencarian.
+                                  </td>
+                                </tr>
+                              )}
                            </tbody>
                         </table>
                      </div>
@@ -355,28 +525,49 @@ export default function ReferencesPage() {
 
                   {/* TAB: BELANJA */}
                   {activeTab === 'belanja' && (
-                     <div className="bg-white border rounded-2xl border-gray-200 overflow-hidden shadow-sm max-w-4xl mx-auto">
-                        <table className="w-full text-left border-collapse">
-                           <thead className="bg-gray-100 text-gray-500 text-xs uppercase tracking-wider font-bold">
+                     <div className="bg-white border rounded-2xl border-gray-200/80 overflow-hidden shadow-xs max-w-4xl mx-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                           <thead className="bg-gray-50/80 text-gray-400 text-[10px] uppercase tracking-wider font-black border-b border-gray-200">
                               <tr>
-                                 <th className="p-4 border-b">Nama Belanja (Barang)</th>
-                                 <th className="p-4 border-b">Terkait ke Akun Murni</th>
-                                 <th className="p-4 border-b text-center w-32">Status</th>
-                                 <th className="p-4 border-b text-center w-32">Aksi</th>
+                                 <th className="p-3.5 px-5">Nama Belanja (Barang)</th>
+                                 <th className="p-3.5 px-5">Terkait ke Akun Murni</th>
+                                 <th className="p-3.5 px-5 text-center w-32">Status</th>
+                                 <th className="p-3.5 px-5 text-center w-28">Aksi</th>
                               </tr>
                            </thead>
-                           <tbody>
+                           <tbody className="divide-y divide-gray-100">
                               {filteredBelanja.map((b, i) => (
-                                 <tr key={b.id} className="hover:bg-gray-50 border-b last:border-0 transition-colors">
-                                    <td className="p-4 font-bold text-gray-900">{b.nama_belanja}</td>
-                                    <td className="p-4 font-medium text-indigo-600 text-xs">{(b.ref_akun as any)?.nama_akun || 'Akun Terhapus'}</td>
-                                    <td className="p-4 text-center"><span className={`px-3 py-1 rounded-full text-[10px] font-black ${b.status === 'Aktif' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{b.status}</span></td>
-                                    <td className="p-4 text-center flex justify-center gap-2">
-                                       <button onClick={() => openModal(b)} className="text-amber-500 hover:bg-amber-100 p-2 font-bold text-xs uppercase rounded"><Edit size={16}/></button>
-                                       <button onClick={() => handleDelete(b.id, 'ref_jenis_belanja')} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={16}/></button>
+                                 <tr key={b.id || i} className="hover:bg-gray-50/70 transition-colors">
+                                    <td className="p-3.5 px-5 font-bold text-gray-900 text-xs md:text-sm">{b.nama_belanja}</td>
+                                    <td className="p-3.5 px-5 font-medium text-indigo-700">
+                                      <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md">
+                                        {(b.ref_akun as any)?.nama_akun || 'Akun Terhapus'}
+                                      </span>
+                                    </td>
+                                    <td className="p-3.5 px-5 text-center">
+                                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                                         b.status === 'Aktif' 
+                                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                           : 'bg-rose-50 text-rose-700 border-rose-200'
+                                       }`}>
+                                         {b.status}
+                                       </span>
+                                    </td>
+                                    <td className="p-3.5 px-5 text-center">
+                                       <div className="flex items-center justify-center gap-1.5">
+                                          <button onClick={() => openModal(b)} className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors" title="Edit"><Edit size={12}/></button>
+                                          <button onClick={() => handleDelete(b.id, 'ref_jenis_belanja')} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors" title="Hapus"><Trash2 size={12}/></button>
+                                       </div>
                                     </td>
                                  </tr>
                               ))}
+                              {filteredBelanja.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="p-8 text-center text-gray-400 font-bold">
+                                    Tidak ada data belanja yang cocok dengan pencarian.
+                                  </td>
+                                </tr>
+                              )}
                            </tbody>
                         </table>
                      </div>
@@ -384,54 +575,120 @@ export default function ReferencesPage() {
                </>
             )}
          </div>
-         
-         <div className="p-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end">
-            <button onClick={() => openModal()} className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-md font-bold transition-all">
-               <Plus size={18} /> Tambah Data {activeTab === 'akun' ? 'Akun' : activeTab === 'personel' ? 'Personel' : 'Belanja'}
-            </button>
-         </div>
       </div>
 
+      {/* MODAL TAMBAH / EDIT REFERENSI */}
       {isModalOpen && (
-         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
-               <div className="p-6 flex justify-between items-center border-b border-gray-100">
-                  <h3 className="font-bold text-lg">Tambah/Edit Referensi</h3>
-                  <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-red-500"><X size={20}/></button>
+         <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+            <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 border border-gray-100">
+               <div className="p-4 px-6 flex justify-between items-center border-b border-gray-100 bg-gray-50/80">
+                  <div className="flex items-center gap-2.5">
+                     <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                        <Database size={16} />
+                     </div>
+                     <h3 className="font-black text-sm text-gray-900">
+                       {formData.id ? 'Edit' : 'Tambah'} Referensi {activeTab === 'akun' ? 'Akun' : activeTab === 'personel' ? 'Personel' : 'Belanja'}
+                     </h3>
+                  </div>
+                  <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg">
+                    <X size={18}/>
+                  </button>
                </div>
+
                <div className="p-6 space-y-4">
                   {activeTab === 'akun' && (
                      <>
-                        <input type="text" placeholder="Nomor Akun (Misal: 11110.01)" value={formData.nomor_akun || ''} onChange={(e) => setFormData({...formData, nomor_akun: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" />
-                        <input type="text" placeholder="Nama Akun (Misal: Saldo Awal)" value={formData.nama_akun || ''} onChange={(e) => setFormData({...formData, nama_akun: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500 font-bold" />
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Nomor Akun (COA)</label>
+                          <input 
+                            type="text" 
+                            placeholder="Misal: 11110.01" 
+                            value={formData.nomor_akun || ''} 
+                            onChange={(e) => setFormData({...formData, nomor_akun: e.target.value})} 
+                            className="w-full border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Nama Akun</label>
+                          <input 
+                            type="text" 
+                            placeholder="Misal: Saldo Awal" 
+                            value={formData.nama_akun || ''} 
+                            onChange={(e) => setFormData({...formData, nama_akun: e.target.value})} 
+                            className="w-full border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                          />
+                        </div>
                      </>
                   )}
                   {activeTab === 'personel' && (
-                     <input type="text" placeholder="Nama Karyawan/Pengurus" value={formData.nama_orang || ''} onChange={(e) => setFormData({...formData, nama_orang: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500" />
+                     <div>
+                       <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Nama Karyawan / Pengurus</label>
+                       <input 
+                         type="text" 
+                         placeholder="Nama Lengkap" 
+                         value={formData.nama_orang || ''} 
+                         onChange={(e) => setFormData({...formData, nama_orang: e.target.value})} 
+                         className="w-full border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                       />
+                     </div>
                   )}
                   {activeTab === 'belanja' && (
                      <>
-                        <input type="text" placeholder="Nama Belanja/Barang (Misal: Sabun Cuci)" value={formData.nama_belanja || ''} onChange={(e) => setFormData({...formData, nama_belanja: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-indigo-500" />
-                        <div className="relative z-50">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Nama Belanja / Barang</label>
+                          <input 
+                            type="text" 
+                            placeholder="Misal: Sabun Cuci" 
+                            value={formData.nama_belanja || ''} 
+                            onChange={(e) => setFormData({...formData, nama_belanja: e.target.value})} 
+                            className="w-full border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                          />
+                        </div>
+                        <div>
+                           <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Kategori Akun COA</label>
                            <Select 
                               options={listAkun.map(a => ({ value: a.id, label: `${a.nomor_akun} - ${a.nama_akun}` }))}
                               value={formData.akun_id ? { value: formData.akun_id, label: listAkun.find(a => a.id === formData.akun_id)?.nama_akun } : null}
                               onChange={(val: any) => setFormData({...formData, akun_id: val?.value})}
-                              placeholder="Ketik & Pilih Kategori Akun..."
-                              styles={{ control: (b) => ({ ...b, padding: '4px', borderRadius: '0.75rem' }) }}
+                              placeholder="Pilih Kategori Akun..."
+                              className="text-xs font-bold"
+                              styles={{
+                                control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb' }),
+                                valueContainer: (base) => ({ ...base, padding: '0 8px' })
+                              }}
                            />
                         </div>
                      </>
                   )}
+                  
                   {/* Status Dropdown */}
-                  <select value={formData.status || 'Aktif'} onChange={(e) => setFormData({...formData, status: e.target.value})} className="w-full border rounded-xl p-3 outline-none focus:ring-2 focus:ring-amber-500 font-bold">
-                     <option value="Aktif">🟢 Status: Aktif</option>
-                     <option value="Tidak Aktif">⚪ Status: Tidak Aktif</option>
-                  </select>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Status Keaktifan</label>
+                    <select 
+                      value={formData.status || 'Aktif'} 
+                      onChange={(e) => setFormData({...formData, status: e.target.value})} 
+                      className="w-full border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white"
+                    >
+                       <option value="Aktif">🟢 Status: Aktif</option>
+                       <option value="Tidak Aktif">🔴 Status: Tidak Aktif</option>
+                    </select>
+                  </div>
                </div>
-               <div className="p-6 bg-gray-50 flex justify-end">
-                  <button onClick={handleSave} disabled={isSaving} className="bg-indigo-600 text-white font-bold py-3 px-6 rounded-xl flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50 shadow-md">
-                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Simpan ke Supabase
+
+               <div className="p-4 px-6 bg-gray-50 flex justify-end gap-2 border-t border-gray-100">
+                  <button 
+                    onClick={() => setIsModalOpen(false)} 
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-white border border-transparent hover:border-gray-200 transition-all"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={handleSave} 
+                    disabled={isSaving} 
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs disabled:opacity-50 active:scale-95"
+                  >
+                     {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
+                     <span>Simpan Referensi</span>
                   </button>
                </div>
             </div>

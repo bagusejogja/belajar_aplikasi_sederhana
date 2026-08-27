@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldCheck, ShieldAlert, Loader2, Save, UserX, UserCheck, Search, Mail, Calendar, Hash, KeyRound, Copy, Check, X, Lock, Send } from 'lucide-react';
+import { 
+  ShieldCheck, ShieldAlert, Loader2, Save, UserX, UserCheck, Search, 
+  Mail, Calendar, Hash, KeyRound, Copy, Check, X, Lock, Send, 
+  Users as UsersIcon, RefreshCw, Filter, Sparkles, AlertCircle, CheckCircle2,
+  ChevronDown
+} from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface AppUser {
   id: string;
@@ -16,6 +22,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL');
   const [availableRoles, setAvailableRoles] = useState<any[]>([]);
 
   // State Modal Reset Password
@@ -25,16 +32,7 @@ export default function UsersPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [resetResult, setResetResult] = useState<{ success: boolean; message: string; password?: string } | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const defaultRoles = [
-    { value: 'ADMIN', label: '👑 Administrator', color: 'indigo' },
-    { value: 'Pemroses Anggaran', label: '📊 Pemroses Anggaran', color: 'emerald' },
-    { value: 'STAFF', label: '📝 Staff / Keuangan', color: 'blue' },
-    { value: 'MANAGER', label: '💼 Manager', color: 'amber' },
-    { value: 'VIEWER', label: '👁️ Pengamat (View Only)', color: 'gray' },
-    { value: 'GUEST', label: '👤 Tamu', color: 'slate' },
-    { value: 'Pending', label: '🚫 Kunci / Blokir Akun', color: 'red' },
-  ];
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -51,29 +49,29 @@ export default function UsersPage() {
       if (error) throw error;
       setUsers(data || []);
 
-      // 2. Ambil SEMUA role unik dari tabel Menu dan User (Tanpa kecuali)
+      // 2. Ambil SEMUA role unik dari tabel Menu dan User
       const { data: menuRoles } = await supabase.from('app_role_menus').select('role');
       
-      const rawDbRoles = [
-        ...(data?.map(u => u.role) || []),
-        ...(menuRoles?.map(r => r.role) || [])
-      ].filter(r => r && r !== 'Pending');
-
-      // 3. Gabungkan dan bersihkan (Hanya tampilkan yang ada di Menu Akses)
       const finalRoles: any[] = [
         { value: 'ADMIN', label: '👑 Administrator', color: 'indigo' }
       ];
       
-      // Ambil unik role dari DB (Menu Akses)
       const uniqueMenuRoles = Array.from(new Set(menuRoles?.map(r => r.role) || []))
         .filter(r => r && r.toUpperCase() !== 'ADMIN' && r !== 'Pending');
 
       uniqueMenuRoles.forEach(role => {
-          finalRoles.push({ 
-            value: role, 
-            label: `👤 ${role}`, 
-            color: 'emerald' 
-          });
+        finalRoles.push({ 
+          value: role, 
+          label: `👤 ${role}`, 
+          color: 'emerald' 
+        });
+      });
+
+      // Tambahkan role unik lain yang mungkin ada di user
+      const otherRoles = Array.from(new Set(data?.map(u => u.role) || []))
+        .filter(r => r && r.toUpperCase() !== 'ADMIN' && r !== 'Pending' && !uniqueMenuRoles.includes(r));
+      otherRoles.forEach(role => {
+        finalRoles.push({ value: role, label: `👤 ${role}`, color: 'blue' });
       });
 
       // Tambahkan pilihan Blokir di paling bawah
@@ -82,6 +80,7 @@ export default function UsersPage() {
       setAvailableRoles(finalRoles);
     } catch (err: any) {
       console.error("DEBUG - Sync Error:", err.message);
+      toast.error('Gagal memuat daftar user: ' + (err.message || ''));
     } finally {
       setLoading(false);
     }
@@ -97,8 +96,9 @@ export default function UsersPage() {
 
       if (error) throw error;
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success('Hak akses pengguna berhasil diperbarui!');
     } catch (err: any) {
-      alert("Gagal merubah akses: " + err.message);
+      toast.error("Gagal merubah akses: " + err.message);
     } finally {
       setSavingId(null);
     }
@@ -130,11 +130,13 @@ export default function UsersPage() {
         message: data.message,
         password: data.newPassword,
       });
+      toast.success('Password berhasil di-reset!');
     } catch (err: any) {
       setResetResult({
         success: false,
         message: err.message || 'Terjadi kesalahan saat mereset password.',
       });
+      toast.error(err.message || 'Gagal reset password');
     } finally {
       setIsResetting(false);
     }
@@ -144,78 +146,191 @@ export default function UsersPage() {
     if (resetResult?.password) {
       navigator.clipboard.writeText(resetResult.password);
       setCopied(true);
+      toast.success('Password tersalin ke clipboard!');
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.role.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleCopyEmail = (email: string) => {
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(email);
+    toast.success('Email tersalin!');
+    setTimeout(() => setCopiedEmail(null), 2000);
+  };
 
-  if (loading) return <div className="h-screen flex justify-center items-center"><Loader2 size={40} className="animate-spin text-amber-500"/></div>;
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const matchesSearch = u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            u.role.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole = selectedRoleFilter === 'ALL' || u.role === selectedRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchTerm, selectedRoleFilter]);
+
+  const activeUsersCount = users.filter(u => u.role?.toUpperCase() !== 'PENDING').length;
+  const pendingUsersCount = users.filter(u => u.role?.toUpperCase() === 'PENDING').length;
+
+  if (loading) {
+    return (
+      <div className="min-h-[400px] flex flex-col justify-center items-center gap-3">
+        <Loader2 size={36} className="animate-spin text-indigo-600"/>
+        <span className="text-xs font-bold text-gray-500">Memuat data pengguna...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-20 px-4">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-         <div className="flex items-center gap-5">
-            <div className="bg-amber-500 p-4 rounded-3xl text-white shadow-xl shadow-amber-100">
-               <ShieldCheck size={32} />
+    <div className="max-w-6xl mx-auto space-y-4 pb-20">
+      {/* SLIM & COMPACT HEADER BAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-2 rounded-xl text-white shadow-xs">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Manajemen User</h2>
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                {users.length} Total Akun
+              </span>
             </div>
-            <div>
-               <h2 className="text-3xl font-black text-gray-900 tracking-tight">Manajemen User</h2>
-               <p className="text-gray-500 font-medium mt-1 text-sm italic">Atur jabatan, hak akses, dan reset password pengguna aplikasi.</p>
-            </div>
-         </div>
-         <div className="relative w-full md:w-[350px]">
-           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-           <input 
-             type="text" 
-             placeholder="Cari email atau role..."
-             value={searchTerm}
-             onChange={(e) => setSearchTerm(e.target.value)}
-             className="w-full pl-14 pr-6 py-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 ring-amber-100 transition-all font-medium text-sm"
-           />
-         </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Kelola hak akses role, status akun, dan reset password pengguna.
+            </p>
+          </div>
+        </div>
+
+        {/* Search & Filters in Header */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Role Filter */}
+          <div className="relative">
+            <select
+              value={selectedRoleFilter}
+              onChange={(e) => setSelectedRoleFilter(e.target.value)}
+              className="h-9 pl-3 pr-8 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer transition-colors appearance-none"
+            >
+              <option value="ALL">Semua Role ({users.length})</option>
+              <option value="ADMIN">👑 Administrator ({users.filter(u => u.role === 'ADMIN').length})</option>
+              {availableRoles.filter(r => r.value !== 'ADMIN' && r.value !== 'Pending').map(r => (
+                <option key={r.value} value={r.value}>{r.label} ({users.filter(u => u.role === r.value).length})</option>
+              ))}
+              <option value="Pending">🚫 Terkunci / Pending ({pendingUsersCount})</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Search Input */}
+          <div className="relative flex-1 md:w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input 
+              type="text" 
+              placeholder="Cari email atau role..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9 w-full pl-9 pr-7 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-semibold text-xs text-gray-800"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={fetchUsers}
+            className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-1.5 transition-colors shadow-2xs"
+            title="Refresh Data"
+          >
+            <RefreshCw size={13} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
       </div>
 
-      {/* Grid Users */}
-      <div className="grid grid-cols-1 gap-6">
+      {/* QUICK STATUS BAR */}
+      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
+        <span>Menampilkan <strong>{filteredUsers.length}</strong> dari <strong>{users.length}</strong> pengguna terdaftar</span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-emerald-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {activeUsersCount} Aktif
+          </span>
+          {pendingUsersCount > 0 && (
+            <span className="flex items-center gap-1 text-rose-700">
+              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {pendingUsersCount} Terkunci
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* USER LIST CARDS */}
+      <div className="space-y-2.5">
         {filteredUsers.length === 0 ? (
-          <div className="bg-white p-20 rounded-[2.5rem] text-center border border-dashed border-gray-200">
-            <p className="text-gray-400 font-bold italic">User tidak ditemukan...</p>
+          <div className="bg-white p-12 rounded-2xl text-center border border-dashed border-gray-200 space-y-2">
+            <UserX size={32} className="mx-auto text-gray-300" />
+            <p className="text-gray-500 font-bold text-sm">Pengguna tidak ditemukan</p>
+            <p className="text-xs text-gray-400">Coba ubah kata kunci pencarian atau filter role.</p>
           </div>
-        ) : filteredUsers.map((u) => {
+        ) : filteredUsers.map((u, idx) => {
           const isPending = u.role?.toUpperCase() === 'PENDING';
           const isAdmin = u.role?.toUpperCase() === 'ADMIN';
+          const initial = (u.email || 'U').charAt(0).toUpperCase();
 
           return (
-            <div key={u.id} className={`bg-white p-6 rounded-[2rem] border transition-all hover:shadow-md flex flex-col md:flex-row items-center justify-between gap-6 ${isPending ? 'border-red-100 bg-red-50/10' : 'border-gray-50'}`}>
-              
-              <div className="flex items-center gap-6 flex-1 w-full">
-                <div className={`p-5 rounded-2xl shrink-0 ${isPending ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-400'}`}>
-                  {isPending ? <ShieldAlert size={28}/> : <UserCheck size={28} className={isAdmin ? "text-indigo-600" : "text-emerald-500"}/>}
+            <div 
+              key={u.id} 
+              className={`bg-white p-3.5 px-4 md:px-5 rounded-2xl border transition-all duration-200 hover:shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
+                isPending ? 'border-rose-200 bg-rose-50/20' : 'border-gray-200/80 hover:border-indigo-200'
+              }`}
+            >
+              {/* Left Column: Avatar & User Details */}
+              <div className="flex items-center gap-3.5 flex-1 min-w-0 w-full">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-2xs ${
+                  isAdmin 
+                    ? 'bg-gradient-to-br from-indigo-600 to-indigo-800 text-white shadow-indigo-100' 
+                    : isPending 
+                    ? 'bg-rose-100 text-rose-700 border border-rose-200' 
+                    : 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-100'
+                }`}>
+                  {isAdmin ? '👑' : isPending ? <ShieldAlert size={18} /> : initial}
                 </div>
-                <div className="overflow-hidden">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Mail size={12} className="text-gray-400" />
-                    <h3 className="text-lg font-black text-gray-900 truncate">{u.email}</h3>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs md:text-sm font-black text-gray-900 truncate">{u.email}</span>
+                    <button
+                      onClick={() => handleCopyEmail(u.email)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded"
+                      title="Salin Email"
+                    >
+                      {copiedEmail === u.email ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    </button>
+                    {isAdmin && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        Admin
+                      </span>
+                    )}
+                    {isPending && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
+                        Terkunci
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-4 items-center text-[11px] font-bold text-gray-400 uppercase tracking-tighter">
-                    <div className="flex items-center gap-1">
-                      <Calendar size={12} />
+
+                  <div className="flex flex-wrap items-center gap-3 mt-1 text-[10px] font-bold text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Calendar size={11} className="text-gray-400" />
                       Daftar: {new Date(u.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Hash size={12} />
-                      ID: {u.id.slice(0, 8)}...
-                    </div>
+                    </span>
+                    <span className="flex items-center gap-1 font-mono">
+                      <Hash size={11} className="text-gray-400" />
+                      ID: {u.id.slice(0, 8)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              {/* Right Column: Actions (Reset Password & Role Selector) */}
+              <div className="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-end pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
                 <button
                   onClick={() => {
                     setResetModalUser(u);
@@ -223,33 +338,35 @@ export default function UsersPage() {
                     setResetResult(null);
                     setResetMode('default');
                   }}
-                  className="px-4 py-3.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-bold rounded-2xl text-xs transition-colors flex items-center gap-2 shrink-0 shadow-sm"
+                  className="h-9 px-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-95"
                   title="Reset Password Pengguna"
                 >
-                  <KeyRound size={16} />
+                  <KeyRound size={13} className="text-amber-700" />
                   <span>Reset Password</span>
                 </button>
 
-                <div className="relative w-full md:w-[240px]">
+                <div className="relative w-[180px] md:w-[210px]">
                   <select 
                     value={u.role} 
                     disabled={savingId === u.id}
                     onChange={(e) => updateRole(u.id, e.target.value)}
-                    className={`w-full appearance-none font-black p-4 pr-12 rounded-2xl border-2 outline-none transition-all cursor-pointer shadow-sm text-xs
-                      ${isAdmin ? 'border-indigo-500 text-indigo-700 bg-indigo-50' : 
-                        isPending ? 'border-red-500 text-red-700 bg-red-50' : 
-                        'border-emerald-500 text-emerald-700 bg-emerald-50'}`}
+                    className={`h-9 w-full appearance-none font-bold pl-3 pr-8 rounded-xl border text-xs outline-none transition-all cursor-pointer shadow-2xs ${
+                      isAdmin 
+                        ? 'border-indigo-300 text-indigo-800 bg-indigo-50/70 hover:bg-indigo-50' 
+                        : isPending 
+                        ? 'border-rose-300 text-rose-800 bg-rose-50/70 hover:bg-rose-50' 
+                        : 'border-emerald-300 text-emerald-800 bg-emerald-50/70 hover:bg-emerald-50'
+                    }`}
                   >
                     {availableRoles.map(r => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-                    {savingId === u.id ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                    {savingId === u.id ? <Loader2 size={14} className="animate-spin text-indigo-600" /> : <ChevronDown size={14} />}
                   </div>
                 </div>
               </div>
-
             </div>
           );
         })}

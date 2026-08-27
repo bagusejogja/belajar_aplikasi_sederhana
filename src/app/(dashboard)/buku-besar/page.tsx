@@ -214,7 +214,7 @@ export default function BukuBesarPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { size: portrait; margin: 15mm; }
@@ -230,42 +230,56 @@ export default function BukuBesarPage() {
       `}} />
 
       {/* WEB HEADER & FILTERS */}
-      <div className="print-hidden bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-gray-800 flex items-center gap-3">
-            <BookOpen size={28} className="text-indigo-600" /> Buku Besar
-          </h2>
-          <p className="text-gray-500 text-sm mt-1">Laporan rincian transaksi per akun & rekening.</p>
+      <div className="print-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <BookOpen size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Buku Besar
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {ledgerData.rows.length} Transaksi
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Rincian mutasi debit & kredit per akun dan rekening kas/bank.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200">
-             <CalendarIcon size={16} className="text-gray-400" />
-             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-sm font-medium outline-none text-gray-700" />
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
+             <CalendarIcon size={13} className="text-gray-400" />
+             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-28" />
              <span className="text-gray-300">-</span>
-             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-sm font-medium outline-none text-gray-700" />
+             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-28" />
           </div>
 
-          <select value={selectedRekening} onChange={e => setSelectedRekening(e.target.value)} className="bg-white px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 outline-none min-w-[150px]">
-            <option value="all">Semua Rekening Bank & Kas</option>
+          <select value={selectedRekening} onChange={e => setSelectedRekening(e.target.value)} className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer">
+            <option value="all">Semua Rekening & Kas</option>
             <option value="kas">Kas Kecil (KK1)</option>
             <option value="bank">Semua Bank Saja</option>
             {allRekening.map(r => <option key={r.id} value={String(r.id)}>{r.nama_rekening || r.nama || r.no_rekening}</option>)}
           </select>
 
-          <div className="min-w-[250px]">
+          <div className="min-w-[200px]">
              <Select 
                 options={[{value: 'all', label: 'Semua Akun (Gabungan)'}, ...activeAkunOptions.map(a => ({ value: a.id, label: `${a.nomor} - ${a.nama}` }))]}
                 value={selectedAkun === 'all' ? {value: 'all', label: 'Semua Akun (Gabungan)'} : {value: selectedAkun, label: activeAkunOptions.find(a => a.id === selectedAkun) ? `${activeAkunOptions.find(a => a.id === selectedAkun)?.nomor} - ${activeAkunOptions.find(a => a.id === selectedAkun)?.nama}` : 'Pilih Akun'}}
                 onChange={(val: any) => setSelectedAkun(val?.value || 'all')}
                 styles={{
-                   control: (b) => ({ ...b, borderRadius: '0.75rem', border: '1px solid #e5e7eb', backgroundColor: 'white', padding: '2px' }),
+                   control: (b) => ({ ...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', fontSize: '12px', fontWeight: 600 }),
+                   valueContainer: (b) => ({ ...b, padding: '0 8px' }),
                 }}
              />
           </div>
 
-          <button onClick={() => window.print()} className="bg-indigo-600 text-white hover:bg-indigo-700 px-5 py-2.5 rounded-xl font-black transition-transform hover:scale-105 flex items-center gap-2 shadow-md">
-             <Printer size={16} /> CETAK
+          <button onClick={() => window.print()} className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95">
+             <Printer size={13} />
+             <span>Cetak PDF</span>
           </button>
         </div>
       </div>
@@ -279,53 +293,53 @@ export default function BukuBesarPage() {
       </div>
 
       {/* TABLE */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 text-gray-500 text-xs uppercase tracking-wider">
-                <th className="p-4 border-b font-black w-32">Tanggal</th>
-                <th className="p-4 border-b font-black">Uraian & Keterangan</th>
-                <th className="p-4 border-b font-black">Sumber Bank/Kas</th>
-                <th className="p-4 border-b font-black">Akun Anak</th>
-                <th className="p-4 border-b font-black text-right">Debit (Masuk)</th>
-                <th className="p-4 border-b font-black text-right">Kredit (Keluar)</th>
-                <th className="p-4 border-b font-black text-right w-40">Jumlah</th>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                <th className="py-3 px-4 w-28">Tanggal</th>
+                <th className="py-3 px-4">Uraian & Keterangan</th>
+                <th className="py-3 px-4">Sumber Bank/Kas</th>
+                <th className="py-3 px-4">Akun Anggaran</th>
+                <th className="py-3 px-4 text-right">Debit (+)</th>
+                <th className="py-3 px-4 text-right">Kredit (-)</th>
+                <th className="py-3 px-4 text-right w-36">Saldo Berjalan</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody className="divide-y divide-gray-100 font-medium">
               {/* Transactions */}
               {ledgerData.rows.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-400 font-medium">Tidak ada transaksi pada periode ini.</td></tr>
+                <tr><td colSpan={7} className="py-16 text-center text-gray-400 font-medium">Tidak ada transaksi pada periode ini.</td></tr>
               ) : (
                 ledgerData.rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-4 border-b text-gray-600 font-medium whitespace-nowrap">
+                  <tr key={idx} className="hover:bg-indigo-50/20 transition-colors">
+                    <td className="py-3 px-4 text-gray-600 font-semibold whitespace-nowrap">
                       {row.tanggal.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
-                    <td className="p-4 border-b text-gray-800 font-medium">{row.uraian}</td>
-                    <td className="p-4 border-b text-indigo-700 font-bold text-xs">
-                       <span className="bg-indigo-50 px-2 py-1 rounded-md">{row.nama_rekening}</span>
+                    <td className="py-3 px-4 text-gray-900 font-semibold">{row.uraian}</td>
+                    <td className="py-3 px-4 text-indigo-700 font-bold text-[11px]">
+                       <span className="bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">{row.nama_rekening}</span>
                     </td>
-                    <td className="p-4 border-b text-gray-500 text-xs">
-                       <span className="bg-gray-100 px-2 py-1 rounded-md font-mono">{row.nomor_akun}</span>
-                       <div className="mt-1 truncate max-w-[150px]">{row.nama_akun}</div>
+                    <td className="py-3 px-4 text-gray-600 text-[11px]">
+                       <span className="bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded font-mono font-bold">{row.nomor_akun}</span>
+                       <div className="mt-0.5 truncate max-w-[150px] text-gray-500 font-semibold">{row.nama_akun}</div>
                     </td>
-                    <td className="p-4 border-b text-right font-black text-emerald-600">
+                    <td className="py-3 px-4 text-right font-black font-mono text-emerald-600">
                       {row.masuk > 0 ? (
                         <div className="flex items-center justify-end gap-1">
-                          <ArrowDownRight size={14} className="text-emerald-400" /> {fmt(row.masuk)}
+                          <ArrowDownRight size={12} className="text-emerald-500" /> {fmt(row.masuk)}
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="p-4 border-b text-right font-black text-rose-600">
+                    <td className="py-3 px-4 text-right font-black font-mono text-rose-600">
                       {row.keluar > 0 ? (
                         <div className="flex items-center justify-end gap-1">
-                          <ArrowUpRight size={14} className="text-rose-400" /> {fmt(row.keluar)}
+                          <ArrowUpRight size={12} className="text-rose-500" /> {fmt(row.keluar)}
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="p-4 border-b text-right font-black text-gray-800">
+                    <td className="py-3 px-4 text-right font-black font-mono text-gray-800">
                       {fmt(row.runningSaldo)}
                     </td>
                   </tr>
@@ -333,9 +347,9 @@ export default function BukuBesarPage() {
               )}
 
               {/* Saldo Akhir Row */}
-              <tr className="bg-slate-100">
-                <td colSpan={6} className="p-5 border-b font-black text-right text-gray-800 uppercase tracking-widest">Total Jumlah Periode</td>
-                <td className="p-5 border-b font-black text-right text-indigo-700 text-base">{fmt(ledgerData.finalSaldo)}</td>
+              <tr className="bg-gray-50/90 font-bold">
+                <td colSpan={6} className="py-3.5 px-4 text-right text-gray-700 uppercase tracking-wider text-[11px] font-black">Total Saldo Periode</td>
+                <td className="py-3.5 px-4 text-right text-indigo-700 font-mono font-black text-sm">{fmt(ledgerData.finalSaldo)}</td>
               </tr>
             </tbody>
           </table>

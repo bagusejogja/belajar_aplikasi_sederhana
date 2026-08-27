@@ -236,107 +236,148 @@ export default function BankTransaksiPage() {
       else if (filterType === 'in') matchType = row.kredit > 0;
       else if (filterType === 'no-proof') matchType = !row.foto_bukti;
       return matchSearch && matchType;
-   });
-
-   return (
-      <div className="space-y-6 max-w-[1200px] mx-auto pb-40 px-4 mt-8 bg-white font-sans text-slate-800">
-         {/* PASTE ZONE - SCALED DOWN COMPACT */}
-         <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center gap-6">
-            <div className="flex-1 space-y-2">
-               <div className="inline-flex items-center gap-2 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/10">
-                  <Zap size={12} className="text-indigo-400"/>
-                  <span className="text-[8px] font-black uppercase tracking-wider">Audit System</span>
+   });   return (
+      <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+         {/* SLIM & UNIFIED TOP TOOLBAR */}
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+            <div className="flex items-center gap-3">
+               <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+                  <FileSpreadsheet size={20} />
                </div>
-               <h2 className="text-3xl font-black italic tracking-tighter uppercase leading-none">Paste Zone</h2>
-               <div className="flex gap-2">
-                  <div className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-xl">
-                     <p className="text-[7px] font-black text-white/30 uppercase leading-none">In Database</p>
-                     <p className="text-sm font-black">{totalInDb}</p>
+               <div>
+                  <div className="flex items-center gap-2">
+                     <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                        Impor & Mutasi Transaksi Bank
+                     </h1>
+                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                        {totalInDb} di Database
+                     </span>
                   </div>
-                  <button onClick={() => fetchHistory(true)} className="bg-white/5 border border-white/10 p-2 rounded-xl h-full"><RefreshCw size={16}/></button>
+                  <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                     Impor data rekening koran via paste Excel dan rekonsiliasi bukti pengajuan transfer.
+                  </p>
                </div>
             </div>
-            <div className="flex-[2] w-full">
-               <textarea onPaste={handlePasteData} placeholder="PASTE DATA DARI EXCEL DI SINI&#10;(Waktu | Rekening | Akun | No Ref | Deskripsi | Debet | Kredit | Saldo)" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-4 h-24 outline-none focus:border-indigo-500 font-bold text-sm text-center placeholder:text-white/30" />
-               {message && <div className={`mt-1 p-1 rounded-lg text-center text-[9px] font-black uppercase ${message.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{message.text}</div>}
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+               <button 
+                  onClick={() => fetchHistory(true)} 
+                  className="h-9 px-3.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+               >
+                  <RefreshCw size={13} />
+                  <span>Refresh Data</span>
+               </button>
             </div>
          </div>
 
-         {/* FILTERS - SCALED DOWN COMPACT */}
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col justify-between h-32">
-               <div className="flex justify-between items-center"><h4 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Periode Laporan</h4><Calendar className="text-indigo-600" size={24}/></div>
-               <div className="flex items-center gap-4">
-                  <select value={selectedMonth} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedMonth(Number(e.target.value))} className="font-black text-slate-800 text-xl bg-transparent outline-none cursor-pointer flex-1">
-                     <option value={0}>Semua Bulan</option>
-                     {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m: string, i: number) => (<option key={i} value={i+1}>{m}</option>))}
-                  </select>
-                  <select value={selectedYear} onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedYear(Number(e.target.value))} className="font-black text-indigo-600 text-xl bg-transparent outline-none cursor-pointer">
-                     {[2024, 2025, 2026].map((y: number) => <option key={y} value={y}>{y}</option>)}
-                  </select>
+         {/* PASTE ZONE */}
+         <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-4">
+            <div className="md:w-56 space-y-1">
+               <div className="inline-flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 text-[10px] font-bold text-indigo-700">
+                  <Zap size={11} />
+                  <span>Excel Paste Zone</span>
                </div>
+               <h2 className="text-sm font-black text-gray-900">Salin dari Excel</h2>
+               <p className="text-[10px] text-gray-500">Blok kolom tabel rekening koran dari Excel, lalu tempel (Ctrl+V) di samping.</p>
             </div>
+            <div className="flex-1 w-full">
+               <textarea 
+                  onPaste={handlePasteData} 
+                  placeholder="Klik dan tekan Ctrl + V di sini untuk menempel tabel data rekening koran..." 
+                  className="w-full bg-gray-50/80 hover:bg-white border border-gray-200 rounded-xl p-3 h-20 outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white font-medium text-xs text-gray-700 placeholder:text-gray-400 transition-all resize-none" 
+               />
+               {message && <div className={`mt-1.5 p-1.5 rounded-lg text-center text-[10px] font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>{message.text}</div>}
+            </div>
+         </div>
 
-            <div className="bg-indigo-600 rounded-3xl p-6 shadow-xl text-white flex flex-col justify-between h-32 relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-4 opacity-10"><Filter size={100}/></div>
-               <div className="flex justify-between items-center relative z-10"><h4 className="text-[9px] font-black text-white/50 uppercase tracking-wider">Tampilan</h4><Search className="text-white" size={24}/></div>
-               <select value={filterType} onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterType(e.target.value as any)} className="relative z-10 bg-transparent font-black tracking-tighter text-xl outline-none cursor-pointer w-full text-left uppercase">
-                  <option value="all" className="text-slate-800">Semua Data</option>
-                  <option value="out" className="text-slate-800">Keluar (-) </option>
-                  <option value="in" className="text-slate-800">Masuk (+) </option>
-                  <option value="no-proof" className="text-slate-800">Cek Bukti</option>
+         {/* FILTER TOOLBAR */}
+         <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+               <select 
+                  value={selectedMonth} 
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedMonth(Number(e.target.value))} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+               >
+                  <option value={0}>Semua Bulan</option>
+                  {['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'].map((m: string, i: number) => (<option key={i} value={i+1}>{m}</option>))}
+               </select>
+               <select 
+                  value={selectedYear} 
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedYear(Number(e.target.value))} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+               >
+                  {[2024, 2025, 2026, 2027].map((y: number) => <option key={y} value={y}>{y}</option>)}
+               </select>
+               <select 
+                  value={filterType} 
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterType(e.target.value as any)} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+               >
+                  <option value="all">Semua Tipe</option>
+                  <option value="out">Keluar (Debet -)</option>
+                  <option value="in">Masuk (Kredit +)</option>
+                  <option value="no-proof">Belum Ada Bukti</option>
                </select>
             </div>
+
+            <div className="relative w-full sm:w-72">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+               <input 
+                  type="text" 
+                  placeholder="Cari deskripsi / noref..." 
+                  value={searchTerm} 
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} 
+                  className="w-full h-9 pl-9 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all text-xs font-semibold text-gray-700" 
+               />
+            </div>
          </div>
 
-         {/* PREVIEW - COMPACT */}
+         {/* PREVIEW IMPORT */}
          {parsedData.length > 0 && (
-            <div className="bg-white rounded-3xl shadow-lg p-6 border border-slate-100 animate-in slide-in-from-top-2">
-               <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-black uppercase text-slate-800">Preview Impor ({parsedData.length})</h3>
+            <div className="bg-white rounded-2xl shadow-xs p-4 md:p-5 border border-indigo-200/80 animate-in slide-in-from-top-2 space-y-3">
+               <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-black uppercase text-gray-900">Preview Data Siap Impor ({parsedData.length} Baris)</h3>
                   <div className="flex gap-2">
-                     <button onClick={() => setParsedData([])} className="px-4 py-1 text-[9px] font-black uppercase text-slate-400">Batal</button>
-                     <button onClick={handleSimpanData} disabled={isSaving} className="bg-emerald-500 text-white px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest">{isSaving ? 'Unggah...' : 'SIMPAN KE SERVER'}</button>
+                     <button onClick={() => setParsedData([])} className="h-8 px-3 text-xs font-bold text-gray-500 hover:text-gray-700">Batal</button>
+                     <button onClick={handleSimpanData} disabled={isSaving} className="h-8 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs active:scale-95">{isSaving ? 'Menyimpan...' : 'Simpan ke Server'}</button>
                   </div>
                </div>
-               <div className="overflow-x-auto rounded-xl border border-slate-50">
-                  <table className="w-full text-left text-[9px] whitespace-nowrap">
-                     <thead className="bg-slate-900 text-white font-bold uppercase tracking-wider italic">
-                        <tr><th className="p-3">Waktu</th><th className="p-3">Akun</th><th className="p-3">Deskripsi</th><th className="p-3 text-right">D</th><th className="p-3 text-right">K</th></tr>
+               <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                     <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase text-[10px]">
+                        <tr><th className="p-2.5 px-3">Waktu</th><th className="p-2.5 px-3">Akun</th><th className="p-2.5 px-3">Deskripsi</th><th className="p-2.5 px-3 text-right">Debet</th><th className="p-2.5 px-3 text-right">Kredit</th></tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-50 italic">
-                        {parsedData.slice(0, 10).map((row: any, i: number) => (<tr key={i} className="hover:bg-slate-50"><td className="p-3 font-black">{row.waktu_transaksi.split(' ')[0]}</td><td className="p-3 font-black text-indigo-600">#{row.akun_id || '-'}</td><td className="p-3 truncate max-w-[300px]">{row.deskripsi}</td><td className="p-3 text-right">-{row.debet.toLocaleString()}</td><td className="p-3 text-right">+{row.kredit.toLocaleString()}</td></tr>))}
+                     <tbody className="divide-y divide-gray-100 font-medium">
+                        {parsedData.slice(0, 10).map((row: any, i: number) => (<tr key={i} className="hover:bg-gray-50"><td className="p-2.5 px-3 font-semibold">{row.waktu_transaksi.split(' ')[0]}</td><td className="p-2.5 px-3 font-semibold text-indigo-600">#{row.akun_id || '-'}</td><td className="p-2.5 px-3 truncate max-w-[280px]">{row.deskripsi}</td><td className="p-2.5 px-3 text-right font-mono text-rose-600">-{row.debet.toLocaleString()}</td><td className="p-2.5 px-3 text-right font-mono text-emerald-600">+{row.kredit.toLocaleString()}</td></tr>))}
                      </tbody>
                   </table>
                </div>
             </div>
          )}
 
-         {/* HISTORY TABLE - CLEAN & PROFESSIONAL */}
-         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
-               <div className="flex items-center gap-4"><div className="bg-indigo-600 p-2.5 rounded-xl text-white"><History size={20}/></div><h3 className="text-lg font-black text-slate-800 tracking-tighter uppercase italic">Histori Mutasi Pusat</h3></div>
-               <div className="relative w-full md:w-64"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/><input type="text" placeholder="Cari..." value={searchTerm} onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} className="bg-white border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-xs font-bold w-full outline-none focus:border-indigo-600 transition-all font-sans" /></div>
-            </div>
-            
-            <div className="overflow-x-auto min-h-[400px]">
-               <table className="w-full text-left whitespace-nowrap table-fixed">
-                  <thead className="bg-white border-b-2 border-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest italic">
+         {/* HISTORY TABLE */}
+         <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+            <div className="overflow-x-auto min-h-[350px]">
+               <table className="w-full text-left whitespace-nowrap table-fixed text-xs">
+                  <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                      <tr>
-                        <th className="p-6 w-[120px]">Waktu</th>
-                        <th className="p-6 w-[80px] text-center">Nota</th>
-                        <th className="p-6">Keterangan Transaksi</th>
-                        <th className="p-6 w-[200px] text-right">Mutasi</th>
-                        <th className="p-6 w-[160px] text-right">Kas Riil</th>
+                        <th className="py-3 px-4 w-[130px]">Waktu</th>
+                        <th className="py-3 px-4 w-[90px] text-center">Bukti</th>
+                        <th className="py-3 px-4">Keterangan Transaksi</th>
+                        <th className="py-3 px-4 w-[180px] text-right">Mutasi</th>
+                        <th className="py-3 px-4 w-[150px] text-right">Saldo Riil</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
-                     {isLoadingHistory ? (<tr><td colSpan={5} className="p-32 text-center"><Loader2 className="animate-spin mx-auto text-indigo-500" size={32}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={5} className="p-20 text-center italic text-slate-200 font-black uppercase tracking-widest">Kosong.</td></tr>) : filteredHistory.map((row: any) => (
-                        <tr key={row.id} className="group hover:bg-slate-50 border-b border-gray-50">
-                           <td className="p-6"><p className="text-[10px] font-black text-slate-800 leading-none">{formatShowDate(row.waktu_transaksi)}</p><p className="text-[8px] font-bold text-slate-300 mt-1 uppercase truncate font-mono">REF: {row.noref_bank || '-'}</p></td>
-                           <td className="p-6">
-                              <div className="flex flex-col items-center gap-2">
-                                 <div className="flex gap-1">
+                  <tbody className="divide-y divide-gray-100 font-medium">
+                     {isLoadingHistory ? (<tr><td colSpan={5} className="py-20 text-center"><Loader2 className="animate-spin mx-auto text-indigo-500" size={28}/></td></tr>) : filteredHistory.length === 0 ? (<tr><td colSpan={5} className="py-16 text-center text-gray-400">Tidak ada transaksi yang cocok dengan filter.</td></tr>) : filteredHistory.map((row: any) => (
+                        <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors">
+                           <td className="py-3 px-4">
+                              <p className="font-bold text-gray-900">{formatShowDate(row.waktu_transaksi)}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5 truncate font-mono">REF: {row.noref_bank || '-'}</p>
+                           </td>
+                           <td className="py-3 px-4">
+                              <div className="flex flex-col items-center gap-1.5">
+                                 <div className="flex items-center gap-1">
                                     <button onClick={() => { 
                                        setEditingRow(row); 
                                        setFotoNotaUrls((row.foto_nota || row.foto_bukti || '').split(',').filter((s: string) => s.startsWith('http'))); 
@@ -344,40 +385,40 @@ export default function BankTransaksiPage() {
                                        setFotoBarangUrls((row.foto_barang || '').split(',').filter((s: string) => s.startsWith('http'))); 
                                        setBuktiTransferUrls((row.bukti_transfer || '').split(',').filter((s: string) => s.startsWith('http'))); 
                                        setEditAkunId(row.akun_id?.toString() || ''); 
-                                    }} className={`p-2 rounded-lg border transition-all active:scale-95 shadow-sm ${(row.foto_nota || row.foto_bukti) ? 'bg-white border-indigo-100 text-indigo-600' : 'bg-red-50 border-red-50 text-red-400'}`}>
-                                       <ImagePlus size={16}/>
+                                    }} className={`p-1.5 rounded-lg border transition-all active:scale-95 ${(row.foto_nota || row.foto_bukti) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-rose-50 border-rose-200 text-rose-500'}`}>
+                                       <ImagePlus size={13}/>
                                     </button>
                                     {!row.pengajuan_id && row.debet > 0 && (
-                                       <button onClick={() => openLinkModal(row)} className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-100 rounded-lg transition-colors text-[10px] font-bold">
+                                       <button onClick={() => openLinkModal(row)} className="h-6 px-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors text-[10px] font-bold">
                                           Kaitkan
                                        </button>
                                     )}
                                     {row.pengajuan_id && (
-                                       <span className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-[10px] font-bold">Linked</span>
+                                       <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold">Linked</span>
                                     )}
                                  </div>
-                                 {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, i: number) => (<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="p-1 bg-slate-100 text-slate-400 rounded hover:bg-indigo-600 hover:text-white transition-all"><ExternalLink size={8}/></a>))}</div>}
+                                 {row.foto_bukti && <div className="flex gap-1">{row.foto_bukti.split(',').filter((u: string) => u.startsWith('http')).map((url: string, i: number) => (<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="p-1 bg-gray-100 text-gray-500 rounded hover:bg-indigo-600 hover:text-white transition-all"><ExternalLink size={10}/></a>))}</div>}
                               </div>
                            </td>
-                           <td className="p-6">
-                              <div className="flex flex-col gap-1 overflow-hidden">
-                                 <p className="text-xs font-black text-slate-900 tracking-tight leading-tight truncate group-hover:whitespace-normal group-hover:overflow-visible transition-all uppercase">{row.deskripsi}</p>
-                                 <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-slate-900 text-white rounded-md font-bold text-[8px] shadow-sm flex items-center gap-1 uppercase italic"><Hash size={8} /> {row.ref_akun?.nomor_akun || row.akun_id || '??'}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase italic tracking-widest">{row.ref_akun?.nama_akun || '-'}</span>
+                           <td className="py-3 px-4">
+                              <div className="flex flex-col gap-0.5 overflow-hidden">
+                                 <p className="font-bold text-gray-900 truncate group-hover:whitespace-normal group-hover:overflow-visible transition-all">{row.deskripsi}</p>
+                                 <div className="flex items-center gap-1.5 text-[10px]">
+                                    <span className="px-1.5 py-0.2 bg-gray-100 text-gray-700 rounded border border-gray-200 font-bold font-mono">#{row.ref_akun?.nomor_akun || row.akun_id || '??'}</span>
+                                    <span className="font-semibold text-gray-500">{row.ref_akun?.nama_akun || '-'}</span>
                                  </div>
                               </div>
                            </td>
-                           <td className={`p-6 text-right font-black text-xs tracking-tighter italic ${row.debet > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                              <span className="flex items-center justify-end gap-1">{row.debet > 0 ? '-' : '+'} Rp {(row.debet || row.kredit).toLocaleString('id-ID')}</span>
+                           <td className={`py-3 px-4 text-right font-black font-mono text-xs ${row.debet > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              <span>{row.debet > 0 ? '-' : '+'} Rp {(row.debet || row.kredit).toLocaleString('id-ID')}</span>
                            </td>
-                           <td className="p-6 text-right font-bold text-slate-300 text-[10px] italic transition-colors uppercase">Rp {row.saldo_riil?.toLocaleString('id-ID')}</td>
+                           <td className="py-3 px-4 text-right font-mono font-bold text-gray-600 text-xs">Rp {row.saldo_riil?.toLocaleString('id-ID')}</td>
                         </tr>
                      ))}
                   </tbody>
                </table>
             </div>
-            {dbTransactions.length < totalInDb && (<div className="p-8 bg-slate-50 flex justify-center border-t border-gray-100"><button onClick={() => fetchHistory(false)} disabled={isLoadingMore} className="bg-slate-900 text-white px-10 py-3 rounded-2xl font-black flex items-center gap-3 hover:bg-indigo-600 transition-all text-[9px] tracking-widest italic">{isLoadingMore ? 'MEMUAT...' : 'LIHAT LAINNYA'}</button></div>)}
+            {dbTransactions.length < totalInDb && (<div className="p-4 bg-gray-50 flex justify-center border-t border-gray-100"><button onClick={() => fetchHistory(false)} disabled={isLoadingMore} className="h-9 px-6 bg-gray-900 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-indigo-600 transition-all text-xs active:scale-95">{isLoadingMore ? 'Memuat...' : 'Lihat Lebih Banyak'}</button></div>)}
          </div>
 
          {/* MODAL - SMALLER & CLEANER */}

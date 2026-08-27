@@ -1,7 +1,14 @@
 'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Target, TrendingUp, Activity, ListFilter, Download, Filter, Table2, List, Image as ImageIcon, AlertCircle, ChevronDown, ChevronUp, Award } from 'lucide-react';
+import { 
+  Target, TrendingUp, Activity, ListFilter, 
+  Download, Filter, Table2, List, Image as ImageIcon, 
+  AlertCircle, ChevronDown, ChevronUp, Award,
+  Layers, DollarSign, ArrowUpRight, ArrowDownRight,
+  RefreshCw, CheckCircle2, Sparkles, PieChart as PieIcon
+} from 'lucide-react';
 import Select from 'react-select';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -32,7 +39,7 @@ export default function DashboardPenerimaan() {
       if (jsonData.success) setAllDataPenerimaan(jsonData.data || []);
       if (jsonJenis.success) setJenisPenerimaan(jsonJenis.data || []);
     } catch (e) {
-      toast.error('Gagal mengambil data dashboard');
+      toast.error('Gagal mengambil data dashboard penerimaan');
     }
     setLoading(false);
   };
@@ -143,15 +150,15 @@ export default function DashboardPenerimaan() {
 
   const renderBadge = (percent: string | number) => {
     const p = Number(percent);
-    if (p >= 100) return <span className="inline-block px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
-    if (p >= 50) return <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
-    return <span className="inline-block px-2 py-1 bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold whitespace-nowrap">{p.toFixed(2)}%</span>;
+    if (p >= 100) return <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-bold font-mono whitespace-nowrap">{p.toFixed(2)}%</span>;
+    if (p >= 50) return <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-[10px] font-bold font-mono whitespace-nowrap">{p.toFixed(2)}%</span>;
+    return <span className="inline-block px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-[10px] font-bold font-mono whitespace-nowrap">{p.toFixed(2)}%</span>;
   };
 
   const getProgressColor = (percent: string | number) => {
     const p = Number(percent);
     if (p >= 100) return 'bg-emerald-500';
-    if (p >= 50) return 'bg-amber-400';
+    if (p >= 50) return 'bg-amber-500';
     return 'bg-rose-500';
   };
 
@@ -177,7 +184,6 @@ export default function DashboardPenerimaan() {
       document.body.removeChild(link);
     } else {
       const headers = ['Nama Penerimaan', 'Pagu (Rencana)', ...monthNames, 'Total Realisasi', 'Selisih', '% Capaian'];
-      // Filter pivotData: dont export zeros if both rencana and total are 0
       const activePivot = pivotData.filter(p => p.rencana > 0 || p.total > 0);
       const rows = activePivot.map(p => [
         `"${p.nama}"`,
@@ -223,88 +229,187 @@ export default function DashboardPenerimaan() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl animate-in fade-in duration-500" ref={dashboardRef}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
-        <div>
-           <h1 className="text-2xl font-black text-indigo-900 tracking-tight flex items-center gap-2">
-             <Target className="text-indigo-600" />
-             Dashboard Penerimaan
-           </h1>
-           <p className="text-sm text-gray-500 font-medium">Pantau ringkasan dan detail penerimaan institusi.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900" ref={dashboardRef}>
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Target size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Dashboard Penerimaan</h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                Tahun {tahun}
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Monitoring target rencana vs realisasi penerimaan institusi</p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-           <Link href="/penerimaan/komparasi" className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-2xl border border-indigo-100 transition-colors shrink-0">
-             <Target size={18}/>
-             Komparasi Tahunan
-           </Link>
-           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200 w-full md:w-[350px]">
-              <Filter size={18} className="text-indigo-600 shrink-0"/>
-              <Select 
-                isMulti
-                options={activeJenisPenerimaan.map(j => ({ value: j.id.toString(), label: j.nama_penerimaan }))}
-                value={selectedJenisOptions}
-                onChange={(selected) => setSelectedJenisOptions(selected as any[])}
-                placeholder="Semua Jenis Penerimaan"
-                className="w-full text-sm font-bold text-gray-800"
-                classNamePrefix="select"
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    border: 'none',
-                    boxShadow: 'none',
-                    backgroundColor: 'transparent',
-                    minHeight: '32px'
-                  }),
-                  multiValue: (base) => ({
-                    ...base,
-                    backgroundColor: '#e0e7ff',
-                    borderRadius: '0.5rem'
-                  }),
-                  multiValueLabel: (base) => ({
-                    ...base,
-                    color: '#4f46e5'
-                  }),
-                  valueContainer: (base) => ({
-                    ...base,
-                    padding: '0 8px'
-                  })
-                }}
-              />
-           </div>
-           <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-2xl border border-gray-200 shrink-0">
-              <ListFilter size={18} className="text-indigo-600"/>
-              <select value={tahun} onChange={e => setTahun(e.target.value)} className="bg-transparent font-bold text-gray-800 outline-none">
-                 {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-           </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          <Link 
+            href="/penerimaan/komparasi" 
+            className="h-9 px-3.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs shrink-0"
+          >
+            <TrendingUp size={14} />
+            <span className="hidden sm:inline">Komparasi Tahunan</span>
+          </Link>
+
+          <div className="w-full sm:w-64">
+            <Select 
+              isMulti
+              options={activeJenisPenerimaan.map(j => ({ value: j.id.toString(), label: j.nama_penerimaan }))}
+              value={selectedJenisOptions}
+              onChange={(selected) => setSelectedJenisOptions(selected as any[])}
+              placeholder="Semua Jenis Penerimaan"
+              className="text-xs font-semibold"
+              classNamePrefix="select"
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  minHeight: '36px',
+                  height: '36px',
+                  borderRadius: '0.75rem',
+                  borderColor: '#e5e7eb',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  boxShadow: 'none',
+                  '&:hover': { borderColor: '#cbd5e1' }
+                }),
+                multiValue: (base) => ({
+                  ...base,
+                  backgroundColor: '#e0e7ff',
+                  borderRadius: '0.375rem',
+                  padding: '0 2px'
+                }),
+                multiValueLabel: (base) => ({
+                  ...base,
+                  color: '#4338ca',
+                  fontSize: '10px',
+                  fontWeight: '700'
+                }),
+                valueContainer: (base) => ({
+                  ...base,
+                  height: '36px',
+                  padding: '0 6px'
+                }),
+                indicatorsContainer: (base) => ({
+                  ...base,
+                  height: '36px'
+                })
+              }}
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 shrink-0">
+            <ListFilter size={14} className="text-gray-400" />
+            <select 
+              value={tahun} 
+              onChange={e => setTahun(e.target.value)} 
+              className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
+            >
+              {[2024, 2025, 2026, 2027, 2028].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Muat Ulang Data"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
+          </button>
         </div>
       </div>
 
-      {/* Tren Historis (Collapsible) */}
+      {/* SUMMARY KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+         {/* Target Pagu Rencana */}
+         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Target Pagu Rencana</p>
+              <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={formatRupiah(totalRencana)}>
+                {formatRupiah(totalRencana)}
+              </h3>
+              <span className="text-[10px] font-semibold text-indigo-600">Alokasi Penerimaan Tahun {tahun}</span>
+            </div>
+            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+              <Target size={20} />
+            </div>
+         </div>
+
+         {/* Total Realisasi */}
+         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div className="min-w-0 flex-1 mr-3">
+              <div className="flex justify-between items-center">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Realisasi</p>
+                <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100">
+                  {persentase}%
+                </span>
+              </div>
+              <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={formatRupiah(totalRealisasi)}>
+                {formatRupiah(totalRealisasi)}
+              </h3>
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                 <div className="h-1.5 rounded-full transition-all duration-1000" style={{ width: `${gaugeValue}%`, backgroundColor: gaugeColor }}></div>
+              </div>
+            </div>
+            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+              <Activity size={20} />
+            </div>
+         </div>
+
+         {/* Surplus / Defisit */}
+         <div className={`p-4 rounded-2xl border shadow-xs flex items-center justify-between ${isSurplus ? 'bg-white border-emerald-200' : 'bg-white border-rose-200'}`}>
+            <div>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isSurplus ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {isSurplus ? 'Surplus Capaian Target' : 'Kekurangan Target'}
+              </p>
+              <h3 className={`text-base font-black mt-0.5 font-mono truncate ${isSurplus ? 'text-emerald-700' : 'text-rose-700'}`} title={formatRupiah(Math.abs(kekurangan))}>
+                {formatRupiah(Math.abs(kekurangan))}
+              </h3>
+              <span className={`text-[10px] font-semibold ${isSurplus ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {isSurplus ? 'Melampaui target rencana' : 'Belum mencapai target'}
+              </span>
+            </div>
+            <div className={`p-2.5 rounded-xl ${isSurplus ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+              {isSurplus ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+            </div>
+         </div>
+      </div>
+
+      {/* TREN HISTORIS COLLAPSIBLE */}
       {!loading && trendData.length > 1 && (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300">
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden transition-all duration-300">
            <button 
              onClick={() => setShowTrend(!showTrend)} 
-             className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+             className="w-full flex items-center justify-between p-3.5 px-5 bg-gray-50/60 hover:bg-gray-100/80 transition-colors"
            >
              <div className="flex items-center gap-2">
-               <Activity size={18} className="text-indigo-600"/>
-               <h3 className="font-black text-gray-900 text-sm uppercase">Riwayat Tren Rencana vs Realisasi</h3>
+               <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">
+                 <Activity size={14} />
+               </div>
+               <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">Riwayat Tren Rencana vs Realisasi Antar-Tahun</h3>
              </div>
-             {showTrend ? <ChevronUp size={20} className="text-gray-500" /> : <ChevronDown size={20} className="text-gray-500" />}
+             <div className="flex items-center gap-2 text-gray-400 text-xs font-semibold">
+               <span>{showTrend ? 'Tutup Grafik' : 'Buka Grafik'}</span>
+               {showTrend ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+             </div>
            </button>
            
-           <div className={`transition-all duration-500 ease-in-out ${showTrend ? 'max-h-[300px] opacity-100 p-4' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+           <div className={`transition-all duration-300 ease-in-out ${showTrend ? 'max-h-[320px] opacity-100 p-4 border-t border-gray-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
              <div className="h-[250px]">
                <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0"/>
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
                      <XAxis dataKey="tahun" tick={{fontSize: 11, fill: '#4b5563', fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                     <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={90} axisLine={false} tickLine={false} />
-                     <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.5rem', border: 'none', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'}} cursor={{fill: '#f8fafc'}} />
-                     <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '10px'}} iconType="circle" />
-                     <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={25} />
-                     <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
+                     <YAxis tickFormatter={formatMilyar} tick={{fontSize: 11, fill: '#374151', fontWeight: 'bold'}} width={80} axisLine={false} tickLine={false} />
+                     <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.75rem', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'}} cursor={{fill: '#f8fafc'}} />
+                     <Legend wrapperStyle={{fontSize: '11px', fontWeight: 'bold', paddingTop: '6px'}} iconType="circle" />
+                     <Bar dataKey="Rencana" name="Total Rencana" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={22} />
+                     <Line type="monotone" dataKey="Realisasi" name="Total Realisasi" stroke="#10b981" strokeWidth={2.5} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
                   </ComposedChart>
                </ResponsiveContainer>
              </div>
@@ -312,92 +417,77 @@ export default function DashboardPenerimaan() {
         </div>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden transition-all hover:shadow-md hover:-translate-y-1">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-50 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-3 text-indigo-600 mb-2 relative"><Target size={20}/><span className="font-black text-xs tracking-widest uppercase">Pagu Rencana (Target)</span></div>
-            <div className="text-3xl font-black text-gray-900 relative truncate" title={formatRupiah(totalRencana)}>{formatRupiah(totalRencana)}</div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl"></div>
-            <div className="flex justify-between items-center mb-2 relative">
-               <div className="flex items-center gap-3 text-emerald-600"><Activity size={20}/><span className="font-black text-xs tracking-widest uppercase">Total Realisasi</span></div>
-               <span className="font-bold text-xs text-gray-500">{persentase}%</span>
-            </div>
-            <div className="text-3xl font-black text-gray-900 relative truncate" title={formatRupiah(totalRealisasi)}>{formatRupiah(totalRealisasi)}</div>
-            <div className="w-full bg-gray-100 rounded-full h-2 mt-4 relative overflow-hidden">
-               <div className="h-2 rounded-full transition-all duration-1000" style={{width: `${gaugeValue}%`, backgroundColor: gaugeColor}}></div>
-            </div>
-         </div>
-         <div className={`p-6 rounded-[2rem] shadow-sm border flex flex-col justify-center relative overflow-hidden ${isSurplus ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-            <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full blur-2xl ${isSurplus ? 'bg-emerald-200/50' : 'bg-rose-200/50'}`}></div>
-            <div className={`flex items-center gap-3 mb-2 relative ${isSurplus ? 'text-emerald-700' : 'text-rose-700'}`}>
-               <AlertCircle size={20}/>
-               <span className="font-black text-xs tracking-widest uppercase">{isSurplus ? 'Surplus / Kelebihan Target' : 'Kekurangan Target'}</span>
-            </div>
-            <div className={`text-3xl font-black relative truncate ${isSurplus ? 'text-emerald-900' : 'text-rose-900'}`} title={formatRupiah(Math.abs(kekurangan))}>
-               {formatRupiah(Math.abs(kekurangan))}
-            </div>
-         </div>
-      </div>
-
       {loading ? (
-        <div className="h-64 flex items-center justify-center bg-white rounded-[2rem] border border-gray-100"><p className="text-gray-500 font-bold">Memuat Grafik...</p></div>
+        <div className="h-64 flex flex-col items-center justify-center bg-white rounded-2xl border border-gray-200/80 gap-2">
+          <RefreshCw size={24} className="animate-spin text-indigo-600" />
+          <p className="text-gray-500 text-xs font-semibold">Memuat Data Visual...</p>
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             <div className="md:col-span-1 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center h-[300px] relative transition-all hover:shadow-md">
-                <h3 className="font-black text-gray-900 mb-2 text-sm text-center uppercase w-full absolute top-6">Indikator Capaian</h3>
-                <ResponsiveContainer width="100%" height="100%">
-                   <PieChart>
-                      <Pie
-                        data={gaugeData}
-                        cx="50%"
-                        cy="75%"
-                        startAngle={180}
-                        endAngle={0}
-                        innerRadius={80}
-                        outerRadius={110}
-                        paddingAngle={0}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        <Cell key="cell-0" fill={gaugeColor} />
-                        <Cell key="cell-1" fill="#f3f4f6" />
-                      </Pie>
-                   </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute bottom-10 flex flex-col items-center">
-                   <span className="text-4xl font-black" style={{color: gaugeColor}}>{persentase}%</span>
-                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Total Keseluruhan</span>
+          {/* CHARTS ROW: GAUGE + TOP ACHIEVERS */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+             {/* Gauge Indikator Capaian */}
+             <div className="md:col-span-1 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col items-center justify-center h-[260px] relative">
+                <div className="w-full flex items-center gap-2 mb-1">
+                  <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">
+                    <PieIcon size={14} />
+                  </div>
+                  <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">Indikator Capaian</h3>
+                </div>
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                        <Pie
+                          data={gaugeData}
+                          cx="50%"
+                          cy="75%"
+                          startAngle={180}
+                          endAngle={0}
+                          innerRadius={70}
+                          outerRadius={95}
+                          paddingAngle={0}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          <Cell key="cell-0" fill={gaugeColor} />
+                          <Cell key="cell-1" fill="#f1f5f9" />
+                        </Pie>
+                     </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute bottom-4 flex flex-col items-center">
+                     <span className="text-3xl font-black font-mono tracking-tight" style={{ color: gaugeColor }}>{persentase}%</span>
+                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Capaian Pagu</span>
+                  </div>
                 </div>
              </div>
 
              {/* Top Achievers Leaderboard */}
-             <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[300px] transition-all hover:shadow-md">
-                 <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                  <Award className="w-5 h-5 mr-2 text-yellow-500" />
-                  3 Penerimaan Tertinggi
-                </h3>
+             <div className="md:col-span-2 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col h-[260px]">
+                 <div className="flex items-center gap-2 mb-3">
+                   <div className="p-1 bg-amber-50 text-amber-600 rounded-md">
+                     <Award size={14} />
+                   </div>
+                   <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">3 Penerimaan Tertinggi</h3>
+                 </div>
+                 
                  {topAchievers.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-sm">Belum ada data capaian.</div>
+                    <div className="flex-1 flex items-center justify-center text-gray-400 font-bold text-xs">Belum ada data capaian penerimaan.</div>
                  ) : (
-                    <div className="flex flex-col gap-4 flex-1 justify-center">
+                    <div className="flex flex-col gap-3 flex-1 justify-center">
                        {topAchievers.map((achiever, idx) => {
                           const isFirst = idx === 0;
-                          const medalColor = idx === 0 ? 'text-amber-400 bg-amber-50' : idx === 1 ? 'text-gray-400 bg-gray-50' : 'text-amber-700 bg-amber-50/50';
+                          const medalColor = idx === 0 ? 'text-amber-600 bg-amber-50 border border-amber-200' : idx === 1 ? 'text-gray-600 bg-gray-50 border border-gray-200' : 'text-amber-700 bg-amber-50/50 border border-amber-100';
                           return (
-                            <div key={achiever.id} className="flex items-center gap-4 animate-in slide-in-from-right duration-500" style={{ animationDelay: `${idx * 150}ms` }}>
-                               <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${medalColor} shrink-0`}>
+                            <div key={achiever.id} className="flex items-center gap-3">
+                               <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs ${medalColor} shrink-0`}>
                                  {idx + 1}
-                               </div>
+                                </div>
                                <div className="flex-1 min-w-0">
                                   <div className="flex justify-between items-end mb-1">
-                                     <div className={`font-bold truncate ${isFirst ? 'text-gray-900 text-base' : 'text-gray-700 text-sm'}`}>{achiever.nama}</div>
-                                     <div className={`font-black ${isFirst ? 'text-emerald-600 text-lg' : 'text-emerald-500 text-sm'}`}>{achiever.persentase}%</div>
+                                     <div className={`font-bold truncate ${isFirst ? 'text-gray-900 text-xs' : 'text-gray-700 text-xs'}`}>{achiever.nama}</div>
+                                     <div className={`font-mono font-black ${isFirst ? 'text-emerald-600 text-xs' : 'text-emerald-500 text-xs'}`}>{achiever.persentase}%</div>
                                   </div>
-                                  <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                      <div 
                                        className={`h-full ${getProgressColor(achiever.persentase)} transition-all duration-1000 ease-out`} 
                                        style={{ width: `${Math.min(Number(achiever.persentase), 100)}%` }}
@@ -405,114 +495,141 @@ export default function DashboardPenerimaan() {
                                   </div>
                                </div>
                             </div>
-                          )
+                          );
                        })}
                     </div>
                  )}
              </div>
           </div>
 
-          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col h-[500px] transition-all hover:shadow-md">
-            <h3 className="font-black text-gray-900 mb-6 text-sm flex items-center gap-2 uppercase"><TrendingUp size={18} className="text-indigo-600"/> Grafik Terpadu Realisasi & Target</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={monthlyData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                <CartesianGrid stroke="#f0f0f0" vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{fill: '#6b7280', fontSize: 12, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="left" tickFormatter={formatMilyar} tick={{fill: '#6b7280', fontSize: 12, fontWeight: 'bold'}} axisLine={false} tickLine={false} width={90}/>
-                <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}} cursor={{fill: '#f3f4f6'}} />
-                <Legend wrapperStyle={{fontSize: '12px', paddingTop: '20px'}} iconType="circle" />
-                
-                <Bar yAxisId="left" dataKey="RealisasiBulanan" name="Realisasi Bulanan" fill="#818cf8" radius={[4, 4, 0, 0]} barSize={30} />
-                <Line yAxisId="left" type="stepAfter" dataKey="RencanaAktif" name="Pagu/Rencana Aktif" stroke="#f59e0b" strokeWidth={3} dot={false} strokeDasharray="5 5" />
-                <Line yAxisId="left" type="monotone" dataKey="AkumulasiRealisasi" name="Akumulasi Realisasi" stroke="#10b981" strokeWidth={4} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} />
-              </ComposedChart>
-            </ResponsiveContainer>
+          {/* INTEGRATED MONTHLY COMPOSED CHART */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col h-[400px]">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">
+                <TrendingUp size={14} />
+              </div>
+              <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">Grafik Bulanan: Realisasi vs Target Akumulatif</h3>
+            </div>
+            <div className="flex-1">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={monthlyData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+                  <CartesianGrid stroke="#f1f5f9" vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{fill: '#64748b', fontSize: 11, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" tickFormatter={formatMilyar} tick={{fill: '#64748b', fontSize: 11, fontWeight: 'bold'}} axisLine={false} tickLine={false} width={80}/>
+                  <Tooltip formatter={(val: any) => formatRupiah(val)} contentStyle={{borderRadius: '0.75rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', fontSize: '11px'}} cursor={{fill: '#f8fafc'}} />
+                  <Legend wrapperStyle={{fontSize: '11px', paddingTop: '10px'}} iconType="circle" />
+                  
+                  <Bar yAxisId="left" dataKey="RealisasiBulanan" name="Realisasi Bulanan" fill="#818cf8" radius={[4, 4, 0, 0]} barSize={24} />
+                  <Line yAxisId="left" type="stepAfter" dataKey="RencanaAktif" name="Pagu/Rencana Aktif" stroke="#f59e0b" strokeWidth={2.5} dot={false} strokeDasharray="4 4" />
+                  <Line yAxisId="left" type="monotone" dataKey="AkumulasiRealisasi" name="Akumulasi Realisasi" stroke="#10b981" strokeWidth={3} dot={{r: 3, strokeWidth: 2}} activeDot={{r: 5}} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          {/* Tabel Tabs */}
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-            <div className="flex justify-between items-center bg-gray-50/80 p-4 border-b border-gray-100">
-               <div className="flex gap-2 bg-gray-200/50 p-1 rounded-2xl">
-                  <button onClick={() => setActiveTab('REKAPITULASI')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-xl transition-all ${activeTab === 'REKAPITULASI' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                     <Table2 size={16}/> Rekapitulasi 12 Bulan
+          {/* TABBED TABLE CARD */}
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs flex flex-col overflow-hidden">
+            {/* Table Control Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 px-4 bg-gray-50/60 border-b border-gray-200 gap-2">
+               <div className="flex gap-1.5 bg-gray-200/60 p-1 rounded-xl">
+                  <button 
+                    onClick={() => setActiveTab('REKAPITULASI')} 
+                    className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 rounded-lg transition-all ${
+                      activeTab === 'REKAPITULASI' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                     <Table2 size={13}/> Rekap 12 Bulan
                   </button>
-                  <button onClick={() => setActiveTab('DETAIL')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-xl transition-all ${activeTab === 'DETAIL' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                     <List size={16}/> Detail Transaksi
+                  <button 
+                    onClick={() => setActiveTab('DETAIL')} 
+                    className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 rounded-lg transition-all ${
+                      activeTab === 'DETAIL' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                     <List size={13}/> Detail Transaksi
                   </button>
                </div>
-               <div className="flex gap-2">
-                 <button onClick={downloadPNG} className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
-                   <ImageIcon size={16}/> Export PNG
+               
+               <div className="flex items-center gap-2">
+                 <button 
+                   onClick={downloadPNG} 
+                   className="h-8 px-3 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-indigo-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs"
+                 >
+                   <ImageIcon size={13}/> Export PNG
                  </button>
-                 <button onClick={downloadCSV} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all">
-                   <Download size={16}/> Excel {activeTab === 'REKAPITULASI' ? 'Rekap' : 'Detail'}
+                 <button 
+                   onClick={downloadCSV} 
+                   className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs"
+                 >
+                   <Download size={13}/> Excel {activeTab === 'REKAPITULASI' ? 'Rekap' : 'Detail'}
                  </button>
                </div>
             </div>
             
+            {/* Table Content */}
             {activeTab === 'REKAPITULASI' ? (
-               <div className="overflow-x-auto p-4">
-                 <table className="w-full text-left text-sm text-gray-700">
-                   <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] whitespace-nowrap">
-                     <tr>
-                       <th className="px-4 py-3 sticky left-0 bg-gray-50 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Nama Penerimaan</th>
-                       <th className="px-4 py-3 text-right border-r border-gray-200 text-indigo-600">Pagu (Rencana)</th>
-                       {monthNames.map(m => <th key={m} className="px-4 py-3 text-right">{m}</th>)}
-                       <th className="px-4 py-3 text-right border-l border-gray-200 text-emerald-600">Total Realisasi</th>
-                       <th className="px-4 py-3 text-right">Selisih</th>
-                       <th className="px-4 py-3 text-right">%</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-100">
-                     {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
-                       <tr><td colSpan={16} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
-                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
-                       <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
-                         <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[200px]" title={row.nama}>{row.nama}</td>
-                         <td className="px-4 py-3 font-bold text-right text-indigo-700 border-r border-gray-100 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
-                         {row.bulanan.map((val, idx) => (
-                           <td key={idx} className="px-4 py-3 text-right">{val > 0 ? formatRupiah(val) : '-'}</td>
-                         ))}
-                         <td className="px-4 py-3 font-bold text-right text-emerald-700 border-l border-gray-100 bg-emerald-50/30">{formatRupiah(row.total)}</td>
-                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
-                         <td className="px-4 py-3 text-right">{renderBadge(row.persentase)}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider whitespace-nowrap">
+                        <th className="py-3 px-4 sticky left-0 bg-gray-50/90 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.06)]">Nama Penerimaan</th>
+                        <th className="py-3 px-4 text-right border-r border-gray-200 text-indigo-700 bg-indigo-50/30">Pagu (Rencana)</th>
+                        {monthNames.map(m => <th key={m} className="py-3 px-3 text-right">{m}</th>)}
+                        <th className="py-3 px-4 text-right border-l border-gray-200 text-emerald-700 bg-emerald-50/30">Total Realisasi</th>
+                        <th className="py-3 px-4 text-right">Selisih</th>
+                        <th className="py-3 px-4 text-right">%</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
+                        <tr><td colSpan={16} className="py-8 text-center text-gray-400 text-xs italic">Tidak ada data penerimaan pada filter ini.</td></tr>
+                      ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
+                        <tr key={row.id} className="hover:bg-indigo-50/20 whitespace-nowrap transition-colors">
+                          <td className="py-2.5 px-4 font-bold text-gray-800 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[220px] text-xs" title={row.nama}>{row.nama}</td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-right text-indigo-700 border-r border-gray-100 bg-indigo-50/10 text-xs">{formatRupiah(row.rencana)}</td>
+                          {row.bulanan.map((val, idx) => (
+                            <td key={idx} className="py-2.5 px-3 font-mono text-right text-xs text-gray-600">{val > 0 ? formatRupiah(val) : '-'}</td>
+                          ))}
+                          <td className="py-2.5 px-4 font-mono font-bold text-right text-emerald-700 border-l border-gray-100 bg-emerald-50/10 text-xs">{formatRupiah(row.total)}</td>
+                          <td className={`py-2.5 px-4 font-mono font-bold text-right text-xs ${row.selisih < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
+                          <td className="py-2.5 px-4 text-right">{renderBadge(row.persentase)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
             ) : (
-               <div className="overflow-x-auto p-4">
-                 <table className="w-full text-left text-sm text-gray-700">
-                   <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] whitespace-nowrap">
-                     <tr>
-                       <th className="px-4 py-3">Nama Penerimaan</th>
-                       <th className="px-4 py-3 text-right">Total Rencana</th>
-                       <th className="px-4 py-3 text-right">Total Realisasi</th>
-                       <th className="px-4 py-3 text-right">Selisih</th>
-                       <th className="px-4 py-3 text-right">% Capaian</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-gray-100">
-                     {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
-                       <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">Tidak ada data.</td></tr>
-                     ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).sort((a,b) => Number(a.persentase) - Number(b.persentase)).map((row) => (
-                       <tr key={row.id} className="hover:bg-gray-50 whitespace-nowrap">
-                         <td className="px-4 py-4 w-1/3">
-                            <div className="font-black text-gray-900">{row.nama}</div>
-                            <div className="w-full max-w-[250px] h-2 bg-gray-200 rounded-full mt-2 overflow-hidden flex" title={`${row.persentase}% tercapai`}>
-                               <div className={`h-full ${getProgressColor(row.persentase)} transition-all duration-1000`} style={{ width: `${Math.min(Number(row.persentase), 100)}%` }}></div>
-                            </div>
-                         </td>
-                         <td className="px-4 py-3 font-bold text-right text-indigo-700 bg-indigo-50/30">{formatRupiah(row.rencana)}</td>
-                         <td className="px-4 py-3 font-bold text-right text-emerald-700 bg-emerald-50/30">{formatRupiah(row.total)}</td>
-                         <td className={`px-4 py-3 font-bold text-right ${row.selisih < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
-                         <td className="px-4 py-3 text-right">{renderBadge(row.persentase)}</td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider whitespace-nowrap">
+                        <th className="py-3 px-4">Nama Penerimaan</th>
+                        <th className="py-3 px-4 text-right w-44">Total Rencana</th>
+                        <th className="py-3 px-4 text-right w-44">Total Realisasi</th>
+                        <th className="py-3 px-4 text-right w-40">Selisih</th>
+                        <th className="py-3 px-4 text-right w-24">% Capaian</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
+                        <tr><td colSpan={5} className="py-8 text-center text-gray-400 text-xs italic">Tidak ada data penerimaan pada filter ini.</td></tr>
+                      ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).sort((a,b) => Number(a.persentase) - Number(b.persentase)).map((row) => (
+                        <tr key={row.id} className="hover:bg-indigo-50/20 whitespace-nowrap transition-colors">
+                          <td className="py-3 px-4">
+                             <div className="font-bold text-gray-900 text-xs">{row.nama}</div>
+                             <div className="w-full max-w-[260px] h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden flex" title={`${row.persentase}% tercapai`}>
+                                <div className={`h-full ${getProgressColor(row.persentase)} transition-all duration-1000`} style={{ width: `${Math.min(Number(row.persentase), 100)}%` }}></div>
+                             </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-right text-indigo-700 bg-indigo-50/10 text-xs">{formatRupiah(row.rencana)}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-right text-emerald-700 bg-emerald-50/10 text-xs">{formatRupiah(row.total)}</td>
+                          <td className={`py-3 px-4 font-mono font-bold text-right text-xs ${row.selisih < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatRupiah(row.selisih)}</td>
+                          <td className="py-3 px-4 text-right">{renderBadge(row.persentase)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
             )}
           </div>
         </>

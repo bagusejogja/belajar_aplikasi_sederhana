@@ -361,30 +361,37 @@ export default function PotretMutasiPaguPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-36 px-4 pt-4 space-y-8">
-      {/* 1. HEADER CONTROL BAR WITH FILTERS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1.5">
-            <Sparkles size={16} className="text-amber-500" /> Ringkasan Pagu Keuangan Database
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* 1. SLIM & UNIFIED TOP TOOLBAR WITH FILTERS */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-2 rounded-xl text-white shadow-xs">
+            <BarChart3 size={20} />
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            Potret Mutasi Pagu Keseluruhan
-          </h1>
-          <p className="text-slate-500 font-medium text-xs md:text-sm mt-1">
-            Data dikalkulasi secara presisi dari tabel <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code>, <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">gov_units</code>, & <code className="bg-slate-100 text-indigo-700 px-2 py-0.5 rounded font-mono font-bold">tambah_pagu</code>.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Potret Mutasi Pagu Keseluruhan
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                TA {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group' : selectedGroupOrg}
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Data dikalkulasi dari tabel database <span className="font-mono text-indigo-700 font-bold">gov_pagu_anggaran</span>, <span className="font-mono text-indigo-700 font-bold">gov_units</span>, & <span className="font-mono text-indigo-700 font-bold">tambah_pagu</span>.
+            </p>
+          </div>
         </div>
 
-        {/* TOP FILTER CONTROLS */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+        {/* TOP FILTER CONTROLS & ACTIONS */}
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
           {/* Tahun Filter */}
-          <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
-            <span className="text-[10px] font-black uppercase text-slate-400 pl-1">Tahun:</span>
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 h-9 rounded-xl border border-gray-200">
+            <span className="text-[10px] font-black uppercase text-gray-400">Tahun:</span>
             <select 
               value={selectedYear} 
               onChange={(e) => setSelectedYear(e.target.value)}
-              className="bg-transparent font-bold text-xs text-slate-700 outline-none cursor-pointer pr-1"
+              className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
             >
               <option value="2026">2026</option>
               <option value="2025">2025</option>
@@ -394,17 +401,17 @@ export default function PotretMutasiPaguPage() {
           </div>
 
           {/* Group Org Filter */}
-          <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200">
-            <span className="text-[10px] font-black uppercase text-slate-400 pl-1">Group:</span>
+          <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 h-9 rounded-xl border border-gray-200">
+            <span className="text-[10px] font-black uppercase text-gray-400">Group:</span>
             <select 
               value={selectedGroupOrg} 
               onChange={(e) => {
                 setSelectedGroupOrg(e.target.value);
                 setSelectedUnit('ALL');
               }}
-              className="bg-transparent font-bold text-xs text-indigo-700 outline-none cursor-pointer pr-1 max-w-[140px]"
+              className="bg-transparent font-bold text-xs text-indigo-700 outline-none cursor-pointer max-w-[140px]"
             >
-              <option value="ALL">SEMUA GROUP ORG</option>
+              <option value="ALL">SEMUA GROUP</option>
               {groupOrgOptions.map((g, idx) => (
                 <option key={idx} value={g}>{g}</option>
               ))}
@@ -415,17 +422,17 @@ export default function PotretMutasiPaguPage() {
           <div className="relative">
             <div 
               onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
-              className="flex items-center gap-2 bg-slate-100 p-2 rounded-2xl border border-slate-200 cursor-pointer max-w-[200px]"
+              className="flex items-center gap-1.5 bg-gray-50 px-2.5 h-9 rounded-xl border border-gray-200 cursor-pointer max-w-[200px]"
             >
-              <span className="text-[10px] font-black uppercase text-slate-400 pl-1 shrink-0">Unit:</span>
-              <span className="font-bold text-xs text-slate-700 truncate w-full pr-2">
-                {selectedUnit === 'ALL' ? 'SEMUA UNIT KERJA' : availableUnitsForDropdown.find(u => u.id.toString() === selectedUnit.toString())?.nama_unit}
+              <span className="text-[10px] font-black uppercase text-gray-400 shrink-0">Unit:</span>
+              <span className="font-bold text-xs text-gray-800 truncate pr-1">
+                {selectedUnit === 'ALL' ? 'SEMUA UNIT' : availableUnitsForDropdown.find(u => u.id.toString() === selectedUnit.toString())?.nama_unit}
               </span>
-              <ChevronDown size={14} className="text-slate-400 shrink-0 pr-1" />
+              <ChevronDown size={13} className="text-gray-400 shrink-0" />
             </div>
             {isUnitDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col">
-                <div className="p-2 border-b border-slate-100">
+              <div className="absolute right-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
+                <div className="p-2 border-b border-gray-100">
                   <input
                     autoFocus
                     type="text"
@@ -456,14 +463,14 @@ export default function PotretMutasiPaguPage() {
                         }
                       }
                     }}
-                    className="w-full bg-slate-50 border border-slate-200 text-xs font-medium p-2.5 rounded-lg outline-none focus:border-indigo-400"
+                    className="w-full bg-gray-50 border border-gray-200 text-xs font-medium p-2 rounded-lg outline-none focus:border-indigo-500"
                   />
                 </div>
-                <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5">
+                <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
                   <div 
                     onMouseEnter={() => setHighlightedIndex(0)}
                     onClick={() => { setSelectedUnit('ALL'); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
-                    className={`px-3 py-2 text-[11px] font-bold rounded-lg cursor-pointer transition-colors ${highlightedIndex === 0 ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'}`}
+                    className={`px-3 py-1.5 text-[11px] font-bold rounded-lg cursor-pointer transition-colors ${highlightedIndex === 0 ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
                   >
                     SEMUA UNIT KERJA
                   </div>
@@ -474,7 +481,7 @@ export default function PotretMutasiPaguPage() {
                         key={u.id}
                         onMouseEnter={() => setHighlightedIndex(idx + 1)}
                         onClick={() => { setSelectedUnit(u.id); setIsUnitDropdownOpen(false); setUnitSearchText(''); }}
-                        className={`px-3 py-2 text-[11px] font-medium rounded-lg cursor-pointer truncate transition-colors ${highlightedIndex === idx + 1 ? 'bg-indigo-100 text-indigo-700' : 'text-slate-700 hover:bg-slate-100'}`}
+                        className={`px-3 py-1.5 text-[11px] font-medium rounded-lg cursor-pointer truncate transition-colors ${highlightedIndex === idx + 1 ? 'bg-indigo-100 text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
                       >
                         [{u.kode_unit}] {u.nama_unit}
                       </div>
@@ -484,44 +491,42 @@ export default function PotretMutasiPaguPage() {
               </div>
             )}
           </div>
+
+          <button 
+            onClick={handleSyncGlobalData}
+            disabled={isSyncing}
+            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={isSyncing ? "animate-spin" : ""} />
+            <span>{isSyncing ? "Menarik..." : "Tarik Data"}</span>
+          </button>
+          
+          <button 
+            onClick={exportToExcel}
+            className="h-9 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Download size={13} />
+            <span>Excel</span>
+          </button>
         </div>
       </div>
 
-      {/* 2. POTRET MUTASI PAGU KESELURUHAN CONTAINER (SINGLE TARIK DATA GLOBAL BUTTON) */}
-      <div className="bg-white rounded-[2.5rem] border border-emerald-100 shadow-sm overflow-hidden">
+      {/* 2. POTRET MUTASI PAGU KESELURUHAN CONTAINER */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
         {/* Container Header */}
-        <div className="p-6 md:p-8 bg-emerald-50/40 border-b border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-600 text-white p-2.5 rounded-2xl shadow-sm">
-              <BarChart3 size={22} />
+        <div className="p-4 px-5 bg-gray-50/80 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-emerald-600 text-white p-1.5 rounded-lg shadow-2xs">
+              <BarChart3 size={16} />
             </div>
             <div>
-              <h2 className="text-lg md:text-xl font-black text-emerald-900 tracking-wider uppercase flex items-center gap-2">
-                Potret Mutasi Pagu Keseluruhan
+              <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                Ringkasan Pagu & Mutasi
               </h2>
-              <p className="text-xs text-emerald-700 font-medium">
+              <p className="text-[10px] text-gray-500 font-medium">
                 Tahun Anggaran {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group Org' : `Group: ${selectedGroupOrg}`}
               </p>
             </div>
-          </div>
-
-          {/* SINGLE TARIK DATA GLOBAL BUTTON & EXPORT EXCEL */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button 
-              onClick={handleSyncGlobalData}
-              disabled={isSyncing}
-              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs tracking-wide transition-all shadow-md active:scale-95 disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-              {isSyncing ? "Menarik Data..." : "Tarik Data Global"}
-            </button>
-            <button 
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs tracking-wide transition-all shadow-md active:scale-95"
-            >
-              <Download size={16} />
-              Export Excel
-            </button>
           </div>
         </div>
 
@@ -848,7 +853,7 @@ export default function PotretMutasiPaguPage() {
         {/* TAB 2: BREAKDOWN PER UNIT KERJA (GROUP ORG COLLAPSE) */}
         {activeTab === 'unit-group' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
@@ -1037,7 +1042,7 @@ export default function PotretMutasiPaguPage() {
         {/* TAB 3: RINCIAN CATATAN MUTASI PAGU (DATABASE `gov_pagu_anggaran`) */}
         {activeTab === 'surat' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-gray-200/80 rounded-2xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">

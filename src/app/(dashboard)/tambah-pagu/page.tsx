@@ -14,7 +14,7 @@ import {
   ChevronUp, BarChart3, TrendingUp, LayoutGrid, ChevronDown,
   Wallet, CheckCircle, BarChart as ChartIcon, Eye,
   ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet,
-  ExternalLink, X, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3
+  ExternalLink, X, XCircle, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3
 } from 'lucide-react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
@@ -168,7 +168,7 @@ export default function TambahPaguPage() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchData();
@@ -347,10 +347,12 @@ export default function TambahPaguPage() {
   };
 
   // Pagination Logic
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const currentItems = useMemo(() => {
+    if (itemsPerPage === -1) return filteredData;
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
 
   // REAL NATIVE EXCEL (.XLSX) DOWNLOAD WITH DYNAMIC TAB AWARENESS
   const exportToExcel = () => {
@@ -479,114 +481,142 @@ export default function TambahPaguPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto pb-32 px-4 pt-6 space-y-6">
-      {/* ROW 1: HEADER PAGE TITLE & ACTION BUTTONS */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-200/80 shadow-sm">
-        <div>
-          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs uppercase tracking-widest mb-1.5">
-            <Sparkles size={16} className="text-amber-500" /> Portal Pengusulan Pagu Anggaran
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* ROW 1: SLIM & UNIFIED TOP TOOLBAR & ACTION BUTTONS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-2 rounded-xl text-white shadow-xs">
+            <Wallet size={20} />
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-            Tambah Pagu Anggaran
-          </h1>
-          <p className="text-slate-500 font-medium text-xs md:text-sm mt-1">
-            Pantau status permohonan penambahan pagu anggaran unit kerja UGM ({selectedYear}).
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Tambah Pagu Anggaran
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                TA {selectedYear} • {kpiMetrics.totalCount} Usulan
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Pantau status permohonan & surat penambahan pagu anggaran unit kerja UGM.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <Button 
-            variant="outline" 
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
             onClick={() => router.push('/tambah-pagu/komparasi')}
-            className="rounded-2xl border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold text-xs shadow-sm h-11"
+            className="h-9 px-3 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
           >
-            <Scale size={16} className="mr-2 text-indigo-600" /> Komparasi DB Pagu
-          </Button>
+            <Scale size={14} />
+            <span>Komparasi DB</span>
+          </button>
 
-          <Button 
-            variant="outline" 
+          <button 
             onClick={exportToExcel}
-            className="rounded-2xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold text-xs shadow-sm h-11"
+            className="h-9 px-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
           >
-            <FileSpreadsheet size={16} className="mr-2 text-emerald-600" /> Export Excel (.xlsx)
-          </Button>
+            <FileSpreadsheet size={14} />
+            <span>Export Excel</span>
+          </button>
 
           {perms.can_create && (
-            <Button
+            <button
               onClick={() => router.push('/tambah-pagu/tambah')}
-              className="bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-2xl shadow-lg h-11 px-5 border-b-4 border-emerald-500 shrink-0"
+              className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
             >
-              <Plus size={16} className="mr-2" /> Tambah Usulan
-            </Button>
+              <Plus size={15} />
+              <span>Tambah Usulan</span>
+            </button>
           )}
         </div>
       </div>
 
-      {/* ROW 2: 4 SUMMARY KPI CARDS (EXACT MATCHING SCREENSHOT REVIEW-ANGGARAN/UNIT-KERJA) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ROW 2: 4 SUMMARY KPI CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* CARD 1: TOTAL USULAN ANGGARAN */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">TOTAL USULAN ANGGARAN</span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-              Rp {formatRp(kpiMetrics.totalAnggaranUsulan)}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">TOTAL USULAN ANGGARAN</span>
+              <div className="text-xl font-black text-gray-900 font-mono tracking-tight">
+                Rp {formatRp(kpiMetrics.totalAnggaranUsulan)}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-gray-50 text-gray-600 border border-gray-100">
+              <Wallet size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-slate-500 flex items-center justify-between">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">
             <span>{kpiMetrics.totalCount} Usulan Item</span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">100%</span>
+            <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-mono font-bold">100%</span>
           </div>
         </div>
 
         {/* CARD 2: DISETUJUI SEMUA (100%) */}
-        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">DISETUJUI SEMUA (100%)</span>
-            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
-              Rp {formatRp(kpiMetrics.approvedSemuaAnggaran)}
+        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">DISETUJUI SEMUA (100%)</span>
+              <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
+                Rp {formatRp(kpiMetrics.approvedSemuaAnggaran)}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <CheckCircle2 size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-emerald-700 flex items-center justify-between">
+          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
             <span>{kpiMetrics.approvedSemuaCount} Item</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono font-bold">
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-mono font-bold">
               {kpiMetrics.approvedPct}%
             </span>
           </div>
         </div>
 
         {/* CARD 3: DISETUJUI SEBAGIAN */}
-        <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block mb-1">DISETUJUI SEBAGIAN</span>
-            <div className="text-2xl font-black text-indigo-700 font-mono tracking-tight">
-              Rp {formatRp(kpiMetrics.approvedSebagianAnggaran)}
+        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">DISETUJUI SEBAGIAN</span>
+              <div className="text-xl font-black text-indigo-700 font-mono tracking-tight">
+                Rp {formatRp(kpiMetrics.approvedSebagianAnggaran)}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Clock size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-indigo-700 flex items-center justify-between">
+          <div className="mt-3 text-xs font-bold text-indigo-700 flex items-center justify-between border-t border-indigo-100/60 pt-2">
             <span>{kpiMetrics.approvedSebagianCount} Item</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Sebagian</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Sebagian</span>
           </div>
         </div>
 
         {/* CARD 4: DITOLAK / DIAJUKAN */}
-        <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 block mb-1">DITOLAK / DIAJUKAN</span>
-            <div className="text-2xl font-black text-rose-700 font-mono tracking-tight">
-              Rp {formatRp(kpiMetrics.rejectedAnggaran)}
+        <div className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">DITOLAK / DIAJUKAN</span>
+              <div className="text-xl font-black text-rose-700 font-mono tracking-tight">
+                Rp {formatRp(kpiMetrics.rejectedAnggaran)}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+              <XCircle size={18} />
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-rose-700 flex items-center justify-between">
+          <div className="mt-3 text-xs font-bold text-rose-700 flex items-center justify-between border-t border-rose-100/60 pt-2">
             <span>{kpiMetrics.rejectedCount} Item</span>
-            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold">Proses/Tolak</span>
+            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md font-bold">Proses/Tolak</span>
           </div>
         </div>
       </div>
 
       {/* ROW 3: SEPARATE FILTER TOOLBAR WITH SEARCHABLE AUTOCOMPLETE UNIT FILTER */}
-      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center gap-4">
-        <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider shrink-0">
-          <Zap size={16} className="text-amber-500" /> FILTER DATA:
+      <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
+        <div className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-wider shrink-0">
+          <Zap size={14} className="text-amber-500" /> FILTER DATA:
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
@@ -604,7 +634,7 @@ export default function TambahPaguPage() {
             <select
               value={selectedYear}
               onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-slate-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-gray-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="Semua Tahun">📅 Semua Tahun</option>
               {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
@@ -616,7 +646,7 @@ export default function TambahPaguPage() {
             <select
               value={selectedStatusFilter}
               onChange={(e) => { setSelectedStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer font-bold"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="ALL">✨ Semua Status</option>
               <option value="Disetujui Semua">Disetujui Semua</option>
@@ -628,13 +658,13 @@ export default function TambahPaguPage() {
 
           {/* Search Input */}
           <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Cari No Surat, Hal, Unit..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full h-[42px] bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 text-xs outline-none focus:border-emerald-500 font-medium"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
             />
           </div>
         </div>
@@ -728,7 +758,7 @@ export default function TambahPaguPage() {
                   ) : (
                     currentItems.map((item, idx) => {
                       const uName = item.gov_units?.nama_unit || item.unit_kerja_nama || item.unit_pengusul || '-';
-                      const rowNum = indexOfFirstItem + idx + 1;
+                      const rowNum = (itemsPerPage === -1 ? 0 : (currentPage - 1) * itemsPerPage) + idx + 1;
 
                       return (
                         <TableRow key={item.id} className="hover:bg-slate-50/80 transition-colors border-b border-slate-100">
@@ -826,37 +856,80 @@ export default function TambahPaguPage() {
                 </TableBody>
               </Table>
             </CardContent>
-          </Card>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-xs">
-              <span className="text-slate-500 font-medium">
-                Menampilkan {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredData.length)} dari {filteredData.length} records
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => prev - 1)}
-                  className="h-8 text-xs font-bold"
-                >
-                  <ChevronLeft size={14} /> Prev
-                </Button>
-                <span className="font-bold text-slate-700 px-2">Page {currentPage} of {totalPages}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  className="h-8 text-xs font-bold"
-                >
-                  Next <ChevronRight size={14} />
-                </Button>
+            {/* PAGINATION FOOTER */}
+            {filteredData.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+                {/* Left: Info */}
+                <div className="flex items-center gap-2">
+                  <span>
+                    Menampilkan <strong className="text-gray-900">{itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1}</strong> - <strong className="text-gray-900">{itemsPerPage === -1 ? filteredData.length : Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> dari <strong className="text-gray-900">{filteredData.length}</strong> usulan
+                  </span>
+                </div>
+
+                {/* Center: Rows per page */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={-1}>Semua</option>
+                  </select>
+                </div>
+
+                {/* Right: Page Navigation */}
+                {itemsPerPage !== -1 && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Pertama"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Sebelumnya"
+                    >
+                      ‹ Prev
+                    </button>
+                    
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-black">
+                      Hal {currentPage} / {totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Selanjutnya"
+                    >
+                      Next ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Terakhir"
+                    >
+                      »
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </Card>
         </div>
       )}
 

@@ -164,54 +164,81 @@ export default function ReportPhotoPage() {
     };
 
    return (
-      <div className="space-y-6 max-w-5xl mx-auto">
-         {/* KONTROL PANEL (Sembunyi saat Print PDF) */}
-         <div className="print:hidden bg-indigo-600 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-            <div>
-               <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><FileText size={32}/> Cetak Bukti Fisik</h2>
-               <p className="text-indigo-100 font-medium text-sm">Filter <strong>TANGGAL DISETUJUI (ACC)</strong> untuk mengunci laporan akhir.</p>
+      <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+         {/* SLIM & UNIFIED TOP TOOLBAR */}
+         <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+            <div className="flex items-center gap-3">
+               <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+                  <FileText size={20} />
+               </div>
+               <div>
+                  <div className="flex items-center gap-2">
+                     <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                        Pengajuan & Bukti Kas Kecil
+                     </h1>
+                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                        {totalTrxAll} Transaksi
+                     </span>
+                  </div>
+                  <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                     Filter tanggal disetujui (ACC) untuk mencetak arsip pengajuan kas fisik berlampiran foto.
+                  </p>
+               </div>
             </div>
-            
-            <div className="flex flex-wrap gap-4 items-center bg-white/10 p-4 rounded-2xl w-full md:w-auto backdrop-blur-sm">
-               <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-200">Mulai:</span>
-                  <input type="date" value={tglAwal} onChange={e => setTglAwal(e.target.value)} className="bg-white text-indigo-900 border-0 font-bold rounded-xl outline-none p-2 text-sm" />
-               </div>
-               <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-indigo-200">Sampai:</span>
-                  <input type="date" value={tglAkhir} onChange={e => setTglAkhir(e.target.value)} className="bg-white text-indigo-900 border-0 font-bold rounded-xl outline-none p-2 text-sm" />
-               </div>
-               <div className="flex items-center gap-2 ml-2">
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+               <input 
+                  type="date" 
+                  value={tglAwal} 
+                  onChange={e => setTglAwal(e.target.value)} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" 
+               />
+               <span className="text-gray-400 font-bold text-xs">s/d</span>
+               <input 
+                  type="date" 
+                  value={tglAkhir} 
+                  onChange={e => setTglAkhir(e.target.value)} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" 
+               />
+               <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer select-none bg-gray-50 border border-gray-200 px-2.5 h-9 rounded-xl">
                   <input 
                      type="checkbox" 
-                     id="uangMasuk"
                      checked={showUangMasuk} 
                      onChange={e => setShowUangMasuk(e.target.checked)} 
-                     className="w-4 h-4 rounded border-gray-300 text-indigo-500 focus:ring-indigo-500 cursor-pointer"
+                     className="w-3.5 h-3.5 rounded text-indigo-600"
                   />
-                  <label htmlFor="uangMasuk" className="text-xs font-bold uppercase tracking-widest text-white cursor-pointer select-none">Tampilkan Uang Masuk</label>
-               </div>
-               
-               <button onClick={fetchReport} className="bg-amber-500 text-white hover:bg-amber-600 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
-                  BUAT LAPORAN
+                  <span>Uang Masuk</span>
+               </label>
+               <button 
+                  onClick={fetchReport} 
+                  className="h-9 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all active:scale-95"
+               >
+                  Filter
                </button>
-               <button onClick={() => {
-                  const originalTitle = document.title;
-                  document.title = `pengajuan kas kecil ${tglAwal.replace(/-/g, '_')}`;
-                  window.print();
-                  setTimeout(() => { document.title = originalTitle; }, 1000);
-               }} className="bg-white text-indigo-600 hover:bg-gray-100 px-4 py-2.5 rounded-xl font-black transition-transform flex items-center gap-2 drop-shadow-md">
-                  <Printer size={18}/> PDF
+               <button 
+                  onClick={() => {
+                     const originalTitle = document.title;
+                     document.title = `pengajuan kas kecil ${tglAwal.replace(/-/g, '_')}`;
+                     window.print();
+                     setTimeout(() => { document.title = originalTitle; }, 1000);
+                  }} 
+                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+               >
+                  <Printer size={13}/>
+                  <span>Cetak PDF</span>
                </button>
             </div>
          </div>
 
-         {/* ARENA CETAK (Print Area) */}
-         <div className="bg-white p-8 print:p-0 min-h-[500px] text-sm text-gray-900 print:text-black">
+         {/* ARENA CETAK */}
+         <div className="bg-white rounded-2xl print:rounded-none shadow-xs border border-gray-200/80 p-6 md:p-8 print:p-0 min-h-[500px] text-xs text-gray-900 print:text-black">
             {loading ? (
-               <div className="h-full flex items-center justify-center print:hidden"><Loader2 size={40} className="animate-spin text-indigo-600"/></div>
+               <div className="h-48 flex flex-col items-center justify-center text-indigo-600">
+                  <Loader2 size={32} className="animate-spin mb-2 text-indigo-500"/>
+                  <p className="text-xs font-medium text-gray-500">Menyiapkan cetakan berkas fisik...</p>
+               </div>
             ) : transactions.length === 0 ? (
-               <div className="text-center py-20 text-gray-400 font-bold print:hidden">Tidak ada transaksi yang di-ACC pada rentang tanggal tersebut.</div>
+               <div className="text-center py-16 text-gray-400 font-medium print:hidden">Tidak ada transaksi yang disetujui pada rentang tanggal tersebut.</div>
             ) : (
                <div className="space-y-6">
                   {/* Kop Kepala / Judul PDF */}

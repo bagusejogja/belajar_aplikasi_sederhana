@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Database, Loader2, CheckCircle, XCircle, Search, FileText, Eye, AlertCircle, Copy, Check, UploadCloud } from 'lucide-react';
+import { Database, Loader2, CheckCircle, XCircle, Search, FileText, Eye, AlertCircle, Copy, Check, UploadCloud, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -122,8 +122,8 @@ export default function ApprovalTransferPage() {
      if (!teks) return null;
      const links = teks.split(',').map(s => s.trim()).filter(Boolean);
      return (
-        <div className="mb-4">
-           <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">{label}</p>
+        <div className="mb-3">
+           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">{label}</p>
            <div className="flex flex-wrap gap-2">
               {links.map((lnk, idx) => {
                  let imgSrc = lnk;
@@ -134,12 +134,12 @@ export default function ApprovalTransferPage() {
                  const isImage = lnk.toLowerCase().match(/\.(jpeg|jpg|gif|png)$/) != null || gdriveMatch;
                  
                  return isImage ? (
-                    <div key={idx} className="border border-gray-200 shadow-sm bg-white p-1 rounded-xl cursor-pointer hover:border-indigo-500 hover:ring-4 ring-indigo-50 transition-all" onClick={() => setPreviewImage(lnk)}>
-                       <img src={imgSrc} alt="Lampiran" className="h-40 w-auto object-contain rounded-lg" />
+                    <div key={idx} className="border border-gray-200 shadow-2xs bg-white p-1 rounded-xl cursor-pointer hover:border-indigo-500 transition-all" onClick={() => setPreviewImage(lnk)}>
+                       <img src={imgSrc} alt="Lampiran" className="h-32 w-auto object-contain rounded-lg" />
                     </div>
                  ) : (
-                    <button key={idx} onClick={() => window.open(lnk, '_blank')} className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-3 rounded-xl border border-blue-100 flex items-center gap-2 transition-colors">
-                       <Eye size={16}/> Lihat {label} {idx + 1}
+                    <button key={idx} onClick={() => window.open(lnk, '_blank')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 p-2.5 rounded-xl border border-indigo-100 flex items-center gap-1.5 transition-colors">
+                       <Eye size={14}/> <span>Lihat {label} {idx + 1}</span>
                     </button>
                  );
               })}
@@ -149,84 +149,114 @@ export default function ApprovalTransferPage() {
   };
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
-      
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-           <div className="flex items-center gap-3 mb-2">
-              <div className="bg-amber-100 p-2 rounded-xl">
-                 <CheckCircle className="text-amber-600" size={24} />
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-black text-gray-900 tracking-tight">Approval Transfer</h1>
-           </div>
-           <p className="text-gray-500 font-medium">Persetujuan pengajuan pembayaran via transfer bank.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-amber-500 to-amber-700 p-2 rounded-xl text-white shadow-xs">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Approval Transfer
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
+                {statusFilter} ({filteredData.length})
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Persetujuan dan validasi pengajuan pembayaran via transfer bank.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* Status Toggle Pills */}
+          <div className="flex bg-gray-100/80 p-1 rounded-xl gap-1">
+            <button 
+              onClick={() => setStatusFilter('Diajukan')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${statusFilter === 'Diajukan' ? 'bg-amber-500 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Diajukan
+            </button>
+            <button 
+              onClick={() => setStatusFilter('Disetujui')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${statusFilter === 'Disetujui' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Disetujui
+            </button>
+            <button 
+              onClick={() => setStatusFilter('Ditolak')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${statusFilter === 'Ditolak' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Ditolak
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/30">
-           
-           <div className="flex bg-gray-100 p-1.5 rounded-2xl w-full md:w-auto">
-              <button onClick={() => setStatusFilter('Diajukan')} className={`flex-1 md:w-32 py-2 text-sm font-bold rounded-xl transition-all ${statusFilter === 'Diajukan' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Diajukan</button>
-              <button onClick={() => setStatusFilter('Disetujui')} className={`flex-1 md:w-32 py-2 text-sm font-bold rounded-xl transition-all ${statusFilter === 'Disetujui' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Disetujui</button>
-              <button onClick={() => setStatusFilter('Ditolak')} className={`flex-1 md:w-32 py-2 text-sm font-bold rounded-xl transition-all ${statusFilter === 'Ditolak' ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Ditolak</button>
-           </div>
-
-           <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input 
-                 type="text" 
-                 placeholder="Cari kegiatan/barang/nama..." 
-                 value={search}
-                 onChange={(e) => setSearch(e.target.value)}
-                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-4 focus:ring-amber-50 focus:border-amber-500 transition-all text-sm font-medium"
-              />
-           </div>
+      {/* FILTER SEARCH BAR */}
+      <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between gap-3">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <input 
+            type="text" 
+            placeholder="Cari kegiatan / rekening / tujuan..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-9 pl-9 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-amber-500/20 focus:bg-white transition-all text-xs font-semibold text-gray-700"
+          />
         </div>
-        
+        <p className="text-[11px] font-semibold text-gray-400 hidden sm:block">
+          Ditemukan <span className="text-gray-900 font-bold">{filteredData.length}</span> data
+        </p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           {loading ? (
-             <div className="flex flex-col items-center justify-center p-20 text-gray-400">
-                <Loader2 size={40} className="animate-spin mb-4 text-amber-500" />
-                <p className="font-medium">Memuat pengajuan...</p>
+             <div className="flex flex-col items-center justify-center p-16 text-gray-400">
+                <Loader2 size={32} className="animate-spin mb-2 text-amber-500" />
+                <p className="text-xs font-medium">Memuat data pengajuan...</p>
              </div>
           ) : filteredData.length === 0 ? (
-             <div className="flex flex-col items-center justify-center p-20 text-gray-400">
-                <Database size={48} className="mb-4 opacity-50" />
-                <p className="font-medium">Tidak ada data untuk status {statusFilter}</p>
+             <div className="flex flex-col items-center justify-center p-16 text-gray-400">
+                <Database size={36} className="mb-2 opacity-40" />
+                <p className="text-xs font-medium">Tidak ada data untuk status {statusFilter}</p>
              </div>
           ) : (
-             <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50/50 text-gray-500 font-semibold border-b border-gray-100">
+             <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                    <tr>
-                      <th className="py-4 px-6">Tgl / Kategori</th>
-                      <th className="py-4 px-6">Tujuan Transfer</th>
-                      <th className="py-4 px-6">Kegiatan & Barang</th>
-                      <th className="py-4 px-6 text-right">Nominal</th>
-                      <th className="py-4 px-6 text-center">Aksi</th>
+                      <th className="py-3 px-4">Tgl / Kategori</th>
+                      <th className="py-3 px-4">Tujuan Transfer</th>
+                      <th className="py-3 px-4">Kegiatan & Rincian</th>
+                      <th className="py-3 px-4 text-right">Nominal</th>
+                      <th className="py-3 px-4 text-center">Aksi</th>
                    </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-100">
                    {filteredData.map((item) => (
-                      <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
-                         <td className="py-4 px-6">
+                      <tr key={item.id} className="hover:bg-amber-50/20 transition-colors font-medium">
+                         <td className="py-3 px-4">
                             <p className="font-bold text-gray-900">{item.tanggal_pengajuan}</p>
-                            <p className="text-xs text-gray-500 font-medium">{item.ref_jenis_belanja?.nama_belanja}</p>
+                            <p className="text-[11px] text-gray-500">{item.ref_jenis_belanja?.nama_belanja}</p>
                          </td>
-                         <td className="py-4 px-6">
+                         <td className="py-3 px-4">
                             <p className="font-bold text-gray-800">{item.master_rekening?.nama_rekening}</p>
-                            <p className="text-xs text-gray-500 font-mono">{item.master_rekening?.ref_bank?.nama_bank} - {item.master_rekening?.no_rekening}</p>
+                            <p className="text-[11px] text-gray-500 font-mono">{item.master_rekening?.ref_bank?.nama_bank} - {item.master_rekening?.no_rekening}</p>
                          </td>
-                         <td className="py-4 px-6 max-w-[200px]">
-                            <p className="font-bold text-gray-700 truncate">{item.kegiatan}</p>
-                            <p className="text-xs text-gray-500 truncate">{item.barang}</p>
+                         <td className="py-3 px-4 max-w-[220px]">
+                            <p className="font-bold text-gray-800 truncate">{item.kegiatan}</p>
+                            <p className="text-[11px] text-gray-500 truncate">{item.barang}</p>
                          </td>
-                         <td className="py-4 px-6 text-right font-black text-emerald-600 text-base">
+                         <td className="py-3 px-4 text-right font-black text-emerald-600 font-mono text-sm">
                             Rp {formatRp(item.nominal)}
                          </td>
-                         <td className="py-4 px-6 text-center">
-                            <button onClick={() => openDetail(item)} className="px-4 py-2 bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-700 font-bold rounded-xl transition-colors text-xs flex items-center gap-2 mx-auto">
-                               <Eye size={14} /> Detail
+                         <td className="py-3 px-4 text-center">
+                            <button onClick={() => openDetail(item)} className="h-8 px-3 bg-gray-50 hover:bg-amber-50 hover:text-amber-700 text-gray-700 font-bold rounded-lg border border-gray-200 hover:border-amber-200 transition-all text-xs inline-flex items-center gap-1.5">
+                               <Eye size={12} /> <span>Detail</span>
                             </button>
                          </td>
                       </tr>

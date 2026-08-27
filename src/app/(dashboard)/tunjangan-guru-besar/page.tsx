@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { 
+  GraduationCap, Search, Download, Users, UserCheck, 
+  Wallet, RefreshCw, Calendar, ChevronLeft, ChevronRight, Info
+} from 'lucide-react';
 
 const KONSTANTA = {
   TAHUN_REFERENSI: 2026, 
@@ -57,39 +61,40 @@ export default function TunjanganGuruBesarPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
 
-  useEffect(() => {
-    const fetchGBData = async () => {
-      setIsLoading(true);
-      try {
-        let allRecords: any[] = [];
-        let from = 0;
-        let keepFetching = true;
+  const fetchGBData = async () => {
+    setIsLoading(true);
+    try {
+      let allRecords: any[] = [];
+      let from = 0;
+      let keepFetching = true;
 
-        while (keepFetching) {
-          const { data, error, count } = await supabase
-            .from('gov_anggaran_pegawai')
-            .select('*', { count: 'exact' })
-            .ilike('jabatan', '%Guru Besar%')
-            .range(from, from + 999)
-            .order('nama_pegawai', { ascending: true });
+      while (keepFetching) {
+        const { data, error, count } = await supabase
+          .from('gov_anggaran_pegawai')
+          .select('*', { count: 'exact' })
+          .ilike('jabatan', '%Guru Besar%')
+          .range(from, from + 999)
+          .order('nama_pegawai', { ascending: true });
 
-          if (error) throw error;
-          if (count) setDbTotalCount(count);
-          if (data && data.length > 0) {
-            allRecords = [...allRecords, ...data];
-            from += 1000;
-            if (data.length < 1000) keepFetching = false;
-          } else {
-            keepFetching = false;
-          }
+        if (error) throw error;
+        if (count) setDbTotalCount(count);
+        if (data && data.length > 0) {
+          allRecords = [...allRecords, ...data];
+          from += 1000;
+          if (data.length < 1000) keepFetching = false;
+        } else {
+          keepFetching = false;
         }
-        setDataPegawai(allRecords);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setIsLoading(false);
       }
-    };
+      setDataPegawai(allRecords);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchGBData();
   }, []);
 
@@ -103,8 +108,6 @@ export default function TunjanganGuruBesarPage() {
       .filter(p => (p.jabatan || '').toLowerCase().includes('guru besar'))
       .map((p, idx) => {
         const info = hitungBulanAktif(p.tanggal_lahir, p.status);
-        
-        // Tunjangan Guru Besar menggunakan field tunjangan_guru_besar dari tabel
         const tunjGuruBesar = p.tunjangan_guru_besar || 0;
         const total = info.totalBulanBayar * tunjGuruBesar;
 
@@ -256,130 +259,235 @@ export default function TunjanganGuruBesarPage() {
       const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `Tunjangan_Guru_Besar_2026.xls`);
+      link.href = url;
+      link.download = `Tunjangan_Guru_Besar_2026.xls`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch (e) { alert("Error."); } finally { setIsExporting(false); }
+    } catch (e) { 
+      alert("Error."); 
+    } finally { 
+      setIsExporting(false); 
+    }
   };
 
   return (
-    <div className="p-8 max-w-full mx-auto bg-slate-50 min-h-screen">
-      <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Tunjangan Guru Besar</h1>
-          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mt-4 flex items-center gap-2">
-            <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
-            TA 2026 • {filteredData.length} Guru Besar
-          </p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <GraduationCap size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Tunjangan Guru Besar</h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                TA {KONSTANTA.TAHUN_REFERENSI} (Pensiun 70 Thn)
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Kalkulasi tunjangan kehormatan Guru Besar (termasuk komponen THR dan Gaji 13)</p>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-          <input 
-            type="text" placeholder="Cari Nama / NIP..." 
-            className="border-2 border-slate-100 rounded-2xl px-6 py-4 text-sm w-full sm:w-80 focus:border-indigo-500 outline-none bg-slate-50"
-            value={searchTerm} onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
-          />
+
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          <div className="relative w-full sm:w-60">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <input 
+              type="text" 
+              placeholder="Cari Nama / NIP..." 
+              value={searchTerm} 
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+            />
+          </div>
+
+          <button
+            onClick={fetchGBData}
+            disabled={isLoading}
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Muat Ulang Data"
+          >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
+          </button>
+
           <button 
             onClick={handleExportExcel}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase shadow-xl transition-all flex items-center justify-center gap-3"
+            disabled={isExporting || isLoading}
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
           >
-            {isExporting ? 'Proses...' : '📊 EXPORT EXCEL'}
+            <Download size={14} />
+            <span>{isExporting ? 'Mengekspor...' : 'Export Excel'}</span>
           </button>
         </div>
       </div>
 
+      {/* KPI SUMMARY CARDS */}
       {!isLoading && (
-        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-6 rounded-3xl shadow-lg text-white flex items-center justify-between min-w-0">
-             <div className="min-w-0 flex-1 pr-4">
-               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Total Keseluruhan</span>
-               <div className="text-2xl font-black text-white truncate">{filteredData.length} <span className="text-xs font-normal text-slate-400">Org</span></div>
-               <div className="text-sm font-bold text-emerald-400 mt-1 truncate" title={formatRupiah(stats.total)}>{formatRupiah(stats.total).replace(',00', '')}</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Total Keseluruhan */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+             <div>
+               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Tunjangan Guru Besar</p>
+               <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={formatRupiah(stats.total)}>
+                 {formatRupiah(stats.total).replace(',00', '')}
+               </h3>
+               <span className="text-[10px] font-semibold text-indigo-600">{filteredData.length} Guru Besar Aktif</span>
              </div>
-             <div className="w-12 h-12 flex-shrink-0 bg-white/10 rounded-2xl flex items-center justify-center text-white font-black text-xl">Σ</div>
+             <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+               <GraduationCap size={20} />
+             </div>
           </div>
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
-             <div className="min-w-0 flex-1 pr-4">
-               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Kelompok PNS</span>
-               <div className="text-2xl font-black text-slate-800 truncate">{stats.countPNS} <span className="text-xs font-normal text-slate-400">Org</span></div>
-               <div className="text-sm font-bold text-indigo-600 mt-1 truncate" title={formatRupiah(stats.totalPNS)}>{formatRupiah(stats.totalPNS).replace(',00', '')}</div>
+
+          {/* Kelompok PNS */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+             <div>
+               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kelompok PNS</p>
+               <h3 className="text-base font-black text-blue-700 mt-0.5 font-mono truncate" title={formatRupiah(stats.totalPNS)}>
+                 {formatRupiah(stats.totalPNS).replace(',00', '')}
+               </h3>
+               <span className="text-[10px] font-semibold text-blue-600">{stats.countPNS} Guru Besar PNS</span>
              </div>
-             <div className="w-12 h-12 flex-shrink-0 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-xl">P</div>
+             <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+               <UserCheck size={20} />
+             </div>
           </div>
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between min-w-0">
-             <div className="min-w-0 flex-1 pr-4">
-               <span className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Pegawai UGM</span>
-               <div className="text-2xl font-black text-slate-800 truncate">{stats.countUGM} <span className="text-xs font-normal text-slate-400">Org</span></div>
-               <div className="text-sm font-bold text-emerald-600 mt-1 truncate" title={formatRupiah(stats.totalUGM)}>{formatRupiah(stats.totalUGM).replace(',00', '')}</div>
+
+          {/* Pegawai UGM */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
+             <div>
+               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pegawai UGM</p>
+               <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={formatRupiah(stats.totalUGM)}>
+                 {formatRupiah(stats.totalUGM).replace(',00', '')}
+               </h3>
+               <span className="text-[10px] font-semibold text-emerald-600">{stats.countUGM} Guru Besar UGM</span>
              </div>
-             <div className="w-12 h-12 flex-shrink-0 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 font-black text-xl">U</div>
+             <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+               <Wallet size={20} />
+             </div>
           </div>
         </div>
       )}
 
       {/* NOTE SECTION */}
-      <div className="mb-6 px-8 py-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-xs italic font-medium flex items-center gap-3">
-        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-        Note: Tunjangan Guru Besar menggunakan field tunjangan_guru_besar, ditambah Tunjangan ke-13 dan ke-14 (THR).
+      <div className="p-3 px-4 bg-amber-50/70 border border-amber-200 rounded-xl text-amber-900 text-xs font-medium flex items-center gap-2">
+        <Info size={16} className="text-amber-600 shrink-0" />
+        <span>Kalkulasi Tunjangan Guru Besar menggunakan nominal tunjangan kehormatan bulanan ditambah alokasi Tunjangan ke-13 dan ke-14 (THR).</span>
       </div>
 
-      <div className="bg-white shadow-2xl rounded-[2.5rem] overflow-hidden border border-slate-200">
+      {/* TABLE DATA */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+        <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-gray-900 text-xs">
+            Daftar Penerima Tunjangan Guru Besar
+          </h3>
+          <span className="text-[11px] font-mono font-bold text-gray-600">
+            Menampilkan {currentItems.length} dari {filteredData.length} data
+          </span>
+        </div>
+
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-[10px] text-slate-400 uppercase bg-slate-50 font-black tracking-widest border-b">
-              <tr>
-                <th className="px-8 py-6 text-center w-16">No</th>
-                <th className="px-6 py-6">Profil Guru Besar</th>
-                <th className="px-6 py-6 text-center w-24">Bln</th>
-                <th className="px-6 py-6 text-right w-48">Tunj. Guru Besar</th>
-                <th className="px-8 py-6 text-right w-48">Total Anggaran</th>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                <th className="py-3 px-4 text-center w-14">No</th>
+                <th className="py-3 px-4">Profil Guru Besar</th>
+                <th className="py-3 px-4 text-center w-24">Bulan</th>
+                <th className="py-3 px-4 text-right w-44">Tunj. Guru Besar</th>
+                <th className="py-3 px-4 text-right w-48">Total Anggaran</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {isLoading ? (
-                <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-300 font-medium italic animate-pulse">Menghitung Anggaran Tunjangan...</td></tr>
-              ) : currentItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-400">Data tidak ditemukan.</td></tr>
-              ) : currentItems.map((item) => (
-                <tr key={item.id} className="border-b border-slate-50 hover:bg-indigo-50/20 transition-colors group">
-                  <td className="px-8 py-5 text-center text-slate-300 font-bold align-top">{item.no}</td>
-                  <td className="px-6 py-5 align-top">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="font-bold text-sm text-slate-800 group-hover:text-indigo-600 transition-colors">{item.nama_pegawai}</div>
-                      <div className="flex flex-wrap items-center gap-3 text-xs">
-                        <span className="font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{item.nip}</span>
-                        <span className="text-slate-500 truncate max-w-xs">{item.unit_kerja}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${item.isPegawaiUGM ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}`}>
-                          {item.isPegawaiUGM ? 'UGM' : 'PNS'}
-                        </span>
-                        {item.golongan && <span className="px-2 py-0.5 rounded-md text-[10px] font-black text-slate-500 bg-slate-100 border border-slate-200">{item.golongan}</span>}
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-slate-400">
-                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          Pensiun (70th): {item.info.tglPensiun}
-                        </span>
-                        {item.info.isPensiun2026 && <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 border border-amber-200 text-[9px] rounded font-black uppercase tracking-tighter">Pensiun 2026</span>}
-                      </div>
-                    </div>
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-gray-400 text-xs">
+                    <RefreshCw size={20} className="animate-spin inline-block text-indigo-600 mr-2" />
+                    Menghitung tunjangan guru besar...
                   </td>
-                  <td className="px-6 py-5 text-center font-bold text-indigo-900 align-top">{item.info.totalBulanBayar}</td>
-                  <td className="px-6 py-5 text-right font-medium text-slate-600 align-top">{formatRupiah(item.tunjGuruBesar)}</td>
-                  <td className="px-8 py-5 text-right font-black text-slate-900 align-top">{formatRupiah(item.total)}</td>
                 </tr>
-              ))}
+              ) : currentItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-gray-400 text-xs italic">
+                    Data tidak ditemukan.
+                  </td>
+                </tr>
+              ) : (
+                currentItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors">
+                    <td className="py-2.5 px-4 text-center font-mono font-bold text-gray-400 text-xs align-top">
+                      {item.no}
+                    </td>
+                    <td className="py-2.5 px-4 align-top">
+                      <div className="flex flex-col gap-1">
+                        <div className="font-bold text-xs text-gray-900">{item.nama_pegawai}</div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="font-mono text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded border border-gray-200 text-[10px]">
+                            {item.nip}
+                          </span>
+                          <span className="text-gray-500 truncate max-w-xs text-[11px]">
+                            {item.unit_kerja}
+                          </span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                            item.isPegawaiUGM 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                          }`}>
+                            {item.isPegawaiUGM ? 'UGM' : 'PNS'}
+                          </span>
+                          {item.golongan && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold text-gray-600 bg-gray-100 border border-gray-200">
+                              Gol. {item.golongan}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-400">
+                            • Pensiun (70th): {item.info.tglPensiun}
+                          </span>
+                          {item.info.isPensiun2026 && (
+                            <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 border border-amber-200 text-[9px] rounded font-bold">
+                              Pensiun 2026
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono font-bold text-indigo-700 text-xs align-top">
+                      {item.info.totalBulanBayar} bln
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-mono text-gray-600 text-xs align-top">
+                      {formatRupiah(item.tunjGuruBesar)}
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900 text-xs align-top">
+                      {formatRupiah(item.total).replace(',00', '')}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
         
+        {/* Pagination Footer */}
         {!isLoading && totalPages > 1 && (
-          <div className="px-10 py-8 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Halaman {currentPage} dari {totalPages}</span>
-            <div className="flex gap-2">
-              <button onClick={() => {setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0,0);}} disabled={currentPage === 1} className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-[11px] font-black uppercase hover:shadow-lg disabled:opacity-30 transition-all active:scale-95">← Sebelumnya</button>
-              <button onClick={() => {setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0,0);}} disabled={currentPage === totalPages} className="px-6 py-3 bg-white border border-slate-200 rounded-2xl text-[11px] font-black uppercase hover:shadow-lg disabled:opacity-30 transition-all active:scale-95">Selanjutnya →</button>
+          <div className="p-3 px-5 bg-gray-50/80 border-t border-gray-200 flex justify-between items-center">
+            <span className="text-[11px] font-semibold text-gray-500">
+              Halaman {currentPage} dari {totalPages}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0,0); }} 
+                disabled={currentPage === 1} 
+                className="h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-all flex items-center gap-1 shadow-2xs"
+              >
+                <ChevronLeft size={14} /> Sebelumnya
+              </button>
+              <button 
+                onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0,0); }} 
+                disabled={currentPage === totalPages} 
+                className="h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-all flex items-center gap-1 shadow-2xs"
+              >
+                Selanjutnya <ChevronRight size={14} />
+              </button>
             </div>
           </div>
         )}

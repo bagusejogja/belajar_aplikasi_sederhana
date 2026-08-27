@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 import {
-   Building2, MessageSquare, Copy, CheckCircle2, Info, Share, Undo2, FileText, Send
+   Building2, MessageSquare, Copy, CheckCircle2, Info, Share, Undo2, FileText, Send, Sparkles, Check
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 export default function GovNarrativePage() {
    const [loading, setLoading] = useState(true);
@@ -39,8 +40,8 @@ export default function GovNarrativePage() {
    const prefixName = (name: string) => {
       if (!name) return '';
       const n = name.toLowerCase();
-      if (n.includes('iswandari')) return `Mbak ${name}`;
-      if (n.includes('bambang') || n.includes('ridwan') || n.includes('bagus')) return `Mas ${name}`;
+      if (n.includes('iswandari') || n.includes('muslifah')) return `Mbak ${name}`;
+      if (n.includes('bambang') || n.includes('ridwan') || n.includes('bagus') || n.includes('triyanto') || n.includes('rohman')) return `Mas ${name}`;
       return name;
    };
 
@@ -62,7 +63,7 @@ export default function GovNarrativePage() {
 
       const pic = prefixName(picOverride);
       return `Assalamualaikum warahmatullahi wabarakatuh,
-${pic || '[pic]'}, ${mainText}
+${pic || '[PIC]'}, ${mainText}
 Terima kasih.`;
    };
 
@@ -122,125 +123,193 @@ Terima kasih..`;
    const copyToClipboard = (text: string, type: string) => {
       navigator.clipboard.writeText(text);
       setCopied(type);
+      toast.success('Pesan narasi berhasil disalin!');
       setTimeout(() => setCopied(null), 2000);
    };
 
-   if (loading) return (
-      <div className="p-40 flex flex-col items-center justify-center gap-6">
-         <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin" />
-         <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Menyiapkan Mesin Narasi...</p>
-      </div>
-   );
-
    return (
-      <div className="max-w-5xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
-         {/* 1. HEADER */}
-         <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
-            <div className="relative z-10">
-               <h1 className="text-3xl font-black tracking-tighter italic uppercase flex items-center gap-4">
-                  <MessageSquare size={36} className="text-indigo-400" /> Narrative Engine <span className="text-sm font-normal text-slate-500 hidden md:inline">v2.0</span>
-               </h1>
-               <p className="text-slate-400 mt-1 font-bold tracking-widest text-[10px] uppercase">Official Budget Communication Generator</p>
-            </div>
-         </div>
-
-         {/* 2. CONFIGURATION */}
-         <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-8 border-b bg-slate-50/50 flex items-center justify-between">
-               <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] italic flex items-center gap-2"><Building2 size={14} /> Parameter Unit & PIC</h3>
-            </div>
-            <div className="p-10 space-y-8">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Unit Kerja</label>
-                     <Select options={units} onChange={handleUnitChange} placeholder="Cari Nama Unit..." className="react-select-container" classNamePrefix="react-select" />
-                  </div>
-                  <div className="space-y-3">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama PIC Tujuan</label>
-                     <input type="text" value={picOverride} onChange={e => setPicOverride(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-[1.2rem] p-4 font-black text-sm outline-none focus:border-indigo-500 transition-all shadow-inner" placeholder="Penerima Pesan..." />
-                  </div>
+      <div className="max-w-5xl mx-auto space-y-4 pb-20">
+         {/* SLIM & UNIFIED TOP TOOLBAR */}
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
+            <div className="flex items-center gap-3">
+               <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-2 rounded-xl text-white shadow-xs">
+                  <MessageSquare size={20} />
                </div>
-               <div className="flex items-center gap-4 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 transition-all hover:border-emerald-200">
-                  <input type="checkbox" checked={isProcessed} onChange={e => setIsProcessed(e.target.checked)} className="w-12 h-6 appearance-none bg-slate-200 rounded-full checked:bg-emerald-500 relative transition-all cursor-pointer before:content-[''] before:absolute before:w-4 before:h-4 before:bg-white before:rounded-full before:top-1 before:left-1 before:transition-all checked:before:translate-x-6 shadow-inner" />
-                  <div>
-                     <h4 className="text-[11px] font-black text-slate-700 uppercase italic">Status: Penambahan Pagu / Selesai</h4>
-                     <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase">Aktifkan untuk Konfirmasi Selesai & Draft Persetujuan WR</p>
+               <div>
+                  <div className="flex items-center gap-2">
+                     <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Generator Narasi Komunikasi</h2>
+                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                        WhatsApp & Surat
+                     </span>
                   </div>
+                  <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                     Buat draf narasi permohonan buka akses, konfirmasi selesai, dan draf surat WR secara otomatis.
+                  </p>
                </div>
             </div>
          </div>
 
-         {/* 3. OUTPUTS */}
-         <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
-            {/* ROW 1: PRIMARY REQUEST */}
-            <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-indigo-50 group hover:border-indigo-100 transition-all">
-               <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                     <MessageSquare size={14} /> Permohonan Akses (WA)
-                  </h4>
-                  <span className="bg-indigo-50 text-[9px] font-black px-3 py-1 rounded-full text-indigo-600 uppercase">Phase 1</span>
+         {/* CONFIGURATION CARD */}
+         <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                     <Building2 size={13} className="text-indigo-600"/> Pilih Unit Kerja
+                  </label>
+                  <Select 
+                     options={units} 
+                     value={selectedUnit}
+                     onChange={handleUnitChange} 
+                     placeholder="Cari & pilih nama unit..." 
+                     className="text-xs font-bold"
+                     styles={{
+                        control: (base) => ({ ...base, minHeight: '38px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+                        valueContainer: (base) => ({ ...base, padding: '0 8px' })
+                     }}
+                  />
                </div>
-               <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100">
-                  <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-sm italic">{selectedUnit ? getNarrative() : '...'}</p>
+
+               <div>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                     Nama PIC Tujuan
+                  </label>
+                  <input 
+                     type="text" 
+                     value={picOverride} 
+                     onChange={e => setPicOverride(e.target.value)} 
+                     className="w-full h-9.5 px-3.5 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
+                     placeholder="Nama penerima pesan..." 
+                  />
                </div>
-               <button disabled={!selectedUnit} onClick={() => copyToClipboard(getNarrative(), 'req')} className={`mt-6 w-full py-4 rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg ${!selectedUnit ? 'bg-slate-100 text-slate-300' : 'bg-indigo-600 text-white hover:bg-slate-900 shadow-indigo-100'}`}>
-                  {copied === 'req' ? <CheckCircle2 size={16} /> : <Copy size={16} />} {copied === 'req' ? 'Tersalin' : 'Salin Pesan WA'}
-               </button>
             </div>
 
-            {/* ROW 2: PROCESSED & NOTIF (Visible when checked) */}
+            <div className="flex items-center gap-3 p-3 bg-indigo-50/40 border border-indigo-100 rounded-xl">
+               <input 
+                  type="checkbox" 
+                  id="statusProcessed"
+                  checked={isProcessed} 
+                  onChange={e => setIsProcessed(e.target.checked)} 
+                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer" 
+               />
+               <label htmlFor="statusProcessed" className="text-xs font-bold text-gray-800 cursor-pointer select-none">
+                  Tampilkan Opsi Tambahan (Konfirmasi Selesai, Notifikasi Unit, dan Draf Persetujuan WR)
+               </label>
+            </div>
+         </div>
+
+         {/* OUTPUT CARDS */}
+         <div className="space-y-4">
+            {/* PHASE 1: PERMOHONAN AKSES */}
+            <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-200/80 space-y-3">
+               <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase">
+                        Fase 1
+                     </span>
+                     <h3 className="text-xs font-black text-gray-900">Permohonan Buka Akses (Pesan WhatsApp)</h3>
+                  </div>
+                  <button 
+                     disabled={!selectedUnit} 
+                     onClick={() => copyToClipboard(getNarrative(), 'req')} 
+                     className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
+                  >
+                     {copied === 'req' ? <Check size={13} /> : <Copy size={13} />}
+                     <span>{copied === 'req' ? 'Tersalin' : 'Salin Pesan'}</span>
+                  </button>
+               </div>
+               <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {selectedUnit ? getNarrative() : <span className="text-gray-400 italic">Silakan pilih unit kerja di atas untuk melihat narasi...</span>}
+               </div>
+            </div>
+
+            {/* PHASE 2, 3, 4, 5 (When checked) */}
             {isProcessed && (
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-500">
-                  <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-emerald-50 flex flex-col group hover:border-emerald-100 transition-all">
-                     <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-4">Konfirmasi Selesai (Phase 2)</h4>
-                     <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
-                        <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getProcessedNote()}</p>
+               <div className="space-y-4 animate-in fade-in duration-300">
+                  {/* Phase 2: Konfirmasi Selesai */}
+                  <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-200/80 space-y-3">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase">
+                              Fase 2
+                           </span>
+                           <h3 className="text-xs font-black text-gray-900">Konfirmasi Selesai / Diarsipkan (Closing WA)</h3>
+                        </div>
+                        <button 
+                           onClick={() => copyToClipboard(getProcessedNote(), 'proc')} 
+                           className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
+                        >
+                           {copied === 'proc' ? <Check size={13} /> : <Copy size={13} />}
+                           <span>{copied === 'proc' ? 'Tersalin' : 'Salin Pesan'}</span>
+                        </button>
                      </div>
-                     <button onClick={() => copyToClipboard(getProcessedNote(), 'proc')} className="mt-6 w-full py-4 bg-emerald-600 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-emerald-50 flex items-center justify-center gap-2">
-                        {copied === 'proc' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN CLOSING
-                     </button>
+                     <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {getProcessedNote()}
+                     </div>
                   </div>
 
-                  <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-amber-50 flex flex-col group hover:border-amber-100 transition-all">
-                     <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-4">Notifikasi Unit (Phase 3)</h4>
-                     <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
-                        <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getUnitNotification()}</p>
+                  {/* Phase 3: Notifikasi Unit */}
+                  <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-200/80 space-y-3">
+                     <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-black uppercase">
+                              Fase 3
+                           </span>
+                           <h3 className="text-xs font-black text-gray-900">Pemberitahuan ke Unit Kerja</h3>
+                        </div>
+                        <button 
+                           onClick={() => copyToClipboard(getUnitNotification(), 'notif')} 
+                           className="h-8 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
+                        >
+                           {copied === 'notif' ? <Check size={13} /> : <Copy size={13} />}
+                           <span>{copied === 'notif' ? 'Tersalin' : 'Salin Pesan'}</span>
+                        </button>
                      </div>
-                     <button onClick={() => copyToClipboard(getUnitNotification(), 'unit')} className="mt-6 w-full py-4 bg-amber-500 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-amber-50 flex items-center justify-center gap-2">
-                        {copied === 'unit' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN NOTIF UNIT
-                     </button>
+                     <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">
+                        {getUnitNotification()}
+                     </div>
+                  </div>
+
+                  {/* Phase 4 & 5: Draf WR */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                           <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black uppercase">
+                              Persetujuan WR
+                           </span>
+                           <button 
+                              onClick={() => copyToClipboard(getWRApprovalReq(), 'wr_req')} 
+                              className="h-7 px-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 active:scale-95"
+                           >
+                              {copied === 'wr_req' ? <Check size={12} /> : <Copy size={12} />}
+                              <span>Salin</span>
+                           </button>
+                        </div>
+                        <div className="bg-gray-50/80 p-3 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 whitespace-pre-wrap leading-relaxed min-h-[110px]">
+                           {getWRApprovalReq()}
+                        </div>
+                     </div>
+
+                     <div className="bg-white rounded-2xl p-5 shadow-xs border border-gray-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                           <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase">
+                              Follow-up WR
+                           </span>
+                           <button 
+                              onClick={() => copyToClipboard(getWRFollowUp(), 'wr_fu')} 
+                              className="h-7 px-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 active:scale-95"
+                           >
+                              {copied === 'wr_fu' ? <Check size={12} /> : <Copy size={12} />}
+                              <span>Salin</span>
+                           </button>
+                        </div>
+                        <div className="bg-gray-50/80 p-3 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 whitespace-pre-wrap leading-relaxed min-h-[110px]">
+                           {getWRFollowUp()}
+                        </div>
+                     </div>
                   </div>
                </div>
             )}
-
-            {/* ROW 3: WR APPROVAL (Visible when checked) */}
-            {isProcessed && (
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-700">
-                  <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-fuchsia-50 flex flex-col group hover:border-fuchsia-100 transition-all">
-                     <h4 className="text-[10px] font-black text-fuchsia-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><FileText size={14} /> Permintaan Surat WR (Phase 4)</h4>
-                     <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
-                        <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getWRApprovalReq()}</p>
-                     </div>
-                     <button onClick={() => copyToClipboard(getWRApprovalReq(), 'wr-req')} className="mt-6 w-full py-4 bg-fuchsia-600 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-fuchsia-50 flex items-center justify-center gap-2">
-                        {copied === 'wr-req' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN DRAFT WR
-                     </button>
-                  </div>
-
-                  <div className="bg-white rounded-[3rem] p-8 shadow-xl border-4 border-rose-50 flex flex-col group hover:border-rose-100 transition-all">
-                     <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Send size={14} /> Tindak Lanjut WR (Phase 5)</h4>
-                     <div className="bg-slate-50/50 p-6 rounded-[1.5rem] border-2 border-dashed border-slate-100 flex-1">
-                        <p className="text-slate-800 font-bold whitespace-pre-wrap leading-relaxed text-xs italic">{getWRFollowUp()}</p>
-                     </div>
-                     <button onClick={() => copyToClipboard(getWRFollowUp(), 'wr-follow')} className="mt-6 w-full py-4 bg-rose-600 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-widest hover:bg-slate-900 shadow-lg shadow-rose-50 flex items-center justify-center gap-2">
-                        {copied === 'wr-follow' ? <CheckCircle2 size={16} /> : <Copy size={16} />} SALIN TINDAK LANJUT
-                     </button>
-                  </div>
-               </div>
-            )}
          </div>
-
-         {/* FOOTER TIPS */}
-
       </div>
    );
 }

@@ -536,93 +536,114 @@ export default function TimelinePage() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto flex flex-col h-[calc(100vh-100px)] min-h-[700px] space-y-4 pb-4 pt-4">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-800 to-sky-700 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
-        <div>
-          <h1 className="text-3xl font-black flex items-center gap-3"><Calendar size={32} /> Gantt Chart Kegiatan</h1>
-          <p className="text-indigo-100 font-medium mt-2">Pantau jadwal Induk & Sub-Kegiatan dalam bentuk Gantt Chart interaktif.</p>
+    <div className="max-w-screen-2xl mx-auto flex flex-col h-[calc(100vh-100px)] min-h-[700px] space-y-3 pb-2 pt-1">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Calendar size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Gantt Chart Jadwal Kegiatan</h2>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {data.length} Kegiatan ({data.filter(d => d.status === 'Selesai').length} Selesai)
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Pantau jadwal Induk & Sub-Kegiatan dalam bentuk Gantt Chart interaktif.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
            <button 
              onClick={handleExportWord}
-             className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-sky-400"
+             className="h-9 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
            >
-             <Download size={20} /> UNDUH WORD
+             <Download size={13} />
+             <span>Word</span>
            </button>
+
            <button 
              onClick={handleExportExcel}
-             className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border border-emerald-400"
+             className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
            >
-             <FileText size={20} /> UNDUH EXCEL
+             <FileText size={13} />
+             <span>Excel</span>
            </button>
+
            <button 
              onClick={() => { resetForm(); setIsModalOpen(true); }}
-             className="bg-white text-indigo-700 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center justify-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
+             className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
            >
-             <Plus size={20} /> TAMBAH KEGIATAN
+             <Plus size={15} />
+             <span>Tambah Kegiatan</span>
            </button>
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4 relative z-[70]">
+      {/* FILTER CONTROLS BAR */}
+      <div className="bg-white p-3 px-4 rounded-2xl shadow-xs border border-gray-200/80 flex flex-wrap items-center gap-3 relative z-[70] shrink-0">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
           <input 
             type="text" 
-            placeholder="Cari nama kegiatan besar atau PIC..." 
+            placeholder="Cari kegiatan atau PIC..." 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 ring-indigo-100 font-medium text-gray-700"
+            className="w-full h-9 pl-8 pr-4 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-xs font-semibold text-gray-700 transition-all"
           />
         </div>
         
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl shrink-0">
+        {/* Mode Harian / Pekanan */}
+        <div className="flex bg-gray-100 p-1 rounded-xl shrink-0">
            <button 
              onClick={() => setViewMode('hari')} 
-             className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'hari' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+             className={`h-7 px-3 rounded-lg text-xs font-bold transition-all ${viewMode === 'hari' ? 'bg-white shadow-2xs text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
            >
              Harian
            </button>
            <button 
              onClick={() => setViewMode('pekan')} 
-             className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'pekan' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+             className={`h-7 px-3 rounded-lg text-xs font-bold transition-all ${viewMode === 'pekan' ? 'bg-white shadow-2xs text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
            >
              Pekanan
            </button>
         </div>
 
-        <div className="relative w-48 shrink-0 z-[60]">
+        {/* Filter Tahun */}
+        <div className="relative w-44 shrink-0 z-[60]">
           <Select 
              options={[{value: 'All', label: 'Semua Tahun'}, ...availableYears.map(y => ({value: y.toString(), label: `Tahun ${y}`}))]}
              value={{value: filterYear, label: filterYear === 'All' ? 'Semua Tahun' : `Tahun ${filterYear}`}}
              onChange={(v: any) => setFilterYear(v.value)}
-             className="text-sm font-bold"
+             className="text-xs font-bold"
              styles={{
-                control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
+                control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
                 menu: (base) => ({ ...base, zIndex: 9999 }),
              }}
           />
         </div>
 
-        <div className="relative w-64 shrink-0 z-[60]">
+        {/* Filter Kegiatan */}
+        <div className="relative w-56 shrink-0 z-[60]">
           <Select 
              options={[{value: 'All', label: 'Semua Kegiatan'}, ...parents.map((p: any) => ({value: p.id.toString(), label: p.judul_kegiatan}))]}
              value={{value: filterParentId, label: filterParentId === 'All' ? 'Semua Kegiatan' : parents.find((p: any) => p.id.toString() === filterParentId)?.judul_kegiatan || 'Pilih Kegiatan'}}
              onChange={(v: any) => setFilterParentId(v.value)}
-             className="text-sm font-bold"
+             className="text-xs font-bold"
              placeholder="Filter Kegiatan"
              styles={{
-                control: (base) => ({ ...base, borderRadius: '1rem', padding: '0.25rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
+                control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb', color: '#374151' }),
                 menu: (base) => ({ ...base, zIndex: 9999 }),
              }}
           />
         </div>
       </div>
 
-      {/* Gantt Chart View */}
-      <div className="bg-white rounded-3xl shadow-md border border-gray-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+      {/* GANTT CHART VIEW CARD */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden flex-1 min-h-0 flex flex-col">
         {loading ? (
           <div className="flex justify-center items-center h-40 flex-1">
             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>

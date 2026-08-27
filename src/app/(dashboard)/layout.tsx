@@ -133,35 +133,36 @@ export default function DashboardLayout({
       </div>
       
       <div className={`flex-1 flex flex-col ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible print:h-auto print:block`}>
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 lg:px-10 lg:py-8 gap-4 bg-white/50 backdrop-blur-md sticky top-0 z-30 border-b border-gray-100 lg:border-none print:hidden">
+        <header className="flex items-center justify-between px-4 py-2.5 md:px-6 lg:px-8 bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-200/80 shadow-2xs print:hidden">
            
-           <div className="flex items-center gap-3 w-full md:w-auto">
+           <div className="flex items-center gap-3">
               {/* Tombol Hamburger Untuk Mobile Saja */}
               <button 
                  onClick={() => setIsSidebarOpen(true)}
-                 className="lg:hidden p-2 -ml-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                 className="lg:hidden p-1.5 -ml-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
               >
-
-                 <Menu size={24} />
+                 <Menu size={20} />
               </button>
               
-              <div>
-                 <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">{getPageTitle(pathname)}</h1>
-                 <p className="text-gray-500 text-xs md:text-sm font-medium mt-1">Selamat datang - [SYNC_v4.5.18.5]</p>
+              <div className="flex flex-wrap items-center gap-2">
+                 <h1 className="text-sm md:text-base font-black text-gray-900 tracking-tight leading-none">{getPageTitle(pathname)}</h1>
+                 <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-gray-300" />
+                 <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Selamat datang</span>
+                 <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold border border-indigo-100 shadow-2xs">
+                   SYNC_v4.5.18.5
+                 </span>
               </div>
            </div>
            
-           {/* Kanan / Kotak Cari */}
-           <div className="flex items-center justify-end w-full md:w-auto gap-4">
-              <div className="flex gap-2">
-                 <button className="p-2.5 bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 hover:border-gray-300 text-gray-500 transition-all shadow-sm">
-                    <Bell size={20} />
-                 </button>
-              </div>
+           {/* Kanan / Action */}
+           <div className="flex items-center gap-2">
+              <button className="p-1.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all shadow-2xs" title="Notifikasi">
+                 <Bell size={16} />
+              </button>
            </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 lg:p-10 lg:pt-0 w-full">
+        <main className="flex-1 p-3 md:p-5 lg:p-6 w-full">
           {children}
         </main>
       </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send } from 'lucide-react';
+import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
@@ -26,7 +26,6 @@ export default function InputPage() {
      catatan: ''
   });
 
-  // State File Update (Dukung Banyak File)
   type AttachmentState = { files: File[]; url: string };
   const [attachments, setAttachments] = useState<{
      nota: AttachmentState,
@@ -70,7 +69,6 @@ export default function InputPage() {
   const handleAttachmentChange = (type: keyof typeof attachments, e: React.ChangeEvent<HTMLInputElement>) => {
      if (e.target.files && e.target.files.length > 0) {
          const newFiles = Array.from(e.target.files);
-         // Filter ukuran
          const validFiles = newFiles.filter(f => f.size <= 3 * 1024 * 1024);
          if (validFiles.length < newFiles.length) {
              alert("Beberapa file diabaikan karena ukurannya melebihi 3MB.");
@@ -93,86 +91,79 @@ export default function InputPage() {
      }));
   };
 
-   // Upload BANYAK FILE secara paralel melalui API ROUTE (LEBIH STABIL)
    const uploadMultipleFiles = async (files: File[]) => {
       if (files.length === 0) return '';
       
       const uploadPromises = files.map(async (file) => {
-         try {
-            console.log("Mengirim file ke API:", file.name);
-            
-            const upData = new FormData();
-            upData.append('file', file);
-            upData.append('folder', 'transaksi');
+         const fileExt = file.name.split('.').pop();
+         const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+         const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${cleanFileName}`;
+         
+         const uploadFormData = new FormData();
+         uploadFormData.append('file', file);
+         uploadFormData.append('fileName', fileName);
 
-            const response = await fetch('/api/upload', {
-               method: 'POST',
-               body: upData
-            });
+         const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: uploadFormData,
+         });
 
-            const result = await response.json();
-
-            if (!result.success) {
-               throw new Error(result.error || "Gagal upload file");
-            }
-            
-            console.log("API berhasil upload:", file.name);
-            return result.publicUrl;
-         } catch (err: any) {
-            console.error("Gagal Upload via API:", err);
-            alert("GAGAL UPLOAD: " + err.message);
-            throw err;
+         const result = await response.json();
+         if (!response.ok || !result.success) {
+            throw new Error(result.error || `Gagal mengunggah file ${file.name}`);
          }
+         return result.publicUrl;
       });
 
-      const urls = await Promise.all(uploadPromises);
-      return urls.join(',');
+      const uploadedUrls = await Promise.all(uploadPromises);
+      return uploadedUrls.filter(Boolean).join(', ');
    };
 
   const handleSave = async (e: React.FormEvent) => {
      e.preventDefault();
-     if (tipeTransaksi === 'Transfer') {
-        if (!formData.jenis_belanja_id || !formData.rek_tujuan_id || !formData.uraian || !formData.nominal) {
-           toast.error("Lengkapi Kategori Belanja, Dibayarkan Ke, Nominal, dan Uraian!");
-           return;
-        }
-     } else {
-        if (!formData.jenis_belanja_id || !formData.personel_id || !formData.uraian || !formData.nominal) {
-           toast.error("Lengkapi Jenis Belanja, Personel, Uraian, dan Nominal!");
-           return;
-        }
+     if (!formData.nominal || isNaN(Number(formData.nominal))) {
+        toast.error("Nominal transaksi harus diisi dengan angka valid!");
+        return;
+     }
+
+     if (tipeTransaksi === 'Transfer' && !formData.rek_tujuan_id) {
+        toast.error("Rekening Tujuan wajib dipilih untuk transaksi Transfer!");
+        return;
+     }
+
+     if (tipeTransaksi !== 'Transfer' && !formData.jenis_belanja_id) {
+        toast.error("Jenis Belanja / Kategori wajib dipilih!");
+        return;
+     }
+
+     if (tipeTransaksi !== 'Transfer' && !formData.personel_id) {
+        toast.error("Personel Pemohon wajib dipilih!");
+        return;
      }
 
      setIsSaving(true);
      try {
-        // Ambil UUID user yang sedang login secara otomatis (di belakang layar)
-        const { data: sessionData } = await supabase.auth.getSession();
-        const currentUserId = sessionData?.session?.user?.id || null;
-        const currentUserEmail = sessionData?.session?.user?.email || 'Sistem';
-
+        const nominalAngka = Number(formData.nominal);
         const selectedBelanja = listBelanja.find(b => b.id === formData.jenis_belanja_id?.value);
+        const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
 
-        // Proses Gambar
         const notaUrl = attachments.nota.files.length > 0 ? await uploadMultipleFiles(attachments.nota.files) : attachments.nota.url;
         const kegiatanUrl = attachments.kegiatan.files.length > 0 ? await uploadMultipleFiles(attachments.kegiatan.files) : attachments.kegiatan.url;
         const barangUrl = attachments.barang.files.length > 0 ? await uploadMultipleFiles(attachments.barang.files) : attachments.barang.url;
-        
-        const nominalAngka = Number(formData.nominal) || 0;
 
         if (tipeTransaksi === 'Transfer') {
            const { error } = await supabase.from('pengajuan_transfer').insert([
               {
-                 tanggal_pengajuan: formData.tanggal,
-                 kategori_belanja_id: formData.jenis_belanja_id.value,
+                 tgl_pengajuan: formData.tanggal,
+                 jenis_belanja_id: formData.jenis_belanja_id ? formData.jenis_belanja_id.value : null,
                  rek_tujuan_id: formData.rek_tujuan_id.value,
                  nominal: nominalAngka,
-                 kegiatan: formData.uraian,
-                 barang: currentUserEmail,
-                 catatan: formData.catatan,
-                 nota_url: notaUrl || null,
+                 uraian: formData.uraian,
+                 catatan: formData.catatan || null,
+                 status_approval: 'Menunggu',
+                 foto_nota: notaUrl || null,
                  foto_kegiatan: kegiatanUrl || null,
                  foto_barang: barangUrl || null,
-                 status: 'Diajukan',
                  created_by: currentUserId
               }
            ]);
@@ -203,7 +194,7 @@ export default function InputPage() {
            if (error) throw error;
         }
         
-        toast.success(`Data ${tipeTransaksi === 'Transfer' ? 'Pengajuan Transfer' : 'Transaksi'} BERHASIL disimpan! 🚀`);
+        toast.success(`Data ${tipeTransaksi} berhasil disimpan!`);
         setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, rek_tujuan_id: null, toko: '', uraian: '', nominal: '', catatan: '' });
         setAttachments({
            nota: { files: [], url: '' }, kegiatan: { files: [], url: '' },
@@ -225,92 +216,128 @@ export default function InputPage() {
       label: `${r.nama_rekening} - ${r.ref_bank?.nama_bank} (${r.no_rekening})`
   }));
 
-  const inputColor = tipeTransaksi === 'Pemasukan' ? 'emerald' : tipeTransaksi === 'Transfer' ? 'blue' : 'red';
-
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 overflow-hidden max-w-5xl mx-auto animate-in zoom-in-95 duration-300">
-         <form onSubmit={handleSave} className="space-y-8">
-            <div className="flex flex-col sm:flex-row bg-gray-100 p-1.5 rounded-2xl gap-1">
-               <button type="button" onClick={() => setTipeTransaksi('Pengeluaran')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Pengeluaran' ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PENGELUARAN KAS (-)</button>
-               <button type="button" onClick={() => setTipeTransaksi('Pemasukan')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PEMASUKAN KAS (+)</button>
-               <button type="button" onClick={() => setTipeTransaksi('Transfer')} className={`flex-1 flex justify-center items-center py-3 px-4 rounded-xl font-black transition-all ${tipeTransaksi === 'Transfer' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>PENGAJUAN TRANSFER</button>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <FileEdit size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Input Transaksi Kas Masjid
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {tipeTransaksi}
+              </span>
             </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Pencatatan pengeluaran, pemasukan, dan pengajuan transfer dana masjid.
+            </p>
+          </div>
+        </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{tipeTransaksi === 'Transfer' ? 'Tgl Pengajuan' : 'Tgl Transaksi'}</label>
-                  <input type="date" name="tanggal" value={formData.tanggal} onChange={handleInputChange} required className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-3.5 outline-none font-medium" />
+        <div className="flex bg-gray-100/80 p-1 rounded-xl gap-1">
+          <button 
+            type="button" 
+            onClick={() => setTipeTransaksi('Pengeluaran')} 
+            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pengeluaran' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            Pengeluaran (-)
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setTipeTransaksi('Pemasukan')} 
+            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            Pemasukan (+)
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setTipeTransaksi('Transfer')} 
+            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Transfer' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            Transfer
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 md:p-6 overflow-hidden">
+         <form onSubmit={handleSave} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">{tipeTransaksi === 'Transfer' ? 'Tgl Pengajuan' : 'Tgl Transaksi'}</label>
+                  <input type="date" name="tanggal" value={formData.tanggal} onChange={handleInputChange} required className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700" />
                </div>
-               <div className="space-y-2 relative z-50">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{tipeTransaksi === 'Transfer' ? 'Kategori Belanja' : 'Barang / Kategori Belanja'}</label>
-                  <Select options={optionBelanja} placeholder="Ketik disini..." value={formData.jenis_belanja_id} onChange={(val) => setFormData({...formData, jenis_belanja_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
+               <div className="space-y-1.5 relative z-50">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">{tipeTransaksi === 'Transfer' ? 'Kategori Belanja' : 'Barang / Kategori Belanja'}</label>
+                  <Select options={optionBelanja} placeholder="Pilih Kategori..." value={formData.jenis_belanja_id} onChange={(val) => setFormData({...formData, jenis_belanja_id: val})} className="text-xs" styles={{ control: (b) => ({...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', background: '#f9fafb', fontSize: '0.75rem', fontWeight: '600'}), valueContainer: (b) => ({ ...b, padding: '0 8px' }) }} />
                </div>
                {tipeTransaksi === 'Transfer' ? (
-                  <div className="space-y-2 relative z-40">
-                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dibayarkan Ke (Rekening)</label>
-                     <Select options={optionRekening} placeholder="Pilih Rekening Tujuan..." value={formData.rek_tujuan_id} onChange={(val) => setFormData({...formData, rek_tujuan_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
+                  <div className="space-y-1.5 relative z-40">
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Dibayarkan Ke (Rekening)</label>
+                     <Select options={optionRekening} placeholder="Pilih Rekening Tujuan..." value={formData.rek_tujuan_id} onChange={(val) => setFormData({...formData, rek_tujuan_id: val})} className="text-xs" styles={{ control: (b) => ({...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', background: '#f9fafb', fontSize: '0.75rem', fontWeight: '600'}), valueContainer: (b) => ({ ...b, padding: '0 8px' }) }} />
                   </div>
                ) : (
-                  <div className="space-y-2 relative z-40">
-                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Personel Pemohon</label>
-                     <Select options={optionPersonel} placeholder="Cari..." value={formData.personel_id} onChange={(val) => setFormData({...formData, personel_id: val})} styles={{ control: (b) => ({...b, padding: '4px', borderRadius: '1rem', background: '#f9fafb'}) }} />
+                  <div className="space-y-1.5 relative z-40">
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Personel Pemohon</label>
+                     <Select options={optionPersonel} placeholder="Cari Personel..." value={formData.personel_id} onChange={(val) => setFormData({...formData, personel_id: val})} className="text-xs" styles={{ control: (b) => ({...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', background: '#f9fafb', fontSize: '0.75rem', fontWeight: '600'}), valueContainer: (b) => ({ ...b, padding: '0 8px' }) }} />
                   </div>
                )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nominal {tipeTransaksi === 'Transfer' ? 'Transfer' : 'Rincian'}</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Nominal {tipeTransaksi === 'Transfer' ? 'Transfer' : 'Rincian'}</label>
                   <div className="relative">
-                     <span className={`absolute left-4 top-1/2 -translate-y-1/2 font-black text-${inputColor}-600`}>Rp</span>
-                     <input type="number" name="nominal" value={formData.nominal} onChange={handleInputChange} required className={`w-full bg-${inputColor}-50 border border-${inputColor}-100 text-${inputColor}-700 rounded-2xl pl-12 pr-4 py-4 outline-none font-black text-xl`} placeholder="0" />
+                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xs text-gray-400">Rp</span>
+                     <input type="number" name="nominal" value={formData.nominal} onChange={handleInputChange} required className="w-full h-9 pl-9 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-bold text-xs text-gray-700" placeholder="0" />
                   </div>
                </div>
-               <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Uraian / Rincian Kegiatan</label>
+               <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">Uraian / Rincian Kegiatan</label>
                   <div className="flex flex-col gap-2">
                      {tipeTransaksi !== 'Transfer' && (
-                        <input type="text" name="toko" value={formData.toko} onChange={handleInputChange} placeholder="Nama Toko..." className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
+                        <input type="text" name="toko" value={formData.toko} onChange={handleInputChange} placeholder="Nama Toko / Rekanan..." className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700" />
                      )}
-                     <input type="text" name="uraian" required value={formData.uraian} onChange={handleInputChange} placeholder={tipeTransaksi === 'Transfer' ? "Contoh: Honor Narasumber A.n Budi..." : "Uraian Pembayaran..."} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3" />
+                     <input type="text" name="uraian" required value={formData.uraian} onChange={handleInputChange} placeholder={tipeTransaksi === 'Transfer' ? "Contoh: Honor Narasumber A.n Budi..." : "Uraian Pembayaran..."} className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700" />
                      {tipeTransaksi === 'Transfer' && (
-                        <input type="text" name="catatan" value={formData.catatan} onChange={handleInputChange} placeholder="Catatan Opsional..." className="w-full bg-amber-50 border border-amber-200 rounded-xl p-3" />
+                        <input type="text" name="catatan" value={formData.catatan} onChange={handleInputChange} placeholder="Catatan Opsional..." className="w-full h-9 px-3 bg-amber-50/40 hover:bg-white border border-amber-200 rounded-xl outline-none focus:ring-2 ring-amber-500/20 focus:bg-white transition-all font-medium text-xs text-gray-700" />
                      )}
                   </div>
                </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
-               <label className="text-sm font-bold text-indigo-800 flex items-center gap-2"><UploadCloud/> Lampiran Foto (BISA PILIH LEBIH DARI 1 GAMBAR!)</label>
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2 pt-2 border-t border-gray-100">
+               <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5"><UploadCloud size={14} className="text-indigo-600"/> Lampiran Foto Bukti</label>
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {(Object.keys(attachments) as Array<keyof typeof attachments>).map((key) => {
-                     if (tipeTransaksi === 'Transfer' && key === 'transfer') return null; // Bukti TF di-upload saat approval untuk transfer
+                     if (tipeTransaksi === 'Transfer' && key === 'transfer') return null;
                      
                      const item = attachments[key];
-                     const title = key === 'nota' ? 'Nota/Kwitansi' : key === 'kegiatan' ? 'Kegiatan' : key === 'barang' ? 'Barang' : 'Bukti TF';
+                     const title = key === 'nota' ? 'Nota / Kwitansi' : key === 'kegiatan' ? 'Foto Kegiatan' : key === 'barang' ? 'Foto Barang' : 'Bukti Transfer';
                      
                      return (
-                        <div key={key} className="border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-start text-center relative hover:bg-gray-50 transition-all min-h-[160px] p-2">
-                           <p className="font-bold text-xs text-gray-700 w-full mb-2 pt-2 border-b pb-2">📂 {title} - ({item.files.length} File)</p>
+                        <div key={key} className="border border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-start text-center hover:bg-gray-50 transition-all p-2.5 space-y-1.5">
+                           <p className="font-bold text-[11px] text-gray-700 w-full pb-1 border-b border-gray-100">{title} ({item.files.length})</p>
                            
-                           {/* Daftar File List yang Dipilih */}
-                           <div className="w-full flex-1 overflow-y-auto max-h-[80px] space-y-1 mb-2">
+                           <div className="w-full flex-1 overflow-y-auto max-h-[60px] space-y-1">
                               {item.files.map((file, idx) => (
-                                 <div key={idx} className="flex items-center justify-between bg-indigo-50 px-2 py-1 rounded text-[10px] text-indigo-700 font-bold mx-1">
+                                 <div key={idx} className="flex items-center justify-between bg-indigo-50 px-2 py-0.5 rounded-lg text-[10px] text-indigo-700 font-bold">
                                     <span className="truncate max-w-[80%]">{file.name}</span>
-                                    <button type="button" onClick={() => removeFile(key, idx)} className="text-red-500 hover:bg-red-200 p-0.5 rounded"><X size={12}/></button>
+                                    <button type="button" onClick={() => removeFile(key, idx)} className="text-rose-500 hover:bg-rose-100 p-0.5 rounded"><X size={11}/></button>
                                  </div>
                               ))}
                            </div>
 
-                           <label className="cursor-pointer w-[90%] bg-white border border-gray-200 py-2 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 shadow-sm transition-all text-center">
-                              + Pilih File / Foto
+                           <label className="cursor-pointer w-full bg-white border border-gray-200 py-1.5 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 shadow-2xs transition-all text-center block">
+                              + Pilih File
                               <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleAttachmentChange(key, e)} />
                            </label>
                            
                            {item.files.length === 0 && (
-                              <input type="text" placeholder="Atau Link GDrive (Pakai Koma)..." value={item.url} onChange={(e) => setAttachments(p => ({ ...p, [key]: { ...p[key], url: e.target.value } }))} className="w-[90%] mt-2 bg-gray-50 border border-gray-200 text-[10px] p-2 rounded shadow-inner" />
+                              <input type="text" placeholder="Atau Link GDrive..." value={item.url} onChange={(e) => setAttachments(p => ({ ...p, [key]: { ...p[key], url: e.target.value } }))} className="w-full bg-gray-50 border border-gray-200 text-[10px] px-2 py-1 rounded-lg outline-none font-mono" />
                            )}
                         </div>
                      );
@@ -318,10 +345,10 @@ export default function InputPage() {
                </div>
             </div>
 
-            <div className="flex justify-center pt-8 border-t border-gray-100">
-               <button type="submit" disabled={isSaving} className={`px-10 py-5 w-full bg-${inputColor}-600 text-white rounded-2xl font-black shadow-2xl hover:bg-${inputColor}-700 transition-all flex items-center justify-center gap-3 disabled:opacity-70 text-lg`}>
-                  {isSaving ? <Loader2 size={24} className="animate-spin" /> : (tipeTransaksi === 'Transfer' ? <Send size={24} /> : <Save size={24} />)} 
-                  {isSaving ? "Mengunggah..." : (tipeTransaksi === 'Transfer' ? "KIRIM PENGAJUAN TRANSFER" : "SIMPAN TRANSAKSI KAS")}
+            <div className="flex justify-end pt-3 border-t border-gray-100">
+               <button type="submit" disabled={isSaving} className={`h-10 px-6 ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-600 hover:bg-emerald-700' : tipeTransaksi === 'Transfer' ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-rose-600 hover:bg-rose-700'} text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 disabled:opacity-70 active:scale-95`}>
+                  {isSaving ? <Loader2 size={14} className="animate-spin" /> : (tipeTransaksi === 'Transfer' ? <Send size={14} /> : <Save size={14} />)} 
+                  <span>{isSaving ? "Mengunggah..." : (tipeTransaksi === 'Transfer' ? "Kirim Pengajuan Transfer" : "Simpan Transaksi Kas")}</span>
                </button>
             </div>
          </form>

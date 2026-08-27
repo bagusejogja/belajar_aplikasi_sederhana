@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, Archive, Settings } from 'lucide-react';
+import { 
+  FolderTree, Plus, Search, Edit2, Trash2, Folder, FileText, Upload, 
+  Link as LinkIcon, Loader2, Save, X, ChevronDown, ChevronRight, File, 
+  Archive, Settings, Globe, FileSpreadsheet, Image as ImageIcon, ExternalLink 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import Select from 'react-select';
 
@@ -194,6 +198,73 @@ export default function ArsipKegiatanPage() {
   // --- FILE & NOTE LOGIC ---
   const normalizePhases = (arr: any[]) => arr.map(p => typeof p === 'string' ? { nama_fase: p, files: [] } : { ...p, files: p.files || [] });
 
+  const getFileItemMeta = (file: { name: string; url: string; type?: string }) => {
+    const url = (file.url || '').toLowerCase();
+    const name = (file.name || '').toLowerCase();
+    const cleanUrl = url.split('?')[0];
+    const ext = (cleanUrl.split('.').pop() || name.split('.').pop() || '').toLowerCase();
+
+    if (file.type === 'link' || url.includes('drive.google.com') || url.includes('docs.google.com') || url.includes('sharepoint.com') || url.includes('onedrive')) {
+      if (url.includes('drive.google.com') || url.includes('docs.google.com')) {
+        return {
+          label: 'GDrive',
+          icon: <Globe size={15} className="text-emerald-600 shrink-0" />,
+          badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          cardBg: 'hover:bg-emerald-50/40 hover:border-emerald-200'
+        };
+      }
+      return {
+        label: 'Link Web',
+        icon: <LinkIcon size={15} className="text-sky-600 shrink-0" />,
+        badgeColor: 'bg-sky-50 text-sky-700 border-sky-200',
+        cardBg: 'hover:bg-sky-50/40 hover:border-sky-200'
+      };
+    }
+
+    if (['xlsx', 'xls', 'csv'].includes(ext)) {
+      return {
+        label: 'Excel',
+        icon: <FileSpreadsheet size={15} className="text-emerald-600 shrink-0" />,
+        badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        cardBg: 'hover:bg-emerald-50/40 hover:border-emerald-200'
+      };
+    }
+
+    if (['pdf'].includes(ext)) {
+      return {
+        label: 'PDF',
+        icon: <FileText size={15} className="text-rose-600 shrink-0" />,
+        badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
+        cardBg: 'hover:bg-rose-50/40 hover:border-rose-200'
+      };
+    }
+
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext)) {
+      return {
+        label: 'Foto/Gambar',
+        icon: <ImageIcon size={15} className="text-amber-600 shrink-0" />,
+        badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
+        cardBg: 'hover:bg-amber-50/40 hover:border-amber-200'
+      };
+    }
+
+    if (['doc', 'docx'].includes(ext)) {
+      return {
+        label: 'Word',
+        icon: <FileText size={15} className="text-blue-600 shrink-0" />,
+        badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+        cardBg: 'hover:bg-blue-50/40 hover:border-blue-200'
+      };
+    }
+
+    return {
+      label: ext.toUpperCase() || 'Dokumen',
+      icon: <File size={15} className="text-indigo-600 shrink-0" />,
+      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      cardBg: 'hover:bg-indigo-50/40 hover:border-indigo-200'
+    };
+  };
+
   const addLink = async (arcId: number, phaseIdx: number, phases: any[], catName: string, tahun: number) => {
     const newPhases = normalizePhases(phases);
     const url = prompt('Masukkan URL Google Drive / Link lainnya:');
@@ -210,43 +281,76 @@ export default function ArsipKegiatanPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Ukuran file maksimal 10MB!');
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 50MB!');
       return;
     }
 
     setUploadingPhase(`${arcId}-${phaseIdx}`);
-    const toastId = toast.loading('Mengunggah file...');
-    const formData = new FormData();
-    formData.append('file', file);
+    const toastId = toast.loading(`Mengunggah file (${(file.size / 1024 / 1024).toFixed(1)} MB)...`);
     const safeFolderName = catName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() || 'arsip_umum';
-    formData.append('folder', `arsip_kegiatan/${safeFolderName}/${tahun}`);
+    const folderPath = `arsip_kegiatan/${safeFolderName}/${tahun}`;
 
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        const newPhases = normalizePhases(phases);
-        
-        // Format nama file: [tahun]_[kegiatanbesar]_[fasedokumen]
-        const safeCatName = catName.replace(/[^a-zA-Z0-9]/g, '_');
-        const safePhaseName = newPhases[phaseIdx].nama_fase.replace(/[^a-zA-Z0-9]/g, '_');
-        const extMatch = file.name.match(/\.[0-9a-z]+$/i);
-        const ext = extMatch ? extMatch[0] : '';
-        const newFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
+      let publicUrl = '';
 
-        newPhases[phaseIdx].files.push({ name: newFileName, url: data.publicUrl, type: 'file', uploaded_at: new Date().toISOString() });
-        await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
-        toast.success('File berhasil diunggah!', { id: toastId });
-        fetchData();
-      } else {
-        toast.error('Gagal upload: ' + data.error, { id: toastId });
+      // 1. Coba Presigned Direct Upload terlebih dahulu (bypass limit Next.js server)
+      try {
+        const presignRes = await fetch('/api/upload/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type || 'application/octet-stream',
+            folder: folderPath
+          })
+        });
+        const presignData = await presignRes.json();
+        if (presignData.success && presignData.presignedUrl) {
+          const directUploadRes = await fetch(presignData.presignedUrl, {
+            method: 'PUT',
+            body: file,
+            headers: { 'Content-Type': file.type || 'application/octet-stream' }
+          });
+          if (directUploadRes.ok) {
+            publicUrl = presignData.publicUrl;
+          }
+        }
+      } catch (presignErr) {
+        console.warn("Presigned upload fallback to standard API:", presignErr);
       }
-    } catch (err) {
+
+      // 2. Fallback ke standard multipart POST /api/upload
+      if (!publicUrl) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', folderPath);
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          publicUrl = data.publicUrl;
+        } else {
+          throw new Error(data.error || 'Gagal mengunggah file.');
+        }
+      }
+
+      const newPhases = normalizePhases(phases);
+      const safeCatName = catName.replace(/[^a-zA-Z0-9]/g, '_');
+      const safePhaseName = newPhases[phaseIdx].nama_fase.replace(/[^a-zA-Z0-9]/g, '_');
+      const extMatch = file.name.match(/\.[0-9a-z]+$/i);
+      const ext = extMatch ? extMatch[0] : '';
+      const newFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
+
+      newPhases[phaseIdx].files.push({ name: newFileName, url: publicUrl, type: 'file', uploaded_at: new Date().toISOString() });
+      await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newPhases }).eq('id', arcId);
+      toast.success('File berhasil diunggah!', { id: toastId });
+      fetchData();
+    } catch (err: any) {
       console.error(err);
-      toast.error('Terjadi kesalahan saat upload', { id: toastId });
+      toast.error('Terjadi kesalahan saat upload: ' + (err.message || ''), { id: toastId });
     } finally {
       setUploadingPhase(null);
+      e.target.value = '';
     }
   };
 
@@ -272,68 +376,95 @@ export default function ArsipKegiatanPage() {
 
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-sky-800 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <FolderTree size={120} />
+    <div className="max-w-7xl mx-auto space-y-4 pb-20">
+      {/* SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+            <Archive size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Arsip Kegiatan Tahunan</h2>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {categories.length} Folder Kegiatan ({archives.length} Arsip Tahun)
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Kelola dokumen kegiatan tahunan, tahapan/fase, dan perbandingan antar tahun.
+            </p>
+          </div>
         </div>
-        <div className="relative z-10">
-          <h1 className="text-3xl font-black flex items-center gap-3"><Archive size={32} /> Arsip Kegiatan Tahunan</h1>
-          <p className="text-indigo-100 font-medium mt-2 max-w-xl">Kelola Arsip berdasarkan Folder Kegiatan Besar. Template tahap/fase otomatis terbentuk saat membuat arsip tahun baru.</p>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* View Mode Toggle */}
+          <div className="flex bg-gray-100 p-1 rounded-xl shrink-0">
+             <button 
+               onClick={() => setViewMode('list')} 
+               className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${viewMode === 'list' ? 'bg-white shadow-2xs text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               <Folder size={12} />
+               <span>Tampilan List</span>
+             </button>
+             <button 
+               onClick={() => setViewMode('matrix')} 
+               className={`h-7 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${viewMode === 'matrix' ? 'bg-white shadow-2xs text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               <Archive size={12} />
+               <span>Sandingkan Tahun</span>
+             </button>
+          </div>
+
+          <button 
+            onClick={() => { setCatForm({ id: null, nama_kegiatan: '', deskripsi: '', template_fase: [{nama_fase: 'Tahap 1', catatan_global: ''}, {nama_fase: 'Tahap 2', catatan_global: ''}] }); setIsCatModalOpen(true); }}
+            className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+          >
+            <Plus size={15} />
+            <span>Buat Folder Kegiatan</span>
+          </button>
         </div>
-        <button 
-          onClick={() => { setCatForm({ id: null, nama_kegiatan: '', deskripsi: '', template_fase: [{nama_fase: 'Tahap 1', catatan_global: ''}, {nama_fase: 'Tahap 2', catatan_global: ''}] }); setIsCatModalOpen(true); }}
-          className="relative z-10 bg-white text-indigo-800 hover:bg-gray-100 px-6 py-3 rounded-2xl font-black transition-transform hover:scale-105 flex items-center gap-2 drop-shadow-md border-b-4 border-indigo-200"
-        >
-          <Plus size={20} /> BUAT FOLDER KEGIATAN
-        </button>
       </div>
 
-      {/* View Toggle */}
-      <div className="flex justify-end gap-2 relative z-10">
-        <button onClick={() => setViewMode('list')} className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
-          <Folder size={18} /> Tampilan List
-        </button>
-        <button onClick={() => setViewMode('matrix')} className={`px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all ${viewMode === 'matrix' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'}`}>
-          <Archive size={18} /> Sandingkan Tahun
-        </button>
-      </div>
-
-      {/* Filter */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4 z-10 relative">
+      {/* FILTER BAR */}
+      <div className="bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80 flex flex-col md:flex-row items-center gap-3 z-10 relative">
         <div className="flex-1 w-full">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Pilih Kegiatan Besar</label>
+          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Pilih Kegiatan Besar</label>
           <Select 
             options={[{ value: null, label: '— SEMUA KEGIATAN BESAR (KOMPLIT) —' }, ...categories.map(c => ({ value: c.id, label: c.nama_kegiatan }))]}
             value={selectedCatId ? { value: selectedCatId, label: categories.find(c => c.id === selectedCatId)?.nama_kegiatan } : { value: null, label: '— SEMUA KEGIATAN BESAR (KOMPLIT) —' }}
             onChange={(val: any) => setSelectedCatId(val && val.value !== null ? val.value : null)}
             placeholder="Cari atau pilih kegiatan..."
             isClearable
+            className="text-xs font-bold"
             styles={{
-              control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' })
+              control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+              valueContainer: (base) => ({ ...base, padding: '0 8px' })
             }}
           />
         </div>
+        
         {viewMode === 'matrix' && (
-          <div className="w-full md:w-[600px] animate-in slide-in-from-right-4 duration-300">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Sandingkan Tahun</label>
-          <Select
-            isMulti
-            options={allYears.map(y => ({ value: y, label: String(y) }))}
-            value={selectedYears.map(y => ({ value: y, label: String(y) }))}
-            onChange={(val: any) => setSelectedYears(val ? val.map((v: any) => v.value) : [])}
-            placeholder="Pilih tahun..."
-            styles={{
-              control: (base) => ({ ...base, borderRadius: '0.75rem', padding: '0.2rem', border: '1px solid #e5e7eb', fontWeight: 'bold', backgroundColor: '#f9fafb' }),
-              multiValue: (base) => ({ ...base, backgroundColor: '#4f46e5', borderRadius: '0.5rem' }),
-              multiValueLabel: (base) => ({ ...base, color: 'white', fontWeight: 'bold' }),
-              multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#4338ca', color: 'white' } })
-            }}
-          />
+          <div className="w-full md:w-[480px] animate-in slide-in-from-right-4 duration-300">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sandingkan Tahun</label>
+            <Select
+              isMulti
+              options={allYears.map(y => ({ value: y, label: String(y) }))}
+              value={selectedYears.map(y => ({ value: y, label: String(y) }))}
+              onChange={(val: any) => setSelectedYears(val ? val.map((v: any) => v.value) : [])}
+              placeholder="Pilih tahun..."
+              className="text-xs font-bold"
+              styles={{
+                control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+                multiValue: (base) => ({ ...base, backgroundColor: '#4f46e5', borderRadius: '0.375rem', padding: '0 2px' }),
+                multiValueLabel: (base) => ({ ...base, color: 'white', fontWeight: 'bold', fontSize: '11px', padding: '0 4px' }),
+                multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#4338ca', color: 'white' } })
+              }}
+            />
           </div>
         )}
       </div>
+
+      {/* Main Content Area */}
 
       {/* Main Content Area */}
       {loading ? (
@@ -467,20 +598,37 @@ export default function ArsipKegiatanPage() {
                                       <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest text-center py-4 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">KOSONG</p>
                                     ) : (
                                       <ul className="space-y-2">
-                                        {phaseData.files.map((file: any, fIdx: number) => (
-                                          <li key={fIdx} className="group flex items-start justify-between p-2 rounded-lg bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
-                                            <a href={file.url} target="_blank" rel="noreferrer" className="flex items-start gap-2 w-full pr-2 overflow-hidden">
-                                              {file.type === 'link' ? <LinkIcon size={14} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={14} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                              <div className="flex flex-col">
-                                                <span className="text-[11px] font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight" title={file.name}>{file.name}</span>
-                                                {file.uploaded_at && <span className="text-[9px] text-gray-400 mt-0.5 font-normal">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
-                                              </div>
-                                            </a>
-                                            <button onClick={() => removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
-                                              <Trash2 size={12} />
-                                            </button>
-                                          </li>
-                                        ))}
+                                        {phaseData.files.map((file: any, fIdx: number) => {
+                                          const meta = getFileItemMeta(file);
+                                          return (
+                                            <li key={fIdx} className={`group flex items-center justify-between p-2 rounded-xl bg-white border border-gray-200/80 shadow-2xs transition-all duration-200 ${meta.cardBg} hover:shadow-xs`}>
+                                              <a href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 w-full pr-2 overflow-hidden" title={`Buka: ${file.name}`}>
+                                                <div className={`p-1.5 rounded-lg border flex items-center justify-center shrink-0 ${meta.badgeColor}`}>
+                                                  {meta.icon}
+                                                </div>
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <span className="text-[11px] font-bold text-gray-800 group-hover:text-indigo-600 truncate leading-snug">{file.name}</span>
+                                                    <ExternalLink size={10} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0 transition-opacity" />
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className={`px-1.5 py-0.2 rounded text-[8px] font-black tracking-wider uppercase border ${meta.badgeColor}`}>
+                                                      {meta.label}
+                                                    </span>
+                                                    {file.uploaded_at && (
+                                                      <span className="text-[9px] text-gray-400 font-medium truncate">
+                                                        {new Date(file.uploaded_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </a>
+                                              <button onClick={() => removeFile(arc.id, arcPhaseIdx, fIdx, arcPhases)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1 hover:bg-rose-50 rounded-lg transition-all shrink-0" title="Hapus / Cabut">
+                                                <Trash2 size={12} />
+                                              </button>
+                                            </li>
+                                          );
+                                        })}
                                       </ul>
                                     )}
                                     </div>
@@ -686,21 +834,38 @@ export default function ArsipKegiatanPage() {
                                         {(!phase.files || phase.files.length === 0) ? (
                                           <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest text-center py-6 border-2 border-dashed border-gray-100 rounded-xl bg-gray-50">Belum ada file</p>
                                         ) : (
-                                          <ul className="space-y-3">
-                                            {phase.files.map((file: any, fIdx: number) => (
-                                              <li key={fIdx} className="group flex items-start justify-between p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 transition-colors">
-                                                <a href={file.url} target="_blank" rel="noreferrer" className="flex flex-col gap-0.5 w-full pr-2">
-                                                  <div className="flex items-start gap-3">
-                                                    {file.type === 'link' ? <LinkIcon size={16} className="text-sky-500 mt-0.5 shrink-0" /> : <FileText size={16} className="text-indigo-500 mt-0.5 shrink-0" />}
-                                                    <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-700 break-words line-clamp-2 leading-tight">{file.name}</span>
-                                                  </div>
-                                                  {file.uploaded_at && <span className="text-[9px] font-bold text-indigo-300 ml-7">{new Date(file.uploaded_at).toLocaleString('id-ID')}</span>}
-                                                </a>
-                                                <button onClick={() => removeFile(expandedArc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-rose-400 hover:text-rose-600 p-1 hover:bg-rose-100 rounded-md transition-all shrink-0">
-                                                  <Trash2 size={14} />
-                                                </button>
-                                              </li>
-                                            ))}
+                                          <ul className="space-y-2.5">
+                                            {phase.files.map((file: any, fIdx: number) => {
+                                              const meta = getFileItemMeta(file);
+                                              return (
+                                                <li key={fIdx} className={`group flex items-center justify-between p-2.5 rounded-xl bg-white border border-gray-200/80 shadow-2xs transition-all duration-200 ${meta.cardBg} hover:shadow-xs`}>
+                                                  <a href={file.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 w-full pr-2 overflow-hidden" title={`Buka: ${file.name}`}>
+                                                    <div className={`p-2 rounded-xl border flex items-center justify-center shrink-0 ${meta.badgeColor}`}>
+                                                      {meta.icon}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                      <div className="flex items-center gap-1.5">
+                                                        <span className="text-xs font-bold text-gray-800 group-hover:text-indigo-600 truncate leading-snug">{file.name}</span>
+                                                        <ExternalLink size={11} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0 transition-opacity" />
+                                                      </div>
+                                                      <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className={`px-1.5 py-0.2 rounded text-[9px] font-black tracking-wider uppercase border ${meta.badgeColor}`}>
+                                                          {meta.label}
+                                                        </span>
+                                                        {file.uploaded_at && (
+                                                          <span className="text-[10px] text-gray-400 font-medium truncate">
+                                                            {new Date(file.uploaded_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </a>
+                                                  <button onClick={() => removeFile(expandedArc.id, pIdx, fIdx, phases)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-all shrink-0" title="Hapus / Cabut">
+                                                    <Trash2 size={14} />
+                                                  </button>
+                                                </li>
+                                              );
+                                            })}
                                           </ul>
                                         )}
                                       </div>

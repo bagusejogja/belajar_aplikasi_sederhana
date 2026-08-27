@@ -2,7 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PieChart, Loader2, Calendar, Printer, ChevronDown, ChevronRight, X, AlertCircle } from 'lucide-react';
+import { PieChart, Loader2, Calendar, Printer, ChevronDown, ChevronRight, X, AlertCircle, Layers } from 'lucide-react';
+
+const extractGdriveLink = (val: any): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean);
+  if (typeof val === 'string') {
+    return val.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0 && s.startsWith('http'));
+  }
+  return [];
+};
 
 export default function SummaryPage() {
    const d = new Date();
@@ -99,32 +108,39 @@ export default function SummaryPage() {
             groupMap[head2Digit].subGroups[nomor_akun].items.push(t);
          });
 
-         // Konversi ke Array untuk di Render
-         const arrGroup = Object.keys(groupMap).map(k => {
-             const subGroupsArray = Object.keys(groupMap[k].subGroups).map(subKey => ({
-                 nomor_akun: subKey,
-                 ...groupMap[k].subGroups[subKey]
-             })).sort((a,b) => a.nomor_akun.localeCompare(b.nomor_akun));
+         // Format Array untuk Render UI
+         const finalArr = Object.keys(groupMap).map(k2Digit => {
+            const grp = groupMap[k2Digit];
+            
+            const subGroupsArr = Object.keys(grp.subGroups).map(noAkun => {
+               return {
+                  nomor_akun: noAkun,
+                  nama_akun: grp.subGroups[noAkun].nama_akun,
+                  masuk: grp.subGroups[noAkun].masuk,
+                  keluar: grp.subGroups[noAkun].keluar,
+                  items: grp.subGroups[noAkun].items
+               };
+            }).sort((a, b) => a.nomor_akun.localeCompare(b.nomor_akun));
 
-             return {
-                kode: k,
-                ...groupMap[k],
-                subGroupsArr: subGroupsArray
-             }
+            return {
+               kode: k2Digit,
+               nama: grp.nama,
+               masuk: grp.masuk,
+               keluar: grp.keluar,
+               subGroupsArr: subGroupsArr
+            };
          }).sort((a, b) => a.kode.localeCompare(b.kode));
-         
-         setSummaryData(arrGroup);
-      } catch (err) {
-         console.error("Gagal menarik data", err);
+
+         setSummaryData(finalArr);
+      } catch (err: any) {
+         console.error("Gagal menarik data ringkasan:", err);
       } finally {
          setLoading(false);
       }
    };
 
-   const totalMasuk = summaryData.reduce((acc, c) => acc + c.masuk, 0);
-   const totalKeluar = summaryData.reduce((acc, c) => acc + c.keluar, 0);
-
-   const extractGdriveLink = (str: string | null) => {
+   // Helper untuk mengambil list link foto
+   const getPhotoList = (str: string | null) => {
       if (!str) return [];
       const links = str.split(',').map(s => s.trim()).filter(Boolean);
       return links.map(lnk => {
@@ -136,56 +152,86 @@ export default function SummaryPage() {
       });
    };
 
+   const totalMasuk = summaryData.reduce((acc, c) => acc + c.masuk, 0);
+   const totalKeluar = summaryData.reduce((acc, c) => acc + c.keluar, 0);
+
    return (
-      <div className="space-y-6 max-w-6xl mx-auto">
-         {/* KONTROL PANEL */}
-         <div className="print:hidden bg-indigo-600 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-            <div>
-               <h2 className="text-3xl font-black mb-2 flex items-center gap-3"><PieChart size={32}/> Laporan Ringkasan Kas Kecil</h2>
-               <p className="text-indigo-100 font-medium text-sm">Filter Tanggal Transaksi Berjalan. Data digabung per Induk 2-Digit, lalu dipecah per Akun Asli.</p>
+      <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+         {/* SLIM & UNIFIED TOP TOOLBAR */}
+         <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+            <div className="flex items-center gap-3">
+               <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+                  <Layers size={20} />
+               </div>
+               <div>
+                  <div className="flex items-center gap-2">
+                     <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                        Ringkasan Kas Kecil
+                     </h1>
+                     <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                        Bulan {bulanPilih} / {tahunPilih}
+                     </span>
+                  </div>
+                  <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+                     Ringkasan multi-level mutasi kas kecil per Induk 2-Digit dan Akun Anggaran.
+                  </p>
+               </div>
             </div>
-            
-            <div className="flex flex-wrap gap-4 items-center bg-white/10 p-4 rounded-2xl w-full md:w-auto backdrop-blur-sm">
-               <Calendar className="text-indigo-200"/>
-               <select value={bulanPilih} onChange={e => setBulan(Number(e.target.value))} className="bg-white/20 text-white border-0 font-bold rounded-xl outline-none p-2 appearance-none text-center cursor-pointer">
-                  {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1} className="text-black">Bulan {i+1}</option>)}
+
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+               <select 
+                  value={bulanPilih} 
+                  onChange={e => setBulan(Number(e.target.value))} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+               >
+                  {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>Bulan {i+1}</option>)}
                </select>
-               <select value={tahunPilih} onChange={e => setTahun(Number(e.target.value))} className="bg-white/20 text-white border-0 font-bold rounded-xl outline-none p-2 appearance-none text-center cursor-pointer">
-                  {[2023, 2024, 2025, 2026, 2027].map(t => <option key={t} value={t} className="text-black">{t}</option>)}
+               <select 
+                  value={tahunPilih} 
+                  onChange={e => setTahun(Number(e.target.value))} 
+                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
+               >
+                  {[2023, 2024, 2025, 2026, 2027].map(t => <option key={t} value={t}>{t}</option>)}
                </select>
-               <button onClick={() => window.print()} className="ml-auto md:ml-4 bg-white text-indigo-600 hover:bg-gray-100 px-6 py-2.5 rounded-xl font-black transition-transform hover:scale-105 flex items-center gap-2 drop-shadow-md">
-                  <Printer size={18}/> CETAK PDF
+               <button 
+                  onClick={() => window.print()} 
+                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+               >
+                  <Printer size={13}/> <span>Cetak PDF</span>
                </button>
             </div>
          </div>
 
-         {/* ARENA CETAK */}
-         <div className="bg-white rounded-3xl print:rounded-none shadow-sm print:shadow-none p-8 border border-gray-100 print:border-none min-h-[400px]">
+         {/* ARENA TABEL */}
+         <div className="bg-white rounded-2xl print:rounded-none shadow-xs border border-gray-200/80 overflow-hidden min-h-[300px]">
             {loading ? (
-               <div className="h-full flex items-center justify-center print:hidden"><Loader2 size={40} className="animate-spin text-indigo-600"/></div>
+               <div className="h-48 flex flex-col items-center justify-center text-indigo-600">
+                  <Loader2 size={32} className="animate-spin mb-2 text-indigo-500" />
+                  <p className="text-xs font-medium text-gray-500">Memuat ringkasan kas...</p>
+               </div>
             ) : summaryData.length === 0 ? (
-               <div className="text-center py-20 text-gray-500 font-bold print:hidden flex flex-col bg-gray-50 rounded-2xl border-2 border-dashed items-center p-8">
-                   <AlertCircle size={40} className="mb-4 text-gray-400" />
-                   Tidak ditemukan transaksi berstatus "Disetujui" pada TANGGAL: {tahunPilih}-{bulanPilih.toString().padStart(2, '0')}
+               <div className="text-center py-16 text-gray-500 font-medium flex flex-col items-center p-8">
+                   <AlertCircle size={36} className="mb-2 text-gray-400 opacity-60" />
+                   <p className="text-xs">Tidak ditemukan transaksi pada periode {tahunPilih}-{bulanPilih.toString().padStart(2, '0')}</p>
                </div>
             ) : (
                <div>
-                  <div className="hidden print:block text-center mb-10 border-b-2 border-black pb-4">
-                     <h1 className="text-3xl font-black tracking-widest uppercase">Laporan Ringkasan Multi-Level</h1>
-                     <p className="font-bold text-gray-700 mt-2">Periode Transaksi: Bulan {bulanPilih} Tahun {tahunPilih}</p>
+                  <div className="hidden print:block text-center mb-6 border-b border-black pb-3">
+                     <h1 className="text-xl font-black tracking-wider uppercase">Laporan Ringkasan Kas Kecil</h1>
+                     <p className="font-bold text-gray-700 text-xs mt-1">Periode: Bulan {bulanPilih} Tahun {tahunPilih}</p>
                   </div>
 
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse text-xs">
                      <thead>
-                        <tr className="border-b-2 border-gray-300 print:border-black text-xs font-black text-gray-500 uppercase tracking-widest bg-gray-50/50">
-                           <th className="p-4 w-[5%]">{/* Panah Kolaps */}</th>
-                           <th className="p-4 w-[15%]">Kode Induk</th>
-                           <th className="p-4 w-[30%]">Grup Induk</th>
-                           <th className="p-4 text-right w-[25%]">Total Debit (Masuk)</th>
-                           <th className="p-4 text-right w-[25%]">Total Kredit (Keluar)</th>
+                        <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                           <th className="py-3 px-4 w-10">{/* Panah Kolaps */}</th>
+                           <th className="py-3 px-4 w-28">Kode Induk</th>
+                           <th className="py-3 px-4">Grup Induk</th>
+                           <th className="py-3 px-4 text-right">Total Debit (+)</th>
+                           <th className="py-3 px-4 text-right">Total Kredit (-)</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-gray-100 print:divide-black">
+                     <tbody className="divide-y divide-gray-100 font-medium">
                         {summaryData.map(grp => {
                            // STATUS LEVEL 1 (2-Digit Group)
                            const isExpand2Digit = expandedGroup2Digit === grp.kode;
