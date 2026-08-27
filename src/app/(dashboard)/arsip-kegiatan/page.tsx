@@ -98,34 +98,76 @@ export default function ArsipKegiatanPage() {
       return;
     }
 
-    const payload = { ...catForm, template_fase: JSON.stringify(catForm.template_fase.filter((t: any) => t.nama_fase && t.nama_fase.trim() !== '')) };
+    const cleanTemplateFase = catForm.template_fase
+      .filter((t: any) => t.nama_fase && t.nama_fase.trim() !== '')
+      .map((t: any) => ({
+        nama_fase: t.nama_fase.trim(),
+        catatan_global: t.catatan_global || ''
+      }));
+
+    const payload = { 
+      nama_kegiatan: catForm.nama_kegiatan.trim(),
+      deskripsi: catForm.deskripsi || '',
+      template_fase: JSON.stringify(cleanTemplateFase) 
+    };
+
     let err;
     if (catForm.id) {
-      const { id, ...updateData } = payload;
-      const { error } = await supabase.from('app_arsip_kategori').update(updateData).eq('id', catForm.id);
+      const { error } = await supabase.from('app_arsip_kategori').update(payload).eq('id', catForm.id);
       err = error;
 
       if (!err) {
-         // Sync archives
+         // Sync archives safely without EVER losing files
          const { data: existingArcs } = await supabase.from('app_arsip_kegiatan').select('*').eq('kategori_id', catForm.id);
          if (existingArcs && existingArcs.length > 0) {
             for (const arc of existingArcs) {
                let oldArcPhases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
-               let newArcPhases = catForm.template_fase.map((tpl: any) => {
-                  let existing = oldArcPhases.find((o: any) => o.nama_fase === tpl._old_nama);
-                  return {
-                     ...(existing || { files: [], catatan: '' }),
-                     nama_fase: tpl.nama_fase,
-                     catatan_global: tpl.catatan_global
-                  };
+               let matchedOldPhases = new Set<string>();
+
+               let newArcPhases = catForm.template_fase
+                 .filter((t: any) => t.nama_fase && t.nama_fase.trim() !== '')
+                 .map((tpl: any, idx: number) => {
+                    // 1. Try match by _old_nama (prior name before rename) or current nama_fase
+                    let existing = oldArcPhases.find((o: any) => 
+                      (tpl._old_nama && o.nama_fase?.trim() === tpl._old_nama?.trim()) || 
+                      o.nama_fase?.trim() === tpl.nama_fase?.trim()
+                    );
+
+                    // 2. If not matched, try matching by index if that index hasn't been matched yet
+                    if (!existing && oldArcPhases[idx] && !matchedOldPhases.has(oldArcPhases[idx].nama_fase)) {
+                      existing = oldArcPhases[idx];
+                    }
+
+                    if (existing) {
+                      matchedOldPhases.add(existing.nama_fase);
+                    }
+
+                    return {
+                       nama_fase: tpl.nama_fase.trim(),
+                       catatan_global: tpl.catatan_global || '',
+                       catatan: existing?.catatan || '',
+                       files: existing?.files || []
+                    };
+                 });
+
+               // 3. Safety check: preserve any old phases that had files so no files are EVER lost!
+               oldArcPhases.forEach((oldP: any) => {
+                 if (!matchedOldPhases.has(oldP.nama_fase) && oldP.files && oldP.files.length > 0) {
+                   newArcPhases.push({
+                     nama_fase: oldP.nama_fase,
+                     catatan_global: oldP.catatan_global || '',
+                     catatan: oldP.catatan || '',
+                     files: oldP.files || []
+                   });
+                 }
                });
+
                await supabase.from('app_arsip_kegiatan').update({ fase_dokumen: newArcPhases }).eq('id', arc.id);
             }
          }
       }
     } else {
-      const { id, ...insertData } = payload;
-      const { error } = await supabase.from('app_arsip_kategori').insert([insertData]);
+      const { error } = await supabase.from('app_arsip_kategori').insert([payload]);
       err = error;
     }
     
@@ -133,7 +175,7 @@ export default function ArsipKegiatanPage() {
       toast.error('Gagal menyimpan kategori: ' + err.message);
       return;
     }
-    toast.success('Kategori berhasil disimpan!');
+    toast.success('Kategori & Template berhasil disimpan!');
     setIsCatModalOpen(false);
     fetchData();
   };
@@ -486,7 +528,15 @@ export default function ArsipKegiatanPage() {
             if (!cat) return null;
             
             const phases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
-            const normalizedPhases = phases.map((p: any) => typeof p === 'string' ? { nama_fase: p, catatan_global: '' } : p);
+            const normalizedPhases = phases.map((p: any) => {
+              const name = typeof p === 'string' ? p : p.nama_fase;
+              const globalNote = typeof p === 'string' ? '' : (p.catatan_global || '');
+              return {
+                nama_fase: name,
+                catatan_global: globalNote,
+                _old_nama: name
+              };
+            });
 
             return (
               <div className="overflow-x-auto custom-scrollbar pb-4">
@@ -496,7 +546,7 @@ export default function ArsipKegiatanPage() {
                     {cat.deskripsi && <p className="text-sm text-gray-500 font-medium mt-1">{cat.deskripsi}</p>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <button onClick={() => { setCatForm({ ...cat, template_fase: normalizedPhases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                    <button onClick={() => { setCatForm({ ...cat, template_fase: normalizedPhases }); setIsCatModalOpen(true); }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100" title="Edit Kategori & Template Fase"><Settings size={18}/></button>
                   </div>
                 </div>
 
@@ -566,7 +616,10 @@ export default function ArsipKegiatanPage() {
                             
                             // Arsip is available. Find the phase.
                             const arcPhases = typeof arc.fase_dokumen === 'string' ? JSON.parse(arc.fase_dokumen) : (arc.fase_dokumen || []);
-                            const arcPhaseIdx = arcPhases.findIndex((f: any) => f.nama_fase === phaseName);
+                            let arcPhaseIdx = arcPhases.findIndex((f: any) => f.nama_fase?.trim() === phaseName?.trim());
+                            if (arcPhaseIdx === -1 && arcPhases[pIdx]) {
+                              arcPhaseIdx = pIdx;
+                            }
                             const phaseData = arcPhaseIdx >= 0 ? arcPhases[arcPhaseIdx] : null;
 
                             return (
@@ -716,10 +769,18 @@ export default function ArsipKegiatanPage() {
                       <button onClick={(e) => { 
                         e.stopPropagation(); 
                         const phases = typeof cat.template_fase === 'string' ? JSON.parse(cat.template_fase) : (cat.template_fase || []);
-                        const normalizedPhases = phases.map((p: any) => typeof p === 'string' ? { nama_fase: p, catatan_global: '' } : p);
+                        const normalizedPhases = phases.map((p: any) => {
+                          const name = typeof p === 'string' ? p : p.nama_fase;
+                          const globalNote = typeof p === 'string' ? '' : (p.catatan_global || '');
+                          return {
+                            nama_fase: name,
+                            catatan_global: globalNote,
+                            _old_nama: name
+                          };
+                        });
                         setCatForm({ ...cat, template_fase: normalizedPhases }); 
                         setIsCatModalOpen(true); 
-                      }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100"><Settings size={18}/></button>
+                      }} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-xl transition-colors bg-white shadow-sm border border-indigo-100" title="Edit Kategori & Template Fase"><Settings size={18}/></button>
                       <div className="w-px h-6 bg-gray-300 mx-2"></div>
                       {isCatExpanded ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
                     </div>
