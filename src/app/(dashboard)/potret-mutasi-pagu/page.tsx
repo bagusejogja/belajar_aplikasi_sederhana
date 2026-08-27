@@ -37,8 +37,9 @@ export default function PotretMutasiPaguPage() {
   
   // Modal State
   const [activeModalCategory, setActiveModalCategory] = useState<string | null>(null);
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
 
-  // Dynamic Data States (Calculated directly from filtered units)
+  // Dynamic Data States
   const [mutasiData, setMutasiData] = useState({
     pagu_awal: 0,
     pengalihan: 0,
@@ -61,6 +62,26 @@ export default function PotretMutasiPaguPage() {
   const [historisChartData, setHistorisChartData] = useState<any[]>([]);
   const [tambahPaguLetters, setTambahPaguLetters] = useState<any[]>([]);
   const [govMutasiRows, setGovMutasiRows] = useState<any[]>([]);
+  const [allPaguHistory, setAllPaguHistory] = useState<any[]>([]);
+
+  // Helper to fetch ALL records from gov_pagu_anggaran without the 1000 limit
+  const fetchAllPaguData = async () => {
+    let allRows: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data, error } = await supabase
+        .from('gov_pagu_anggaran')
+        .select('*, gov_units(nama_unit, kode_unit, group_org)')
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+      
+      if (error || !data || data.length === 0) break;
+      allRows = allRows.concat(data);
+      if (data.length < pageSize) break;
+      page++;
+    }
+    return allRows;
+  };
 
   useEffect(() => {
     fetchGlobalMutasiData();
@@ -69,6 +90,7 @@ export default function PotretMutasiPaguPage() {
   const fetchGlobalMutasiData = async () => {
     setIsLoading(true);
     try {
+      // 1. Fetch Units
       const { data: unitsData } = await supabase
         .from('gov_units')
         .select('id, kode_unit, nama_unit, group_org')
@@ -87,16 +109,16 @@ export default function PotretMutasiPaguPage() {
       if (selectedUnit !== 'ALL') {
         filteredUnits = filteredUnits.filter(u => u.id.toString() === selectedUnit.toString());
       }
-
-      const { data: paguRows, error: errPagu } = await supabase
-        .from('gov_pagu_anggaran')
-        .select('*')
-        .eq('tahun_anggaran', selectedYear);
-
-      if (errPagu) console.error("Error fetching gov_pagu_anggaran:", errPagu);
-
       const filteredUnitIds = new Set(filteredUnits.map(u => u.id));
-      const activePaguRows = (paguRows || []).filter(r => filteredUnitIds.has(r.unit_id));
+
+      // 2. Fetch all pagu records with pagination loop (no 1000 row truncation)
+      const allPaguRows = await fetchAllPaguData();
+      setAllPaguHistory(allPaguRows);
+
+      // Filter rows for selectedYear and active units
+      const activePaguRows = allPaguRows.filter(r => 
+        r.tahun_anggaran?.toString() === selectedYear.toString() && filteredUnitIds.has(r.unit_id)
+      );
 
       let totalPaguAwal = 0;
       let totalPengalihan = 0;
@@ -133,18 +155,20 @@ export default function PotretMutasiPaguPage() {
         if (jenis.includes('pagu awal') || jenis === 'awal' || ket.includes('pagu awal')) {
           totalPaguAwal += nom;
           if (unitMap[uId]) unitMap[uId].pagu_awal += nom;
-        } else if (jenis.includes('pengalihan') || jenis.includes('kurang') || jenis.includes('tambah pagu')) {
-          totalPengalihan += nom;
-          if (unitMap[uId]) unitMap[uId].pengalihan += nom;
-        } else if (jenis.includes('inisiatif')) {
-          totalInisiatif += nom;
-          if (unitMap[uId]) unitMap[uId].inisiatif += nom;
+        } else if (jenis.includes('pengalihan') || jenis.includes('kurang') || jenis.includes('tambah')) {
+          if (jenis.includes('inisiatif')) {
+            totalInisiatif += nom;
+            if (unitMap[uId]) unitMap[uId].inisiatif += nom;
+          } else if (jenis.includes('penugasan')) {
+            totalPenugasan += nom;
+            if (unitMap[uId]) unitMap[uId].penugasan += nom;
+          } else {
+            totalPengalihan += nom;
+            if (unitMap[uId]) unitMap[uId].pengalihan += nom;
+          }
         } else if (jenis.includes('efisiensi')) {
           totalEfisiensi += nom;
           if (unitMap[uId]) unitMap[uId].efisiensi += nom;
-        } else if (jenis.includes('penugasan')) {
-          totalPenugasan += nom;
-          if (unitMap[uId]) unitMap[uId].penugasan += nom;
         } else if (jenis.includes('luncuran') || ket.includes('luncuran')) {
           totalLuncuran += nom;
           if (unitMap[uId]) unitMap[uId].luncuran += nom;
@@ -172,19 +196,11 @@ export default function PotretMutasiPaguPage() {
       });
 
       setUnitBreakdownData(Object.values(unitMap));
+      setGovMutasiRows(activePaguRows);
 
       // Fetch Surat Tambah Pagu Data
       const tambahPaguData = await getTambahPagu();
       setTambahPaguLetters(tambahPaguData || []);
-
-      // Fetch Rincian Catatan Mutasi Pagu
-      const { data: allGovMutasi } = await supabase
-        .from('gov_pagu_anggaran')
-        .select('*, gov_units(nama_unit, kode_unit, group_org)')
-        .eq('tahun_anggaran', selectedYear)
-        .order('id', { ascending: false });
-
-      setGovMutasiRows(allGovMutasi || []);
 
       // Fetch penerimaan statis
       const { data: statisData } = await supabase
@@ -212,11 +228,7 @@ export default function PotretMutasiPaguPage() {
         pengeluaran: peng
       });
 
-      // Historis Chart Multi-Tahun
-      const { data: multiPagu } = await supabase
-        .from('gov_pagu_anggaran')
-        .select('tahun_anggaran, jenis_anggaran, nominal, unit_id');
-
+      // 3. Compute Multi-Tahun Chart (2019 - 2026) using complete rows
       const chartMap: Record<string, any> = {
         '2019': { tahun: '2019', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
         '2020': { tahun: '2020', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
@@ -228,28 +240,37 @@ export default function PotretMutasiPaguPage() {
         '2026': { tahun: '2026', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
       };
 
-      (multiPagu || []).forEach(mp => {
+      allPaguRows.forEach(mp => {
         if (!filteredUnitIds.has(mp.unit_id)) return;
-        const thn = mp.tahun_anggaran;
+        const thn = mp.tahun_anggaran?.toString();
         if (chartMap[thn]) {
           const nom = Number(mp.nominal || 0);
           const j = (mp.jenis_anggaran || '').toLowerCase();
-          if (j.includes('pagu awal') || j === 'awal') chartMap[thn].pagu_awal += nom;
-          else if (j.includes('penugasan')) chartMap[thn].tambah_penugasan += nom;
-          else if (j.includes('inisiatif')) chartMap[thn].tambah_inisiatif += nom;
+          const k = (mp.keterangan || '').toLowerCase();
+          if (j.includes('pagu awal') || j === 'awal' || k.includes('pagu awal')) {
+            chartMap[thn].pagu_awal += nom;
+          } else if (j.includes('penugasan')) {
+            chartMap[thn].tambah_penugasan += nom;
+          } else if (j.includes('inisiatif')) {
+            chartMap[thn].tambah_inisiatif += nom;
+          }
           chartMap[thn].total_pagu += nom;
         }
       });
 
-      const { data: allStatis } = await supabase
-        .from('app_laporan_statis')
-        .select('tahun, realisasi, app_laporan_akun(kode_sistem)');
+      // Fetch Realisasi from gov_transactions
+      const { data: govTrxs } = await supabase
+        .from('gov_transactions')
+        .select('tanggal, nominal, jenis, unit_id')
+        .range(0, 10000);
 
-      (allStatis || []).forEach((st: any) => {
-        const thn = st.tahun?.toString();
-        const ks = Array.isArray(st.app_laporan_akun) ? st.app_laporan_akun[0]?.kode_sistem : st.app_laporan_akun?.kode_sistem;
-        if (chartMap[thn] && ks === 'JML_PENG') {
-          chartMap[thn].realisasi += Number(st.realisasi || 0);
+      (govTrxs || []).forEach((t: any) => {
+        if (!filteredUnitIds.has(t.unit_id)) return;
+        if (t.jenis === 'realisasi') {
+          const thn = t.tanggal?.substring(0, 4);
+          if (chartMap[thn]) {
+            chartMap[thn].realisasi += Number(t.nominal || 0);
+          }
         }
       });
 
@@ -305,16 +326,55 @@ export default function PotretMutasiPaguPage() {
       const ket = r.keterangan || '';
       const jenis = r.jenis_anggaran || '';
 
-      const matchGroup = selectedGroupOrg === 'ALL' || groupOrg === selectedGroupOrg;
-      const matchUnit = selectedUnit === 'ALL' || r.unit_id?.toString() === selectedUnit.toString();
       const matchSearch = searchQuery === '' ||
         unitName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ket.toLowerCase().includes(searchQuery.toLowerCase()) ||
         jenis.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchGroup && matchUnit && matchSearch;
+      return matchSearch;
     });
-  }, [govMutasiRows, selectedGroupOrg, selectedUnit, searchQuery]);
+  }, [govMutasiRows, searchQuery]);
+
+  // Modal Category Filtered Rows
+  const modalDetailRows = useMemo(() => {
+    if (!activeModalCategory) return [];
+    const cat = activeModalCategory.toLowerCase();
+
+    return govMutasiRows.filter(r => {
+      const jenis = (r.jenis_anggaran || '').toLowerCase();
+      const ket = (r.keterangan || '').toLowerCase();
+      const unitName = (r.gov_units?.nama_unit || '').toLowerCase();
+
+      let matchCategory = false;
+      if (cat === 'inisiatif') {
+        matchCategory = jenis.includes('inisiatif');
+      } else if (cat === 'penugasan') {
+        matchCategory = jenis.includes('penugasan');
+      } else if (cat === 'efisiensi') {
+        matchCategory = jenis.includes('efisiensi');
+      } else if (cat === 'pengalihan') {
+        matchCategory = (jenis.includes('pengalihan') || jenis.includes('kurang') || jenis.includes('tambah')) && !jenis.includes('inisiatif') && !jenis.includes('penugasan');
+      } else if (cat === 'luncuran') {
+        matchCategory = jenis.includes('luncuran') || ket.includes('luncuran');
+      } else if (cat === 'talangan') {
+        matchCategory = jenis.includes('talangan') || ket.includes('talangan');
+      } else if (cat === 'pagu_awal') {
+        matchCategory = jenis.includes('pagu awal') || jenis === 'awal' || ket.includes('pagu awal');
+      }
+
+      if (!matchCategory) return false;
+
+      if (modalSearchQuery.trim()) {
+        const query = modalSearchQuery.toLowerCase();
+        return unitName.includes(query) || ket.includes(query) || jenis.includes(query);
+      }
+      return true;
+    });
+  }, [govMutasiRows, activeModalCategory, modalSearchQuery]);
+
+  const modalTotalNominal = useMemo(() => {
+    return modalDetailRows.reduce((sum, r) => sum + Number(r.nominal || 0), 0);
+  }, [modalDetailRows]);
 
   const exportToExcel = () => {
     const wsData = [
@@ -396,6 +456,10 @@ export default function PotretMutasiPaguPage() {
               <option value="2025">2025</option>
               <option value="2024">2024</option>
               <option value="2023">2023</option>
+              <option value="2022">2022</option>
+              <option value="2021">2021</option>
+              <option value="2020">2020</option>
+              <option value="2019">2019</option>
             </select>
           </div>
 
@@ -524,7 +588,7 @@ export default function PotretMutasiPaguPage() {
                 Ringkasan Pagu & Komponen Mutasi
               </h2>
               <p className="text-[10px] text-gray-500 font-medium">
-                Tahun Anggaran {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group Org' : `Group: ${selectedGroupOrg}`}
+                Tahun Anggaran {selectedYear} • {selectedGroupOrg === 'ALL' ? 'Semua Group Org' : `Group: ${selectedGroupOrg}`} • Klik kartu untuk melihat rincian
               </p>
             </div>
           </div>
@@ -535,13 +599,18 @@ export default function PotretMutasiPaguPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             
             {/* 1. PAGU AWAL CARD */}
-            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div 
+              onClick={() => { setActiveModalCategory('pagu_awal'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between hover:border-indigo-400 transition-all cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
                   <Wallet size={18} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PAGU AWAL</span>
+                  <span className="text-[10px] font-bold text-gray-700 uppercase tracking-wider block flex items-center gap-1">
+                    PAGU AWAL <ArrowUpRight size={12} className="text-indigo-500" />
+                  </span>
                   <span className="text-[10px] text-gray-500 font-medium">Pagu Dasar Penetapan RKAT {selectedYear}</span>
                 </div>
               </div>
@@ -551,13 +620,18 @@ export default function PotretMutasiPaguPage() {
             </div>
 
             {/* 2. PENGALIHAN (+/-) CARD */}
-            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div 
+              onClick={() => { setActiveModalCategory('pengalihan'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between hover:border-indigo-400 transition-all cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600">
                   <RefreshCw size={18} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PENGALIHAN (+/-)</span>
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
+                    PENGALIHAN (+/-) <ArrowUpRight size={12} className="text-indigo-500" />
+                  </span>
                   <span className="text-[10px] text-gray-500 font-medium">Pergeseran Anggaran Antar Unit</span>
                 </div>
               </div>
@@ -568,8 +642,8 @@ export default function PotretMutasiPaguPage() {
 
             {/* 3. TAMBAH PAGU - INISIATIF (+) CARD */}
             <div 
-              onClick={() => setActiveModalCategory('inisiatif')}
-              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 transition-all cursor-pointer group"
+              onClick={() => { setActiveModalCategory('inisiatif'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 hover:bg-emerald-50/10 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
@@ -589,8 +663,8 @@ export default function PotretMutasiPaguPage() {
 
             {/* 4. EFISIENSI (-) CARD */}
             <div 
-              onClick={() => setActiveModalCategory('efisiensi')}
-              className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex items-center justify-between hover:border-rose-400 transition-all cursor-pointer group"
+              onClick={() => { setActiveModalCategory('efisiensi'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex items-center justify-between hover:border-rose-400 hover:bg-rose-50/10 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600">
@@ -610,8 +684,8 @@ export default function PotretMutasiPaguPage() {
 
             {/* 5. TAMBAH PAGU - PENUGASAN (+) CARD */}
             <div 
-              onClick={() => setActiveModalCategory('penugasan')}
-              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 transition-all cursor-pointer group"
+              onClick={() => { setActiveModalCategory('penugasan'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex items-center justify-between hover:border-emerald-400 hover:bg-emerald-50/10 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600">
@@ -630,13 +704,18 @@ export default function PotretMutasiPaguPage() {
             </div>
 
             {/* 6. LUNCURAN (+) CARD */}
-            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between">
+            <div 
+              onClick={() => { setActiveModalCategory('luncuran'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-cyan-200/80 shadow-xs flex items-center justify-between hover:border-cyan-400 transition-all cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-cyan-50 rounded-xl text-cyan-600">
                   <TrendingUp size={18} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">LUNCURAN (+)</span>
+                  <span className="text-[10px] font-bold text-cyan-700 uppercase tracking-wider block flex items-center gap-1">
+                    LUNCURAN (+) <ArrowUpRight size={12} className="text-cyan-500" />
+                  </span>
                   <span className="text-[10px] text-gray-500 font-medium">Carry Over Sisa Pagu Tahun Sebelumnya</span>
                 </div>
               </div>
@@ -646,13 +725,18 @@ export default function PotretMutasiPaguPage() {
             </div>
 
             {/* 7. TALANGAN PINDAH FAKULTAS CARD */}
-            <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex items-center justify-between col-span-1 md:col-span-2">
+            <div 
+              onClick={() => { setActiveModalCategory('talangan'); setModalSearchQuery(''); }}
+              className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex items-center justify-between col-span-1 md:col-span-2 hover:border-amber-400 transition-all cursor-pointer group"
+            >
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600">
                   <DollarSign size={18} />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">TALANGAN PINDAH FAKULTAS</span>
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block flex items-center gap-1">
+                    TALANGAN PINDAH FAKULTAS <ArrowUpRight size={12} className="text-amber-500" />
+                  </span>
                   <span className="text-[10px] text-gray-500 font-medium">Dana Talangan Transisi Pindah Fakultas/Unit</span>
                 </div>
               </div>
@@ -1017,20 +1101,22 @@ export default function PotretMutasiPaguPage() {
         )}
       </div>
 
-      {/* MODAL BREAKDOWN CATEGORY */}
+      {/* MODAL BREAKDOWN CATEGORY WITH FULL ITEM TABLE & SEARCH */}
       {activeModalCategory && (
         <div className="fixed inset-0 z-50 bg-gray-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-5 max-w-lg w-full shadow-xl space-y-4 border border-gray-200">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div className="bg-white rounded-2xl p-5 max-w-3xl w-full shadow-xl space-y-4 border border-gray-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                   <FileText size={18} />
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-gray-900 uppercase">
-                    Rincian Mutasi: {activeModalCategory}
+                    Rincian Mutasi: {activeModalCategory.replace('_', ' ')}
                   </h3>
-                  <p className="text-[11px] text-gray-500 font-medium">Daftar usulan & penetapan pagu yang membentuk nominal ini</p>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    Tahun Anggaran {selectedYear} • {modalDetailRows.length} Catatan Transaksi Ditemukan
+                  </p>
                 </div>
               </div>
 
@@ -1042,27 +1128,83 @@ export default function PotretMutasiPaguPage() {
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
-                <span className="font-semibold text-emerald-900 text-xs">Total Nominal Komponen</span>
-                <span className="text-base font-black font-mono text-emerald-800">
-                  Rp {formatRp(
-                    activeModalCategory === 'inisiatif' ? mutasiData.tambah_inisiatif :
-                    activeModalCategory === 'penugasan' ? mutasiData.tambah_penugasan :
-                    Math.abs(mutasiData.efisiensi)
-                  )}
+            {/* Modal Summary Card & Search */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+              <div className="px-3.5 py-2 bg-indigo-50/60 border border-indigo-200 rounded-xl flex items-center gap-3">
+                <span className="font-bold text-indigo-950 text-xs">Total Akumulasi:</span>
+                <span className="text-sm font-black font-mono text-indigo-700">
+                  Rp {formatRp(modalTotalNominal)}
                 </span>
               </div>
 
-              <p className="text-[11px] text-gray-500 italic">
-                Terdiri dari usulan fakultas/direktorat yang telah disetujui dalam Surat Penetapan Rektor.
-              </p>
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text"
+                  placeholder="Cari unit atau keterangan..."
+                  value={modalSearchQuery}
+                  onChange={e => setModalSearchQuery(e.target.value)}
+                  className="w-full h-8 pl-8 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-gray-100">
+            {/* Modal Scrollable Table */}
+            <div className="overflow-y-auto border border-gray-200 rounded-xl flex-1 max-h-[50vh]">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-gray-50 text-gray-400 uppercase font-black text-[10px] tracking-wider border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
+                  <tr>
+                    <th className="py-2 px-3 text-center w-8">No</th>
+                    <th className="py-2 px-3 w-48">Unit Kerja</th>
+                    <th className="py-2 px-3 text-right w-36">Nominal</th>
+                    <th className="py-2 px-3">Keterangan / Catatan Surat Penetapan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium">
+                  {modalDetailRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-gray-400 italic text-xs">
+                        Tidak ada data rincian transaksi mutasi yang sesuai kategori ini pada TA {selectedYear}.
+                      </td>
+                    </tr>
+                  ) : (
+                    modalDetailRows.map((r: any, idx: number) => {
+                      const nom = Number(r.nominal || 0);
+                      const unitName = r.gov_units?.nama_unit || `Unit ID: ${r.unit_id}`;
+                      const group = r.gov_units?.group_org || '';
+
+                      return (
+                        <tr key={r.id || idx} className="hover:bg-indigo-50/20 transition-colors">
+                          <td className="py-2 px-3 text-center text-gray-400 font-mono align-top pt-2.5">{idx + 1}</td>
+                          <td className="py-2 px-3 align-top pt-2">
+                            <div className="font-bold text-gray-900 leading-tight">{unitName}</div>
+                            {group && (
+                              <span className="text-[9px] text-gray-400 font-medium">{group}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono font-bold align-top pt-2">
+                            <span className={nom > 0 ? "text-emerald-700" : nom < 0 ? "text-rose-600" : "text-gray-800"}>
+                              Rp {formatRp(nom)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-gray-600 text-xs align-top pt-2 leading-relaxed">
+                            {r.keterangan || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-gray-100 shrink-0">
+              <span className="text-[11px] text-gray-400 font-semibold">
+                Menampilkan {modalDetailRows.length} data rincian
+              </span>
               <button 
                 onClick={() => setActiveModalCategory(null)}
-                className="h-9 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-semibold text-xs"
+                className="h-8 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-semibold text-xs"
               >
                 Tutup
               </button>
