@@ -446,16 +446,24 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                      </div>
                    )}
                  </div>
-                 {!isCollapsed && (
-                   <div className="flex gap-1 shrink-0">
-                      <a href="/api/backup" title="Download Backup Database" className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
-                         <Database size={15} />
-                      </a>
-                      <button onClick={handleLogout} title="Logout" className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                         <LogOut size={15} />
-                      </button>
-                   </div>
-                 )}
+                {!isCollapsed && (
+                  <div className="flex items-center gap-1 shrink-0">
+                     <a 
+                       href="/api/backup" 
+                       title="Download Backup Database (Semua Tabel .SQL)" 
+                       className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 rounded-xl transition-all shadow-2xs flex items-center justify-center"
+                     >
+                        <Database size={15} />
+                     </a>
+                     <button 
+                       onClick={handleLogout} 
+                       title="Keluar / Logout Aplikasi" 
+                       className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-100 hover:border-rose-100 rounded-xl transition-all shadow-2xs flex items-center justify-center cursor-pointer"
+                     >
+                        <LogOut size={15} />
+                     </button>
+                  </div>
+                )}
               </div>
 
               {/* Flyout for User Profile in Collapsed Mode */}
