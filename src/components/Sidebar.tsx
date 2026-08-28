@@ -448,13 +448,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                  </div>
                 {!isCollapsed && (
                   <div className="flex items-center gap-1 shrink-0">
-                     <Link 
-                       href="/backup" 
-                       title="Dashboard Backup & Restore Database (Cloudflare R2 & SQL)" 
-                       className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-100 rounded-xl transition-all shadow-2xs flex items-center justify-center"
-                     >
-                        <Database size={15} />
-                     </Link>
                      <button 
                        onClick={handleLogout} 
                        title="Keluar / Logout Aplikasi" 
@@ -485,12 +478,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                     </div>
 
                     <div className="flex flex-col gap-1.5 relative z-10">
-                      <Link 
-                        href="/backup" 
-                        className="flex items-center gap-2.5 px-3 py-2 bg-slate-800 hover:bg-indigo-600 rounded-xl text-xs font-bold text-slate-200 hover:text-white transition-all active:scale-95"
-                      >
-                        <Database size={15} /> Backup & Restore
-                      </Link>
                       <button 
                         onClick={handleLogout} 
                         className="flex items-center gap-2.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition-all w-full text-left active:scale-95 border border-rose-500/20 hover:border-transparent"

@@ -16,6 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
+import { 
+  FileEdit, Upload, Download, FileText, Sparkles, 
+  ArrowLeft, ShieldCheck, Database, Layers, Search, RefreshCw 
+} from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -799,107 +804,152 @@ export default function UnitKerjaDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-8 animate-in fade-in duration-300">
-      <div className="w-full space-y-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <Link href="/review-anggaran">
-              <Button variant="ghost" className="text-gray-500 hover:text-gray-900 px-0">&larr; Kembali ke Overview</Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-black tracking-tight text-gray-900">Dashboard Unit Kerja</h1>
-              <p className="text-gray-500 font-medium">Pantau status penguncian anggaran (Rule & AI), ajukan usulan, dan kelompokkan data multi-dimensi.</p>
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <Link href="/review-anggaran">
+            <button className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer" title="Kembali ke Overview">
+              <ArrowLeft size={16} />
+            </button>
+          </Link>
+          <div className="bg-gradient-to-br from-sky-600 to-indigo-700 p-2.5 rounded-xl text-white shadow-xs">
+            <FileEdit size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Portal Usulan Anggaran Unit Kerja
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-black">
+                Submission & Review Hub
+              </span>
             </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Pantau status penguncian anggaran (Rule & AI), ajukan usulan (Paste Zone), dan kelompokkan data multi-dimensi.
+            </p>
           </div>
-          
-          <div className="flex flex-wrap gap-3">
-            <Button 
-              variant="outline"
-              className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 font-bold"
-              onClick={() => exportToExcelByTab(activeTab)}
-            >
-              📥 Export Excel ({activeTab === 'summary' ? 'Summary' : activeTab === 'data' ? 'Detail' : 'Pivot'})
-            </Button>
-            <Button 
-              variant="outline"
-              className="border-rose-300 text-rose-700 hover:bg-rose-50 font-bold"
-              onClick={() => generateFormattedPDFReport(activeTab)}
-            >
-              📄 Export PDF Report
-            </Button>
-            <Button 
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
-              onClick={() => setDialogOpen(true)}
-            >
-              + Import Data (Paste Zone)
-            </Button>
-            <Button 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-sm"
-              onClick={handleBulkApprove}
-            >
-              Bulk Approve AI
-            </Button>
-          </div>
-        </header>
+        </div>
 
-        {/* Global Summary Cards (REAKTIF SESUAI FILTER DATA) */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-white border-gray-200">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Anggaran</CardTitle>
-                {selectedUnitFilter !== 'ALL' && <Badge variant="secondary" className="text-[10px]">{selectedUnitFilter}</Badge>}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-gray-900 font-mono">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={() => exportToExcelByTab(activeTab)}
+            className="h-9 px-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <Download size={13} />
+            <span>Export Excel</span>
+          </button>
+
+          <button 
+            onClick={() => generateFormattedPDFReport(activeTab)}
+            className="h-9 px-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <FileText size={13} />
+            <span>PDF Laporan</span>
+          </button>
+
+          <button 
+            onClick={() => setDialogOpen(true)}
+            className="h-9 px-3.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+          >
+            <Upload size={13} />
+            <span>Import TSV (Paste)</span>
+          </button>
+
+          <button 
+            onClick={handleBulkApprove}
+            className="h-9 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+          >
+            <Sparkles size={13} />
+            <span>Bulk Approve AI</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. 4 MODERN KPI SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* CARD 1: TOTAL ANGGARAN */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">TOTAL ANGGARAN USULAN</span>
+              <div className="text-xl font-black text-gray-900 font-mono tracking-tight">
                 Rp {new Intl.NumberFormat('id-ID').format(totalAnggaranSum)}
               </div>
-              <p className="text-xs text-gray-500 mt-1 font-medium">{totalUsulan} Usulan Item</p>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white border-emerald-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Ada Status (Kunci)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-emerald-600 font-mono">
+            </div>
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Layers size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">
+            <span>{totalUsulan.toLocaleString()} Usulan Item</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">{selectedUnitFilter === 'ALL' ? 'Semua Unit' : selectedUnitFilter}</span>
+          </div>
+        </div>
+
+        {/* CARD 2: ADA STATUS TERKUNCI */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">TERKUNCI STATUS (WAJIB)</span>
+              <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
                 Rp {new Intl.NumberFormat('id-ID').format(totalAdaStatusSum)}
               </div>
-              <p className="text-xs text-emerald-700 mt-1 font-medium">
-                {adaStatusItems.length} Item ({totalAnggaranSum > 0 ? Math.round((totalAdaStatusSum / totalAnggaranSum) * 100) : 0}%)
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-white border-amber-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-amber-600 uppercase tracking-wider">Tanpa Status (Bebas)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-amber-600 font-mono">
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <ShieldCheck size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
+            <span>{adaStatusItems.length} Item Terkunci</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">
+              {totalAnggaranSum > 0 ? Math.round((totalAdaStatusSum / totalAnggaranSum) * 100) : 0}% Pagu
+            </span>
+          </div>
+        </div>
+
+        {/* CARD 3: TANPA STATUS */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">PAGU BEBAS (TANPA STATUS)</span>
+              <div className="text-xl font-black text-amber-700 font-mono tracking-tight">
                 Rp {new Intl.NumberFormat('id-ID').format(totalTanpaStatusSum)}
               </div>
-              <p className="text-xs text-amber-700 mt-1 font-medium">
-                {tanpaStatusItems.length} Item ({totalAnggaranSum > 0 ? Math.round((totalTanpaStatusSum / totalAnggaranSum) * 100) : 0}%)
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border-indigo-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Sumber Kunci (Rule vs AI)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center text-sm font-bold text-gray-800">
-                <span className="text-indigo-700">RULE: {terkunciRule}</span>
-                <span className="text-purple-700">AI: {saranAi}</span>
-              </div>
-              <p className="text-xs text-gray-500 mt-2 font-medium">Otomatis Dievaluasi</p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
+              <Database size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
+            <span>{tanpaStatusItems.length} Item Bebas</span>
+            <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">
+              {totalAnggaranSum > 0 ? Math.round((totalTanpaStatusSum / totalAnggaranSum) * 100) : 0}% Pagu
+            </span>
+          </div>
         </div>
+
+        {/* CARD 4: COVERAGE PENGUNCIAN */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">SUMBER PENGUNCIAN</span>
+              <div className="text-sm font-black text-gray-900 truncate mt-1">
+                {terkunciRule} Rule | {saranAi} AI
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-gray-50 text-gray-600 border border-gray-100">
+              <Sparkles size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">
+            <span>Coverage Penguncian</span>
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">
+              {totalUsulan > 0 ? ((adaStatusItems.length / totalUsulan) * 100).toFixed(1) + '%' : '0%'}
+            </span>
+          </div>
+        </div>
+      </div>
 
         {/* GLOBAL FILTER CONTROL BAR */}
         <div className="bg-white border border-indigo-100 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
@@ -1482,6 +1532,5 @@ export default function UnitKerjaDashboard() {
           </Card>
         )}
       </div>
-    </div>
-  );
-}
+    );
+  }
