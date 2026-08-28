@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   FileCode, Copy, Check, Eye, Code, Sparkles, RefreshCw, 
   Plus, Trash2, ArrowRight, Printer, FileText, Table as TableIcon, 
-  ListOrdered, List, AlignJustify, AlignLeft, Bold, Italic, 
-  Download, Upload, CheckCircle2, BookmarkCheck, ArrowLeft,
-  ChevronRight, Layers, HelpCircle, Columns, Settings2
+  ListOrdered, List, AlignJustify, AlignLeft, AlignCenter, AlignRight,
+  Bold, Italic, Underline, Download, Upload, CheckCircle2, BookmarkCheck, 
+  ArrowLeft, ChevronRight, Layers, HelpCircle, Columns, Settings2,
+  Edit3, Play, SplitSquareVertical, Rows
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -158,23 +159,54 @@ const TEMPLATE_PRESETS = [
 
 export default function SuratHtmlEditorPage() {
   const [htmlCode, setHtmlCode] = useState(TEMPLATE_PRESETS[0].html);
-  const [activeTab, setActiveTab] = useState<'visual' | 'code' | 'preview'>('visual');
+  const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
   const [copied, setCopied] = useState(false);
   const [fontFamily, setFontFamily] = useState<'serif' | 'sans'>('sans');
   const [fontSize, setFontSize] = useState<'11pt' | '12pt'>('12pt');
   const [lineSpacing, setLineSpacing] = useState<'1.15' | '1.5' | '1.0'>('1.15');
 
+  // Ref untuk Visual ContentEditable DOM
+  const visualEditorRef = useRef<HTMLDivElement>(null);
+
+  // Sync state ke visual editor saat htmlCode berubah dari luar
+  useEffect(() => {
+    if (visualEditorRef.current && visualEditorRef.current.innerHTML !== htmlCode) {
+      visualEditorRef.current.innerHTML = htmlCode;
+    }
+  }, [htmlCode]);
+
+  // Saat user mengetik langsung di visual editor
+  const handleVisualInput = () => {
+    if (visualEditorRef.current) {
+      setHtmlCode(visualEditorRef.current.innerHTML);
+    }
+  };
+
   // Interactive Table Modal
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  const [tableRows, setTableRows] = useState(3);
-  const [tableCols, setTableCols] = useState(3);
+  const [tableRows, setTableRows] = useState(2);
+  const [tableCols, setTableCols] = useState(2);
   const [tableBorder, setTableBorder] = useState(true);
   const [tableHeader, setTableHeader] = useState(true);
+  const [tablePresetType, setTablePresetType] = useState<'pagu' | 'klasifikasi' | 'custom'>('pagu');
+
+  // Interactive Pagu Values Helper
+  const [paguUnitCode, setPaguUnitCode] = useState('010101');
+  const [paguUnitName, setPaguUnitName] = useState('Majelis Wali Amanat');
+  const [paguNominal, setPaguNominal] = useState('Rp 12.500.000.000');
 
   // Function to insert HTML snippet into the current code
   const insertSnippet = (snippet: string) => {
     setHtmlCode(prev => prev + '\n' + snippet);
     toast.success('Komponen baru berhasil ditambahkan!');
+  };
+
+  // Formatting Commands for Visual Editor (document.execCommand)
+  const execFormat = (command: string, value: string | undefined = undefined) => {
+    document.execCommand(command, false, value);
+    if (visualEditorRef.current) {
+      setHtmlCode(visualEditorRef.current.innerHTML);
+    }
   };
 
   // Quick Action Snippet Generators
@@ -187,7 +219,7 @@ export default function SuratHtmlEditorPage() {
   };
 
   const addSubParagraphIndent = () => {
-    insertSnippet('<p style="text-align: justify; margin: 0; padding-left: 30pt;">Tuliskan sub-paragraf dengan margin kiri (padding-left) di sini...</p>');
+    insertSnippet('<p style="text-align: justify; margin: 0; padding-left: 30pt;">Tuliskan sub-paragraf dengan margin kiri (padding-left 30pt) di sini...</p>');
   };
 
   const addRomanList = () => {
@@ -219,31 +251,75 @@ export default function SuratHtmlEditorPage() {
 </ul>`);
   };
 
+  // Table Generator
   const handleGenerateTable = () => {
-    let tableHtml = `<table style="border-collapse: collapse; width: 100%; margin: 12px 0;" ${tableBorder ? 'border="1"' : 'border="0"'}>\n<tbody>\n`;
+    let tableHtml = '';
     
-    // Header Row
-    if (tableHeader) {
-      tableHtml += '<tr>\n';
-      for (let c = 1; c <= tableCols; c++) {
-        const colWidth = Math.round(100 / tableCols);
-        tableHtml += `  <td style="width: ${colWidth}%; text-align: center; padding: 6px;"><strong>Kolom ${c}</strong></td>\n`;
+    if (tablePresetType === 'pagu') {
+      tableHtml = `<table style="border-collapse: collapse; width: 100%; margin: 12px 0;" border="1">
+<tbody>
+<tr>
+<td style="width: 50%; text-align: center; padding: 6px;"><strong>Kode Unit Kerja</strong></td>
+<td style="width: 50%; text-align: center; padding: 6px;"><strong>Nilai Pagu</strong></td>
+</tr>
+<tr>
+<td style="width: 50%; text-align: center; padding: 6px;">${paguUnitCode}</td>
+<td style="width: 50%; text-align: center; padding: 6px;">${paguNominal}</td>
+</tr>
+</tbody>
+</table>`;
+    } else if (tablePresetType === 'klasifikasi') {
+      tableHtml = `<table style="border-collapse: collapse; width: 90%; margin: 12px 0; font-weight: normal;" border="1">
+<tbody>
+<tr>
+<td style="width: 20%; text-align: center; padding: 6px;"><strong>Klasifikasi Akun</strong></td>
+<td style="width: 50%; text-align: center; padding: 6px;"><strong>Uraian Umum</strong></td>
+<td style="width: 30%; text-align: center; padding: 6px;"><strong>Persentase Penyesuaian</strong></td>
+</tr>
+<tr>
+<td style="width: 20%; text-align: center; padding: 6px;">51</td>
+<td style="width: 50%; padding: 6px;">Belanja Pegawai non-pokok</td>
+<td style="width: 30%; text-align: center; padding: 6px;">7,3%</td>
+</tr>
+<tr>
+<td style="width: 20%; text-align: center; padding: 6px;">52</td>
+<td style="width: 50%; padding: 6px;">Belanja Barang dan Jasa</td>
+<td style="width: 30%; text-align: center; padding: 6px;">12,125%</td>
+</tr>
+<tr>
+<td style="width: 20%; text-align: center; padding: 6px;">53</td>
+<td style="width: 50%; padding: 6px;">Belanja Pemeliharaan</td>
+<td style="width: 30%; text-align: center; padding: 6px;">10,0%</td>
+</tr>
+<tr>
+<td style="width: 20%; text-align: center; padding: 6px;">54</td>
+<td style="width: 50%; padding: 6px;">Belanja Perjalanan Dinas</td>
+<td style="width: 30%; text-align: center; padding: 6px;">40,0%</td>
+</tr>
+</tbody>
+</table>`;
+    } else {
+      tableHtml = `<table style="border-collapse: collapse; width: 100%; margin: 12px 0;" ${tableBorder ? 'border="1"' : 'border="0"'}>\n<tbody>\n`;
+      if (tableHeader) {
+        tableHtml += '<tr>\n';
+        for (let c = 1; c <= tableCols; c++) {
+          const colWidth = Math.round(100 / tableCols);
+          tableHtml += `  <td style="width: ${colWidth}%; text-align: center; padding: 6px;"><strong>Kolom ${c}</strong></td>\n`;
+        }
+        tableHtml += '</tr>\n';
       }
-      tableHtml += '</tr>\n';
+      const dataRowStart = tableHeader ? 2 : 1;
+      for (let r = dataRowStart; r <= tableRows; r++) {
+        tableHtml += '<tr>\n';
+        for (let c = 1; c <= tableCols; c++) {
+          const colWidth = Math.round(100 / tableCols);
+          tableHtml += `  <td style="width: ${colWidth}%; padding: 6px; text-align: ${c === 1 ? 'center' : 'left'};">&nbsp;</td>\n`;
+        }
+        tableHtml += '</tr>\n';
+      }
+      tableHtml += '</tbody>\n</table>';
     }
 
-    // Data Rows
-    const dataRowStart = tableHeader ? 2 : 1;
-    for (let r = dataRowStart; r <= tableRows; r++) {
-      tableHtml += '<tr>\n';
-      for (let c = 1; c <= tableCols; c++) {
-        const colWidth = Math.round(100 / tableCols);
-        tableHtml += `  <td style="width: ${colWidth}%; padding: 6px; text-align: ${c === 1 ? 'center' : 'left'};">&nbsp;</td>\n`;
-      }
-      tableHtml += '</tr>\n';
-    }
-
-    tableHtml += '</tbody>\n</table>';
     insertSnippet(tableHtml);
     setIsTableModalOpen(false);
   };
@@ -251,7 +327,7 @@ export default function SuratHtmlEditorPage() {
   const handleCopyHtml = () => {
     navigator.clipboard.writeText(htmlCode);
     setCopied(true);
-    toast.success('Kode HTML berhasil disalin ke clipboard! Siap dipaste ke editor kantor.');
+    toast.success('Kode HTML berhasil disalin! Siap dipaste ke mode HTML di WYSIWYG editor kantor Anda.');
     setTimeout(() => setCopied(false), 2500);
   };
 
@@ -260,7 +336,7 @@ export default function SuratHtmlEditorPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `format_surat_clean_${new Date().toISOString().slice(0, 10)}.html`;
+    link.download = `surat_clean_html_${new Date().toISOString().slice(0, 10)}.html`;
     link.click();
     URL.revokeObjectURL(url);
     toast.success('File HTML berhasil diunduh!');
@@ -296,24 +372,24 @@ export default function SuratHtmlEditorPage() {
             text-align: justify;
           }
           table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 10pt;
+            border-collapse: collapse !important;
+            width: 100% !important;
+            margin: 12px 0 !important;
           }
           table, th, td {
-            border: 1px solid #000000;
+            border: 1px solid #000000 !important;
           }
           td, th {
-            padding: 5px 8px;
+            padding: 5px 8px !important;
             font-size: ${fontSize};
           }
           ol, ul {
-            margin: 0 0 10pt 0;
-            padding-left: 24pt;
+            margin: 0 0 10pt 0 !important;
+            padding-left: 24pt !important;
           }
           li {
-            margin-bottom: 4pt;
-            text-align: justify;
+            margin-bottom: 4pt !important;
+            text-align: justify !important;
           }
         </style>
       </head>
@@ -364,7 +440,7 @@ export default function SuratHtmlEditorPage() {
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Hasilkan kode HTML yang 100% presisi untuk penomoran bertingkat (Romawi/Abjad/Angka), tabel resmi, dan paragraf rata kiri-kanan (*justified*).
+              Ketik langsung seperti Microsoft Word atau edit HTML untuk membuat tabel surat, penomoran Romawi/Abjad/Angka, dan paragraf rata kanan-kiri.
             </p>
           </div>
         </div>
@@ -396,11 +472,48 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 2. PRESET TEMPLATES BAR */}
+      {/* 2. PANDUAN CARA PENGGUNAAN CEPAT */}
+      <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-white p-3.5 px-5 rounded-2xl border border-indigo-100 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-indigo-950">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0">
+            <HelpCircle size={15} />
+          </div>
+          <div>
+            <span className="font-black text-indigo-900 block">Cara Mudah Menggunakannya:</span>
+            <span className="text-[11px] text-indigo-800 font-medium">
+              1. Pilih <strong>Template Resmi</strong> atau klik tombol <strong>+ Tabel Surat / Romawi / Paragraf</strong> ➔ 2. Ketik / ubah teks langsung di kertas ➔ 3. Klik <strong>Salin Kode HTML</strong> lalu *paste* ke editor kantor Anda!
+            </span>
+          </div>
+        </div>
+
+        {/* Mode Switcher: Visual Editor vs HTML Source Code */}
+        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-indigo-200 shadow-2xs shrink-0">
+          <button
+            onClick={() => setEditorMode('visual')}
+            className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+              editorMode === 'visual' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Edit3 size={13} />
+            <span>Mode Ketik Visual (Word)</span>
+          </button>
+          <button
+            onClick={() => setEditorMode('code')}
+            className={`px-3 py-1.5 rounded-lg font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+              editorMode === 'code' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <Code size={13} />
+            <span>Mode Kode HTML</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 3. PRESET TEMPLATES BAR */}
       <div className="bg-white p-3.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div className="flex items-center gap-2 shrink-0">
           <BookmarkCheck size={16} className="text-indigo-600" />
-          <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Template Resmi:</span>
+          <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Template Resmi Siap Pakai:</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -418,10 +531,51 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 3. QUICK INSERT TOOLBAR (Komponen Surat) */}
+      {/* 4. QUICK INSERT & FORMATTING TOOLBAR */}
       <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1.5">Sisipkan:</span>
+          {/* Format Text Tools for Visual Mode */}
+          {editorMode === 'visual' && (
+            <>
+              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
+                <button
+                  onClick={() => execFormat('bold')}
+                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors font-bold cursor-pointer"
+                  title="Tebal (Ctrl+B)"
+                >
+                  <Bold size={13} />
+                </button>
+                <button
+                  onClick={() => execFormat('italic')}
+                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors italic cursor-pointer"
+                  title="Miring (Ctrl+I)"
+                >
+                  <Italic size={13} />
+                </button>
+                <button
+                  onClick={() => execFormat('underline')}
+                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors underline cursor-pointer"
+                  title="Garis Bawah (Ctrl+U)"
+                >
+                  <Underline size={13} />
+                </button>
+              </div>
+
+              <div className="h-4 w-[1px] bg-gray-200 mx-1" />
+            </>
+          )}
+
+          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1">Sisipkan:</span>
+
+          {/* Tabel Surat Utama */}
+          <button 
+            onClick={() => setIsTableModalOpen(true)} 
+            className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer active:scale-95"
+            title="Buka Generator Tabel Surat Resmi"
+          >
+            <TableIcon size={13} />
+            <span>+ Tabel Surat Resmi</span>
+          </button>
 
           {/* Paragraf */}
           <button 
@@ -439,7 +593,7 @@ export default function SuratHtmlEditorPage() {
             title="Paragraf Menjorok Awal Baris"
           >
             <AlignLeft size={12} className="text-indigo-600" />
-            <span>Paragraf Menjorok</span>
+            <span>Menjorok (Indent)</span>
           </button>
 
           <button 
@@ -479,27 +633,6 @@ export default function SuratHtmlEditorPage() {
             <ListOrdered size={12} />
             <span>Angka (1, 2, 3)</span>
           </button>
-
-          <button 
-            onClick={addBulletList} 
-            className="h-7 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Poin Bullet"
-          >
-            <List size={12} className="text-gray-600" />
-            <span>Bullet</span>
-          </button>
-
-          <div className="h-4 w-[1px] bg-gray-200 mx-1" />
-
-          {/* Tabel */}
-          <button 
-            onClick={() => setIsTableModalOpen(true)} 
-            className="h-7 px-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold text-emerald-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Buat Tabel Resmi Bergaris"
-          >
-            <TableIcon size={12} />
-            <span>+ Tabel Surat</span>
-          </button>
         </div>
 
         {/* Font & Spacing Control */}
@@ -525,91 +658,137 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 4. MAIN DUAL WORKSPACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* PANEL KIRI: EDITOR KODE HTML CLEAN */}
-        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden flex flex-col h-[780px]">
-          {/* Header Panel Kiri */}
-          <div className="p-3 px-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <div className="flex items-center gap-2">
-              <Code size={15} className="text-indigo-600" />
-              <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Editor Kode HTML Surat</span>
+      {/* 5. MAIN WORKSPACE (VISUAL WORD EDITOR ATAU DUAL PANE) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* PANEL KIRI: VISUAL KERTAS WORD / EDITOR KODE */}
+        <div className={editorMode === 'visual' ? 'lg:col-span-8' : 'lg:col-span-6'}>
+          <div className="bg-slate-100 rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden flex flex-col min-h-[780px]">
+            {/* Header Panel */}
+            <div className="p-3 px-4 border-b border-gray-200 bg-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {editorMode === 'visual' ? (
+                  <>
+                    <Edit3 size={15} className="text-indigo-600" />
+                    <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                      Lembar Kertas Surat (Ketik Langsung / Edit Bebas)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Code size={15} className="text-indigo-600" />
+                    <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                      Editor Kode Sumber HTML
+                    </span>
+                  </>
+                )}
+              </div>
+              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold">
+                {editorMode === 'visual' ? 'Mode Interaktif Aktif' : 'Raw HTML Code'}
+              </span>
             </div>
-            <span className="text-[11px] text-gray-400 font-mono">
-              {htmlCode.length.toLocaleString()} Karakter
-            </span>
-          </div>
 
-          {/* Textarea Code */}
-          <div className="p-3 flex-1 flex flex-col">
-            <textarea
-              value={htmlCode}
-              onChange={(e) => setHtmlCode(e.target.value)}
-              placeholder="Ketik atau paste format HTML surat di sini..."
-              className="w-full flex-1 p-4 bg-slate-900 text-slate-100 font-mono text-xs leading-relaxed rounded-xl border border-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 resize-none shadow-inner selection:bg-indigo-600 selection:text-white"
-              spellCheck={false}
-            />
-          </div>
+            {/* Content Area */}
+            {editorMode === 'visual' ? (
+              <div className="flex-1 p-4 md:p-6 overflow-y-auto flex justify-center bg-slate-200/70">
+                <div className="bg-white w-full max-w-[760px] min-h-[920px] p-8 md:p-14 rounded-xl shadow-lg border border-gray-300 transition-all text-gray-900">
+                  {/* ContentEditable Visual Paper */}
+                  <div
+                    ref={visualEditorRef}
+                    contentEditable
+                    onInput={handleVisualInput}
+                    suppressContentEditableWarning
+                    className="surat-rendered-content focus:outline-none min-h-[800px]"
+                    style={{
+                      fontFamily: fontFamily === 'serif' ? "'Times New Roman', Times, serif" : "Arial, 'Segoe UI', sans-serif",
+                      fontSize: fontSize,
+                      lineHeight: lineSpacing
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 flex-1 flex flex-col bg-slate-900">
+                <textarea
+                  value={htmlCode}
+                  onChange={(e) => setHtmlCode(e.target.value)}
+                  placeholder="Ketik atau paste format HTML surat di sini..."
+                  className="w-full flex-1 p-4 bg-slate-900 text-slate-100 font-mono text-xs leading-relaxed rounded-xl border-none outline-none resize-none selection:bg-indigo-600 selection:text-white"
+                  spellCheck={false}
+                />
+              </div>
+            )}
 
-          {/* Footer Panel Kiri */}
-          <div className="p-3 px-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center text-[11px] text-gray-500 font-medium">
-            <span>Tip: Salin kode ini lalu paste pada mode "Source / HTML Code" di WYSIWYG editor kantor Anda.</span>
-            <button
-              onClick={() => {
-                if (confirm('Kosongkan editor?')) {
-                  setHtmlCode('');
-                }
-              }}
-              className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
-            >
-              Reset Kosong
-            </button>
+            {/* Footer Panel */}
+            <div className="p-3 px-4 border-t border-gray-200 bg-white flex justify-between items-center text-[11px] text-gray-500 font-medium">
+              <span>
+                {editorMode === 'visual' 
+                  ? '💡 Anda bisa langsung klik teks atau tabel di atas untuk mengubah isinya seperti di Word.' 
+                  : 'Salin kode ini lalu paste pada mode "Source / HTML" di aplikasi kantor Anda.'}
+              </span>
+              <button
+                onClick={() => {
+                  if (confirm('Kosongkan lembar kerja?')) {
+                    setHtmlCode('');
+                  }
+                }}
+                className="text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
+              >
+                Reset Kosong
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* PANEL KANAN: PRATINJAU KERTAS DOKUMEN RESMI (A4 PREVIEW) */}
-        <div className="bg-slate-100 rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden flex flex-col h-[780px]">
-          {/* Header Panel Kanan */}
-          <div className="p-3 px-4 border-b border-gray-200 bg-white flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Eye size={15} className="text-emerald-600" />
-              <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Pratinjau Kertas Surat Resmi</span>
+        {/* PANEL KANAN: OUTPUT KODE HTML BERSIH & LIVE COPY */}
+        <div className={editorMode === 'visual' ? 'lg:col-span-4' : 'lg:col-span-6'}>
+          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden flex flex-col h-full min-h-[780px]">
+            {/* Header Panel Kanan */}
+            <div className="p-3 px-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <Code size={15} className="text-indigo-600" />
+                <span className="text-xs font-black text-gray-900 uppercase tracking-wider">Output Kode HTML Siap Salin</span>
+              </div>
+              <button
+                onClick={handleCopyHtml}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+              >
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                <span>{copied ? 'Tersalin' : 'Salin'}</span>
+              </button>
             </div>
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
-              ● Live Render 1:1
-            </span>
-          </div>
 
-          {/* Lembar Kertas Dokumen */}
-          <div className="flex-1 p-4 overflow-y-auto flex justify-center bg-slate-200/60">
-            <div 
-              className="bg-white w-full max-w-[720px] min-h-[900px] p-8 md:p-12 rounded-xl shadow-md border border-gray-300 transition-all text-gray-900"
-              style={{
-                fontFamily: fontFamily === 'serif' ? "'Times New Roman', Times, serif" : "Arial, 'Segoe UI', sans-serif",
-                fontSize: fontSize,
-                lineHeight: lineSpacing
-              }}
-            >
-              {/* Rendered HTML Container */}
-              <div 
-                className="surat-rendered-content"
-                dangerouslySetInnerHTML={{ __html: htmlCode }}
+            {/* Code Output Textarea */}
+            <div className="p-3 flex-1 flex flex-col bg-slate-950">
+              <div className="text-[10px] text-slate-400 font-mono pb-2 border-b border-slate-800 flex justify-between">
+                <span>FORMAT HTML CLEAN</span>
+                <span>{htmlCode.length} Karakter</span>
+              </div>
+              <textarea
+                readOnly
+                value={htmlCode}
+                className="w-full flex-1 pt-3 bg-transparent text-emerald-400 font-mono text-[11px] leading-relaxed border-none outline-none resize-none selection:bg-indigo-600 selection:text-white"
+                spellCheck={false}
               />
+            </div>
+
+            {/* Footer Panel Kanan */}
+            <div className="p-3 px-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center text-[11px] text-gray-500 font-medium">
+              <span>100% Kompatibel dengan WYSIWYG Editor Kantor.</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 5. MODAL BUILDER TABEL INTERAKTIF */}
+      {/* 6. MODAL BUILDER TABEL SURAT INTERAKTIF */}
       {isTableModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in transition-opacity">
-          <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl border border-gray-100 animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-in fade-in transition-opacity">
+          <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100 animate-in zoom-in-95">
             <div className="p-4 px-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
                   <TableIcon size={18} />
                 </div>
-                <h3 className="text-sm font-black text-gray-900">Buat Tabel Surat Resmi</h3>
+                <h3 className="text-sm font-black text-gray-900">Pembuat Tabel Surat Resmi</h3>
               </div>
               <button 
                 onClick={() => setIsTableModalOpen(false)} 
@@ -620,57 +799,136 @@ export default function SuratHtmlEditorPage() {
             </div>
             
             <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                    Jumlah Baris:
-                  </label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="50" 
-                    value={tableRows} 
-                    onChange={(e) => setTableRows(parseInt(e.target.value) || 1)} 
-                    className="w-full h-9 px-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs font-bold text-gray-800" 
-                  />
-                </div>
+              {/* Pilihan Model Tabel */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
+                  Pilih Model Tabel Surat:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTablePresetType('pagu')}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                      tablePresetType === 'pagu' 
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="font-black">1. Tabel Pagu RKAT</div>
+                    <div className="text-[10px] font-medium text-gray-500 mt-0.5">Kode Unit & Nilai Pagu</div>
+                  </button>
 
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
-                    Jumlah Kolom:
-                  </label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="10" 
-                    value={tableCols} 
-                    onChange={(e) => setTableCols(parseInt(e.target.value) || 1)} 
-                    className="w-full h-9 px-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs font-bold text-gray-800" 
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setTablePresetType('klasifikasi')}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                      tablePresetType === 'klasifikasi' 
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="font-black">2. Akun 51-54</div>
+                    <div className="text-[10px] font-medium text-gray-500 mt-0.5">Tabel Penyesuaian</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTablePresetType('custom')}
+                    className={`p-2.5 rounded-xl border text-left text-xs font-bold transition-all cursor-pointer ${
+                      tablePresetType === 'custom' 
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="font-black">3. Tabel Kustom</div>
+                    <div className="text-[10px] font-medium text-gray-500 mt-0.5">Atur Baris & Kolom</div>
+                  </button>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-gray-100">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={tableHeader} 
-                    onChange={(e) => setTableHeader(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" 
-                  />
-                  <span className="text-xs font-bold text-gray-700">Sertakan Baris Header Tebal</span>
-                </label>
+              {/* Form Input Sesuai Pilihan Model */}
+              {tablePresetType === 'pagu' && (
+                <div className="space-y-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-500">Kode Unit Kerja:</label>
+                      <input 
+                        type="text" 
+                        value={paguUnitCode} 
+                        onChange={(e) => setPaguUnitCode(e.target.value)} 
+                        className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-mono font-bold"
+                        placeholder="010101"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-gray-500">Nilai Penetapan Pagu:</label>
+                      <input 
+                        type="text" 
+                        value={paguNominal} 
+                        onChange={(e) => setPaguNominal(e.target.value)} 
+                        className="w-full h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-bold text-emerald-700"
+                        placeholder="Rp 12.500.000.000"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={tableBorder} 
-                    onChange={(e) => setTableBorder(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500" 
-                  />
-                  <span className="text-xs font-bold text-gray-700">Tampilkan Garis Tepi Tabel (Border 1)</span>
-                </label>
-              </div>
+              {tablePresetType === 'custom' && (
+                <div className="space-y-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
+                        Jumlah Baris:
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="50" 
+                        value={tableRows} 
+                        onChange={(e) => setTableRows(parseInt(e.target.value) || 1)} 
+                        className="w-full h-8 px-3 border border-gray-300 rounded-lg text-xs font-bold bg-white" 
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
+                        Jumlah Kolom:
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="10" 
+                        value={tableCols} 
+                        onChange={(e) => setTableCols(parseInt(e.target.value) || 1)} 
+                        className="w-full h-8 px-3 border border-gray-300 rounded-lg text-xs font-bold bg-white" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2 border-t border-gray-200">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={tableHeader} 
+                        onChange={(e) => setTableHeader(e.target.checked)}
+                        className="w-4 h-4 rounded text-emerald-600" 
+                      />
+                      <span className="text-xs font-bold text-gray-700">Baris Judul Header Tebal</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={tableBorder} 
+                        onChange={(e) => setTableBorder(e.target.checked)}
+                        className="w-4 h-4 rounded text-emerald-600" 
+                      />
+                      <span className="text-xs font-bold text-gray-700">Garis Tabel Penuh (border="1")</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-4 bg-gray-50 flex justify-end gap-2 border-t border-gray-100">
@@ -685,12 +943,67 @@ export default function SuratHtmlEditorPage() {
                 className="h-8 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Plus size={14} />
-                <span>Sisipkan Tabel</span>
+                <span>Sisipkan Tabel Sekarang</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 7. CSS KHUSUS UNTUK SURAT RESMI, TABEL, DAN NUMBERING AGAR TIDAK TERHAPUS OLEH TAILWIND */}
+      <style jsx global>{`
+        .surat-rendered-content {
+          color: #000000 !important;
+          line-height: 1.35 !important;
+        }
+        .surat-rendered-content p {
+          margin-top: 0 !important;
+          margin-bottom: 11pt !important;
+          text-align: justify !important;
+        }
+        .surat-rendered-content table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+          margin-top: 10pt !important;
+          margin-bottom: 12pt !important;
+          border: 1px solid #000000 !important;
+        }
+        .surat-rendered-content table tr td,
+        .surat-rendered-content table tr th {
+          border: 1px solid #000000 !important;
+          padding: 6px 10px !important;
+          vertical-align: top !important;
+        }
+        .surat-rendered-content table tr th {
+          font-weight: bold !important;
+          background-color: transparent !important;
+        }
+        .surat-rendered-content ol {
+          margin-top: 4pt !important;
+          margin-bottom: 10pt !important;
+          padding-left: 26pt !important;
+          list-style-position: outside !important;
+        }
+        .surat-rendered-content ol[style*="upper-roman"],
+        .surat-rendered-content ol[style*="UPPER-ROMAN"] {
+          list-style-type: upper-roman !important;
+        }
+        .surat-rendered-content ol[style*="lower-alpha"],
+        .surat-rendered-content ol[style*="LOWER-ALPHA"] {
+          list-style-type: lower-alpha !important;
+        }
+        .surat-rendered-content ul {
+          margin-top: 4pt !important;
+          margin-bottom: 10pt !important;
+          padding-left: 26pt !important;
+          list-style-type: disc !important;
+          list-style-position: outside !important;
+        }
+        .surat-rendered-content li {
+          margin-bottom: 4pt !important;
+          text-align: justify !important;
+        }
+      `}</style>
     </div>
   );
 }
