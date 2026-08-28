@@ -83,6 +83,7 @@ export const menuList: MenuItem[] = [
   { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'], group: 'Master' },
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
+  { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN ---
   { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },

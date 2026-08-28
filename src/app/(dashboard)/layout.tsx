@@ -101,6 +101,7 @@ export default function DashboardLayout({
       case '/surat/convert-ai': return 'AI Convert Surat';
       case '/potret-mutasi-pagu': return 'Potret Mutasi Pagu Keseluruhan';
       case '/tambah-pagu/komparasi': return 'Komparasi Audit Tambah Pagu';
+      case '/backup': return 'Backup & Restore Database';
       default: return 'Dashboard';
     }
   };

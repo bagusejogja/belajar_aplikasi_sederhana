@@ -820,15 +820,15 @@ const handleAutoExtractTanggapanAI = async () => {
             )}
 
             {/* UNIFIED CONTAINER FOR INFORMASI DASAR & DATA PENGAJUAN */}
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 relative overflow-hidden space-y-8">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-xs border border-gray-200/80 relative overflow-hidden space-y-6">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-3 rounded-2xl text-emerald-600 shadow-sm">
-                    <FileText size={24} />
+                  <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600 shadow-xs">
+                    <FileText size={20} />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Informasi & Data Pengajuan (Surat Masuk)</h2>
-                    <p className="text-xs text-gray-500 font-medium">Informasi dasar usulan dan lampiran surat pengajuan dari unit kerja.</p>
+                    <h2 className="text-base font-black text-gray-900 tracking-tight">Informasi & Data Pengajuan (Surat Masuk)</h2>
+                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">Informasi dasar usulan dan lampiran surat pengajuan dari unit kerja.</p>
                   </div>
                 </div>
 
@@ -861,7 +861,7 @@ const handleAutoExtractTanggapanAI = async () => {
 
               {/* LOCAL OCR PANEL PENGAJUAN (DI ATAS AGAR BISA MEMENUHI ISIAN DI BAWAHNYA) */}
               {!isReadOnlyPengajuan && (
-                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                <div className="bg-slate-50 border border-slate-200 p-5 md:p-6 rounded-2xl shadow-xs">
                   <OCRPanelPengajuan 
                     mainData={formData} 
                     setMainData={setFormData} 
@@ -1098,7 +1098,7 @@ const handleAutoExtractTanggapanAI = async () => {
         {/* ================= TAHAP 2 (IMPORTED): RINCIAN KEGIATAN & PAGU (EXACTLY LIKE ANALISIS) ================= */}
         {activeStep === 'step2' && selectedAnalisis && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs">
               <DataPendukung 
                 mainData={selectedAnalisis} 
                 setMainData={() => {}} 
@@ -1134,7 +1134,7 @@ const handleAutoExtractTanggapanAI = async () => {
         {/* ================= TAHAP 3 (IMPORTED): POSISI PAGU & AI ANALYSIS (EXACTLY LIKE ANALISIS) ================= */}
         {activeStep === 'step3' && selectedAnalisis && (
           <div className="space-y-8 animate-in fade-in duration-300">
-            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-6 lg:p-8 shadow-sm">
+            <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs">
               <DataForm 
                 mainData={selectedAnalisis} 
                 setMainData={(newVal: any) => {
@@ -1182,22 +1182,22 @@ const handleAutoExtractTanggapanAI = async () => {
         {((activeStep === 'step2' && !selectedAnalisis) || (activeStep === 'step4' && selectedAnalisis)) && (
           <div className="space-y-8 animate-in fade-in duration-300">
             {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
-            <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-sm border border-gray-200/80 space-y-8">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-xs border border-gray-200/80 space-y-6">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-indigo-50 p-3 rounded-2xl text-indigo-600 shadow-sm">
-                    <CheckCircle2 size={24} />
+                  <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600 shadow-xs">
+                    <CheckCircle2 size={20} />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
-                    <p className="text-xs text-gray-500 font-medium">Upload file tanggapan atau masukkan link di atas, lalu jalankan AI Ekstraksi untuk mengisikan form di bawahnya secara otomatis.</p>
+                    <h2 className="text-base font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
+                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">Upload file tanggapan atau masukkan link di atas, lalu jalankan AI Ekstraksi untuk mengisikan form di bawahnya secara otomatis.</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-8">
+              <div className="space-y-6">
                 {/* 1. TOP SECTION: LOCAL OCR PANEL FOR TANGGAPAN */}
-                <div className="bg-slate-50 border border-slate-200 p-6 md:p-8 rounded-[2rem] shadow-sm">
+                <div className="bg-slate-50 border border-slate-200 p-5 md:p-6 rounded-2xl shadow-xs">
                   <OCRPanelTanggapan 
                     mainData={formData} 
                     setMainData={setFormData} 
@@ -1367,7 +1367,7 @@ const handleAutoExtractTanggapanAI = async () => {
       {/* MODAL PILIH ANALISIS (UNLOCKED SELECTION BUTTON FOR ALL HISTORICAL PROPOSAL DATA) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
             
             {/* Modal Header */}
             <div className="p-6 md:p-8 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">

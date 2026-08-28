@@ -77,7 +77,7 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-[42px] px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 shadow-sm flex items-center justify-between gap-2 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full h-9 px-3.5 rounded-xl bg-gray-50 hover:bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
       >
         <span className="truncate font-bold">
           {selectedUnit === 'ALL' ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
@@ -714,22 +714,22 @@ export default function TambahPaguPage() {
       {/* TAB 1: TABEL DATA DETAIL (NO GROUP ORG BADGE - UNIT KERJA & DETAIL SURAT PENGAJUAN COMBINED) */}
       {activeTab === 'data' && (
         <div className="space-y-4 animate-in fade-in duration-300">
-          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
-            <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100 flex flex-row items-center justify-between">
+          <Card className="bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base font-black text-slate-900">
+                <CardTitle className="text-sm font-black text-gray-900">
                   Rincian Usulan Tambah Pagu ({filteredData.length} Records)
                 </CardTitle>
-                <CardDescription className="text-xs text-slate-500 font-medium">
+                <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
                   Kolom Unit Kerja & Detail Surat Pengajuan digabung tanpa badge group unit untuk tampilan ultra-ramping
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-bold">Baris per halaman:</span>
+                <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
                 <select 
                   value={itemsPerPage} 
                   onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold"
+                  className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -739,13 +739,13 @@ export default function TambahPaguPage() {
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
-                  <TableRow>
-                    <TableHead className="w-10 text-center">No</TableHead>
-                    <TableHead>Unit Kerja & Detail Surat Pengajuan (No, Tanggal, & Hal)</TableHead>
-                    <TableHead className="w-56 text-right">Nominal Usulan & Disetujui</TableHead>
-                    <TableHead className="w-44 text-center">Jenis & Status</TableHead>
-                    <TableHead className="w-28 text-center">Aksi</TableHead>
+                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">No</TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold">Unit Kerja & Detail Surat Pengajuan (No, Tanggal, & Hal)</TableHead>
+                    <TableHead className="w-56 text-right text-gray-500 text-xs uppercase font-bold">Nominal Usulan & Disetujui</TableHead>
+                    <TableHead className="w-44 text-center text-gray-500 text-xs uppercase font-bold">Jenis & Status</TableHead>
+                    <TableHead className="w-28 text-center text-gray-500 text-xs uppercase font-bold">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -936,25 +936,25 @@ export default function TambahPaguPage() {
       {/* TAB 2: SUMMARY PER UNIT KERJA (COLLAPSIBLE ACCORDION PER UNIT) */}
       {activeTab === 'summary' && (
         <div className="space-y-4 animate-in fade-in duration-300">
-          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white">
-            <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100">
-              <CardTitle className="text-base font-black text-slate-900">
+          <Card className="bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100">
+              <CardTitle className="text-sm font-black text-gray-900">
                 Ringkasan Usulan Anggaran Per Unit Kerja (Collapsible Accordion)
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500 font-medium">
+              <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
                 Klik pada baris unit kerja untuk memperluas (expand) rincian surat usulan di dalamnya
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-slate-50/80 text-slate-500 font-black text-[11px] uppercase tracking-wider border-b border-slate-200">
-                  <TableRow>
-                    <TableHead className="w-10 text-center"></TableHead>
-                    <TableHead>Nama Unit Kerja</TableHead>
-                    <TableHead className="text-center">Total Usulan Surat</TableHead>
-                    <TableHead className="text-right">Total Nominal Diajukan (Rp)</TableHead>
-                    <TableHead className="text-right text-emerald-700">Total Nominal Disetujui (Rp)</TableHead>
-                    <TableHead className="text-center">% Disetujui</TableHead>
+                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold"></TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold">Nama Unit Kerja</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold">Total Usulan Surat</TableHead>
+                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold">Total Nominal Diajukan (Rp)</TableHead>
+                    <TableHead className="text-right text-emerald-700 text-xs uppercase font-bold">Total Nominal Disetujui (Rp)</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold">% Disetujui</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1099,12 +1099,12 @@ export default function TambahPaguPage() {
       {/* TAB 3: VISUALISASI TREN & GRAFIS */}
       {activeTab === 'chart' && (
         <div className="space-y-4 animate-in fade-in duration-300">
-          <Card className="border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden bg-white p-6">
-            <CardHeader className="px-0 pt-0 pb-4">
-              <CardTitle className="text-base font-black text-slate-900">
+          <Card className="bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden p-6">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 -mx-6 -mt-6 mb-6">
+              <CardTitle className="text-sm font-black text-gray-900">
                 Grafik Volume & Nominal Usulan Tambah Pagu ({selectedYear})
               </CardTitle>
-              <CardDescription className="text-xs text-slate-500 font-medium">
+              <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
                 Perbandingan nominal usulan diajukan vs disetujui per bulan
               </CardDescription>
             </CardHeader>

@@ -584,8 +584,8 @@ export default function DashboardPenerimaan() {
                       {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
                         <tr><td colSpan={16} className="py-8 text-center text-gray-400 text-xs italic">Tidak ada data penerimaan pada filter ini.</td></tr>
                       ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).map((row) => (
-                        <tr key={row.id} className="hover:bg-indigo-50/20 whitespace-nowrap transition-colors">
-                          <td className="py-2.5 px-4 font-bold text-gray-800 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[220px] text-xs" title={row.nama}>{row.nama}</td>
+                        <tr key={row.id} className="even:bg-slate-50/80 odd:bg-white hover:bg-indigo-50/60 whitespace-nowrap transition-colors">
+                          <td className="py-2.5 px-4 font-bold text-gray-800 sticky left-0 bg-inherit shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] truncate max-w-[220px] text-xs" title={row.nama}>{row.nama}</td>
                           <td className="py-2.5 px-4 font-mono font-bold text-right text-indigo-700 border-r border-gray-100 bg-indigo-50/10 text-xs">{formatRupiah(row.rencana)}</td>
                           {row.bulanan.map((val, idx) => (
                             <td key={idx} className="py-2.5 px-3 font-mono text-right text-xs text-gray-600">{val > 0 ? formatRupiah(val) : '-'}</td>
@@ -614,7 +614,7 @@ export default function DashboardPenerimaan() {
                       {pivotData.filter(p => p.rencana > 0 || p.total > 0).length === 0 ? (
                         <tr><td colSpan={5} className="py-8 text-center text-gray-400 text-xs italic">Tidak ada data penerimaan pada filter ini.</td></tr>
                       ) : pivotData.filter(p => p.rencana > 0 || p.total > 0).sort((a,b) => Number(a.persentase) - Number(b.persentase)).map((row) => (
-                        <tr key={row.id} className="hover:bg-indigo-50/20 whitespace-nowrap transition-colors">
+                        <tr key={row.id} className="even:bg-slate-50/80 odd:bg-white hover:bg-indigo-50/60 whitespace-nowrap transition-colors">
                           <td className="py-3 px-4">
                              <div className="font-bold text-gray-900 text-xs">{row.nama}</div>
                              <div className="w-full max-w-[260px] h-1.5 bg-gray-100 rounded-full mt-1.5 overflow-hidden flex" title={`${row.persentase}% tercapai`}>

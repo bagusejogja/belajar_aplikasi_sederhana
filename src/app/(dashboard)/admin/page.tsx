@@ -716,15 +716,15 @@ export default function AdminDashboard() {
 
         {/* TAB 2: TABEL DATA DETAIL + PAGINATION 100-250-500 */}
         {activeTab === 'data' && (
-          <Card className="bg-white border-gray-200">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-              <div>
-                <CardTitle className="text-xl text-gray-900">Usulan Anggaran Detail ({filteredDetailBudgets.length} Data)</CardTitle>
-                <CardDescription className="text-gray-500">
-                  Filter Keyakinan AI dan tombol ⚡ Setujui AI 1-Klik mempermudah validasi manual Anda.
-                </CardDescription>
-              </div>
+          <Card className="bg-white border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100">
+              <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+                <div>
+                  <CardTitle className="text-sm font-black text-gray-900">Usulan Anggaran Detail ({filteredDetailBudgets.length} Data)</CardTitle>
+                  <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    Filter Keyakinan AI dan tombol ⚡ Setujui AI 1-Klik mempermudah validasi manual Anda.
+                  </CardDescription>
+                </div>
 
               {/* AUTOCOMPLETE FILTER UNIT KERJA, FILTER KEYAKINAN AI & FILTER STATUS */}
               <div className="flex flex-wrap items-center gap-2">
@@ -764,9 +764,9 @@ export default function AdminDashboard() {
                   placeholder="Cari ID DB, akun, deskripsi..." 
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs"
+                  className="bg-white border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 w-44 h-9 text-xs"
                 />
-                <Button variant="outline" size="sm" onClick={fetchBudgets} className="border-gray-300 text-gray-700 hover:bg-gray-50 h-9">
+                <Button variant="outline" size="sm" onClick={fetchBudgets} className="h-9 rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold shadow-sm">
                   🔄 Refresh
                 </Button>
               </div>
@@ -774,7 +774,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Table>
-              <TableHeader className="bg-gray-50 border-b border-gray-200">
+              <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-gray-500 text-xs uppercase font-bold">ID DB</TableHead>
                   <TableHead className="text-gray-500 text-xs uppercase font-bold">Rincian Usulan (Unit | Lingkup | Akun | Deskripsi)</TableHead>
@@ -981,10 +981,10 @@ export default function AdminDashboard() {
 
         {/* TAB 3: ANALISIS PIVOT */}
         {activeTab === 'pivot' && (
-          <Card className="bg-white border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-xl text-gray-900">Analisis Pengelompokan Data (Pivot)</CardTitle>
-              <CardDescription className="text-gray-500">
+          <Card className="bg-white border-gray-200/80 rounded-2xl shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100">
+              <CardTitle className="text-sm font-black text-gray-900">Analisis Pengelompokan Data (Pivot)</CardTitle>
+              <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
                 Pilih kolom di bawah ini untuk mengelompokkan data dan melihat total anggarannya.
               </CardDescription>
               <div className="flex flex-wrap gap-2 mt-4">
@@ -1005,7 +1005,7 @@ export default function AdminDashboard() {
             <CardContent>
               <div className="rounded-2xl border border-gray-200 overflow-hidden">
                 <Table>
-                  <TableHeader className="bg-gray-50 border-b border-gray-200">
+                  <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
                     <TableRow>
                       <TableHead className="text-gray-500">Grup: {groupBy.map(g => pivotFields.find(p=>p.id===g)?.label).join(' ➔ ') || 'Semua Data'}</TableHead>
                       <TableHead className="text-gray-500 text-center">Jumlah Usulan</TableHead>

@@ -77,10 +77,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background Ornamen */}
-      <div className="absolute top-0 right-0 -mr-32 -mt-32 w-96 h-96 rounded-full bg-indigo-500/10 blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 -ml-32 -mb-32 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl"></div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-emerald-50/30 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Background Ornamen Glassmorphism */}
+      <div className="absolute top-0 right-0 -mr-32 -mt-32 w-[500px] h-[500px] rounded-full bg-indigo-400/20 blur-[100px] animate-pulse"></div>
+      <div className="absolute bottom-0 left-0 -ml-32 -mb-32 w-[500px] h-[500px] rounded-full bg-emerald-400/20 blur-[100px] animate-pulse" style={{ animationDelay: '2s' }}></div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
          <div className="flex justify-center flex-col items-center">
@@ -101,7 +101,7 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="bg-white py-8 px-4 shadow-xl shadow-gray-200/50 sm:rounded-3xl sm:px-10 border border-gray-100">
+        <div className="bg-white/60 backdrop-blur-2xl py-8 px-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-[2rem] sm:px-10 border border-white/80">
           
           {/* Pesan Sukses Reset Password */}
           {mode === 'forgot' && resetSent ? (
@@ -149,7 +149,7 @@ export default function LoginPage() {
                       required 
                       value={email} 
                       onChange={e => setEmail(e.target.value)} 
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium text-xs text-gray-900" 
+                      className="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-white/80 rounded-2xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium text-xs text-gray-900 shadow-sm" 
                       placeholder="nama@email.com" 
                    />
                 </div>
@@ -179,7 +179,7 @@ export default function LoginPage() {
                         required 
                         value={password} 
                         onChange={e => setPassword(e.target.value)} 
-                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium text-sm text-gray-900 tracking-widest" 
+                        className="w-full pl-11 pr-4 py-3.5 bg-white/50 border border-white/80 rounded-2xl focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none font-medium text-sm text-gray-900 tracking-widest shadow-sm" 
                         placeholder="••••••••" 
                      />
                   </div>
@@ -187,10 +187,10 @@ export default function LoginPage() {
               )}
 
               <div className="pt-2">
-                <button 
+                 <button 
                    type="submit" 
                    disabled={loading} 
-                   className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-2xl shadow-xl shadow-indigo-100 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 gap-2"
+                   className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-2xl shadow-lg shadow-indigo-500/30 text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 gap-2"
                 >
                    {loading ? (
                       <Loader2 size={20} className="animate-spin" />

@@ -320,7 +320,7 @@ export default function InputPenerimaan() {
                 </tr>
               ) : (
                 dataInput.map((row) => (
-                  <tr key={row.jenis_penerimaan_id} className="hover:bg-indigo-50/20 transition-colors">
+                  <tr key={row.jenis_penerimaan_id} className="even:bg-slate-50/80 odd:bg-white hover:bg-indigo-50/60 transition-colors">
                     <td className="py-2 px-4 font-mono font-bold text-gray-500 text-xs text-center">{row.id}</td>
                     <td className="py-2 px-4 font-bold text-gray-800 text-xs">{row.nama}</td>
                     <td className="py-2 px-4">
