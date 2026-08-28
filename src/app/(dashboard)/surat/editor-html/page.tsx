@@ -7,7 +7,7 @@ import {
   ListOrdered, List, AlignJustify, AlignLeft, AlignCenter, AlignRight,
   Bold, Italic, Underline, Download, Upload, CheckCircle2, BookmarkCheck, 
   ArrowLeft, ChevronRight, Layers, HelpCircle, Columns, Settings2,
-  Edit3, Play, SplitSquareVertical, Rows
+  Edit3, Play, SplitSquareVertical, Rows, FileUp, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -157,6 +157,53 @@ const TEMPLATE_PRESETS = [
   }
 ];
 
+// Helper untuk membersihkan dan menstandarisasi HTML hasil konversi Word agar sesuai standar kantor
+function cleanAndStandardizeOfficeHtml(rawHtml: string): string {
+  let output = rawHtml;
+
+  // 1. Standarisasi Paragraph agar rata justify
+  output = output.replace(/<p(\s+[^>]*)?>/gi, (match, attrs) => {
+    if (!attrs) return '<p style="text-align: justify;">';
+    if (/style=["'][^"']*text-align/i.test(attrs)) {
+      return match;
+    }
+    if (/style=["']/i.test(attrs)) {
+      return match.replace(/style=["']([^"']*)["']/i, 'style="text-align: justify; $1"');
+    }
+    return `<p style="text-align: justify;" ${attrs}>`;
+  });
+
+  // 2. Standarisasi Tabel agar memiliki border-collapse, border="1", width="100%", dan margin
+  output = output.replace(/<table(\s+[^>]*)?>/gi, (match, attrs) => {
+    return '<table style="border-collapse: collapse; width: 100%; margin: 12px 0;" border="1">';
+  });
+
+  // 3. Standarisasi Sel Tabel (td dan th)
+  output = output.replace(/<td(\s+[^>]*)?>/gi, (match, attrs) => {
+    if (!attrs) return '<td style="padding: 6px 10px;">';
+    if (/style=["']/i.test(attrs)) {
+      return match.replace(/style=["']([^"']*)["']/i, 'style="padding: 6px 10px; $1"');
+    }
+    return `<td style="padding: 6px 10px;" ${attrs}>`;
+  });
+
+  output = output.replace(/<th(\s+[^>]*)?>/gi, (match, attrs) => {
+    if (!attrs) return '<th style="padding: 6px 10px; text-align: center;"><strong>';
+    return match;
+  });
+
+  // 4. Standarisasi List / Numbering
+  output = output.replace(/<ol(\s+[^>]*)?>/gi, (match, attrs) => {
+    if (!attrs) return '<ol style="padding-left: 26pt; margin-bottom: 10pt;">';
+    return match;
+  });
+
+  // 5. Bersihkan span kosong atau berulang
+  output = output.replace(/<span>(.*?)<\/span>/gi, '$1');
+  
+  return output.trim();
+}
+
 export default function SuratHtmlEditorPage() {
   const [htmlCode, setHtmlCode] = useState(TEMPLATE_PRESETS[0].html);
   const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
@@ -164,6 +211,11 @@ export default function SuratHtmlEditorPage() {
   const [fontFamily, setFontFamily] = useState<'serif' | 'sans'>('sans');
   const [fontSize, setFontSize] = useState<'11pt' | '12pt'>('12pt');
   const [lineSpacing, setLineSpacing] = useState<'1.15' | '1.5' | '1.0'>('1.15');
+
+  // Word Upload State
+  const [isWordConverting, setIsWordConverting] = useState(false);
+  const [isWordModalOpen, setIsWordModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ref untuk Visual ContentEditable DOM
   const visualEditorRef = useRef<HTMLDivElement>(null);
@@ -244,13 +296,6 @@ export default function SuratHtmlEditorPage() {
 </ol>`);
   };
 
-  const addBulletList = () => {
-    insertSnippet(`<ul style="list-style-type: disc;">
-<li style="text-align: justify;">Poin butir bullet pertama;</li>
-<li style="text-align: justify;">Poin butir bullet kedua.</li>
-</ul>`);
-  };
-
   // Table Generator
   const handleGenerateTable = () => {
     let tableHtml = '';
@@ -322,6 +367,53 @@ export default function SuratHtmlEditorPage() {
 
     insertSnippet(tableHtml);
     setIsTableModalOpen(false);
+  };
+
+  // Convert Word (.docx) to HTML using mammoth
+  const handleWordFileSelect = async (file: File) => {
+    if (!file.name.endsWith('.docx') && !file.name.endsWith('.doc')) {
+      toast.error('Harap pilih file dokumen Microsoft Word (.docx)');
+      return;
+    }
+
+    setIsWordConverting(true);
+    const toastId = toast.loading('Mengonversi dokumen Word ke HTML presisi...');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          // Dynamic import mammoth to keep bundle fast
+          const mammoth = (await import('mammoth')).default || (await import('mammoth'));
+          
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          const rawConvertedHtml = result.value;
+          
+          // Post-process with standard office rules (justify, table borders, cell padding)
+          const standardizedHtml = cleanAndStandardizeOfficeHtml(rawConvertedHtml);
+
+          setHtmlCode(standardizedHtml);
+          setIsWordModalOpen(false);
+          toast.success(`Berhasil mengonversi file "${file.name}"! Tabel dan teks telah distandarisasi.`, { id: toastId });
+        } catch (convErr: any) {
+          console.error(convErr);
+          toast.error('Gagal membaca struktur dokumen Word: ' + convErr.message, { id: toastId });
+        } finally {
+          setIsWordConverting(false);
+        }
+      };
+
+      reader.onerror = () => {
+        toast.error('Gagal membaca file Word', { id: toastId });
+        setIsWordConverting(false);
+      };
+
+      reader.readAsArrayBuffer(file);
+    } catch (err: any) {
+      toast.error('Terjadi kesalahan: ' + err.message, { id: toastId });
+      setIsWordConverting(false);
+    }
   };
 
   const handleCopyHtml = () => {
@@ -419,6 +511,19 @@ export default function SuratHtmlEditorPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* Hidden File Input for Word Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept=".docx,.doc"
+        onChange={(e) => {
+          if (e.target.files && e.target.files[0]) {
+            handleWordFileSelect(e.target.files[0]);
+          }
+        }}
+        className="hidden"
+      />
+
       {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">
@@ -436,16 +541,27 @@ export default function SuratHtmlEditorPage() {
                 Pembuat & Konverter HTML Surat Resmi
               </h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black">
-                WYSIWYG Clean HTML Generator
+                Word (.docx) ➔ Clean HTML
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Ketik langsung seperti Microsoft Word atau edit HTML untuk membuat tabel surat, penomoran Romawi/Abjad/Angka, dan paragraf rata kanan-kiri.
+              Upload file Word (.docx) atau ketik langsung seperti di Word untuk menghasilkan kode HTML bersumber tabel dan nomor bertingkat yang rapi.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* Tombol Upload File Word */}
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isWordConverting}
+            className="h-9 px-3.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
+            title="Upload dokumen Word (.docx) untuk dikonversi otomatis ke format HTML kantor"
+          >
+            {isWordConverting ? <Loader2 size={13} className="animate-spin" /> : <FileUp size={13} />}
+            <span>{isWordConverting ? 'Mengonversi...' : 'Upload Word (.docx)'}</span>
+          </button>
+
           <button 
             onClick={handlePrintPreview}
             className="h-9 px-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
@@ -472,16 +588,16 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 2. PANDUAN CARA PENGGUNAAN CEPAT */}
+      {/* 2. PANDUAN CARA PENGGUNAAN CEPAT DENGAN OPSI UPLOAD WORD */}
       <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-white p-3.5 px-5 rounded-2xl border border-indigo-100 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-indigo-950">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0">
             <HelpCircle size={15} />
           </div>
           <div>
-            <span className="font-black text-indigo-900 block">Cara Mudah Menggunakannya:</span>
+            <span className="font-black text-indigo-900 block">Cara Termudah:</span>
             <span className="text-[11px] text-indigo-800 font-medium">
-              1. Pilih <strong>Template Resmi</strong> atau klik tombol <strong>+ Tabel Surat / Romawi / Paragraf</strong> ➔ 2. Ketik / ubah teks langsung di kertas ➔ 3. Klik <strong>Salin Kode HTML</strong> lalu *paste* ke editor kantor Anda!
+              1. Klik tombol biru <strong>"Upload Word (.docx)"</strong> atau pilih <strong>Template</strong> ➔ 2. Tabel, list, & teks otomatis terformat ➔ 3. Klik <strong>"Salin Kode HTML"</strong> dan paste ke aplikasi kantor!
             </span>
           </div>
         </div>
