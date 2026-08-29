@@ -221,16 +221,56 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
   const elements = docXml.match(/(<w:p[\s\S]*?<\/w:p>|<w:tbl[\s\S]*?<\/w:tbl>)/g) || [];
   
   let htmlOut: string[] = [];
+  let listStack: Array<{ numFmt: string; level: number; isUl: boolean; openLi: boolean }> = [];
   let headingSeq = 0;
-  let runningNumber = 0;
-  let currentNumId: string | null = null;
+
+  function closeAllLists() {
+    while (listStack.length > 0) {
+      const item = listStack.pop()!;
+      if (item.openLi) htmlOut.push('</li>');
+      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+    }
+  }
+
+  function adjustListStack(targetFmt: string, targetLevel: number) {
+    while (listStack.length > targetLevel) {
+      const item = listStack.pop()!;
+      if (item.openLi) htmlOut.push('</li>');
+      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+    }
+
+    if (listStack.length === targetLevel && targetLevel > 0) {
+      const current = listStack[listStack.length - 1];
+      if (current.numFmt !== targetFmt) {
+        const item = listStack.pop()!;
+        if (item.openLi) htmlOut.push('</li>');
+        htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+      }
+    }
+
+    while (listStack.length < targetLevel) {
+      const currentLevel = listStack.length;
+      const isUl = targetFmt === 'disc' || targetFmt === 'bullet';
+      const padLeft = currentLevel === 0 ? 28 : 20;
+      const listStyleType = isUl ? 'disc' : (
+        targetFmt === 'lowerLetter' || targetFmt === 'lower-alpha' ? 'lower-alpha' :
+        targetFmt === 'upperRoman' || targetFmt === 'upper-roman' ? 'upper-roman' :
+        targetFmt === 'lowerRoman' || targetFmt === 'lower-roman' ? 'lower-roman' :
+        'decimal'
+      );
+
+      const tag = isUl ? 'ul' : 'ol';
+      const style = `list-style-type: ${listStyleType}; margin: 2pt 0 6pt 0; padding-left: ${padLeft}pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4;`;
+      htmlOut.push(`<${tag} style="${style}">`);
+      listStack.push({ numFmt: targetFmt, level: currentLevel, isUl, openLi: false });
+    }
+  }
 
   elements.forEach(elem => {
     if (elem.startsWith('<w:tbl')) {
-      runningNumber = 0;
-      currentNumId = null;
+      closeAllLists();
       
-      let tblHtml = '<table style="border-collapse: collapse; width: 100%; margin: 14px 0;" border="1">\n<tbody>\n';
+      let tblHtml = '<table style="border-collapse: collapse; width: 100%; margin: 14px 0; font-family: \'Times New Roman\', Times, serif; font-size: 12pt;" border="1">\n<tbody>\n';
       const rows = elem.match(/<w:tr[\s\S]*?<\/w:tr>/g) || [];
       let tableRowSeq = 0;
 
@@ -270,7 +310,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           const weight = isHeader ? 'font-weight: bold;' : '';
           const alignStyle = `text-align: ${textAlign};`;
           
-          tblHtml += `  <${tag} style="${padding} ${weight} ${alignStyle}">\n    ${cellContent || '&nbsp;'}\n  </${tag}>\n`;
+          tblHtml += `  <${tag} style="${padding} ${weight} ${alignStyle} font-family: 'Times New Roman', Times, serif; font-size: 12pt;">\n    ${cellContent || '&nbsp;'}\n  </${tag}>\n`;
         });
         tblHtml += '</tr>\n';
       });
@@ -300,9 +340,8 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
 
         // 1. BAB / Heading (A. PENDAHULUAN, B. DASAR HUKUM, C. MANFAAT..., D. KETENTUAN...)
         if ((lvlDef.numFmt === 'upperLetter' || lvlDef.numFmt === 'upperRoman') && ilvl === '0') {
+          closeAllLists();
           headingSeq++;
-          runningNumber = 0;
-          currentNumId = null;
           const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingSeq) : toAlpha(headingSeq, true);
           htmlOut.push(
             `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
@@ -311,63 +350,39 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           return;
         }
 
-        // 2. Sub-Item a., b., c. (Letter starts at 36pt, text starts at 54pt)
+        // Determine Level:
+        // Any decimal list items directly under a BAB (Dasar Hukum 1-17, Manfaat 1-5, Ketentuan 1-7) = Level 1
+        let targetLevel = 1;
         if (lvlDef.numFmt === 'lowerLetter' || lvlDef.numFmt === 'lower-alpha') {
-          if (currentNumId !== numId) {
-            currentNumId = numId || null;
-            runningNumber = 1;
-          } else {
-            runningNumber++;
-          }
-          const char = toAlpha(runningNumber, false);
-          htmlOut.push(
-            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
-            `<td style="width: 54pt; vertical-align: top; padding: 1pt 0; padding-left: 36pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0;">${char}.</td>` +
-            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
-            `</tr></tbody></table>`
-          );
-          return;
+          targetLevel = 2; // Sub-items a., b., c.
+        } else if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
+          targetLevel = 3; // Bullets
         }
 
-        // 3. Bullet Point (Bullet starts at 52pt, text starts at 68pt)
-        if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
-          htmlOut.push(
-            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
-            `<td style="width: 68pt; vertical-align: top; padding: 1pt 0; padding-left: 52pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0;">●</td>` +
-            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
-            `</tr></tbody></table>`
-          );
-          return;
+        adjustListStack(lvlDef.numFmt, targetLevel);
+
+        const currentList = listStack[listStack.length - 1];
+        if (currentList && currentList.openLi) {
+          htmlOut.push('</li>');
+        }
+        if (currentList) {
+          currentList.openLi = true;
         }
 
-        // 4. Decimal Numbering (1., 9., 10., 17.)
-        // Number starts at 18pt (matching paragraph indent), text starts at 36pt
-        if (currentNumId !== numId) {
-          currentNumId = numId || null;
-          runningNumber = 1;
-        } else {
-          runningNumber++;
-        }
-
-        htmlOut.push(
-          `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
-          `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; padding-left: 18pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0; font-weight: normal;">${runningNumber}.</td>` +
-          `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
-          `</tr></tbody></table>`
-        );
+        htmlOut.push(`<li style="text-align: ${align}; margin-bottom: 4pt; padding-left: 4pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4;">${text}`);
         return;
       }
 
-      // Paragraf Narasi / Redaksi (starts at 18pt, matching number 1.)
-      runningNumber = 0;
-      currentNumId = null;
+      // Paragraf Narasi / Redaksi
+      closeAllLists();
 
       htmlOut.push(
-        `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin-top: 2pt; margin-bottom: 8pt; padding-left: 18pt; line-height: 1.4;">${text}</p>`
+        `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin-top: 2pt; margin-bottom: 8pt; padding-left: 28pt; line-height: 1.4;">${text}</p>`
       );
     }
   });
 
+  closeAllLists();
   return htmlOut.join('\n');
 }
 
