@@ -305,7 +305,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           currentNumId = null;
           const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingSeq) : toAlpha(headingSeq, true);
           htmlOut.push(
-            `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
+            `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
             `<strong>${letter}. ${text}</strong></p>`
           );
           return;
@@ -321,9 +321,9 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           }
           const char = toAlpha(runningNumber, false);
           htmlOut.push(
-            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt;" border="0"><tbody><tr>` +
-            `<td style="width: 54pt; vertical-align: top; padding: 1pt 0; padding-left: 36pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
-            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; line-height: 1.4; border: 0;">${text}</td>` +
+            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
+            `<td style="width: 54pt; vertical-align: top; padding: 1pt 0; padding-left: 36pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0;">${char}.</td>` +
+            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
           return;
@@ -332,9 +332,9 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         // 3. Bullet Point (Bullet starts at 52pt, text starts at 68pt)
         if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
           htmlOut.push(
-            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt;" border="0"><tbody><tr>` +
-            `<td style="width: 68pt; vertical-align: top; padding: 1pt 0; padding-left: 52pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
-            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; line-height: 1.4; border: 0;">${text}</td>` +
+            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
+            `<td style="width: 68pt; vertical-align: top; padding: 1pt 0; padding-left: 52pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0;">●</td>` +
+            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
           return;
@@ -350,9 +350,9 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         }
 
         htmlOut.push(
-          `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt;" border="0"><tbody><tr>` +
-          `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; padding-left: 18pt; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
-          `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; line-height: 1.4; border: 0;">${text}</td>` +
+          `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 3pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt;" border="0"><tbody><tr>` +
+          `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; padding-left: 18pt; font-family: 'Times New Roman', Times, serif; font-size: 12pt; border: 0; font-weight: normal;">${runningNumber}.</td>` +
+          `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.4; border: 0;">${text}</td>` +
           `</tr></tbody></table>`
         );
         return;
@@ -363,7 +363,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
       currentNumId = null;
 
       htmlOut.push(
-        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 8pt; padding-left: 18pt; line-height: 1.4;">${text}</p>`
+        `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin-top: 2pt; margin-bottom: 8pt; padding-left: 18pt; line-height: 1.4;">${text}</p>`
       );
     }
   });
