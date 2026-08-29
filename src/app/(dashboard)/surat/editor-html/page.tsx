@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  FileCode, Copy, Check, Eye, Code, Sparkles, RefreshCw, 
+  FileCode, Copy, Check, Eye, Code, Sparkles, RefreshCw, RotateCcw,
   Plus, Trash2, ArrowRight, Printer, FileText, Table as TableIcon, 
   ListOrdered, List, AlignJustify, AlignLeft, AlignCenter, AlignRight,
   Bold, Italic, Underline, Download, Upload, CheckCircle2, BookmarkCheck, 
@@ -387,10 +387,10 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
 }
 
 export default function SuratHtmlEditorPage() {
-  const [htmlCode, setHtmlCode] = useState(TEMPLATE_PRESETS[0].html);
+  const [htmlCode, setHtmlCode] = useState('');
   const [editorMode, setEditorMode] = useState<'visual' | 'code'>('visual');
   const [copied, setCopied] = useState(false);
-  const [fontFamily, setFontFamily] = useState<'serif' | 'sans'>('sans');
+  const [fontFamily, setFontFamily] = useState<'serif' | 'sans'>('serif');
   const [fontSize, setFontSize] = useState<'11pt' | '12pt'>('12pt');
   const [lineSpacing, setLineSpacing] = useState<'1.15' | '1.5' | '1.0'>('1.15');
 
@@ -707,11 +707,26 @@ export default function SuratHtmlEditorPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* Tombol Lembar Baru / Bersihkan */}
+          <button 
+            onClick={() => {
+              if (!htmlCode.trim() || confirm('Bersihkan lembar kerja dan mulai dari halaman kosong baru?')) {
+                setHtmlCode('');
+                toast.success('Lembar kerja telah dibersihkan!');
+              }
+            }}
+            className="h-9 px-3 bg-gray-50 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            title="Bersihkan lembar kerja untuk memulai dokumen baru"
+          >
+            <RotateCcw size={13} />
+            <span>Lembar Baru</span>
+          </button>
+
           {/* Tombol Upload File Word */}
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isWordConverting}
-            className="h-9 px-3.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
+            className="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
             title="Upload dokumen Word (.docx) untuk dikonversi otomatis ke format HTML kantor"
           >
             {isWordConverting ? <Loader2 size={13} className="animate-spin" /> : <FileUp size={13} />}
@@ -957,19 +972,75 @@ export default function SuratHtmlEditorPage() {
             {/* Content Area */}
             {editorMode === 'visual' ? (
               <div className="flex-1 p-4 md:p-6 overflow-y-auto flex justify-center bg-slate-200/70">
-                <div className="bg-white w-full max-w-[760px] min-h-[920px] p-8 md:p-14 rounded-xl shadow-lg border border-gray-300 transition-all text-gray-900">
-                  <div
-                    ref={visualEditorRef}
-                    contentEditable
-                    onInput={handleVisualInput}
-                    suppressContentEditableWarning
-                    className="surat-rendered-content focus:outline-none min-h-[800px]"
-                    style={{
-                      fontFamily: fontFamily === 'serif' ? "'Times New Roman', Times, serif" : "Arial, 'Segoe UI', sans-serif",
-                      fontSize: fontSize,
-                      lineHeight: lineSpacing
-                    }}
-                  />
+                <div className="bg-white w-full max-w-[760px] min-h-[920px] p-8 md:p-14 rounded-xl shadow-lg border border-gray-300 transition-all text-gray-900 relative">
+                  {!htmlCode.trim() ? (
+                    <div className="flex flex-col items-center justify-center h-full min-h-[700px] border-2 border-dashed border-indigo-200/80 rounded-2xl p-8 bg-gradient-to-b from-indigo-50/30 to-white text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-200 text-indigo-600 flex items-center justify-center mb-4 shadow-xs">
+                        <FileUp size={32} />
+                      </div>
+                      <h3 className="text-base font-black text-gray-900 mb-1">
+                        Lembar Kerja Surat Bersih
+                      </h3>
+                      <p className="text-xs text-gray-500 max-w-md mb-6 leading-relaxed">
+                        Upload dokumen Word (.docx) Anda atau pilih salah satu template resmi di bawah untuk menghasilkan kode HTML bersumber tabel dan nomor bertingkat yang rapi.
+                      </p>
+
+                      <div className="flex flex-wrap justify-center gap-3 mb-6">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isWordConverting}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                          {isWordConverting ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+                          <span>Upload Dokumen Word (.docx)</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setHtmlCode('<p style="text-align: justify; font-family: \'Times New Roman\', Times, serif; font-size: 12pt; margin: 0 0 10pt 0;">Tuliskan isi surat resmi di sini...</p>');
+                            toast.success('Lembar pengetikan siap!');
+                          }}
+                          className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                        >
+                          <Edit3 size={14} />
+                          <span>Mulai Ketik Manual</span>
+                        </button>
+                      </div>
+
+                      <div className="pt-4 border-t border-indigo-100 w-full max-w-md">
+                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2.5">
+                          Atau Muat Template Siap Pakai:
+                        </span>
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {TEMPLATE_PRESETS.map((preset) => (
+                            <button
+                              key={preset.id}
+                              onClick={() => {
+                                setHtmlCode(preset.html);
+                                toast.success(`Template ${preset.name} dimuat!`);
+                              }}
+                              className="px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 rounded-lg text-[11px] font-bold text-gray-600 hover:text-indigo-600 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                            >
+                              <Sparkles size={11} className="text-amber-500" />
+                              <span>{preset.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      ref={visualEditorRef}
+                      contentEditable
+                      onInput={handleVisualInput}
+                      suppressContentEditableWarning
+                      className="surat-rendered-content focus:outline-none min-h-[800px]"
+                      style={{
+                        fontFamily: fontFamily === 'serif' ? "'Times New Roman', Times, serif" : "Arial, 'Segoe UI', sans-serif",
+                        fontSize: fontSize,
+                        lineHeight: lineSpacing
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             ) : (
