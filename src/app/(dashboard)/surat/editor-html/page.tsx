@@ -134,7 +134,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
   if (!docXml) return '<p style="text-align: justify;">Dokumen kosong</p>';
 
   // 1. Parse Numbering Definitions from numbering.xml
-  const abstractNums: Record<string, Record<string, { numFmt: string; lvlText: string; start: number }>> = {};
+  const abstractNums: Record<string, Record<string, { numFmt: string; lvlText: string }>> = {};
   const numToAbstract: Record<string, string> = {};
   
   const anMatches = numXml.match(/<w:abstractNum[\s\S]*?<\/w:abstractNum>/g) || [];
@@ -147,8 +147,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
       const ilvl = lvl.match(/w:ilvl="(\d+)"/)?.[1] || '0';
       const numFmt = lvl.match(/<w:numFmt w:val="([^"]+)"/)?.[1] || 'decimal';
       const lvlText = lvl.match(/<w:lvlText w:val="([^"]+)"/)?.[1] || '%1.';
-      const start = parseInt(lvl.match(/<w:start w:val="(\d+)"/)?.[1] || '1', 10);
-      abstractNums[anId][ilvl] = { numFmt, lvlText, start };
+      abstractNums[anId][ilvl] = { numFmt, lvlText };
     });
   });
 
@@ -161,6 +160,11 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
     }
   });
 
+  function toAlpha(num: number, isUpper = false): string {
+    const code = (isUpper ? 65 : 97) + ((num - 1) % 26);
+    return String.fromCharCode(code);
+  }
+
   function toRoman(num: number): string {
     const roman: Record<string, number> = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
     let str = '';
@@ -172,50 +176,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
     return str;
   }
 
-  function toAlpha(num: number, isUpper = false): string {
-    const code = (isUpper ? 65 : 97) + ((num - 1) % 26);
-    return String.fromCharCode(code);
-  }
-
-  const listCounters: Record<string, number> = {};
-
-  function getNumberingPrefix(numId: string, ilvl: string) {
-    const anId = numToAbstract[numId];
-    if (!anId || !abstractNums[anId]) {
-      return { type: 'decimal', text: '', count: 1, ilvl: parseInt(ilvl, 10) };
-    }
-
-    const lvlDef = abstractNums[anId][ilvl] || { numFmt: 'decimal', lvlText: '%1.', start: 1 };
-    const counterKey = `${numId}_${ilvl}`;
-    if (!listCounters[counterKey]) {
-      listCounters[counterKey] = lvlDef.start || 1;
-    } else {
-      listCounters[counterKey]++;
-    }
-
-    const currentCount = listCounters[counterKey];
-    let numFormatted = currentCount.toString();
-
-    if (lvlDef.numFmt === 'upperRoman') {
-      numFormatted = toRoman(currentCount);
-    } else if (lvlDef.numFmt === 'lowerRoman') {
-      numFormatted = toRoman(currentCount).toLowerCase();
-    } else if (lvlDef.numFmt === 'upperLetter') {
-      numFormatted = toAlpha(currentCount, true);
-    } else if (lvlDef.numFmt === 'lowerLetter') {
-      numFormatted = toAlpha(currentCount, false);
-    } else if (lvlDef.numFmt === 'bullet') {
-      numFormatted = '●';
-    }
-
-    let prefixText = lvlDef.lvlText.replace(/%\d+/g, numFormatted);
-    return {
-      type: lvlDef.numFmt,
-      text: prefixText,
-      count: currentCount,
-      ilvl: parseInt(ilvl, 10)
-    };
-  }
+  let headingLetterSeq = 0;
 
   function extractFormattedText(xml: string): string {
     let result = '';
@@ -247,29 +208,67 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
   }
 
   function parseIndentationPt(indXml: string | null) {
-    if (!indXml) return { leftPt: 0, hangingPt: 0, firstLinePt: 0 };
+    if (!indXml) return { leftPt: 0, firstLinePt: 0 };
     const left = indXml.match(/w:left="(\d+)"/)?.[1];
-    const hanging = indXml.match(/w:hanging="(\d+)"/)?.[1];
     const firstLine = indXml.match(/w:firstLine="(\d+)"/)?.[1];
 
-    // In OpenXML Word: 1 pt = 20 dxa
     const leftPt = left ? Math.round(parseInt(left, 10) / 20) : 0;
-    const hangingPt = hanging ? Math.round(parseInt(hanging, 10) / 20) : 0;
     const firstLinePt = firstLine ? Math.round(parseInt(firstLine, 10) / 20) : 0;
 
-    return { leftPt, hangingPt, firstLinePt };
+    return { leftPt, firstLinePt };
   }
 
-  let htmlResult: string[] = [];
-  const bodyMatch = docXml.match(/<w:body>([\s\S]*?)<\/w:body>/);
-  if (!bodyMatch) return '<p style="text-align: justify;">Format tidak valid</p>';
+  const elements = docXml.match(/(<w:p[\s\S]*?<\/w:p>|<w:tbl[\s\S]*?<\/w:tbl>)/g) || [];
+  
+  let htmlOut: string[] = [];
+  let listStack: Array<{ numFmt: string; level: number; isUl: boolean; openLi: boolean }> = [];
 
-  const bodyContent = bodyMatch[1];
-  const elements = bodyContent.match(/(<w:p[\s\S]*?<\/w:p>|<w:tbl[\s\S]*?<\/w:tbl>)/g) || [];
+  function closeAllLists() {
+    while (listStack.length > 0) {
+      const item = listStack.pop()!;
+      if (item.openLi) htmlOut.push('</li>');
+      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+    }
+  }
+
+  function adjustListStack(targetFmt: string, targetLevel: number) {
+    while (listStack.length > targetLevel) {
+      const item = listStack.pop()!;
+      if (item.openLi) htmlOut.push('</li>');
+      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+    }
+
+    if (listStack.length === targetLevel && targetLevel > 0) {
+      const current = listStack[listStack.length - 1];
+      if (current.numFmt !== targetFmt) {
+        const item = listStack.pop()!;
+        if (item.openLi) htmlOut.push('</li>');
+        htmlOut.push(item.isUl ? '</ul>' : '</ol>');
+      }
+    }
+
+    while (listStack.length < targetLevel) {
+      const currentLevel = listStack.length;
+      const isUl = targetFmt === 'disc' || targetFmt === 'bullet';
+      const padLeft = currentLevel === 0 ? 28 : 22;
+      const listStyleType = isUl ? 'disc' : (
+        targetFmt === 'lowerLetter' || targetFmt === 'lower-alpha' ? 'lower-alpha' :
+        targetFmt === 'upperRoman' || targetFmt === 'upper-roman' ? 'upper-roman' :
+        targetFmt === 'lowerRoman' || targetFmt === 'lower-roman' ? 'lower-roman' :
+        'decimal'
+      );
+
+      const tag = isUl ? 'ul' : 'ol';
+      const style = `list-style-type: ${listStyleType}; padding-left: ${padLeft}pt; margin-top: 4pt; margin-bottom: 6pt;`;
+      htmlOut.push(`<${tag} style="${style}">`);
+      listStack.push({ numFmt: targetFmt, level: currentLevel, isUl, openLi: false });
+    }
+  }
 
   elements.forEach(elem => {
     if (elem.startsWith('<w:tbl')) {
-      // TABEL RESMI
+      closeAllLists();
+      
       let tblHtml = '<table style="border-collapse: collapse; width: 100%; margin: 14px 0;" border="1">\n<tbody>\n';
       const rows = elem.match(/<w:tr[\s\S]*?<\/w:tr>/g) || [];
       let tableRowSeq = 0;
@@ -291,7 +290,6 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
             const numPr = p.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
             let pText = extractFormattedText(p);
 
-            // Handle automatic row numbering inside table cells
             if (numPr && !pText.trim() && colIdx === 0 && !isHeader) {
               tableRowSeq++;
               pText = tableRowSeq.toString();
@@ -316,11 +314,10 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         tblHtml += '</tr>\n';
       });
 
-      tblHtml += '</tbody>\n</table>\n';
-      htmlResult.push(tblHtml);
+      tblHtml += '</tbody>\n</table>';
+      htmlOut.push(tblHtml);
 
     } else if (elem.startsWith('<w:p')) {
-      // PARAGRAF & HEADING RESMI
       const text = extractFormattedText(elem);
       if (!text.trim()) return;
 
@@ -332,53 +329,69 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         else if (alignMatch[1] === 'left') align = 'left';
       }
 
-      // Read exact indentation from w:ind
-      const indMatch = elem.match(/<w:ind\s+([^>]*)\/>/);
-      const indProps = indMatch ? parseIndentationPt(indMatch[1]) : { leftPt: 0, hangingPt: 0, firstLinePt: 0 };
-
       const numPr = elem.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
+      const indMatch = elem.match(/<w:ind\s+([^>]*)\/>/);
+      const indProps = indMatch ? parseIndentationPt(indMatch[1]) : { leftPt: 0, firstLinePt: 0 };
+
       if (numPr) {
         const numId = numPr[0].match(/<w:numId w:val="(\d+)"/)?.[1];
         const ilvl = numPr[0].match(/<w:ilvl w:val="(\d+)"/)?.[1] || '0';
-        
-        if (numId) {
-          const prefix = getNumberingPrefix(numId, ilvl);
-          
-          // Level 0 Heading (e.g. A. PENDAHULUAN atau I. PENDAHULUAN)
-          if ((prefix.type === 'upperLetter' || prefix.type === 'upperRoman') && ilvl === '0') {
-            htmlResult.push(
-              `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
-              `<strong>${prefix.text} ${text}</strong></p>`
-            );
-            return;
-          }
+        const anId = numId ? numToAbstract[numId] : undefined;
+        const lvlDef = (anId && abstractNums[anId]) ? abstractNums[anId][ilvl] || { numFmt: 'decimal', lvlText: '%1.' } : { numFmt: 'decimal', lvlText: '%1.' };
 
-          // Indentasi list berjenjang yang presisi (hanging indent / tab gap)
-          const totalLeftIndent = indProps.leftPt > 0 ? indProps.leftPt : ((parseInt(ilvl, 10) + 1) * 25);
-          const prefixWidth = prefix.text.length > 3 ? 24 : 18;
-
-          htmlResult.push(
-            `<p style="text-align: ${align}; margin-top: 3pt; margin-bottom: 5pt; padding-left: ${totalLeftIndent}pt; text-indent: -${prefixWidth}pt; margin-left: ${prefixWidth}pt;">` +
-            `<span style="display: inline-block; width: ${prefixWidth}pt; font-weight: ${prefix.type === 'upperLetter' ? 'bold' : 'normal'};">${prefix.text}</span>` +
-            `${text}</p>`
+        // Check if top-level Heading (A. PENDAHULUAN, B. DASAR HUKUM, D. KETENTUAN UMUM, etc.)
+        if ((lvlDef.numFmt === 'upperLetter' || lvlDef.numFmt === 'upperRoman') && ilvl === '0') {
+          closeAllLists();
+          headingLetterSeq++;
+          const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingLetterSeq) : toAlpha(headingLetterSeq, true);
+          htmlOut.push(
+            `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
+            `<strong>${letter}. ${text}</strong></p>`
           );
           return;
         }
+
+        // Determine nesting level:
+        // Level 1 = decimal (1., 2.)
+        // Level 2 = lowerLetter (a., b.)
+        // Level 3 = decimal (1), 2))
+        let targetLevel = 1;
+        if (lvlDef.numFmt === 'lowerLetter' || lvlDef.numFmt === 'lower-alpha') {
+          targetLevel = 2;
+        } else if (parseInt(ilvl, 10) > 0) {
+          targetLevel = parseInt(ilvl, 10) + 1;
+        }
+
+        adjustListStack(lvlDef.numFmt, targetLevel);
+        
+        const currentList = listStack[listStack.length - 1];
+        if (currentList && currentList.openLi) {
+          htmlOut.push('</li>');
+        }
+        if (currentList) {
+          currentList.openLi = true;
+        }
+
+        htmlOut.push(`<li style="text-align: ${align}; margin-bottom: 4pt;">${text}`);
+        return;
       }
 
-      // Paragraf Reguler dengan indentasi Word asli (w:left / w:firstLine)
+      // Paragraf Reguler
+      closeAllLists();
+
       if (indProps.leftPt > 0 || indProps.firstLinePt > 0) {
         let styleStr = `text-align: ${align}; margin-bottom: 10pt;`;
         if (indProps.leftPt > 0) styleStr += ` padding-left: ${indProps.leftPt}pt;`;
         if (indProps.firstLinePt > 0) styleStr += ` text-indent: ${indProps.firstLinePt}pt;`;
-        htmlResult.push(`<p style="${styleStr}">${text}</p>`);
+        htmlOut.push(`<p style="${styleStr}">${text}</p>`);
       } else {
-        htmlResult.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
+        htmlOut.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
       }
     }
   });
 
-  return htmlResult.join('\n');
+  closeAllLists();
+  return htmlOut.join('\n');
 }
 
 export default function SuratHtmlEditorPage() {
