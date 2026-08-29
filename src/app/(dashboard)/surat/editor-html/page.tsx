@@ -305,8 +305,10 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           currentNumId = null;
           const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingSeq) : toAlpha(headingSeq, true);
           htmlOut.push(
-            `<p style="text-align: ${align}; font-weight: bold; margin-top: 16pt; margin-bottom: 8pt;">` +
-            `<strong>${letter}. ${text}</strong></p>`
+            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 16pt; margin-bottom: 6pt;" border="0"><tbody><tr>` +
+            `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: bold;"><strong>${letter}.</strong></td>` +
+            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0; font-weight: bold;"><strong>${text}</strong></td>` +
+            `</tr></tbody></table>`
           );
           return;
         }
@@ -322,7 +324,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           const char = toAlpha(runningNumber, false);
           htmlOut.push(
             `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-            `<td style="width: 48pt; vertical-align: top; padding: 1pt 0; padding-left: 24pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
+            `<td style="width: 60pt; vertical-align: top; padding: 1pt 0; padding-left: 36pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
             `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
@@ -333,7 +335,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
           htmlOut.push(
             `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-            `<td style="width: 54pt; vertical-align: top; padding: 1pt 0; padding-left: 40pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
+            `<td style="width: 78pt; vertical-align: top; padding: 1pt 0; padding-left: 60pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
             `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
@@ -350,7 +352,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
 
         htmlOut.push(
           `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-          `<td style="width: 24pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
+          `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
           `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
           `</tr></tbody></table>`
         );
@@ -362,7 +364,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
       currentNumId = null;
 
       htmlOut.push(
-        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 10pt; padding-left: 24pt;">${text}</p>`
+        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 10pt; padding-left: 36pt;">${text}</p>`
       );
     }
   });
