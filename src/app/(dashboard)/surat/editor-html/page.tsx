@@ -353,15 +353,14 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           return;
         }
 
-        // Determine nesting level:
-        // Level 1 = decimal (1., 2.)
-        // Level 2 = lowerLetter (a., b.)
-        // Level 3 = decimal (1), 2))
+        // UNIFIED LEVEL RESOLUTION:
+        // Any decimal list items directly under a BAB (e.g. Dasar Hukum 1-17, Manfaat 1-5, Ketentuan 1-7)
+        // are ALWAYS Level 1 (padding-left: 28pt)
         let targetLevel = 1;
         if (lvlDef.numFmt === 'lowerLetter' || lvlDef.numFmt === 'lower-alpha') {
-          targetLevel = 2;
-        } else if (parseInt(ilvl, 10) > 0) {
-          targetLevel = parseInt(ilvl, 10) + 1;
+          targetLevel = 2; // Sub-items a., b., c.
+        } else if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
+          targetLevel = 3; // Bullets
         }
 
         adjustListStack(lvlDef.numFmt, targetLevel);
