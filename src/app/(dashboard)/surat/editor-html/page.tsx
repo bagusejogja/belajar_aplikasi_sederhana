@@ -299,16 +299,15 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         const lvlDef = (anId && abstractNums[anId]) ? abstractNums[anId][ilvl] || { numFmt: 'decimal', lvlText: '%1.' } : { numFmt: 'decimal', lvlText: '%1.' };
 
         // 1. BAB / Heading (A. PENDAHULUAN, B. DASAR HUKUM, C. MANFAAT..., D. KETENTUAN...)
+        // Normal single space between letter and title: "B. DASAR HUKUM"
         if ((lvlDef.numFmt === 'upperLetter' || lvlDef.numFmt === 'upperRoman') && ilvl === '0') {
           headingSeq++;
           runningNumber = 0;
           currentNumId = null;
           const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingSeq) : toAlpha(headingSeq, true);
           htmlOut.push(
-            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 16pt; margin-bottom: 6pt;" border="0"><tbody><tr>` +
-            `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: bold;"><strong>${letter}.</strong></td>` +
-            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0; font-weight: bold;"><strong>${text}</strong></td>` +
-            `</tr></tbody></table>`
+            `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
+            `<strong>${letter}. ${text}</strong></p>`
           );
           return;
         }
@@ -324,7 +323,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
           const char = toAlpha(runningNumber, false);
           htmlOut.push(
             `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-            `<td style="width: 60pt; vertical-align: top; padding: 1pt 0; padding-left: 36pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
+            `<td style="width: 58pt; vertical-align: top; padding: 1pt 0; padding-left: 40pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
             `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
@@ -335,7 +334,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
           htmlOut.push(
             `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-            `<td style="width: 78pt; vertical-align: top; padding: 1pt 0; padding-left: 60pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
+            `<td style="width: 72pt; vertical-align: top; padding: 1pt 0; padding-left: 56pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
             `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
             `</tr></tbody></table>`
           );
@@ -343,6 +342,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         }
 
         // 4. Decimal Numbering (1., 9., 10., 17.)
+        // Number 1. starts at 20pt (EXACTLY UNDER the letter D of "B. DASAR HUKUM" / P of "A. PENDAHULUAN")
         if (currentNumId !== numId) {
           currentNumId = numId || null;
           runningNumber = 1;
@@ -352,19 +352,19 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
 
         htmlOut.push(
           `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
-          `<td style="width: 36pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
+          `<td style="width: 44pt; vertical-align: top; padding: 1pt 0; padding-left: 20pt; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
           `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
           `</tr></tbody></table>`
         );
         return;
       }
 
-      // Paragraf Narasi / Redaksi
+      // Paragraf Narasi / Redaksi (starts at 20pt — EXACTLY UNDER letter P / D / M!)
       runningNumber = 0;
       currentNumId = null;
 
       htmlOut.push(
-        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 10pt; padding-left: 36pt;">${text}</p>`
+        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 10pt; padding-left: 20pt;">${text}</p>`
       );
     }
   });
