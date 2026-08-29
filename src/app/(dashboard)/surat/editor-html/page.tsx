@@ -251,7 +251,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
     while (listStack.length < targetLevel) {
       const currentLevel = listStack.length;
       const isUl = targetFmt === 'disc' || targetFmt === 'bullet';
-      const padLeft = currentLevel === 0 ? 28 : 20;
+      const padLeft = currentLevel === 0 ? 20 : 16;
       const listStyleType = isUl ? 'disc' : (
         targetFmt === 'lowerLetter' || targetFmt === 'lower-alpha' ? 'lower-alpha' :
         targetFmt === 'upperRoman' || targetFmt === 'upper-roman' ? 'upper-roman' :
@@ -373,11 +373,11 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         return;
       }
 
-      // Paragraf Narasi / Redaksi
+      // Paragraf Narasi / Redaksi (starts at 15pt — EXACTLY UNDER letter P in "A. PENDAHULUAN" / M in "C. MANFAAT")
       closeAllLists();
 
       htmlOut.push(
-        `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin-top: 2pt; margin-bottom: 8pt; padding-left: 28pt; line-height: 1.4;">${text}</p>`
+        `<p style="text-align: ${align}; font-family: 'Times New Roman', Times, serif; font-size: 12pt; margin-top: 2pt; margin-bottom: 8pt; padding-left: 15pt; line-height: 1.4;">${text}</p>`
       );
     }
   });
