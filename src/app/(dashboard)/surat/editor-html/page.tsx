@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import JSZip from 'jszip';
 
 // TEMPLATES RESMI PRESET
 const TEMPLATE_PRESETS = [
@@ -121,87 +122,252 @@ const TEMPLATE_PRESETS = [
 </ol>
 <li style="text-align: justify;">Penutup<br /><span style="font-weight: normal;">Kebijakan penyesuaian ini ditempuh dengan semangat kolegialitas dan tanggung jawab bersama untuk menjaga kesehatan fiskal, akuntabilitas, serta keberlanjutan Universitas Gadjah Mada. Kami meyakini bahwa dengan dukungan penuh dari para pimpinan unit kerja, proses penyesuaian dapat berjalan tertib, terukur, dan tetap menjaga kualitas layanan akademik maupun layanan publik Universitas.</span></li>
 </ol>`
-  },
-  {
-    id: 'undangan_rapat_resmi',
-    name: 'Surat Undangan Pembahasan Anggaran (Standard)',
-    category: 'Undangan & Pemberitahuan',
-    description: 'Format surat undangan pembahasan anggaran dengan rincian jadwal, tempat, dan agenda terstruktur.',
-    html: `<p style="text-align: justify;">Menindaklanjuti agenda penelaahan usulan Rencana Kerja dan Anggaran Tahunan (RKAT), dengan ini kami mengundang Bapak/Ibu Pimpinan Unit Kerja untuk hadir dalam rapat koordinasi teknis yang akan diselenggarakan pada:</p>
-<table style="border-collapse: collapse; width: 90%; margin: 12px 0 12px 20px;" border="0">
-<tbody>
-<tr>
-<td style="width: 25%; padding: 4px 0;"><strong>Hari, Tanggal</strong></td>
-<td style="width: 5%; padding: 4px 0;">:</td>
-<td style="width: 70%; padding: 4px 0;">Senin, 15 September 2026</td>
-</tr>
-<tr>
-<td style="width: 25%; padding: 4px 0;"><strong>Waktu</strong></td>
-<td style="width: 5%; padding: 4px 0;">:</td>
-<td style="width: 70%; padding: 4px 0;">09.00 WIB - selesai</td>
-</tr>
-<tr>
-<td style="width: 25%; padding: 4px 0;"><strong>Tempat</strong></td>
-<td style="width: 5%; padding: 4px 0;">:</td>
-<td style="width: 70%; padding: 4px 0;">Ruang Sidang Utama / Zoom Meeting (Hybrid)</td>
-</tr>
-<tr>
-<td style="width: 25%; padding: 4px 0;"><strong>Agenda</strong></td>
-<td style="width: 5%; padding: 4px 0;">:</td>
-<td style="width: 70%; padding: 4px 0;">Klarifikasi dan Penelaahan Usulan Belanja Mandatori 2027</td>
-</tr>
-</tbody>
-</table>
-<p style="text-align: justify;">Mengingat pentingnya agenda tersebut, kami mohon kehadiran Bapak/Ibu tepat waktu. Apabila berhalangan hadir, mohon dapat menugaskan pejabat yang berwenang mengambil keputusan.</p>
-<p style="text-align: justify;">Demikian undangan ini kami sampaikan. Atas perhatian dan kehadiran Bapak/Ibu, kami ucapkan terima kasih.</p>`
   }
 ];
 
-// Helper untuk membersihkan dan menstandarisasi HTML hasil konversi Word agar sesuai standar kantor
-function cleanAndStandardizeOfficeHtml(rawHtml: string): string {
-  let output = rawHtml;
+// NATIVE HIGH-PRECISION DOCX TO HTML CONVERTER (Preserves Numbering, Tables, Alignment & Styles)
+async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<string> {
+  const zip = await JSZip.loadAsync(buffer);
+  const docXml = await zip.file('word/document.xml')?.async('string');
+  const numXml = await zip.file('word/numbering.xml')?.async('string') || '';
 
-  // 1. Standarisasi Paragraph agar rata justify
-  output = output.replace(/<p(\s+[^>]*)?>/gi, (match, attrs) => {
-    if (!attrs) return '<p style="text-align: justify;">';
-    if (/style=["'][^"']*text-align/i.test(attrs)) {
-      return match;
-    }
-    if (/style=["']/i.test(attrs)) {
-      return match.replace(/style=["']([^"']*)["']/i, 'style="text-align: justify; $1"');
-    }
-    return `<p style="text-align: justify;" ${attrs}>`;
-  });
+  if (!docXml) return '<p style="text-align: justify;">Dokumen kosong</p>';
 
-  // 2. Standarisasi Tabel agar memiliki border-collapse, border="1", width="100%", dan margin
-  output = output.replace(/<table(\s+[^>]*)?>/gi, (match, attrs) => {
-    return '<table style="border-collapse: collapse; width: 100%; margin: 12px 0;" border="1">';
-  });
-
-  // 3. Standarisasi Sel Tabel (td dan th)
-  output = output.replace(/<td(\s+[^>]*)?>/gi, (match, attrs) => {
-    if (!attrs) return '<td style="padding: 6px 10px;">';
-    if (/style=["']/i.test(attrs)) {
-      return match.replace(/style=["']([^"']*)["']/i, 'style="padding: 6px 10px; $1"');
-    }
-    return `<td style="padding: 6px 10px;" ${attrs}>`;
-  });
-
-  output = output.replace(/<th(\s+[^>]*)?>/gi, (match, attrs) => {
-    if (!attrs) return '<th style="padding: 6px 10px; text-align: center;"><strong>';
-    return match;
-  });
-
-  // 4. Standarisasi List / Numbering
-  output = output.replace(/<ol(\s+[^>]*)?>/gi, (match, attrs) => {
-    if (!attrs) return '<ol style="padding-left: 26pt; margin-bottom: 10pt;">';
-    return match;
-  });
-
-  // 5. Bersihkan span kosong atau berulang
-  output = output.replace(/<span>(.*?)<\/span>/gi, '$1');
+  // 1. Parse Numbering Definitions from numbering.xml
+  const abstractNums: Record<string, Record<string, { numFmt: string; lvlText: string; start: number }>> = {};
+  const numToAbstract: Record<string, string> = {};
   
-  return output.trim();
+  const anMatches = numXml.match(/<w:abstractNum[\s\S]*?<\/w:abstractNum>/g) || [];
+  anMatches.forEach(an => {
+    const anId = an.match(/w:abstractNumId="(\d+)"/)?.[1];
+    if (!anId) return;
+    abstractNums[anId] = {};
+    const lvls = an.match(/<w:lvl[\s\S]*?<\/w:lvl>/g) || [];
+    lvls.forEach(lvl => {
+      const ilvl = lvl.match(/w:ilvl="(\d+)"/)?.[1] || '0';
+      const numFmt = lvl.match(/<w:numFmt w:val="([^"]+)"/)?.[1] || 'decimal';
+      const lvlText = lvl.match(/<w:lvlText w:val="([^"]+)"/)?.[1] || '%1.';
+      const start = parseInt(lvl.match(/<w:start w:val="(\d+)"/)?.[1] || '1', 10);
+      abstractNums[anId][ilvl] = { numFmt, lvlText, start };
+    });
+  });
+
+  const numMatches = numXml.match(/<w:num[\s\S]*?<\/w:num>/g) || [];
+  numMatches.forEach(n => {
+    const numId = n.match(/w:numId="(\d+)"/)?.[1];
+    const anId = n.match(/<w:abstractNumId w:val="(\d+)"/)?.[1];
+    if (numId && anId) {
+      numToAbstract[numId] = anId;
+    }
+  });
+
+  function toRoman(num: number): string {
+    const roman: Record<string, number> = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+    let str = '';
+    for (let i of Object.keys(roman)) {
+      let q = Math.floor(num / roman[i]);
+      num -= q * roman[i];
+      str += i.repeat(q);
+    }
+    return str;
+  }
+
+  function toAlpha(num: number, isUpper = false): string {
+    const code = (isUpper ? 65 : 97) + ((num - 1) % 26);
+    return String.fromCharCode(code);
+  }
+
+  const listCounters: Record<string, number> = {};
+
+  function getNumberingPrefix(numId: string, ilvl: string) {
+    const anId = numToAbstract[numId];
+    if (!anId || !abstractNums[anId]) {
+      return { type: 'decimal', text: '', count: 1, ilvl: parseInt(ilvl, 10) };
+    }
+
+    const lvlDef = abstractNums[anId][ilvl] || { numFmt: 'decimal', lvlText: '%1.', start: 1 };
+    const counterKey = `${numId}_${ilvl}`;
+    if (!listCounters[counterKey]) {
+      listCounters[counterKey] = lvlDef.start || 1;
+    } else {
+      listCounters[counterKey]++;
+    }
+
+    const currentCount = listCounters[counterKey];
+    let numFormatted = currentCount.toString();
+
+    if (lvlDef.numFmt === 'upperRoman') {
+      numFormatted = toRoman(currentCount);
+    } else if (lvlDef.numFmt === 'lowerRoman') {
+      numFormatted = toRoman(currentCount).toLowerCase();
+    } else if (lvlDef.numFmt === 'upperLetter') {
+      numFormatted = toAlpha(currentCount, true);
+    } else if (lvlDef.numFmt === 'lowerLetter') {
+      numFormatted = toAlpha(currentCount, false);
+    } else if (lvlDef.numFmt === 'bullet') {
+      numFormatted = '●';
+    }
+
+    let prefixText = lvlDef.lvlText.replace(/%\d+/g, numFormatted);
+    return {
+      type: lvlDef.numFmt,
+      text: prefixText,
+      count: currentCount,
+      ilvl: parseInt(ilvl, 10)
+    };
+  }
+
+  function extractFormattedText(xml: string): string {
+    let result = '';
+    const runs = xml.match(/<w:r[\s\S]*?<\/w:r>/g) || [];
+    
+    runs.forEach(r => {
+      const isBold = /<w:b(\s*\/|>|\s+w:val="1")/.test(r) || /<w:bCs(\s*\/|>|\s+w:val="1")/.test(r);
+      const isItalic = /<w:i(\s*\/|>|\s+w:val="1")/.test(r) || /<w:iCs(\s*\/|>|\s+w:val="1")/.test(r);
+      const isUnderline = /<w:u\s+w:val="single"/.test(r);
+
+      const textMatches = r.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g) || [];
+      let runText = textMatches.map(t => t.replace(/<[^>]+>/g, '')).join('');
+
+      if (!runText) return;
+
+      runText = runText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      if (isBold) runText = `<strong>${runText}</strong>`;
+      if (isItalic) runText = `<em>${runText}</em>`;
+      if (isUnderline) runText = `<u>${runText}</u>`;
+
+      result += runText;
+    });
+
+    return result;
+  }
+
+  let htmlResult: string[] = [];
+  const bodyMatch = docXml.match(/<w:body>([\s\S]*?)<\/w:body>/);
+  if (!bodyMatch) return '<p style="text-align: justify;">Format tidak valid</p>';
+
+  const bodyContent = bodyMatch[1];
+  const elements = bodyContent.match(/(<w:p[\s\S]*?<\/w:p>|<w:tbl[\s\S]*?<\/w:tbl>)/g) || [];
+
+  elements.forEach(elem => {
+    if (elem.startsWith('<w:tbl')) {
+      // TABEL RESMI
+      let tblHtml = '<table style="border-collapse: collapse; width: 100%; margin: 14px 0;" border="1">\n<tbody>\n';
+      const rows = elem.match(/<w:tr[\s\S]*?<\/w:tr>/g) || [];
+      let tableRowSeq = 0;
+
+      rows.forEach((row, rowIdx) => {
+        tblHtml += '<tr>\n';
+        const cells = row.match(/<w:tc[\s\S]*?<\/w:tc>/g) || [];
+        
+        cells.forEach((cell, colIdx) => {
+          const isHeader = rowIdx === 0;
+          const alignMatch = cell.match(/<w:jc w:val="([^"]+)"/);
+          let textAlign = alignMatch ? alignMatch[1] : (colIdx === 0 ? 'center' : 'left');
+          if (textAlign === 'both') textAlign = 'justify';
+
+          const pMatches = cell.match(/<w:p[\s\S]*?<\/w:p>/g) || [];
+          let cellTextArr: string[] = [];
+
+          pMatches.forEach(p => {
+            const numPr = p.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
+            let pText = extractFormattedText(p);
+
+            // Handle automatic row numbering inside table cells
+            if (numPr && !pText.trim() && colIdx === 0 && !isHeader) {
+              tableRowSeq++;
+              pText = tableRowSeq.toString();
+            }
+
+            if (pText.trim()) cellTextArr.push(pText);
+          });
+
+          let cellContent = cellTextArr.join('<br />');
+          if (!cellContent.trim() && colIdx === 0 && !isHeader) {
+            tableRowSeq++;
+            cellContent = tableRowSeq.toString();
+          }
+
+          const tag = isHeader ? 'th' : 'td';
+          const padding = 'padding: 6px 10px;';
+          const weight = isHeader ? 'font-weight: bold;' : '';
+          const alignStyle = `text-align: ${textAlign};`;
+          
+          tblHtml += `  <${tag} style="${padding} ${weight} ${alignStyle}">\n    ${cellContent || '&nbsp;'}\n  </${tag}>\n`;
+        });
+        tblHtml += '</tr>\n';
+      });
+
+      tblHtml += '</tbody>\n</table>\n';
+      htmlResult.push(tblHtml);
+
+    } else if (elem.startsWith('<w:p')) {
+      // PARAGRAF & HEADING RESMI
+      const text = extractFormattedText(elem);
+      if (!text.trim()) return;
+
+      const alignMatch = elem.match(/<w:jc w:val="([^"]+)"/);
+      let align = 'justify';
+      if (alignMatch) {
+        if (alignMatch[1] === 'center') align = 'center';
+        else if (alignMatch[1] === 'right') align = 'right';
+        else if (alignMatch[1] === 'left') align = 'left';
+      }
+
+      const numPr = elem.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
+      if (numPr) {
+        const numId = numPr[0].match(/<w:numId w:val="(\d+)"/)?.[1];
+        const ilvl = numPr[0].match(/<w:ilvl w:val="(\d+)"/)?.[1] || '0';
+        
+        if (numId) {
+          const prefix = getNumberingPrefix(numId, ilvl);
+          
+          if (prefix.type === 'upperRoman' || (ilvl === '0' && prefix.type === 'upperRoman')) {
+            // Heading Romawi (I. PENDAHULUAN)
+            htmlResult.push(
+              `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
+              `<strong>${prefix.text} ${text}</strong></p>`
+            );
+          } else if (prefix.type === 'upperLetter' || (ilvl === '0' && prefix.type === 'upperLetter')) {
+            // Sub-Heading Huruf Besar (A. PENDAPATAN)
+            htmlResult.push(
+              `<p style="text-align: ${align}; font-weight: bold; margin-top: 10pt; margin-bottom: 4pt; padding-left: 15pt;">` +
+              `<strong>${prefix.text} ${text}</strong></p>`
+            );
+          } else if (prefix.type === 'lowerLetter' || ilvl === '2') {
+            // Sub-Abjad (a., b., c.)
+            htmlResult.push(
+              `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 4pt; padding-left: 30pt;">` +
+              `<span style="font-weight: normal;">${prefix.text} ${text}</span></p>`
+            );
+          } else if (prefix.type === 'bullet') {
+            // Bullet Point
+            htmlResult.push(
+              `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 4pt; padding-left: 30pt;">` +
+              `● ${text}</p>`
+            );
+          } else {
+            // Numbered (1., 2., 3.)
+            const indent = parseInt(ilvl, 10) > 0 ? (parseInt(ilvl, 10) * 18 + 12) : 18;
+            htmlResult.push(
+              `<p style="text-align: ${align}; margin-top: 3pt; margin-bottom: 4pt; padding-left: ${indent}pt;">` +
+              `${prefix.text} ${text}</p>`
+            );
+          }
+          return;
+        }
+      }
+
+      // Paragraf Reguler Rata Justify
+      htmlResult.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
+    }
+  });
+
+  return htmlResult.join('\n');
 }
 
 export default function SuratHtmlEditorPage() {
@@ -214,7 +380,6 @@ export default function SuratHtmlEditorPage() {
 
   // Word Upload State
   const [isWordConverting, setIsWordConverting] = useState(false);
-  const [isWordModalOpen, setIsWordModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Ref untuk Visual ContentEditable DOM
@@ -244,16 +409,13 @@ export default function SuratHtmlEditorPage() {
 
   // Interactive Pagu Values Helper
   const [paguUnitCode, setPaguUnitCode] = useState('010101');
-  const [paguUnitName, setPaguUnitName] = useState('Majelis Wali Amanat');
   const [paguNominal, setPaguNominal] = useState('Rp 12.500.000.000');
 
-  // Function to insert HTML snippet into the current code
   const insertSnippet = (snippet: string) => {
     setHtmlCode(prev => prev + '\n' + snippet);
     toast.success('Komponen baru berhasil ditambahkan!');
   };
 
-  // Formatting Commands for Visual Editor (document.execCommand)
   const execFormat = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
     if (visualEditorRef.current) {
@@ -369,7 +531,7 @@ export default function SuratHtmlEditorPage() {
     setIsTableModalOpen(false);
   };
 
-  // Convert Word (.docx) to HTML using mammoth
+  // Convert Word (.docx) to HTML using High-Precision Native Engine
   const handleWordFileSelect = async (file: File) => {
     if (!file.name.endsWith('.docx') && !file.name.endsWith('.doc')) {
       toast.error('Harap pilih file dokumen Microsoft Word (.docx)');
@@ -377,41 +539,19 @@ export default function SuratHtmlEditorPage() {
     }
 
     setIsWordConverting(true);
-    const toastId = toast.loading('Mengonversi dokumen Word ke HTML presisi...');
+    const toastId = toast.loading('Mengonversi dokumen Word ke HTML presisi tinggi...');
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const arrayBuffer = e.target?.result as ArrayBuffer;
-          // Dynamic import mammoth to keep bundle fast
-          const mammoth = (await import('mammoth')).default || (await import('mammoth'));
-          
-          const result = await mammoth.convertToHtml({ arrayBuffer });
-          const rawConvertedHtml = result.value;
-          
-          // Post-process with standard office rules (justify, table borders, cell padding)
-          const standardizedHtml = cleanAndStandardizeOfficeHtml(rawConvertedHtml);
+      const arrayBuffer = await file.arrayBuffer();
+      const precisionHtml = await parseDocxToPrecisionOfficeHtml(arrayBuffer);
 
-          setHtmlCode(standardizedHtml);
-          setIsWordModalOpen(false);
-          toast.success(`Berhasil mengonversi file "${file.name}"! Tabel dan teks telah distandarisasi.`, { id: toastId });
-        } catch (convErr: any) {
-          console.error(convErr);
-          toast.error('Gagal membaca struktur dokumen Word: ' + convErr.message, { id: toastId });
-        } finally {
-          setIsWordConverting(false);
-        }
-      };
-
-      reader.onerror = () => {
-        toast.error('Gagal membaca file Word', { id: toastId });
-        setIsWordConverting(false);
-      };
-
-      reader.readAsArrayBuffer(file);
+      setHtmlCode(precisionHtml);
+      setEditorMode('visual');
+      toast.success(`Berhasil mengonversi "${file.name}"! Tabel, nomor urut, dan format Word telah disempurnakan.`, { id: toastId });
     } catch (err: any) {
-      toast.error('Terjadi kesalahan: ' + err.message, { id: toastId });
+      console.error(err);
+      toast.error('Gagal mengonversi file Word: ' + err.message, { id: toastId });
+    } finally {
       setIsWordConverting(false);
     }
   };
@@ -541,7 +681,7 @@ export default function SuratHtmlEditorPage() {
                 Pembuat & Konverter HTML Surat Resmi
               </h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black">
-                Word (.docx) ➔ Clean HTML
+                Word (.docx) ➔ Precision HTML
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
@@ -588,16 +728,16 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 2. PANDUAN CARA PENGGUNAAN CEPAT DENGAN OPSI UPLOAD WORD */}
+      {/* 2. PANDUAN CARA PENGGUNAAN CEPAT */}
       <div className="bg-gradient-to-r from-indigo-50 via-sky-50 to-white p-3.5 px-5 rounded-2xl border border-indigo-100 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs text-indigo-950">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0">
             <HelpCircle size={15} />
           </div>
           <div>
-            <span className="font-black text-indigo-900 block">Cara Termudah:</span>
+            <span className="font-black text-indigo-900 block">Cara Penggunaan:</span>
             <span className="text-[11px] text-indigo-800 font-medium">
-              1. Klik tombol biru <strong>"Upload Word (.docx)"</strong> atau pilih <strong>Template</strong> ➔ 2. Tabel, list, & teks otomatis terformat ➔ 3. Klik <strong>"Salin Kode HTML"</strong> dan paste ke aplikasi kantor!
+              1. Klik tombol biru <strong>"Upload Word (.docx)"</strong> atau pilih <strong>Template</strong> ➔ 2. Tabel (lengkap nomor urut), list, & teks otomatis terformat ➔ 3. Klik <strong>"Salin Kode HTML"</strong> dan paste ke aplikasi kantor!
             </span>
           </div>
         </div>
@@ -650,7 +790,6 @@ export default function SuratHtmlEditorPage() {
       {/* 4. QUICK INSERT & FORMATTING TOOLBAR */}
       <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Format Text Tools for Visual Mode */}
           {editorMode === 'visual' && (
             <>
               <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
@@ -683,7 +822,6 @@ export default function SuratHtmlEditorPage() {
 
           <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1">Sisipkan:</span>
 
-          {/* Tabel Surat Utama */}
           <button 
             onClick={() => setIsTableModalOpen(true)} 
             className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer active:scale-95"
@@ -693,7 +831,6 @@ export default function SuratHtmlEditorPage() {
             <span>+ Tabel Surat Resmi</span>
           </button>
 
-          {/* Paragraf */}
           <button 
             onClick={addJustifiedParagraph} 
             className="h-7 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
@@ -722,7 +859,6 @@ export default function SuratHtmlEditorPage() {
 
           <div className="h-4 w-[1px] bg-gray-200 mx-1" />
 
-          {/* List & Numbering */}
           <button 
             onClick={addRomanList} 
             className="h-7 px-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
@@ -751,7 +887,6 @@ export default function SuratHtmlEditorPage() {
           </button>
         </div>
 
-        {/* Font & Spacing Control */}
         <div className="flex items-center gap-2">
           <select 
             value={fontFamily} 
@@ -774,7 +909,7 @@ export default function SuratHtmlEditorPage() {
         </div>
       </div>
 
-      {/* 5. MAIN WORKSPACE (VISUAL WORD EDITOR ATAU DUAL PANE) */}
+      {/* 5. MAIN WORKSPACE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* PANEL KIRI: VISUAL KERTAS WORD / EDITOR KODE */}
         <div className={editorMode === 'visual' ? 'lg:col-span-8' : 'lg:col-span-6'}>
@@ -807,7 +942,6 @@ export default function SuratHtmlEditorPage() {
             {editorMode === 'visual' ? (
               <div className="flex-1 p-4 md:p-6 overflow-y-auto flex justify-center bg-slate-200/70">
                 <div className="bg-white w-full max-w-[760px] min-h-[920px] p-8 md:p-14 rounded-xl shadow-lg border border-gray-300 transition-all text-gray-900">
-                  {/* ContentEditable Visual Paper */}
                   <div
                     ref={visualEditorRef}
                     contentEditable
@@ -858,7 +992,6 @@ export default function SuratHtmlEditorPage() {
         {/* PANEL KANAN: OUTPUT KODE HTML BERSIH & LIVE COPY */}
         <div className={editorMode === 'visual' ? 'lg:col-span-4' : 'lg:col-span-6'}>
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden flex flex-col h-full min-h-[780px]">
-            {/* Header Panel Kanan */}
             <div className="p-3 px-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div className="flex items-center gap-2">
                 <Code size={15} className="text-indigo-600" />
@@ -873,7 +1006,6 @@ export default function SuratHtmlEditorPage() {
               </button>
             </div>
 
-            {/* Code Output Textarea */}
             <div className="p-3 flex-1 flex flex-col bg-slate-950">
               <div className="text-[10px] text-slate-400 font-mono pb-2 border-b border-slate-800 flex justify-between">
                 <span>FORMAT HTML CLEAN</span>
@@ -887,7 +1019,6 @@ export default function SuratHtmlEditorPage() {
               />
             </div>
 
-            {/* Footer Panel Kanan */}
             <div className="p-3 px-4 border-t border-gray-100 bg-gray-50/50 flex justify-between items-center text-[11px] text-gray-500 font-medium">
               <span>100% Kompatibel dengan WYSIWYG Editor Kantor.</span>
             </div>
@@ -915,7 +1046,6 @@ export default function SuratHtmlEditorPage() {
             </div>
             
             <div className="p-5 space-y-4">
-              {/* Pilihan Model Tabel */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black uppercase tracking-wider text-gray-500">
                   Pilih Model Tabel Surat:
@@ -962,7 +1092,6 @@ export default function SuratHtmlEditorPage() {
                 </div>
               </div>
 
-              {/* Form Input Sesuai Pilihan Model */}
               {tablePresetType === 'pagu' && (
                 <div className="space-y-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
                   <div className="grid grid-cols-2 gap-3">
@@ -1066,7 +1195,7 @@ export default function SuratHtmlEditorPage() {
         </div>
       )}
 
-      {/* 7. CSS KHUSUS UNTUK SURAT RESMI, TABEL, DAN NUMBERING AGAR TIDAK TERHAPUS OLEH TAILWIND */}
+      {/* 7. CSS KHUSUS UNTUK SURAT RESMI, TABEL, DAN NUMBERING */}
       <style jsx global>{`
         .surat-rendered-content {
           color: #000000 !important;
@@ -1074,7 +1203,7 @@ export default function SuratHtmlEditorPage() {
         }
         .surat-rendered-content p {
           margin-top: 0 !important;
-          margin-bottom: 11pt !important;
+          margin-bottom: 10pt !important;
           text-align: justify !important;
         }
         .surat-rendered-content table {
