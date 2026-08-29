@@ -222,6 +222,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
   
   let htmlOut: string[] = [];
   let listStack: Array<{ numFmt: string; level: number; isUl: boolean; openLi: boolean }> = [];
+  let currentSectionActive = false;
 
   function closeAllLists() {
     while (listStack.length > 0) {
@@ -343,6 +344,7 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         if ((lvlDef.numFmt === 'upperLetter' || lvlDef.numFmt === 'upperRoman') && ilvl === '0') {
           closeAllLists();
           headingLetterSeq++;
+          currentSectionActive = true;
           const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingLetterSeq) : toAlpha(headingLetterSeq, true);
           htmlOut.push(
             `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
@@ -376,17 +378,14 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         return;
       }
 
-      // Paragraf Reguler
+      // Paragraf Redaksi / Narasi Reguler
       closeAllLists();
 
-      if (indProps.leftPt > 0 || indProps.firstLinePt > 0) {
-        let styleStr = `text-align: ${align}; margin-bottom: 10pt;`;
-        if (indProps.leftPt > 0) styleStr += ` padding-left: ${indProps.leftPt}pt;`;
-        if (indProps.firstLinePt > 0) styleStr += ` text-indent: ${indProps.firstLinePt}pt;`;
-        htmlOut.push(`<p style="${styleStr}">${text}</p>`);
-      } else {
-        htmlOut.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
-      }
+      const finalPaddingLeft = (indProps.leftPt > 0 || currentSectionActive) ? 28 : 0;
+      let styleStr = `text-align: ${align}; margin-bottom: 10pt;`;
+      if (finalPaddingLeft > 0) styleStr += ` padding-left: ${finalPaddingLeft}pt;`;
+      if (indProps.firstLinePt > 0) styleStr += ` text-indent: ${indProps.firstLinePt}pt;`;
+      htmlOut.push(`<p style="${styleStr}">${text}</p>`);
     }
   });
 
