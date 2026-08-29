@@ -246,6 +246,20 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
     return result;
   }
 
+  function parseIndentationPt(indXml: string | null) {
+    if (!indXml) return { leftPt: 0, hangingPt: 0, firstLinePt: 0 };
+    const left = indXml.match(/w:left="(\d+)"/)?.[1];
+    const hanging = indXml.match(/w:hanging="(\d+)"/)?.[1];
+    const firstLine = indXml.match(/w:firstLine="(\d+)"/)?.[1];
+
+    // In OpenXML Word: 1 pt = 20 dxa
+    const leftPt = left ? Math.round(parseInt(left, 10) / 20) : 0;
+    const hangingPt = hanging ? Math.round(parseInt(hanging, 10) / 20) : 0;
+    const firstLinePt = firstLine ? Math.round(parseInt(firstLine, 10) / 20) : 0;
+
+    return { leftPt, hangingPt, firstLinePt };
+  }
+
   let htmlResult: string[] = [];
   const bodyMatch = docXml.match(/<w:body>([\s\S]*?)<\/w:body>/);
   if (!bodyMatch) return '<p style="text-align: justify;">Format tidak valid</p>';
@@ -318,6 +332,10 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         else if (alignMatch[1] === 'left') align = 'left';
       }
 
+      // Read exact indentation from w:ind
+      const indMatch = elem.match(/<w:ind\s+([^>]*)\/>/);
+      const indProps = indMatch ? parseIndentationPt(indMatch[1]) : { leftPt: 0, hangingPt: 0, firstLinePt: 0 };
+
       const numPr = elem.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
       if (numPr) {
         const numId = numPr[0].match(/<w:numId w:val="(\d+)"/)?.[1];
@@ -326,44 +344,37 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         if (numId) {
           const prefix = getNumberingPrefix(numId, ilvl);
           
-          if (prefix.type === 'upperRoman' || (ilvl === '0' && prefix.type === 'upperRoman')) {
-            // Heading Romawi (I. PENDAHULUAN)
+          // Level 0 Heading (e.g. A. PENDAHULUAN atau I. PENDAHULUAN)
+          if ((prefix.type === 'upperLetter' || prefix.type === 'upperRoman') && ilvl === '0') {
             htmlResult.push(
               `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
               `<strong>${prefix.text} ${text}</strong></p>`
             );
-          } else if (prefix.type === 'upperLetter' || (ilvl === '0' && prefix.type === 'upperLetter')) {
-            // Sub-Heading Huruf Besar (A. PENDAPATAN)
-            htmlResult.push(
-              `<p style="text-align: ${align}; font-weight: bold; margin-top: 10pt; margin-bottom: 4pt; padding-left: 15pt;">` +
-              `<strong>${prefix.text} ${text}</strong></p>`
-            );
-          } else if (prefix.type === 'lowerLetter' || ilvl === '2') {
-            // Sub-Abjad (a., b., c.)
-            htmlResult.push(
-              `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 4pt; padding-left: 30pt;">` +
-              `<span style="font-weight: normal;">${prefix.text} ${text}</span></p>`
-            );
-          } else if (prefix.type === 'bullet') {
-            // Bullet Point
-            htmlResult.push(
-              `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 4pt; padding-left: 30pt;">` +
-              `● ${text}</p>`
-            );
-          } else {
-            // Numbered (1., 2., 3.)
-            const indent = parseInt(ilvl, 10) > 0 ? (parseInt(ilvl, 10) * 18 + 12) : 18;
-            htmlResult.push(
-              `<p style="text-align: ${align}; margin-top: 3pt; margin-bottom: 4pt; padding-left: ${indent}pt;">` +
-              `${prefix.text} ${text}</p>`
-            );
+            return;
           }
+
+          // Indentasi list berjenjang yang presisi (hanging indent / tab gap)
+          const totalLeftIndent = indProps.leftPt > 0 ? indProps.leftPt : ((parseInt(ilvl, 10) + 1) * 25);
+          const prefixWidth = prefix.text.length > 3 ? 24 : 18;
+
+          htmlResult.push(
+            `<p style="text-align: ${align}; margin-top: 3pt; margin-bottom: 5pt; padding-left: ${totalLeftIndent}pt; text-indent: -${prefixWidth}pt; margin-left: ${prefixWidth}pt;">` +
+            `<span style="display: inline-block; width: ${prefixWidth}pt; font-weight: ${prefix.type === 'upperLetter' ? 'bold' : 'normal'};">${prefix.text}</span>` +
+            `${text}</p>`
+          );
           return;
         }
       }
 
-      // Paragraf Reguler Rata Justify
-      htmlResult.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
+      // Paragraf Reguler dengan indentasi Word asli (w:left / w:firstLine)
+      if (indProps.leftPt > 0 || indProps.firstLinePt > 0) {
+        let styleStr = `text-align: ${align}; margin-bottom: 10pt;`;
+        if (indProps.leftPt > 0) styleStr += ` padding-left: ${indProps.leftPt}pt;`;
+        if (indProps.firstLinePt > 0) styleStr += ` text-indent: ${indProps.firstLinePt}pt;`;
+        htmlResult.push(`<p style="${styleStr}">${text}</p>`);
+      } else {
+        htmlResult.push(`<p style="text-align: ${align}; margin-bottom: 10pt;">${text}</p>`);
+      }
     }
   });
 
