@@ -221,54 +221,14 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
   const elements = docXml.match(/(<w:p[\s\S]*?<\/w:p>|<w:tbl[\s\S]*?<\/w:tbl>)/g) || [];
   
   let htmlOut: string[] = [];
-  let listStack: Array<{ numFmt: string; level: number; isUl: boolean; openLi: boolean }> = [];
-  let currentSectionActive = false;
-
-  function closeAllLists() {
-    while (listStack.length > 0) {
-      const item = listStack.pop()!;
-      if (item.openLi) htmlOut.push('</li>');
-      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
-    }
-  }
-
-  function adjustListStack(targetFmt: string, targetLevel: number) {
-    while (listStack.length > targetLevel) {
-      const item = listStack.pop()!;
-      if (item.openLi) htmlOut.push('</li>');
-      htmlOut.push(item.isUl ? '</ul>' : '</ol>');
-    }
-
-    if (listStack.length === targetLevel && targetLevel > 0) {
-      const current = listStack[listStack.length - 1];
-      if (current.numFmt !== targetFmt) {
-        const item = listStack.pop()!;
-        if (item.openLi) htmlOut.push('</li>');
-        htmlOut.push(item.isUl ? '</ul>' : '</ol>');
-      }
-    }
-
-    while (listStack.length < targetLevel) {
-      const currentLevel = listStack.length;
-      const isUl = targetFmt === 'disc' || targetFmt === 'bullet';
-      const padLeft = currentLevel === 0 ? 28 : 22;
-      const listStyleType = isUl ? 'disc' : (
-        targetFmt === 'lowerLetter' || targetFmt === 'lower-alpha' ? 'lower-alpha' :
-        targetFmt === 'upperRoman' || targetFmt === 'upper-roman' ? 'upper-roman' :
-        targetFmt === 'lowerRoman' || targetFmt === 'lower-roman' ? 'lower-roman' :
-        'decimal'
-      );
-
-      const tag = isUl ? 'ul' : 'ol';
-      const style = `list-style-type: ${listStyleType}; padding-left: ${padLeft}pt; margin-top: 4pt; margin-bottom: 6pt;`;
-      htmlOut.push(`<${tag} style="${style}">`);
-      listStack.push({ numFmt: targetFmt, level: currentLevel, isUl, openLi: false });
-    }
-  }
+  let headingSeq = 0;
+  let runningNumber = 0;
+  let currentNumId: string | null = null;
 
   elements.forEach(elem => {
     if (elem.startsWith('<w:tbl')) {
-      closeAllLists();
+      runningNumber = 0;
+      currentNumId = null;
       
       let tblHtml = '<table style="border-collapse: collapse; width: 100%; margin: 14px 0;" border="1">\n<tbody>\n';
       const rows = elem.match(/<w:tr[\s\S]*?<\/w:tr>/g) || [];
@@ -331,8 +291,6 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
       }
 
       const numPr = elem.match(/<w:numPr>[\s\S]*?<\/w:numPr>/);
-      const indMatch = elem.match(/<w:ind\s+([^>]*)\/>/);
-      const indProps = indMatch ? parseIndentationPt(indMatch[1]) : { leftPt: 0, firstLinePt: 0 };
 
       if (numPr) {
         const numId = numPr[0].match(/<w:numId w:val="(\d+)"/)?.[1];
@@ -340,55 +298,75 @@ async function parseDocxToPrecisionOfficeHtml(buffer: ArrayBuffer): Promise<stri
         const anId = numId ? numToAbstract[numId] : undefined;
         const lvlDef = (anId && abstractNums[anId]) ? abstractNums[anId][ilvl] || { numFmt: 'decimal', lvlText: '%1.' } : { numFmt: 'decimal', lvlText: '%1.' };
 
-        // Check if top-level Heading (A. PENDAHULUAN, B. DASAR HUKUM, D. KETENTUAN UMUM, etc.)
+        // 1. BAB / Heading (A. PENDAHULUAN, B. DASAR HUKUM, C. MANFAAT..., D. KETENTUAN...)
         if ((lvlDef.numFmt === 'upperLetter' || lvlDef.numFmt === 'upperRoman') && ilvl === '0') {
-          closeAllLists();
-          headingLetterSeq++;
-          currentSectionActive = true;
-          const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingLetterSeq) : toAlpha(headingLetterSeq, true);
+          headingSeq++;
+          runningNumber = 0;
+          currentNumId = null;
+          const letter = lvlDef.numFmt === 'upperRoman' ? toRoman(headingSeq) : toAlpha(headingSeq, true);
           htmlOut.push(
-            `<p style="text-align: ${align}; font-weight: bold; margin-top: 14pt; margin-bottom: 6pt;">` +
+            `<p style="text-align: ${align}; font-weight: bold; margin-top: 16pt; margin-bottom: 8pt;">` +
             `<strong>${letter}. ${text}</strong></p>`
           );
           return;
         }
 
-        // UNIFIED LEVEL RESOLUTION:
-        // Any decimal list items directly under a BAB (e.g. Dasar Hukum 1-17, Manfaat 1-5, Ketentuan 1-7)
-        // are ALWAYS Level 1 (padding-left: 28pt)
-        let targetLevel = 1;
+        // 2. Sub-Item a., b., c.
         if (lvlDef.numFmt === 'lowerLetter' || lvlDef.numFmt === 'lower-alpha') {
-          targetLevel = 2; // Sub-items a., b., c.
-        } else if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
-          targetLevel = 3; // Bullets
+          if (currentNumId !== numId) {
+            currentNumId = numId || null;
+            runningNumber = 1;
+          } else {
+            runningNumber++;
+          }
+          const char = toAlpha(runningNumber, false);
+          htmlOut.push(
+            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
+            `<td style="width: 48pt; vertical-align: top; padding: 1pt 0; padding-left: 24pt; font-family: inherit; font-size: inherit; border: 0;">${char}.</td>` +
+            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
+            `</tr></tbody></table>`
+          );
+          return;
         }
 
-        adjustListStack(lvlDef.numFmt, targetLevel);
-        
-        const currentList = listStack[listStack.length - 1];
-        if (currentList && currentList.openLi) {
-          htmlOut.push('</li>');
-        }
-        if (currentList) {
-          currentList.openLi = true;
+        // 3. Bullet Point
+        if (lvlDef.numFmt === 'bullet' || lvlDef.numFmt === 'disc') {
+          htmlOut.push(
+            `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
+            `<td style="width: 54pt; vertical-align: top; padding: 1pt 0; padding-left: 40pt; font-family: inherit; font-size: inherit; border: 0;">●</td>` +
+            `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
+            `</tr></tbody></table>`
+          );
+          return;
         }
 
-        htmlOut.push(`<li style="text-align: ${align}; margin-bottom: 4pt;">${text}`);
+        // 4. Decimal Numbering (1., 9., 10., 17.)
+        if (currentNumId !== numId) {
+          currentNumId = numId || null;
+          runningNumber = 1;
+        } else {
+          runningNumber++;
+        }
+
+        htmlOut.push(
+          `<table style="border: 0; width: 100%; border-collapse: collapse; margin-top: 2pt; margin-bottom: 4pt;" border="0"><tbody><tr>` +
+          `<td style="width: 24pt; vertical-align: top; padding: 1pt 0; font-family: inherit; font-size: inherit; border: 0; font-weight: normal;">${runningNumber}.</td>` +
+          `<td style="vertical-align: top; padding: 1pt 0; text-align: ${align}; font-family: inherit; font-size: inherit; border: 0;">${text}</td>` +
+          `</tr></tbody></table>`
+        );
         return;
       }
 
-      // Paragraf Redaksi / Narasi Reguler
-      closeAllLists();
+      // Paragraf Narasi / Redaksi
+      runningNumber = 0;
+      currentNumId = null;
 
-      const finalPaddingLeft = (indProps.leftPt > 0 || currentSectionActive) ? 28 : 0;
-      let styleStr = `text-align: ${align}; margin-bottom: 10pt;`;
-      if (finalPaddingLeft > 0) styleStr += ` padding-left: ${finalPaddingLeft}pt;`;
-      if (indProps.firstLinePt > 0) styleStr += ` text-indent: ${indProps.firstLinePt}pt;`;
-      htmlOut.push(`<p style="${styleStr}">${text}</p>`);
+      htmlOut.push(
+        `<p style="text-align: ${align}; margin-top: 2pt; margin-bottom: 10pt; padding-left: 24pt;">${text}</p>`
+      );
     }
   });
 
-  closeAllLists();
   return htmlOut.join('\n');
 }
 
