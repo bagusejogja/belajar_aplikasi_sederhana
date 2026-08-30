@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, UploadCloud, X, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 import Select from 'react-select';
 
 export default function InputTransferPage() {
@@ -159,6 +160,21 @@ export default function InputTransferPage() {
 
         if (error) throw error;
         
+        logActivity({
+          user_id: currentUserId || undefined,
+          user_email: sessionData?.session?.user?.email,
+          action_type: 'CREATE',
+          action_title: `Pengajuan Transfer: Rp ${nominalAngka.toLocaleString('id-ID')} (${formData.kegiatan})`,
+          module: 'MASJID',
+          path: '/input-transfer',
+          details: {
+            nominal: nominalAngka,
+            kegiatan: formData.kegiatan,
+            tanggal: formData.tanggal,
+            rek_tujuan_id: formData.rek_tujuan_id.value
+          }
+        });
+
         alert("Pengajuan Transfer BERHASIL disimpan dan menunggu persetujuan! 🚀");
         setFormData({ 
            tanggal: new Date().toISOString().split('T')[0], 

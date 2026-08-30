@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   CheckCircle, XCircle, Loader2, LayoutDashboard, 
-  Clock, AlertCircle, Eye, Sparkles, Building2, CreditCard 
+  Clock, AlertCircle, Eye, Sparkles, Building2, CreditCard, User
 } from 'lucide-react';
 import Select from 'react-select';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 export default function VerificationPage() {
   const [pendingTrx, setPendingTrx] = useState<any[]>([]);
   const [listAkun, setListAkun] = useState<any[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<{ src: string, original: string } | null>(null);
@@ -27,17 +28,26 @@ export default function VerificationPage() {
   const fetchPending = async () => {
      setLoading(true);
      try {
-        const [trxRes, akunRes] = await Promise.all([
+        const [trxRes, akunRes, userRes] = await Promise.all([
            supabase.from('transactions')
               .select('*, ref_akun(nama_akun, nomor_akun), ref_personel(nama_orang)')
               .eq('disetujui', 'Menunggu')
               .order('tanggal', { ascending: false }),
-           supabase.from('ref_akun').select('id, nomor_akun, nama_akun').order('nomor_akun')
+           supabase.from('ref_akun').select('id, nomor_akun, nama_akun').order('nomor_akun'),
+           supabase.from('app_users').select('id, email, role')
         ]);
 
         if (trxRes.error) throw trxRes.error;
         setPendingTrx(trxRes.data || []);
         setListAkun(akunRes.data || []);
+
+        if (userRes.data) {
+          const map: Record<string, string> = {};
+          userRes.data.forEach((u: any) => {
+            map[u.id] = u.email;
+          });
+          setUsersMap(map);
+        }
      } catch (err) {
         console.error(err);
      } finally {
@@ -198,6 +208,12 @@ export default function VerificationPage() {
                                  {trx.toko && (
                                     <div className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600">
                                        <CreditCard size={13} className="text-gray-400" /> {trx.toko}
+                                    </div>
+                                 )}
+                                 {trx.created_by && (
+                                    <div className="flex items-center gap-1.5 bg-indigo-50/80 px-2.5 py-1 rounded-lg border border-indigo-100/80 text-indigo-700 font-medium">
+                                       <User size={12} className="text-indigo-500" />
+                                       <span>Dibuat: <strong className="font-bold">{usersMap[trx.created_by] || trx.created_by}</strong></span>
                                     </div>
                                  )}
                               </div>

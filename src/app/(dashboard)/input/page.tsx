@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit } from 'lucide-react';
+import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit, UserCheck, User } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 import { RefPersonel, RefJenisBelanja } from '@/types';
 import Select from 'react-select';
 import toast from 'react-hot-toast';
 
 export default function InputPage() {
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; role: string } | null>(null);
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
   const [listBelanja, setListBelanja] = useState<RefJenisBelanja[]>([]);
   const [listRekening, setListRekening] = useState<any[]>([]);
@@ -41,7 +43,31 @@ export default function InputPage() {
 
   useEffect(() => {
     fetchReferences();
+    fetchCurrentUser();
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        let role = 'Viewer';
+        const { data: roleData } = await supabase.from('app_users').select('role').eq('id', user.id).single();
+        if (roleData?.role) role = roleData.role;
+
+        setCurrentUser({
+          id: user.id,
+          email: user.email || '',
+          role
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('user_id', user.id);
+          localStorage.setItem('user_email', user.email || '');
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal memuat profil pengguna aktif:', e);
+    }
+  };
 
   const fetchReferences = async () => {
      try {
@@ -145,7 +171,11 @@ export default function InputPage() {
      try {
         const nominalAngka = Number(formData.nominal);
         const selectedBelanja = listBelanja.find(b => b.id === formData.jenis_belanja_id?.value);
-        const currentUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
+        
+        // Dapatkan user ID aktif dari sesi Supabase Auth
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const activeUserId = authUser?.id || currentUser?.id || (typeof window !== 'undefined' ? localStorage.getItem('user_id') : null);
+        const activeUserEmail = authUser?.email || currentUser?.email || (typeof window !== 'undefined' ? localStorage.getItem('user_email') : 'Unknown');
 
         const notaUrl = attachments.nota.files.length > 0 ? await uploadMultipleFiles(attachments.nota.files) : attachments.nota.url;
         const kegiatanUrl = attachments.kegiatan.files.length > 0 ? await uploadMultipleFiles(attachments.kegiatan.files) : attachments.kegiatan.url;
@@ -164,7 +194,7 @@ export default function InputPage() {
                  foto_nota: notaUrl || null,
                  foto_kegiatan: kegiatanUrl || null,
                  foto_barang: barangUrl || null,
-                 created_by: currentUserId
+                 created_by: activeUserId
               }
            ]);
            if (error) throw error;
@@ -188,13 +218,32 @@ export default function InputPage() {
                  foto_barang: barangUrl || null,
                  foto_bukti_transfer: transferUrl || null,
                  disetujui: 'Menunggu',
-                 created_by: currentUserId
+                 created_by: activeUserId
               }
            ]);
            if (error) throw error;
         }
         
-        toast.success(`Data ${tipeTransaksi} berhasil disimpan!`);
+        // Log ke Audit Trail Aktivitas Pengguna
+        logActivity({
+          user_id: activeUserId || undefined,
+          user_email: activeUserEmail || undefined,
+          user_role: currentUser?.role,
+          action_type: 'CREATE',
+          action_title: `Input ${tipeTransaksi} Kas Masjid: Rp ${nominalAngka.toLocaleString('id-ID')} (${formData.uraian || selectedBelanja?.nama_belanja || 'Transaksi'})`,
+          module: 'MASJID',
+          path: '/input',
+          details: {
+            tipe: tipeTransaksi,
+            nominal: nominalAngka,
+            uraian: formData.uraian,
+            tanggal: formData.tanggal,
+            created_by: activeUserId,
+            toko: formData.toko || null
+          }
+        });
+
+        toast.success(`Data ${tipeTransaksi} berhasil disimpan oleh ${activeUserEmail}!`);
         setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, rek_tujuan_id: null, toko: '', uraian: '', nominal: '', catatan: '' });
         setAttachments({
            nota: { files: [], url: '' }, kegiatan: { files: [], url: '' },
@@ -238,28 +287,44 @@ export default function InputPage() {
           </div>
         </div>
 
-        <div className="flex bg-gray-100/80 p-1 rounded-xl gap-1">
-          <button 
-            type="button" 
-            onClick={() => setTipeTransaksi('Pengeluaran')} 
-            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pengeluaran' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Pengeluaran (-)
-          </button>
-          <button 
-            type="button" 
-            onClick={() => setTipeTransaksi('Pemasukan')} 
-            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Pemasukan (+)
-          </button>
-          <button 
-            type="button" 
-            onClick={() => setTipeTransaksi('Transfer')} 
-            className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Transfer' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Transfer
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Creator User Indicator */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600">
+            <UserCheck size={13} className="text-emerald-600" />
+            <span className="text-gray-400">Pembuat:</span>
+            <span className="font-semibold text-gray-800 max-w-[180px] truncate" title={currentUser?.email || 'Memuat akun...'}>
+              {currentUser?.email || 'Memuat akun...'}
+            </span>
+            {currentUser?.role && (
+              <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-700 font-bold text-[9px] rounded border border-indigo-100 uppercase">
+                {currentUser.role}
+              </span>
+            )}
+          </div>
+
+          <div className="flex bg-gray-100/80 p-1 rounded-xl gap-1">
+            <button 
+              type="button" 
+              onClick={() => setTipeTransaksi('Pengeluaran')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pengeluaran' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Pengeluaran (-)
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setTipeTransaksi('Pemasukan')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Pemasukan' ? 'bg-emerald-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Pemasukan (+)
+            </button>
+            <button 
+              type="button" 
+              onClick={() => setTipeTransaksi('Transfer')} 
+              className={`h-7 px-3 rounded-lg font-bold text-xs transition-all ${tipeTransaksi === 'Transfer' ? 'bg-indigo-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              Transfer
+            </button>
+          </div>
         </div>
       </div>
 
