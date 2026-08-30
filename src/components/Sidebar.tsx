@@ -33,12 +33,16 @@ import {
   Mail,
   Calendar,
   FolderTree,
-  Box
+  Box,
+  Activity,
+  Radio,
+  Clock
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { menuList } from '../lib/mock-db';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
 
@@ -63,7 +67,10 @@ const iconMap: Record<string, any> = {
   MessageSquare,
   BookOpen,
   Settings,
-  Wand2
+  Wand2,
+  Activity,
+  Radio,
+  Clock
 };
 
 const groupIconMap: Record<string, any> = {
@@ -164,10 +171,18 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   }, []);
 
   const handleLogout = async () => {
-     if (confirm("Ingin keluar dari sistem?")) {
-        await supabase.auth.signOut();
-        router.push('/login');
-     }
+    if (confirm("Ingin keluar dari sistem?")) {
+      logActivity({
+        action_type: 'LOGOUT',
+        action_title: 'Pengguna melakukan Logout',
+        module: 'AUTH',
+        path: '/login',
+        user_email: userEmail,
+        user_role: userRole
+      });
+      await supabase.auth.signOut();
+      router.push('/login');
+    }
   };
 
   const allGroupsExpanded = expandedGroups.length > 0;

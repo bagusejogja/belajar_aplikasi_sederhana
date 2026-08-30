@@ -75,14 +75,15 @@ export const menuList: MenuItem[] = [
   { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
   
   // --- MASTER & PENGATURAN ---
+  { title: 'Monitoring Aktivitas User', path: '/monitoring-user', icon: 'Activity', roles: ['ADMIN', 'MANAGER'], group: 'Master' },
+  { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'], group: 'Master' },
+  { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN'], group: 'Master' },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
   { title: 'Unit Kerja (DB)', path: '/units', icon: 'Building2', roles: ['ADMIN'], group: 'Master' },
   { title: 'Unit', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 

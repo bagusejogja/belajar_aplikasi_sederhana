@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import JSZip from 'jszip';
+import { logActivity } from '@/lib/activityLogger';
 
 // TEMPLATES RESMI PRESET
 const TEMPLATE_PRESETS = [
@@ -563,6 +564,15 @@ export default function SuratHtmlEditorPage() {
 
       setHtmlCode(precisionHtml);
       setEditorMode('visual');
+
+      logActivity({
+        action_type: 'IMPORT',
+        action_title: `Mengonversi dokumen Word [${file.name}] ke HTML`,
+        module: 'PERSURATAN',
+        path: '/surat/editor-html',
+        details: { filename: file.name, size: file.size }
+      });
+
       toast.success(`Berhasil mengonversi "${file.name}"! Tabel, nomor urut, dan format Word telah disempurnakan.`, { id: toastId });
     } catch (err: any) {
       console.error(err);
@@ -575,6 +585,15 @@ export default function SuratHtmlEditorPage() {
   const handleCopyHtml = () => {
     navigator.clipboard.writeText(htmlCode);
     setCopied(true);
+    
+    logActivity({
+      action_type: 'EXPORT',
+      action_title: 'Menyalin kode HTML surat resmi ke clipboard',
+      module: 'PERSURATAN',
+      path: '/surat/editor-html',
+      details: { char_length: htmlCode.length }
+    });
+
     toast.success('Kode HTML berhasil disalin! Siap dipaste ke mode HTML di WYSIWYG editor kantor Anda.');
     setTimeout(() => setCopied(false), 2500);
   };
@@ -587,6 +606,15 @@ export default function SuratHtmlEditorPage() {
     link.download = `surat_clean_html_${new Date().toISOString().slice(0, 10)}.html`;
     link.click();
     URL.revokeObjectURL(url);
+
+    logActivity({
+      action_type: 'EXPORT',
+      action_title: 'Mengunduh file dokumen HTML surat',
+      module: 'PERSURATAN',
+      path: '/surat/editor-html',
+      details: { char_length: htmlCode.length }
+    });
+
     toast.success('File HTML berhasil diunduh!');
   };
 

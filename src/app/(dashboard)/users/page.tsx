@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 import { 
   ShieldCheck, ShieldAlert, Loader2, Save, UserX, UserCheck, Search, 
   Mail, Calendar, Hash, KeyRound, Copy, Check, X, Lock, Send, 
@@ -89,6 +90,7 @@ export default function UsersPage() {
   const updateRole = async (userId: string, newRole: string) => {
     setSavingId(userId);
     try {
+      const targetUser = users.find(u => u.id === userId);
       const { error } = await supabase
         .from('app_users')
         .update({ role: newRole })
@@ -96,6 +98,15 @@ export default function UsersPage() {
 
       if (error) throw error;
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      
+      logActivity({
+        action_type: 'SECURITY',
+        action_title: `Mengubah hak akses user ${targetUser?.email || userId} menjadi [${newRole}]`,
+        module: 'MASTER',
+        path: '/users',
+        details: { target_email: targetUser?.email, new_role: newRole, user_id: userId }
+      });
+
       toast.success('Hak akses pengguna berhasil diperbarui!');
     } catch (err: any) {
       toast.error("Gagal merubah akses: " + err.message);
@@ -124,6 +135,14 @@ export default function UsersPage() {
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || 'Gagal me-reset password.');
+
+      logActivity({
+        action_type: 'SECURITY',
+        action_title: `Reset password untuk pengguna ${resetModalUser.email} (Mode: ${resetMode})`,
+        module: 'MASTER',
+        path: '/users',
+        details: { target_email: resetModalUser.email, mode: resetMode }
+      });
 
       setResetResult({
         success: true,

@@ -2,9 +2,10 @@
 
 import Sidebar from '@/components/Sidebar';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Bell, HelpCircle, Menu, Loader2, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 
 export default function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default function DashboardLayout({
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
+  const lastLoggedPath = useRef<string>('');
 
   const [isUnauthorized, setIsUnauthorized] = useState(false);
 
@@ -43,13 +45,33 @@ export default function DashboardLayout({
         }
 
         // --- AUTHORIZATION CHECK (Mencegah Akses URL Manual) ---
+        // Fetch role data
+        const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
+        const currentRole = roleData?.role || 'Viewer';
+        
+        if (typeof window !== 'undefined') {
+           sessionStorage.setItem('user_role', currentRole);
+        }
+
+        // Track page view if path changed
+        if (lastLoggedPath.current !== pathname) {
+           lastLoggedPath.current = pathname;
+           logActivity({
+              action_type: 'PAGE_VIEW',
+              action_title: `Membuka menu ${getPageTitle(pathname)}`,
+              path: pathname,
+              user_email: session.user.email || '',
+              user_role: currentRole,
+              details: { page_title: getPageTitle(pathname) }
+           });
+        }
+
         // Jika sedang di root '/' atau '/dashboard', biarkan lewat
         if (pathname === '/' || pathname === '/dashboard') {
            setIsAuthChecking(false);
            return;
         }
 
-        const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
         if (roleData) {
            if (roleData.role.toLowerCase() === 'admin') {
               setIsAuthChecking(false); // Admin selalu lolos
@@ -91,18 +113,23 @@ export default function DashboardLayout({
   const getPageTitle = (path: string) => {
     switch (path) {
       case '/': return 'Apps Bersama Dashboard';
+      case '/dashboard': return 'Dashboard Masjid';
+      case '/monitoring-user': return 'Monitoring Aktivitas User';
       case '/input': return 'Input Transaksi Baru';
       case '/reports': return 'Laporan Keuangan';
       case '/references': return 'Data Referensi';
       case '/users': return 'Manajemen User';
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
+      case '/surat/editor-html': return 'Editor HTML Surat';
       case '/gov-narrative': return 'Narrative Generator';
       case '/surat/convert-ai': return 'AI Convert Surat';
       case '/potret-mutasi-pagu': return 'Potret Mutasi Pagu Keseluruhan';
       case '/tambah-pagu/komparasi': return 'Komparasi Audit Tambah Pagu';
+      case '/tambah-pagu/tambah': return 'Input Tambah Pagu';
+      case '/tambah-pagu': return 'Daftar Tambah Pagu';
       case '/backup': return 'Backup & Restore Database';
-      default: return 'Dashboard';
+      default: return path.replace('/', '').replace('-', ' ').toUpperCase() || 'Dashboard';
     }
   };
 

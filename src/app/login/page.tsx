@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { logActivity } from '@/lib/activityLogger';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, Mail, Lock, Loader2, UserPlus, LogIn, KeyRound, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -50,13 +51,46 @@ export default function LoginPage() {
                   role: 'Pending'
                }]);
 
+               logActivity({
+                  user_id: data.user.id,
+                  user_email: data.user.email || email,
+                  user_role: 'Pending',
+                  action_type: 'SECURITY',
+                  action_title: 'Pendaftaran akun baru (Menunggu Persetujuan Admin)',
+                  module: 'AUTH',
+                  path: '/login'
+               });
+
                alert("Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi, atau jika sistem Auto-Confirm aktif, langsung klik Login.");
                setMode('login');
            }
         } else if (mode === 'login') {
            // 2. Proses Masuk (Sign In)
-           const { error } = await supabase.auth.signInWithPassword({ email, password });
+           const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
            if (error) throw error;
+           
+           // Ambil role pengguna
+           let role = 'Viewer';
+           if (authData?.user) {
+             const { data: roleData } = await supabase.from('app_users').select('role').eq('id', authData.user.id).single();
+             if (roleData?.role) {
+               role = roleData.role;
+               if (typeof window !== 'undefined') {
+                 sessionStorage.setItem('user_role', role);
+               }
+             }
+           }
+
+           logActivity({
+             user_id: authData?.user?.id,
+             user_email: authData?.user?.email || email,
+             user_role: role,
+             action_type: 'LOGIN',
+             action_title: 'Berhasil login ke sistem',
+             module: 'AUTH',
+             path: '/login',
+             details: { login_time: new Date().toISOString() }
+           });
            
            router.push('/');
         } else if (mode === 'forgot') {
