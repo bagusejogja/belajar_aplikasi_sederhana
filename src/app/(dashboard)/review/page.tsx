@@ -2460,13 +2460,13 @@ export default function ReviewPage() {
                             {/* Breakdown Sub-Row for 2026 Pagu Components */}
                             {isUnitExpanded && (
                               <tr>
-                                <td colSpan={8} className="p-0 border-b border-gray-300">
+                              <td colSpan={8} className="p-0 border-b border-gray-300">
                                   <div className="bg-slate-50 p-4 pl-12 space-y-3">
                                     <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
                                       <Landmark size={14} className="text-indigo-600" />
                                       <span>Rincian Komponen Pagu 2026 vs Usulan 2027 ({u.unitName})</span>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5 text-xs">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
                                       <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                                         <div className="text-[10px] text-gray-500 font-bold uppercase">Pagu Awal 2026</div>
                                         <div className="font-mono font-bold text-slate-900 mt-0.5">Rp {formatRp(u.pagu2026Awal)}</div>
@@ -2482,6 +2482,12 @@ export default function ReviewPage() {
                                       <div className="p-2.5 rounded-xl bg-white border border-slate-200">
                                         <div className="text-[10px] text-gray-500 font-bold uppercase">Efisiensi 2026</div>
                                         <div className="font-mono font-bold text-rose-600 mt-0.5">Rp {formatRp(u.pagu2026Efisiensi)}</div>
+                                      </div>
+                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
+                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Pengalihan 2026</div>
+                                        <div className={`font-mono font-bold mt-0.5 ${u.pagu2026Pengalihan > 0 ? 'text-emerald-700' : u.pagu2026Pengalihan < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                          {u.pagu2026Pengalihan > 0 ? '+Rp ' : 'Rp '}{formatRp(u.pagu2026Pengalihan)}
+                                        </div>
                                       </div>
                                       <div className="p-2.5 rounded-xl bg-cyan-50/80 border border-cyan-200">
                                         <div className="text-[10px] text-cyan-800 font-bold uppercase">Luncuran/Talangan</div>
