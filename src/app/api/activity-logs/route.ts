@@ -112,7 +112,7 @@ function writeLocalLogs(logs: ActivityLogItem[]) {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get('limit') || '200', 10);
+    const limit = parseInt(searchParams.get('limit') || '500', 10);
     const userEmail = searchParams.get('userEmail') || '';
     const moduleFilter = searchParams.get('module') || '';
     const actionType = searchParams.get('actionType') || '';
@@ -120,9 +120,224 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get('startDate') || '';
     const endDate = searchParams.get('endDate') || '';
 
-    const allLogs = readLocalLogs();
+    // 1. Read local runtime logs
+    const localLogs = readLocalLogs();
 
-    // Filter logs
+    // 2. Fetch database users & real user activities from Supabase
+    let dbUsers: Array<{ id: string; email: string; role: string; created_at: string }> = [];
+    const dbDerivedLogs: ActivityLogItem[] = [];
+
+    if (isSupabaseConfigured) {
+      try {
+        // A. Fetch Registered Users from app_users
+        const { data: usersData } = await supabaseAdmin
+          .from('app_users')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (usersData && usersData.length > 0) {
+          dbUsers = usersData;
+        }
+
+        // B. Fetch Form Submissions (RKAT & Pemohon)
+        const { data: formData } = await supabaseAdmin
+          .from('form_submissions')
+          .select('id, email, unit, pic, created_at, status, tahun')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (formData && formData.length > 0) {
+          formData.forEach((f) => {
+            if (f.email) {
+              dbDerivedLogs.push({
+                id: `form-sub-${f.id}`,
+                user_email: f.email.trim(),
+                user_role: 'Unit Kerja / Pemohon',
+                action_type: 'CREATE',
+                action_title: `Submit Usulan RKAT ${f.tahun || ''} - ${f.unit || 'Unit Kerja'}`,
+                module: 'ANGGARAN',
+                path: '/input-form',
+                details: {
+                  unit: f.unit,
+                  pic: f.pic,
+                  status: f.status,
+                  tipe: 'Form RKAT'
+                },
+                ip_address: 'UGM Network',
+                user_agent: 'Web Client Portal Unit',
+                created_at: f.created_at || new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        // C. Fetch MAK Submissions
+        const { data: makData } = await supabaseAdmin
+          .from('mak_submissions')
+          .select('id, email, unit, pic, created_at, status, tahun, kategori')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (makData && makData.length > 0) {
+          makData.forEach((m) => {
+            if (m.email) {
+              dbDerivedLogs.push({
+                id: `mak-sub-${m.id}`,
+                user_email: m.email.trim(),
+                user_role: 'Unit Kerja / Pemohon',
+                action_type: 'CREATE',
+                action_title: `Submit Pengajuan MAK ${m.kategori || ''} - ${m.unit || 'Unit Kerja'}`,
+                module: 'ANGGARAN',
+                path: '/input-mak',
+                details: {
+                  unit: m.unit,
+                  pic: m.pic,
+                  status: m.status,
+                  tipe: 'Pengajuan MAK'
+                },
+                ip_address: 'UGM Network',
+                user_agent: 'Web Client Portal Unit',
+                created_at: m.created_at || new Date().toISOString()
+              });
+            }
+          });
+        }
+
+        // D. Fetch Tambah Pagu Activities
+        const { data: tambahPaguData } = await supabaseAdmin
+          .from('tambah_pagu')
+          .select('id, no_surat_pengajuan, hal_surat_pengajuan, created_by, created_time, jenis_tambah_pagu')
+          .order('created_time', { ascending: false })
+          .limit(50);
+
+        if (tambahPaguData && tambahPaguData.length > 0) {
+          tambahPaguData.forEach((tp) => {
+            if (tp.created_by) {
+              // Match created_by to registered user if it is UUID or email
+              const matchedUser = dbUsers.find(u => u.id === tp.created_by || u.email.toLowerCase() === tp.created_by.toLowerCase());
+              const email = matchedUser ? matchedUser.email : (tp.created_by.includes('@') ? tp.created_by : 'admin@ugm.ac.id');
+              const role = matchedUser ? matchedUser.role : 'Pemroses Anggaran';
+
+              dbDerivedLogs.push({
+                id: `tp-${tp.id}`,
+                user_email: email,
+                user_role: role,
+                action_type: 'CREATE',
+                action_title: `Input Tambah Pagu (${tp.jenis_tambah_pagu || 'Baru'}) - No: ${tp.no_surat_pengajuan || '-'}`,
+                module: 'ANGGARAN',
+                path: '/tambah-pagu',
+                details: {
+                  hal: tp.hal_surat_pengajuan,
+                  no_surat: tp.no_surat_pengajuan
+                },
+                ip_address: '127.0.0.1',
+                user_agent: 'Dashboard Web System',
+                created_at: tp.created_time || new Date().toISOString()
+              });
+            }
+          });
+        }
+      } catch (err: any) {
+        console.error('Error querying Supabase tables for logs:', err?.message);
+      }
+    }
+
+    // 3. Merge & Deduplicate All Logs
+    const logMap = new Map<string, ActivityLogItem>();
+    [...localLogs, ...dbDerivedLogs].forEach((l) => {
+      if (!logMap.has(l.id)) {
+        logMap.set(l.id, l);
+      }
+    });
+
+    const allLogs = Array.from(logMap.values());
+
+    // 4. Calculate Timestamps
+    const now = Date.now();
+    const fifteenMinAgo = now - 15 * 60 * 1000;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const activeUserEmails = new Set<string>();
+    const todayLogsCount = allLogs.filter(l => new Date(l.created_at) >= startOfToday).length;
+
+    // 5. Build Comprehensive User Summaries (Including ALL db registered users + submission users)
+    const userSummaryMap: Record<string, {
+      email: string;
+      role: string;
+      registeredAt?: string;
+      isRegistered: boolean;
+      unit?: string;
+      lastActive: string;
+      lastLogin: string | null;
+      lastAction: string;
+      lastPath: string;
+      totalActions: number;
+      isOnline: boolean;
+    }> = {};
+
+    // First: Populate ALL registered users from database
+    dbUsers.forEach((u) => {
+      const emailLower = u.email.toLowerCase().trim();
+      userSummaryMap[emailLower] = {
+        email: u.email,
+        role: u.role || 'Viewer',
+        registeredAt: u.created_at,
+        isRegistered: true,
+        lastActive: u.created_at,
+        lastLogin: null,
+        lastAction: 'Akun Terdaftar di Sistem',
+        lastPath: '/login',
+        totalActions: 0,
+        isOnline: false
+      };
+    });
+
+    // Second: Aggregate logs for every user
+    allLogs.forEach((log) => {
+      if (!log.user_email) return;
+      const emailLower = log.user_email.toLowerCase().trim();
+      const logTime = new Date(log.created_at).getTime();
+
+      if (logTime >= fifteenMinAgo) {
+        activeUserEmails.add(emailLower);
+      }
+
+      if (!userSummaryMap[emailLower]) {
+        userSummaryMap[emailLower] = {
+          email: log.user_email,
+          role: log.user_role || 'Unit Kerja / Pemohon',
+          isRegistered: false,
+          unit: log.details?.unit || undefined,
+          lastActive: log.created_at,
+          lastLogin: log.action_type === 'LOGIN' ? log.created_at : null,
+          lastAction: log.action_title,
+          lastPath: log.path || '/',
+          totalActions: 1,
+          isOnline: logTime >= fifteenMinAgo
+        };
+      } else {
+        const u = userSummaryMap[emailLower];
+        u.totalActions += 1;
+        if (log.details?.unit && !u.unit) {
+          u.unit = log.details.unit;
+        }
+        if (new Date(log.created_at) > new Date(u.lastActive)) {
+          u.lastActive = log.created_at;
+          u.lastAction = log.action_title;
+          u.lastPath = log.path || u.lastPath;
+          u.isOnline = logTime >= fifteenMinAgo;
+        }
+        if (log.action_type === 'LOGIN' && (!u.lastLogin || new Date(log.created_at) > new Date(u.lastLogin))) {
+          u.lastLogin = log.created_at;
+        }
+        if (logTime >= fifteenMinAgo) {
+          u.isOnline = true;
+        }
+      }
+    });
+
+    // 6. Filter logs for response
     let filtered = allLogs.filter(item => {
       if (userEmail && userEmail !== 'ALL' && item.user_email.toLowerCase() !== userEmail.toLowerCase()) {
         return false;
@@ -156,66 +371,18 @@ export async function GET(req: NextRequest) {
     // Sort descending (most recent first)
     filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // Calculate Statistics
-    const now = Date.now();
-    const fifteenMinAgo = now - 15 * 60 * 1000;
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const activeUserEmails = new Set<string>();
-    const todayLogsCount = allLogs.filter(l => new Date(l.created_at) >= startOfToday).length;
-
-    // Per User summary calculation
-    const userSummaryMap: Record<string, {
-      email: string;
-      role: string;
-      lastActive: string;
-      lastLogin: string | null;
-      lastAction: string;
-      lastPath: string;
-      totalActions: number;
-      isOnline: boolean;
-    }> = {};
-
-    allLogs.forEach(log => {
-      const email = log.user_email;
-      const logTime = new Date(log.created_at).getTime();
-
-      if (logTime >= fifteenMinAgo) {
-        activeUserEmails.add(email);
-      }
-
-      if (!userSummaryMap[email]) {
-        userSummaryMap[email] = {
-          email,
-          role: log.user_role || 'Viewer',
-          lastActive: log.created_at,
-          lastLogin: log.action_type === 'LOGIN' ? log.created_at : null,
-          lastAction: log.action_title,
-          lastPath: log.path || '/',
-          totalActions: 1,
-          isOnline: logTime >= fifteenMinAgo
-        };
-      } else {
-        const u = userSummaryMap[email];
-        u.totalActions += 1;
-        if (new Date(log.created_at) > new Date(u.lastActive)) {
-          u.lastActive = log.created_at;
-          u.lastAction = log.action_title;
-          u.lastPath = log.path || u.lastPath;
-          u.isOnline = logTime >= fifteenMinAgo;
-        }
-        if (log.action_type === 'LOGIN' && (!u.lastLogin || new Date(log.created_at) > new Date(u.lastLogin))) {
-          u.lastLogin = log.created_at;
-        }
-      }
-    });
-
     // Top Modules breakdown
     const moduleCounts: Record<string, number> = {};
     allLogs.forEach(l => {
       const m = l.module || 'LAINNYA';
       moduleCounts[m] = (moduleCounts[m] || 0) + 1;
+    });
+
+    // Sort user summaries (online first, then active recent first)
+    const userSummariesList = Object.values(userSummaryMap).sort((a, b) => {
+      if (a.isOnline && !b.isOnline) return -1;
+      if (!a.isOnline && b.isOnline) return 1;
+      return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime();
     });
 
     return NextResponse.json({
@@ -224,10 +391,11 @@ export async function GET(req: NextRequest) {
         totalLogsCount: allLogs.length,
         todayLogsCount,
         activeUsersCount: activeUserEmails.size,
-        totalTrackedUsers: Object.keys(userSummaryMap).length,
+        registeredUsersCount: dbUsers.length,
+        totalTrackedUsers: userSummariesList.length,
         moduleCounts
       },
-      userSummaries: Object.values(userSummaryMap).sort((a, b) => new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime()),
+      userSummaries: userSummariesList,
       logs: filtered.slice(0, limit),
       totalFiltered: filtered.length
     });

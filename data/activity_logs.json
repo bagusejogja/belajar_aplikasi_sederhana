@@ -1,5 +1,200 @@
 [
   {
+    "id": "log-1788160225319-5qovh",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Monitoring Aktivitas User",
+    "module": "UMUM",
+    "path": "/monitoring-user",
+    "details": {
+      "page_title": "Monitoring Aktivitas User"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T07:10:25.319Z"
+  },
+  {
+    "id": "log-1788160057756-55wnp",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu REVIEW",
+    "module": "REVIEW ANGGARAN",
+    "path": "/review",
+    "details": {
+      "page_title": "REVIEW"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T07:07:37.756Z"
+  },
+  {
+    "id": "log-1788152863312-hbgfa",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu REVIEW",
+    "module": "REVIEW ANGGARAN",
+    "path": "/review",
+    "details": {
+      "page_title": "REVIEW"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T05:07:43.313Z"
+  },
+  {
+    "id": "log-1788148856641-yk94m",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu REVIEW",
+    "module": "REVIEW ANGGARAN",
+    "path": "/review",
+    "details": {
+      "page_title": "REVIEW"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T04:00:56.641Z"
+  },
+  {
+    "id": "log-1788148551913-k941s",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Potret Mutasi Pagu Keseluruhan",
+    "module": "ANGGARAN",
+    "path": "/potret-mutasi-pagu",
+    "details": {
+      "page_title": "Potret Mutasi Pagu Keseluruhan"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T03:55:51.916Z"
+  },
+  {
+    "id": "log-1788129286621-rbf55",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Potret Mutasi Pagu Keseluruhan",
+    "module": "ANGGARAN",
+    "path": "/potret-mutasi-pagu",
+    "details": {
+      "page_title": "Potret Mutasi Pagu Keseluruhan"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T22:34:46.621Z"
+  },
+  {
+    "id": "log-1788129279127-hh4d0",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Monitoring Aktivitas User",
+    "module": "UMUM",
+    "path": "/monitoring-user",
+    "details": {
+      "page_title": "Monitoring Aktivitas User"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T22:34:39.127Z"
+  },
+  {
+    "id": "log-1788129200320-2zr4l",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Monitoring Aktivitas User",
+    "module": "UMUM",
+    "path": "/monitoring-user",
+    "details": {
+      "page_title": "Monitoring Aktivitas User"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T22:33:20.320Z"
+  },
+  {
+    "id": "log-1788127214803-mf146",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu GOV UNITS",
+    "module": "DANA PEMERINTAH",
+    "path": "/gov-units",
+    "details": {
+      "page_title": "GOV UNITS"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T22:00:14.803Z"
+  },
+  {
+    "id": "log-1788099596954-ws7f3",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu GOV UNITS",
+    "module": "DANA PEMERINTAH",
+    "path": "/gov-units",
+    "details": {
+      "page_title": "GOV UNITS"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T14:19:56.954Z"
+  },
+  {
+    "id": "log-1788099554131-e4mdl",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu Monitoring Aktivitas User",
+    "module": "UMUM",
+    "path": "/monitoring-user",
+    "details": {
+      "page_title": "Monitoring Aktivitas User"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T14:19:14.132Z"
+  },
+  {
+    "id": "log-1788095638641-k6m18",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu VERIFIKASI",
+    "module": "MASJID",
+    "path": "/verifikasi",
+    "details": {
+      "page_title": "VERIFIKASI"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T13:13:58.641Z"
+  },
+  {
+    "id": "log-1788080791624-hsijh",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu VERIFIKASI",
+    "module": "MASJID",
+    "path": "/verifikasi",
+    "details": {
+      "page_title": "VERIFIKASI"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-30T09:06:31.624Z"
+  },
+  {
     "id": "log-1788080011276-kgqq9",
     "user_email": "bagusejogja@gmail.com",
     "user_role": "Admin",

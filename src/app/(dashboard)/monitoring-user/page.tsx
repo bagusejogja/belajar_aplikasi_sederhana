@@ -37,6 +37,10 @@ export default function MonitoringUserPage() {
   // Detail Modal
   const [selectedLog, setSelectedLog] = useState<ActivityLogItem | null>(null);
 
+  // User Tab Category and Search filter
+  const [userTabCategory, setUserTabCategory] = useState<'all' | 'registered' | 'units' | 'online'>('all');
+  const [userTabSearch, setUserTabSearch] = useState('');
+
   // Clear modal confirmation
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -715,95 +719,212 @@ export default function MonitoringUserPage() {
       {/* 5. TAB CONTENT 2: STATUS & PROFIL USER */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {userSummaries.map((user) => (
-              <div 
-                key={user.email}
-                className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-xs flex flex-col justify-between hover:border-indigo-300 transition-all group"
+          {/* Sub-Header & Controls for Users Tab */}
+          <div className="bg-white p-4 px-5 rounded-3xl border border-gray-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            {/* Category Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-gray-100/90 p-1 rounded-2xl border border-gray-200/60 text-xs font-bold">
+              <button
+                onClick={() => setUserTabCategory('all')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  userTabCategory === 'all'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
               >
-                <div>
-                  {/* Top Bar Card */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-black text-sm flex items-center justify-center shadow-xs">
-                        {user.email.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900 truncate max-w-[170px]" title={user.email}>
-                          {user.email}
-                        </h4>
-                        <span className="inline-block px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 text-[10px] font-bold mt-0.5">
-                          {user.role}
-                        </span>
-                      </div>
-                    </div>
+                👥 Semua Pengguna ({userSummaries.length})
+              </button>
+              <button
+                onClick={() => setUserTabCategory('registered')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  userTabCategory === 'registered'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                👑 Akun Terdaftar ({userSummaries.filter(u => u.isRegistered).length})
+              </button>
+              <button
+                onClick={() => setUserTabCategory('units')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  userTabCategory === 'units'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🏢 Unit Kerja / Pemohon ({userSummaries.filter(u => !u.isRegistered).length})
+              </button>
+              <button
+                onClick={() => setUserTabCategory('online')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  userTabCategory === 'online'
+                    ? 'bg-white text-emerald-700 shadow-2xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🟢 Online ({userSummaries.filter(u => u.isOnline).length})
+              </button>
+            </div>
 
-                    {/* Status Online Indicator */}
-                    {user.isOnline ? (
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black shrink-0">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                        Online
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold shrink-0">
-                        Offline
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Informasi Aktivitas */}
-                  <div className="space-y-2 pt-3 border-t border-gray-100 text-xs">
-                    <div className="flex justify-between items-center text-gray-500">
-                      <span>Terakhir Aktif:</span>
-                      <span className="font-bold text-gray-900">{getRelativeTime(user.lastActive)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-gray-500">
-                      <span>Login Terakhir:</span>
-                      <span className="font-bold text-gray-700">
-                        {user.lastLogin ? formatTime(user.lastLogin) : 'Sesi Aktif'}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-gray-500">
-                      <span>Total Tindakan:</span>
-                      <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-black text-[11px]">
-                        {user.totalActions} kali
-                      </span>
-                    </div>
-
-                    <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 mt-2">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
-                        Tindakan Terakhir:
-                      </span>
-                      <p className="text-[11px] font-bold text-gray-800 line-clamp-2">
-                        {user.lastAction}
-                      </p>
-                      {user.lastPath && (
-                        <span className="text-[10px] text-indigo-600 font-mono mt-1 block">
-                          Path: {user.lastPath}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Button: Filter Log to this user */}
-                <div className="mt-4 pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => {
-                      setSelectedUserFilter(user.email);
-                      setActiveTab('feed');
-                    }}
-                    className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>Lihat Riwayat Lengkap User</span>
-                    <ChevronRight size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
+            {/* Search User */}
+            <div className="relative min-w-[240px]">
+              <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cari user, email, unit, role..."
+                value={userTabSearch}
+                onChange={(e) => setUserTabSearch(e.target.value)}
+                className="w-full h-9 pl-9 pr-8 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 outline-none focus:border-indigo-500 focus:bg-white transition-all"
+              />
+              {userTabSearch && (
+                <button
+                  onClick={() => setUserTabSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* User Cards Grid */}
+          {userSummaries.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-gray-200/80 p-12 text-center">
+              <Users size={32} className="mx-auto text-gray-300 mb-2" />
+              <h3 className="text-sm font-black text-gray-700">Belum Ada Data Pengguna</h3>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {userSummaries
+                .filter(u => {
+                  if (userTabCategory === 'registered' && !u.isRegistered) return false;
+                  if (userTabCategory === 'units' && u.isRegistered) return false;
+                  if (userTabCategory === 'online' && !u.isOnline) return false;
+                  if (userTabSearch.trim()) {
+                    const q = userTabSearch.toLowerCase().trim();
+                    const emailMatch = u.email?.toLowerCase().includes(q);
+                    const roleMatch = u.role?.toLowerCase().includes(q);
+                    const unitMatch = u.unit?.toLowerCase().includes(q);
+                    const actionMatch = u.lastAction?.toLowerCase().includes(q);
+                    if (!emailMatch && !roleMatch && !unitMatch && !actionMatch) return false;
+                  }
+                  return true;
+                })
+                .map((user) => {
+                  // Role Badge Styling
+                  const getRoleStyle = (roleName: string, isReg: boolean) => {
+                    const r = (roleName || '').toLowerCase();
+                    if (r.includes('admin')) return 'bg-rose-50 text-rose-700 border-rose-200';
+                    if (r.includes('pemroses')) return 'bg-blue-50 text-blue-700 border-blue-200';
+                    if (r.includes('takmir')) return 'bg-amber-50 text-amber-700 border-amber-200';
+                    if (r.includes('arsip')) return 'bg-teal-50 text-teal-700 border-teal-200';
+                    if (isReg) return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                    return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  };
+
+                  const roleBadgeClass = getRoleStyle(user.role, user.isRegistered);
+
+                  return (
+                    <div 
+                      key={user.email}
+                      className="bg-white p-5 rounded-3xl border border-gray-200/80 shadow-xs flex flex-col justify-between hover:border-indigo-300 hover:shadow-md transition-all group"
+                    >
+                      <div>
+                        {/* Top Bar Card */}
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-2xl ${user.isRegistered ? 'bg-gradient-to-tr from-indigo-600 to-purple-600' : 'bg-gradient-to-tr from-emerald-600 to-teal-600'} text-white font-black text-sm flex items-center justify-center shadow-xs`}>
+                              {user.email.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="text-xs font-black text-gray-900 truncate max-w-[150px]" title={user.email}>
+                                  {user.email}
+                                </h4>
+                                {user.isRegistered && (
+                                  <span title="Akun Terdaftar di Sistem" className="text-amber-500 text-xs">⭐</span>
+                                )}
+                              </div>
+                              <span className={`inline-block px-2 py-0.5 rounded-md border text-[10px] font-bold mt-0.5 ${roleBadgeClass}`}>
+                                {user.role}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Status Online Indicator */}
+                          {user.isOnline ? (
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black shrink-0">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                              Online
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold shrink-0">
+                              Offline
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Unit Name if Available */}
+                        {user.unit && (
+                          <div className="mb-2 px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[11px] text-slate-700 font-semibold truncate" title={user.unit}>
+                            🏢 {user.unit}
+                          </div>
+                        )}
+
+                        {/* Informasi Aktivitas */}
+                        <div className="space-y-2 pt-2 border-t border-gray-100 text-xs">
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Terakhir Aktif:</span>
+                            <span className="font-bold text-gray-900">{getRelativeTime(user.lastActive)}</span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Status Akun:</span>
+                            <span className="font-bold text-gray-700">
+                              {user.isRegistered ? 'Terdaftar (RBAC)' : 'Pemohon Unit'}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-gray-500">
+                            <span>Total Aktivitas:</span>
+                            <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-black text-[11px]">
+                              {user.totalActions} tindakan
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 mt-2">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                              Tindakan Terakhir:
+                            </span>
+                            <p className="text-[11px] font-bold text-gray-800 line-clamp-2">
+                              {user.lastAction || 'Belum ada aktivitas'}
+                            </p>
+                            {user.lastPath && (
+                              <span className="text-[10px] text-indigo-600 font-mono mt-1 block">
+                                Path: {user.lastPath}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Button: Filter Log to this user */}
+                      <div className="mt-4 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            setSelectedUserFilter(user.email);
+                            setActiveTab('feed');
+                          }}
+                          className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <span>Lihat Log Aktivitas</span>
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
 
