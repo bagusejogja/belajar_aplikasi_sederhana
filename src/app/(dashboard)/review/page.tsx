@@ -764,6 +764,12 @@ export default function ReviewPage() {
   interface KomparasiGroupData {
     groupOrg: string;
     units: KomparasiUnitData[];
+    pagu2026Awal: number;
+    pagu2026Inisiatif: number;
+    pagu2026Penugasan: number;
+    pagu2026Efisiensi: number;
+    pagu2026Pengalihan: number;
+    pagu2026Luncuran: number;
     pagu2026Total: number;
     totalUsulan2027: number;
     totalPenyesuaian2027: number;
@@ -915,6 +921,12 @@ export default function ReviewPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([groupOrg, units]) => {
         const sortedUnits = units.sort((a, b) => a.unitName.localeCompare(b.unitName));
+        const pagu2026Awal = sortedUnits.reduce((sum, u) => sum + u.pagu2026Awal, 0);
+        const pagu2026Inisiatif = sortedUnits.reduce((sum, u) => sum + u.pagu2026Inisiatif, 0);
+        const pagu2026Penugasan = sortedUnits.reduce((sum, u) => sum + u.pagu2026Penugasan, 0);
+        const pagu2026Efisiensi = sortedUnits.reduce((sum, u) => sum + u.pagu2026Efisiensi, 0);
+        const pagu2026Pengalihan = sortedUnits.reduce((sum, u) => sum + u.pagu2026Pengalihan, 0);
+        const pagu2026Luncuran = sortedUnits.reduce((sum, u) => sum + u.pagu2026Luncuran, 0);
         const pagu2026Total = sortedUnits.reduce((sum, u) => sum + u.pagu2026Total, 0);
         const totalUsulan2027 = sortedUnits.reduce((sum, u) => sum + u.totalUsulan2027, 0);
         const totalPenyesuaian2027 = sortedUnits.reduce((sum, u) => sum + u.totalPenyesuaian2027, 0);
@@ -925,6 +937,12 @@ export default function ReviewPage() {
         return {
           groupOrg,
           units: sortedUnits,
+          pagu2026Awal,
+          pagu2026Inisiatif,
+          pagu2026Penugasan,
+          pagu2026Efisiensi,
+          pagu2026Pengalihan,
+          pagu2026Luncuran,
           pagu2026Total,
           totalUsulan2027,
           totalPenyesuaian2027,
@@ -940,6 +958,12 @@ export default function ReviewPage() {
   }, [komparasiGroupedData]);
 
   const komparasiGrandTotals = useMemo(() => {
+    const pagu2026Awal = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Awal, 0);
+    const pagu2026Inisiatif = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Inisiatif, 0);
+    const pagu2026Penugasan = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Penugasan, 0);
+    const pagu2026Efisiensi = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Efisiensi, 0);
+    const pagu2026Pengalihan = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Pengalihan, 0);
+    const pagu2026Luncuran = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Luncuran, 0);
     const pagu2026 = komparasiGroupedData.reduce((acc, g) => acc + g.pagu2026Total, 0);
     const usulan2027 = komparasiGroupedData.reduce((acc, g) => acc + g.totalUsulan2027, 0);
     const penyesuaian2027 = komparasiGroupedData.reduce((acc, g) => acc + g.totalPenyesuaian2027, 0);
@@ -948,6 +972,12 @@ export default function ReviewPage() {
     const growth = pagu2026 > 0 ? ((selisih / pagu2026) * 100) : 0;
 
     return {
+      pagu2026Awal,
+      pagu2026Inisiatif,
+      pagu2026Penugasan,
+      pagu2026Efisiensi,
+      pagu2026Pengalihan,
+      pagu2026Luncuran,
       pagu2026,
       usulan2027,
       penyesuaian2027,
@@ -1474,12 +1504,13 @@ export default function ReviewPage() {
 
       // SHEET 4: KOMPARASI ANGGARAN 2027 VS PAGU 2026
       const wsKomp = workbook.addWorksheet('Komparasi 2027 vs 2026');
-      wsKomp.mergeCells('A1:I1');
+      wsKomp.mergeCells('A1:O1');
       wsKomp.getCell('A1').value = 'KOMPARASI USULAN ANGGARAN 2027 VS PAGU ANGGARAN 2026';
       wsKomp.getCell('A1').font = { bold: true, size: 14, name: 'Calibri' };
 
       const kompHeaders = [
-        'No', 'Group Organisasi', 'Nama Unit Kerja', 'Pagu Anggaran 2026',
+        'No', 'Group Organisasi', 'Nama Unit Kerja',
+        'Pagu Awal 2026', 'Inisiatif 2026', 'Penugasan 2026', 'Efisiensi 2026', 'Pengalihan 2026', 'Luncuran/Talangan 2026', 'Total Pagu 2026',
         'Total Usulan 2027', 'Penyesuaian 2027', 'Setelah Penyesuaian 2027',
         'Selisih (Rp)', 'Pertumbuhan (%)'
       ];
@@ -1503,20 +1534,32 @@ export default function ReviewPage() {
         rG.getCell(1).value = '';
         rG.getCell(2).value = g.groupOrg;
         rG.getCell(3).value = `${g.units.length} Unit Kerja`;
-        rG.getCell(4).value = g.pagu2026Total;
+        rG.getCell(4).value = g.pagu2026Awal;
         rG.getCell(4).numFmt = '#,##0';
-        rG.getCell(5).value = g.totalUsulan2027;
+        rG.getCell(5).value = g.pagu2026Inisiatif;
         rG.getCell(5).numFmt = '#,##0';
-        rG.getCell(6).value = g.totalPenyesuaian2027;
+        rG.getCell(6).value = g.pagu2026Penugasan;
         rG.getCell(6).numFmt = '#,##0';
-        rG.getCell(7).value = g.totalSetelahPenyesuaian2027;
+        rG.getCell(7).value = g.pagu2026Efisiensi;
         rG.getCell(7).numFmt = '#,##0';
-        rG.getCell(8).value = g.selisih;
+        rG.getCell(8).value = g.pagu2026Pengalihan;
         rG.getCell(8).numFmt = '#,##0';
-        rG.getCell(9).value = g.growth / 100;
-        rG.getCell(9).numFmt = '0.00%';
+        rG.getCell(9).value = g.pagu2026Luncuran;
+        rG.getCell(9).numFmt = '#,##0';
+        rG.getCell(10).value = g.pagu2026Total;
+        rG.getCell(10).numFmt = '#,##0';
+        rG.getCell(11).value = g.totalUsulan2027;
+        rG.getCell(11).numFmt = '#,##0';
+        rG.getCell(12).value = g.totalPenyesuaian2027;
+        rG.getCell(12).numFmt = '#,##0';
+        rG.getCell(13).value = g.totalSetelahPenyesuaian2027;
+        rG.getCell(13).numFmt = '#,##0';
+        rG.getCell(14).value = g.selisih;
+        rG.getCell(14).numFmt = '#,##0';
+        rG.getCell(15).value = g.growth / 100;
+        rG.getCell(15).numFmt = '0.00%';
 
-        for (let c = 1; c <= 9; c++) {
+        for (let c = 1; c <= 15; c++) {
           rG.getCell(c).border = borderThin;
           rG.getCell(c).fill = subHeaderFill;
           rG.getCell(c).font = { bold: true };
@@ -1529,20 +1572,32 @@ export default function ReviewPage() {
           rU.getCell(1).value = kSeq;
           rU.getCell(2).value = g.groupOrg;
           rU.getCell(3).value = u.unitName;
-          rU.getCell(4).value = u.pagu2026Total;
+          rU.getCell(4).value = u.pagu2026Awal;
           rU.getCell(4).numFmt = '#,##0';
-          rU.getCell(5).value = u.totalUsulan2027;
+          rU.getCell(5).value = u.pagu2026Inisiatif;
           rU.getCell(5).numFmt = '#,##0';
-          rU.getCell(6).value = u.totalPenyesuaian2027;
+          rU.getCell(6).value = u.pagu2026Penugasan;
           rU.getCell(6).numFmt = '#,##0';
-          rU.getCell(7).value = u.totalSetelahPenyesuaian2027;
+          rU.getCell(7).value = u.pagu2026Efisiensi;
           rU.getCell(7).numFmt = '#,##0';
-          rU.getCell(8).value = u.selisih;
+          rU.getCell(8).value = u.pagu2026Pengalihan;
           rU.getCell(8).numFmt = '#,##0';
-          rU.getCell(9).value = u.growth / 100;
-          rU.getCell(9).numFmt = '0.00%';
+          rU.getCell(9).value = u.pagu2026Luncuran;
+          rU.getCell(9).numFmt = '#,##0';
+          rU.getCell(10).value = u.pagu2026Total;
+          rU.getCell(10).numFmt = '#,##0';
+          rU.getCell(11).value = u.totalUsulan2027;
+          rU.getCell(11).numFmt = '#,##0';
+          rU.getCell(12).value = u.totalPenyesuaian2027;
+          rU.getCell(12).numFmt = '#,##0';
+          rU.getCell(13).value = u.totalSetelahPenyesuaian2027;
+          rU.getCell(13).numFmt = '#,##0';
+          rU.getCell(14).value = u.selisih;
+          rU.getCell(14).numFmt = '#,##0';
+          rU.getCell(15).value = u.growth / 100;
+          rU.getCell(15).numFmt = '0.00%';
 
-          for (let c = 1; c <= 9; c++) rU.getCell(c).border = borderThin;
+          for (let c = 1; c <= 15; c++) rU.getCell(c).border = borderThin;
           kRowIdx++;
           kSeq++;
         });
@@ -1554,20 +1609,32 @@ export default function ReviewPage() {
       wsKomp.mergeCells(kRowIdx, 1, kRowIdx, 3);
       kTotRow.getCell(1).value = 'TOTAL KESELURUHAN';
       kTotRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
-      kTotRow.getCell(4).value = komparasiGrandTotals.pagu2026;
+      kTotRow.getCell(4).value = komparasiGrandTotals.pagu2026Awal;
       kTotRow.getCell(4).numFmt = '#,##0';
-      kTotRow.getCell(5).value = komparasiGrandTotals.usulan2027;
+      kTotRow.getCell(5).value = komparasiGrandTotals.pagu2026Inisiatif;
       kTotRow.getCell(5).numFmt = '#,##0';
-      kTotRow.getCell(6).value = komparasiGrandTotals.penyesuaian2027;
+      kTotRow.getCell(6).value = komparasiGrandTotals.pagu2026Penugasan;
       kTotRow.getCell(6).numFmt = '#,##0';
-      kTotRow.getCell(7).value = komparasiGrandTotals.setelahPenyesuaian2027;
+      kTotRow.getCell(7).value = komparasiGrandTotals.pagu2026Efisiensi;
       kTotRow.getCell(7).numFmt = '#,##0';
-      kTotRow.getCell(8).value = komparasiGrandTotals.selisih;
+      kTotRow.getCell(8).value = komparasiGrandTotals.pagu2026Pengalihan;
       kTotRow.getCell(8).numFmt = '#,##0';
-      kTotRow.getCell(9).value = komparasiGrandTotals.growth / 100;
-      kTotRow.getCell(9).numFmt = '0.00%';
+      kTotRow.getCell(9).value = komparasiGrandTotals.pagu2026Luncuran;
+      kTotRow.getCell(9).numFmt = '#,##0';
+      kTotRow.getCell(10).value = komparasiGrandTotals.pagu2026;
+      kTotRow.getCell(10).numFmt = '#,##0';
+      kTotRow.getCell(11).value = komparasiGrandTotals.usulan2027;
+      kTotRow.getCell(11).numFmt = '#,##0';
+      kTotRow.getCell(12).value = komparasiGrandTotals.penyesuaian2027;
+      kTotRow.getCell(12).numFmt = '#,##0';
+      kTotRow.getCell(13).value = komparasiGrandTotals.setelahPenyesuaian2027;
+      kTotRow.getCell(13).numFmt = '#,##0';
+      kTotRow.getCell(14).value = komparasiGrandTotals.selisih;
+      kTotRow.getCell(14).numFmt = '#,##0';
+      kTotRow.getCell(15).value = komparasiGrandTotals.growth / 100;
+      kTotRow.getCell(15).numFmt = '0.00%';
 
-      for (let c = 1; c <= 9; c++) {
+      for (let c = 1; c <= 15; c++) {
         kTotRow.getCell(c).border = borderThin;
         kTotRow.getCell(c).fill = totalFill;
         kTotRow.getCell(c).font = { bold: true };
@@ -1576,12 +1643,18 @@ export default function ReviewPage() {
       wsKomp.getColumn(1).width = 6;
       wsKomp.getColumn(2).width = 24;
       wsKomp.getColumn(3).width = 38;
-      wsKomp.getColumn(4).width = 24;
-      wsKomp.getColumn(5).width = 24;
+      wsKomp.getColumn(4).width = 20;
+      wsKomp.getColumn(5).width = 20;
       wsKomp.getColumn(6).width = 20;
-      wsKomp.getColumn(7).width = 25;
-      wsKomp.getColumn(8).width = 22;
-      wsKomp.getColumn(9).width = 16;
+      wsKomp.getColumn(7).width = 20;
+      wsKomp.getColumn(8).width = 20;
+      wsKomp.getColumn(9).width = 22;
+      wsKomp.getColumn(10).width = 24;
+      wsKomp.getColumn(11).width = 24;
+      wsKomp.getColumn(12).width = 20;
+      wsKomp.getColumn(13).width = 25;
+      wsKomp.getColumn(14).width = 22;
+      wsKomp.getColumn(15).width = 16;
 
       // Trigger Download
       const buffer = await workbook.xlsx.writeBuffer();
@@ -2459,47 +2532,111 @@ export default function ReviewPage() {
 
                             {/* Breakdown Sub-Row for 2026 Pagu Components */}
                             {isUnitExpanded && (
-                              <tr>
-                              <td colSpan={8} className="p-0 border-b border-gray-300">
-                                  <div className="bg-slate-50 p-4 pl-12 space-y-3">
-                                    <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                                      <Landmark size={14} className="text-indigo-600" />
-                                      <span>Rincian Komponen Pagu 2026 vs Usulan 2027 ({u.unitName})</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 text-xs">
-                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Pagu Awal 2026</div>
-                                        <div className="font-mono font-bold text-slate-900 mt-0.5">Rp {formatRp(u.pagu2026Awal)}</div>
-                                      </div>
-                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Inisiatif 2026</div>
-                                        <div className="font-mono font-bold text-emerald-700 mt-0.5">+Rp {formatRp(u.pagu2026Inisiatif)}</div>
-                                      </div>
-                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Penugasan 2026</div>
-                                        <div className="font-mono font-bold text-emerald-700 mt-0.5">+Rp {formatRp(u.pagu2026Penugasan)}</div>
-                                      </div>
-                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Efisiensi 2026</div>
-                                        <div className="font-mono font-bold text-rose-600 mt-0.5">Rp {formatRp(u.pagu2026Efisiensi)}</div>
-                                      </div>
-                                      <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                                        <div className="text-[10px] text-gray-500 font-bold uppercase">Pengalihan 2026</div>
-                                        <div className={`font-mono font-bold mt-0.5 ${u.pagu2026Pengalihan > 0 ? 'text-emerald-700' : u.pagu2026Pengalihan < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                                          {u.pagu2026Pengalihan > 0 ? '+Rp ' : 'Rp '}{formatRp(u.pagu2026Pengalihan)}
+                              <tr className="bg-gradient-to-b from-indigo-50/20 to-slate-50/80">
+                                <td colSpan={8} className="p-0 border-b border-indigo-100">
+                                  <div className="p-4 pl-10 pr-6 space-y-3">
+                                    {/* Header Bar */}
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100/80 pb-2.5">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                                          <Landmark size={14} />
+                                        </div>
+                                        <div>
+                                          <div className="text-xs font-black text-slate-800 flex items-center gap-2">
+                                            <span>Rincian Komponen Pagu 2026 vs Usulan 2027</span>
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                              {u.unitName}
+                                            </span>
+                                          </div>
+                                          <div className="text-[10px] text-slate-500 font-medium">
+                                            Komparasi alokasi komponen anggaran tahun berjalan (2026) terhadap usulan yang disetujui untuk tahun 2027
+                                          </div>
                                         </div>
                                       </div>
-                                      <div className="p-2.5 rounded-xl bg-cyan-50/80 border border-cyan-200">
-                                        <div className="text-[10px] text-cyan-800 font-bold uppercase">Luncuran/Talangan</div>
-                                        <div className="font-mono font-bold text-cyan-950 mt-0.5">+Rp {formatRp(u.pagu2026Luncuran)}</div>
+                                      
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-semibold text-slate-500">Pertumbuhan:</span>
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                          u.growth > 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : u.growth < 0 ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-gray-100 text-gray-700'
+                                        }`}>
+                                          {u.growth > 0 ? '+' : ''}{u.growth.toFixed(1)}%
+                                        </span>
                                       </div>
-                                      <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200">
-                                        <div className="text-[10px] text-indigo-800 font-bold uppercase">Total Pagu 2026</div>
-                                        <div className="font-mono font-bold text-indigo-950 mt-0.5">Rp {formatRp(u.pagu2026Total)}</div>
+                                    </div>
+
+                                    {/* 2-Section Aesthetic Layout */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                                      {/* SECTION 1: 6 Breakdown Components (Cols 1-8) */}
+                                      <div className="lg:col-span-8 bg-white/90 rounded-2xl p-3.5 border border-slate-200 shadow-sm space-y-2.5">
+                                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                                          <span>6 Komponen Pembentuk Pagu 2026</span>
+                                          <span className="text-slate-400 font-normal">Awal + Inisiatif + Penugasan + Efisiensi + Pengalihan + Luncuran</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                                          {/* Pagu Awal */}
+                                          <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200 hover:border-slate-300 transition-all">
+                                            <div className="text-[10px] text-slate-500 font-bold uppercase">1. Pagu Awal 2026</div>
+                                            <div className="font-mono font-bold text-slate-900 text-xs mt-1">Rp {formatRp(u.pagu2026Awal)}</div>
+                                          </div>
+
+                                          {/* Inisiatif */}
+                                          <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200/80 hover:border-emerald-300 transition-all">
+                                            <div className="text-[10px] text-emerald-800 font-bold uppercase">2. Inisiatif 2026</div>
+                                            <div className="font-mono font-bold text-emerald-700 text-xs mt-1">+Rp {formatRp(u.pagu2026Inisiatif)}</div>
+                                          </div>
+
+                                          {/* Penugasan */}
+                                          <div className="p-2.5 rounded-xl bg-teal-50/50 border border-teal-200/80 hover:border-teal-300 transition-all">
+                                            <div className="text-[10px] text-teal-800 font-bold uppercase">3. Penugasan 2026</div>
+                                            <div className="font-mono font-bold text-teal-700 text-xs mt-1">+Rp {formatRp(u.pagu2026Penugasan)}</div>
+                                          </div>
+
+                                          {/* Efisiensi */}
+                                          <div className="p-2.5 rounded-xl bg-rose-50/50 border border-rose-200/80 hover:border-rose-300 transition-all">
+                                            <div className="text-[10px] text-rose-800 font-bold uppercase">4. Efisiensi 2026</div>
+                                            <div className="font-mono font-bold text-rose-600 text-xs mt-1">Rp {formatRp(u.pagu2026Efisiensi)}</div>
+                                          </div>
+
+                                          {/* Pengalihan */}
+                                          <div className="p-2.5 rounded-xl bg-amber-50/50 border border-amber-200/80 hover:border-amber-300 transition-all">
+                                            <div className="text-[10px] text-amber-800 font-bold uppercase">5. Pengalihan 2026</div>
+                                            <div className={`font-mono font-bold text-xs mt-1 ${u.pagu2026Pengalihan > 0 ? 'text-emerald-700' : u.pagu2026Pengalihan < 0 ? 'text-rose-600' : 'text-slate-700'}`}>
+                                              {u.pagu2026Pengalihan > 0 ? '+Rp ' : 'Rp '}{formatRp(u.pagu2026Pengalihan)}
+                                            </div>
+                                          </div>
+
+                                          {/* Luncuran/Talangan */}
+                                          <div className="p-2.5 rounded-xl bg-cyan-50/70 border border-cyan-200 hover:border-cyan-300 transition-all">
+                                            <div className="text-[10px] text-cyan-800 font-bold uppercase">6. Luncuran/Talangan</div>
+                                            <div className="font-mono font-bold text-cyan-950 text-xs mt-1">+Rp {formatRp(u.pagu2026Luncuran)}</div>
+                                          </div>
+                                        </div>
                                       </div>
-                                      <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200">
-                                        <div className="text-[10px] text-emerald-800 font-bold uppercase">Setelah Review 2027</div>
-                                        <div className="font-mono font-bold text-emerald-950 mt-0.5">Rp {formatRp(u.totalSetelahPenyesuaian2027)}</div>
+
+                                      {/* SECTION 2: 2 Highlight Cards (Cols 9-12) */}
+                                      <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+                                        {/* Total Pagu 2026 */}
+                                        <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-50 via-indigo-50/50 to-blue-50 border-2 border-indigo-200 shadow-sm flex flex-col justify-between">
+                                          <div className="flex items-center justify-between">
+                                            <div className="text-[10px] text-indigo-900 font-black uppercase tracking-wider">Total Pagu 2026</div>
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-indigo-200/60 text-indigo-900">Baseline</span>
+                                          </div>
+                                          <div className="font-mono font-black text-indigo-950 text-sm mt-1.5">
+                                            Rp {formatRp(u.pagu2026Total)}
+                                          </div>
+                                        </div>
+
+                                        {/* Setelah Review 2027 */}
+                                        <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50 via-emerald-50/50 to-teal-50 border-2 border-emerald-200 shadow-sm flex flex-col justify-between">
+                                          <div className="flex items-center justify-between">
+                                            <div className="text-[10px] text-emerald-900 font-black uppercase tracking-wider">Setelah Review 2027</div>
+                                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-emerald-200/60 text-emerald-900">Disetujui</span>
+                                          </div>
+                                          <div className="font-mono font-black text-emerald-950 text-sm mt-1.5">
+                                            Rp {formatRp(u.totalSetelahPenyesuaian2027)}
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
