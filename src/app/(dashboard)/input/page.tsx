@@ -184,14 +184,15 @@ export default function InputPage() {
         if (tipeTransaksi === 'Transfer') {
            const { error } = await supabase.from('pengajuan_transfer').insert([
               {
-                 tgl_pengajuan: formData.tanggal,
-                 jenis_belanja_id: formData.jenis_belanja_id ? formData.jenis_belanja_id.value : null,
+                 tanggal_pengajuan: formData.tanggal,
+                 kategori_belanja_id: formData.jenis_belanja_id ? formData.jenis_belanja_id.value : null,
                  rek_tujuan_id: formData.rek_tujuan_id.value,
                  nominal: nominalAngka,
-                 uraian: formData.uraian,
+                 kegiatan: formData.uraian,
+                 barang: activeUserEmail || 'Pengaju',
                  catatan: formData.catatan || null,
-                 status_approval: 'Menunggu',
-                 foto_nota: notaUrl || null,
+                 status: 'Diajukan',
+                 nota_url: notaUrl || null,
                  foto_kegiatan: kegiatanUrl || null,
                  foto_barang: barangUrl || null,
                  created_by: activeUserId
