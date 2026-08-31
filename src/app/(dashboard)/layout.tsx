@@ -111,6 +111,13 @@ export default function DashboardLayout({
 
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
+    if (path.startsWith('/input-transfer/edit')) return 'Perbaiki & Ajukan Ulang Transfer';
+    if (path.startsWith('/input-transfer')) return 'Input Pengajuan Transfer';
+    if (path.startsWith('/approval-transfer')) return 'Approval Transfer Kas';
+    if (path.startsWith('/rekap-transfer')) return 'Rekap & Riwayat Transfer';
+    if (path.startsWith('/tambah-pagu/view')) return 'Detail Tambah Pagu';
+    if (path.startsWith('/tambah-pagu/edit')) return 'Edit Tambah Pagu';
+
     switch (path) {
       case '/': return 'Apps Bersama Dashboard';
       case '/dashboard': return 'Dashboard Masjid';
@@ -121,6 +128,8 @@ export default function DashboardLayout({
       case '/users': return 'Manajemen User';
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
+      case '/verifikasi': return 'Verifikasi Kas Masjid';
+      case '/revisi': return 'Revisi Transaksi';
       case '/surat/editor-html': return 'Editor HTML Surat';
       case '/gov-narrative': return 'Narrative Generator';
       case '/surat/convert-ai': return 'AI Convert Surat';
@@ -129,7 +138,7 @@ export default function DashboardLayout({
       case '/tambah-pagu/tambah': return 'Input Tambah Pagu';
       case '/tambah-pagu': return 'Daftar Tambah Pagu';
       case '/backup': return 'Backup & Restore Database';
-      default: return path.replace('/', '').replace('-', ' ').toUpperCase() || 'Dashboard';
+      default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }
   };
 

@@ -26,6 +26,8 @@ export function detectModuleFromPath(pathname: string): string {
   return 'UMUM';
 }
 
+let lastLoggedMap = new Map<string, number>();
+
 /**
  * Log user activity asynchronously without blocking UI interactions.
  */
@@ -34,6 +36,19 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
     let email = params.user_email;
     let role = params.user_role;
     let userId = params.user_id;
+
+    const currentPath = params.path || (typeof window !== 'undefined' ? window.location.pathname : '');
+
+    // Anti-Spam / Debounce untuk PAGE_VIEW ganda dalam waktu 3 detik
+    if (params.action_type === 'PAGE_VIEW') {
+      const cacheKey = `${email || 'user'}:${currentPath}`;
+      const now = Date.now();
+      const lastTime = lastLoggedMap.get(cacheKey) || 0;
+      if (now - lastTime < 3000) {
+        return; // Lewati jika baru saja dicatat dalam 3 detik terakhir
+      }
+      lastLoggedMap.set(cacheKey, now);
+    }
 
     // If not supplied, attempt to read from Supabase session
     if (!email) {
@@ -59,7 +74,6 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
       return;
     }
 
-    const currentPath = params.path || (typeof window !== 'undefined' ? window.location.pathname : '');
     const moduleName = params.module || detectModuleFromPath(currentPath);
 
     // Send payload to backend API

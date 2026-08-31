@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Database, Loader2, CheckCircle, XCircle, Search, FileText, 
+  Database, Loader2, CheckCircle, CheckCircle2, XCircle, Search, FileText, 
   Eye, AlertCircle, Copy, Check, UploadCloud, ShieldCheck, 
   ArrowRight, Calendar, Landmark, User, FileImage, ExternalLink,
-  ChevronDown, ChevronUp, Paperclip, ImageIcon
+  ChevronDown, ChevronUp, Paperclip, ImageIcon, Clock
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
@@ -29,22 +29,55 @@ export default function ApprovalTransferPage() {
 
   const [buktiFile, setBuktiFile] = useState<File | null>(null);
   const [tglTransfer, setTglTransfer] = useState(new Date().toISOString().split('T')[0]);
+  const [catatanReviewer, setCatatanReviewer] = useState('');
+  const [usersMap, setUsersMap] = useState<Record<string, string>>({});
+
+  const formatFullDateTime = (isoDate: string | null | undefined, fallbackDate?: string | null) => {
+    const target = isoDate || fallbackDate;
+    if (!target) return '-';
+    try {
+      const d = new Date(target);
+      if (isNaN(d.getTime())) return target;
+      return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }).format(d) + ' WIB';
+    } catch {
+      return target;
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('pengajuan_transfer')
-        .select(`
-          *,
-          master_rekening(nama_rekening, no_rekening, ref_bank(nama_bank)),
-          ref_jenis_belanja(nama_belanja)
-        `)
-        .eq('status', statusFilter)
-        .order('created_at', { ascending: false });
+      const [transferRes, usersRes] = await Promise.all([
+        supabase
+          .from('pengajuan_transfer')
+          .select(`
+            *,
+            master_rekening(nama_rekening, no_rekening, ref_bank(nama_bank)),
+            ref_jenis_belanja(nama_belanja)
+          `)
+          .eq('status', statusFilter)
+          .order('created_at', { ascending: false }),
+        supabase.from('app_users').select('id, email')
+      ]);
         
-      if (error) throw error;
-      setListData(data || []);
+      if (transferRes.error) throw transferRes.error;
+      setListData(transferRes.data || []);
+
+      if (usersRes.data) {
+        const map: Record<string, string> = {};
+        usersRes.data.forEach((u: any) => {
+          map[u.id] = u.email;
+        });
+        setUsersMap(map);
+      }
     } catch (err: any) {
       console.error("Gagal menarik data", err.message);
     } finally {
@@ -60,6 +93,7 @@ export default function ApprovalTransferPage() {
     setSelectedData(item);
     setBuktiFile(null);
     setShowLampiran(false);
+    setCatatanReviewer('');
     setTglTransfer(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
   };
@@ -70,9 +104,16 @@ export default function ApprovalTransferPage() {
       return;
     }
 
+    if (status_update === 'Ditolak') {
+      if (!catatanReviewer.trim()) {
+        toast.error("Alasan penolakan WAJIB diisi pada kolom catatan di bawah!");
+        return;
+      }
+    }
+
     const confirmMsg = status_update === 'Disetujui' 
       ? `Yakin ingin MENYETUJUI transfer sebesar Rp ${formatRp(selectedData.nominal)} ke ${selectedData.master_rekening?.nama_rekening}?`
-      : `Yakin ingin MENOLAK pengajuan transfer ini?`;
+      : `Yakin ingin MENOLAK pengajuan transfer ini dengan alasan:\n"${catatanReviewer.trim()}"?`;
 
     if (!confirm(confirmMsg)) return;
     
@@ -90,22 +131,71 @@ export default function ApprovalTransferPage() {
         buktiUrl = result.publicUrl;
       }
 
+      const updatePayload: any = { 
+        status: status_update, 
+        foto_bukti_transfer: buktiUrl || null,
+        tanggal_transfer: status_update === 'Disetujui' ? tglTransfer : null
+      };
+
+      if (status_update === 'Ditolak') {
+        updatePayload.catatan = `[DITOLAK] Alasan: ${catatanReviewer.trim()}${selectedData.catatan ? `\n\nCatatan Awal: ${selectedData.catatan}` : ''}`;
+      } else if (catatanReviewer.trim()) {
+        updatePayload.catatan = `${selectedData.catatan ? `${selectedData.catatan}\n\n` : ''}[DISETUJUI] Catatan: ${catatanReviewer.trim()}`;
+      }
+
       const { error } = await supabase
         .from('pengajuan_transfer')
-        .update({ 
-          status: status_update, 
-          foto_bukti_transfer: buktiUrl || null,
-          tanggal_transfer: status_update === 'Disetujui' ? tglTransfer : null
-        })
+        .update(updatePayload)
         .eq('id', selectedData.id);
         
       if (error) throw error;
 
+      // Kirim Notifikasi Email Otomatis ke Pembuat Pengajuan
+      const targetEmail = selectedData.barang || usersMap[selectedData.created_by];
+      if (targetEmail && targetEmail.includes('@')) {
+        fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: targetEmail,
+            subject: `[Pengajuan Transfer ${status_update}] - Rp ${formatRp(selectedData.nominal)} (${selectedData.kegiatan})`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">
+                <h2 style="color: ${status_update === 'Disetujui' ? '#059669' : '#dc2626'}; margin-top: 0;">
+                  Pengajuan Transfer ${status_update.toUpperCase()}
+                </h2>
+                <p>Halo,</p>
+                <p>Pengajuan transfer kas yang Anda ajukan telah <strong>${status_update}</strong> oleh bagian keuangan.</p>
+                
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Kegiatan:</td><td style="padding: 6px 0; font-weight: bold;">${selectedData.kegiatan}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Nominal:</td><td style="padding: 6px 0; font-weight: bold; color: #4338ca;">Rp ${formatRp(selectedData.nominal)}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #6b7280;">Rekening Tujuan:</td><td style="padding: 6px 0; font-weight: bold;">${selectedData.master_rekening?.nama_rekening} (${selectedData.master_rekening?.ref_bank?.nama_bank} - ${selectedData.master_rekening?.no_rekening})</td></tr>
+                  ${status_update === 'Ditolak' ? `<tr><td style="padding: 6px 0; color: #dc2626; font-weight: bold;">Alasan Penolakan:</td><td style="padding: 6px 0; color: #dc2626; font-weight: bold;">${catatanReviewer.trim()}</td></tr>` : ''}
+                </table>
+
+                ${status_update === 'Ditolak' ? `
+                  <div style="background-color: #fff1f2; padding: 12px; border-radius: 8px; border-left: 4px solid #f43f5e; margin: 16px 0;">
+                    <p style="margin: 0; color: #9f1239; font-size: 13px;">
+                      <strong>Perhatian:</strong> Silakan buka menu <em>Rekap Transfer</em> di aplikasi, lalu klik tombol <strong>"Edit & Ajukan Ulang"</strong> untuk memperbaiki dan mengirimkan kembali pengajuan Anda.
+                    </p>
+                  </div>
+                ` : ''}
+                
+                <p style="color: #6b7280; font-size: 12px; margin-top: 20px; border-top: 1px solid #f3f4f6; pt: 10px;">
+                  Pemberitahuan Otomatis Sistem Apps Bersama
+                </p>
+              </div>
+            `
+          })
+        }).catch(() => {});
+      }
+
       setIsModalOpen(false);
       toast.success(
         status_update === 'Disetujui' 
-          ? "Pengajuan Transfer BERHASIL disetujui & dicatat!" 
-          : "Pengajuan Transfer telah DITOLAK."
+          ? "Pengajuan Transfer BERHASIL disetujui & bukti transfer tersimpan!" 
+          : "Pengajuan Transfer telah DITOLAK dan notifikasi dikirimkan."
       );
       fetchData();
     } catch (err: any) {
@@ -177,15 +267,18 @@ export default function ApprovalTransferPage() {
           
           return links.map((lnk: string, lIdx: number) => {
             const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-            const imgSrc = gdriveMatch && gdriveMatch[1] 
-              ? `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200` 
-              : lnk;
+            let imgSrc = lnk;
+            if (gdriveMatch && gdriveMatch[1]) {
+              imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w200`;
+            } else if (lnk.includes('.r2.dev') || lnk.includes('r2.cloudflarestorage.com')) {
+              imgSrc = `/api/image-cors?url=${encodeURIComponent(lnk)}`;
+            }
             const isImage = lnk.toLowerCase().match(/\.(jpeg|jpg|png|webp|gif)$/) != null || !!gdriveMatch;
 
             return (
               <div 
                 key={`${cIdx}-${lIdx}`} 
-                onClick={() => setPreviewImage(lnk)}
+                onClick={() => setPreviewImage(imgSrc)}
                 className="group relative bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:border-indigo-400 hover:shadow-xs transition-all flex flex-col"
               >
                 <div className="h-20 bg-gray-50 flex items-center justify-center overflow-hidden">
@@ -195,7 +288,12 @@ export default function ApprovalTransferPage() {
                       alt={cat.label} 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                       onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.includes('/api/image-cors') && lnk.startsWith('http')) {
+                          target.src = `/api/image-cors?url=${encodeURIComponent(lnk)}`;
+                        } else {
+                          target.style.display = 'none';
+                        }
                       }}
                     />
                   ) : (
@@ -471,6 +569,38 @@ export default function ApprovalTransferPage() {
                 </div>
               </div>
 
+              {/* INFO SIKLUS PENGAJUAN & WAKTU LENGKAP */}
+              <div className="bg-gray-50/90 p-3.5 rounded-xl border border-gray-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                    <Clock size={11} className="text-gray-400" /> Waktu Diajukan (Detik):
+                  </span>
+                  <p className="font-bold text-gray-800 font-mono text-[11px] mt-0.5">
+                    {formatFullDateTime(selectedData.created_at, selectedData.tanggal_pengajuan)}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                    <User size={11} className="text-gray-400" /> Diajukan Oleh (Email):
+                  </span>
+                  <p className="font-bold text-indigo-700 text-xs mt-0.5 truncate" title={selectedData.barang || usersMap[selectedData.created_by] || '-'}>
+                    {selectedData.barang || usersMap[selectedData.created_by] || '-'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle2 size={11} className="text-emerald-600" /> Waktu Transfer:
+                  </span>
+                  <p className="font-bold text-emerald-700 font-mono text-[11px] mt-0.5">
+                    {selectedData.status === 'Disetujui' && selectedData.tanggal_transfer
+                      ? formatFullDateTime(selectedData.tanggal_transfer, selectedData.tanggal_transfer)
+                      : selectedData.status === 'Ditolak'
+                      ? 'Ditolak'
+                      : 'Menunggu Persetujuan'}
+                  </p>
+                </div>
+              </div>
+
               {/* Rincian Kegiatan & Catatan */}
               <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200/80 space-y-2 text-xs">
                 <div>
@@ -481,11 +611,6 @@ export default function ApprovalTransferPage() {
                   <div className="pt-2 border-t border-gray-200">
                     <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block mb-0.5">Catatan Tambahan:</span>
                     <p className="font-medium text-amber-900 italic">{selectedData.catatan}</p>
-                  </div>
-                )}
-                {selectedData.barang && (
-                  <div className="text-[11px] text-gray-400 flex items-center gap-1 pt-1">
-                    <User size={11} /> <span>Diajukan oleh: <strong className="text-gray-600">{selectedData.barang}</strong></span>
                   </div>
                 )}
               </div>
@@ -537,6 +662,21 @@ export default function ApprovalTransferPage() {
                         />
                       </label>
                     </div>
+                  </div>
+
+                  {/* Catatan / Alasan Penolakan Visual Textarea */}
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                      <span>Catatan Reviewer / Alasan Penolakan</span>
+                      <span className="text-rose-600 font-bold normal-case">*Wajib diisi jika MENOLAK</span>
+                    </label>
+                    <textarea 
+                      rows={2}
+                      value={catatanReviewer}
+                      onChange={(e) => setCatatanReviewer(e.target.value)}
+                      placeholder="Tuliskan alasan penolakan (wajib jika tolak) atau pesan/catatan persetujuan (opsional)..."
+                      className="w-full p-2.5 bg-white border border-gray-300 rounded-xl font-medium text-xs text-gray-800 outline-none focus:ring-2 ring-indigo-500/20 focus:border-indigo-500 placeholder:text-gray-400 transition-all"
+                    />
                   </div>
                 </div>
               ) : (

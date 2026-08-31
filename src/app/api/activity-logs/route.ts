@@ -18,93 +18,75 @@ export interface ActivityLogItem {
   created_at: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LOGS_FILE = path.join(DATA_DIR, 'activity_logs.json');
+import os from 'os';
+
+// Gunakan file di os.tmpdir() dan in-memory cache agar Next.js Webpack/Turbopack dev watcher TIDAK me-reload halaman
+const LOGS_FILE = path.join(os.tmpdir(), 'verifikasi_activity_logs.json');
+
+declare global {
+  var __activityLogsCache: ActivityLogItem[] | undefined;
+}
 
 // Helper to ensure data file exists
 function readLocalLogs(): ActivityLogItem[] {
+  if (global.__activityLogsCache && Array.isArray(global.__activityLogsCache)) {
+    return global.__activityLogsCache;
+  }
+
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(LOGS_FILE)) {
-      // Seed with initial sample activity logs so monitoring is lively right away
-      const initialLogs: ActivityLogItem[] = [
-        {
-          id: 'log-seed-1',
-          user_email: 'bagusejogja@gmail.com',
-          user_role: 'Admin',
-          action_type: 'LOGIN',
-          action_title: 'Berhasil login ke sistem',
-          module: 'AUTH',
-          path: '/login',
-          details: { method: 'password', platform: 'Web' },
-          ip_address: '127.0.0.1',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString()
-        },
-        {
-          id: 'log-seed-2',
-          user_email: 'bagusejogja@gmail.com',
-          user_role: 'Admin',
-          action_type: 'PAGE_VIEW',
-          action_title: 'Membuka menu Editor HTML Surat',
-          module: 'PERSURATAN',
-          path: '/surat/editor-html',
-          details: { page_title: 'Editor HTML Surat' },
-          ip_address: '127.0.0.1',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          created_at: new Date(Date.now() - 1000 * 60 * 3).toISOString()
-        },
-        {
-          id: 'log-seed-3',
-          user_email: 'dokumenebagusejogja@gmail.com',
-          user_role: 'Pemroses Anggaran',
-          action_type: 'LOGIN',
-          action_title: 'Berhasil login ke sistem',
-          module: 'AUTH',
-          path: '/login',
-          details: { method: 'password', platform: 'Web' },
-          ip_address: '192.168.100.15',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString()
-        },
-        {
-          id: 'log-seed-4',
-          user_email: 'dokumenebagusejogja@gmail.com',
-          user_role: 'Pemroses Anggaran',
-          action_type: 'PAGE_VIEW',
-          action_title: 'Membuka menu Potret Mutasi Pagu',
-          module: 'ANGGARAN',
-          path: '/potret-mutasi-pagu',
-          details: { page_title: 'Potret Mutasi Pagu' },
-          ip_address: '192.168.100.15',
-          user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          created_at: new Date(Date.now() - 1000 * 60 * 18).toISOString()
-        }
-      ];
-      fs.writeFileSync(LOGS_FILE, JSON.stringify(initialLogs, null, 2), 'utf8');
-      return initialLogs;
+    if (fs.existsSync(LOGS_FILE)) {
+      const content = fs.readFileSync(LOGS_FILE, 'utf8');
+      const parsed = JSON.parse(content || '[]');
+      global.__activityLogsCache = parsed;
+      return parsed;
     }
 
-    const content = fs.readFileSync(LOGS_FILE, 'utf8');
-    return JSON.parse(content || '[]');
+    // Cek apakah ada file legacy di data/activity_logs.json
+    const legacyPath = path.join(process.cwd(), 'data', 'activity_logs.json');
+    if (fs.existsSync(legacyPath)) {
+      try {
+        const content = fs.readFileSync(legacyPath, 'utf8');
+        const parsed = JSON.parse(content || '[]');
+        global.__activityLogsCache = parsed;
+        fs.writeFileSync(LOGS_FILE, JSON.stringify(parsed), 'utf8');
+        return parsed;
+      } catch {}
+    }
+
+    // Initial default logs
+    const initialLogs: ActivityLogItem[] = [
+      {
+        id: 'log-seed-1',
+        user_email: 'bagusejogja@gmail.com',
+        user_role: 'Admin',
+        action_type: 'LOGIN',
+        action_title: 'Berhasil login ke sistem',
+        module: 'AUTH',
+        path: '/login',
+        details: { method: 'password', platform: 'Web' },
+        ip_address: '127.0.0.1',
+        user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString()
+      }
+    ];
+
+    global.__activityLogsCache = initialLogs;
+    fs.writeFileSync(LOGS_FILE, JSON.stringify(initialLogs), 'utf8');
+    return initialLogs;
   } catch (err) {
-    console.error('Error reading activity logs file:', err);
-    return [];
+    console.error('Error reading activity logs:', err);
+    return global.__activityLogsCache || [];
   }
 }
 
 function writeLocalLogs(logs: ActivityLogItem[]) {
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    // Limit to max 10,000 logs to prevent file from growing indefinitely
     const trimmed = logs.slice(0, 10000);
+    global.__activityLogsCache = trimmed;
+    // Tulis ke os.tmpdir() secara non-blocking/aman
     fs.writeFileSync(LOGS_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
   } catch (err) {
-    console.error('Error saving activity logs file:', err);
+    console.error('Error saving activity logs:', err);
   }
 }
 
@@ -235,6 +217,75 @@ export async function GET(req: NextRequest) {
                 created_at: tp.created_time || new Date().toISOString()
               });
             }
+          });
+        }
+
+        // E. Fetch Pengajuan Transfer Activities
+        const { data: transferData } = await supabaseAdmin
+          .from('pengajuan_transfer')
+          .select('id, tanggal_pengajuan, kegiatan, nominal, status, barang, created_at, created_by')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (transferData && transferData.length > 0) {
+          transferData.forEach((pt) => {
+            const matchedUser = dbUsers.find(u => u.id === pt.created_by || u.email.toLowerCase() === (pt.barang || '').toLowerCase());
+            const email = pt.barang?.includes('@') 
+              ? pt.barang 
+              : (matchedUser ? matchedUser.email : (pt.created_by?.includes('@') ? pt.created_by : 'takmir@ugm.ac.id'));
+            const role = matchedUser ? matchedUser.role : 'Takmir Muda';
+
+            dbDerivedLogs.push({
+              id: `pt-${pt.id}`,
+              user_email: email,
+              user_role: role,
+              action_type: 'CREATE',
+              action_title: `Pengajuan Transfer: Rp ${Number(pt.nominal || 0).toLocaleString('id-ID')} (${pt.kegiatan || 'Transfer'})`,
+              module: 'MASJID',
+              path: '/input-transfer',
+              details: {
+                nominal: pt.nominal,
+                status: pt.status,
+                kegiatan: pt.kegiatan
+              },
+              ip_address: 'Portal Web',
+              user_agent: 'Web Client',
+              created_at: pt.created_at || (pt.tanggal_pengajuan ? `${pt.tanggal_pengajuan}T08:00:00.000Z` : new Date().toISOString())
+            });
+          });
+        }
+
+        // F. Fetch Kas Transaksi Activities
+        const { data: trxData } = await supabaseAdmin
+          .from('transactions')
+          .select('id, tanggal, uraian, uang_masuk, uang_keluar, disetujui, created_at, created_by')
+          .order('id', { ascending: false })
+          .limit(100);
+
+        if (trxData && trxData.length > 0) {
+          trxData.forEach((tx) => {
+            const matchedUser = dbUsers.find(u => u.id === tx.created_by);
+            const email = matchedUser ? matchedUser.email : 'takmir@ugm.ac.id';
+            const role = matchedUser ? matchedUser.role : 'Takmir Muda';
+            const nominal = Number(tx.uang_keluar || tx.uang_masuk || 0);
+
+            dbDerivedLogs.push({
+              id: `trx-${tx.id}`,
+              user_email: email,
+              user_role: role,
+              action_type: 'CREATE',
+              action_title: `Input Kas: Rp ${nominal.toLocaleString('id-ID')} - ${tx.uraian || 'Transaksi'}`,
+              module: 'MASJID',
+              path: '/input',
+              details: {
+                uang_masuk: tx.uang_masuk,
+                uang_keluar: tx.uang_keluar,
+                uraian: tx.uraian
+              },
+              ip_address: 'Portal Web',
+              user_agent: 'Web Client',
+              created_at: tx.created_at || (tx.tanggal ? `${tx.tanggal}T08:00:00.000Z` : new Date().toISOString())
+            });
           });
         }
       } catch (err: any) {

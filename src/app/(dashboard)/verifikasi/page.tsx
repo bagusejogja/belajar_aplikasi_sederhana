@@ -99,6 +99,19 @@ export default function VerificationPage() {
      }
   };
 
+  const getSafeImage = (lnk: string) => {
+    if (!lnk) return '';
+    const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
+    if (gdriveMatch && gdriveMatch[1]) {
+      return `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
+    }
+    // Jika URL R2, bypass blokir ISP (Indihome/Telkomsel) lewat proxy backend
+    if (lnk.includes('.r2.dev') || lnk.includes('r2.cloudflarestorage.com')) {
+      return `/api/image-cors?url=${encodeURIComponent(lnk)}`;
+    }
+    return lnk;
+  };
+
   const renderFoto = (label: string, teks: string | null) => {
      if (!teks) return null;
      const links = teks.split(',').map(s => s.trim()).filter(Boolean);
@@ -108,11 +121,7 @@ export default function VerificationPage() {
            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">{label}</h4>
            <div className="flex flex-col gap-3">
               {links.map((lnk, idx) => {
-                  let imgSrc = lnk;
-                  const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-                  if (gdriveMatch && gdriveMatch[1]) {
-                     imgSrc = `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w800`;
-                  }
+                  const imgSrc = getSafeImage(lnk);
 
                   return (
                      <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm flex items-center justify-center">
@@ -121,9 +130,15 @@ export default function VerificationPage() {
                            alt="Lampiran" 
                            className="w-full h-auto max-h-64 object-contain" 
                            onError={(e) => {
+                              // Jika direct link gagal dimuat, fallback otomatis lewat proxy server
+                              const target = e.target as HTMLImageElement;
+                              if (!target.src.includes('/api/image-cors') && lnk.startsWith('http')) {
+                                 target.src = `/api/image-cors?url=${encodeURIComponent(lnk)}`;
+                                 return;
+                              }
                               // Gunakan SVG lokal sebagai placeholder jika gambar gagal dimuat (misal PDF)
-                              (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAydjRzMiA0IDQgNEgyIi8+PHBhdGggZD0iTTQgMjJWMm0xNiAyMHYtOG0wIDBoLTQiLz48L3N2Zz4=';
-                              (e.target as HTMLImageElement).className = 'w-16 h-16 object-contain opacity-50 m-6';
+                              target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAydjRzMiA0IDQgNEgyIi8+PHBhdGggZD0iTTQgMjJWMm0xNiAyMHYtOG0wIDBoLTQiLz48L3N2Zz4=';
+                              target.className = 'w-16 h-16 object-contain opacity-50 m-6';
                            }} 
                         />
                         <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
