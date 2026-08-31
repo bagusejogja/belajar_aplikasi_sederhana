@@ -559,49 +559,18 @@ export default function ApprovalTransferPage() {
                 </div>
               )}
 
-              {/* COLLAPSIBLE LAMPIRAN & FOTO DOKUMEN */}
-              {(() => {
-                const allFiles = getLampiranFiles(selectedData);
-                return (
-                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-white transition-all shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => setShowLampiran(!showLampiran)}
-                      className="w-full p-3 px-3.5 flex items-center justify-between bg-gray-50/90 hover:bg-gray-100/80 transition-colors text-left select-none"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-1 rounded-md ${allFiles.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
-                          <Paperclip size={13} />
-                        </div>
-                        <span className="text-xs font-bold text-gray-800">
-                          Lampiran & Foto Dokumen
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          allFiles.length > 0 
-                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' 
-                            : 'bg-gray-100 text-gray-400 border border-gray-200'
-                        }`}>
-                          {allFiles.length > 0 ? `${allFiles.length} berkas` : 'Tidak ada berkas'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">
-                        <span className="text-[11px] font-bold text-indigo-600">
-                          {showLampiran ? 'Sembunyikan' : 'Buka Lampiran'}
-                        </span>
-                        <div className="p-0.5 rounded bg-white border border-gray-200 text-gray-600">
-                          {showLampiran ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        </div>
-                      </div>
-                    </button>
-
-                    {showLampiran && (
-                      <div className="p-3.5 border-t border-gray-200 bg-gray-50/50 animate-in fade-in-50 duration-150">
-                        {renderLampiranThumbnails(selectedData)}
-                      </div>
-                    )}
+              {/* LAMPIRAN & FOTO DOKUMEN (LANGSUNG TAMPIL) */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden bg-white p-3.5 shadow-2xs">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="p-1 rounded-md bg-indigo-100 text-indigo-700">
+                    <Paperclip size={13} />
                   </div>
-                );
-              })()}
+                  <span className="text-xs font-bold text-gray-800">
+                    Lampiran &amp; Foto Dokumen
+                  </span>
+                </div>
+                {renderLampiranThumbnails(selectedData)}
+              </div>
 
             </div>
             
