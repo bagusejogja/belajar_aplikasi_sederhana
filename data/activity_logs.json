@@ -1,5 +1,50 @@
 [
   {
+    "id": "log-1788174456471-rpehf",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu APPROVAL TRANSFER",
+    "module": "UMUM",
+    "path": "/approval-transfer",
+    "details": {
+      "page_title": "APPROVAL TRANSFER"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T11:07:36.471Z"
+  },
+  {
+    "id": "log-1788174124726-n51kd",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu APPROVAL TRANSFER",
+    "module": "UMUM",
+    "path": "/approval-transfer",
+    "details": {
+      "page_title": "APPROVAL TRANSFER"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T11:02:04.726Z"
+  },
+  {
+    "id": "log-1788174089137-qan0m",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu APPROVAL TRANSFER",
+    "module": "UMUM",
+    "path": "/approval-transfer",
+    "details": {
+      "page_title": "APPROVAL TRANSFER"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T11:01:29.137Z"
+  },
+  {
     "id": "log-1788172494425-d3z54",
     "user_email": "bagusejogja@gmail.com",
     "user_role": "Admin",
