@@ -1,5 +1,20 @@
 [
   {
+    "id": "log-1788172494425-d3z54",
+    "user_email": "bagusejogja@gmail.com",
+    "user_role": "Admin",
+    "action_type": "PAGE_VIEW",
+    "action_title": "Membuka menu APPROVAL TRANSFER",
+    "module": "UMUM",
+    "path": "/approval-transfer",
+    "details": {
+      "page_title": "APPROVAL TRANSFER"
+    },
+    "ip_address": "::1",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "created_at": "2026-08-31T10:34:54.425Z"
+  },
+  {
     "id": "log-1788167178514-zza5y",
     "user_email": "bagusejogja@gmail.com",
     "user_role": "Admin",
