@@ -32,6 +32,15 @@ export default function ApprovalTransferPage() {
   const [catatanReviewer, setCatatanReviewer] = useState('');
   const [usersMap, setUsersMap] = useState<Record<string, string>>({});
 
+  const extractTransferTime = (item: any) => {
+    if (!item?.foto_bukti_transfer) return null;
+    const match = item.foto_bukti_transfer.match(/transfer_(\d{13})/);
+    if (match && match[1]) {
+      return new Date(parseInt(match[1])).toISOString();
+    }
+    return null;
+  };
+
   const formatFullDateTime = (isoDate: string | null | undefined, fallbackDate?: string | null) => {
     const target = isoDate || fallbackDate;
     if (!target) return '-';
@@ -45,7 +54,8 @@ export default function ApprovalTransferPage() {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
+        hour12: false,
+        timeZone: 'Asia/Jakarta'
       }).format(d) + ' WIB';
     } catch {
       return target;
@@ -538,93 +548,110 @@ export default function ApprovalTransferPage() {
             {/* Modal Body - 2 Column Clean Layout */}
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
               
-              {/* TOP BANNER: Nominal & Target Account */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Nominal Card */}
-                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/80 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Nominal Transfer</span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md">
-                      {selectedData.ref_jenis_belanja?.nama_belanja || 'Kas'}
+              {/* TOP BANNER: 2 CARD LAYOUT (Status & Log Pengajuan vs Nominal & Rekening) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Card Siklus Waktu & Pengaju */}
+                <div className="bg-gray-50/90 p-4 rounded-2xl border border-gray-200/80 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Status & Log Pengajuan</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
+                      selectedData.status === 'Disetujui' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      selectedData.status === 'Ditolak' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      ● {selectedData.status}
                     </span>
                   </div>
-                  <div className="font-black text-2xl text-emerald-700 font-mono tracking-tight mt-1">
-                    Rp {formatRp(selectedData.nominal)}
-                  </div>
-                </div>
 
-                {/* Rekening Card with 1-Click Copy */}
-                <div className="bg-indigo-50/70 p-3.5 rounded-xl border border-indigo-200/80 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 flex items-center gap-1">
-                      <Landmark size={12} /> Rekening Tujuan
-                    </span>
-                    <span className="font-bold text-xs text-indigo-900 bg-white px-2 py-0.5 rounded border border-indigo-200">
-                      {selectedData.master_rekening?.ref_bank?.nama_bank || 'Bank'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-xs text-gray-900 truncate">
-                        {selectedData.master_rekening?.nama_rekening || '-'}
+                  <div className="space-y-2.5 text-xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <User size={11} className="text-gray-400" /> Pembuat Pengajuan (User):
                       </p>
-                      <p className="font-mono font-bold text-sm text-indigo-900">
-                        {selectedData.master_rekening?.no_rekening || '-'}
+                      <p className="font-bold text-indigo-700 text-xs mt-0.5 break-all" title={selectedData.barang || usersMap[selectedData.created_by] || '-'}>
+                        {selectedData.barang || usersMap[selectedData.created_by] || '-'}
                       </p>
                     </div>
-                    {selectedData.master_rekening?.no_rekening && (
-                      <button 
-                        type="button" 
-                        onClick={() => handleCopyText(selectedData.master_rekening.no_rekening, 'modal-rek')} 
-                        className="h-8 px-2.5 bg-white hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg border border-indigo-200 transition-all text-xs inline-flex items-center gap-1 shrink-0 shadow-2xs"
-                        title="Salin Nomor Rekening"
-                      >
-                        {copiedRekId === 'modal-rek' ? (
-                          <>
-                            <Check size={13} className="text-emerald-600" />
-                            <span className="text-emerald-600">Disalin</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            <span>Salin</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <Clock size={11} className="text-gray-400" /> Waktu Diajukan (Presisi):
+                      </p>
+                      <p className="font-bold text-gray-800 font-mono text-[11px] mt-0.5">
+                        {formatFullDateTime(selectedData.created_at, selectedData.tanggal_pengajuan)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle2 size={11} className="text-emerald-500" /> Waktu Eksekusi Transfer:
+                      </p>
+                      <p className="font-bold text-emerald-700 font-mono text-[11px] mt-0.5">
+                        {selectedData.status === 'Disetujui' 
+                          ? formatFullDateTime(extractTransferTime(selectedData), selectedData.tanggal_transfer)
+                          : selectedData.status === 'Ditolak'
+                          ? 'Ditolak'
+                          : 'Menunggu Persetujuan'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* INFO SIKLUS PENGAJUAN & WAKTU LENGKAP */}
-              <div className="bg-gray-50/90 p-3.5 rounded-xl border border-gray-200/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                    <Clock size={11} className="text-gray-400" /> Waktu Diajukan (Detik):
-                  </span>
-                  <p className="font-bold text-gray-800 font-mono text-[11px] mt-0.5">
-                    {formatFullDateTime(selectedData.created_at, selectedData.tanggal_pengajuan)}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                    <User size={11} className="text-gray-400" /> Diajukan Oleh (Email):
-                  </span>
-                  <p className="font-bold text-indigo-700 text-xs mt-0.5 truncate" title={selectedData.barang || usersMap[selectedData.created_by] || '-'}>
-                    {selectedData.barang || usersMap[selectedData.created_by] || '-'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                    <CheckCircle2 size={11} className="text-emerald-600" /> Waktu Transfer:
-                  </span>
-                  <p className="font-bold text-emerald-700 font-mono text-[11px] mt-0.5">
-                    {selectedData.status === 'Disetujui' && selectedData.tanggal_transfer
-                      ? formatFullDateTime(selectedData.tanggal_transfer, selectedData.tanggal_transfer)
-                      : selectedData.status === 'Ditolak'
-                      ? 'Ditolak'
-                      : 'Menunggu Persetujuan'}
-                  </p>
+                {/* Card Nominal & Rekening Tujuan */}
+                <div className="bg-gradient-to-br from-indigo-50/80 via-white to-indigo-50/30 p-4 rounded-2xl border border-indigo-200/80 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">Nominal Transfer</span>
+                      <span className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 text-[10px] font-bold rounded-md border border-indigo-200">
+                        {selectedData.ref_jenis_belanja?.nama_belanja || 'Kas'}
+                      </span>
+                    </div>
+                    <p className="text-2xl font-black text-indigo-700 font-mono tracking-tight">
+                      Rp {formatRp(selectedData.nominal)}
+                    </p>
+                  </div>
+
+                  {/* Rekening Tujuan Box */}
+                  <div className="pt-2.5 border-t border-indigo-100/80">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                        <Landmark size={11} className="text-indigo-600" /> Rekening Tujuan:
+                      </span>
+                      <span className="font-bold text-[10px] text-indigo-900 bg-white px-1.5 py-0.2 rounded border border-indigo-200">
+                        {selectedData.master_rekening?.ref_bank?.nama_bank || 'Bank'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-xl border border-indigo-100">
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs text-gray-900 truncate">
+                          {selectedData.master_rekening?.nama_rekening || '-'}
+                        </p>
+                        <p className="font-mono font-bold text-xs text-indigo-900">
+                          {selectedData.master_rekening?.no_rekening || '-'}
+                        </p>
+                      </div>
+                      {selectedData.master_rekening?.no_rekening && (
+                        <button 
+                          type="button" 
+                          onClick={() => handleCopyText(selectedData.master_rekening.no_rekening, 'modal-rek')} 
+                          className="h-7 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg border border-indigo-200 transition-all text-[11px] inline-flex items-center gap-1 shrink-0 shadow-2xs"
+                          title="Salin Nomor Rekening"
+                        >
+                          {copiedRekId === 'modal-rek' ? (
+                            <>
+                              <Check size={11} className="text-emerald-600" />
+                              <span className="text-emerald-600">Disalin</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={11} />
+                              <span>Salin</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
