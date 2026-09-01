@@ -69,7 +69,17 @@ export default function ApprovalTransferPage() {
       ]);
         
       if (transferRes.error) throw transferRes.error;
-      setListData(transferRes.data || []);
+      
+      const nowMs = Date.now();
+      const activeItems = (transferRes.data || []).filter((item: any) => {
+        if (statusFilter !== 'Diajukan') return true;
+        const itemDate = item.created_at ? new Date(item.created_at).getTime() : (item.tanggal_pengajuan ? new Date(item.tanggal_pengajuan).getTime() : 0);
+        if (!itemDate) return true;
+        // Hanya tampilkan jika waktu tayang sudah tiba (sekarang >= waktu pengajuan)
+        return itemDate <= nowMs;
+      });
+
+      setListData(activeItems);
 
       if (usersRes.data) {
         const map: Record<string, string> = {};

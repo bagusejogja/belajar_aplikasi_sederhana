@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit, UserCheck, User, Mail } from 'lucide-react';
+import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit, UserCheck, User, Mail, Clock, Calendar } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
 import { RefPersonel, RefJenisBelanja } from '@/types';
@@ -15,6 +15,8 @@ export default function InputPage() {
   const [listRekening, setListRekening] = useState<any[]>([]);
   const [listApprovers, setListApprovers] = useState<any[]>([]);
   const [selectedApprover, setSelectedApprover] = useState<any>({ value: 'ALL', label: '🌟 Kirim ke Semua Approver / Admin' });
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [jadwalWaktu, setJadwalWaktu] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -208,9 +210,17 @@ export default function InputPage() {
         const barangUrl = attachments.barang.files.length > 0 ? await uploadMultipleFiles(attachments.barang.files) : attachments.barang.url;
 
         if (tipeTransaksi === 'Transfer') {
+           const createdAtIso = isScheduled && jadwalWaktu 
+             ? new Date(jadwalWaktu).toISOString() 
+             : new Date().toISOString();
+
+           const tanggalPengajuan = isScheduled && jadwalWaktu
+             ? jadwalWaktu.split('T')[0]
+             : formData.tanggal;
+
            const { error } = await supabase.from('pengajuan_transfer').insert([
               {
-                 tanggal_pengajuan: formData.tanggal,
+                 tanggal_pengajuan: tanggalPengajuan,
                  kategori_belanja_id: formData.jenis_belanja_id ? formData.jenis_belanja_id.value : null,
                  rek_tujuan_id: formData.rek_tujuan_id.value,
                  nominal: nominalAngka,
@@ -221,7 +231,8 @@ export default function InputPage() {
                  nota_url: notaUrl || null,
                  foto_kegiatan: kegiatanUrl || null,
                  foto_barang: barangUrl || null,
-                 created_by: activeUserId
+                 created_by: activeUserId,
+                 created_at: createdAtIso
               }
            ]);
            if (error) throw error;
@@ -339,6 +350,8 @@ export default function InputPage() {
 
         toast.success(`Data ${tipeTransaksi} berhasil disimpan oleh ${activeUserEmail}!`);
         setFormData({ tanggal: new Date().toISOString().split('T')[0], jenis_belanja_id: null, personel_id: null, rek_tujuan_id: null, toko: '', uraian: '', nominal: '', catatan: '' });
+        setIsScheduled(false);
+        setJadwalWaktu('');
         setAttachments({
            nota: { files: [], url: '' }, kegiatan: { files: [], url: '' },
            barang: { files: [], url: '' }, transfer: { files: [], url: '' }
@@ -423,7 +436,7 @@ export default function InputPage() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 md:p-6 overflow-hidden">
-         <form onSubmit={handleSave} className="space-y-5">
+         <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-0.5">{tipeTransaksi === 'Transfer' ? 'Tgl Pengajuan' : 'Tgl Transaksi'}</label>
@@ -468,38 +481,82 @@ export default function InputPage() {
                </div>
             </div>
 
+            {/* Panel Pengaturan Khusus Transfer (Compact 2-Kolom) */}
             {tipeTransaksi === 'Transfer' && (
-               <div className="space-y-1.5 p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100">
-                  <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest px-0.5 flex items-center gap-1.5">
-                     <Mail size={12} className="text-indigo-600" />
-                     Kirim Notifikasi Email Persetujuan Ke (Role Approval):
-                  </label>
-                  <Select 
-                     options={[
-                        ...listApprovers.map(a => ({
-                           value: a.email,
-                           label: `👤 ${a.email} (Approval)`
-                        })),
-                        { value: 'ALL', label: `🌟 Kirim ke Semua Petugas Approval (${listApprovers.length} Petugas)` }
-                     ]} 
-                     value={selectedApprover} 
-                     onChange={(val: any) => {
-                        setSelectedApprover(val);
-                        if (typeof window !== 'undefined' && val?.value) {
-                           localStorage.setItem('preferred_approver_email', val.value);
-                        }
-                     }} 
-                     className="text-xs" 
-                     styles={{ 
-                        control: (b) => ({ ...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#c7d2fe', background: '#ffffff', fontSize: '0.75rem', fontWeight: '600' }), 
-                        valueContainer: (b) => ({ ...b, padding: '0 8px' }) 
-                     }} 
-                  />
-                  <p className="text-[10px] text-indigo-600 font-medium px-0.5">
-                     {selectedApprover?.value === 'ALL'
-                        ? `Notifikasi email otomatis akan dikirim ke seluruh petugas approval (${listApprovers.map(a => a.email).join(', ') || 'Approval'}).`
-                        : `Notifikasi email otomatis akan dikirim khusus ke ${selectedApprover?.value}.`}
-                  </p>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                  <div className="space-y-1">
+                     <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Mail size={12} className="text-indigo-600" />
+                        Notifikasi Approval Ke:
+                     </label>
+                     <Select 
+                        options={[
+                           ...listApprovers.map(a => ({
+                              value: a.email,
+                              label: `👤 ${a.email}`
+                           })),
+                           { value: 'ALL', label: `🌟 Kirim ke Semua (${listApprovers.length} Petugas)` }
+                        ]} 
+                        value={selectedApprover} 
+                        onChange={(val: any) => {
+                           setSelectedApprover(val);
+                           if (typeof window !== 'undefined' && val?.value) {
+                              localStorage.setItem('preferred_approver_email', val.value);
+                           }
+                        }} 
+                        className="text-xs" 
+                        styles={{ 
+                           control: (b) => ({ ...b, minHeight: '34px', height: '34px', borderRadius: '0.5rem', borderColor: '#c7d2fe', background: '#ffffff', fontSize: '0.75rem', fontWeight: '600' }), 
+                           valueContainer: (b) => ({ ...b, padding: '0 8px' }) 
+                        }} 
+                     />
+                  </div>
+
+                  <div className="space-y-1">
+                     <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
+                           <Clock size={12} className="text-indigo-600" />
+                           Waktu Tayang di Approval:
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer text-[10px] text-indigo-600 font-bold select-none hover:text-indigo-800">
+                           <input 
+                              type="checkbox" 
+                              checked={isScheduled} 
+                              onChange={(e) => {
+                                 const checked = e.target.checked;
+                                 setIsScheduled(checked);
+                                 if (checked && !jadwalWaktu) {
+                                    // Default ke waktu sekarang jika baru dicentang
+                                    const now = new Date();
+                                    const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+                                    setJadwalWaktu(localIso);
+                                 }
+                              }} 
+                              className="rounded text-indigo-600 focus:ring-indigo-500 w-3 h-3 cursor-pointer"
+                           />
+                           Jadwalkan Khusus
+                        </label>
+                     </div>
+
+                     {isScheduled ? (
+                        <input 
+                           type="datetime-local" 
+                           step="1"
+                           value={jadwalWaktu} 
+                           onChange={(e) => setJadwalWaktu(e.target.value)} 
+                           required={isScheduled}
+                           className="w-full h-[34px] px-2.5 bg-white border border-indigo-300 rounded-lg outline-none focus:ring-2 ring-indigo-500/20 font-bold text-xs text-indigo-900"
+                        />
+                     ) : (
+                        <div className="h-[34px] px-3 bg-white/90 border border-indigo-100 rounded-lg flex items-center justify-between text-xs text-indigo-700">
+                           <span className="font-semibold text-[11px] flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Langsung Tayang (Sekarang)
+                           </span>
+                           <span className="text-[10px] text-gray-400 font-medium">Default</span>
+                        </div>
+                     )}
+                  </div>
                </div>
             )}
 
