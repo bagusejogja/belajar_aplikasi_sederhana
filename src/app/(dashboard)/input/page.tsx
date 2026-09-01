@@ -86,9 +86,17 @@ export default function InputPage() {
         
         if (usersRes.data) {
           const approvers = usersRes.data.filter((u: any) => 
-            ['Admin', 'Approval', 'Bendahara', 'Verifikator'].includes(u.role)
+            u.role?.toLowerCase() === 'approval'
           );
           setListApprovers(approvers);
+          if (approvers.length > 0) {
+            // Default dipilih ke salah satu petugas Approval
+            const defaultUser = approvers.find((u: any) => u.email?.includes('dokumen')) || approvers[0];
+            setSelectedApprover({
+              value: defaultUser.email,
+              label: `👤 ${defaultUser.email} (Approval)`
+            });
+          }
         }
      } catch (error) {
         console.error("Gagal menarik data Master:", error);
@@ -456,15 +464,15 @@ export default function InputPage() {
                <div className="space-y-1.5 p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100">
                   <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest px-0.5 flex items-center gap-1.5">
                      <Mail size={12} className="text-indigo-600" />
-                     Kirim Notifikasi Email Persetujuan Ke:
+                     Kirim Notifikasi Email Persetujuan Ke (Role Approval):
                   </label>
                   <Select 
                      options={[
-                        { value: 'ALL', label: `🌟 Kirim ke Semua Approver / Admin (${listApprovers.length} Petugas)` },
                         ...listApprovers.map(a => ({
                            value: a.email,
-                           label: `👤 ${a.email} (${a.role})`
-                        }))
+                           label: `👤 ${a.email} (Approval)`
+                        })),
+                        { value: 'ALL', label: `🌟 Kirim ke Semua Petugas Approval (${listApprovers.length} Petugas)` }
                      ]} 
                      value={selectedApprover} 
                      onChange={(val: any) => setSelectedApprover(val)} 
@@ -476,8 +484,8 @@ export default function InputPage() {
                   />
                   <p className="text-[10px] text-indigo-600 font-medium px-0.5">
                      {selectedApprover?.value === 'ALL'
-                        ? `Notifikasi email otomatis akan dikirim ke seluruh admin (${listApprovers.map(a => a.email).join(', ') || 'Admin'}).`
-                        : `Notifikasi email otomatis hanya akan dikirim khusus ke ${selectedApprover?.value}.`}
+                        ? `Notifikasi email otomatis akan dikirim ke seluruh petugas approval (${listApprovers.map(a => a.email).join(', ') || 'Approval'}).`
+                        : `Notifikasi email otomatis akan dikirim khusus ke ${selectedApprover?.value}.`}
                   </p>
                </div>
             )}
