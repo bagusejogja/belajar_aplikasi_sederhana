@@ -89,12 +89,20 @@ export default function InputPage() {
             u.role?.toLowerCase() === 'approval'
           );
           setListApprovers(approvers);
-          if (approvers.length > 0) {
-            // Default dipilih ke salah satu petugas Approval
-            const defaultUser = approvers.find((u: any) => u.email?.includes('dokumen')) || approvers[0];
+          
+          // Pilihan default dinamis: Mengingat pilihan terakhir user dari localStorage, atau default ke 'ALL'
+          const savedPref = typeof window !== 'undefined' ? localStorage.getItem('preferred_approver_email') : null;
+          const matchedPrefUser = savedPref && savedPref !== 'ALL' ? approvers.find((u: any) => u.email === savedPref) : null;
+
+          if (matchedPrefUser) {
             setSelectedApprover({
-              value: defaultUser.email,
-              label: `👤 ${defaultUser.email} (Approval)`
+              value: matchedPrefUser.email,
+              label: `👤 ${matchedPrefUser.email} (Approval)`
+            });
+          } else {
+            setSelectedApprover({
+              value: 'ALL',
+              label: `🌟 Kirim ke Semua Petugas Approval (${approvers.length} Petugas)`
             });
           }
         }
@@ -475,7 +483,12 @@ export default function InputPage() {
                         { value: 'ALL', label: `🌟 Kirim ke Semua Petugas Approval (${listApprovers.length} Petugas)` }
                      ]} 
                      value={selectedApprover} 
-                     onChange={(val: any) => setSelectedApprover(val)} 
+                     onChange={(val: any) => {
+                        setSelectedApprover(val);
+                        if (typeof window !== 'undefined' && val?.value) {
+                           localStorage.setItem('preferred_approver_email', val.value);
+                        }
+                     }} 
                      className="text-xs" 
                      styles={{ 
                         control: (b) => ({ ...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#c7d2fe', background: '#ffffff', fontSize: '0.75rem', fontWeight: '600' }), 
