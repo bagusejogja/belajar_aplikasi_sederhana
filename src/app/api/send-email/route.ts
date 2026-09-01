@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { to, subject, html, text } = body;
+    const { to, subject, html, text, attachments } = body;
 
     if (!to || !subject || (!html && !text)) {
       return NextResponse.json(
@@ -42,6 +42,7 @@ export async function POST(req: Request) {
       subject,
       text: text || '',
       html: html || '',
+      attachments: Array.isArray(attachments) ? attachments : undefined,
     });
 
     return NextResponse.json({ success: true, messageId: info.messageId });

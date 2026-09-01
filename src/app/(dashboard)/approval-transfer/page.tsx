@@ -169,31 +169,48 @@ export default function ApprovalTransferPage() {
           body: JSON.stringify({
             to: targetEmail,
             subject: `[Pengajuan Transfer ${status_update}] - Rp ${formatRp(selectedData.nominal)} (${selectedData.kegiatan})`,
+            attachments: (status_update === 'Disetujui' && buktiUrl) ? [
+              { filename: `Bukti_Transfer_${selectedData.id}.jpg`, path: buktiUrl }
+            ] : undefined,
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px;">
-                <h2 style="color: ${status_update === 'Disetujui' ? '#059669' : '#dc2626'}; margin-top: 0;">
-                  Pengajuan Transfer ${status_update.toUpperCase()}
-                </h2>
-                <p>Halo,</p>
-                <p>Pengajuan transfer kas yang Anda ajukan telah <strong>${status_update}</strong> oleh bagian keuangan.</p>
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 14px; background: #ffffff;">
+                <div style="background: ${status_update === 'Disetujui' ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)' : 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)'}; padding: 16px; border-radius: 10px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+                  <h2 style="margin: 0; font-size: 18px;">Pengajuan Transfer ${status_update.toUpperCase()}</h2>
+                  <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9;">Sistem Notifikasi Kas & Verifikasi</p>
+                </div>
+                <p style="font-size: 14px; color: #334155;">Halo,</p>
+                <p style="font-size: 13px; color: #475569;">Pengajuan transfer kas yang Anda ajukan telah <strong>${status_update.toLowerCase()}</strong> oleh bagian bendahara/keuangan.</p>
                 
-                <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-                  <tr><td style="padding: 6px 0; color: #6b7280;">Kegiatan:</td><td style="padding: 6px 0; font-weight: bold;">${selectedData.kegiatan}</td></tr>
-                  <tr><td style="padding: 6px 0; color: #6b7280;">Nominal:</td><td style="padding: 6px 0; font-weight: bold; color: #4338ca;">Rp ${formatRp(selectedData.nominal)}</td></tr>
-                  <tr><td style="padding: 6px 0; color: #6b7280;">Rekening Tujuan:</td><td style="padding: 6px 0; font-weight: bold;">${selectedData.master_rekening?.nama_rekening} (${selectedData.master_rekening?.ref_bank?.nama_bank} - ${selectedData.master_rekening?.no_rekening})</td></tr>
-                  ${status_update === 'Ditolak' ? `<tr><td style="padding: 6px 0; color: #dc2626; font-weight: bold;">Alasan Penolakan:</td><td style="padding: 6px 0; color: #dc2626; font-weight: bold;">${catatanReviewer.trim()}</td></tr>` : ''}
+                <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
+                  <tr><td style="padding: 7px 0; color: #64748b; width: 35%; border-bottom: 1px solid #f1f5f9;">Kegiatan / Uraian:</td><td style="padding: 7px 0; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${selectedData.kegiatan}</td></tr>
+                  <tr style="background: #f8fafc;"><td style="padding: 7px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Nominal:</td><td style="padding: 7px 8px; font-weight: bold; color: #4338ca; font-size: 15px; border-bottom: 1px solid #f1f5f9;">Rp ${formatRp(selectedData.nominal)}</td></tr>
+                  <tr><td style="padding: 7px 0; color: #64748b; border-bottom: 1px solid #f1f5f9;">Rekening Tujuan:</td><td style="padding: 7px 0; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${selectedData.master_rekening?.nama_rekening} (${selectedData.master_rekening?.ref_bank?.nama_bank || ''} - ${selectedData.master_rekening?.no_rekening})</td></tr>
+                  ${status_update === 'Disetujui' ? `<tr style="background: #f8fafc;"><td style="padding: 7px 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Tanggal Transfer:</td><td style="padding: 7px 8px; font-weight: bold; color: #059669; border-bottom: 1px solid #f1f5f9;">${tglTransfer}</td></tr>` : ''}
+                  ${catatanReviewer.trim() ? `<tr><td style="padding: 7px 0; color: #64748b; border-bottom: 1px solid #f1f5f9;">Catatan Reviewer:</td><td style="padding: 7px 0; color: ${status_update === 'Ditolak' ? '#dc2626' : '#1e293b'}; font-weight: bold; border-bottom: 1px solid #f1f5f9;">${catatanReviewer.trim()}</td></tr>` : ''}
                 </table>
 
+                ${status_update === 'Disetujui' && buktiUrl ? `
+                  <div style="margin: 20px 0; padding: 16px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; text-align: center;">
+                    <p style="font-weight: bold; color: #1e293b; margin: 0 0 12px 0; font-size: 13px;">📸 Bukti Transfer Resmi Telah Diunggah:</p>
+                    <div style="max-width: 420px; margin: 0 auto; border-radius: 8px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.06); background: #ffffff;">
+                      <img src="${buktiUrl}" alt="Bukti Transfer" style="width: 100%; display: block; max-height: 380px; object-fit: contain;" />
+                    </div>
+                    <div style="margin-top: 14px;">
+                      <a href="${buktiUrl}" target="_blank" style="display: inline-block; padding: 9px 18px; background: #059669; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 12px;">Buka Bukti Transfer Resolusi Penuh</a>
+                    </div>
+                  </div>
+                ` : ''}
+
                 ${status_update === 'Ditolak' ? `
-                  <div style="background-color: #fff1f2; padding: 12px; border-radius: 8px; border-left: 4px solid #f43f5e; margin: 16px 0;">
+                  <div style="background-color: #fff1f2; padding: 14px; border-radius: 8px; border-left: 4px solid #f43f5e; margin: 16px 0;">
                     <p style="margin: 0; color: #9f1239; font-size: 13px;">
-                      <strong>Perhatian:</strong> Silakan buka menu <em>Rekap Transfer</em> di aplikasi, lalu klik tombol <strong>"Edit & Ajukan Ulang"</strong> untuk memperbaiki dan mengirimkan kembali pengajuan Anda.
+                      <strong>Perhatian:</strong> Silakan buka menu <em>Rekap Transfer</em> di aplikasi, lalu klik tombol <strong>"Perbaiki"</strong> untuk merevisi dan mengajukan ulang pengajuan Anda.
                     </p>
                   </div>
                 ` : ''}
                 
-                <p style="color: #6b7280; font-size: 12px; margin-top: 20px; border-top: 1px solid #f3f4f6; pt: 10px;">
-                  Pemberitahuan Otomatis Sistem Apps Bersama
+                <p style="color: #94a3b8; font-size: 11px; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 12px; text-align: center;">
+                  Pemberitahuan Otomatis Sistem Verifikasi Kas & Transfer
                 </p>
               </div>
             `
