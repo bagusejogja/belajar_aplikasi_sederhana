@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit, UserCheck, User } from 'lucide-react';
+import { Save, Loader2, Info, ImagePlus, UploadCloud, X, Send, FileEdit, UserCheck, User, Mail } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
 import { RefPersonel, RefJenisBelanja } from '@/types';
@@ -13,6 +13,8 @@ export default function InputPage() {
   const [listPersonel, setListPersonel] = useState<RefPersonel[]>([]);
   const [listBelanja, setListBelanja] = useState<RefJenisBelanja[]>([]);
   const [listRekening, setListRekening] = useState<any[]>([]);
+  const [listApprovers, setListApprovers] = useState<any[]>([]);
+  const [selectedApprover, setSelectedApprover] = useState<any>({ value: 'ALL', label: '🌟 Kirim ke Semua Approver / Admin' });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -71,15 +73,23 @@ export default function InputPage() {
 
   const fetchReferences = async () => {
      try {
-        const [belanjaRes, personelRes, rekRes] = await Promise.all([
+        const [belanjaRes, personelRes, rekRes, usersRes] = await Promise.all([
            supabase.from('ref_jenis_belanja').select('*').eq('status', 'Aktif').order('id', { ascending: true }),
            supabase.from('ref_personel').select('*').eq('status', 'Aktif').order('id', { ascending: true }),
-           supabase.from('master_rekening').select('*, ref_bank(nama_bank)').order('nama_rekening', { ascending: true })
+           supabase.from('master_rekening').select('*, ref_bank(nama_bank)').order('nama_rekening', { ascending: true }),
+           supabase.from('app_users').select('id, email, role')
         ]);
 
         if (belanjaRes.data) setListBelanja(belanjaRes.data as any);
         if (personelRes.data) setListPersonel(personelRes.data as any);
         if (rekRes.data) setListRekening(rekRes.data as any);
+        
+        if (usersRes.data) {
+          const approvers = usersRes.data.filter((u: any) => 
+            ['Admin', 'Approval', 'Bendahara', 'Verifikator'].includes(u.role)
+          );
+          setListApprovers(approvers);
+        }
      } catch (error) {
         console.error("Gagal menarik data Master:", error);
      } finally {
@@ -199,6 +209,73 @@ export default function InputPage() {
               }
            ]);
            if (error) throw error;
+
+           // Kirim Notifikasi Email Otomatis ke Approver / Bendahara
+           try {
+             let targetEmails: string[] = [];
+             if (!selectedApprover || selectedApprover.value === 'ALL') {
+               targetEmails = listApprovers.map(a => a.email).filter(Boolean);
+             } else {
+               targetEmails = [selectedApprover.value];
+             }
+
+             if (targetEmails.length > 0) {
+               const rekObj = listRekening.find(r => r.rek_id === formData.rek_tujuan_id?.value);
+               const rekInfo = rekObj ? `${rekObj.nama_rekening} - ${rekObj.ref_bank?.nama_bank || ''} (${rekObj.no_rekening})` : 'Rekening Kas';
+               
+               await fetch('/api/send-email', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                   to: targetEmails,
+                   subject: `🔔 Pengajuan Transfer Baru: Rp ${nominalAngka.toLocaleString('id-ID')} - ${formData.uraian || 'Transfer Dana'}`,
+                   html: `
+                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+                       <div style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); padding: 16px; border-radius: 8px; color: #ffffff; text-align: center; margin-bottom: 20px;">
+                         <h2 style="margin: 0; font-size: 18px;">Permohonan Transfer Baru Masuk</h2>
+                         <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9;">Sistem Notifikasi Pengajuan Kas</p>
+                       </div>
+                       <p style="font-size: 14px; color: #334155;">Halo Bapak/Ibu Petugas Approval & Bendahara,</p>
+                       <p style="font-size: 13px; color: #475569;">Terdapat permohonan transfer kas baru yang memerlukan persetujuan dan eksekusi transfer Anda:</p>
+                       <table style="width: 100%; font-size: 13px; border-collapse: collapse; margin: 15px 0;">
+                         <tr>
+                           <td style="padding: 8px; color: #64748b; width: 35%; border-bottom: 1px solid #f1f5f9;">Diajukan Oleh</td>
+                           <td style="padding: 8px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${activeUserEmail || 'Pengaju'}</td>
+                         </tr>
+                         <tr style="background: #f8fafc;">
+                           <td style="padding: 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Tanggal Pengajuan</td>
+                           <td style="padding: 8px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${formData.tanggal}</td>
+                         </tr>
+                         <tr>
+                           <td style="padding: 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Kegiatan / Uraian</td>
+                           <td style="padding: 8px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${formData.uraian}</td>
+                         </tr>
+                         <tr style="background: #f8fafc;">
+                           <td style="padding: 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Nominal Transfer</td>
+                           <td style="padding: 8px; font-weight: bold; color: #4f46e5; font-size: 15px; border-bottom: 1px solid #f1f5f9;">Rp ${nominalAngka.toLocaleString('id-ID')}</td>
+                         </tr>
+                         <tr>
+                           <td style="padding: 8px; color: #64748b; border-bottom: 1px solid #f1f5f9;">Rekening Tujuan</td>
+                           <td style="padding: 8px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #f1f5f9;">${rekInfo}</td>
+                         </tr>
+                         ${formData.catatan ? `
+                         <tr style="background: #fef3c7;">
+                           <td style="padding: 8px; color: #92400e; border-bottom: 1px solid #fde68a;">Catatan Tambahan</td>
+                           <td style="padding: 8px; color: #92400e; font-weight: 500; border-bottom: 1px solid #fde68a;">${formData.catatan}</td>
+                         </tr>` : ''}
+                       </table>
+                       <div style="text-align: center; margin-top: 25px;">
+                         <a href="http://localhost:3000/approval-transfer" style="display: inline-block; padding: 11px 22px; background: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px;">Buka Halaman Approval Transfer</a>
+                       </div>
+                       <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 20px;">Email ini dikirim otomatis oleh Sistem Verifikasi Online.</p>
+                     </div>
+                   `
+                 })
+               });
+             }
+           } catch (emailErr) {
+             console.warn('Gagal mengirim notifikasi email pengajuan:', emailErr);
+           }
         } else {
            if (!selectedBelanja) throw new Error("Jenis Belanja tidak valid");
            const transferUrl = attachments.transfer.files.length > 0 ? await uploadMultipleFiles(attachments.transfer.files) : attachments.transfer.url;
@@ -374,6 +451,36 @@ export default function InputPage() {
                   </div>
                </div>
             </div>
+
+            {tipeTransaksi === 'Transfer' && (
+               <div className="space-y-1.5 p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                  <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest px-0.5 flex items-center gap-1.5">
+                     <Mail size={12} className="text-indigo-600" />
+                     Kirim Notifikasi Email Persetujuan Ke:
+                  </label>
+                  <Select 
+                     options={[
+                        { value: 'ALL', label: `🌟 Kirim ke Semua Approver / Admin (${listApprovers.length} Petugas)` },
+                        ...listApprovers.map(a => ({
+                           value: a.email,
+                           label: `👤 ${a.email} (${a.role})`
+                        }))
+                     ]} 
+                     value={selectedApprover} 
+                     onChange={(val: any) => setSelectedApprover(val)} 
+                     className="text-xs" 
+                     styles={{ 
+                        control: (b) => ({ ...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#c7d2fe', background: '#ffffff', fontSize: '0.75rem', fontWeight: '600' }), 
+                        valueContainer: (b) => ({ ...b, padding: '0 8px' }) 
+                     }} 
+                  />
+                  <p className="text-[10px] text-indigo-600 font-medium px-0.5">
+                     {selectedApprover?.value === 'ALL'
+                        ? `Notifikasi email otomatis akan dikirim ke seluruh admin (${listApprovers.map(a => a.email).join(', ') || 'Admin'}).`
+                        : `Notifikasi email otomatis hanya akan dikirim khusus ke ${selectedApprover?.value}.`}
+                  </p>
+               </div>
+            )}
 
             <div className="space-y-2 pt-2 border-t border-gray-100">
                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5"><UploadCloud size={14} className="text-indigo-600"/> Lampiran Foto Bukti</label>

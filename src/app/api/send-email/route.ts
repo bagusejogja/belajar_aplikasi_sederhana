@@ -37,8 +37,8 @@ export async function POST(req: Request) {
     });
 
     const info = await transporter.sendMail({
-      from: `"Notifikasi Pengajuan Transfer" <${user}>`,
-      to,
+      from: `"Notifikasi Kas & Transfer" <${user}>`,
+      to: Array.isArray(to) ? to.join(', ') : to,
       subject,
       text: text || '',
       html: html || '',
