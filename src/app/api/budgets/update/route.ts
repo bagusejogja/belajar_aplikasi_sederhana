@@ -47,6 +47,43 @@ export async function POST(request: Request) {
     if (approval_pagu_indikatif_anggaran_rumus !== undefined) updatePayload.approval_pagu_indikatif_anggaran_rumus = approval_pagu_indikatif_anggaran_rumus;
     if (ai_reason !== undefined) updatePayload.ai_reason = ai_reason;
 
+    // Hitung Approved Fields jika ada perubahan rumus atau nilai dasar
+    if (
+      approval_pagu_indikatif_anggaran_rumus !== undefined ||
+      vol !== undefined ||
+      tarif !== undefined ||
+      total !== undefined
+    ) {
+      const targetApprRumus = approval_pagu_indikatif_anggaran_rumus !== undefined ? approval_pagu_indikatif_anggaran_rumus : null;
+      let volAppr = volNum;
+      let tarifAppr = tarifNum;
+      let totalAppr = totalNum;
+      let penyesuaian = 0;
+
+      if (targetApprRumus) {
+        // Parse approval formula jika ada
+        const matchRes = typeof targetApprRumus === 'string' ? targetApprRumus.match(/"hasil";a:2:\{([^}]+)\}/) : null;
+        let qtyStr = '';
+        if (matchRes) {
+          const regex = /i:(\d+);s:\d+:"([^"]*)"/g;
+          let m;
+          while ((m = regex.exec(matchRes[1])) !== null) {
+            if (m[1] === '0') qtyStr = m[2];
+          }
+        }
+        if (qtyStr) {
+          volAppr = parseFloat(qtyStr) || 0;
+          totalAppr = volAppr * tarifAppr;
+          penyesuaian = totalAppr - totalNum;
+        }
+      }
+
+      updatePayload.volumen_approved = volAppr;
+      updatePayload.tarif_approved = tarifAppr;
+      updatePayload.total_approve = totalAppr;
+      updatePayload.nominal_penyesuaian = penyesuaian;
+    }
+
     // Jika status dikirim secara eksplisit (misal dari Combo Box Status), langsung simpan!
     if (kunci !== undefined) updatePayload.kunci = kunci;
     if (custom_status !== undefined) updatePayload.custom_status = custom_status;
@@ -74,7 +111,7 @@ export async function POST(request: Request) {
               kunci: 'Y',
               kunci_by: 'RULE',
               custom_status: ruleMatch.custom_status || null,
-              ai_reason: 'Match exact rule dari Master Aturan',
+              ai_reason: null, // Nullkan ai_reason saat match rule
             };
           } else {
             const aiResult = await analyzeBudgetWithAI(updatedBudget);

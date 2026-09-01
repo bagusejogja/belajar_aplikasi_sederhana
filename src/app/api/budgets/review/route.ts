@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         kunci_by: 'RULE',
         custom_status: ruleMatch.custom_status || null,
         ai_confidence: null,
-        ai_reason: 'Match exact rule dari Master Aturan',
+        ai_reason: null,
       };
     } else {
       // 2. AI Review Process

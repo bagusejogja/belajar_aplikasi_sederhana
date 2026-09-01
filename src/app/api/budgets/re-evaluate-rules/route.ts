@@ -62,7 +62,7 @@ export async function POST() {
             kunci: 'Y',
             kunci_by: 'RULE',
             custom_status: ruleMatch.custom_status || 'Wajib Ada',
-            ai_reason: 'Match exact rule dari Master Aturan'
+            ai_reason: null
           });
         }
       } else {
