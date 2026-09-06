@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Wand2, Upload, FileText, Copy, Check, Sparkles, 
   RefreshCw, FileCheck, Info, Layers, ChevronRight,
   Clipboard, Trash2, Edit3, Settings2, Sliders, ArrowRight,
-  Building, Calendar, Hash, Tag, UserCheck, DollarSign
+  Building, Calendar, Hash, Tag, UserCheck, DollarSign,
+  Code2, PlusCircle, RotateCcw, BookmarkCheck
 } from 'lucide-react';
 import { convertSuratToTextWithAI } from '@/app/actions/ai-scan';
 import toast from 'react-hot-toast';
 
-type DynamicFormatKey = 'standar' | 'menindaklanjuti' | 'berdasarkan' | 'sehubungan' | 'memo_singkat' | 'lengkap';
+type DynamicFormatKey = 'standar' | 'menindaklanjuti' | 'berdasarkan' | 'sehubungan' | 'memo_singkat' | 'lengkap' | 'kustom';
 
 interface EditableSuratData {
   no_surat: string;
@@ -20,6 +21,8 @@ interface EditableSuratData {
   yth: string;
   nominal_usulan?: string | number;
 }
+
+const DEFAULT_CUSTOM_TEMPLATE = "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal], bersama ini kami sampaikan...";
 
 export default function AIConvertSuratPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -32,6 +35,9 @@ export default function AIConvertSuratPage() {
 
   // Dynamic Sentence Generator State
   const [selectedFormat, setSelectedFormat] = useState<DynamicFormatKey>('standar');
+  const [customTemplate, setCustomTemplate] = useState<string>(DEFAULT_CUSTOM_TEMPLATE);
+  const customTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   const [editableData, setEditableData] = useState<EditableSuratData>({
     no_surat: '',
     tanggal_surat: '',
@@ -40,6 +46,21 @@ export default function AIConvertSuratPage() {
     yth: '',
     nominal_usulan: ''
   });
+
+  // Load custom template from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('custom_surat_template');
+      if (saved) setCustomTemplate(saved);
+    }
+  }, []);
+
+  const handleUpdateCustomTemplate = (val: string) => {
+    setCustomTemplate(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('custom_surat_template', val);
+    }
+  };
 
   // Listener for Image Paste (Ctrl+V) - preserved & enhanced
   useEffect(() => {
@@ -191,6 +212,52 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
     setTimeout(() => setCopiedField(null), 2500);
   };
 
+  // Insert tag into custom template at cursor position
+  const insertTagToTemplate = (tag: string) => {
+    if (!customTextareaRef.current) {
+      handleUpdateCustomTemplate(customTemplate + ' ' + tag);
+      return;
+    }
+    const el = customTextareaRef.current;
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const text = customTemplate;
+    const before = text.substring(0, start);
+    const after = text.substring(end, text.length);
+    const newText = before + tag + after;
+    handleUpdateCustomTemplate(newText);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + tag.length, start + tag.length);
+    }, 50);
+  };
+
+  // Helper to render placeholders in custom template
+  const renderCustomTemplate = (tpl: string): string => {
+    const no = editableData.no_surat.trim() || '[no_surat]';
+    const tgl = editableData.tanggal_surat.trim() || '[tanggal_surat]';
+    const hal = editableData.perihal.trim() || '[perihal]';
+    const unit = editableData.unit_pengirim.trim() || '[unit_pengirim]';
+    const yth = editableData.yth.trim() || '[yth]';
+    const nominal = editableData.nominal_usulan ? String(editableData.nominal_usulan).trim() : '[nominal_usulan]';
+
+    return tpl
+      .replace(/\[no_surat\]/gi, no)
+      .replace(/\[nomor_surat\]/gi, no)
+      .replace(/\[nomor\]/gi, no)
+      .replace(/\[tanggal_surat\]/gi, tgl)
+      .replace(/\[tanggal\]/gi, tgl)
+      .replace(/\[tgl\]/gi, tgl)
+      .replace(/\[perihal\]/gi, hal)
+      .replace(/\[hal\]/gi, hal)
+      .replace(/\[unit_pengirim\]/gi, unit)
+      .replace(/\[unit\]/gi, unit)
+      .replace(/\[yth\]/gi, yth)
+      .replace(/\[tujuan\]/gi, yth)
+      .replace(/\[nominal_usulan\]/gi, nominal)
+      .replace(/\[nominal\]/gi, nominal);
+  };
+
   // Compute dynamic sentence live based on current editable fields
   const generateDynamicSentence = (format: DynamicFormatKey): string => {
     const no = editableData.no_surat.trim() || '[Nomor Surat]';
@@ -212,12 +279,15 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
         return `Ref: Surat No. ${no} tgl ${tgl} (${hal})`;
       case 'lengkap':
         return `Sesuai surat dari ${unit || 'Unit Pengirim'}${yth ? ` kepada ${yth}` : ''} Nomor ${no} tanggal ${tgl} perihal ${hal}`;
+      case 'kustom':
+        return renderCustomTemplate(customTemplate);
       default:
         return `Sesuai surat Nomor ${no} tanggal ${tgl} perihal ${hal}`;
     }
   };
 
   const activeDynamicSentence = generateDynamicSentence(selectedFormat);
+  const renderedCustomPreview = renderCustomTemplate(customTemplate);
 
   const formatOptions: { key: DynamicFormatKey; title: string; desc: string; icon: string }[] = [
     { key: 'standar', title: 'Standar Rujukan UGM', desc: 'Sesuai surat Nomor... tanggal... perihal...', icon: '🌟' },
@@ -226,6 +296,35 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
     { key: 'sehubungan', title: 'Sehubungan Dengan', desc: 'Sehubungan dengan surat Nomor... tanggal...', icon: '🔗' },
     { key: 'lengkap', title: 'Lengkap (Pengirim & Yth)', desc: 'Sesuai surat dari [Unit] kepada [Yth] Nomor...', icon: '🏛️' },
     { key: 'memo_singkat', title: 'Memo / Ref Singkat', desc: 'Ref: Surat No... tgl... (Perihal)', icon: '⚡' },
+    { key: 'kustom', title: 'Redaksi Kustom Bebas', desc: 'Sesuai template placeholder kustom Anda...', icon: '⚙️' },
+  ];
+
+  const customTagButtons = [
+    { tag: '[no_surat]', label: 'Nomor Surat', icon: Hash },
+    { tag: '[tanggal_surat]', label: 'Tanggal Surat', icon: Calendar },
+    { tag: '[perihal]', label: 'Perihal Surat', icon: Tag },
+    { tag: '[unit_pengirim]', label: 'Unit Pengirim', icon: Building },
+    { tag: '[yth]', label: 'Penerima (Yth)', icon: UserCheck },
+    { tag: '[nominal_usulan]', label: 'Nominal', icon: DollarSign },
+  ];
+
+  const presetTemplates = [
+    { 
+      name: 'Rujukan Standar', 
+      tpl: 'Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]' 
+    },
+    { 
+      name: 'Disposisi Pimpinan', 
+      tpl: 'Menindaklanjuti disposisi pimpinan atas surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal] dari [unit_pengirim] kepada [yth], bersama ini kami sampaikan...' 
+    },
+    { 
+      name: 'Nota Dinas Anggaran', 
+      tpl: 'Berdasarkan surat permohonan Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal], dengan alokasi usulan sebesar [nominal_usulan]...' 
+    },
+    { 
+      name: 'Balasan / Tanggapan', 
+      tpl: 'Sehubungan dengan surat Saudara Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal], dengan ini diberitahukan bahwa...' 
+    }
   ];
 
   return (
@@ -233,7 +332,7 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
       {/* Toast Notification when image is pasted */}
       {pasteNotice && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-4 font-bold text-xs">
-          <Check size={16} /> Gambar dari Clipboard berhasil ditempel & sedang diekstrak!
+          <Check size={16} /> Gambar dari Clipboard berhasil ditempel &amp; sedang diekstrak!
         </div>
       )}
 
@@ -253,14 +352,14 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Ekstrak metadata surat otomatis &amp; susun kalimat rujukan dinamis 1-klik copas.
+              Ekstrak metadata surat otomatis &amp; susun kalimat dinamis kustom menggunakan placeholder [no_surat] [tanggal_surat] [perihal].
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold flex items-center gap-1.5">
-            📋 Ctrl+V Gambar &bull; Salin Teks OCR &bull; Kalimat Dinamis
+            📋 Ctrl+V Gambar &bull; Salin Teks OCR &bull; Template [no_surat] [tanggal] [perihal]
           </span>
         </div>
       </div>
@@ -469,6 +568,126 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
                 <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
                   <span>Format Terpilih: <strong className="text-amber-300 uppercase">{selectedFormat.replace('_', ' ')}</strong></span>
                   <span>{activeDynamicSentence.length} Karakter</span>
+                </div>
+              </div>
+
+              {/* CARD TEMPLATE REDAKSI KUSTOM DENGAN PLACEHOLDER [no_surat] [tanggal_surat] [perihal] */}
+              <div className="bg-gradient-to-br from-indigo-50/70 via-white to-sky-50/50 rounded-2xl p-4 md:p-5 border border-indigo-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Code2 size={16} className="text-indigo-600" />
+                    <h3 className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                      Template Redaksi Kustom (Kustomisasi Dinamis Bebas)
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedFormat('kustom');
+                      toast.success("Mode Redaksi Kustom Aktif!");
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      selectedFormat === 'kustom'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                    }`}
+                  >
+                    {selectedFormat === 'kustom' ? <BookmarkCheck size={12} /> : <Sliders size={12} />}
+                    <span>{selectedFormat === 'kustom' ? 'Sedang Dipilih' : 'Gunakan Format Ini'}</span>
+                  </button>
+                </div>
+
+                {/* Preset Template Buttons */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                    Pilih Draf Cepat:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {presetTemplates.map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          handleUpdateCustomTemplate(p.tpl);
+                          setSelectedFormat('kustom');
+                          toast.success(`Draf "${p.name}" diterapkan!`);
+                        }}
+                        className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-700 text-[10px] font-bold rounded-lg border border-indigo-200 transition-all shadow-2xs hover:border-indigo-300"
+                      >
+                        ⚡ {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tag Inserter Chips */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                    Klik Tag Placeholder untuk Menyisipkan ke Template:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {customTagButtons.map((t, idx) => {
+                      const Icon = t.icon;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => insertTagToTemplate(t.tag)}
+                          className="px-2.5 py-1 bg-indigo-600/10 hover:bg-indigo-600 hover:text-white text-indigo-800 text-[10px] font-bold rounded-lg border border-indigo-200 transition-all flex items-center gap-1 active:scale-95"
+                          title={`Sisipkan ${t.tag}`}
+                        >
+                          <PlusCircle size={11} />
+                          <Icon size={11} className="opacity-70" />
+                          <span>{t.tag}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom Template Editor */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                      Editor Pola Kalimat Kustom:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateCustomTemplate(DEFAULT_CUSTOM_TEMPLATE)}
+                      className="text-[10px] font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                      title="Kembalikan ke Default"
+                    >
+                      <RotateCcw size={10} /> Reset
+                    </button>
+                  </div>
+                  <textarea
+                    ref={customTextareaRef}
+                    rows={3}
+                    value={customTemplate}
+                    onChange={(e) => handleUpdateCustomTemplate(e.target.value)}
+                    placeholder="Contoh: Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal], kami sampaikan..."
+                    className="w-full p-3 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 ring-indigo-500/20 text-xs font-mono text-indigo-950 font-medium leading-relaxed"
+                  />
+                </div>
+
+                {/* Rendered Custom Preview & 1-Click Copy */}
+                <div className="p-3 bg-indigo-900/90 text-white rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles size={11} /> Hasil Redaksi Kustom Real-Time:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(renderedCustomPreview, 'renderedCustomPreview')}
+                      className="px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded-md transition-all flex items-center gap-1"
+                    >
+                      {copiedField === 'renderedCustomPreview' ? <Check size={10} /> : <Copy size={10} />}
+                      <span>{copiedField === 'renderedCustomPreview' ? 'Tersalin!' : 'Salin Redaksi Kustom'}</span>
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono leading-relaxed select-all text-indigo-50">
+                    {renderedCustomPreview}
+                  </p>
                 </div>
               </div>
 
