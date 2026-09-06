@@ -217,33 +217,38 @@ export async function convertSuratToTextWithAI(formData: FormData) {
       const base64Data = Buffer.from(bytes).toString('base64');
       inlineData = { data: base64Data, mimeType: file.type || 'application/pdf' };
     } else if (rawText) {
-      promptContext = `TEKS SURAT:\n${rawText}\n`;
+      promptContext = `TEKS SURAT / OCR:\n${rawText}\n`;
     } else {
       throw new Error("File atau teks surat tidak ditemukan");
     }
 
     const prompt = `
       ${promptContext}
-      Tugas Anda adalah membaca dokumen/teks surat resmi berikut dan mengekstrak rincian persuratan.
+      Tugas Anda adalah membaca dokumen atau teks surat resmi berikut dan mengekstrak rincian persuratan secara presisi.
       
-      Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan) dengan struktur:
+      Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan di luar JSON) dengan struktur:
       {
-        "no_surat": "Nomor surat lengkap",
-        "tanggal_surat": "Tanggal surat",
-        "perihal": "Perihal surat",
-        "yth": "Penerima/Tujuan surat (contoh: Yth. Wakil Rektor Bidang SDM dan Keuangan)",
-        "unit_pengirim": "Nama unit pengirim surat",
-        "teks_copas_standar": "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]"
+        "no_surat": "Nomor surat lengkap (contoh: 2107/UN1/DPM/Dit-PKM/PM.00/2026)",
+        "tanggal_surat": "Tanggal surat (contoh: 30 Juni 2026 atau 15 Juli 2026)",
+        "perihal": "Perihal / hal surat",
+        "yth": "Penerima atau Tujuan surat (contoh: Yth. Wakil Rektor Bidang Sumber Daya Manusia dan Keuangan)",
+        "unit_pengirim": "Nama instansi/fakultas/direktorat/unit pengirim surat",
+        "nominal_usulan": "Nominal usulan anggaran jika disebutkan di surat (angka saja, atau kosongkan jika tidak ada)",
+        "teks_copas_standar": "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]",
+        "variasi_kalimat": {
+          "standar": "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]",
+          "menindaklanjuti": "Menindaklanjuti surat dari [unit_pengirim] Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]",
+          "berdasarkan": "Berdasarkan surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal] dari [unit_pengirim]",
+          "sehubungan": "Sehubungan dengan surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]",
+          "memo_singkat": "Ref: Surat No. [no_surat] tgl [tanggal_surat] ([perihal])",
+          "lengkap": "Sesuai surat dari [unit_pengirim] kepada [yth] Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]"
+        }
       }
 
-      PENTING untuk field "teks_copas_standar":
-      Format harus persis seperti format rujukan berikut (menggunakan "Nomor" berhuruf N kapital, TANPA titik dua ":"):
-      "Sesuai surat Nomor [no_surat] tanggal [tanggal_surat] perihal [perihal]"
-
-      Contoh output teks_copas_standar yang BENAR:
-      "Sesuai surat Nomor 2107/UN1/DPM/Dit-PKM/PM.00/2026 tanggal 30 Juni 2026 perihal Permohonan penambahan pagu anggaran DPKM UGM"
-
-      Hanya berikan JSON saja.
+      PENTING untuk field teks rujukan:
+      - Selalu gunakan kata "Nomor" berhuruf N kapital TANPA titik dua ":".
+      - Pastikan nama perihal tidak terpotong.
+      - Hanya kembalikan JSON valid.
     `;
 
     const requestContent: any = { role: "user", parts: [{ text: prompt }] };
