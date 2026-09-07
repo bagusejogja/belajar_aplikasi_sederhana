@@ -6,35 +6,9 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, Printer, FileText, CheckCircle2, Clock, AlertCircle, XCircle, 
-  Sparkles, ExternalLink, Paperclip, Save, RefreshCw, BarChart3, TrendingUp,
-  Building2, Calendar, Tag, Landmark, PieChart, Check, FileCheck, Layers,
-  FileSpreadsheet, Lock, CheckSquare, Info
+  Sparkles, Save, RefreshCw, CheckSquare, Lock, FileCheck
 } from 'lucide-react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import DataPendukung from '../../components/DataPendukung';
 
 function terbilang(n: number): string {
   const angka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
@@ -100,14 +74,89 @@ export default function PresentasiAnalisisPage() {
 
       if (utamaRes.error) throw utamaRes.error;
       const row = utamaRes.data;
-      setData(row);
-      setHistoris(histRes.data || []);
-      setDetails(detailRes.data || []);
+
+      // Parse JSON from analisis_html exactly like saat input / riwayat
+      let parsed: any = {};
+      if (row.analisis_html) {
+        try {
+          parsed = JSON.parse(row.analisis_html);
+        } catch (e) {
+          parsed = { analisis: row.analisis_html };
+        }
+      }
+
+      const ringkasanSubstansi = parsed.analisis || row.ringkasan_ai || '';
+      const subyekSimaster = row.subyek_persuratan_simaster || parsed.subyek_persuratan_simaster || '';
+      const paguBerjalan = parsed.pagu_berjalan || {};
+
+      const loadedMainData = {
+        ...row,
+        raw_analisis_html: row.analisis_html,
+        subyek_persuratan_simaster: subyekSimaster,
+        ringkasan_ai: ringkasanSubstansi,
+        analisis_html: ringkasanSubstansi,
+        rekomendasi_ai: row.rekomendasi_ai || parsed.rekomendasi || '',
+        pagu_berjalan: paguBerjalan,
+        file_lampiran: row.file_lampiran || '',
+        link_lampiran: row.link_lampiran || '',
+        keputusan: row.keputusan || parsed.keputusan || 'diajukan',
+        nominal_disetujui: row.nominal_disetujui ?? parsed.nominal_disetujui ?? row.total_anggaran ?? '0',
+        keterangan_keputusan: row.keterangan_keputusan || parsed.keterangan_keputusan || '',
+      };
+      setData(loadedMainData);
+
+      // Parse historis data
+      const parsedHistoris = (histRes.data || []).map((h: any) => {
+        let parsedTambah: any = {};
+        try {
+          if (h.tambah && typeof h.tambah === 'string' && h.tambah.startsWith('{')) {
+            parsedTambah = JSON.parse(h.tambah);
+          }
+        } catch(e) {}
+
+        const pNum = (str: any) => {
+          const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
+          return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+        };
+        const pagu = pNum(h.total_pagu);
+        const real = pNum(h.realisasi_historis);
+
+        return {
+          ...h,
+          pengalihan: parsedTambah.pengalihan || (h.tambah && !h.tambah.startsWith('{') ? h.tambah : '0'),
+          tambah_pagu_penugasan: parsedTambah.tambah_pagu_penugasan || '0',
+          tambah_pagu_inisiatif: parsedTambah.tambah_pagu_inisiatif || '0',
+          efisiensi: parsedTambah.efisiensi || '0',
+          talangan: parsedTambah.talangan || '0',
+          persen_serapan: h.persen_serapan || (pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '0%')
+        };
+      });
+      setHistoris(parsedHistoris);
+
+      // Parse and clean details
+      const cleanedDetail = (detailRes.data || []).map((d: any, idx: number) => {
+        let uraian = (d.uraian_kegiatan || d.uraian_belanja || '').toString();
+        const firstLetter = uraian.match(/[a-zA-Z]/);
+        if (firstLetter && firstLetter.index !== undefined) {
+          uraian = uraian.substring(firstLetter.index).trim();
+        } else {
+          uraian = uraian.trim();
+        }
+        return {
+          ...d,
+          no_urut: d.no_urut || idx + 1,
+          uraian_kegiatan: uraian || '-',
+          anggaran: d.anggaran || d.nominal_usulan || '0',
+          realisasi: d.realisasi || d.realisasi_berjalan || '0',
+          persen_serapan: d.persen_serapan || '0%'
+        };
+      });
+      setDetails(cleanedDetail);
 
       // Initialize form values
-      setModalKeputusan(row.keputusan || 'diajukan');
-      setModalNominalDisetujui(row.nominal_disetujui?.toString() || row.total_anggaran?.toString() || '0');
-      setModalKeteranganKeputusan(row.keterangan_keputusan || '');
+      setModalKeputusan(loadedMainData.keputusan || 'diajukan');
+      setModalNominalDisetujui(loadedMainData.nominal_disetujui?.toString() || loadedMainData.total_anggaran?.toString() || '0');
+      setModalKeteranganKeputusan(loadedMainData.keterangan_keputusan || '');
     } catch (err: any) {
       console.error('Gagal memuat data presentasi:', err);
       alert('Gagal memuat data: ' + err.message);
@@ -141,12 +190,26 @@ export default function PresentasiAnalisisPage() {
     setSaveSuccess(false);
     try {
       const nominalClean = parseNum(modalNominalDisetujui);
+      
+      // Update inside analisis_html payload as well to ensure consistency across all views
+      let updatedAnalisisHtml = data.raw_analisis_html;
+      if (data.raw_analisis_html) {
+        try {
+          const parsed = JSON.parse(data.raw_analisis_html);
+          parsed.keputusan = modalKeputusan;
+          parsed.nominal_disetujui = nominalClean;
+          parsed.keterangan_keputusan = modalKeteranganKeputusan;
+          updatedAnalisisHtml = JSON.stringify(parsed);
+        } catch(e) {}
+      }
+
       const { error } = await supabase
         .from('app_analisis_utama')
         .update({
           keputusan: modalKeputusan,
           nominal_disetujui: nominalClean,
           keterangan_keputusan: modalKeteranganKeputusan,
+          analisis_html: updatedAnalisisHtml,
           updated_at: new Date().toISOString()
         })
         .eq('id_analisis', data.id_analisis);
@@ -155,6 +218,7 @@ export default function PresentasiAnalisisPage() {
 
       setData((prev: any) => ({
         ...prev,
+        raw_analisis_html: updatedAnalisisHtml,
         keputusan: modalKeputusan,
         nominal_disetujui: nominalClean,
         keterangan_keputusan: modalKeteranganKeputusan
@@ -206,78 +270,6 @@ export default function PresentasiAnalisisPage() {
         <Clock size={13} className="text-blue-600" /> Diajukan (Pending)
       </span>
     );
-  };
-
-  // Chart Data Preparation
-  const chartLabels = historis.map(h => h.tahun);
-  const chartPagu = historis.map(h => parseNum(h.total_pagu || h.pagu_awal));
-  const chartReal = historis.map(h => parseNum(h.realisasi_historis));
-
-  const multiYearChartData = {
-    labels: chartLabels.length > 0 ? chartLabels : ['2024', '2025', '2026'],
-    datasets: [
-      {
-        type: 'bar' as const,
-        label: 'Total Pagu (Rp)',
-        backgroundColor: 'rgba(59, 130, 246, 0.8)',
-        borderColor: 'rgb(37, 99, 235)',
-        borderWidth: 1.5,
-        borderRadius: 8,
-        data: chartPagu.length > 0 ? chartPagu : [150000000, 180000000, 210000000],
-      },
-      {
-        type: 'bar' as const,
-        label: 'Realisasi Belanja (Rp)',
-        backgroundColor: 'rgba(16, 185, 129, 0.85)',
-        borderColor: 'rgb(5, 150, 105)',
-        borderWidth: 1.5,
-        borderRadius: 8,
-        data: chartReal.length > 0 ? chartReal : [142000000, 175000000, 198000000],
-      }
-    ]
-  };
-
-  const chartOptions: any = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: { font: { size: 11, weight: 'bold' as const }, color: '#334155' }
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => `${context.dataset.label}: Rp ${formatRp(context.raw)}`
-        }
-      }
-    },
-    scales: {
-      y: {
-        ticks: {
-          callback: (value: any) => 'Rp ' + (value >= 1000000000 ? (value / 1000000000).toFixed(1) + ' M' : (value / 1000000).toFixed(0) + ' Jt'),
-          color: '#64748b',
-          font: { size: 10 }
-        },
-        grid: { color: 'rgba(226, 232, 240, 0.8)' }
-      },
-      x: {
-        ticks: { color: '#334155', font: { size: 11, weight: 'bold' as const } },
-        grid: { display: false }
-      }
-    }
-  };
-
-  const detailItems = details.slice(0, 6);
-  const donutData = {
-    labels: detailItems.map(d => d.uraian_belanja?.substring(0, 24) || 'Item Belanja'),
-    datasets: [
-      {
-        data: detailItems.map(d => parseNum(d.nominal_usulan)),
-        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'],
-        borderWidth: 2,
-        borderColor: '#ffffff'
-      }
-    ]
   };
 
   if (loading) {
@@ -363,11 +355,13 @@ export default function PresentasiAnalisisPage() {
         
         {/* Banner Info */}
         <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-2xl flex items-start gap-3 text-indigo-900">
-          <Info size={20} className="text-indigo-600 shrink-0 mt-0.5" />
+          <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700">
+            <Lock size={16} />
+          </div>
           <div className="text-xs space-y-0.5">
-            <p className="font-bold">Mode Presentasi Data Usulan &amp; Pengambilan Keputusan</p>
+            <p className="font-bold">Mode Lembar Presentasi Sidang Usulan Pagu</p>
             <p className="text-indigo-700 leading-relaxed">
-              Seluruh data usulan, rincian realisasi, dan analisis AI ditampilkan untuk tinjauan sidang/presentasi (read-only). Hanya seksi <strong>Keputusan &amp; Catatan Persetujuan Pimpinan</strong> di bagian bawah yang dapat Anda ubah dan simpan.
+              Seluruh data usulan surat, rincian realisasi belanja, pagu historis, dan potret mutasi alokasi unit disajikan sama seperti saat input. Bagian yang dapat diedit dan disimpan adalah <strong>Keputusan &amp; Catatan Persetujuan Pimpinan</strong> di bawah.
             </p>
           </div>
         </div>
@@ -412,7 +406,7 @@ export default function PresentasiAnalisisPage() {
               </label>
               <input 
                 type="text" 
-                value={data.tgl_surat || (data.created_at ? new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-')} 
+                value={data.tanggal_surat || data.tgl_surat || (data.created_at ? new Date(data.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-')} 
                 readOnly 
                 disabled 
                 className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 cursor-not-allowed" 
@@ -434,7 +428,7 @@ export default function PresentasiAnalisisPage() {
             </div>
 
             {/* Perihal Usulan */}
-            <div className="md:col-span-2 lg:col-span-3 space-y-1.5">
+            <div className="md:col-span-2 space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Perihal Usulan
               </label>
@@ -467,43 +461,30 @@ export default function PresentasiAnalisisPage() {
               </p>
             </div>
 
-            {/* Sumber Dana */}
-            <div className="space-y-1.5">
+            {/* Subyek di Persuratan Simaster (Sumber Dana TIDAK ditampilkan) */}
+            <div className="col-span-full space-y-1.5">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Sumber Dana
-              </label>
-              <input 
-                type="text" 
-                value={data.sumber_dana || '-'} 
-                readOnly 
-                disabled 
-                className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 cursor-not-allowed" 
-              />
-            </div>
-
-            {/* Subyek Persuratan Simaster */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Subyek Persuratan Simaster
+                Subyek di Persuratan Simaster
               </label>
               <input 
                 type="text" 
                 value={data.subyek_persuratan_simaster || '-'} 
                 readOnly 
                 disabled 
+                placeholder="Subyek persuratan Simaster..."
                 className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-not-allowed" 
               />
             </div>
 
           </div>
 
-          {/* Ringkasan Substansi Surat (AI) */}
+          {/* Ringkasan Substansi Permohonan (AI) */}
           <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi Permohonan
               </label>
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Hasil Analisis Teks Surat</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Sesuai Input &amp; Simpan</span>
             </div>
             <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5 shadow-2xs">
               {data.ringkasan_ai ? (
@@ -520,178 +501,18 @@ export default function PresentasiAnalisisPage() {
           </div>
         </div>
 
-        {/* SECTION 2: GRAFIK TREN PAGU & REALISASI HISTORIS MULTI-TAHUN */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <BarChart3 size={18} className="text-blue-600" />
-                Grafik &amp; Realisasi Pagu Historis Multi-Tahun
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Komparasi alokasi pagu terhadap penyerapan belanja unit kerja beberapa tahun terakhir.
-              </p>
-            </div>
-            <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-              Analisis Komparatif
-            </span>
-          </div>
-
-          {/* Visual Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Bar Chart Total Pagu vs Realisasi */}
-            <div className="lg:col-span-2 bg-slate-50/70 rounded-2xl border border-slate-200 p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-blue-600" /> Tren Total Pagu vs Realisasi Belanja
-                </span>
-                <span className="text-[10px] bg-white text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-200">
-                  {chartLabels.length > 0 ? `${chartLabels.length} Tahun` : 'Multi-Tahun'}
-                </span>
-              </div>
-              <div className="h-64 sm:h-72 w-full bg-white p-3 rounded-xl border border-slate-200/80">
-                <Bar data={multiYearChartData as any} options={chartOptions} />
-              </div>
-            </div>
-
-            {/* Donut Chart Usulan Belanja */}
-            <div className="bg-slate-50/70 rounded-2xl border border-slate-200 p-5 flex flex-col justify-between space-y-3">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <PieChart size={14} className="text-emerald-600" /> Komposisi Item Belanja yang Diajukan
-              </span>
-              
-              {detailItems.length > 0 ? (
-                <div className="h-52 w-full flex items-center justify-center bg-white p-2 rounded-xl border border-slate-200/80">
-                  <Doughnut 
-                    data={donutData} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: { position: 'bottom' as const, labels: { font: { size: 9 }, boxWidth: 10 } }
-                      }
-                    }} 
-                  />
-                </div>
-              ) : (
-                <div className="h-52 flex flex-col items-center justify-center text-slate-400 text-xs italic bg-white rounded-xl p-4 text-center border border-slate-200/80">
-                  <Layers size={32} className="opacity-30 mb-2" />
-                  Alokasi utuh usulan: Rp {formatRp(data.total_anggaran)}
-                </div>
-              )}
-
-              <div className="pt-2 border-t border-slate-200 text-xs text-slate-600 font-medium flex justify-between items-center">
-                <span>Total Usulan:</span>
-                <span className="font-black text-slate-900 font-mono">Rp {formatRp(data.total_anggaran)}</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Tabel Realisasi & Pagu Multi-Tahun */}
-          {historis.length > 0 && (
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Tabel Historis Multi-Tahun
-              </label>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 text-center w-20">Tahun</th>
-                      <th className="px-4 py-3 text-right">Pagu Awal</th>
-                      <th className="px-4 py-3 text-right">Penambahan</th>
-                      <th className="px-4 py-3 text-right">Total Pagu</th>
-                      <th className="px-4 py-3 text-right">Realisasi Belanja</th>
-                      <th className="px-4 py-3 text-center w-28">% Serapan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono">
-                    {historis.map((h: any, i: number) => {
-                      const paguAwal = parseNum(h.pagu_awal);
-                      const totalPagu = parseNum(h.total_pagu || paguAwal);
-                      const real = parseNum(h.realisasi_historis);
-                      const pct = totalPagu > 0 ? ((real / totalPagu) * 100).toFixed(1) : '0';
-                      const pctNum = parseFloat(pct);
-
-                      return (
-                        <tr key={h.id || i} className="hover:bg-slate-50/80">
-                          <td className="px-4 py-3 text-center font-bold text-indigo-700 font-sans">{h.tahun}</td>
-                          <td className="px-4 py-3 text-right font-medium text-slate-700">Rp {formatRp(paguAwal)}</td>
-                          <td className="px-4 py-3 text-right font-medium text-emerald-700">
-                            {h.tambah ? `+ Rp ${formatRp(h.tambah)}` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-right font-black text-slate-900">Rp {formatRp(totalPagu)}</td>
-                          <td className="px-4 py-3 text-right text-indigo-700 font-bold">Rp {formatRp(real)}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] ${
-                              pctNum >= 80 
-                                ? 'bg-emerald-100 text-emerald-800' 
-                                : pctNum >= 50 
-                                ? 'bg-indigo-100 text-indigo-800' 
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {pct}%
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Tabel Rincian Belanja Kegiatan yang Diajukan */}
-          {details.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <FileSpreadsheet size={14} className="text-emerald-600" /> Rincian Item Belanja Kegiatan yang Diajukan
-              </label>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-600 font-bold text-[10px] uppercase border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 w-12 text-center">No</th>
-                      <th className="px-4 py-3">Uraian Belanja</th>
-                      <th className="px-4 py-3">Kategori / Akun</th>
-                      <th className="px-4 py-3 text-right">Nominal Usulan</th>
-                      <th className="px-4 py-3 text-right">Realisasi Berjalan</th>
-                      <th className="px-4 py-3">Keterangan</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {details.map((d: any, idx: number) => (
-                      <tr key={d.id || idx} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-2.5 text-center text-slate-500 font-bold">{d.no_urut || idx + 1}</td>
-                        <td className="px-4 py-2.5 font-semibold text-slate-900">{d.uraian_belanja || '-'}</td>
-                        <td className="px-4 py-2.5 text-slate-600 font-mono text-[11px]">{d.kategori || '-'}</td>
-                        <td className="px-4 py-2.5 text-right font-black text-slate-900 font-mono">
-                          Rp {formatRp(d.nominal_usulan)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-slate-600 font-mono">
-                          {d.realisasi_berjalan ? `Rp ${formatRp(d.realisasi_berjalan)}` : '-'}
-                        </td>
-                        <td className="px-4 py-2.5 text-slate-500 text-[11px]">{d.keterangan_anggaran || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50/90 font-bold border-t border-slate-200 font-mono">
-                    <tr>
-                      <td colSpan={3} className="px-4 py-3 text-right font-black uppercase text-slate-700 font-sans text-xs">Total Rincian:</td>
-                      <td className="px-4 py-3 text-right font-black text-indigo-900 text-sm">
-                        Rp {formatRp(details.reduce((acc, curr) => acc + parseNum(curr.nominal_usulan), 0))}
-                      </td>
-                      <td colSpan={2}></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          )}
-
+        {/* SECTION 2: DATA PENDUKUNG (TAMPIL SEPERTI SAAT INPUT) */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs">
+          <DataPendukung 
+            mainData={data} 
+            setMainData={setData} 
+            detailData={details} 
+            setDetailData={setDetails} 
+            historisData={historis} 
+            setHistorisData={setHistoris} 
+            renderMode="tabs" 
+            readOnly={true} 
+          />
         </div>
 
         {/* SECTION 3: REKOMENDASI AI & DASAR PERTIMBANGAN (READ ONLY) */}
@@ -715,30 +536,8 @@ export default function PresentasiAnalisisPage() {
           </div>
         )}
 
-        {/* SECTION 4: BERKAS LAMPIRAN ASLI */}
-        {(data.link_lampiran || data.file_lampiran) && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
-                <Paperclip size={20} />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Berkas PDF Lampiran Pengajuan Asli Unit Kerja</h4>
-                <p className="text-xs text-slate-500">Buka dokumen surat dinas pengajuan dan rincian lampiran asli</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => window.open(data.link_lampiran || data.file_lampiran, '_blank')}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-            >
-              <ExternalLink size={14} /> Buka PDF Asli
-            </button>
-          </div>
-        )}
-
         {/* ========================================================================= */}
-        {/* SECTION 5: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (SATU-SATUNYA YANG BISA DI-EDIT!) */}
+        {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (SATU-SATUNYA YANG BISA DI-EDIT!) */}
         {/* ========================================================================= */}
         <div id="form-keputusan-pimpinan" className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-10 shadow-2xl border-2 border-indigo-500/40 space-y-6">
           

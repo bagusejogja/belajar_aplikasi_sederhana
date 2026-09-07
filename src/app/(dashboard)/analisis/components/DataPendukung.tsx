@@ -196,23 +196,54 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
 
 
 
-  const isVertical = renderMode === 'vertical' || readOnly;
+  const isVertical = renderMode === 'vertical' || activeSubTab === 'semua';
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
       <div className="flex justify-between items-end shrink-0">
         <div>
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2 mb-2"><FileSpreadsheet className="text-emerald-600"/> Data Pendukung</h2>
-          <p className="text-gray-500 text-sm">Kelola rincian anggaran, pagu historis, dan lampiran.</p>
+          <p className="text-gray-500 text-sm">{readOnly ? 'Rincian realisasi belanja, pagu historis, dan potret mutasi alokasi unit.' : 'Kelola rincian anggaran, pagu historis, dan lampiran.'}</p>
         </div>
       </div>
 
-      {!isVertical && (
-        <div className="flex border-b border-gray-200 gap-4 overflow-x-auto pb-2">
-          <button onClick={() => setActiveSubTab('realisasi')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'realisasi' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Detail Realisasi Belanja</button>
-          <button onClick={() => setActiveSubTab('historis')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'historis' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Data Pagu Historis</button>
-          <button onClick={() => setActiveSubTab('berjalan')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'berjalan' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Potret Mutasi Pagu Keseluruhan</button>
-          <button onClick={() => setActiveSubTab('lampiran')} className={`pb-2 whitespace-nowrap text-sm font-bold border-b-2 transition-colors ${activeSubTab === 'lampiran' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Lampiran Lainnya</button>
+      {renderMode !== 'vertical' && (
+        <div className="flex border-b border-gray-200 gap-2 overflow-x-auto pb-2">
+          <button 
+            type="button" 
+            onClick={() => setActiveSubTab('semua')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === 'semua' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Tampilkan Semua
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setActiveSubTab('realisasi')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === 'realisasi' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Detail Realisasi Belanja
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setActiveSubTab('historis')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === 'historis' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Data Pagu Historis
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setActiveSubTab('berjalan')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === 'berjalan' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Potret Mutasi Pagu Keseluruhan
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setActiveSubTab('lampiran')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === 'lampiran' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            Lampiran Dokumen
+          </button>
         </div>
       )}
 
@@ -340,7 +371,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
              </div>
           )}
           <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[350px]">
-            <div className="overflow-y-auto custom-scrollbar flex-1">
+            <fieldset disabled={readOnly} className="overflow-y-auto custom-scrollbar flex-1">
               <table className="w-full text-left text-sm text-gray-700">
                 <thead className="bg-gray-50 text-gray-500 uppercase font-black text-[10px] sticky top-0 border-b border-gray-200">
                   <tr>
@@ -354,7 +385,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                     <th className="px-4 py-3 text-right font-bold text-indigo-600">Total Pagu</th>
                     <th className="px-4 py-3 text-right text-rose-500">Realisasi</th>
                     <th className="px-4 py-3 text-center w-20">% Serapan</th>
-                    <th className="px-4 py-3 w-16 text-center">Aksi</th>
+                    {!readOnly && <th className="px-4 py-3 w-16 text-center">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -438,26 +469,30 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                           setHistorisData(newD);
                         }} className="w-full bg-transparent outline-none text-center focus:border-b border-indigo-500" placeholder="0%"/>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
+                      {!readOnly && (
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {(!historisData || historisData.length === 0) && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-8 text-center text-gray-500 italic">Belum ada data pagu historis.</td>
+                      <td colSpan={readOnly ? 10 : 11} className="px-4 py-8 text-center text-gray-500 italic">Belum ada data pagu historis.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
-            </div>
-            <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
-               <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-indigo-600 hover:text-indigo-700 font-bold text-sm flex items-center gap-1">
-                 <Plus size={16}/> Tambah Tahun
-               </button>
-            </div>
+            </fieldset>
+            {!readOnly && (
+              <div className="p-3 bg-gray-50 border-t border-gray-100 shrink-0">
+                 <button onClick={() => setHistorisData([...(historisData||[]), { tahun: new Date().getFullYear().toString(), pagu_awal: '0', pengalihan: '0', tambah_pagu_penugasan: '0', tambah_pagu_inisiatif: '0', efisiensi: '0', talangan: '0', total_pagu: '0', realisasi_historis: '0', persen_serapan: '0%' }])} className="text-indigo-600 hover:text-indigo-700 font-bold text-sm flex items-center gap-1">
+                   <Plus size={16}/> Tambah Tahun
+                 </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -495,11 +530,13 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                  <BarChart3 size={18} />
                  <span className="font-bold text-sm uppercase tracking-widest">Potret Mutasi Pagu Keseluruhan</span>
                </div>
-               <button onClick={syncFromHistoris} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
-                 Tarik Data Global
-               </button>
+               {!readOnly && (
+                 <button onClick={syncFromHistoris} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                   Tarik Data Global
+                 </button>
+               )}
             </div>
-            <div className="p-6">
+            <fieldset disabled={readOnly} className="p-6">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 max-w-4xl">
                   <div className="flex flex-col gap-1">
                      <label className="text-xs font-bold text-gray-500 uppercase">Pagu Awal</label>
@@ -589,7 +626,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                     )}
                   </div>
                </div>
-            </div>
+            </fieldset>
           </div>
         );
       })()}
