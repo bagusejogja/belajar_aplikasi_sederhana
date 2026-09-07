@@ -6,7 +6,8 @@ import {
   History, FileText, ChevronDown, ChevronUp, Building2, Calendar, TrendingUp, 
   Search, CheckCircle2, AlertCircle, XCircle, Clock, 
   Trash2, Sparkles, Layers, Tag, Eye, Edit3, X, FileSpreadsheet, Paperclip, ExternalLink,
-  Printer, FileCheck, Landmark, BarChart3, Check, DollarSign, ListFilter, ArrowRight, PieChart
+  Printer, FileCheck, Landmark, BarChart3, Check, DollarSign, ListFilter, ArrowRight, PieChart,
+  RefreshCw, Save
 } from 'lucide-react';
 
 export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAnalisis: (id_analisis: string) => void, setActiveTab: (tab: string) => void }) {
@@ -24,8 +25,19 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   const [activeTabMap, setActiveTabMap] = useState<Record<string, string>>({});
   const [unitHistoryMap, setUnitHistoryMap] = useState<Record<string, any[]>>({});
 
-  // Pop Up View Detail Modal State (Triggered by Eye Icon 👁️)
+  // Pop Up View Detail & Decision Modal State
   const [viewModalData, setViewModalData] = useState<any | null>(null);
+  const [modalKeputusan, setModalKeputusan] = useState('disetujui semua');
+  const [modalNominalDisetujui, setModalNominalDisetujui] = useState('');
+  const [modalKeteranganKeputusan, setModalKeteranganKeputusan] = useState('');
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
+
+  const openDecisionModal = (r: any) => {
+    setViewModalData(r);
+    setModalKeputusan(r.keputusan || 'disetujui semua');
+    setModalNominalDisetujui(r.nominal_disetujui?.toString() || r.total_anggaran?.toString() || '0');
+    setModalKeteranganKeputusan(r.keterangan_keputusan || '');
+  };
 
   const parseNum = (str: string | number) => {
     if (typeof str === 'number') return str;
@@ -183,6 +195,61 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
 
     const fileName = `Riwayat_Analisis_Pagu_${new Date().getTime()}.xlsx`;
     XLSX.writeFile(workbook, fileName);
+  };
+
+  const handleSaveDecision = async () => {
+    if (!viewModalData) return;
+    setIsSavingDecision(true);
+    try {
+      let existingHtmlObj: any = {};
+      if (viewModalData.analisis_html) {
+        try {
+          existingHtmlObj = JSON.parse(viewModalData.analisis_html);
+        } catch (e) {
+          existingHtmlObj = { analisis: viewModalData.analisis_html };
+        }
+      }
+
+      const updatedHtmlObj = {
+        ...existingHtmlObj,
+        keputusan: modalKeputusan,
+        nominal_disetujui: modalNominalDisetujui,
+        keterangan_keputusan: modalKeteranganKeputusan
+      };
+
+      const payload = {
+        keputusan: modalKeputusan,
+        nominal_disetujui: modalNominalDisetujui,
+        analisis_html: JSON.stringify(updatedHtmlObj)
+      };
+
+      const { error } = await supabase
+        .from('app_analisis_utama')
+        .update(payload)
+        .eq('id_analisis', viewModalData.id_analisis);
+
+      if (error) throw error;
+
+      // Update state locally
+      const updatedRow = {
+        ...viewModalData,
+        keputusan: modalKeputusan,
+        nominal_disetujui: modalNominalDisetujui,
+        keterangan_keputusan: modalKeteranganKeputusan,
+        analisis_html: JSON.stringify(updatedHtmlObj)
+      };
+
+      setViewModalData(updatedRow);
+      setRiwayat(prev => prev.map(item => item.id_analisis === viewModalData.id_analisis ? updatedRow : item));
+      setFiltered(prev => prev.map(item => item.id_analisis === viewModalData.id_analisis ? updatedRow : item));
+
+      alert('✅ Keputusan & Catatan berhasil disimpan ke database!');
+    } catch (err: any) {
+      console.error('Error saving decision:', err);
+      alert('Gagal menyimpan keputusan: ' + err.message);
+    } finally {
+      setIsSavingDecision(false);
+    }
   };
 
   const handleDelete = async (id_analisis: string, e: React.MouseEvent) => {
@@ -530,36 +597,40 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                             )}
                           </td>
 
-                         <td className="px-4 py-4 text-center align-top pt-4" onClick={e => e.stopPropagation()}>
-                           <div className="flex items-center justify-center gap-1.5">
-                             <button
-                               onClick={() => setViewModalData(r)}
-                               className="p-2.5 bg-slate-900 hover:bg-black text-white rounded-xl transition-all shadow-sm flex items-center justify-center"
-                               title="Lihat Detail & Preview PDF (Tombol Mata)"
-                             >
-                               <Eye size={15} />
-                             </button>
+                          <td className="px-4 py-4 text-center align-top pt-4" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => openDecisionModal(r)}
+                                className="h-8.5 px-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5 font-bold text-xs"
+                                title="Lihat Isi Dokumen & Input/Tambah Keputusan"
+                              >
+                                <FileCheck size={14} />
+                                <span>Detail &amp; Keputusan</span>
+                              </button>
 
-                             <button
-                               onClick={() => {
-                                 onLoadAnalisis(r.id_analisis);
-                                 setTimeout(() => setActiveTab('form'), 200);
-                               }}
-                               className="p-2.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl transition-all border border-indigo-200 shadow-sm"
-                               title="Edit & Buka Form Analisis"
-                             >
-                               <Edit3 size={15} />
-                             </button>
+                              <button
+                                onClick={() => {
+                                  onLoadAnalisis(r.id_analisis);
+                                  setTimeout(() => setActiveTab('pdf'), 200);
+                                }}
+                                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all border border-slate-200 shadow-2xs"
+                                title="Pratinjau PDF Nota Analisis"
+                              >
+                                <Printer size={14} />
+                              </button>
 
-                             <button
-                               onClick={(e) => handleDelete(r.id_analisis, e)}
-                               className="p-2.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-200 shadow-sm"
-                               title="Hapus Arsip"
-                             >
-                               <Trash2 size={15} />
-                             </button>
-                           </div>
-                         </td>
+                              <button
+                                onClick={() => {
+                                  onLoadAnalisis(r.id_analisis);
+                                  setTimeout(() => setActiveTab('form'), 200);
+                                }}
+                                className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all border border-indigo-200 shadow-2xs"
+                                title="Edit & Buka Form Analisis"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                            </div>
+                          </td>
                        </tr>
 
                        {isExpanded && (
@@ -1064,61 +1135,53 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                    </div>
                                  )}
 
-                               </div>
-
-                               <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-                                 <div className="flex items-center gap-2">
-                                   <button
-                                     onClick={() => setViewModalData(r)}
-                                     className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                                   >
-                                     <Eye size={14} /> Lihat Detail Modal & Preview PDF
-                                   </button>
                                  </div>
 
-                                 <div className="flex items-center gap-2">
-                                   <button
-                                     onClick={() => {
-                                       onLoadAnalisis(r.id_analisis);
-                                       setTimeout(() => setActiveTab('form'), 200);
-                                     }}
-                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                                   >
-                                     <Edit3 size={14} /> Edit & Buka Form Analisis
-                                   </button>
+                                 <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                                   <div className="flex items-center gap-2">
+                                     <button
+                                       onClick={() => openDecisionModal(r)}
+                                       className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                                     >
+                                       <FileCheck size={14} /> Detail &amp; Input Keputusan
+                                     </button>
+                                   </div>
 
-                                   <button
-                                     onClick={() => {
-                                       onLoadAnalisis(r.id_analisis);
-                                       setTimeout(() => setActiveTab('pdf'), 200);
-                                     }}
-                                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                                   >
-                                     <Printer size={14} /> Pratinjau PDF Nota
-                                   </button>
+                                   <div className="flex items-center gap-2">
+                                     <button
+                                       onClick={() => {
+                                         onLoadAnalisis(r.id_analisis);
+                                         setTimeout(() => setActiveTab('pdf'), 200);
+                                       }}
+                                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                                     >
+                                       <Printer size={14} /> Pratinjau PDF Nota
+                                     </button>
 
-                                   <button
-                                     onClick={(e) => handleDelete(r.id_analisis, e)}
-                                     className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-200 shadow-sm"
-                                     title="Hapus Arsip"
-                                   >
-                                     <Trash2 size={14} />
-                                   </button>
+                                     <button
+                                       onClick={() => {
+                                         onLoadAnalisis(r.id_analisis);
+                                         setTimeout(() => setActiveTab('form'), 200);
+                                       }}
+                                       className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+                                     >
+                                       <Edit3 size={14} /> Edit Form Lengkap
+                                     </button>
+                                   </div>
                                  </div>
-                               </div>
 
-                             </div>
-                           </td>
-                         </tr>
-                       )}
-                     </React.Fragment>
-                   );
-                 })}
-               </tbody>
-             </table>
-           </div>
-         )}
-      </div>
+                               </div>
+                             </td>
+                           </tr>
+                         )}
+                       </React.Fragment>
+                     );
+                   })}
+                 </tbody>
+               </table>
+             </div>
+           )}
+        </div>
 
       {viewModalData && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -1128,7 +1191,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  {getStatusBadge(viewModalData.keputusan)}
+                  {getStatusBadge(modalKeputusan)}
                   {viewModalData.subyek_persuratan_simaster && (
                     <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-bold">
                       Simaster: {viewModalData.subyek_persuratan_simaster}
@@ -1136,7 +1199,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   )}
                 </div>
                 <h3 className="font-black text-xl text-slate-900 pt-1">
-                  {viewModalData.perihal || 'Detail Nota Analisis'}
+                  {viewModalData.perihal || 'Detail Nota Analisis & Keputusan'}
                 </h3>
                 <p className="text-xs text-slate-500 font-mono">
                   📄 No Surat: <span className="font-bold text-slate-800">{viewModalData.no_surat || '-'}</span> • Unit: <span className="font-bold text-indigo-700">{viewModalData.unit_pengirim || '-'}</span>
@@ -1160,17 +1223,160 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                 </div>
               </div>
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 space-y-1">
-                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nominal Disetujui Pimpinan</span>
+                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nominal Disetujui Saat Ini</span>
                 <div className="text-xl font-black font-mono text-emerald-800">
-                  Rp {formatRp(viewModalData.nominal_disetujui)}
+                  Rp {formatRp(modalNominalDisetujui || viewModalData.nominal_disetujui)}
                 </div>
               </div>
             </div>
 
-            {/* Modal Section 2: Ringkasan AI & Substansi (FULL HTML FORMATTED) */}
+            {/* Modal Section 2: SEKSI FORM KEPUTUSAN & CATATAN PIMPINAN (INTERAKTIF BISA DIISI/DIUBAH) */}
+            <div className="bg-gradient-to-br from-indigo-50/80 via-white to-sky-50/50 p-5 rounded-2xl border-2 border-indigo-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-indigo-100 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-2xs">
+                    <FileCheck size={16} />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xs uppercase tracking-wider text-indigo-950">
+                      Keputusan &amp; Catatan Persetujuan Pimpinan
+                    </h4>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Tentukan status persetujuan, nominal yang disetujui, dan tambahkan catatan keputusan
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Status:</span>
+                  {getStatusBadge(modalKeputusan)}
+                </div>
+              </div>
+
+              {/* Status Radio / Pills */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black uppercase text-gray-700 block">
+                  1. Pilih Status Keputusan:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    { id: 'disetujui semua', label: 'Disetujui Penuh', color: 'emerald' },
+                    { id: 'disetujui sebagian', label: 'Disetujui Sebagian', color: 'amber' },
+                    { id: 'ditolak', label: 'Ditolak', color: 'rose' },
+                    { id: 'perlu revisi', label: 'Perlu Revisi', color: 'purple' },
+                    { id: 'diajukan', label: 'Diajukan (Pending)', color: 'blue' }
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => {
+                        setModalKeputusan(st.id);
+                        if (st.id === 'disetujui semua') {
+                          setModalNominalDisetujui(viewModalData.total_anggaran?.toString() || '0');
+                        } else if (st.id === 'ditolak') {
+                          setModalNominalDisetujui('0');
+                        }
+                      }}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                        modalKeputusan.toLowerCase() === st.id.toLowerCase()
+                          ? st.color === 'emerald'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : st.color === 'amber'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : st.color === 'rose'
+                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                            : st.color === 'purple'
+                            ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                            : 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      <span className="truncate">{st.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nominal Disetujui */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase text-gray-700 block">
+                    2. Nominal Disetujui (Rp):
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setModalNominalDisetujui(viewModalData.total_anggaran?.toString() || '0')}
+                      className="text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 transition-colors"
+                    >
+                      Setujui 100% Penuh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalNominalDisetujui((Math.round(parseNum(viewModalData.total_anggaran) / 2)).toString())}
+                      className="text-[10px] font-bold text-gray-700 hover:bg-gray-100 px-2 py-0.5 rounded border border-gray-200 transition-colors"
+                    >
+                      50%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setModalNominalDisetujui('0')}
+                      className="text-[10px] font-bold text-rose-700 hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 transition-colors"
+                    >
+                      Rp 0
+                    </button>
+                  </div>
+                </div>
+
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-400">Rp</span>
+                  <input
+                    type="text"
+                    value={modalNominalDisetujui}
+                    onChange={e => setModalNominalDisetujui(e.target.value)}
+                    placeholder="Contoh: 150000000"
+                    className="w-full h-10 pl-9 pr-3 bg-white border border-gray-300 rounded-xl font-mono font-bold text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+                  />
+                </div>
+                {modalNominalDisetujui && (
+                  <p className="text-[11px] font-mono text-emerald-700 font-bold">
+                    Terbaca: Rp {formatRp(modalNominalDisetujui)}
+                  </p>
+                )}
+              </div>
+
+              {/* Catatan / Keterangan Keputusan */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black uppercase text-gray-700 block">
+                  3. Catatan / Keterangan Hasil Keputusan Pimpinan:
+                </label>
+                <textarea
+                  rows={3}
+                  value={modalKeteranganKeputusan}
+                  onChange={e => setModalKeteranganKeputusan(e.target.value)}
+                  placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
+                  className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* Save Decision Button */}
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveDecision}
+                  disabled={isSavingDecision}
+                  className="h-10 px-5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                >
+                  {isSavingDecision ? <RefreshCw className="animate-spin" size={15} /> : <Save size={15} />}
+                  <span>Simpan Perubahan Keputusan</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Section 3: Ringkasan AI & Substansi (FULL HTML FORMATTED) */}
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
               <span className="text-[11px] font-black text-indigo-900 uppercase tracking-widest block flex items-center gap-1.5">
-                <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi & AI Note (Lengkap)
+                <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi &amp; AI Note (Lengkap)
               </span>
               {viewModalData.ringkasan_ai ? (
                 <div 
@@ -1183,14 +1389,6 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                 </p>
               )}
             </div>
-
-            {/* Modal Section 3: Keterangan Keputusan Pimpinan (If available) */}
-            {viewModalData.keterangan_keputusan && (
-              <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 space-y-1">
-                <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest block">Catatan / Keterangan Persetujuan Pimpinan</span>
-                <p className="text-xs font-medium text-amber-950">{viewModalData.keterangan_keputusan}</p>
-              </div>
-            )}
 
             {/* Modal Section 4: File Lampiran Original (If available) */}
             {viewModalData.link_lampiran && (
@@ -1226,7 +1424,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   }}
                   className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <Eye size={14} /> View / Preview Nota Analisis PDF
+                  <Eye size={14} /> Pratinjau PDF Nota Lengkap
                 </button>
 
                 <button
@@ -1238,7 +1436,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   }}
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <Edit3 size={14} /> Buka Form & Edit
+                  <Edit3 size={14} /> Buka Form Edit Analisis
                 </button>
               </div>
             </div>
@@ -1250,4 +1448,3 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
     </div>
   );
 }
-
