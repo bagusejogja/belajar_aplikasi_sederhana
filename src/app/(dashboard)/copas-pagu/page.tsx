@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileSpreadsheet, Sparkles, Upload, CheckCircle2, AlertTriangle, 
-  Trash2, Save, RefreshCw, Building2, Landmark, ArrowRight,
-  Database, Search, Filter, Info, Check, X, ChevronLeft, ChevronRight, 
-  ChevronDown, ChevronUp, Copy
+  Trash2, Save, RefreshCw, Database, Search, Info, ChevronLeft, ChevronRight, 
+  ChevronDown, Copy
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
@@ -41,8 +40,6 @@ const JENIS_ANGGARAN_OPTIONS = [
   'Talangan'
 ];
 
-const STATUS_PAGU_OPTIONS = ['Draft', 'Diajukan', 'Disetujui', 'Final'];
-
 export default function CopasPaguPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
   const [rawText, setRawText] = useState('');
@@ -50,10 +47,7 @@ export default function CopasPaguPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [loadingUnits, setLoadingUnits] = useState(true);
 
-  // Configuration & Presets
-  const [defaultStatus, setDefaultStatus] = useState('Draft');
-  const [defaultJenis, setDefaultJenis] = useState('Pagu Awal');
-  const [formatPreset, setFormatPreset] = useState<'auto' | '6col_jenis_ket' | '6col_ket_jenis' | '5col' | '7col'>('auto');
+  // Filter toggle for unconverted units
   const [filterIssueOnly, setFilterIssueOnly] = useState(false);
 
   // Database records list state
@@ -126,7 +120,7 @@ export default function CopasPaguPage() {
     return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
   };
 
-  // Unit matching with smart alias dictionary & fuzzy search
+  // Smart unit matcher with alias dictionary
   const matchUnit = (unitStr: string): { id: number | null; name: string | null } => {
     if (!unitStr || !units.length) return { id: null, name: null };
     const query = unitStr.trim().toLowerCase();
@@ -210,38 +204,26 @@ export default function CopasPaguPage() {
     return { id: null, name: null };
   };
 
-  // Helper to test if a string matches STATUS_PAGU_OPTIONS
-  const matchStatus = (val: string): string | null => {
-    if (!val) return null;
-    const v = val.trim().toLowerCase();
-    const found = STATUS_PAGU_OPTIONS.find(opt => opt.toLowerCase() === v);
-    return found || null;
-  };
-
-  // Helper to test if a string matches JENIS_ANGGARAN_OPTIONS
+  // Exact/Strict matcher for Jenis Anggaran
   const matchJenisAnggaran = (val: string): string | null => {
     if (!val) return null;
     const v = val.trim().toLowerCase();
+    
     const exact = JENIS_ANGGARAN_OPTIONS.find(opt => opt.toLowerCase() === v);
     if (exact) return exact;
 
-    if (v === 'kurang' || v.includes('kurang pagu') || v.includes('pengurangan')) return 'Kurang';
-    if (v === 'tambah' || v.includes('penambahan pagu')) return 'Tambah';
-    if (v.includes('inisiatif')) return 'Tambah Pagu - Inisiatif';
-    if (v.includes('penugasan')) return 'Tambah Pagu - Penugasan';
-    if (v.includes('pagu awal') || v === 'awal' || v === 'rutin') return 'Pagu Awal';
-    if (v.includes('efisiensi')) return 'Efisiensi';
-    if (v.includes('talangan')) return 'Talangan';
+    if (v === 'kurang' || v === 'kurang pagu' || v === 'pengurangan' || v === 'kurang alokasi') return 'Kurang';
+    if (v === 'tambah' || v === 'tambah pagu' || v === 'penambahan' || v === 'tambah alokasi') return 'Tambah';
+    if (v === 'inisiatif' || v === 'tambah inisiatif' || v === 'tambah pagu inisiatif' || v === 'tambah pagu - inisiatif') return 'Tambah Pagu - Inisiatif';
+    if (v === 'penugasan' || v === 'tambah penugasan' || v === 'tambah pagu penugasan' || v === 'tambah pagu - penugasan') return 'Tambah Pagu - Penugasan';
+    if (v === 'pagu awal' || v === 'awal' || v === 'rutin') return 'Pagu Awal';
+    if (v === 'efisiensi') return 'Efisiensi';
+    if (v === 'talangan') return 'Talangan';
 
     return null;
   };
 
-  const parseRawTextToRows = (
-    text: string, 
-    preset = formatPreset, 
-    defStatus = defaultStatus, 
-    defJenis = defaultJenis
-  ) => {
+  const parseRawTextToRows = (text: string) => {
     if (!text.trim()) {
       setParsedRows([]);
       return;
@@ -265,97 +247,61 @@ export default function CopasPaguPage() {
       }
 
       let tahun = new Date().getFullYear().toString();
-      let unitInput = '';
-      let nominalStr = '0';
-      let sumberDana = 'Dana Masyarakat Tidak Mengikat';
+      let remaining = [...rawCols];
+
+      // 1. Tahun
+      if (/^\d{4}$/.test(remaining[0])) {
+        tahun = remaining[0];
+        remaining = remaining.slice(1);
+      }
+
+      // 2. Unit Kerja
+      const unitInput = remaining[0] || '';
+      remaining = remaining.slice(1);
+
+      // 3. Nominal
+      const nominalStr = remaining[0] || '0';
+      const parsedNominal = parseNum(nominalStr);
+      remaining = remaining.slice(1);
+
+      // 4. Sumber Dana
+      const sumberDana = remaining[0] || 'Dana Masyarakat Tidak Mengikat';
+      remaining = remaining.slice(1);
+
+      // 5. Keterangan & Jenis Anggaran
       let keterangan = '-';
-      let statusPagu = defStatus;
-      let jenisAnggaran = defJenis;
+      let jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
 
-      if (preset === '6col_jenis_ket') {
-        // [Tahun] [Unit] [Nominal] [Sumber] [Jenis] [Keterangan]
-        tahun = rawCols[0] || new Date().getFullYear().toString();
-        unitInput = rawCols[1] || '';
-        nominalStr = rawCols[2] || '0';
-        sumberDana = rawCols[3] || 'Dana Masyarakat Tidak Mengikat';
-        jenisAnggaran = matchJenisAnggaran(rawCols[4]) || rawCols[4] || defJenis;
-        keterangan = rawCols[5] || '-';
-        statusPagu = defStatus;
-      } else if (preset === '6col_ket_jenis') {
-        // [Tahun] [Unit] [Nominal] [Sumber] [Keterangan] [Jenis]
-        tahun = rawCols[0] || new Date().getFullYear().toString();
-        unitInput = rawCols[1] || '';
-        nominalStr = rawCols[2] || '0';
-        sumberDana = rawCols[3] || 'Dana Masyarakat Tidak Mengikat';
-        keterangan = rawCols[4] || '-';
-        jenisAnggaran = matchJenisAnggaran(rawCols[5]) || rawCols[5] || defJenis;
-        statusPagu = defStatus;
-      } else if (preset === '5col') {
-        // [Tahun] [Unit] [Nominal] [Sumber] [Keterangan]
-        tahun = rawCols[0] || new Date().getFullYear().toString();
-        unitInput = rawCols[1] || '';
-        nominalStr = rawCols[2] || '0';
-        sumberDana = rawCols[3] || 'Dana Masyarakat Tidak Mengikat';
-        keterangan = rawCols[4] || '-';
-        statusPagu = defStatus;
-        jenisAnggaran = defJenis;
-      } else if (preset === '7col') {
-        // [Tahun] [Unit] [Nominal] [Sumber] [Keterangan] [Status] [Jenis]
-        tahun = rawCols[0] || new Date().getFullYear().toString();
-        unitInput = rawCols[1] || '';
-        nominalStr = rawCols[2] || '0';
-        sumberDana = rawCols[3] || 'Dana Masyarakat Tidak Mengikat';
-        keterangan = rawCols[4] || '-';
-        statusPagu = matchStatus(rawCols[5]) || rawCols[5] || defStatus;
-        jenisAnggaran = matchJenisAnggaran(rawCols[6]) || rawCols[6] || defJenis;
-      } else {
-        // PRESET 'auto': Intelligent Adaptive Parser
-        let cols = [...rawCols];
+      if (remaining.length >= 2) {
+        // We have 2 or more trailing columns (e.g. Keterangan and Jenis Anggaran)
+        const matchedFirst = matchJenisAnggaran(remaining[0]);
+        const matchedSecond = matchJenisAnggaran(remaining[1]);
 
-        // 1. Detect Tahun (Col 0 if 4 digits)
-        if (/^\d{4}$/.test(cols[0])) {
-          tahun = cols[0];
-          cols = cols.slice(1);
-        }
-
-        // 2. Detect Unit
-        unitInput = cols[0] || '';
-        cols = cols.slice(1);
-
-        // 3. Detect Nominal
-        nominalStr = cols[0] || '0';
-        cols = cols.slice(1);
-
-        // 4. Detect Sumber Dana
-        sumberDana = cols[0] || 'Dana Masyarakat Tidak Mengikat';
-        cols = cols.slice(1);
-
-        // 5. Remaining cols (could be 1, 2, or 3 cells)
-        // Inspect for Status match first
-        const statusIdx = cols.findIndex(c => matchStatus(c) !== null);
-        if (statusIdx !== -1) {
-          statusPagu = matchStatus(cols[statusIdx])!;
-          cols.splice(statusIdx, 1);
+        if (matchedFirst && !matchedSecond) {
+          // Format: [Jenis Anggaran] [Keterangan]
+          jenisAnggaran = matchedFirst;
+          keterangan = remaining.slice(1).join(' - ');
+        } else if (matchedSecond && !matchedFirst) {
+          // Format: [Keterangan] [Jenis Anggaran] (Standard user Excel layout)
+          keterangan = remaining[0];
+          jenisAnggaran = matchedSecond;
         } else {
-          statusPagu = defStatus;
+          // Neither or both match; evaluate by length or position
+          if (remaining[1].length <= 25 && remaining[0].length > 25) {
+            keterangan = remaining[0];
+            jenisAnggaran = matchJenisAnggaran(remaining[1]) || (parsedNominal < 0 ? 'Kurang' : remaining[1]);
+          } else {
+            keterangan = remaining[0] || '-';
+            jenisAnggaran = matchJenisAnggaran(remaining[1]) || (parsedNominal < 0 ? 'Kurang' : 'Pagu Awal');
+          }
         }
-
-        // Inspect for Jenis Anggaran match
-        const jenisIdx = cols.findIndex(c => matchJenisAnggaran(c) !== null);
-        if (jenisIdx !== -1) {
-          jenisAnggaran = matchJenisAnggaran(cols[jenisIdx])!;
-          cols.splice(jenisIdx, 1);
-        } else {
-          jenisAnggaran = defJenis;
-        }
-
-        // Any remaining text is Keterangan
-        const remainingKet = cols.filter(c => c && c.trim() !== '').join(' - ').trim();
-        keterangan = remainingKet || '-';
+      } else if (remaining.length === 1) {
+        // 1 column left: Keterangan
+        keterangan = remaining[0] || '-';
+        jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
       }
 
       const matched = matchUnit(unitInput);
-      const parsedNominal = parseNum(nominalStr);
 
       result.push({
         id: `row-${index}-${Date.now()}`,
@@ -366,8 +312,8 @@ export default function CopasPaguPage() {
         nominal: parsedNominal,
         sumber_dana: sumberDana || 'Dana Masyarakat Tidak Mengikat',
         keterangan: keterangan || '-',
-        status_pagu: statusPagu || defStatus,
-        jenis_anggaran: jenisAnggaran || defJenis,
+        status_pagu: 'Draft', // Saved automatically to DB as Draft
+        jenis_anggaran: jenisAnggaran || 'Pagu Awal',
         isValid: matched.id !== null && parsedNominal !== 0
       });
     });
@@ -378,34 +324,7 @@ export default function CopasPaguPage() {
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setRawText(val);
-    parseRawTextToRows(val, formatPreset, defaultStatus, defaultJenis);
-  };
-
-  const handlePresetChange = (newPreset: typeof formatPreset) => {
-    setFormatPreset(newPreset);
-    if (rawText) {
-      parseRawTextToRows(rawText, newPreset, defaultStatus, defaultJenis);
-    }
-  };
-
-  const handleDefaultStatusChange = (newStatus: string) => {
-    setDefaultStatus(newStatus);
-    if (rawText) {
-      parseRawTextToRows(rawText, formatPreset, newStatus, defaultJenis);
-    }
-  };
-
-  const handleDefaultJenisChange = (newJenis: string) => {
-    setDefaultJenis(newJenis);
-    if (rawText) {
-      parseRawTextToRows(rawText, formatPreset, defaultStatus, newJenis);
-    }
-  };
-
-  // Bulk update all parsed rows
-  const handleBulkSetStatus = (status: string) => {
-    setParsedRows(prev => prev.map(r => ({ ...r, status_pagu: status })));
-    toast.success(`Status semua baris berhasil diubah ke "${status}"`);
+    parseRawTextToRows(val);
   };
 
   const handleBulkSetJenis = (jenis: string) => {
@@ -430,20 +349,19 @@ export default function CopasPaguPage() {
           .join('\n');
 
         setRawText(textLines);
-        parseRawTextToRows(textLines, formatPreset, defaultStatus, defaultJenis);
+        parseRawTextToRows(textLines);
       };
       reader.readAsBinaryString(file);
     }
   };
 
   const loadExampleData = () => {
-    // Example without status column to demonstrate auto-mapping
-    const example = `2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tKurang\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026
-2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tTambah\tPenambahan alokasi program kerja tahun 2026
-2026\tFakultas Biologi\t4828145097\tBPPTN\tPagu Awal\tPagu Awal TA 2026
-2026\tBiro Manajemen Strategis\t186500000\tBPPTN\tTambah Pagu - Inisiatif\tUsulan Tambahan Pagu Prioritas 2026`;
+    const example = `2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tKurang
+2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tTambah
+2026\tFakultas Biologi\t4828145097\tBPPTN\tPagu Awal TA 2026\tPagu Awal
+2026\tBiro Manajemen Strategis\t186500000\tBPPTN\tUsulan Tambahan Pagu Prioritas\tTambah Pagu - Inisiatif`;
     setRawText(example);
-    parseRawTextToRows(example, formatPreset, defaultStatus, defaultJenis);
+    parseRawTextToRows(example);
   };
 
   const handleRowUnitChange = (rowId: string, newUnitId: number) => {
@@ -492,7 +410,7 @@ export default function CopasPaguPage() {
       nominal: r.nominal,
       sumber_dana: r.sumber_dana,
       keterangan: r.keterangan,
-      status_pagu: r.status_pagu,
+      status_pagu: 'Draft', // default status
       jenis_anggaran: r.jenis_anggaran
     }));
 
@@ -608,7 +526,7 @@ export default function CopasPaguPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Copas Zone Pagu Anggaran</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                Auto-Mapping Unit &amp; Kolom
+                Format 6 Kolom
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">Copy-paste masal pagu anggaran dari spreadsheet ke tabel gov_pagu_anggaran</p>
@@ -621,7 +539,7 @@ export default function CopasPaguPage() {
             className="h-9 px-3 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs"
           >
             <Sparkles size={14} className="text-amber-600" />
-            <span>Isi Contoh (Format Tanpa Kolom Status)</span>
+            <span>Isi Contoh Format Excel</span>
           </button>
 
           <label className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer">
@@ -632,155 +550,67 @@ export default function CopasPaguPage() {
         </div>
       </div>
 
-      {/* PENGATURAN FORMAT & SMART COLUMN DETECTOR */}
-      <div className="p-4 bg-gradient-to-br from-indigo-50/70 via-white to-sky-50/50 border border-indigo-100 rounded-2xl shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-indigo-100/80 pb-2.5">
+      {/* FORMAT KOLOM GUIDE (6 KOLOM SESUAI EXCEL) */}
+      <div className="p-4 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 border border-amber-200 rounded-2xl text-amber-950 text-xs shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-600 text-white rounded-lg">
-              <Sparkles size={14} />
+            <div className="p-1 bg-amber-500 text-white rounded-lg">
+              <Info size={14} />
             </div>
-            <div>
-              <span className="font-black text-xs uppercase tracking-wide text-indigo-950 block">
-                Pengaturan Deteksi Kolom &amp; Nilai Default
-              </span>
-              <p className="text-[11px] text-gray-500">
-                Jika Excel tidak memiliki kolom <strong>Status</strong>, sistem otomatis mengisi Status default tanpa merusak urutan <strong>Jenis Anggaran</strong> dan <strong>Keterangan</strong>.
-              </p>
-            </div>
+            <span className="font-black text-xs uppercase tracking-wide text-amber-900">
+              Urutan Kolom Excel / Spreadsheet (6 Kolom Standar):
+            </span>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => {
-                const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tJenis Anggaran\tKeterangan";
-                navigator.clipboard.writeText(headerText);
-                toast.success("Header 6 Kolom (Tahun, Unit, Nominal, Sumber, Jenis, Keterangan) berhasil disalin!");
-              }}
-              className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 shadow-2xs"
-              title="Salin header 6 kolom standar (tanpa kolom status)"
-            >
-              <Copy size={12} /> Salin Header 6 Kolom (Standar)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tKeterangan\tStatus\tJenis Anggaran";
-                navigator.clipboard.writeText(headerText);
-                toast.success("Header 7 Kolom Lengkap berhasil disalin ke clipboard!");
-              }}
-              className="text-[11px] font-bold text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 shadow-2xs"
-              title="Salin header 7 kolom lengkap"
-            >
-              <Copy size={12} /> Salin Header 7 Kolom
-            </button>
-          </div>
-        </div>
-
-        {/* Toolbar Controls for Presets & Defaults */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 block mb-1">
-              Mode Format Kolom Excel:
-            </label>
-            <select
-              value={formatPreset}
-              onChange={e => handlePresetChange(e.target.value as any)}
-              className="w-full h-8 px-2.5 bg-white border border-indigo-200 rounded-xl font-bold text-indigo-950 outline-none focus:border-indigo-500 shadow-2xs cursor-pointer"
-            >
-              <option value="auto">✨ Otomatis (Cerdas &amp; Fleksibel - Disarankan)</option>
-              <option value="6col_jenis_ket">📄 6 Kolom: [Tahun] [Unit] [Nominal] [Sumber] [Jenis] [Keterangan]</option>
-              <option value="6col_ket_jenis">📄 6 Kolom: [Tahun] [Unit] [Nominal] [Sumber] [Keterangan] [Jenis]</option>
-              <option value="5col">📄 5 Kolom: [Tahun] [Unit] [Nominal] [Sumber] [Keterangan]</option>
-              <option value="7col">📄 7 Kolom: [Tahun] [Unit] [Nominal] [Sumber] [Keterangan] [Status] [Jenis]</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 block mb-1">
-              Default Status (Jika Excel Tanpa Kolom Status):
-            </label>
-            <div className="flex items-center gap-1.5">
-              <select
-                value={defaultStatus}
-                onChange={e => handleDefaultStatusChange(e.target.value)}
-                className="w-full h-8 px-2.5 bg-white border border-indigo-200 rounded-xl font-bold text-emerald-800 outline-none focus:border-indigo-500 shadow-2xs cursor-pointer"
-              >
-                {STATUS_PAGU_OPTIONS.map(st => (
-                  <option key={st} value={st}>{st}</option>
-                ))}
-              </select>
-              {parsedRows.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleBulkSetStatus(defaultStatus)}
-                  className="h-8 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-[10px] font-black shrink-0 transition-colors"
-                  title="Terapkan status default ke semua baris di bawah"
-                >
-                  Terapkan Semua
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-black uppercase text-gray-500 block mb-1">
-              Default Jenis Anggaran:
-            </label>
-            <div className="flex items-center gap-1.5">
-              <select
-                value={defaultJenis}
-                onChange={e => handleDefaultJenisChange(e.target.value)}
-                className="w-full h-8 px-2.5 bg-white border border-indigo-200 rounded-xl font-bold text-indigo-900 outline-none focus:border-indigo-500 shadow-2xs cursor-pointer"
-              >
-                {JENIS_ANGGARAN_OPTIONS.map(j => (
-                  <option key={j} value={j}>{j}</option>
-                ))}
-              </select>
-              {parsedRows.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleBulkSetJenis(defaultJenis)}
-                  className="h-8 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-xl text-[10px] font-black shrink-0 transition-colors"
-                  title="Terapkan jenis anggaran ke semua baris di bawah"
-                >
-                  Terapkan Semua
-                </button>
-              )}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tKeterangan\tJenis Anggaran";
+              navigator.clipboard.writeText(headerText);
+              toast.success("Header 6 Kolom Excel berhasil disalin!");
+            }}
+            className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 self-start sm:self-auto"
+            title="Salin judul kolom ini untuk ditempel di Excel sebagai baris kepala"
+          >
+            <Copy size={12} /> Salin Header Excel
+          </button>
         </div>
 
         {/* Visual Columns Breakdown */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 font-mono text-[11px] pt-1">
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[1] Tahun</span>
-            <strong className="text-gray-900 block truncate">2026</strong>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 font-mono text-[11px]">
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 1</span>
+            <strong className="text-gray-900 block truncate">Tahun</strong>
+            <span className="text-[10px] text-gray-400">Contoh: 2026</span>
           </div>
 
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[2] Nama Unit</span>
-            <strong className="text-gray-900 block truncate">Unit Kerja / ID</strong>
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 2</span>
+            <strong className="text-gray-900 block truncate">Nama Unit</strong>
+            <span className="text-[10px] text-gray-400">Fakultas / Unit</span>
           </div>
 
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[3] Nominal</span>
-            <strong className="text-gray-900 block truncate">Rp / Angka</strong>
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 3</span>
+            <strong className="text-gray-900 block truncate">Nominal</strong>
+            <span className="text-[10px] text-gray-400">Positif / Negatif</span>
           </div>
 
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[4] Sumber Dana</span>
-            <strong className="text-gray-900 block truncate">Dana Masy. / BPPTN</strong>
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 4</span>
+            <strong className="text-gray-900 block truncate">Sumber Dana</strong>
+            <span className="text-[10px] text-gray-400">Dana Masyarakat / BPPTN</span>
           </div>
 
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[5] Jenis Anggaran</span>
-            <strong className="text-gray-900 block truncate">Kurang / Tambah / Awal</strong>
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 5</span>
+            <strong className="text-gray-900 block truncate">Keterangan</strong>
+            <span className="text-[10px] text-gray-400">Uraian / Redaksi Surat</span>
           </div>
 
-          <div className="bg-white p-2 rounded-xl border border-indigo-100 shadow-2xs">
-            <span className="text-[9px] font-black text-indigo-600 block uppercase">[6] Keterangan</span>
-            <strong className="text-gray-900 block truncate">Uraian / Redaksi Surat</strong>
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 6</span>
+            <strong className="text-gray-900 block truncate">Jenis Anggaran</strong>
+            <span className="text-[10px] text-gray-400">Kurang / Tambah / Awal</span>
           </div>
         </div>
       </div>
@@ -815,15 +645,15 @@ export default function CopasPaguPage() {
           <div>[2] Nama Unit</div>
           <div>[3] Nominal</div>
           <div>[4] Sumber Dana</div>
-          <div>[5] Jenis Anggaran</div>
-          <div>[6] Keterangan / Uraian</div>
+          <div>[5] Keterangan</div>
+          <div>[6] Jenis Anggaran</div>
         </div>
 
         <textarea
           value={rawText}
           onChange={handleTextChange}
           rows={6}
-          placeholder={`Tempelkan (Ctrl+V) baris tabel data dari Excel di sini...\n\nContoh data yang dicopy dari Excel (6 Kolom tanpa Kolom Status):\n2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tKurang\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026\n2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tTambah\tPenambahan alokasi program kerja`}
+          placeholder={`Tempelkan (Ctrl+V) baris tabel data dari Excel di sini...\n\nContoh data yang dicopy dari Excel:\n2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tKurang\n2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tTambah`}
           className="w-full p-3 bg-gray-50/80 border border-gray-200 rounded-b-xl -mt-2.5 outline-none focus:border-indigo-500 focus:bg-white font-mono text-xs text-gray-900 transition-colors leading-relaxed resize-none"
         />
       </div>
@@ -888,7 +718,6 @@ export default function CopasPaguPage() {
                   <th className="py-2.5 px-3">Hasil Konversi Unit</th>
                   <th className="py-2.5 px-3 text-right">Nominal</th>
                   <th className="py-2.5 px-3">Sumber Dana</th>
-                  <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3">Jenis Anggaran</th>
                   <th className="py-2.5 px-3">Keterangan</th>
                   <th className="py-2.5 px-3 text-center w-10">Aksi</th>
@@ -947,17 +776,6 @@ export default function CopasPaguPage() {
                     </td>
                     <td className="py-2.5 px-3">
                       <select
-                        value={r.status_pagu}
-                        onChange={e => handleRowChange(r.id, 'status_pagu', e.target.value)}
-                        className="p-1 bg-white border border-gray-200 rounded text-xs font-bold text-gray-800 outline-none"
-                      >
-                        {STATUS_PAGU_OPTIONS.map(st => (
-                          <option key={st} value={st}>{st}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <select
                         value={r.jenis_anggaran}
                         onChange={e => handleRowChange(r.id, 'jenis_anggaran', e.target.value)}
                         className="p-1 bg-white border border-gray-200 rounded text-xs font-bold text-indigo-900 outline-none max-w-[140px]"
@@ -973,7 +791,7 @@ export default function CopasPaguPage() {
                         value={r.keterangan}
                         onChange={e => handleRowChange(r.id, 'keterangan', e.target.value)}
                         placeholder="Keterangan / uraian..."
-                        className="w-full min-w-[180px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
+                        className="w-full min-w-[200px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
                       />
                     </td>
                     <td className="py-2.5 px-3 text-center">
@@ -1102,7 +920,7 @@ export default function CopasPaguPage() {
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
                 <th className="py-3 px-4 w-12 text-center">No</th>
-                <th className="py-3 px-4">Informasi Pagu (Unit, Tahun, Jenis, Status)</th>
+                <th className="py-3 px-4">Informasi Pagu (Unit, Tahun, Jenis)</th>
                 <th className="py-3 px-4 text-right w-44">Nominal</th>
                 <th className="py-3 px-4">Keterangan</th>
               </tr>
@@ -1131,7 +949,6 @@ export default function CopasPaguPage() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 font-bold">
                         <span className="bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded text-[10px]">Thn {r.tahun_anggaran}</span>
                         <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded text-[10px] border border-indigo-100">{r.jenis_anggaran || '-'}</span>
-                        <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded text-[10px] border border-emerald-100">{r.status_pagu || 'Disetujui'}</span>
                         <span className="bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded text-[10px] border border-amber-100">{r.sumber_dana || '-'}</span>
                       </div>
                     </td>
