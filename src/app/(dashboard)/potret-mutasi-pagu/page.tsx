@@ -24,6 +24,9 @@ export default function PotretMutasiPaguPage() {
   
   // Filter States
   const [selectedYear, setSelectedYear] = useState('2026');
+  const [availableYearsList, setAvailableYearsList] = useState<string[]>([
+    '2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019'
+  ]);
   const [selectedGroupOrg, setSelectedGroupOrg] = useState('ALL');
   const [selectedUnit, setSelectedUnit] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -228,17 +231,18 @@ export default function PotretMutasiPaguPage() {
         pengeluaran: peng
       });
 
-      // 3. Compute Multi-Tahun Chart (2019 - 2026) using complete rows
-      const chartMap: Record<string, any> = {
-        '2019': { tahun: '2019', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2020': { tahun: '2020', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2021': { tahun: '2021', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2022': { tahun: '2022', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2023': { tahun: '2023', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2024': { tahun: '2024', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2025': { tahun: '2025', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-        '2026': { tahun: '2026', pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 },
-      };
+      // Extract all distinct years from DB + standard years list
+      const dbYears = allPaguRows.map((r: any) => r.tahun_anggaran?.toString()).filter(Boolean);
+      const standardYears = ['2027', '2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019'];
+      const dynamicYearsDesc = Array.from(new Set([...dbYears, ...standardYears])).sort((a, b) => Number(b) - Number(a));
+      setAvailableYearsList(dynamicYearsDesc);
+
+      // 3. Compute Multi-Tahun Chart dynamically for all years (chronological oldest to newest)
+      const dynamicYearsAsc = [...dynamicYearsDesc].sort((a, b) => Number(a) - Number(b));
+      const chartMap: Record<string, any> = {};
+      dynamicYearsAsc.forEach(y => {
+        chartMap[y] = { tahun: y, pagu_awal: 0, tambah_penugasan: 0, tambah_inisiatif: 0, total_pagu: 0, realisasi: 0 };
+      });
 
       allPaguRows.forEach(mp => {
         if (!filteredUnitIds.has(mp.unit_id)) return;
@@ -452,14 +456,9 @@ export default function PotretMutasiPaguPage() {
               onChange={(e) => setSelectedYear(e.target.value)}
               className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
             >
-              <option value="2026">2026</option>
-              <option value="2025">2025</option>
-              <option value="2024">2024</option>
-              <option value="2023">2023</option>
-              <option value="2022">2022</option>
-              <option value="2021">2021</option>
-              <option value="2020">2020</option>
-              <option value="2019">2019</option>
+              {availableYearsList.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
 
