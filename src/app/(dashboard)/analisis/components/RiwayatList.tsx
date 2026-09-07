@@ -601,11 +601,10 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => openDecisionModal(r)}
-                                className="h-8.5 px-3 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl transition-all shadow-xs flex items-center gap-1.5 font-bold text-xs"
-                                title="Lihat Isi Dokumen & Input/Tambah Keputusan"
+                                className="p-2.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl transition-all border border-indigo-200 shadow-2xs flex items-center justify-center"
+                                title="Lihat Pop-up Detail & Keputusan"
                               >
-                                <FileCheck size={14} />
-                                <span>Detail &amp; Keputusan</span>
+                                <Eye size={15} />
                               </button>
 
                               <button
@@ -613,10 +612,10 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                   onLoadAnalisis(r.id_analisis);
                                   setTimeout(() => setActiveTab('pdf'), 200);
                                 }}
-                                className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all border border-slate-200 shadow-2xs"
+                                className="p-2.5 bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white rounded-xl transition-all border border-slate-200 shadow-2xs flex items-center justify-center"
                                 title="Pratinjau PDF Nota Analisis"
                               >
-                                <Printer size={14} />
+                                <Printer size={15} />
                               </button>
 
                               <button
@@ -624,10 +623,10 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                   onLoadAnalisis(r.id_analisis);
                                   setTimeout(() => setActiveTab('form'), 200);
                                 }}
-                                className="p-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all border border-indigo-200 shadow-2xs"
+                                className="p-2.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl transition-all border border-emerald-200 shadow-2xs flex items-center justify-center"
                                 title="Edit & Buka Form Analisis"
                               >
-                                <Edit3 size={14} />
+                                <Edit3 size={15} />
                               </button>
                             </div>
                           </td>
@@ -1141,9 +1140,9 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                    <div className="flex items-center gap-2">
                                      <button
                                        onClick={() => openDecisionModal(r)}
-                                       className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                                       className="px-4 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
                                      >
-                                       <FileCheck size={14} /> Detail &amp; Input Keputusan
+                                       <Eye size={14} /> Lihat Detail &amp; Keputusan
                                      </button>
                                    </div>
 
@@ -1153,7 +1152,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                          onLoadAnalisis(r.id_analisis);
                                          setTimeout(() => setActiveTab('pdf'), 200);
                                        }}
-                                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                                       className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                                      >
                                        <Printer size={14} /> Pratinjau PDF Nota
                                      </button>
@@ -1163,7 +1162,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                          onLoadAnalisis(r.id_analisis);
                                          setTimeout(() => setActiveTab('form'), 200);
                                        }}
-                                       className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+                                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                                      >
                                        <Edit3 size={14} /> Edit Form Lengkap
                                      </button>
