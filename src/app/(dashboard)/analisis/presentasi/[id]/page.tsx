@@ -90,8 +90,8 @@ export default function PresentasiAnalisisPage() {
   };
 
   const formatRp = (val: any) => {
-    const num = parseNum(val);
-    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+    const num = Math.round(parseNum(val) || 0);
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
   };
 
   const fetchAnalisisData = async () => {

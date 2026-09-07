@@ -21,7 +21,10 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
     return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
   };
   
-  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+  const formatRp = (num: number | string) => {
+    const val = Math.round(parseNum(num) || 0);
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+  };
 
   const showTambahPaguPenugasan = historisData?.some((d: any) => d.tambah_pagu_penugasan && d.tambah_pagu_penugasan !== '0');
   const showTambahPaguInisiatif = historisData?.some((d: any) => d.tambah_pagu_inisiatif && d.tambah_pagu_inisiatif !== '0');
@@ -266,18 +269,18 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
             <table className="w-full text-left text-sm text-gray-700">
               <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs sticky top-0 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 w-16 text-center">No</th>
+                  <th className="px-4 py-3 w-16 text-center whitespace-nowrap">No</th>
                   <th className="px-4 py-3">Uraian Kegiatan</th>
-                  <th className="px-4 py-3 text-right">Anggaran</th>
-                  <th className="px-4 py-3 text-right">Realisasi</th>
-                  <th className="px-4 py-3 text-right">Sisa Anggaran</th>
-                  <th className="px-4 py-3 text-center w-20">%</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Anggaran</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Realisasi</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Sisa Anggaran</th>
+                  <th className="px-4 py-3 text-center w-20 whitespace-nowrap">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {[...(detailData || [])].sort((a: any, b: any) => (Number(a.no_urut) || 0) - (Number(b.no_urut) || 0)).map((d: any, idx: number) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-center font-bold text-gray-600">{d.no_urut}</td>
+                    <td className="px-4 py-3 text-center font-bold text-gray-600 whitespace-nowrap">{d.no_urut}</td>
                     <td className="px-4 py-3 min-w-[280px]">
                       {readOnly ? (
                         <div className="whitespace-normal break-words leading-relaxed text-xs sm:text-sm text-gray-800 font-medium py-0.5">
@@ -292,9 +295,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       {readOnly ? (
-                        <span className="font-mono font-bold text-gray-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.anggaran))}</span>
+                        <span className="font-mono font-bold text-gray-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.anggaran))}</span>
                       ) : (
                         <input type="text" value={d.anggaran} onChange={(e) => {
                           const newD = [...detailData];
@@ -303,9 +306,9 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       {readOnly ? (
-                        <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.realisasi))}</span>
+                        <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.realisasi))}</span>
                       ) : (
                         <input type="text" value={d.realisasi} onChange={(e) => {
                           const newD = [...detailData];
@@ -314,12 +317,12 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                         }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono text-xs sm:text-sm">
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono text-xs sm:text-sm whitespace-nowrap">
                       Rp {formatRp((parseNum(d.anggaran) || 0) - (parseNum(d.realisasi) || 0))}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
                       {readOnly ? (
-                        <span className="font-bold text-emerald-600 font-mono text-xs">{d.persen_serapan || '0%'}</span>
+                        <span className="font-bold text-emerald-600 font-mono text-xs whitespace-nowrap">{d.persen_serapan || '0%'}</span>
                       ) : (
                         <input type="text" value={d.persen_serapan} onChange={(e) => {
                           const newD = [...detailData];
