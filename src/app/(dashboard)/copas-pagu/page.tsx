@@ -5,10 +5,11 @@ import {
   FileSpreadsheet, Sparkles, Upload, CheckCircle2, AlertTriangle, 
   Trash2, Save, RefreshCw, Building2, Landmark, ArrowRight,
   Database, Search, Filter, Info, Check, X, ChevronLeft, ChevronRight, 
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Copy
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
+import toast from 'react-hot-toast';
 
 interface GovUnit {
   id: number;
@@ -415,44 +416,118 @@ export default function CopasPaguPage() {
         </div>
       </div>
 
-      {/* GUIDE CARD */}
-      <div className="p-3.5 px-4 bg-amber-50/60 border border-amber-200 rounded-xl text-amber-900 text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-        <div className="flex items-center gap-2">
-          <Info size={16} className="text-amber-600 shrink-0" />
-          <span className="font-bold">Format Kolom Excel (Tab Separated):</span>
+      {/* GUIDE CARD & FORMAT KOLOM */}
+      <div className="p-4 bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 border border-amber-200/90 rounded-2xl text-amber-950 text-xs shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-amber-500 text-white rounded-lg">
+              <Info size={14} />
+            </div>
+            <span className="font-black text-xs uppercase tracking-wide text-amber-900">
+              Urutan Kolom Excel / Spreadsheet (Wajib Berurutan dari Kiri ke Kanan):
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tKeterangan\tStatus\tJenis Anggaran";
+              navigator.clipboard.writeText(headerText);
+              toast.success("Header kolom Excel berhasil disalin ke clipboard!");
+            }}
+            className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 self-start sm:self-auto"
+            title="Salin judul kolom ini untuk ditempel di Excel sebagai baris kepala"
+          >
+            <Copy size={12} /> Salin Header Kolom Excel
+          </button>
         </div>
-        <div className="flex flex-wrap gap-1 text-[11px] font-mono">
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">1. Tahun</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">2. Nama Unit</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">3. Nominal</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">4. Sumber Dana</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">5. Keterangan</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">6. Status</span>
-          <span className="bg-white px-2 py-0.5 rounded border border-amber-200 text-amber-800">7. Jenis Anggaran</span>
+
+        {/* Visual Columns Breakdown */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 font-mono text-[11px]">
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 1</span>
+            <strong className="text-gray-900 block truncate">Tahun</strong>
+            <span className="text-[10px] text-gray-400">Contoh: 2026</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 2</span>
+            <strong className="text-gray-900 block truncate">Nama Unit</strong>
+            <span className="text-[10px] text-gray-400">Fakultas / Unit</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 3</span>
+            <strong className="text-gray-900 block truncate">Nominal</strong>
+            <span className="text-[10px] text-gray-400">186500000</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 4</span>
+            <strong className="text-gray-900 block truncate">Sumber Dana</strong>
+            <span className="text-[10px] text-gray-400">BPPTN / RUK</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 5</span>
+            <strong className="text-gray-900 block truncate">Keterangan</strong>
+            <span className="text-[10px] text-gray-400">Uraian pagu</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 6</span>
+            <strong className="text-gray-900 block truncate">Status</strong>
+            <span className="text-[10px] text-gray-400">Disetujui / Draft</span>
+          </div>
+
+          <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 7</span>
+            <strong className="text-gray-900 block truncate">Jenis Anggaran</strong>
+            <span className="text-[10px] text-gray-400">Pagu Awal / Tambah</span>
+          </div>
         </div>
       </div>
 
       {/* INPUT TEXTAREA ZONE */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs space-y-2.5">
+      <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200/80 shadow-xs space-y-2.5">
         <div className="flex justify-between items-center">
-          <label className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-            <FileSpreadsheet className="text-indigo-600" size={15} /> Area Paste Data (Copas Zone)
-          </label>
-          {rawText && (
-            <button 
-              onClick={() => { setRawText(''); setParsedRows([]); }} 
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex items-center gap-1"
-            >
-              <Trash2 size={13} /> Bersihkan
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+              <FileSpreadsheet className="text-indigo-600" size={16} /> Area Paste Data (Copas Zone)
+            </label>
+            <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+              (Blok tabel di Excel &bull; Tekan Ctrl+C &bull; Klik di kotak ini &bull; Tekan Ctrl+V)
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {rawText && (
+              <button 
+                type="button"
+                onClick={() => { setRawText(''); setParsedRows([]); }} 
+                className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+              >
+                <Trash2 size={13} /> Bersihkan
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Visual Column Header Guide above Textarea */}
+        <div className="grid grid-cols-7 gap-1 px-3 py-1.5 bg-slate-100/90 rounded-t-xl border border-slate-200 text-[10px] font-mono font-black text-slate-600 uppercase">
+          <div>[1] Tahun</div>
+          <div>[2] Nama Unit</div>
+          <div>[3] Nominal</div>
+          <div>[4] Sumber Dana</div>
+          <div>[5] Keterangan</div>
+          <div>[6] Status</div>
+          <div>[7] Jenis Anggaran</div>
+        </div>
+
         <textarea
           value={rawText}
           onChange={handleTextChange}
-          rows={5}
-          placeholder="Tempelkan (Ctrl+V) baris data dari Excel di sini..."
-          className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-indigo-500 focus:bg-white font-mono text-xs text-gray-900 transition-colors leading-relaxed resize-none"
+          rows={6}
+          placeholder={`Tempelkan (Ctrl+V) baris tabel data dari Excel di sini...\n\nContoh data yang dicopy dari Excel:\n2026\tBiro Manajemen Strategis\t186500000\tBPPTN\tUsulan Tambahan Pagu\tDisetujui\tTambah Pagu - Inisiatif\n2026\tFakultas Biologi\t4828145097\tBPPTN\tPagu Awal TA 2026\tDisetujui\tPagu Awal\n2026\tDirektorat Perencanaan\t126776000\tRUK\tPengalihan Alokasi Program\tDisetujui\tKurang`}
+          className="w-full p-3 bg-gray-50/80 border border-gray-200 rounded-b-xl -mt-2.5 outline-none focus:border-indigo-500 focus:bg-white font-mono text-xs text-gray-900 transition-colors leading-relaxed resize-none"
         />
       </div>
 
