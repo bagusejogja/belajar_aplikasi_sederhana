@@ -193,7 +193,7 @@ export default function CopasPaguPage() {
         keterangan: keterangan || '-',
         status_pagu: statusPagu || 'Disetujui',
         jenis_anggaran: jenisAnggaran || 'Pagu Awal',
-        isValid: matched.id !== null && parsedNominal > 0
+        isValid: matched.id !== null && parsedNominal !== 0
       };
     });
 
@@ -232,7 +232,7 @@ export default function CopasPaguPage() {
   const loadExampleData = () => {
     const example = `2026\tBiro Manajemen Strategis\t186500000\tBPPTN\tUsulan Tambahan Pagu\tDisetujui\tTambah Pagu - Inisiatif
 2026\tFakultas Biologi\t4828145097\tBPPTN\tPagu Awal TA 2026\tDisetujui\tPagu Awal
-2026\tDirektorat Perencanaan\t126776000\tRUK\tPengalihan Alokasi Program\tDisetujui\tKurang
+2026\tDirektorat Perencanaan\t-126776000\tRUK\tPengalihan Alokasi Program\tDisetujui\tKurang
 2026\tFakultas Ekonomika dan Bisnis\t1591175273\tBPPTN\tPagu Penugasan Prioritas\tDisetujui\tTambah Pagu - Penugasan`;
     setRawText(example);
     parseRawTextToRows(example);
@@ -246,7 +246,7 @@ export default function CopasPaguPage() {
           ...r,
           unit_id: newUnitId,
           matched_unit_name: selectedUnit?.nama_unit || null,
-          isValid: newUnitId !== null && r.nominal > 0
+          isValid: newUnitId !== null && r.nominal !== 0
         };
       }
       return r;
@@ -260,7 +260,7 @@ export default function CopasPaguPage() {
         if (field === 'nominal') {
           updated.nominal = parseNum(value);
         }
-        updated.isValid = updated.unit_id !== null && updated.nominal > 0;
+        updated.isValid = updated.unit_id !== null && updated.nominal !== 0;
         return updated;
       }
       return r;
