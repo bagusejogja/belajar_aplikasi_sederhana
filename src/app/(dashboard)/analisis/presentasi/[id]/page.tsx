@@ -601,22 +601,8 @@ export default function PresentasiAnalisisPage() {
           </div>
         </div>
 
-        {/* SECTION 2: DATA PENDUKUNG (TAMPIL SEPERTI SAAT INPUT) */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs">
-          <DataPendukung 
-            mainData={data} 
-            setMainData={setData} 
-            detailData={details} 
-            setDetailData={setDetails} 
-            historisData={historis} 
-            setHistorisData={setHistoris} 
-            renderMode="tabs" 
-            readOnly={true} 
-          />
-        </div>
-
         {/* ========================================================================= */}
-        {/* SECTION 3: POSISI PAGU TAHUN 2026 & HISTORI USULAN TAMBAH PAGU UNIT KERJA */}
+        {/* SECTION 2: POSISI PAGU TAHUN 2026 & HISTORI USULAN TAMBAH PAGU UNIT KERJA (ATAS) */}
         {/* ========================================================================= */}
         {(() => {
           const historis2026 = historis.find((h: any) => h.tahun === '2026' || h.tahun?.toString().includes('2026')) || historis[historis.length - 1] || {};
@@ -651,11 +637,11 @@ export default function PresentasiAnalisisPage() {
                 </div>
               </div>
 
-              {/* Grid Content: 2 Kolom (Kiri: Posisi Pagu 2026, Kanan: Histori Usulan Unit) */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Susunan Atas - Bawah */}
+              <div className="space-y-8">
                 
-                {/* 1. POSISI PAGU TAHUN 2026 */}
-                <div className="lg:col-span-5 space-y-3">
+                {/* 1. POSISI PAGU TAHUN 2026 (ATAS) */}
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-black uppercase tracking-widest text-slate-700">
                       1. Posisi Pagu Tahun 2026 {data.tanggal_surat ? `(per ${data.tanggal_surat})` : ''}
@@ -664,63 +650,63 @@ export default function PresentasiAnalisisPage() {
                   </div>
 
                   <div className="bg-slate-50/50 border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-xs text-left">
+                    <table className="w-full text-xs sm:text-sm text-left">
                       <tbody className="divide-y divide-slate-100 font-mono">
                         <tr className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-2.5 font-sans font-medium text-slate-700 w-1/2">Pagu Awal</td>
-                          <td className="px-4 py-2.5 text-right text-slate-900 font-semibold">Rp {formatRp(historis2026.pagu_awal || '0')}</td>
+                          <td className="px-5 py-3 font-sans font-medium text-slate-700 w-1/2">Pagu Awal</td>
+                          <td className="px-5 py-3 text-right text-slate-900 font-semibold">Rp {formatRp(historis2026.pagu_awal || '0')}</td>
                         </tr>
                         <tr className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-2.5 font-sans font-medium text-slate-700">Pengalihan (+/-)</td>
-                          <td className="px-4 py-2.5 text-right text-purple-700 font-semibold">Rp {formatRp(historis2026.pengalihan || '0')}</td>
+                          <td className="px-5 py-3 font-sans font-medium text-slate-700">Pengalihan (+/-)</td>
+                          <td className="px-5 py-3 text-right text-purple-700 font-semibold">Rp {formatRp(historis2026.pengalihan || '0')}</td>
                         </tr>
                         {parseNum(historis2026.tambah_pagu_inisiatif) > 0 && (
                           <tr className="hover:bg-emerald-50/40 text-emerald-800 transition-colors">
-                            <td className="px-4 py-2.5 font-sans font-medium">Tambah Pagu Inisiatif (+)</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-emerald-700">+ Rp {formatRp(Math.abs(parseNum(historis2026.tambah_pagu_inisiatif)))}</td>
+                            <td className="px-5 py-3 font-sans font-medium">Tambah Pagu Inisiatif (+)</td>
+                            <td className="px-5 py-3 text-right font-bold text-emerald-700">+ Rp {formatRp(Math.abs(parseNum(historis2026.tambah_pagu_inisiatif)))}</td>
                           </tr>
                         )}
                         {parseNum(historis2026.tambah_pagu_penugasan) > 0 && (
                           <tr className="hover:bg-emerald-50/40 text-emerald-800 transition-colors">
-                            <td className="px-4 py-2.5 font-sans font-medium">Tambah Pagu Penugasan (+)</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-emerald-700">+ Rp {formatRp(Math.abs(parseNum(historis2026.tambah_pagu_penugasan)))}</td>
+                            <td className="px-5 py-3 font-sans font-medium">Tambah Pagu Penugasan (+)</td>
+                            <td className="px-5 py-3 text-right font-bold text-emerald-700">+ Rp {formatRp(Math.abs(parseNum(historis2026.tambah_pagu_penugasan)))}</td>
                           </tr>
                         )}
                         {parseNum(historis2026.efisiensi) !== 0 && (
                           <tr className="hover:bg-rose-50/40 text-rose-800 transition-colors">
-                            <td className="px-4 py-2.5 font-sans font-medium">Efisiensi (-)</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-rose-700">- Rp {formatRp(Math.abs(parseNum(historis2026.efisiensi)))}</td>
+                            <td className="px-5 py-3 font-sans font-medium">Efisiensi (-)</td>
+                            <td className="px-5 py-3 text-right font-bold text-rose-700">- Rp {formatRp(Math.abs(parseNum(historis2026.efisiensi)))}</td>
                           </tr>
                         )}
                         {parseNum(historis2026.talangan) > 0 && (
                           <tr className="hover:bg-amber-50/40 text-amber-800 transition-colors">
-                            <td className="px-4 py-2.5 font-sans font-medium">Talangan (+)</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-amber-700">+ Rp {formatRp(historis2026.talangan)}</td>
+                            <td className="px-5 py-3 font-sans font-medium">Talangan (+)</td>
+                            <td className="px-5 py-3 text-right font-bold text-amber-700">+ Rp {formatRp(historis2026.talangan)}</td>
                           </tr>
                         )}
                         <tr className="bg-indigo-50/70 border-t border-indigo-100 font-bold text-indigo-950">
-                          <td className="px-4 py-3 font-sans">Pagu Terkini Sampai Saat Ini</td>
-                          <td className="px-4 py-3 text-right text-xs sm:text-sm font-black text-indigo-900">Rp {formatRp(totalPagu2026)}</td>
+                          <td className="px-5 py-3 font-sans">Pagu Terkini Sampai Saat Ini</td>
+                          <td className="px-5 py-3 text-right text-sm font-black text-indigo-900">Rp {formatRp(totalPagu2026)}</td>
                         </tr>
                         <tr className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-2.5 font-sans font-medium text-slate-700">Realisasi S.d. Saat Ini</td>
-                          <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">Rp {formatRp(totalRealisasiBelanja)}</td>
+                          <td className="px-5 py-3 font-sans font-medium text-slate-700">Realisasi S.d. Saat Ini</td>
+                          <td className="px-5 py-3 text-right text-slate-800 font-semibold">Rp {formatRp(totalRealisasiBelanja)}</td>
                         </tr>
                         <tr className="bg-emerald-50/70 border-t border-emerald-100 font-bold text-emerald-950">
-                          <td className="px-4 py-3 font-sans">Sisa Kapasitas Pagu</td>
-                          <td className="px-4 py-3 text-right text-xs sm:text-sm font-black text-emerald-900">Rp {formatRp(sisaKapasitas2026)}</td>
+                          <td className="px-5 py-3 font-sans">Sisa Kapasitas Pagu</td>
+                          <td className="px-5 py-3 text-right text-sm font-black text-emerald-900">Rp {formatRp(sisaKapasitas2026)}</td>
                         </tr>
                         <tr className="bg-amber-50/80 border-t-2 border-amber-200 font-bold text-amber-950">
-                          <td className="px-4 py-3 font-sans">Nominal Usulan Tambahan Pagu</td>
-                          <td className="px-4 py-3 text-right text-xs sm:text-sm font-black text-amber-900">Rp {formatRp(nominalUsulan)}</td>
+                          <td className="px-5 py-3 font-sans">Nominal Usulan Tambahan Pagu</td>
+                          <td className="px-5 py-3 text-right text-sm font-black text-amber-900">Rp {formatRp(nominalUsulan)}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* 2. HISTORI USULAN TAMBAH PAGU UNIT KERJA */}
-                <div className="lg:col-span-7 space-y-4">
+                {/* 2. HISTORI USULAN TAMBAH PAGU UNIT KERJA (BAWAH) */}
+                <div className="space-y-4 pt-4 border-t border-slate-200/80">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-black uppercase tracking-widest text-slate-700">
                       2. Histori Usulan Tambah Pagu Unit Kerja
@@ -732,39 +718,39 @@ export default function PresentasiAnalisisPage() {
 
                   {/* A. Tambah Pagu Inisiatif */}
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
                       <span className="font-black text-xs uppercase tracking-wider text-slate-800">
                         A. Tambah Pagu Inisiatif
                       </span>
-                      <span className="text-[11px] font-bold text-emerald-700 font-mono">
+                      <span className="text-xs font-bold text-emerald-700 font-mono">
                         Total: Rp {formatRp(totalInisiatifNominal)}
                       </span>
                     </div>
 
                     {detailInisiatif.length === 0 ? (
-                      <div className="p-4 text-center text-slate-400 italic text-xs">
+                      <div className="p-5 text-center text-slate-400 italic text-xs">
                         Belum ada detail Tambah Pagu Inisiatif untuk unit ini.
                       </div>
                     ) : (
-                      <table className="w-full text-xs text-left">
+                      <table className="w-full text-xs sm:text-sm text-left">
                         <thead className="bg-slate-50/60 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-100">
                           <tr>
-                            <th className="px-3 py-2 text-center w-10">No</th>
-                            <th className="px-4 py-2">Uraian / Keterangan Tambah Pagu</th>
-                            <th className="px-4 py-2 text-right whitespace-nowrap">Nominal (Rp)</th>
+                            <th className="px-4 py-2.5 text-center w-12">No</th>
+                            <th className="px-5 py-2.5">Uraian / Keterangan Tambah Pagu</th>
+                            <th className="px-5 py-2.5 text-right whitespace-nowrap">Nominal (Rp)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {detailInisiatif.map((h: any, i: number) => (
                             <tr key={h.id || i} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-3 py-2.5 text-center font-bold text-slate-500">{i + 1}</td>
-                              <td className="px-4 py-2.5">
+                              <td className="px-4 py-3 text-center font-bold text-slate-500">{i + 1}</td>
+                              <td className="px-5 py-3">
                                 <div className="font-bold text-slate-900 leading-snug">{h.keterangan || '-'}</div>
-                                <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                <div className="text-[11px] text-slate-400 font-medium mt-1">
                                   Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-700 font-bold">{h.status_pagu || 'Disetujui'}</span>
                                 </div>
                               </td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              <td className="px-5 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                                 Rp {formatRp(parseNum(h.nominal))}
                               </td>
                             </tr>
@@ -776,39 +762,39 @@ export default function PresentasiAnalisisPage() {
 
                   {/* B. Tambah Pagu Penugasan */}
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                    <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
                       <span className="font-black text-xs uppercase tracking-wider text-slate-800">
                         B. Tambah Pagu Penugasan
                       </span>
-                      <span className="text-[11px] font-bold text-emerald-700 font-mono">
+                      <span className="text-xs font-bold text-emerald-700 font-mono">
                         Total: Rp {formatRp(totalPenugasanNominal)}
                       </span>
                     </div>
 
                     {detailPenugasan.length === 0 ? (
-                      <div className="p-4 text-center text-slate-400 italic text-xs">
+                      <div className="p-5 text-center text-slate-400 italic text-xs">
                         Belum ada detail Tambah Pagu Penugasan untuk unit ini.
                       </div>
                     ) : (
-                      <table className="w-full text-xs text-left">
+                      <table className="w-full text-xs sm:text-sm text-left">
                         <thead className="bg-slate-50/60 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-100">
                           <tr>
-                            <th className="px-3 py-2 text-center w-10">No</th>
-                            <th className="px-4 py-2">Uraian / Keterangan Tambah Pagu</th>
-                            <th className="px-4 py-2 text-right whitespace-nowrap">Nominal (Rp)</th>
+                            <th className="px-4 py-2.5 text-center w-12">No</th>
+                            <th className="px-5 py-2.5">Uraian / Keterangan Tambah Pagu</th>
+                            <th className="px-5 py-2.5 text-right whitespace-nowrap">Nominal (Rp)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {detailPenugasan.map((h: any, i: number) => (
                             <tr key={h.id || i} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-3 py-2.5 text-center font-bold text-slate-500">{i + 1}</td>
-                              <td className="px-4 py-2.5">
+                              <td className="px-4 py-3 text-center font-bold text-slate-500">{i + 1}</td>
+                              <td className="px-5 py-3">
                                 <div className="font-bold text-slate-900 leading-snug">{h.keterangan || '-'}</div>
-                                <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                <div className="text-[11px] text-slate-400 font-medium mt-1">
                                   Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-700 font-bold">{h.status_pagu || 'Disetujui'}</span>
                                 </div>
                               </td>
-                              <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              <td className="px-5 py-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                                 Rp {formatRp(parseNum(h.nominal))}
                               </td>
                             </tr>
@@ -821,7 +807,7 @@ export default function PresentasiAnalisisPage() {
                   {/* C. Riwayat Surat Usulan Tambah Pagu Sebelumnya (Jika Ada) */}
                   {riwayatUsulanUnit.length > 0 && (
                     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                      <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
                         <span className="font-black text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                           <History size={13} className="text-indigo-600" />
                           Arsip Surat Pengajuan Terdahulu ({data.unit_pengirim})
@@ -830,32 +816,32 @@ export default function PresentasiAnalisisPage() {
                           {riwayatUsulanUnit.length} Surat
                         </span>
                       </div>
-                      <div className="overflow-x-auto max-h-[220px] custom-scrollbar">
-                        <table className="w-full text-xs text-left">
+                      <div className="overflow-x-auto max-h-[260px] custom-scrollbar">
+                        <table className="w-full text-xs sm:text-sm text-left">
                           <thead className="bg-slate-50/60 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-100 sticky top-0">
                             <tr>
-                              <th className="px-3 py-2 text-center w-10">No</th>
-                              <th className="px-4 py-2">No &amp; Perihal Surat</th>
-                              <th className="px-4 py-2 text-right">Nominal Usulan</th>
-                              <th className="px-4 py-2 text-right">Disetujui</th>
-                              <th className="px-4 py-2 text-center">Status</th>
+                              <th className="px-4 py-2.5 text-center w-12">No</th>
+                              <th className="px-5 py-2.5">No &amp; Perihal Surat</th>
+                              <th className="px-5 py-2.5 text-right">Nominal Usulan</th>
+                              <th className="px-5 py-2.5 text-right">Disetujui</th>
+                              <th className="px-5 py-2.5 text-center">Status</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-mono">
                             {riwayatUsulanUnit.map((s: any, idx: number) => (
                               <tr key={s.id_analisis || idx} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-3 py-2 text-center font-sans text-slate-500">{idx + 1}</td>
-                                <td className="px-4 py-2 font-sans">
+                                <td className="px-4 py-2.5 text-center font-sans text-slate-500">{idx + 1}</td>
+                                <td className="px-5 py-2.5 font-sans">
                                   <div className="font-bold text-slate-800">{s.no_surat || s.id_analisis}</div>
-                                  <div className="text-[10px] text-slate-500 line-clamp-1">{s.perihal || '-'}</div>
+                                  <div className="text-[11px] text-slate-500 line-clamp-1">{s.perihal || '-'}</div>
                                 </td>
-                                <td className="px-4 py-2 text-right font-bold text-slate-800 whitespace-nowrap">
+                                <td className="px-5 py-2.5 text-right font-bold text-slate-800 whitespace-nowrap">
                                   Rp {formatRp(parseNum(s.total_anggaran))}
                                 </td>
-                                <td className="px-4 py-2 text-right font-bold text-emerald-700 whitespace-nowrap">
+                                <td className="px-5 py-2.5 text-right font-bold text-emerald-700 whitespace-nowrap">
                                   Rp {formatRp(parseNum(s.nominal_disetujui || 0))}
                                 </td>
-                                <td className="px-4 py-2 text-center font-sans whitespace-nowrap">
+                                <td className="px-5 py-2.5 text-center font-sans whitespace-nowrap">
                                   {getStatusBadge(s.keputusan)}
                                 </td>
                               </tr>
@@ -872,6 +858,20 @@ export default function PresentasiAnalisisPage() {
             </div>
           );
         })()}
+
+        {/* SECTION 3: DATA PENDUKUNG / TABEL REALISASI (DIBAWAH POSISI PAGU & HISTORI USULAN) */}
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs">
+          <DataPendukung 
+            mainData={data} 
+            setMainData={setData} 
+            detailData={details} 
+            setDetailData={setDetails} 
+            historisData={historis} 
+            setHistorisData={setHistoris} 
+            renderMode="tabs" 
+            readOnly={true} 
+          />
+        </div>
         {data.rekomendasi_ai && (
           <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
