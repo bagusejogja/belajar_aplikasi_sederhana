@@ -275,39 +275,58 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {detailData?.map((d: any, idx: number) => (
+                {[...(detailData || [])].sort((a: any, b: any) => (Number(a.no_urut) || 0) - (Number(b.no_urut) || 0)).map((d: any, idx: number) => (
                   <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-center">{d.no_urut}</td>
-                    <td className="px-4 py-3">
-                      <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
-                        const newD = [...detailData];
-                        newD[idx].uraian_kegiatan = e.target.value;
-                        setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
+                    <td className="px-4 py-3 text-center font-bold text-gray-600">{d.no_urut}</td>
+                    <td className="px-4 py-3 min-w-[280px]">
+                      {readOnly ? (
+                        <div className="whitespace-normal break-words leading-relaxed text-xs sm:text-sm text-gray-800 font-medium py-0.5">
+                          {d.uraian_kegiatan || '-'}
+                        </div>
+                      ) : (
+                        <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
+                          const newD = [...detailData];
+                          const targetIdx = detailData.findIndex((item: any) => item === d || item.no_urut === d.no_urut);
+                          if (targetIdx !== -1) newD[targetIdx].uraian_kegiatan = e.target.value;
+                          setDetailData(newD);
+                        }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
+                      )}
                     </td>
-                    <td className="px-4 py-3">
-                      <input type="text" value={d.anggaran} onChange={(e) => {
-                        const newD = [...detailData];
-                        newD[idx].anggaran = e.target.value;
-                        setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                    <td className="px-4 py-3 text-right">
+                      {readOnly ? (
+                        <span className="font-mono font-bold text-gray-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.anggaran))}</span>
+                      ) : (
+                        <input type="text" value={d.anggaran} onChange={(e) => {
+                          const newD = [...detailData];
+                          newD[idx].anggaran = e.target.value;
+                          setDetailData(newD);
+                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                      )}
                     </td>
-                    <td className="px-4 py-3">
-                      <input type="text" value={d.realisasi} onChange={(e) => {
-                        const newD = [...detailData];
-                        newD[idx].realisasi = e.target.value;
-                        setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                    <td className="px-4 py-3 text-right">
+                      {readOnly ? (
+                        <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.realisasi))}</span>
+                      ) : (
+                        <input type="text" value={d.realisasi} onChange={(e) => {
+                          const newD = [...detailData];
+                          newD[idx].realisasi = e.target.value;
+                          setDetailData(newD);
+                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-emerald-600">
-                      {new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format((parseFloat((d.anggaran || '0').toString().replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]+/g, '')) || 0) - (parseFloat((d.realisasi || '0').toString().replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]+/g, '')) || 0))}
+                    <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono text-xs sm:text-sm">
+                      Rp {formatRp((parseNum(d.anggaran) || 0) - (parseNum(d.realisasi) || 0))}
                     </td>
-                    <td className="px-4 py-3">
-                      <input type="text" value={d.persen_serapan} onChange={(e) => {
-                        const newD = [...detailData];
-                        newD[idx].persen_serapan = e.target.value;
-                        setDetailData(newD);
-                      }} className="w-full bg-transparent outline-none text-center font-bold text-emerald-600 focus:border-b border-emerald-500"/>
+                    <td className="px-4 py-3 text-center">
+                      {readOnly ? (
+                        <span className="font-bold text-emerald-600 font-mono text-xs">{d.persen_serapan || '0%'}</span>
+                      ) : (
+                        <input type="text" value={d.persen_serapan} onChange={(e) => {
+                          const newD = [...detailData];
+                          newD[idx].persen_serapan = e.target.value;
+                          setDetailData(newD);
+                        }} className="w-full bg-transparent outline-none text-center font-bold text-emerald-600 focus:border-b border-emerald-500"/>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -341,6 +360,19 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                       data={historisData.map((d: any) => {
+                        const rVal = (() => {
+                          const val = parseNum(d.realisasi_historis);
+                          if (val > 0) return val;
+                          if (d.tahun === '2026' || d.tahun?.toString().includes('2026')) {
+                            const fromBerjalan = parseNum(mainData?.pagu_berjalan?.realisasi_keseluruhan);
+                            if (fromBerjalan > 0) return fromBerjalan;
+                            const fromDetail = detailData?.reduce((acc: number, item: any) => acc + parseNum(item.realisasi), 0) || 0;
+                            if (fromDetail > 0) return fromDetail;
+                            return parseNum(mainData?.total_realisasi) || 0;
+                          }
+                          return 0;
+                        })();
+
                         return {
                           tahun: d.tahun,
                           PaguAwal: parseNum(d.pagu_awal),
@@ -350,7 +382,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                           Efisiensi: -Math.abs(parseNum(d.efisiensi)),
                           Talangan: parseNum(d.talangan),
                           total_pagu: d.total_pagu,
-                          Realisasi: parseNum(d.realisasi_historis),
+                          Realisasi: rVal,
                         };
                       })}
                       margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
@@ -391,95 +423,153 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {historisData?.map((d: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.tahun} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].tahun = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-20 bg-transparent outline-none font-bold text-gray-700 focus:border-b border-indigo-500"/>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.pagu_awal} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].pagu_awal = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.pengalihan} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].pengalihan = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
-                      </td>
-                      {showTambahPaguPenugasan && (
-                         <td className="px-4 py-3">
-                           <input type="text" value={d.tambah_pagu_penugasan} onChange={(e) => {
-                             const newD = [...historisData];
-                             newD[idx].tambah_pagu_penugasan = e.target.value;
-                             setHistorisData(newD);
-                           }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
-                         </td>
-                      )}
-                      {showTambahPaguInisiatif && (
-                         <td className="px-4 py-3">
-                           <input type="text" value={d.tambah_pagu_inisiatif} onChange={(e) => {
-                             const newD = [...historisData];
-                             newD[idx].tambah_pagu_inisiatif = e.target.value;
-                             setHistorisData(newD);
-                           }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
-                         </td>
-                      )}
-                      {showEfisiensi && (
-                         <td className="px-4 py-3">
-                           <input type="text" value={d.efisiensi} onChange={(e) => {
-                             const newD = [...historisData];
-                             newD[idx].efisiensi = e.target.value;
-                             setHistorisData(newD);
-                           }} className="w-full bg-transparent outline-none text-right text-rose-600 focus:border-b border-indigo-500"/>
-                         </td>
-                      )}
-                      {showTalangan && (
-                         <td className="px-4 py-3">
-                           <input type="text" value={d.talangan} onChange={(e) => {
-                             const newD = [...historisData];
-                             newD[idx].talangan = e.target.value;
-                             setHistorisData(newD);
-                           }} className="w-full bg-transparent outline-none text-right text-amber-600 focus:border-b border-indigo-500"/>
-                         </td>
-                      )}
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.total_pagu} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].total_pagu = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-full bg-transparent outline-none text-right font-bold text-indigo-700 focus:border-b border-indigo-500"/>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.realisasi_historis || ''} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].realisasi_historis = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-full bg-transparent outline-none text-right text-rose-500 focus:border-b border-indigo-500" placeholder="0"/>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input type="text" value={d.persen_serapan || ''} onChange={(e) => {
-                          const newD = [...historisData];
-                          newD[idx].persen_serapan = e.target.value;
-                          setHistorisData(newD);
-                        }} className="w-full bg-transparent outline-none text-center focus:border-b border-indigo-500" placeholder="0%"/>
-                      </td>
-                      {!readOnly && (
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-                            <Trash2 size={16} />
-                          </button>
+                  {historisData?.map((d: any, idx: number) => {
+                    const rVal = (() => {
+                      const val = parseNum(d.realisasi_historis);
+                      if (val > 0) return val;
+                      if (d.tahun === '2026' || d.tahun?.toString().includes('2026')) {
+                        const fromBerjalan = parseNum(mainData?.pagu_berjalan?.realisasi_keseluruhan);
+                        if (fromBerjalan > 0) return fromBerjalan;
+                        const fromDetail = detailData?.reduce((acc: number, item: any) => acc + parseNum(item.realisasi), 0) || 0;
+                        if (fromDetail > 0) return fromDetail;
+                        return parseNum(mainData?.total_realisasi) || 0;
+                      }
+                      return 0;
+                    })();
+
+                    const tot = parseNum(d.total_pagu);
+                    const pctStr = (tot > 0 && rVal > 0) ? `${((rVal / tot) * 100).toFixed(2)}%` : (d.persen_serapan || '0%');
+
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-gray-700">
+                          {readOnly ? d.tahun : (
+                            <input type="text" value={d.tahun} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].tahun = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-20 bg-transparent outline-none font-bold text-gray-700 focus:border-b border-indigo-500"/>
+                          )}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3 text-right">
+                          {readOnly ? (
+                            <span className="font-mono text-gray-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.pagu_awal))}</span>
+                          ) : (
+                            <input type="text" value={d.pagu_awal} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].pagu_awal = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {readOnly ? (
+                            <span className="font-mono text-purple-700 text-xs sm:text-sm">{parseNum(d.pengalihan) !== 0 ? `Rp ${formatRp(parseNum(d.pengalihan))}` : '-'}</span>
+                          ) : (
+                            <input type="text" value={d.pengalihan} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].pengalihan = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                          )}
+                        </td>
+                        {showTambahPaguPenugasan && (
+                           <td className="px-4 py-3 text-right">
+                             {readOnly ? (
+                               <span className="font-mono text-emerald-700 text-xs sm:text-sm">{parseNum(d.tambah_pagu_penugasan) !== 0 ? `Rp ${formatRp(parseNum(d.tambah_pagu_penugasan))}` : '-'}</span>
+                             ) : (
+                               <input type="text" value={d.tambah_pagu_penugasan} onChange={(e) => {
+                                 const newD = [...historisData];
+                                 newD[idx].tambah_pagu_penugasan = e.target.value;
+                                 setHistorisData(newD);
+                               }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                             )}
+                           </td>
+                        )}
+                        {showTambahPaguInisiatif && (
+                           <td className="px-4 py-3 text-right">
+                             {readOnly ? (
+                               <span className="font-mono text-teal-700 text-xs sm:text-sm">{parseNum(d.tambah_pagu_inisiatif) !== 0 ? `Rp ${formatRp(parseNum(d.tambah_pagu_inisiatif))}` : '-'}</span>
+                             ) : (
+                               <input type="text" value={d.tambah_pagu_inisiatif} onChange={(e) => {
+                                 const newD = [...historisData];
+                                 newD[idx].tambah_pagu_inisiatif = e.target.value;
+                                 setHistorisData(newD);
+                               }} className="w-full bg-transparent outline-none text-right focus:border-b border-indigo-500"/>
+                             )}
+                           </td>
+                        )}
+                        {showEfisiensi && (
+                           <td className="px-4 py-3 text-right">
+                             {readOnly ? (
+                               <span className="font-mono text-rose-600 text-xs sm:text-sm">{parseNum(d.efisiensi) !== 0 ? `Rp ${formatRp(parseNum(d.efisiensi))}` : '-'}</span>
+                             ) : (
+                               <input type="text" value={d.efisiensi} onChange={(e) => {
+                                 const newD = [...historisData];
+                                 newD[idx].efisiensi = e.target.value;
+                                 setHistorisData(newD);
+                               }} className="w-full bg-transparent outline-none text-right text-rose-600 focus:border-b border-indigo-500"/>
+                             )}
+                           </td>
+                        )}
+                        {showTalangan && (
+                           <td className="px-4 py-3 text-right">
+                             {readOnly ? (
+                               <span className="font-mono text-amber-600 text-xs sm:text-sm">{parseNum(d.talangan) !== 0 ? `Rp ${formatRp(parseNum(d.talangan))}` : '-'}</span>
+                             ) : (
+                               <input type="text" value={d.talangan} onChange={(e) => {
+                                 const newD = [...historisData];
+                                 newD[idx].talangan = e.target.value;
+                                 setHistorisData(newD);
+                               }} className="w-full bg-transparent outline-none text-right text-amber-600 focus:border-b border-indigo-500"/>
+                             )}
+                           </td>
+                        )}
+                        <td className="px-4 py-3 text-right">
+                          {readOnly ? (
+                            <span className="font-mono font-black text-indigo-700 text-xs sm:text-sm">Rp {formatRp(parseNum(d.total_pagu))}</span>
+                          ) : (
+                            <input type="text" value={d.total_pagu} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].total_pagu = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-full bg-transparent outline-none text-right font-bold text-indigo-700 focus:border-b border-indigo-500"/>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {readOnly ? (
+                            <span className="font-mono font-bold text-rose-600 text-xs sm:text-sm">
+                              {rVal > 0 ? `Rp ${formatRp(rVal)}` : '-'}
+                            </span>
+                          ) : (
+                            <input type="text" value={d.realisasi_historis || ''} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].realisasi_historis = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-full bg-transparent outline-none text-right text-rose-500 focus:border-b border-indigo-500" placeholder="0"/>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {readOnly ? (
+                            <span className="font-mono font-bold text-indigo-700 text-xs sm:text-sm">{pctStr}</span>
+                          ) : (
+                            <input type="text" value={d.persen_serapan || ''} onChange={(e) => {
+                              const newD = [...historisData];
+                              newD[idx].persen_serapan = e.target.value;
+                              setHistorisData(newD);
+                            }} className="w-full bg-transparent outline-none text-center focus:border-b border-indigo-500" placeholder="0%"/>
+                          )}
+                        </td>
+                        {!readOnly && (
+                          <td className="px-4 py-3 text-center">
+                            <button onClick={() => setHistorisData(historisData.filter((_: any, i: number) => i !== idx))} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                   {(!historisData || historisData.length === 0) && (
                     <tr>
                       <td colSpan={readOnly ? 10 : 11} className="px-4 py-8 text-center text-gray-500 italic">Belum ada data pagu historis.</td>

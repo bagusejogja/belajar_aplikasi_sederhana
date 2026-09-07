@@ -40,6 +40,15 @@ function terbilang(n: number): string {
   return hasil ? `${hasil} rupiah` : 'nol rupiah';
 }
 
+function cleanHtmlContent(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/<p><\/p>/g, '')
+    .replace(/<p>\s*<\/p>/g, '');
+}
+
 export default function PresentasiAnalisisPage() {
   const params = useParams();
   const router = useRouter();
@@ -192,23 +201,25 @@ export default function PresentasiAnalisisPage() {
       setHistoris(parsedHistoris);
 
       // Parse and clean details
-      const cleanedDetail = (detailRes.data || []).map((d: any, idx: number) => {
-        let uraian = (d.uraian_kegiatan || d.uraian_belanja || '').toString();
-        const firstLetter = uraian.match(/[a-zA-Z]/);
-        if (firstLetter && firstLetter.index !== undefined) {
-          uraian = uraian.substring(firstLetter.index).trim();
-        } else {
-          uraian = uraian.trim();
-        }
-        return {
-          ...d,
-          no_urut: d.no_urut || idx + 1,
-          uraian_kegiatan: uraian || '-',
-          anggaran: d.anggaran || d.nominal_usulan || '0',
-          realisasi: d.realisasi || d.realisasi_berjalan || '0',
-          persen_serapan: d.persen_serapan || '0%'
-        };
-      });
+      const cleanedDetail = (detailRes.data || [])
+        .map((d: any, idx: number) => {
+          let uraian = (d.uraian_kegiatan || d.uraian_belanja || '').toString();
+          const firstLetter = uraian.match(/[a-zA-Z]/);
+          if (firstLetter && firstLetter.index !== undefined) {
+            uraian = uraian.substring(firstLetter.index).trim();
+          } else {
+            uraian = uraian.trim();
+          }
+          return {
+            ...d,
+            no_urut: Number(d.no_urut) || idx + 1,
+            uraian_kegiatan: uraian || '-',
+            anggaran: d.anggaran || d.nominal_usulan || '0',
+            realisasi: d.realisasi || d.realisasi_berjalan || '0',
+            persen_serapan: d.persen_serapan || '0%'
+          };
+        })
+        .sort((a, b) => (Number(a.no_urut) || 0) - (Number(b.no_urut) || 0));
       setDetails(cleanedDetail);
 
       // Initialize form values
@@ -528,11 +539,11 @@ export default function PresentasiAnalisisPage() {
               </label>
               <span className="text-[10px] text-slate-400 font-bold uppercase">Sesuai Input &amp; Simpan</span>
             </div>
-            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs">
               {data.ringkasan_ai ? (
                 <div 
-                  className="prose prose-slate max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] text-xs leading-relaxed text-slate-800 [&_*]:max-w-full [&_*]:break-words [&_*]:whitespace-normal [&_p]:mb-2.5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
-                  dangerouslySetInnerHTML={{ __html: data.ringkasan_ai }}
+                  className="prose prose-slate max-w-none w-full text-xs sm:text-sm leading-relaxed text-slate-800 break-normal [overflow-wrap:break-word] text-justify [&_p]:text-justify [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1.5 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
+                  dangerouslySetInnerHTML={{ __html: cleanHtmlContent(data.ringkasan_ai) }}
                 />
               ) : (
                 <p className="text-xs text-slate-500 italic">
@@ -557,7 +568,7 @@ export default function PresentasiAnalisisPage() {
           />
         </div>
 
-        {/* SECTION 3: REKOMENDASI AI & DASAR PERTIMBANGAN (READ ONLY) - Dirapikan teksnya & tidak keluar kotak */}
+        {/* SECTION 3: REKOMENDASI AI & DASAR PERTIMBANGAN (READ ONLY) - Teks rapi & tertata */}
         {data.rekomendasi_ai && (
           <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -569,10 +580,10 @@ export default function PresentasiAnalisisPage() {
                 <Lock size={12} /> Tinjauan Pertimbangan
               </span>
             </div>
-            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs">
               <div 
-                className="prose prose-slate max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] text-xs leading-relaxed text-slate-800 [&_*]:max-w-full [&_*]:break-words [&_*]:whitespace-normal [&_p]:mb-2.5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
-                dangerouslySetInnerHTML={{ __html: data.rekomendasi_ai }}
+                className="prose prose-slate max-w-none w-full text-xs sm:text-sm leading-relaxed text-slate-800 break-normal [overflow-wrap:break-word] text-justify [&_p]:text-justify [&_p]:mb-3 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1.5 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
+                dangerouslySetInnerHTML={{ __html: cleanHtmlContent(data.rekomendasi_ai) }}
               />
             </div>
           </div>
