@@ -125,7 +125,7 @@ export default function CopasPaguPage() {
     const query = unitStr.trim().toLowerCase();
 
     const exact = units.find(
-      u => u.nama_unit.toLowerCase() === query || u.kode_unit.toLowerCase() === query
+      u => u.nama_unit.toLowerCase() === query || u.kode_unit.toLowerCase() === query || u.id.toString() === query
     );
     if (exact) return { id: exact.id, name: exact.nama_unit };
 
