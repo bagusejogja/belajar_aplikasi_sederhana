@@ -147,17 +147,8 @@ export default function PresentasiAnalisisPage() {
         };
       }
 
-      // Hitung realisasi otomatis dari rincian detail agar langsung terisi tanpa delay
-      const totalDetailRealisasi = (detailRes.data || []).reduce((acc: number, d: any) => {
-        return acc + parseNum(d.realisasi || d.realisasi_berjalan);
-      }, 0);
-
-      if (!paguBerjalan.realisasi_keseluruhan || parseNum(paguBerjalan.realisasi_keseluruhan) === 0) {
-        if (totalDetailRealisasi > 0) {
-          paguBerjalan.realisasi_keseluruhan = totalDetailRealisasi.toString();
-        } else if (row.total_realisasi && parseNum(row.total_realisasi) > 0) {
-          paguBerjalan.realisasi_keseluruhan = row.total_realisasi.toString();
-        }
+      if (!paguBerjalan.realisasi_keseluruhan) {
+        paguBerjalan.realisasi_keseluruhan = row.total_realisasi ? row.total_realisasi.toString() : '0';
       }
 
       const loadedMainData = {

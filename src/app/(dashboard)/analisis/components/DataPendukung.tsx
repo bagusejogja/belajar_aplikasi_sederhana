@@ -360,18 +360,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart
                       data={historisData.map((d: any) => {
-                        const rVal = (() => {
-                          const val = parseNum(d.realisasi_historis);
-                          if (val > 0) return val;
-                          if (d.tahun === '2026' || d.tahun?.toString().includes('2026')) {
-                            const fromBerjalan = parseNum(mainData?.pagu_berjalan?.realisasi_keseluruhan);
-                            if (fromBerjalan > 0) return fromBerjalan;
-                            const fromDetail = detailData?.reduce((acc: number, item: any) => acc + parseNum(item.realisasi), 0) || 0;
-                            if (fromDetail > 0) return fromDetail;
-                            return parseNum(mainData?.total_realisasi) || 0;
-                          }
-                          return 0;
-                        })();
+                        const rVal = parseNum(d.realisasi_historis);
 
                         return {
                           tahun: d.tahun,
@@ -424,18 +413,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {historisData?.map((d: any, idx: number) => {
-                    const rVal = (() => {
-                      const val = parseNum(d.realisasi_historis);
-                      if (val > 0) return val;
-                      if (d.tahun === '2026' || d.tahun?.toString().includes('2026')) {
-                        const fromBerjalan = parseNum(mainData?.pagu_berjalan?.realisasi_keseluruhan);
-                        if (fromBerjalan > 0) return fromBerjalan;
-                        const fromDetail = detailData?.reduce((acc: number, item: any) => acc + parseNum(item.realisasi), 0) || 0;
-                        if (fromDetail > 0) return fromDetail;
-                        return parseNum(mainData?.total_realisasi) || 0;
-                      }
-                      return 0;
-                    })();
+                    const rVal = parseNum(d.realisasi_historis);
 
                     const tot = parseNum(d.total_pagu);
                     const pctStr = (tot > 0 && rVal > 0) ? `${((rVal / tot) * 100).toFixed(2)}%` : (d.persen_serapan || '0%');
