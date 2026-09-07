@@ -40,6 +40,15 @@ const JENIS_ANGGARAN_OPTIONS = [
   'Talangan'
 ];
 
+const STATUS_PAGU_OPTIONS = [
+  'Bukan Pagu Awal',
+  'Pagu Awal',
+  'Draft',
+  'Diajukan',
+  'Disetujui',
+  'Final'
+];
+
 export default function CopasPaguPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
   const [rawText, setRawText] = useState('');
@@ -176,7 +185,7 @@ export default function CopasPaguPage() {
     const cleanInput = query.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
     for (const [key, patterns] of Object.entries(aliases)) {
-      if (cleanInput === key || patterns.some(p => cleanInput.includes(p) || p.includes(cleanInput))) {
+      if (cleanInput === key || patterns.some(p => cleanInput === p || cleanInput.includes(p) || p.includes(cleanInput))) {
         const matched = units.find(u => {
           const uLower = u.nama_unit.toLowerCase();
           return uLower.includes(key) || patterns.some(p => uLower.includes(p));
@@ -249,7 +258,7 @@ export default function CopasPaguPage() {
       let tahun = new Date().getFullYear().toString();
       let remaining = [...rawCols];
 
-      // 1. Tahun
+      // 1. Tahun (Col 0 if 4 digits)
       if (/^\d{4}$/.test(remaining[0])) {
         tahun = remaining[0];
         remaining = remaining.slice(1);
@@ -268,36 +277,38 @@ export default function CopasPaguPage() {
       const sumberDana = remaining[0] || 'Dana Masyarakat Tidak Mengikat';
       remaining = remaining.slice(1);
 
-      // 5. Keterangan & Jenis Anggaran
+      // 5. Keterangan, Status Pagu, & Jenis Anggaran
       let keterangan = '-';
+      let statusPagu = 'Bukan Pagu Awal';
       let jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
 
-      if (remaining.length >= 2) {
-        // We have 2 or more trailing columns (e.g. Keterangan and Jenis Anggaran)
-        const matchedFirst = matchJenisAnggaran(remaining[0]);
-        const matchedSecond = matchJenisAnggaran(remaining[1]);
+      if (remaining.length >= 3) {
+        // EXACT 7-COLUMN MATCH: [Keterangan] [Status Pagu] [Jenis Anggaran]
+        keterangan = remaining[0] || '-';
+        statusPagu = remaining[1] || 'Bukan Pagu Awal';
+        jenisAnggaran = matchJenisAnggaran(remaining[2]) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+      } else if (remaining.length === 2) {
+        // 6-COLUMN MATCH: [Keterangan] [Jenis Anggaran] OR [Status Pagu] [Jenis Anggaran]
+        const matchedSecondJenis = matchJenisAnggaran(remaining[1]);
+        const matchedFirstJenis = matchJenisAnggaran(remaining[0]);
 
-        if (matchedFirst && !matchedSecond) {
-          // Format: [Jenis Anggaran] [Keterangan]
-          jenisAnggaran = matchedFirst;
-          keterangan = remaining.slice(1).join(' - ');
-        } else if (matchedSecond && !matchedFirst) {
-          // Format: [Keterangan] [Jenis Anggaran] (Standard user Excel layout)
-          keterangan = remaining[0];
-          jenisAnggaran = matchedSecond;
+        if (matchedSecondJenis) {
+          keterangan = remaining[0] || '-';
+          statusPagu = 'Bukan Pagu Awal';
+          jenisAnggaran = matchedSecondJenis;
+        } else if (matchedFirstJenis) {
+          jenisAnggaran = matchedFirstJenis;
+          keterangan = remaining[1] || '-';
+          statusPagu = 'Bukan Pagu Awal';
         } else {
-          // Neither or both match; evaluate by length or position
-          if (remaining[1].length <= 25 && remaining[0].length > 25) {
-            keterangan = remaining[0];
-            jenisAnggaran = matchJenisAnggaran(remaining[1]) || (parsedNominal < 0 ? 'Kurang' : remaining[1]);
-          } else {
-            keterangan = remaining[0] || '-';
-            jenisAnggaran = matchJenisAnggaran(remaining[1]) || (parsedNominal < 0 ? 'Kurang' : 'Pagu Awal');
-          }
+          keterangan = remaining[0] || '-';
+          statusPagu = 'Bukan Pagu Awal';
+          jenisAnggaran = remaining[1] || (parsedNominal < 0 ? 'Kurang' : 'Pagu Awal');
         }
       } else if (remaining.length === 1) {
-        // 1 column left: Keterangan
+        // 5-COLUMN MATCH: [Keterangan]
         keterangan = remaining[0] || '-';
+        statusPagu = 'Bukan Pagu Awal';
         jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
       }
 
@@ -312,7 +323,7 @@ export default function CopasPaguPage() {
         nominal: parsedNominal,
         sumber_dana: sumberDana || 'Dana Masyarakat Tidak Mengikat',
         keterangan: keterangan || '-',
-        status_pagu: 'Draft', // Saved automatically to DB as Draft
+        status_pagu: statusPagu || 'Bukan Pagu Awal',
         jenis_anggaran: jenisAnggaran || 'Pagu Awal',
         isValid: matched.id !== null && parsedNominal !== 0
       });
@@ -325,11 +336,6 @@ export default function CopasPaguPage() {
     const val = e.target.value;
     setRawText(val);
     parseRawTextToRows(val);
-  };
-
-  const handleBulkSetJenis = (jenis: string) => {
-    setParsedRows(prev => prev.map(r => ({ ...r, jenis_anggaran: jenis })));
-    toast.success(`Jenis anggaran semua baris berhasil diubah ke "${jenis}"`);
   };
 
   const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -356,10 +362,9 @@ export default function CopasPaguPage() {
   };
 
   const loadExampleData = () => {
-    const example = `2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tKurang
-2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tTambah
-2026\tFakultas Biologi\t4828145097\tBPPTN\tPagu Awal TA 2026\tPagu Awal
-2026\tBiro Manajemen Strategis\t186500000\tBPPTN\tUsulan Tambahan Pagu Prioritas\tTambah Pagu - Inisiatif`;
+    const example = `2026\tMajelis Wali Amanat\t-3.000.000,00\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tBukan Pagu Awal\tKurang
+2026\tSekretaris Universitas\t3.000.000,00\tDana Masyarakat Tidak Mengikat\tpengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tBukan Pagu Awal\tTambah
+2026\tSekretaris Universitas\t1.174.500.000,00\tDana Masyarakat Tidak Mengikat\tPenambahan pagu sesuai surat nomor 9716/UN1.P4/Dit-Keu/KU.00.01/2026 tanggal 21 agustus 2026 tentang Penambahan Pagu Anggaran Tahun Anggaran 2026 untuk Penyelenggaraan Wisuda Kelulusan Mahasiswa Universitas Gadjah Mada\tBukan Pagu Awal\tTambah Pagu - Inisiatif`;
     setRawText(example);
     parseRawTextToRows(example);
   };
@@ -410,7 +415,7 @@ export default function CopasPaguPage() {
       nominal: r.nominal,
       sumber_dana: r.sumber_dana,
       keterangan: r.keterangan,
-      status_pagu: 'Draft', // default status
+      status_pagu: r.status_pagu || 'Bukan Pagu Awal',
       jenis_anggaran: r.jenis_anggaran
     }));
 
@@ -459,6 +464,7 @@ export default function CopasPaguPage() {
       const matchSearch = searchFilter === '' || 
         r.gov_units?.nama_unit?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         r.jenis_anggaran?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        r.status_pagu?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         r.sumber_dana?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         r.keterangan?.toLowerCase().includes(searchFilter.toLowerCase());
       
@@ -526,7 +532,7 @@ export default function CopasPaguPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Copas Zone Pagu Anggaran</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                Format 6 Kolom
+                Format 7 Kolom Lengkap
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">Copy-paste masal pagu anggaran dari spreadsheet ke tabel gov_pagu_anggaran</p>
@@ -550,7 +556,7 @@ export default function CopasPaguPage() {
         </div>
       </div>
 
-      {/* FORMAT KOLOM GUIDE (6 KOLOM SESUAI EXCEL) */}
+      {/* FORMAT KOLOM GUIDE (7 KOLOM SESUAI EXCEL) */}
       <div className="p-4 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 border border-amber-200 rounded-2xl text-amber-950 text-xs shadow-xs space-y-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-2">
           <div className="flex items-center gap-2">
@@ -558,15 +564,15 @@ export default function CopasPaguPage() {
               <Info size={14} />
             </div>
             <span className="font-black text-xs uppercase tracking-wide text-amber-900">
-              Urutan Kolom Excel / Spreadsheet (6 Kolom Standar):
+              Urutan Kolom Excel / Spreadsheet (7 Kolom Lengkap):
             </span>
           </div>
           <button
             type="button"
             onClick={() => {
-              const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tKeterangan\tJenis Anggaran";
+              const headerText = "Tahun\tNama Unit Kerja\tNominal\tSumber Dana\tKeterangan\tStatus Pagu\tJenis Anggaran";
               navigator.clipboard.writeText(headerText);
-              toast.success("Header 6 Kolom Excel berhasil disalin!");
+              toast.success("Header 7 Kolom Excel berhasil disalin!");
             }}
             className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 self-start sm:self-auto"
             title="Salin judul kolom ini untuk ditempel di Excel sebagai baris kepala"
@@ -576,7 +582,7 @@ export default function CopasPaguPage() {
         </div>
 
         {/* Visual Columns Breakdown */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 font-mono text-[11px]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 font-mono text-[11px]">
           <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
             <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 1</span>
             <strong className="text-gray-900 block truncate">Tahun</strong>
@@ -607,10 +613,16 @@ export default function CopasPaguPage() {
             <span className="text-[10px] text-gray-400">Uraian / Redaksi Surat</span>
           </div>
 
+          <div className="bg-white p-2 rounded-xl border border-indigo-200 bg-indigo-50/40 shadow-2xs">
+            <span className="text-[9px] font-black text-indigo-700 block uppercase">Kolom 6</span>
+            <strong className="text-indigo-950 block truncate">Status Pagu</strong>
+            <span className="text-[10px] text-indigo-500">Bukan Pagu Awal</span>
+          </div>
+
           <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
-            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 6</span>
+            <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 7</span>
             <strong className="text-gray-900 block truncate">Jenis Anggaran</strong>
-            <span className="text-[10px] text-gray-400">Kurang / Tambah / Awal</span>
+            <span className="text-[10px] text-gray-400">Kurang / Tambah</span>
           </div>
         </div>
       </div>
@@ -640,20 +652,21 @@ export default function CopasPaguPage() {
         </div>
 
         {/* Visual Column Header Guide above Textarea */}
-        <div className="grid grid-cols-6 gap-1 px-3 py-1.5 bg-slate-100/90 rounded-t-xl border border-slate-200 text-[10px] font-mono font-black text-slate-600 uppercase">
+        <div className="grid grid-cols-7 gap-1 px-3 py-1.5 bg-slate-100/90 rounded-t-xl border border-slate-200 text-[10px] font-mono font-black text-slate-600 uppercase">
           <div>[1] Tahun</div>
           <div>[2] Nama Unit</div>
           <div>[3] Nominal</div>
           <div>[4] Sumber Dana</div>
           <div>[5] Keterangan</div>
-          <div>[6] Jenis Anggaran</div>
+          <div className="text-indigo-700">[6] Status Pagu</div>
+          <div>[7] Jenis Anggaran</div>
         </div>
 
         <textarea
           value={rawText}
           onChange={handleTextChange}
           rows={6}
-          placeholder={`Tempelkan (Ctrl+V) baris tabel data dari Excel di sini...\n\nContoh data yang dicopy dari Excel:\n2026\tMajelis Wali Amanat\t-3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tKurang\n2026\tSekretaris Universitas\t3000000\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tTambah`}
+          placeholder={`Tempelkan (Ctrl+V) baris tabel data dari Excel di sini...\n\nContoh data yang dicopy dari Excel:\n2026\tMajelis Wali Amanat\t-3.000.000,00\tDana Masyarakat Tidak Mengikat\tPengalihan dana dalam rangka Pembuatan jawa atan nama A, Batara Gemilang sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tBukan Pagu Awal\tKurang\n2026\tSekretaris Universitas\t3.000.000,00\tDana Masyarakat Tidak Mengikat\tpengalihan dana dalam rangka pembuatan jas sesuai surat nomor 9659/UN1.MWA.1/Set-MWA/KU.00.02/2026 tanggal 19 agustus 2026\tBukan Pagu Awal\tTambah\n2026\tSekretaris Universitas\t1.174.500.000,00\tDana Masyarakat Tidak Mengikat\tPenambahan pagu sesuai surat nomor 9716/UN1.P4/Dit-Keu/KU.00.01/2026 tanggal 21 agustus 2026 tentang Penambahan Pagu Anggaran Tahun Anggaran 2026 untuk Penyelenggaraan Wisuda Kelulusan Mahasiswa Universitas Gadjah Mada\tBukan Pagu Awal\tTambah Pagu - Inisiatif`}
           className="w-full p-3 bg-gray-50/80 border border-gray-200 rounded-b-xl -mt-2.5 outline-none focus:border-indigo-500 focus:bg-white font-mono text-xs text-gray-900 transition-colors leading-relaxed resize-none"
         />
       </div>
@@ -718,8 +731,9 @@ export default function CopasPaguPage() {
                   <th className="py-2.5 px-3">Hasil Konversi Unit</th>
                   <th className="py-2.5 px-3 text-right">Nominal</th>
                   <th className="py-2.5 px-3">Sumber Dana</th>
-                  <th className="py-2.5 px-3">Jenis Anggaran</th>
                   <th className="py-2.5 px-3">Keterangan</th>
+                  <th className="py-2.5 px-3">Status Pagu</th>
+                  <th className="py-2.5 px-3">Jenis Anggaran</th>
                   <th className="py-2.5 px-3 text-center w-10">Aksi</th>
                 </tr>
               </thead>
@@ -775,6 +789,26 @@ export default function CopasPaguPage() {
                       />
                     </td>
                     <td className="py-2.5 px-3">
+                      <input
+                        type="text"
+                        value={r.keterangan}
+                        onChange={e => handleRowChange(r.id, 'keterangan', e.target.value)}
+                        placeholder="Keterangan / uraian..."
+                        className="w-full min-w-[220px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <select
+                        value={r.status_pagu}
+                        onChange={e => handleRowChange(r.id, 'status_pagu', e.target.value)}
+                        className="p-1 bg-white border border-gray-200 rounded text-xs font-bold text-indigo-950 outline-none"
+                      >
+                        {STATUS_PAGU_OPTIONS.map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2.5 px-3">
                       <select
                         value={r.jenis_anggaran}
                         onChange={e => handleRowChange(r.id, 'jenis_anggaran', e.target.value)}
@@ -784,15 +818,6 @@ export default function CopasPaguPage() {
                           <option key={j} value={j}>{j}</option>
                         ))}
                       </select>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <input
-                        type="text"
-                        value={r.keterangan}
-                        onChange={e => handleRowChange(r.id, 'keterangan', e.target.value)}
-                        placeholder="Keterangan / uraian..."
-                        className="w-full min-w-[200px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
-                      />
                     </td>
                     <td className="py-2.5 px-3 text-center">
                       <button
@@ -840,7 +865,7 @@ export default function CopasPaguPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             <input
               type="text"
-              placeholder="Cari unit, jenis, sumber dana, keterangan..."
+              placeholder="Cari unit, jenis, sumber dana, keterangan, status..."
               value={searchFilter}
               onChange={e => setSearchFilter(e.target.value)}
               className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 focus:bg-white"
@@ -920,7 +945,7 @@ export default function CopasPaguPage() {
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
                 <th className="py-3 px-4 w-12 text-center">No</th>
-                <th className="py-3 px-4">Informasi Pagu (Unit, Tahun, Jenis)</th>
+                <th className="py-3 px-4">Informasi Pagu (Unit, Tahun, Jenis, Status)</th>
                 <th className="py-3 px-4 text-right w-44">Nominal</th>
                 <th className="py-3 px-4">Keterangan</th>
               </tr>
@@ -949,6 +974,7 @@ export default function CopasPaguPage() {
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 font-bold">
                         <span className="bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded text-[10px]">Thn {r.tahun_anggaran}</span>
                         <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded text-[10px] border border-indigo-100">{r.jenis_anggaran || '-'}</span>
+                        <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded text-[10px] border border-emerald-100">{r.status_pagu || 'Bukan Pagu Awal'}</span>
                         <span className="bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded text-[10px] border border-amber-100">{r.sumber_dana || '-'}</span>
                       </div>
                     </td>
