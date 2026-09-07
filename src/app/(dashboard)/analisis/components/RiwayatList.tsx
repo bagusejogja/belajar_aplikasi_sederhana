@@ -25,18 +25,56 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   const [activeTabMap, setActiveTabMap] = useState<Record<string, string>>({});
   const [unitHistoryMap, setUnitHistoryMap] = useState<Record<string, any[]>>({});
 
-  // Pop Up View Detail & Decision Modal State
+  // Pop Up View Detail (Original Modal)
   const [viewModalData, setViewModalData] = useState<any | null>(null);
-  const [modalKeputusan, setModalKeputusan] = useState('disetujui semua');
+
+  // Lembar Presentasi PDF & Keputusan Pimpinan Modal State
+  const [presentationModalData, setPresentationModalData] = useState<any | null>(null);
+  const [modalKeputusan, setModalKeputusan] = useState('diajukan');
   const [modalNominalDisetujui, setModalNominalDisetujui] = useState('');
   const [modalKeteranganKeputusan, setModalKeteranganKeputusan] = useState('');
   const [isSavingDecision, setIsSavingDecision] = useState(false);
 
-  const openDecisionModal = (r: any) => {
-    setViewModalData(r);
-    setModalKeputusan(r.keputusan || 'disetujui semua');
+  const loadDetailsForId = async (id: string) => {
+    if (expandedDetails[id]) return;
+    const targetRow = riwayat.find(r => r.id_analisis === id);
+    setLoadingDetails(prev => ({ ...prev, [id]: true }));
+    try {
+      const [detailRes, historisRes, unitHistRes] = await Promise.all([
+        supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id).order('no_urut', { ascending: true }),
+        supabase.from('app_pagu_historis').select('*').eq('id_analisis', id).order('tahun', { ascending: true }),
+        targetRow?.unit_pengirim 
+          ? supabase.from('app_analisis_utama').select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at').ilike('unit_pengirim', `%${targetRow.unit_pengirim}%`).order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] })
+      ]);
+
+      setExpandedDetails(prev => ({
+        ...prev,
+        [id]: {
+          details: detailRes.data || [],
+          historis: historisRes.data || []
+        }
+      }));
+
+      if (unitHistRes.data) {
+        setUnitHistoryMap(prev => ({
+          ...prev,
+          [id]: unitHistRes.data.filter((u: any) => u.id_analisis !== id)
+        }));
+      }
+    } catch (err) {
+      console.error("Error fetching detail for row:", err);
+    } finally {
+      setLoadingDetails(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const openPresentationModal = (r: any) => {
+    setPresentationModalData(r);
+    setModalKeputusan(r.keputusan || 'diajukan');
     setModalNominalDisetujui(r.nominal_disetujui?.toString() || r.total_anggaran?.toString() || '0');
     setModalKeteranganKeputusan(r.keterangan_keputusan || '');
+    loadDetailsForId(r.id_analisis);
   };
 
   const parseNum = (str: string | number) => {
@@ -198,15 +236,16 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   };
 
   const handleSaveDecision = async () => {
-    if (!viewModalData) return;
+    const targetModal = presentationModalData || viewModalData;
+    if (!targetModal) return;
     setIsSavingDecision(true);
     try {
       let existingHtmlObj: any = {};
-      if (viewModalData.analisis_html) {
+      if (targetModal.analisis_html) {
         try {
-          existingHtmlObj = JSON.parse(viewModalData.analisis_html);
+          existingHtmlObj = JSON.parse(targetModal.analisis_html);
         } catch (e) {
-          existingHtmlObj = { analisis: viewModalData.analisis_html };
+          existingHtmlObj = { analisis: targetModal.analisis_html };
         }
       }
 
@@ -226,22 +265,23 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
       const { error } = await supabase
         .from('app_analisis_utama')
         .update(payload)
-        .eq('id_analisis', viewModalData.id_analisis);
+        .eq('id_analisis', targetModal.id_analisis);
 
       if (error) throw error;
 
       // Update state locally
       const updatedRow = {
-        ...viewModalData,
+        ...targetModal,
         keputusan: modalKeputusan,
         nominal_disetujui: modalNominalDisetujui,
         keterangan_keputusan: modalKeteranganKeputusan,
         analisis_html: JSON.stringify(updatedHtmlObj)
       };
 
-      setViewModalData(updatedRow);
-      setRiwayat(prev => prev.map(item => item.id_analisis === viewModalData.id_analisis ? updatedRow : item));
-      setFiltered(prev => prev.map(item => item.id_analisis === viewModalData.id_analisis ? updatedRow : item));
+      if (presentationModalData) setPresentationModalData(updatedRow);
+      if (viewModalData) setViewModalData(updatedRow);
+      setRiwayat(prev => prev.map(item => item.id_analisis === targetModal.id_analisis ? updatedRow : item));
+      setFiltered(prev => prev.map(item => item.id_analisis === targetModal.id_analisis ? updatedRow : item));
 
       alert('✅ Keputusan & Catatan berhasil disimpan ke database!');
     } catch (err: any) {
@@ -278,38 +318,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
       if (!activeTabMap[id]) {
         setActiveTabMap(prev => ({ ...prev, [id]: 'substansi' }));
       }
-      const targetRow = riwayat.find(r => r.id_analisis === id);
-      if (!expandedDetails[id]) {
-        setLoadingDetails(prev => ({ ...prev, [id]: true }));
-        try {
-          const [detailRes, historisRes, unitHistRes] = await Promise.all([
-            supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id).order('no_urut', { ascending: true }),
-            supabase.from('app_pagu_historis').select('*').eq('id_analisis', id).order('tahun', { ascending: true }),
-            targetRow?.unit_pengirim 
-              ? supabase.from('app_analisis_utama').select('id_analisis, no_surat, perihal, total_anggaran, nominal_disetujui, keputusan, created_at').ilike('unit_pengirim', `%${targetRow.unit_pengirim}%`).order('created_at', { ascending: false })
-              : Promise.resolve({ data: [] })
-          ]);
-
-          setExpandedDetails(prev => ({
-            ...prev,
-            [id]: {
-              details: detailRes.data || [],
-              historis: historisRes.data || []
-            }
-          }));
-
-          if (unitHistRes.data) {
-            setUnitHistoryMap(prev => ({
-              ...prev,
-              [id]: unitHistRes.data.filter((u: any) => u.id_analisis !== id)
-            }));
-          }
-        } catch (err) {
-          console.error("Error fetching detail for row:", err);
-        } finally {
-          setLoadingDetails(prev => ({ ...prev, [id]: false }));
-        }
-      }
+      await loadDetailsForId(id);
     }
   };
 
@@ -599,14 +608,25 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
 
                           <td className="px-4 py-4 text-center align-top pt-4" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1.5">
+                              {/* 1. Pop-up Detail (Asli) */}
                               <button
-                                onClick={() => openDecisionModal(r)}
+                                onClick={() => setViewModalData(r)}
                                 className="p-2.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl transition-all border border-indigo-200 shadow-2xs flex items-center justify-center"
-                                title="Lihat Pop-up Detail & Keputusan"
+                                title="Lihat Pop-up Detail"
                               >
                                 <Eye size={15} />
                               </button>
 
+                              {/* 2. Lembar Presentasi PDF & Keputusan (Baru) */}
+                              <button
+                                onClick={() => openPresentationModal(r)}
+                                className="p-2.5 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white rounded-xl transition-all border border-amber-200 shadow-2xs flex items-center justify-center"
+                                title="Lembar Presentasi PDF & Keputusan Pimpinan"
+                              >
+                                <FileCheck size={15} />
+                              </button>
+
+                              {/* 3. Pratinjau PDF Nota Analisis */}
                               <button
                                 onClick={() => {
                                   onLoadAnalisis(r.id_analisis);
@@ -618,6 +638,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                 <Printer size={15} />
                               </button>
 
+                              {/* 4. Edit & Buka Form Analisis */}
                               <button
                                 onClick={() => {
                                   onLoadAnalisis(r.id_analisis);
@@ -1047,7 +1068,6 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                      )}
                                    </div>
                                  )}
-
                                  {(activeTabMap[r.id_analisis] || 'substansi') === 'rekomendasi' && (
                                    <div className="space-y-4 animate-in fade-in duration-200">
                                      <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3">
@@ -1139,10 +1159,17 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                  <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                                    <div className="flex items-center gap-2">
                                      <button
-                                       onClick={() => openDecisionModal(r)}
-                                       className="px-4 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+                                       onClick={() => setViewModalData(r)}
+                                       className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
                                      >
-                                       <Eye size={14} /> Lihat Detail &amp; Keputusan
+                                       <Eye size={14} /> Pop-up Detail
+                                     </button>
+
+                                     <button
+                                       onClick={() => openPresentationModal(r)}
+                                       className="px-3.5 py-2 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
+                                     >
+                                       <FileCheck size={14} /> Lembar Presentasi &amp; Keputusan
                                      </button>
                                    </div>
 
@@ -1180,8 +1207,9 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                </table>
              </div>
            )}
-        </div>
+       </div>
 
+         {/* 1. ORIGINAL VIEW MODAL (POP-UP DETAIL MATA) */}
       {viewModalData && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -1190,7 +1218,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
             <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  {getStatusBadge(modalKeputusan)}
+                  {getStatusBadge(viewModalData.keputusan)}
                   {viewModalData.subyek_persuratan_simaster && (
                     <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-bold">
                       Simaster: {viewModalData.subyek_persuratan_simaster}
@@ -1198,7 +1226,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   )}
                 </div>
                 <h3 className="font-black text-xl text-slate-900 pt-1">
-                  {viewModalData.perihal || 'Detail Nota Analisis & Keputusan'}
+                  {viewModalData.perihal || 'Detail Nota Analisis'}
                 </h3>
                 <p className="text-xs text-slate-500 font-mono">
                   📄 No Surat: <span className="font-bold text-slate-800">{viewModalData.no_surat || '-'}</span> • Unit: <span className="font-bold text-indigo-700">{viewModalData.unit_pengirim || '-'}</span>
@@ -1222,157 +1250,14 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                 </div>
               </div>
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 space-y-1">
-                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nominal Disetujui Saat Ini</span>
+                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nominal Disetujui Pimpinan</span>
                 <div className="text-xl font-black font-mono text-emerald-800">
-                  Rp {formatRp(modalNominalDisetujui || viewModalData.nominal_disetujui)}
+                  Rp {formatRp(viewModalData.nominal_disetujui)}
                 </div>
               </div>
             </div>
 
-            {/* Modal Section 2: SEKSI FORM KEPUTUSAN & CATATAN PIMPINAN (INTERAKTIF BISA DIISI/DIUBAH) */}
-            <div className="bg-gradient-to-br from-indigo-50/80 via-white to-sky-50/50 p-5 rounded-2xl border-2 border-indigo-200/80 shadow-xs space-y-4">
-              <div className="flex items-center justify-between border-b border-indigo-100 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-2xs">
-                    <FileCheck size={16} />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-xs uppercase tracking-wider text-indigo-950">
-                      Keputusan &amp; Catatan Persetujuan Pimpinan
-                    </h4>
-                    <p className="text-[11px] text-gray-500 font-medium">
-                      Tentukan status persetujuan, nominal yang disetujui, dan tambahkan catatan keputusan
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase">Status:</span>
-                  {getStatusBadge(modalKeputusan)}
-                </div>
-              </div>
-
-              {/* Status Radio / Pills */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-black uppercase text-gray-700 block">
-                  1. Pilih Status Keputusan:
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {[
-                    { id: 'disetujui semua', label: 'Disetujui Penuh', color: 'emerald' },
-                    { id: 'disetujui sebagian', label: 'Disetujui Sebagian', color: 'amber' },
-                    { id: 'ditolak', label: 'Ditolak', color: 'rose' },
-                    { id: 'perlu revisi', label: 'Perlu Revisi', color: 'purple' },
-                    { id: 'diajukan', label: 'Diajukan (Pending)', color: 'blue' }
-                  ].map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => {
-                        setModalKeputusan(st.id);
-                        if (st.id === 'disetujui semua') {
-                          setModalNominalDisetujui(viewModalData.total_anggaran?.toString() || '0');
-                        } else if (st.id === 'ditolak') {
-                          setModalNominalDisetujui('0');
-                        }
-                      }}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all border text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                        modalKeputusan.toLowerCase() === st.id.toLowerCase()
-                          ? st.color === 'emerald'
-                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                            : st.color === 'amber'
-                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                            : st.color === 'rose'
-                            ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                            : st.color === 'purple'
-                            ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                            : 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-                      }`}
-                    >
-                      <span className="truncate">{st.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Nominal Disetujui */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black uppercase text-gray-700 block">
-                    2. Nominal Disetujui (Rp):
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setModalNominalDisetujui(viewModalData.total_anggaran?.toString() || '0')}
-                      className="text-[10px] font-bold text-indigo-700 hover:bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 transition-colors"
-                    >
-                      Setujui 100% Penuh
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModalNominalDisetujui((Math.round(parseNum(viewModalData.total_anggaran) / 2)).toString())}
-                      className="text-[10px] font-bold text-gray-700 hover:bg-gray-100 px-2 py-0.5 rounded border border-gray-200 transition-colors"
-                    >
-                      50%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModalNominalDisetujui('0')}
-                      className="text-[10px] font-bold text-rose-700 hover:bg-rose-50 px-2 py-0.5 rounded border border-rose-200 transition-colors"
-                    >
-                      Rp 0
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-xs text-gray-400">Rp</span>
-                  <input
-                    type="text"
-                    value={modalNominalDisetujui}
-                    onChange={e => setModalNominalDisetujui(e.target.value)}
-                    placeholder="Contoh: 150000000"
-                    className="w-full h-10 pl-9 pr-3 bg-white border border-gray-300 rounded-xl font-mono font-bold text-sm text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs"
-                  />
-                </div>
-                {modalNominalDisetujui && (
-                  <p className="text-[11px] font-mono text-emerald-700 font-bold">
-                    Terbaca: Rp {formatRp(modalNominalDisetujui)}
-                  </p>
-                )}
-              </div>
-
-              {/* Catatan / Keterangan Keputusan */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-black uppercase text-gray-700 block">
-                  3. Catatan / Keterangan Hasil Keputusan Pimpinan:
-                </label>
-                <textarea
-                  rows={3}
-                  value={modalKeteranganKeputusan}
-                  onChange={e => setModalKeteranganKeputusan(e.target.value)}
-                  placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
-                  className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs resize-none leading-relaxed"
-                />
-              </div>
-
-              {/* Save Decision Button */}
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  onClick={handleSaveDecision}
-                  disabled={isSavingDecision}
-                  className="h-10 px-5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
-                >
-                  {isSavingDecision ? <RefreshCw className="animate-spin" size={15} /> : <Save size={15} />}
-                  <span>Simpan Perubahan Keputusan</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Section 3: Ringkasan AI & Substansi (FULL HTML FORMATTED) */}
+            {/* Modal Section 2: Ringkasan AI & Substansi (FULL HTML FORMATTED) */}
             <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
               <span className="text-[11px] font-black text-indigo-900 uppercase tracking-widest block flex items-center gap-1.5">
                 <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi &amp; AI Note (Lengkap)
@@ -1388,6 +1273,14 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                 </p>
               )}
             </div>
+
+            {/* Modal Section 3: Keterangan Keputusan Pimpinan (If available) */}
+            {viewModalData.keterangan_keputusan && (
+              <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 space-y-1">
+                <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest block">Catatan / Keterangan Persetujuan Pimpinan</span>
+                <p className="text-xs font-medium text-amber-950">{viewModalData.keterangan_keputusan}</p>
+              </div>
+            )}
 
             {/* Modal Section 4: File Lampiran Original (If available) */}
             {viewModalData.link_lampiran && (
@@ -1423,7 +1316,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   }}
                   className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <Eye size={14} /> Pratinjau PDF Nota Lengkap
+                  <Printer size={14} /> Pratinjau PDF Nota Lengkap
                 </button>
 
                 <button
@@ -1444,6 +1337,379 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
         </div>
       )}
 
+      {/* 2. LEMBAR PRESENTASI PDF & KEPUTUSAN PIMPINAN (NEW DEDICATED MODAL) */}
+      {presentationModalData && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-slate-100 rounded-3xl max-w-5xl w-full max-h-[96vh] flex flex-col shadow-2xl overflow-hidden border border-slate-300">
+            
+            {/* Top Toolbar */}
+            <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-amber-500 text-slate-950 rounded-xl shadow-xs">
+                  <FileCheck size={18} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white tracking-wide">
+                    Lembar Presentasi Nota Analisis &amp; Keputusan Pimpinan
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    {presentationModalData.no_surat || '-'} • {presentationModalData.unit_pengirim || 'Unit Kerja UGM'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const id = presentationModalData.id_analisis;
+                    setPresentationModalData(null);
+                    onLoadAnalisis(id);
+                    setTimeout(() => setActiveTab('pdf'), 200);
+                  }}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5"
+                  title="Buka Pratinjau PDF Cetak"
+                >
+                  <Printer size={13} />
+                  <span>Cetak PDF</span>
+                </button>
+
+                <button
+                  onClick={() => setPresentationModalData(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+                  title="Tutup Lembar Presentasi"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Presentation Sheet Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6 custom-scrollbar">
+              
+              {/* PDF Sheet Canvas (A4 White Paper Styled) */}
+              <div className="bg-white rounded-2xl shadow-xl border border-slate-200/90 p-6 sm:p-10 md:p-12 max-w-4xl mx-auto space-y-6 text-slate-900 font-sans">
+                
+                {/* Decorative Header Bar */}
+                <div className="h-1.5 bg-blue-700 w-full rounded-full" />
+
+                {/* Document Letterhead */}
+                <div className="text-center space-y-1 pb-4 border-b border-slate-200">
+                  <p className="text-xs font-black tracking-widest text-slate-500 uppercase">
+                    UNIVERSITAS GADJAH MADA • DIREKTORAT KEUANGAN
+                  </p>
+                  <h2 className="text-xl sm:text-2xl font-black text-blue-950 tracking-tight">
+                    NOTA ANALISIS USULAN TAMBAH PAGU ANGGARAN
+                  </h2>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Tahun Anggaran {presentationModalData.tahun_anggaran || '2026'}
+                  </p>
+                </div>
+
+                {/* Metadata Formal Box */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Nomor Surat:</span>
+                      <span className="font-bold text-slate-900 font-mono">{presentationModalData.no_surat || '-'}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Tanggal Surat:</span>
+                      <span className="font-semibold text-slate-800">
+                        {presentationModalData.tanggal_surat 
+                          ? new Date(presentationModalData.tanggal_surat).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : '-'}
+                      </span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Unit Pengirim:</span>
+                      <span className="font-bold text-indigo-700">{presentationModalData.unit_pengirim || '-'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex">
+                      <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Perihal Usulan:</span>
+                      <span className="font-medium text-slate-800 break-words">{presentationModalData.perihal || '-'}</span>
+                    </div>
+                    {presentationModalData.subyek_persuratan_simaster && (
+                      <div className="flex">
+                        <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Subyek Simaster:</span>
+                        <span className="font-medium text-amber-800">{presentationModalData.subyek_persuratan_simaster}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center">
+                      <span className="w-28 text-slate-500 font-bold uppercase text-[10px]">Usulan Anggaran:</span>
+                      <span className="font-black text-amber-800 font-mono text-sm">
+                        Rp {formatRp(presentationModalData.total_anggaran)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Substansi Usulan & Ringkasan Analisis AI */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                    <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi &amp; Analisis Usulan
+                  </h4>
+                  {presentationModalData.ringkasan_ai ? (
+                    <div 
+                      className="prose prose-sm max-w-none text-xs leading-relaxed text-slate-800 bg-slate-50/70 p-4 rounded-xl border border-slate-200 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h3]:font-bold [&_h3]:text-sm [&_strong]:font-bold"
+                      dangerouslySetInnerHTML={{ __html: presentationModalData.ringkasan_ai }}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-600 italic bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      {presentationModalData.perihal || 'Usulan penambahan pagu anggaran unit kerja UGM.'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Rincian Belanja (If available in details) */}
+                {expandedDetails[presentationModalData.id_analisis]?.details?.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider pb-1 border-b border-slate-100">
+                      Rincian Belanja Kegiatan yang Diajukan
+                    </h4>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-bold text-[10px] uppercase border-b border-slate-200">
+                          <tr>
+                            <th className="px-3 py-2 w-10 text-center">No</th>
+                            <th className="px-3 py-2">Uraian Belanja</th>
+                            <th className="px-3 py-2 text-right">Anggaran</th>
+                            <th className="px-3 py-2 text-right">Realisasi</th>
+                            <th className="px-3 py-2 text-right">Sisa Pagu</th>
+                            <th className="px-3 py-2 text-center w-20">% Serap</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-mono">
+                          {expandedDetails[presentationModalData.id_analisis].details.map((d: any, i: number) => {
+                            const pagu = parseNum(d.anggaran);
+                            const real = parseNum(d.realisasi);
+                            const sisa = pagu - real;
+                            return (
+                              <tr key={i} className="hover:bg-slate-50/80">
+                                <td className="px-3 py-2 text-center text-slate-400 font-sans">{d.no_urut || i + 1}</td>
+                                <td className="px-3 py-2 font-sans font-medium text-slate-800">{d.uraian_kegiatan}</td>
+                                <td className="px-3 py-2 text-right font-medium">Rp {formatRp(pagu)}</td>
+                                <td className="px-3 py-2 text-right text-indigo-700 font-medium">Rp {formatRp(real)}</td>
+                                <td className="px-3 py-2 text-right font-bold text-emerald-700">Rp {formatRp(sisa)}</td>
+                                <td className="px-3 py-2 text-center font-sans font-bold text-[10px]">{d.persen_serapan || '0%'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Rekomendasi AI (If available) */}
+                {presentationModalData.rekomendasi_ai && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider pb-1 border-b border-slate-100">
+                      Rekomendasi AI &amp; Dasar Pertimbangan
+                    </h4>
+                    <div 
+                      className="prose prose-sm max-w-none text-xs leading-relaxed text-slate-800 bg-slate-50/70 p-4 rounded-xl border border-slate-200 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h3]:font-bold [&_h3]:text-sm [&_strong]:font-bold"
+                      dangerouslySetInnerHTML={{ __html: presentationModalData.rekomendasi_ai }}
+                    />
+                  </div>
+                )}
+
+                {/* File Lampiran Asli */}
+                {presentationModalData.link_lampiran && (
+                  <div className="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
+                      <Paperclip size={15} className="text-indigo-600" /> Berkas PDF Lampiran Pengajuan Unit
+                    </div>
+                    <button
+                      onClick={() => window.open(presentationModalData.link_lampiran, '_blank')}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <ExternalLink size={12} /> Buka PDF Asli
+                    </button>
+                  </div>
+                )}
+
+                {/* SEKSI FORM KEPUTUSAN & CATATAN PIMPINAN (DITARUH DI BAWAH SESUAI PERMINTAAN USER) */}
+                <div className="bg-gradient-to-br from-indigo-50/90 via-white to-sky-50/70 p-6 rounded-2xl border-2 border-indigo-200 shadow-sm space-y-5 mt-6">
+                  <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+                    <div>
+                      <h4 className="font-black text-sm uppercase tracking-wider text-indigo-950 flex items-center gap-2">
+                        <FileCheck size={18} className="text-indigo-600" /> Keputusan &amp; Catatan Persetujuan Pimpinan
+                      </h4>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        Tentukan status persetujuan, nominal yang disetujui, dan tambahkan catatan keputusan
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-400 uppercase">Status:</span>
+                      {getStatusBadge(modalKeputusan)}
+                    </div>
+                  </div>
+
+                  {/* 1. Pilih Status Keputusan */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-slate-800 block">
+                      1. Pilih Status Keputusan:
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { id: 'disetujui semua', label: 'Disetujui Penuh', color: 'emerald' },
+                        { id: 'disetujui sebagian', label: 'Disetujui Sebagian', color: 'amber' },
+                        { id: 'ditolak', label: 'Ditolak', color: 'rose' },
+                        { id: 'perlu revisi', label: 'Perlu Revisi', color: 'purple' },
+                        { id: 'diajukan', label: 'Diajukan (Pending)', color: 'blue' }
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => {
+                            setModalKeputusan(st.id);
+                            if (st.id === 'disetujui semua') {
+                              setModalNominalDisetujui(presentationModalData.total_anggaran?.toString() || '0');
+                            } else if (st.id === 'ditolak') {
+                              setModalNominalDisetujui('0');
+                            }
+                          }}
+                          className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all border text-center flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
+                            modalKeputusan.toLowerCase() === st.id.toLowerCase()
+                              ? st.color === 'emerald'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                : st.color === 'amber'
+                                ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                                : st.color === 'rose'
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                : st.color === 'purple'
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                : 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          <span className="truncate">{st.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. Nominal Disetujui */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase text-slate-800 block">
+                        2. Nominal Disetujui (Rp):
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setModalNominalDisetujui(presentationModalData.total_anggaran?.toString() || '0')}
+                          className="text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors"
+                        >
+                          Setujui 100% Penuh
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalNominalDisetujui((Math.round(parseNum(presentationModalData.total_anggaran) / 2)).toString())}
+                          className="text-[11px] font-bold text-slate-700 hover:bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors"
+                        >
+                          50%
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalNominalDisetujui('0')}
+                          className="text-[11px] font-bold text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors"
+                        >
+                          Rp 0
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-sm text-slate-400">Rp</span>
+                      <input
+                        type="text"
+                        value={modalNominalDisetujui}
+                        onChange={e => setModalNominalDisetujui(e.target.value)}
+                        placeholder="Contoh: 150000000"
+                        className="w-full h-11 pl-11 pr-4 bg-white border border-slate-300 rounded-xl font-mono font-bold text-base text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-xs"
+                      />
+                    </div>
+                    {modalNominalDisetujui && (
+                      <p className="text-xs font-mono text-emerald-700 font-bold">
+                        Terbaca: Rp {formatRp(modalNominalDisetujui)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 3. Catatan / Keterangan Keputusan */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase text-slate-800 block">
+                      3. Catatan / Keterangan Hasil Keputusan Pimpinan:
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={modalKeteranganKeputusan}
+                      onChange={e => setModalKeteranganKeputusan(e.target.value)}
+                      placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
+                      className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-xs resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Simpan Perubahan Keputusan Button */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveDecision}
+                      disabled={isSavingDecision}
+                      className="h-11 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                    >
+                      {isSavingDecision ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
+                      <span>Simpan Perubahan Keputusan</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Modal Bottom Bar */}
+            <div className="bg-slate-200 border-t border-slate-300 px-6 py-3 flex items-center justify-between shrink-0">
+              <button
+                onClick={() => setPresentationModalData(null)}
+                className="px-5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-300"
+              >
+                Tutup
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const id = presentationModalData.id_analisis;
+                    setPresentationModalData(null);
+                    onLoadAnalisis(id);
+                    setTimeout(() => setActiveTab('pdf'), 200);
+                  }}
+                  className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+                >
+                  <Printer size={14} /> Pratinjau PDF Cetak
+                </button>
+
+                <button
+                  onClick={() => {
+                    const id = presentationModalData.id_analisis;
+                    setPresentationModalData(null);
+                    onLoadAnalisis(id);
+                    setTimeout(() => setActiveTab('form'), 200);
+                  }}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2"
+                >
+                  <Edit3 size={14} /> Form Edit Analisis
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
