@@ -28,7 +28,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
   const showEfisiensi = historisData?.some((d: any) => d.efisiensi && d.efisiensi !== '0');
   const showTalangan = historisData?.some((d: any) => d.talangan && d.talangan !== '0');
 
-  const syncFromHistoris = async () => {
+  const syncFromHistoris = async (isManual = false) => {
     try {
       const targetDate = mainData?.created_at || new Date().toISOString();
       const res = await fetch(`/api/analisis/global-pagu?date=${encodeURIComponent(targetDate)}&year=2026`);
@@ -40,37 +40,39 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
             ...prev,
             pagu_berjalan: {
               ...p,
-              pagu_awal: result.data.pagu_awal || '0',
-              pengalihan: result.data.pengalihan || '0',
-              tambah_inisiatif: result.data.tambah_inisiatif || '0',
-              efisiensi: result.data.efisiensi || '0',
-              tambah_penugasan: result.data.tambah_penugasan || '0',
-              luncuran: result.data.talangan || '0',
-              talangan_pindah: result.data.talangan_pindah || '0',
-              rencana_penerimaan: result.data.rencana_penerimaan || '0',
-              realisasi_penerimaan: result.data.realisasi_penerimaan || '0'
+              pagu_awal: p.pagu_awal || result.data.pagu_awal || '0',
+              pengalihan: p.pengalihan || result.data.pengalihan || '0',
+              tambah_inisiatif: p.tambah_inisiatif || result.data.tambah_inisiatif || '0',
+              efisiensi: p.efisiensi || result.data.efisiensi || '0',
+              tambah_penugasan: p.tambah_penugasan || result.data.tambah_penugasan || '0',
+              luncuran: p.luncuran || result.data.talangan || '0',
+              talangan_pindah: p.talangan_pindah || result.data.talangan_pindah || '0',
+              rencana_penerimaan: p.rencana_penerimaan || result.data.rencana_penerimaan || '0',
+              realisasi_penerimaan: p.realisasi_penerimaan || result.data.realisasi_penerimaan || '0'
             }
           };
         });
-        alert("Berhasil menarik data pagu keseluruhan dari seluruh unit!");
+        if (isManual) {
+          alert("Berhasil menarik data pagu keseluruhan dari seluruh unit!");
+        }
       } else {
-        alert("Gagal menarik data: " + result.error);
+        if (isManual) alert("Gagal menarik data: " + result.error);
       }
     } catch (err: any) {
-      alert("Terjadi kesalahan jaringan: " + err.message);
+      if (isManual) alert("Terjadi kesalahan jaringan: " + err.message);
       console.error("Gagal sinkronisasi data global:", err);
     }
   };
 
-  // Auto-sync if empty
+  // Auto-sync immediately on mount if pagu_berjalan is empty
   useEffect(() => {
-    if (historisData && historisData.length > 0 && activeSubTab === 'berjalan') {
+    if (mainData) {
       const p = mainData?.pagu_berjalan || {};
       if (!p.pagu_awal && !p.pengalihan && !p.tambah_inisiatif) {
-        syncFromHistoris();
+        syncFromHistoris(false);
       }
     }
-  }, [activeSubTab, historisData]);
+  }, [mainData?.id_analisis]);
 
   const handlePasteRealisasi = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
@@ -517,6 +519,14 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
            const luncuran = parseNum(p.luncuran) || 0;
            return formatRp(paguAwal + pengalihan + inisiatif + efisiensi + penugasan + luncuran);
         };
+
+        const getRealisasiKeseluruhan = () => {
+           const val = parseNum(p.realisasi_keseluruhan);
+           if (val > 0) return val;
+           const fromDetail = detailData?.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+           if (fromDetail > 0) return fromDetail;
+           return parseNum(mainData?.total_realisasi) || 0;
+        };
         
         const updatePaguBerjalan = (key: string, val: string) => {
            const newP = { ...p, [key]: val };
@@ -531,7 +541,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                  <span className="font-bold text-sm uppercase tracking-widest">Potret Mutasi Pagu Keseluruhan</span>
                </div>
                {!readOnly && (
-                 <button onClick={syncFromHistoris} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                 <button onClick={() => syncFromHistoris(true)} className="text-xs font-bold bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
                    Tarik Data Global
                  </button>
                )}
@@ -588,7 +598,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                        )}
                        <div className="bg-cyan-600 flex-1 rounded-xl p-4 flex flex-col justify-center text-white shadow-lg shadow-cyan-600/20 relative overflow-hidden">
                           <span className="font-bold tracking-wide text-[10px] md:text-xs uppercase mb-1">TOTAL REALISASI PENGELUARAN TAHUN 2026{tanggalInput}</span>
-                          <span className="font-black text-lg md:text-xl relative z-10">Rp {formatRp(parseNum(p.realisasi_keseluruhan || '0'))}</span>
+                          <span className="font-black text-lg md:text-xl relative z-10">Rp {formatRp(getRealisasiKeseluruhan())}</span>
                        </div>
                     </div>
 

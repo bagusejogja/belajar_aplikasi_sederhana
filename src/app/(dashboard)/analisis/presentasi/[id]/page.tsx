@@ -63,19 +63,51 @@ export default function PresentasiAnalisisPage() {
     }
   }, [id]);
 
+  const parseNum = (str: any) => {
+    if (!str) return 0;
+    if (typeof str === 'number') return str;
+    let s = str.toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 2 && parts[0].length > 3) {
+        return parseFloat(s);
+      }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+
+  const formatRp = (val: any) => {
+    const num = parseNum(val);
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+  };
+
   const fetchAnalisisData = async () => {
     setLoading(true);
     try {
-      const [utamaRes, histRes, detailRes] = await Promise.all([
+      // Tentukan target date untuk menarik global pagu otomatis bersamaan
+      let targetDateIso = new Date().toISOString();
+      if (id && id.startsWith('ANL-')) {
+        const ts = parseInt(id.split('-')[1]);
+        if (!isNaN(ts)) {
+          targetDateIso = new Date(ts).toISOString();
+        }
+      }
+
+      // Fetch semua data sekaligus (termasuk global pagu agar langsung terisi tanpa delay)
+      const [utamaRes, histRes, detailRes, globalPaguRes] = await Promise.all([
         supabase.from('app_analisis_utama').select('*').eq('id_analisis', id).single(),
         supabase.from('app_pagu_historis').select('*').eq('id_analisis', id).order('tahun', { ascending: true }),
-        supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id).order('no_urut', { ascending: true })
+        supabase.from('app_detail_realisasi').select('*').eq('id_analisis', id).order('no_urut', { ascending: true }),
+        fetch(`/api/analisis/global-pagu?date=${encodeURIComponent(targetDateIso)}&year=2026`)
+          .then(r => r.json())
+          .catch(() => ({ success: false }))
       ]);
 
       if (utamaRes.error) throw utamaRes.error;
       const row = utamaRes.data;
 
-      // Parse JSON from analisis_html exactly like saat input / riwayat
+      // Parse JSON dari analisis_html
       let parsed: any = {};
       if (row.analisis_html) {
         try {
@@ -87,7 +119,37 @@ export default function PresentasiAnalisisPage() {
 
       const ringkasanSubstansi = parsed.analisis || row.ringkasan_ai || '';
       const subyekSimaster = row.subyek_persuratan_simaster || parsed.subyek_persuratan_simaster || '';
-      const paguBerjalan = parsed.pagu_berjalan || {};
+      let paguBerjalan = parsed.pagu_berjalan || {};
+
+      // Otomatis isi pagu_berjalan jika belum ada di database tanpa menunggu delay
+      if (globalPaguRes?.success && globalPaguRes?.data) {
+        const g = globalPaguRes.data;
+        paguBerjalan = {
+          ...paguBerjalan,
+          pagu_awal: paguBerjalan.pagu_awal || g.pagu_awal || '0',
+          pengalihan: paguBerjalan.pengalihan || g.pengalihan || '0',
+          tambah_inisiatif: paguBerjalan.tambah_inisiatif || g.tambah_inisiatif || '0',
+          efisiensi: paguBerjalan.efisiensi || g.efisiensi || '0',
+          tambah_penugasan: paguBerjalan.tambah_penugasan || g.tambah_penugasan || '0',
+          luncuran: paguBerjalan.luncuran || g.talangan || '0',
+          talangan_pindah: paguBerjalan.talangan_pindah || g.talangan_pindah || '0',
+          rencana_penerimaan: paguBerjalan.rencana_penerimaan || g.rencana_penerimaan || '0',
+          realisasi_penerimaan: paguBerjalan.realisasi_penerimaan || g.realisasi_penerimaan || '0'
+        };
+      }
+
+      // Hitung realisasi otomatis dari rincian detail agar langsung terisi tanpa delay
+      const totalDetailRealisasi = (detailRes.data || []).reduce((acc: number, d: any) => {
+        return acc + parseNum(d.realisasi || d.realisasi_berjalan);
+      }, 0);
+
+      if (!paguBerjalan.realisasi_keseluruhan || parseNum(paguBerjalan.realisasi_keseluruhan) === 0) {
+        if (totalDetailRealisasi > 0) {
+          paguBerjalan.realisasi_keseluruhan = totalDetailRealisasi.toString();
+        } else if (row.total_realisasi && parseNum(row.total_realisasi) > 0) {
+          paguBerjalan.realisasi_keseluruhan = row.total_realisasi.toString();
+        }
+      }
 
       const loadedMainData = {
         ...row,
@@ -114,12 +176,8 @@ export default function PresentasiAnalisisPage() {
           }
         } catch(e) {}
 
-        const pNum = (str: any) => {
-          const cleaned = (str || '0').toString().replace(/\./g, '').replace(/,/g, '.');
-          return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-        };
-        const pagu = pNum(h.total_pagu);
-        const real = pNum(h.realisasi_historis);
+        const pagu = parseNum(h.total_pagu);
+        const real = parseNum(h.realisasi_historis);
 
         return {
           ...h,
@@ -163,25 +221,6 @@ export default function PresentasiAnalisisPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const parseNum = (str: any) => {
-    if (!str) return 0;
-    if (typeof str === 'number') return str;
-    let s = str.toString().trim();
-    if (!s.includes(',') && s.includes('.')) {
-      const parts = s.split('.');
-      if (parts.length === 2 && parts[0].length > 3) {
-        return parseFloat(s);
-      }
-    }
-    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-  };
-
-  const formatRp = (val: any) => {
-    const num = parseNum(val);
-    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
   };
 
   const handleSaveDecision = async () => {
@@ -427,22 +466,40 @@ export default function PresentasiAnalisisPage() {
               />
             </div>
 
-            {/* Perihal Usulan */}
-            <div className="md:col-span-2 space-y-1.5">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Perihal Usulan
-              </label>
-              <input 
-                type="text" 
-                value={data.perihal || '-'} 
-                readOnly 
-                disabled 
-                className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-not-allowed" 
-              />
+            {/* KOLOM KIRI: Perihal Usulan dan Subyek di Persuratan Simaster (ATAS BAWAH) */}
+            <div className="md:col-span-2 space-y-4">
+              {/* Perihal Usulan (Atas) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Perihal Usulan
+                </label>
+                <input 
+                  type="text" 
+                  value={data.perihal || '-'} 
+                  readOnly 
+                  disabled 
+                  className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-not-allowed" 
+                />
+              </div>
+
+              {/* Subyek di Persuratan Simaster (Bawah) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Subyek di Persuratan Simaster
+                </label>
+                <input 
+                  type="text" 
+                  value={data.subyek_persuratan_simaster || '-'} 
+                  readOnly 
+                  disabled 
+                  placeholder="Subyek persuratan Simaster..."
+                  className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-not-allowed" 
+                />
+              </div>
             </div>
 
-            {/* Nominal Usulan Tambahan Pagu */}
-            <div className="space-y-1.5">
+            {/* KOLOM KANAN: Nominal Usulan Tambahan Pagu (Rp) (TETAP SEPERTI SEKARANG) */}
+            <div className="space-y-1.5 flex flex-col justify-start">
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
                 Nominal Usulan Tambahan Pagu (Rp)
               </label>
@@ -456,29 +513,14 @@ export default function PresentasiAnalisisPage() {
                   className="w-full pl-10 pr-3 py-3 bg-amber-50/50 border border-amber-200 rounded-xl text-sm font-black font-mono text-amber-900 cursor-not-allowed" 
                 />
               </div>
-              <p className="text-[11px] text-slate-500 italic">
+              <p className="text-[11px] text-slate-500 italic mt-1 leading-relaxed">
                 Terbilang: {terbilang(parseNum(data.total_anggaran))}
               </p>
             </div>
 
-            {/* Subyek di Persuratan Simaster (Sumber Dana TIDAK ditampilkan) */}
-            <div className="col-span-full space-y-1.5">
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Subyek di Persuratan Simaster
-              </label>
-              <input 
-                type="text" 
-                value={data.subyek_persuratan_simaster || '-'} 
-                readOnly 
-                disabled 
-                placeholder="Subyek persuratan Simaster..."
-                className="w-full p-3 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 cursor-not-allowed" 
-              />
-            </div>
-
           </div>
 
-          {/* Ringkasan Substansi Permohonan (AI) */}
+          {/* Ringkasan Substansi Permohonan (AI) - Dirapikan teksnya & tidak keluar kotak */}
           <div className="space-y-2 pt-2">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -486,10 +528,10 @@ export default function PresentasiAnalisisPage() {
               </label>
               <span className="text-[10px] text-slate-400 font-bold uppercase">Sesuai Input &amp; Simpan</span>
             </div>
-            <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5 shadow-2xs">
+            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
               {data.ringkasan_ai ? (
                 <div 
-                  className="prose prose-sm max-w-none text-xs leading-relaxed text-slate-800 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h3]:font-bold [&_h3]:text-sm [&_strong]:font-bold"
+                  className="prose prose-slate max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] text-xs leading-relaxed text-slate-800 [&_*]:max-w-full [&_*]:break-words [&_*]:whitespace-normal [&_p]:mb-2.5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
                   dangerouslySetInnerHTML={{ __html: data.ringkasan_ai }}
                 />
               ) : (
@@ -515,7 +557,7 @@ export default function PresentasiAnalisisPage() {
           />
         </div>
 
-        {/* SECTION 3: REKOMENDASI AI & DASAR PERTIMBANGAN (READ ONLY) */}
+        {/* SECTION 3: REKOMENDASI AI & DASAR PERTIMBANGAN (READ ONLY) - Dirapikan teksnya & tidak keluar kotak */}
         {data.rekomendasi_ai && (
           <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -527,9 +569,9 @@ export default function PresentasiAnalisisPage() {
                 <Lock size={12} /> Tinjauan Pertimbangan
               </span>
             </div>
-            <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-5">
+            <div className="w-full overflow-hidden bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
               <div 
-                className="prose prose-sm max-w-none text-xs leading-relaxed text-slate-800 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h3]:font-bold [&_h3]:text-sm [&_strong]:font-bold"
+                className="prose prose-slate max-w-none w-full break-words [overflow-wrap:anywhere] [word-break:break-word] text-xs leading-relaxed text-slate-800 [&_*]:max-w-full [&_*]:break-words [&_*]:whitespace-normal [&_p]:mb-2.5 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1 [&_h1]:text-sm [&_h1]:font-bold [&_h2]:text-xs [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-bold [&_strong]:font-bold"
                 dangerouslySetInnerHTML={{ __html: data.rekomendasi_ai }}
               />
             </div>
@@ -537,107 +579,94 @@ export default function PresentasiAnalisisPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (SATU-SATUNYA YANG BISA DI-EDIT!) */}
+        {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (DIBUAT SERAGAM DENGAN MENU LAIN) */}
         {/* ========================================================================= */}
-        <div id="form-keputusan-pimpinan" className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white rounded-3xl p-6 sm:p-10 shadow-2xl border-2 border-indigo-500/40 space-y-6">
+        <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 text-slate-900">
           
-          <div className="flex flex-wrap items-center justify-between border-b border-indigo-700/60 pb-4 gap-3">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-3">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-xs font-black tracking-wide uppercase mb-2">
-                <CheckSquare size={13} /> Seksi Form Aktif (Dapat Diedit)
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold uppercase tracking-wider mb-1.5">
+                <CheckSquare size={13} /> Form Aktif (Dapat Diedit)
               </div>
-              <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2.5">
-                <FileCheck size={22} className="text-emerald-400" />
+              <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                <FileCheck size={20} className="text-emerald-600" />
                 Keputusan &amp; Catatan Persetujuan Pimpinan
               </h2>
-              <p className="text-xs text-slate-300 mt-1">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Tentukan status persetujuan, nominal yang disetujui, dan tambahkan catatan keputusan
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-400 uppercase">Status:</span>
-              <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                modalKeputusan.includes('semua') || modalKeputusan.includes('100') ? 'bg-emerald-500 text-white' :
-                modalKeputusan.includes('sebagian') ? 'bg-amber-500 text-white' :
-                modalKeputusan.includes('tolak') ? 'bg-rose-500 text-white' :
-                modalKeputusan.includes('revisi') ? 'bg-purple-500 text-white' :
-                'bg-blue-500 text-white'
-              }`}>
-                {modalKeputusan || 'Diajukan'}
-              </span>
+              {getStatusBadge(modalKeputusan)}
             </div>
           </div>
 
           {/* 1. PILIH STATUS KEPUTUSAN */}
-          <div className="space-y-2.5">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-200 block">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
               1. Pilih Status Keputusan:
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                { id: 'disetujui semua', label: 'Disetujui Penuh', color: 'emerald' },
-                { id: 'disetujui sebagian', label: 'Disetujui Sebagian', color: 'amber' },
-                { id: 'ditolak', label: 'Ditolak', color: 'rose' },
-                { id: 'perlu revisi', label: 'Perlu Revisi', color: 'purple' },
-                { id: 'diajukan', label: 'Diajukan (Pending)', color: 'blue' }
-              ].map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  onClick={() => {
-                    setModalKeputusan(st.id);
-                    if (st.id === 'disetujui semua') {
-                      setModalNominalDisetujui(data.total_anggaran?.toString() || '0');
-                    } else if (st.id === 'ditolak') {
-                      setModalNominalDisetujui('0');
-                    }
-                  }}
-                  className={`py-3.5 px-3 rounded-2xl text-xs font-bold transition-all border text-center flex flex-col items-center justify-center gap-1 cursor-pointer ${
-                    modalKeputusan.toLowerCase() === st.id.toLowerCase()
-                      ? st.color === 'emerald'
-                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg ring-2 ring-emerald-400/50'
-                        : st.color === 'amber'
-                        ? 'bg-amber-600 text-white border-amber-500 shadow-lg ring-2 ring-amber-400/50'
-                        : st.color === 'rose'
-                        ? 'bg-rose-600 text-white border-rose-500 shadow-lg ring-2 ring-rose-400/50'
-                        : st.color === 'purple'
-                        ? 'bg-purple-600 text-white border-purple-500 shadow-lg ring-2 ring-purple-400/50'
-                        : 'bg-blue-600 text-white border-blue-500 shadow-lg ring-2 ring-blue-400/50'
-                      : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border-slate-700'
-                  }`}
-                >
-                  <span className="truncate">{st.label}</span>
-                </button>
-              ))}
+                { id: 'disetujui semua', label: 'Disetujui Penuh', activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-400/40' },
+                { id: 'disetujui sebagian', label: 'Disetujui Sebagian', activeClass: 'bg-amber-500 text-white border-amber-500 shadow-sm ring-2 ring-amber-400/40' },
+                { id: 'ditolak', label: 'Ditolak', activeClass: 'bg-rose-600 text-white border-rose-600 shadow-sm ring-2 ring-rose-400/40' },
+                { id: 'perlu revisi', label: 'Perlu Revisi', activeClass: 'bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-400/40' },
+                { id: 'diajukan', label: 'Diajukan (Pending)', activeClass: 'bg-blue-600 text-white border-blue-600 shadow-sm ring-2 ring-blue-400/40' }
+              ].map((st) => {
+                const isSelected = modalKeputusan.toLowerCase() === st.id.toLowerCase();
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => {
+                      setModalKeputusan(st.id);
+                      if (st.id === 'disetujui semua') {
+                        setModalNominalDisetujui(data.total_anggaran?.toString() || '0');
+                      } else if (st.id === 'ditolak') {
+                        setModalNominalDisetujui('0');
+                      }
+                    }}
+                    className={`py-3 px-3 rounded-2xl text-xs font-bold transition-all border text-center flex items-center justify-center cursor-pointer ${
+                      isSelected
+                        ? st.activeClass
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="truncate">{st.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* 2. NOMINAL DISETUJUI (RP) */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-200 block">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
                 2. Nominal Disetujui (Rp):
               </label>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setModalNominalDisetujui(data.total_anggaran?.toString() || '0')}
-                  className="text-xs font-bold text-emerald-300 hover:bg-emerald-500/20 px-3 py-1 rounded-lg border border-emerald-500/30 transition-colors cursor-pointer"
+                  className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
                 >
                   Setujui 100% Penuh
                 </button>
                 <button
                   type="button"
                   onClick={() => setModalNominalDisetujui((Math.round(parseNum(data.total_anggaran) / 2)).toString())}
-                  className="text-xs font-bold text-slate-300 hover:bg-slate-700 px-3 py-1 rounded-lg border border-slate-600 transition-colors cursor-pointer"
+                  className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                 >
                   50%
                 </button>
                 <button
                   type="button"
                   onClick={() => setModalNominalDisetujui('0')}
-                  className="text-xs font-bold text-rose-300 hover:bg-rose-500/20 px-3 py-1 rounded-lg border border-rose-500/30 transition-colors cursor-pointer"
+                  className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-lg border border-rose-200 transition-colors cursor-pointer"
                 >
                   Rp 0
                 </button>
@@ -651,19 +680,19 @@ export default function PresentasiAnalisisPage() {
                 value={modalNominalDisetujui}
                 onChange={e => setModalNominalDisetujui(e.target.value)}
                 placeholder="0"
-                className="w-full h-12 pl-12 pr-4 bg-slate-800 border border-slate-600 rounded-xl font-mono font-bold text-lg text-emerald-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 shadow-xs"
+                className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-lg text-emerald-700 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 shadow-xs"
               />
             </div>
             {modalNominalDisetujui && (
-              <p className="text-xs font-mono text-emerald-400 font-bold">
+              <p className="text-xs font-mono text-emerald-700 font-bold">
                 Terbaca: Rp {formatRp(modalNominalDisetujui)} • ({terbilang(parseNum(modalNominalDisetujui))})
               </p>
             )}
           </div>
 
           {/* 3. CATATAN / KETERANGAN KEPUTUSAN */}
-          <div className="space-y-2.5">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-200 block">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
               3. Catatan / Keterangan Hasil Keputusan Pimpinan:
             </label>
             <textarea
@@ -671,14 +700,14 @@ export default function PresentasiAnalisisPage() {
               value={modalKeteranganKeputusan}
               onChange={e => setModalKeteranganKeputusan(e.target.value)}
               placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
-              className="w-full p-4 bg-slate-800 border border-slate-600 rounded-xl text-xs sm:text-sm font-medium text-slate-100 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 shadow-xs resize-none leading-relaxed"
+              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 shadow-xs resize-none leading-relaxed"
             />
           </div>
 
           {/* SAVE BUTTON */}
-          <div className="flex flex-wrap items-center justify-between pt-3 border-t border-indigo-700/60 gap-3">
+          <div className="flex flex-wrap items-center justify-between pt-4 border-t border-slate-100 gap-3">
             {saveSuccess ? (
-              <span className="text-xs sm:text-sm font-bold text-emerald-400 flex items-center gap-1.5 animate-in fade-in">
+              <span className="text-xs sm:text-sm font-bold text-emerald-600 flex items-center gap-1.5 animate-in fade-in">
                 <CheckCircle2 size={18} /> Keputusan &amp; Catatan Persetujuan Berhasil Disimpan ke Database!
               </span>
             ) : (
@@ -691,9 +720,9 @@ export default function PresentasiAnalisisPage() {
                 type="button"
                 onClick={handleSaveDecision}
                 disabled={isSavingDecision}
-                className="h-12 px-8 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-xs sm:text-sm rounded-xl transition-all shadow-xl flex items-center gap-2 cursor-pointer active:scale-98"
+                className="h-11 px-7 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer active:scale-98"
               >
-                {isSavingDecision ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+                {isSavingDecision ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
                 <span>Simpan Perubahan Keputusan</span>
               </button>
             </div>
