@@ -166,7 +166,7 @@ export default function PresentasiAnalisisPage() {
         link_lampiran: row.link_lampiran || '',
         keputusan: row.keputusan || parsed.keputusan || 'diajukan',
         nominal_disetujui: row.nominal_disetujui ?? parsed.nominal_disetujui ?? row.total_anggaran ?? '0',
-        keterangan_keputusan: row.keterangan_keputusan || parsed.keterangan_keputusan || '',
+        keterangan_keputusan: parsed.keterangan_keputusan || row.alasan_keputusan || row.catatan_tambahan || '',
       };
       setData(loadedMainData);
 
@@ -290,24 +290,25 @@ export default function PresentasiAnalisisPage() {
       
       // Update inside analisis_html payload as well to ensure consistency across all views
       let updatedAnalisisHtml = data.raw_analisis_html;
+      let parsed: any = {};
       if (data.raw_analisis_html) {
         try {
-          const parsed = JSON.parse(data.raw_analisis_html);
-          parsed.keputusan = modalKeputusan;
-          parsed.nominal_disetujui = nominalClean;
-          parsed.keterangan_keputusan = modalKeteranganKeputusan;
-          updatedAnalisisHtml = JSON.stringify(parsed);
+          parsed = JSON.parse(data.raw_analisis_html);
         } catch(e) {}
       }
+      parsed.keputusan = modalKeputusan;
+      parsed.nominal_disetujui = nominalClean;
+      parsed.keterangan_keputusan = modalKeteranganKeputusan;
+      updatedAnalisisHtml = JSON.stringify(parsed);
 
       const { error } = await supabase
         .from('app_analisis_utama')
         .update({
           keputusan: modalKeputusan,
-          nominal_disetujui: nominalClean,
-          keterangan_keputusan: modalKeteranganKeputusan,
-          analisis_html: updatedAnalisisHtml,
-          updated_at: new Date().toISOString()
+          nominal_disetujui: nominalClean.toString(),
+          alasan_keputusan: modalKeteranganKeputusan,
+          catatan_tambahan: modalKeteranganKeputusan,
+          analisis_html: updatedAnalisisHtml
         })
         .eq('id_analisis', data.id_analisis);
 
@@ -318,7 +319,9 @@ export default function PresentasiAnalisisPage() {
         raw_analisis_html: updatedAnalisisHtml,
         keputusan: modalKeputusan,
         nominal_disetujui: nominalClean,
-        keterangan_keputusan: modalKeteranganKeputusan
+        keterangan_keputusan: modalKeteranganKeputusan,
+        alasan_keputusan: modalKeteranganKeputusan,
+        catatan_tambahan: modalKeteranganKeputusan
       }));
 
       setSaveSuccess(true);
