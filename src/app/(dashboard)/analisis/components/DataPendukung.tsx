@@ -274,65 +274,95 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   <th className="px-4 py-3 text-right whitespace-nowrap">Anggaran</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Realisasi</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Sisa Anggaran</th>
-                  <th className="px-4 py-3 text-center w-20 whitespace-nowrap">%</th>
+                  <th className="px-4 py-3 text-center w-28 whitespace-nowrap">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...(detailData || [])].sort((a: any, b: any) => (Number(a.no_urut) || 0) - (Number(b.no_urut) || 0)).map((d: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-center font-bold text-gray-600 whitespace-nowrap">{d.no_urut}</td>
-                    <td className="px-4 py-3 min-w-[280px]">
-                      {readOnly ? (
-                        <div className="whitespace-normal break-words leading-relaxed text-xs sm:text-sm text-gray-800 font-medium py-0.5">
-                          {d.uraian_kegiatan || '-'}
+                {[...(detailData || [])].sort((a: any, b: any) => (Number(a.no_urut) || 0) - (Number(b.no_urut) || 0)).map((d: any, idx: number) => {
+                  const angVal = parseNum(d.anggaran);
+                  const realVal = parseNum(d.realisasi);
+                  let pctNum = 0;
+                  if (d.persen_serapan && typeof d.persen_serapan === 'string') {
+                    const parsed = parseFloat(d.persen_serapan.replace('%', '').replace(',', '.').trim());
+                    if (!isNaN(parsed)) pctNum = parsed;
+                  }
+                  if (pctNum === 0 && angVal > 0 && realVal > 0) {
+                    pctNum = (realVal / angVal) * 100;
+                  }
+                  const clampedPct = Math.min(100, Math.max(0, Math.round(pctNum)));
+                  const barColor = clampedPct >= 80 ? 'bg-emerald-500' : clampedPct >= 50 ? 'bg-indigo-500' : 'bg-amber-500';
+
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-center font-bold text-gray-600 whitespace-nowrap">{d.no_urut}</td>
+                      <td className="px-4 py-3 min-w-[280px]">
+                        {readOnly ? (
+                          <div className="whitespace-normal break-words leading-relaxed text-xs sm:text-sm text-gray-800 font-medium py-0.5">
+                            {d.uraian_kegiatan || '-'}
+                          </div>
+                        ) : (
+                          <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
+                            const newD = [...detailData];
+                            const targetIdx = detailData.findIndex((item: any) => item === d || item.no_urut === d.no_urut);
+                            if (targetIdx !== -1) newD[targetIdx].uraian_kegiatan = e.target.value;
+                            setDetailData(newD);
+                          }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        {readOnly ? (
+                          <span className="font-mono font-bold text-gray-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.anggaran))}</span>
+                        ) : (
+                          <input type="text" value={d.anggaran} onChange={(e) => {
+                            const newD = [...detailData];
+                            newD[idx].anggaran = e.target.value;
+                            setDetailData(newD);
+                          }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        {readOnly ? (
+                          <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.realisasi))}</span>
+                        ) : (
+                          <input type="text" value={d.realisasi} onChange={(e) => {
+                            const newD = [...detailData];
+                            newD[idx].realisasi = e.target.value;
+                            setDetailData(newD);
+                          }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono text-xs sm:text-sm whitespace-nowrap">
+                        Rp {formatRp((parseNum(d.anggaran) || 0) - (parseNum(d.realisasi) || 0))}
+                      </td>
+                      <td className="px-4 py-3 text-center align-middle">
+                        <div className="flex flex-col items-center justify-center min-w-[70px] max-w-[100px] mx-auto gap-1">
+                          {readOnly ? (
+                            <span className={`font-bold font-mono text-xs whitespace-nowrap ${clampedPct >= 80 ? 'text-emerald-700' : clampedPct >= 50 ? 'text-indigo-700' : 'text-amber-700'}`}>
+                              {d.persen_serapan || `${clampedPct}%`}
+                            </span>
+                          ) : (
+                            <input 
+                              type="text" 
+                              value={d.persen_serapan} 
+                              onChange={(e) => {
+                                const newD = [...detailData];
+                                newD[idx].persen_serapan = e.target.value;
+                                setDetailData(newD);
+                              }} 
+                              className="w-full bg-transparent outline-none text-center font-bold text-emerald-600 focus:border-b border-emerald-500 font-mono text-xs"
+                            />
+                          )}
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-200/60 shadow-2xs">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                              style={{ width: `${clampedPct}%` }}
+                            />
+                          </div>
                         </div>
-                      ) : (
-                        <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
-                          const newD = [...detailData];
-                          const targetIdx = detailData.findIndex((item: any) => item === d || item.no_urut === d.no_urut);
-                          if (targetIdx !== -1) newD[targetIdx].uraian_kegiatan = e.target.value;
-                          setDetailData(newD);
-                        }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {readOnly ? (
-                        <span className="font-mono font-bold text-gray-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.anggaran))}</span>
-                      ) : (
-                        <input type="text" value={d.anggaran} onChange={(e) => {
-                          const newD = [...detailData];
-                          newD[idx].anggaran = e.target.value;
-                          setDetailData(newD);
-                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {readOnly ? (
-                        <span className="font-mono font-bold text-emerald-700 text-xs sm:text-sm whitespace-nowrap">Rp {formatRp(parseNum(d.realisasi))}</span>
-                      ) : (
-                        <input type="text" value={d.realisasi} onChange={(e) => {
-                          const newD = [...detailData];
-                          newD[idx].realisasi = e.target.value;
-                          setDetailData(newD);
-                        }} className="w-full bg-transparent outline-none text-right focus:border-b border-emerald-500"/>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold text-emerald-600 font-mono text-xs sm:text-sm whitespace-nowrap">
-                      Rp {formatRp((parseNum(d.anggaran) || 0) - (parseNum(d.realisasi) || 0))}
-                    </td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
-                      {readOnly ? (
-                        <span className="font-bold text-emerald-600 font-mono text-xs whitespace-nowrap">{d.persen_serapan || '0%'}</span>
-                      ) : (
-                        <input type="text" value={d.persen_serapan} onChange={(e) => {
-                          const newD = [...detailData];
-                          newD[idx].persen_serapan = e.target.value;
-                          setDetailData(newD);
-                        }} className="w-full bg-transparent outline-none text-center font-bold text-emerald-600 focus:border-b border-emerald-500"/>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {(!detailData || detailData.length === 0) && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500 italic">Belum ada rincian. Silakan Import Excel atau Tambah Baris.</td>

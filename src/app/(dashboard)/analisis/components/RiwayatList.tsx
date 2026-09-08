@@ -466,6 +466,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl border border-gray-200">
               {[
                 { id: 'semua', label: 'Semua' },
+                { id: 'diajukan', label: 'Diajukan' },
                 { id: 'disetujui semua', label: 'Disetujui 100%' },
                 { id: 'disetujui sebagian', label: 'Sebagian' },
                 { id: 'ditolak', label: 'Ditolak' }
@@ -524,7 +525,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                    <th className="px-4 py-4 w-auto min-w-[240px]">Unit Kerja & Detail Surat Pengajuan</th>
                    <th className="px-4 py-4 text-right w-48">Nominal Usulan & Disetujui</th>
                    <th className="px-4 py-4 text-center w-36">Status Keputusan</th>
-                   <th className="px-4 py-4 text-center w-32">Aksi / Kontrol</th>
+                   <th className="px-3 py-4 text-center w-36">Aksi / Kontrol</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
@@ -605,8 +606,8 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                             )}
                           </td>
 
-                          <td className="px-3 py-3 text-center align-middle" onClick={e => e.stopPropagation()}>
-                            <div className="grid grid-cols-2 gap-1.5 w-fit mx-auto">
+                          <td className="px-2 py-3 text-center align-middle" onClick={e => e.stopPropagation()}>
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[125px] mx-auto">
                               {/* Baris 1: 👁️ Pop-up Detail (Asli) */}
                               <button
                                 onClick={() => setViewModalData(r)}
@@ -647,6 +648,15 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                 title="Edit & Buka Form Analisis"
                               >
                                 <Edit3 size={14} />
+                              </button>
+
+                              {/* Baris 2: 🗑️ Hapus Analisis */}
+                              <button
+                                onClick={(e) => handleDelete(r.id_analisis, e)}
+                                className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer"
+                                title="Hapus Arsip Analisis"
+                              >
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </td>
