@@ -4,16 +4,153 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
-  PieChart, ArrowRight
+  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+
+// Component Autocomplete Unit Kerja dengan navigasi Keyboard (↑, ↓, Enter, Esc)
+function UnitAutocompleteInput({ 
+  units, 
+  value, 
+  onChange, 
+  placeholder = "Pilih / Ketik Unit Kerja..." 
+}: { 
+  units: string[]; 
+  value: string; 
+  onChange: (val: string) => void; 
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const filtered = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['ALL', ...filtered];
+  }, [filtered]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onChange(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      } else if (query.trim()) {
+        onChange(query.trim());
+        setIsOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative w-full" onKeyDown={handleKeyDown}>
+      <div className="flex gap-1">
+        <Input 
+          value={value === 'ALL' ? 'Semua Fakultas/Unit Kerja' : value}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange(v === '' ? 'ALL' : v);
+          }}
+          placeholder={placeholder}
+          className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-300 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
+        >
+          ▼
+        </button>
+      </div>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
+            <input
+              type="text"
+              placeholder="Cari nama unit..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="w-full px-2.5 py-1.5 mb-2 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
+            />
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              <div
+                onClick={() => {
+                  onChange('ALL');
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors ${
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : value === 'ALL' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                }`}
+              >
+                🏢 Semua Fakultas/Unit Kerja ({units.length})
+              </div>
+              {filtered.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = value === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onChange(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {u}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filter States
   const [modeLaporan, setModeLaporan] = useState<'kementerian' | 'webometrics'>('kementerian');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
@@ -28,7 +165,7 @@ export default function RkaLaporanPage() {
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
-        setDataList(json.data);
+        setDataList(json.data || []);
       } else {
         toast.error('Gagal memuat data: ' + json.error);
       }
@@ -60,6 +197,9 @@ export default function RkaLaporanPage() {
         return (
           val.toLowerCase().includes(lower) ||
           (d.uraian_belanja && d.uraian_belanja.toLowerCase().includes(lower)) ||
+          (d.kegiatan && d.kegiatan.toLowerCase().includes(lower)) ||
+          (d.lingkup_kegiatan && d.lingkup_kegiatan.toLowerCase().includes(lower)) ||
+          (d.akun_detail && d.akun_detail.toLowerCase().includes(lower)) ||
           (d.unit && d.unit.toLowerCase().includes(lower))
         );
       }
@@ -109,7 +249,7 @@ export default function RkaLaporanPage() {
     const anggaran = groupedData.reduce((acc, g) => acc + g.totalAnggaran, 0);
     const realisasi = groupedData.reduce((acc, g) => acc + g.totalRealisasi, 0);
     const sisa = anggaran - realisasi;
-    const pct = anggaran > 0 ? ((realisasi / anggaran) * 100).toFixed(2) : '0';
+    const pct = anggaran > 0 ? ((realisasi / anggaran) * 100).toFixed(1) : '0';
     const totalItems = groupedData.reduce((acc, g) => acc + g.rows.length, 0);
     return { anggaran, realisasi, sisa, pct, totalItems };
   }, [groupedData]);
@@ -127,6 +267,7 @@ export default function RkaLaporanPage() {
           'Tahun': r.tahun_anggaran,
           'Program': r.program,
           'Kegiatan': r.kegiatan,
+          'Lingkup Kegiatan': r.lingkup_kegiatan,
           'Uraian Belanja': r.uraian_belanja,
           'Akun Detail': r.akun_detail,
           'Pagu Anggaran (Rp)': Number(r.anggaran) || 0,
@@ -141,258 +282,467 @@ export default function RkaLaporanPage() {
     const sheetName = modeLaporan === 'kementerian' ? 'Rekap_Kementerian' : 'Rekap_Webometrics';
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     XLSX.writeFile(wb, `Rekap_RKA_${sheetName}_${tahunFilter}.xlsx`);
+    toast.success('File Excel rekapitulasi berhasil diexport!');
   };
+
+  const isKemen = modeLaporan === 'kementerian';
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-300">
       
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded-full text-xs font-bold uppercase tracking-wider">
-              <Layers size={14} /> Rekapitulasi RKA
+      {/* HEADER UTAMA (SERAGAM DENGAN RKA PENGELUARAN & RULES) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200/80 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-11 w-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs shrink-0">
+            <Layers size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
+                Rekapitulasi Laporan Kementerian &amp; Webometrics
+              </h1>
+              <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold uppercase">
+                REKAP RKA
+              </Badge>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Rekapitulasi Laporan Kementerian &amp; Webometrics
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
-              Melihat akumulasi pagu anggaran dan realisasi belanja RKAT yang telah diidentifikasi dan dikelompokkan sesuai kebutuhan pelaporan eksternal.
+            <p className="text-xs text-gray-500 font-medium">
+              Akumulasi Pagu Anggaran &amp; Realisasi Belanja RKAT Berdasarkan Format Pelaporan Resmi
             </p>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={handleExportExcel}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
+        {/* Action Buttons Top Bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+          >
+            <Download size={14} className="text-emerald-600" />
+            <span>Export Excel</span>
+          </Button>
+
+          <Link href="/rka/rules">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs"
             >
-              <Download size={14} /> Export Rekap Excel
-            </button>
-            <Link
-              href="/rka/rules"
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold shadow-md transition-all flex items-center gap-2"
+              <Sparkles size={14} className="text-indigo-600" />
+              <span>Rule Engine</span>
+            </Button>
+          </Link>
+
+          <Link href="/rka/pengeluaran">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
             >
-              <Sparkles size={14} /> Rule Engine Klasifikasi
-            </Link>
-          </div>
+              <FolderTree size={14} className="text-gray-600" />
+              <span>Data Belanja</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            disabled={loading}
+            className="h-9 w-9 p-0 rounded-xl border-gray-300 text-gray-600 hover:bg-gray-50 shadow-2xs"
+            title="Refresh Data"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </Button>
         </div>
       </div>
 
-      {/* Switcher Mode Laporan & Filter */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {/* KPI METRIC CARDS (SERAGAM DENGAN RKA PENGELUARAN) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        {/* Card 1: Total Kategori Terpetakan */}
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Format Laporan Terpetakan
+            </span>
+            <div className="text-2xl font-black font-mono text-gray-900">
+              {groupedData.length} <span className="text-xs font-semibold text-gray-500 font-sans">Kategori</span>
+            </div>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span>{grandTotal.totalItems.toLocaleString('id-ID')} Baris Belanja</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">TA {tahunFilter}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Total Pagu Teridentifikasi */}
+        <Card className={`rounded-2xl shadow-xs ${
+          isKemen ? 'border-blue-200 bg-gradient-to-b from-white to-blue-50/40' : 'border-emerald-200 bg-gradient-to-b from-white to-emerald-50/40'
+        }`}>
+          <CardContent className="p-5 space-y-2">
+            <span className={`text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1 ${
+              isKemen ? 'text-blue-700' : 'text-emerald-700'
+            }`}>
+              <span>{isKemen ? '🏛️' : '🌐'}</span>
+              <span>Total Pagu Terpetakan</span>
+            </span>
+            <div className={`text-2xl font-black font-mono ${isKemen ? 'text-blue-950' : 'text-emerald-950'}`}>
+              Rp {formatRp(grandTotal.anggaran)}
+            </div>
+            <div className={`text-xs font-semibold flex items-center justify-between pt-1 border-t ${
+              isKemen ? 'border-blue-200/60 text-blue-800' : 'border-emerald-200/60 text-emerald-800'
+            }`}>
+              <span>Format: {isKemen ? 'Kementerian' : 'Webometrics'}</span>
+              <span className="text-[10px] font-mono font-bold">100% Valid</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Realisasi Belanja */}
+        <Card className="rounded-2xl border-emerald-100 shadow-xs bg-gradient-to-b from-white to-emerald-50/30">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
+              Total Realisasi Belanja
+            </span>
+            <div className="text-2xl font-black font-mono text-emerald-700">
+              Rp {formatRp(grandTotal.realisasi)}
+            </div>
+            <div className="text-xs text-emerald-700 font-semibold flex items-center justify-between pt-1 border-t border-emerald-100/60">
+              <span>Serapan: {grandTotal.pct}%</span>
+              <div className="w-16 bg-emerald-100 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-600 rounded-full"
+                  style={{ width: `${Math.min(100, parseFloat(grandTotal.pct))}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Sisa Anggaran */}
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Sisa Anggaran Belanja
+            </span>
+            <div className="text-2xl font-black font-mono text-gray-900">
+              Rp {formatRp(grandTotal.sisa)}
+            </div>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span>Belum Terealisasi</span>
+              <span className="text-[10px] font-mono text-gray-400">
+                {(100 - parseFloat(grandTotal.pct)).toFixed(1)}% Sisa
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* FILTER CONTROL SECTION (SERAGAM DENGAN MODUL LAIN) */}
+      <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+        <CardContent className="p-4 sm:p-5 space-y-4">
           
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-            <button
-              onClick={() => setModeLaporan('kementerian')}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                modeLaporan === 'kementerian'
-                  ? 'bg-indigo-600 text-white shadow-xs font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🏛️ Laporan Kementerian
-            </button>
-            <button
-              onClick={() => setModeLaporan('webometrics')}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                modeLaporan === 'webometrics'
-                  ? 'bg-indigo-600 text-white shadow-xs font-black'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🌐 Laporan Webometrics
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <select
-              value={tahunFilter}
-              onChange={e => setTahunFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-2xl px-3.5 py-2 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="2027">TA 2027</option>
-              <option value="2026">TA 2026</option>
-              <option value="2025">TA 2025</option>
-              <option value="ALL">Semua Tahun</option>
-            </select>
-
-            <select
-              value={unitFilter}
-              onChange={e => setUnitFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-2xl px-3.5 py-2 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[220px] truncate"
-            >
-              <option value="ALL">Semua Unit Kerja</option>
-              {unitOptions.map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-
-            <div className="flex items-center gap-1">
+          {/* Baris 1: Mode Switcher Tab Laporan */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
               <button
+                onClick={() => setModeLaporan('kementerian')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modeLaporan === 'kementerian'
+                    ? 'bg-blue-600 text-white shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <span>🏛️</span>
+                <span>Laporan Kementerian</span>
+              </button>
+
+              <button
+                onClick={() => setModeLaporan('webometrics')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modeLaporan === 'webometrics'
+                    ? 'bg-emerald-600 text-white shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <span>🌐</span>
+                <span>Laporan Webometrics</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={expandAll}
-                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="h-8 text-xs font-bold rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50"
               >
                 Buka Semua
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={collapseAll}
-                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="h-8 text-xs font-bold rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50"
               >
                 Tutup Semua
-              </button>
+              </Button>
             </div>
           </div>
 
-        </div>
+          {/* Baris 2: Filter Tahun, Fakultas Autocomplete, dan Search Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            
+            {/* Filter Tahun */}
+            <div className="sm:col-span-3">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Tahun Anggaran
+              </label>
+              <select
+                value={tahunFilter}
+                onChange={e => setTahunFilter(e.target.value)}
+                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+              >
+                <option value="2027">TA 2027</option>
+                <option value="2026">TA 2026</option>
+                <option value="2025">TA 2025</option>
+                <option value="ALL">Semua Tahun</option>
+              </select>
+            </div>
 
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            type="text"
-            placeholder="Cari format laporan, kegiatan, unit..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 rounded-2xl py-2 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs"
-          />
-        </div>
-      </div>
+            {/* Filter Fakultas Autocomplete */}
+            <div className="sm:col-span-4">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Fakultas / Unit Kerja
+              </label>
+              <UnitAutocompleteInput
+                units={unitOptions}
+                value={unitFilter}
+                onChange={setUnitFilter}
+                placeholder="Pilih atau cari unit..."
+              />
+            </div>
 
-      {/* Ringkasan Grand Total KPI */}
-      <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-5 rounded-3xl shadow-md grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 block">Total Kategori Laporan</span>
-          <div className="text-xl font-black">{groupedData.length} Format</div>
-          <span className="text-xs text-indigo-200">{grandTotal.totalItems} Baris Belanja</span>
-        </div>
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 block">Total Pagu Teridentifikasi</span>
-          <div className="text-xl font-black font-mono">Rp {formatRp(grandTotal.anggaran)}</div>
-          <span className="text-xs text-indigo-200">TA {tahunFilter}</span>
-        </div>
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 block">Total Realisasi</span>
-          <div className="text-xl font-black font-mono text-emerald-300">Rp {formatRp(grandTotal.realisasi)}</div>
-          <span className="text-xs text-emerald-200">Serapan: {grandTotal.pct}%</span>
-        </div>
-        <div>
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 block">Sisa Anggaran</span>
-          <div className="text-xl font-black font-mono text-amber-300">Rp {formatRp(grandTotal.sisa)}</div>
-          <span className="text-xs text-amber-200">Belum Terealisasi</span>
-        </div>
-      </div>
+            {/* Search Box */}
+            <div className="sm:col-span-5">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Pencarian Data
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Cari format laporan, uraian belanja, kegiatan, unit..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full h-9 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl pl-8 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-xs font-medium focus:bg-white transition-all shadow-2xs"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-      {/* Daftar Kategori & Breakdown Baris */}
-      <div className="space-y-4">
+          </div>
+
+        </CardContent>
+      </Card>
+
+      {/* DAFTAR KATEGORI LAPORAN & ACCORDION BREAKDOWN */}
+      <div className="space-y-3.5">
         {loading ? (
-          <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center flex flex-col items-center justify-center space-y-2">
-            <RefreshCw className="animate-spin text-indigo-600" size={32} />
-            <span className="text-xs font-bold text-slate-500">Menyusun rekapitulasi laporan...</span>
-          </div>
+          <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+            <CardContent className="p-16 flex flex-col items-center justify-center space-y-3">
+              <RefreshCw className="animate-spin text-indigo-600" size={30} />
+              <span className="text-xs font-bold text-gray-500">Menyusun rekapitulasi laporan...</span>
+            </CardContent>
+          </Card>
         ) : groupedData.length === 0 ? (
-          <div className="bg-white p-12 rounded-3xl border border-slate-200 text-center space-y-2">
-            <Layers size={40} className="text-slate-300 mx-auto" />
-            <h4 className="text-sm font-black text-slate-700">Belum ada data belanja yang teridentifikasi untuk format ini</h4>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Gunakan menu <strong>Klasifikasi &amp; Rules RKA</strong> untuk otomatis memetakan kata kunci belanja ke dalam Laporan Kementerian atau Webometrics.
-            </p>
-          </div>
+          <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+            <CardContent className="p-16 text-center space-y-3">
+              <Layers size={42} className="mx-auto text-gray-300" />
+              <h3 className="text-sm font-bold text-gray-700">Belum ada data belanja yang terpetakan untuk format ini</h3>
+              <p className="text-xs text-gray-400 max-w-md mx-auto">
+                Gunakan menu <strong>Rule Engine Klasifikasi</strong> untuk memetakan kata kunci belanja secara otomatis ke format {isKemen ? 'Laporan Kementerian' : 'Laporan Webometrics'}.
+              </p>
+              <div className="pt-2">
+                <Link href="/rka/rules">
+                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl gap-1.5">
+                    <Sparkles size={14} />
+                    <span>Buka Rule Engine</span>
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           groupedData.map((group, gIdx) => {
             const isExpanded = expandedGroups.includes(group.label);
             const pct = group.totalAnggaran > 0 ? Math.min(100, Math.round((group.totalRealisasi / group.totalAnggaran) * 100)) : 0;
+            const sisaGroup = group.totalAnggaran - group.totalRealisasi;
 
             return (
-              <div key={group.label || gIdx} className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden transition-all">
+              <Card 
+                key={group.label || gIdx} 
+                className={`rounded-2xl shadow-xs transition-all overflow-hidden border ${
+                  isExpanded 
+                    ? isKemen ? 'border-blue-300' : 'border-emerald-300'
+                    : 'border-gray-200/80 hover:border-gray-300'
+                }`}
+              >
                 {/* Header Group Accordion */}
                 <div 
                   onClick={() => toggleGroup(group.label)}
-                  className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/80 transition-colors"
+                  className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors ${
+                    isExpanded 
+                      ? isKemen ? 'bg-blue-50/40' : 'bg-emerald-50/40'
+                      : 'hover:bg-gray-50/80 bg-white'
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 font-bold">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold ${
+                      isKemen ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
                       {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                        {group.label}
-                        <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-700 font-bold rounded-full">
-                          {group.rows.length} Item
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          isKemen ? 'bg-blue-50 text-blue-900 border-blue-200' : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                        }`}>
+                          <span>{isKemen ? '🏛️' : '🌐'}</span>
+                          <span>{isKemen ? 'Format Kementerian' : 'Format Webometrics'}</span>
                         </span>
+                        <Badge variant="secondary" className="text-[10px] font-bold">
+                          {group.rows.length} Item Belanja
+                        </Badge>
+                      </div>
+                      <h3 className="font-black text-gray-900 text-sm mt-1">
+                        {group.label}
                       </h3>
-                      <p className="text-xs text-slate-500">
-                        Klik untuk melihat rincian baris belanja unit kerja
-                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-6 self-end sm:self-center">
                     <div className="text-right">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Pagu</span>
-                      <span className="font-black font-mono text-slate-900 text-sm">
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Total Pagu</span>
+                      <span className="font-black font-mono text-gray-900 text-sm">
                         Rp {formatRp(group.totalAnggaran)}
                       </span>
                     </div>
 
                     <div className="text-right">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Realisasi</span>
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Realisasi</span>
                       <span className="font-bold font-mono text-emerald-700 text-sm">
                         Rp {formatRp(group.totalRealisasi)}
                       </span>
                     </div>
 
-                    <div className="w-20 text-center">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Serapan</span>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-600 font-mono">{pct}%</span>
+                    <div className="w-24 text-right">
+                      <div className="flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 tracking-wider">
+                        <span>Serapan</span>
+                        <span className="font-mono text-gray-600">{pct}%</span>
                       </div>
+                      <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-1">
+                        <div 
+                          className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
+                        Sisa: Rp {formatRp(sisaGroup)}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Body Details Accordion */}
+                {/* Body Details Accordion (3-Field Breakdown Table) */}
                 {isExpanded && (
-                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 sm:p-5">
-                    <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200">
+                  <div className="border-t border-gray-100 bg-gray-50/50 p-4 sm:p-5 space-y-2">
+                    <div className="text-xs font-bold text-gray-700 flex items-center justify-between px-1">
+                      <span>Rincian Baris Belanja ({group.rows.length} Data):</span>
+                      <span className="text-[10px] text-gray-400 font-normal">Klik judul baris di atas untuk menutup</span>
+                    </div>
+
+                    <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
                       <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
+                        <thead className="bg-gray-50 text-gray-600 uppercase font-bold text-[10px] tracking-wider border-b border-gray-200">
                           <tr>
                             <th className="px-3 py-2.5 w-10 text-center">#</th>
-                            <th className="px-3 py-2.5 min-w-[180px]">Unit Kerja</th>
-                            <th className="px-3 py-2.5 min-w-[240px]">Kegiatan & Uraian Belanja</th>
-                            <th className="px-3 py-2.5 min-w-[140px]">Akun</th>
-                            <th className="px-3 py-2.5 text-right min-w-[120px]">Anggaran</th>
-                            <th className="px-3 py-2.5 text-right min-w-[120px]">Realisasi</th>
-                            <th className="px-3 py-2.5 text-right min-w-[120px]">Sisa</th>
+                            <th className="px-4 py-2.5 min-w-[200px]">Fakultas / Unit Kerja</th>
+                            <th className="px-4 py-2.5 min-w-[300px]">Uraian Belanja &amp; Kegiatan</th>
+                            <th className="px-3 py-2.5 min-w-[130px]">Akun Detail</th>
+                            <th className="px-4 py-2.5 text-right min-w-[120px]">Pagu</th>
+                            <th className="px-4 py-2.5 text-right min-w-[120px]">Realisasi</th>
+                            <th className="px-4 py-2.5 text-right min-w-[120px]">Sisa</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                           {group.rows.map((row, rIdx) => {
                             const ang = Number(row.anggaran) || 0;
                             const rel = Number(row.realisasi) || 0;
                             const sisa = ang - rel;
 
                             return (
-                              <tr key={row.id || rIdx} className="hover:bg-slate-50">
-                                <td className="px-3 py-2 text-center text-slate-400 font-mono">{rIdx + 1}</td>
-                                <td className="px-3 py-2 font-bold text-slate-900">{row.unit}</td>
-                                <td className="px-3 py-2 space-y-0.5">
-                                  <div className="font-bold text-slate-800">{row.uraian_belanja}</div>
-                                  <div className="text-[11px] text-slate-500 line-clamp-1">{row.kegiatan}</div>
+                              <tr key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors">
+                                <td className="px-3 py-3 text-center text-gray-400 font-mono text-[11px] align-top">
+                                  {rIdx + 1}
                                 </td>
-                                <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{row.akun_detail || '-'}</td>
-                                <td className="px-3 py-2 text-right font-mono font-bold text-slate-900">Rp {formatRp(ang)}</td>
-                                <td className="px-3 py-2 text-right font-mono text-emerald-700 font-bold">Rp {formatRp(rel)}</td>
-                                <td className="px-3 py-2 text-right font-mono text-slate-500">Rp {formatRp(sisa)}</td>
+                                
+                                <td className="px-4 py-3 align-top">
+                                  <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                    <Building2 size={12} className="text-indigo-600 shrink-0" />
+                                    <span>{row.unit}</span>
+                                  </div>
+                                  <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
+                                    TA {row.tahun_anggaran} • Prioritas: {row.prioritas || '-'}
+                                  </span>
+                                </td>
+
+                                <td className="px-4 py-3 align-top space-y-1">
+                                  <div className="font-bold text-gray-950 leading-snug">
+                                    {row.uraian_belanja || '-'}
+                                  </div>
+                                  {row.kegiatan && (
+                                    <div className="text-[11px] text-gray-600 leading-tight">
+                                      <span className="font-semibold text-gray-700">Kegiatan:</span> {row.kegiatan}
+                                    </div>
+                                  )}
+                                  {row.lingkup_kegiatan && (
+                                    <div className="text-[10px] text-indigo-700 font-medium">
+                                      Lingkup: {row.lingkup_kegiatan}
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="px-3 py-3 align-top font-mono text-xs">
+                                  {row.akun_detail ? (
+                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-bold inline-block">
+                                      {row.akun_detail}
+                                    </span>
+                                  ) : '-'}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right font-mono font-bold text-gray-900">
+                                  Rp {formatRp(ang)}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right font-mono font-bold text-emerald-700">
+                                  Rp {formatRp(rel)}
+                                </td>
+
+                                <td className="px-4 py-3 align-top text-right font-mono text-gray-600">
+                                  Rp {formatRp(sisa)}
+                                </td>
                               </tr>
                             );
                           })}
@@ -401,7 +751,7 @@ export default function RkaLaporanPage() {
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })
         )}
