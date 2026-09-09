@@ -18,29 +18,29 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
-// Component Autocomplete Unit Kerja dengan navigasi Keyboard (↑, ↓, Enter, Esc)
-function UnitAutocompleteInput({ 
+// Autocomplete Filter Unit Kerja Component (Persis seperti di tambah-pagu dengan Navigasi Keyboard ↑ ↓ + Enter)
+function UnitAutocompleteFilter({ 
   units, 
-  value, 
-  onChange, 
-  placeholder = "Pilih / Ketik Unit Kerja..." 
+  selectedUnit, 
+  onSelect 
 }: { 
   units: string[]; 
-  value: string; 
-  onChange: (val: string) => void; 
-  placeholder?: string;
+  selectedUnit: string; 
+  onSelect: (unit: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const filtered = useMemo(() => {
+  const filteredUnits = useMemo(() => {
     return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
   }, [units, query]);
 
+  const isAll = selectedUnit === 'ALL' || selectedUnit === '*' || !selectedUnit;
+
   const allOptions = useMemo(() => {
-    return ['ALL', ...filtered];
-  }, [filtered]);
+    return ['ALL', ...filteredUnits];
+  }, [filteredUnits]);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -48,7 +48,8 @@ function UnitAutocompleteInput({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
         setIsOpen(true);
       }
       return;
@@ -63,12 +64,9 @@ function UnitAutocompleteInput({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (allOptions.length > 0 && allOptions[highlightedIndex]) {
-        onChange(allOptions[highlightedIndex]);
+        onSelect(allOptions[highlightedIndex]);
         setIsOpen(false);
         setQuery('');
-      } else if (query.trim()) {
-        onChange(query.trim());
-        setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -77,71 +75,68 @@ function UnitAutocompleteInput({
   };
 
   return (
-    <div className="relative w-full" onKeyDown={handleKeyDown}>
-      <div className="flex gap-1">
-        <Input 
-          value={value === 'ALL' ? 'Semua Fakultas/Unit Kerja' : value}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange(v === '' ? 'ALL' : v);
-          }}
-          placeholder={placeholder}
-          className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
-        />
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-300 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
-        >
-          ▼
-        </button>
-      </div>
+    <div className="relative inline-block text-left w-full" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-9 px-3.5 rounded-xl bg-gray-50 hover:bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+      >
+        <span className="truncate font-bold">
+          {isAll ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
+        </span>
+        <span className="text-[10px] opacity-60">▼</span>
+      </button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
+          <div className="absolute left-0 mt-1 w-full min-w-[280px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
             <input
               type="text"
-              placeholder="Cari nama unit..."
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
-              className="w-full px-2.5 py-1.5 mb-2 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
+              className="w-full px-3 py-2 mb-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
             />
-            <div className="max-h-48 overflow-y-auto space-y-1">
+            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
               <div
                 onClick={() => {
-                  onChange('ALL');
+                  onSelect('ALL');
                   setIsOpen(false);
                   setQuery('');
                 }}
-                className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors ${
-                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : value === 'ALL' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                className={`px-3 py-2 rounded-xl cursor-pointer font-bold transition-colors flex items-center justify-between ${
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : isAll ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-100 text-slate-800'
                 }`}
               >
-                🏢 Semua Fakultas/Unit Kerja ({units.length})
+                <span>🏢 Semua Unit Kerja ({units.length})</span>
+                {isAll && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
               </div>
-              {filtered.map((u, idx) => {
+              {filteredUnits.map((u, idx) => {
                 const itemIdx = idx + 1;
                 const isHighlighted = highlightedIndex === itemIdx;
-                const isSelected = value === u;
+                const isSelected = selectedUnit === u;
                 return (
                   <div
                     key={u}
                     onClick={() => {
-                      onChange(u);
+                      onSelect(u);
                       setIsOpen(false);
                       setQuery('');
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
-                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    className={`px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors flex items-center justify-between ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
                     }`}
                   >
-                    {u}
+                    <span className="truncate">{u}</span>
+                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
                   </div>
                 );
               })}
+              {filteredUnits.length === 0 && (
+                <div className="p-3 text-slate-400 text-center italic">Unit kerja tidak ditemukan</div>
+              )}
             </div>
           </div>
         </>
@@ -153,6 +148,7 @@ function UnitAutocompleteInput({
 export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
   const [rulesList, setRulesList] = useState<any[]>([]);
+  const [unitsList, setUnitsList] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRunningEngine, setIsRunningEngine] = useState(false);
 
@@ -178,6 +174,16 @@ export default function RkaLaporanPage() {
     } catch (e) {}
   };
 
+  const fetchUnits = async () => {
+    try {
+      const res = await fetch('/api/rka/rules?units=1');
+      const json = await res.json();
+      if (json.success && json.units) {
+        setUnitsList(json.units);
+      }
+    } catch (e) {}
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -199,8 +205,12 @@ export default function RkaLaporanPage() {
   };
 
   useEffect(() => {
-    fetchData();
     fetchRules();
+    fetchUnits();
+  }, []);
+
+  useEffect(() => {
+    fetchData();
   }, [tahunFilter, unitFilter]);
 
   // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
@@ -331,8 +341,9 @@ export default function RkaLaporanPage() {
   };
 
   const unitOptions = useMemo(() => {
+    if (unitsList.length > 0) return unitsList;
     return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean)));
-  }, [dataList]);
+  }, [unitsList, dataList]);
 
   // Kelompokkan data per Kategori Laporan yang dipilih
   const groupedData = useMemo(() => {
@@ -730,16 +741,15 @@ export default function RkaLaporanPage() {
               </select>
             </div>
 
-            {/* Filter Fakultas Autocomplete */}
+            {/* Filter Fakultas Autocomplete (Seragam dengan tambah-pagu) */}
             <div className="sm:col-span-4">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
                 Fakultas / Unit Kerja
               </label>
-              <UnitAutocompleteInput
+              <UnitAutocompleteFilter
                 units={unitOptions}
-                value={unitFilter}
-                onChange={setUnitFilter}
-                placeholder="Pilih atau cari unit..."
+                selectedUnit={unitFilter}
+                onSelect={setUnitFilter}
               />
             </div>
 

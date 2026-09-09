@@ -9,16 +9,25 @@ export async function GET(request: Request) {
     const getUnits = searchParams.get('units');
 
     if (getUnits) {
-      // Ambil daftar seluruh unit kerja dari rkat_pengeluaran dan master gov_units
+      // Ambil daftar seluruh unit kerja dari rkat_pengeluaran dan master gov_units dengan format kode unit & " " & nama unit
       const [{ data: rkatUnits }, { data: govUnits }] = await Promise.all([
         supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
-        supabaseAdmin.from('gov_units').select('nama_unit').order('nama_unit')
+        supabaseAdmin.from('gov_units').select('kode_unit, nama_unit').order('kode_unit', { ascending: true })
       ]);
 
+      const formattedGovUnits = (govUnits || []).map((g: any) => {
+        const kode = (g.kode_unit || '').trim();
+        const nama = (g.nama_unit || '').trim();
+        if (kode && kode !== '--') {
+          return `${kode} ${nama}`;
+        }
+        return nama;
+      }).filter(Boolean);
+
       const combinedUnits = Array.from(new Set([
-        ...(rkatUnits || []).map(r => r.unit).filter(Boolean),
-        ...(govUnits || []).map(g => g.nama_unit).filter(Boolean)
-      ])).sort();
+        ...formattedGovUnits,
+        ...(rkatUnits || []).map(r => r.unit?.trim()).filter(Boolean)
+      ])).filter(Boolean).sort();
 
       return NextResponse.json({ success: true, units: combinedUnits });
     }
@@ -283,23 +292,29 @@ export async function PUT(request: Request) {
         updateQuery = updateQuery.eq('tahun_anggaran', parseInt(targetYear));
       }
 
-      // Filter Unit
+      // Filter Unit (Mendukung satu atau beberapa unit dipisahkan koma atau |)
       if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
-        const cleanUnit = rule.unit.replace(/\*/g, '').trim();
-        if (cleanUnit) {
-          updateQuery = updateQuery.ilike('unit', `%${cleanUnit}%`);
+        const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
+        if (units.length === 1) {
+          updateQuery = updateQuery.ilike('unit', `%${units[0]}%`);
+        } else if (units.length > 1) {
+          const unitConds = units.map((u: string) => `unit.ilike.%${u}%`).join(',');
+          updateQuery = updateQuery.or(unitConds);
         }
       }
 
-      // Filter Akun
+      // Filter Akun (Mendukung satu atau beberapa kode akun dipisahkan koma atau |)
       if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
-        const cleanAkun = rule.akun.replace(/\*/g, '').trim();
-        if (cleanAkun) {
-          updateQuery = updateQuery.ilike('akun_detail', `${cleanAkun}%`);
+        const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
+        if (akuns.length === 1) {
+          updateQuery = updateQuery.ilike('akun_detail', `${akuns[0]}%`);
+        } else if (akuns.length > 1) {
+          const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
+          updateQuery = updateQuery.or(akunConds);
         }
       }
 
-      // Filter Kata Kunci Belanja
+      // Filter Kata Kunci Belanja (Mendukung satu atau beberapa kata kunci dipisahkan koma atau |)
       if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
         const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.trim()).filter(Boolean);
         if (kws.length === 1) {

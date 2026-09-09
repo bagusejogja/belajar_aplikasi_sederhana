@@ -28,29 +28,29 @@ const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
-// Component Autocomplete Unit Kerja dengan navigasi Keyboard (↑, ↓, Enter, Esc)
-function UnitAutocompleteInput({ 
+// Autocomplete Filter Unit Kerja Component (Persis seperti di tambah-pagu dengan Navigasi Keyboard ↑ ↓ + Enter)
+function UnitAutocompleteFilter({ 
   units, 
-  value, 
-  onChange, 
-  placeholder = "Pilih / Ketik Unit Kerja..." 
+  selectedUnit, 
+  onSelect 
 }: { 
   units: string[]; 
-  value: string; 
-  onChange: (val: string) => void; 
-  placeholder?: string;
+  selectedUnit: string; 
+  onSelect: (unit: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-  const filtered = useMemo(() => {
+  const filteredUnits = useMemo(() => {
     return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
   }, [units, query]);
 
+  const isAll = selectedUnit === 'ALL' || selectedUnit === '*' || !selectedUnit;
+
   const allOptions = useMemo(() => {
-    return ['*', ...filtered];
-  }, [filtered]);
+    return ['*', ...filteredUnits];
+  }, [filteredUnits]);
 
   useEffect(() => {
     setHighlightedIndex(0);
@@ -58,7 +58,8 @@ function UnitAutocompleteInput({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
         setIsOpen(true);
       }
       return;
@@ -73,12 +74,9 @@ function UnitAutocompleteInput({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (allOptions.length > 0 && allOptions[highlightedIndex]) {
-        onChange(allOptions[highlightedIndex]);
+        onSelect(allOptions[highlightedIndex]);
         setIsOpen(false);
         setQuery('');
-      } else if (query.trim()) {
-        onChange(query.trim());
-        setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -87,14 +85,101 @@ function UnitAutocompleteInput({
   };
 
   return (
-    <div className="relative w-full" onKeyDown={handleKeyDown}>
+    <div className="relative inline-block text-left w-full" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-9 px-3.5 rounded-xl bg-gray-50 hover:bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+      >
+        <span className="truncate font-bold">
+          {isAll ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
+        </span>
+        <span className="text-[10px] opacity-60">▼</span>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 mt-1 w-full min-w-[280px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
+            <input
+              type="text"
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="w-full px-3 py-2 mb-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+            />
+            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+              <div
+                onClick={() => {
+                  onSelect('*');
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                className={`px-3 py-2 rounded-xl cursor-pointer font-bold transition-colors flex items-center justify-between ${
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : isAll ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
+                }`}
+              >
+                <span>🏢 Semua Unit Kerja ({units.length})</span>
+                {isAll && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+              </div>
+              {filteredUnits.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = selectedUnit === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onSelect(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors flex items-center justify-between ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
+                    }`}
+                  >
+                    <span className="truncate">{u}</span>
+                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                  </div>
+                );
+              })}
+              {filteredUnits.length === 0 && (
+                <div className="p-3 text-slate-400 text-center italic">Unit kerja tidak ditemukan</div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Input Unit Kerja pada Form Tambah/Edit Aturan (Bisa pilih unit dari daftar atau ketik beberapa unit dipisahkan koma)
+function UnitFormInput({ 
+  units, 
+  value, 
+  onChange, 
+  placeholder = "Ketik beberapa unit atau pilih..." 
+}: { 
+  units: string[]; 
+  value: string; 
+  onChange: (val: string) => void; 
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  return (
+    <div className="relative w-full">
       <div className="flex gap-1">
         <Input 
-          value={value === '*' ? '* (Semua Unit Kerja)' : value}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange(v === '' ? '*' : v);
-          }}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
         />
@@ -102,6 +187,7 @@ function UnitAutocompleteInput({
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-300 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
+          title="Pilih unit dari daftar"
         >
           ▼
         </button>
@@ -110,48 +196,47 @@ function UnitAutocompleteInput({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
+          <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
             <input
               type="text"
-              placeholder="Cari nama unit..."
+              placeholder="Cari nama atau kode unit..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
-              className="w-full px-2.5 py-1.5 mb-2 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
+              className="w-full px-2.5 py-1.5 mb-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
             />
-            <div className="max-h-48 overflow-y-auto space-y-1">
+            <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
               <div
                 onClick={() => {
                   onChange('*');
                   setIsOpen(false);
                   setQuery('');
                 }}
-                className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors ${
-                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : value === '*' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
-                }`}
+                className="px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors hover:bg-indigo-50 text-indigo-700"
               >
-                🏢 * (Semua Unit Kerja) ({units.length})
+                🏢 * (Semua Unit Kerja)
               </div>
-              {filtered.map((u, idx) => {
-                const itemIdx = idx + 1;
-                const isHighlighted = highlightedIndex === itemIdx;
-                const isSelected = value === u;
-                return (
-                  <div
-                    key={u}
-                    onClick={() => {
+              {filtered.map(u => (
+                <div
+                  key={u}
+                  onClick={() => {
+                    if (value && value !== '*' && !value.includes(u)) {
+                      onChange(`${value}, ${u}`);
+                    } else {
                       onChange(u);
-                      setIsOpen(false);
-                      setQuery('');
-                    }}
-                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
-                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {u}
-                  </div>
-                );
-              })}
+                    }
+                    setIsOpen(false);
+                    setQuery('');
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-slate-100 text-slate-800 transition-colors flex items-center justify-between"
+                >
+                  <span className="truncate">{u}</span>
+                  <span className="text-[10px] text-indigo-600 font-bold shrink-0 ml-2">+ Pilih</span>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="p-3 text-slate-400 text-center italic">Unit tidak ditemukan</div>
+              )}
             </div>
           </div>
         </>
@@ -240,11 +325,10 @@ export default function RkaRulesPage() {
     fetchUnits();
   }, []);
 
-  // Opsi Target Format yang terdaftar di sistem
+  // Opsi Target Format yang terdaftar di sistem (Hanya Proposal RKAT dan format kustom pengguna)
   const allTargetOptions = useMemo(() => {
     const list = Array.from(new Set(rules.map(r => r.target_field).filter(Boolean)));
-    const defaults = ['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'];
-    return Array.from(new Set([...defaults, ...list]));
+    return Array.from(new Set(['proposal rkat', ...list]));
   }, [rules]);
 
   // Parser helper untuk Paste Zone
@@ -572,7 +656,11 @@ export default function RkaRulesPage() {
   const filteredRules = rules.filter(r => {
     if (filterTarget !== 'ALL' && (r.target_field || '').toLowerCase() !== filterTarget.toLowerCase()) return false;
     if (filterUnit && filterUnit !== '*' && filterUnit !== 'ALL') {
-      if (r.unit !== '*' && r.unit !== filterUnit) return false;
+      if (r.unit !== '*') {
+        const uLower = r.unit.toLowerCase();
+        const fLower = filterUnit.toLowerCase();
+        if (!uLower.includes(fLower) && !fLower.includes(uLower)) return false;
+      }
     }
     if (search) {
       const q = search.toLowerCase();
@@ -962,13 +1050,9 @@ export default function RkaRulesPage() {
                     }}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
                   >
-                    <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
-                    <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
-                    <option value="laporan_iku">📈 Laporan IKU / Renstra</option>
-                    <option value="laporan_sdgs">🌱 Laporan SDGs</option>
-                    <option value="identifikasi_lain">🔖 Identifikasi Kustom Lainnya</option>
+                    <option value="proposal rkat">📊 Proposal RKAT</option>
                     {allTargetOptions
-                      .filter(t => !['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'].includes(t))
+                      .filter(t => t !== 'proposal rkat')
                       .map(t => (
                         <option key={t} value={t}>✨ {t}</option>
                       ))}
@@ -991,7 +1075,7 @@ export default function RkaRulesPage() {
                         variant="ghost"
                         onClick={() => {
                           setIsCustomTarget(false);
-                          setTargetField('laporan_kementerian');
+                          setTargetField('proposal rkat');
                         }}
                         className="h-9 px-2 text-xs text-gray-500 hover:text-gray-700"
                         title="Batal custom format"
@@ -1013,12 +1097,15 @@ export default function RkaRulesPage() {
                 </label>
                 <Input
                   type="text"
-                  placeholder="Contoh: Mahasiswa Asing, Jurnal, Inbound..."
+                  placeholder="Contoh: gaji, honor, lembur (bisa beberapa dipisahkan koma atau |)"
                   value={kataKunci}
                   onChange={e => setKataKunci(e.target.value)}
                   className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
                   required
                 />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  💡 Mendukung beberapa kata kunci dipisahkan koma (,) atau (|)
+                </p>
               </div>
 
               {/* Nilai Klasifikasi / Label Output */}
@@ -1028,12 +1115,15 @@ export default function RkaRulesPage() {
                 </label>
                 <Input
                   type="text"
-                  placeholder="Contoh: Beasiswa Mahasiswa Asing (MBKM / Internasional)..."
+                  placeholder="Contoh: Belanja Pegawai, Belanja Operasional..."
                   value={nilaiKlasifikasi}
                   onChange={e => setNilaiKlasifikasi(e.target.value)}
                   className="bg-white border-gray-300 text-gray-900 text-xs font-bold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
                   required
                 />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Label grup belanja yang akan ditampilkan di Laporan
+                </p>
               </div>
 
               {/* Filter Kode Akun */}
@@ -1043,27 +1133,33 @@ export default function RkaRulesPage() {
                 </label>
                 <Input
                   type="text"
-                  placeholder="Contoh: 52501 atau * (semua akun)"
+                  placeholder="Contoh: 511, 512, 521 atau * (semua akun)"
                   value={akun}
                   onChange={e => setAkun(e.target.value)}
                   className="bg-white border-gray-300 text-gray-900 text-xs font-mono font-medium h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
                 />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  💡 Bisa beberapa kode akun dipisahkan koma (,) atau (*) untuk semua
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               
-              {/* Filter Unit Kerja Autocomplete */}
+              {/* Filter Unit Kerja Form Input */}
               <div className="sm:col-span-5">
                 <label className="font-bold text-gray-700 block mb-1">
                   Filter Unit Kerja / Fakultas
                 </label>
-                <UnitAutocompleteInput
+                <UnitFormInput
                   units={units}
                   value={unit}
                   onChange={setUnit}
-                  placeholder="Ketik nama unit atau * untuk semua unit..."
+                  placeholder="Ketik unit/kode atau pilih dari tombol ▼..."
                 />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  💡 Bisa pilih dari tombol ▼ atau ketik beberapa unit dipisahkan koma (,) atau (*)
+                </p>
               </div>
 
               {/* Prioritas Aturan */}
@@ -1098,10 +1194,10 @@ export default function RkaRulesPage() {
                 <Button
                   type="submit"
                   disabled={isAdding}
-                  className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs text-xs gap-1.5 cursor-pointer active:scale-95"
+                  className="w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs gap-1.5 cursor-pointer active:scale-95"
                 >
                   {isAdding ? <RefreshCw className="animate-spin" size={14} /> : <Plus size={14} />}
-                  <span>Simpan Aturan</span>
+                  <span>Tambah</span>
                 </Button>
               </div>
             </div>
@@ -1127,13 +1223,12 @@ export default function RkaRulesPage() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             
-            {/* Filter Unit Kerja (Seragam dengan menu sebelumnya) */}
-            <div className="w-52 sm:w-64">
-              <UnitAutocompleteInput
+            {/* Filter Unit Kerja (Seragam dengan tambah-pagu) */}
+            <div className="w-56 sm:w-72">
+              <UnitAutocompleteFilter
                 units={units}
-                value={filterUnit}
-                onChange={setFilterUnit}
-                placeholder="Pilih atau cari unit..."
+                selectedUnit={filterUnit}
+                onSelect={setFilterUnit}
               />
             </div>
 
@@ -1358,13 +1453,9 @@ export default function RkaRulesPage() {
                       }}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
                     >
-                      <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
-                      <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
-                      <option value="laporan_iku">📈 Laporan IKU / Renstra</option>
-                      <option value="laporan_sdgs">🌱 Laporan SDGs</option>
-                      <option value="identifikasi_lain">🔖 Identifikasi Kustom Lainnya</option>
+                      <option value="proposal rkat">📊 Proposal RKAT</option>
                       {allTargetOptions
-                        .filter(t => !['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'].includes(t))
+                        .filter(t => t !== 'proposal rkat')
                         .map(t => (
                           <option key={t} value={t}>✨ {t}</option>
                         ))}
@@ -1386,7 +1477,7 @@ export default function RkaRulesPage() {
                         variant="ghost"
                         onClick={() => {
                           setIsEditCustomTarget(false);
-                          setEditingRule({ ...editingRule, target_field: 'laporan_kementerian' });
+                          setEditingRule({ ...editingRule, target_field: 'proposal rkat' });
                         }}
                         className="h-9 px-2 text-xs text-gray-500 hover:text-gray-700"
                       >
@@ -1413,7 +1504,11 @@ export default function RkaRulesPage() {
                   value={editingRule.kata_kunci}
                   onChange={e => setEditingRule({ ...editingRule, kata_kunci: e.target.value })}
                   className="h-9 font-bold font-mono"
+                  placeholder="Contoh: gaji, honor, lembur (bisa beberapa dipisahkan koma atau |)"
                 />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  💡 Mendukung beberapa kata kunci dipisahkan koma (,) atau (|)
+                </p>
               </div>
 
               <div>
@@ -1422,6 +1517,7 @@ export default function RkaRulesPage() {
                   value={editingRule.nilai_klasifikasi}
                   onChange={e => setEditingRule({ ...editingRule, nilai_klasifikasi: e.target.value })}
                   className="h-9 font-bold text-gray-900"
+                  placeholder="Label grup belanja yang akan ditampilkan di Laporan"
                 />
               </div>
 
@@ -1432,18 +1528,24 @@ export default function RkaRulesPage() {
                     value={editingRule.akun}
                     onChange={e => setEditingRule({ ...editingRule, akun: e.target.value })}
                     className="h-9 font-mono"
-                    placeholder="* (semua akun)"
+                    placeholder="Contoh: 511, 512 atau *"
                   />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    💡 Bisa beberapa kode akun dipisahkan koma (,) atau (*)
+                  </p>
                 </div>
 
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Filter Unit Kerja</label>
-                  <UnitAutocompleteInput
+                  <UnitFormInput
                     units={units}
                     value={editingRule.unit}
                     onChange={val => setEditingRule({ ...editingRule, unit: val })}
-                    placeholder="* (semua unit)"
+                    placeholder="Ketik unit/kode atau pilih dari tombol ▼..."
                   />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    💡 Bisa pilih dari tombol ▼ atau ketik beberapa unit dipisahkan koma (,)
+                  </p>
                 </div>
               </div>
 
