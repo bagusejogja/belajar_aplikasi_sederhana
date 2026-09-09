@@ -112,6 +112,11 @@ export const menuList: MenuItem[] = [
 
   // --- MOCKUP ---
   { title: 'Approval RKAT', path: '/mockup/approval-rkat', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Mockup' },
+
+  // --- RKA ---
+  { title: 'RKA Pengeluaran', path: '/rka/pengeluaran', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'RKA' },
+  { title: 'Klasifikasi & Rules RKA', path: '/rka/rules', icon: 'Wand2', roles: ['ADMIN', 'MANAGER'], group: 'RKA' },
+  { title: 'Rekap Laporan RKA', path: '/rka/laporan', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'RKA' },
 ];
 
 

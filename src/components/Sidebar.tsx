@@ -85,6 +85,7 @@ const groupIconMap: Record<string, any> = {
   'Input Form': FileEdit,
   'Manajemen Kegiatan': Calendar,
   'Mockup': Wand2,
+  'RKA': FolderTree,
   'Lainnya': Layers
 };
 
