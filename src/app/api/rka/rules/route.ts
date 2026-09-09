@@ -3,8 +3,23 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const getUnits = searchParams.get('units');
+
+    if (getUnits) {
+      // Ambil daftar unit unik dari rkat_pengeluaran untuk autocomplete
+      const { data: unitsData, error: uErr } = await supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select('unit')
+        .order('unit');
+      if (uErr) throw uErr;
+
+      const uniqueUnits = Array.from(new Set((unitsData || []).map(r => r.unit).filter(Boolean)));
+      return NextResponse.json({ success: true, units: uniqueUnits });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('rka_rules')
       .select('*')
@@ -27,7 +42,7 @@ export async function POST(request: Request) {
       const lines = body.rawText.trim().split('\n');
       let startIndex = 0;
       const firstLine = lines[0].toLowerCase();
-      if (firstLine.includes('unit') || firstLine.includes('kunci') || firstLine.includes('target') || firstLine.includes('klasifikasi')) {
+      if (firstLine.includes('unit') || firstLine.includes('kunci') || firstLine.includes('target') || firstLine.includes('klasifikasi') || firstLine.includes('prioritas')) {
         startIndex = 1;
       }
 
@@ -42,7 +57,8 @@ export async function POST(request: Request) {
         const uVal = cols[1] || '*';
         const aVal = cols[2] || '*';
         const kVal = cols[3] || '';
-        const targetField = (cols[4] && cols[4].toLowerCase().includes('webo')) ? 'laporan_webometrics' : 'laporan_kementerian';
+        const rawTarget = (cols[4] || '').toLowerCase();
+        const targetField = (rawTarget.includes('webo') || rawTarget.includes('webometrics')) ? 'laporan_webometrics' : 'laporan_kementerian';
         const nilaiVal = cols[5] || '';
         const ket = cols[6] || '';
 
@@ -60,7 +76,7 @@ export async function POST(request: Request) {
       }
 
       if (rulesToInsert.length === 0) {
-        return NextResponse.json({ success: false, error: 'Tidak ada baris aturan valid' }, { status: 400 });
+        return NextResponse.json({ success: false, error: 'Tidak ada baris aturan valid yang ditemukan. Pastikan format TSV sesuai.' }, { status: 400 });
       }
 
       const { data, error } = await supabaseAdmin.from('rka_rules').insert(rulesToInsert).select();
@@ -95,10 +111,33 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT: Menjalankan Rule Engine (Terapkan Aturan Klasifikasi ke rkat_pengeluaran)
+// PUT: Menjalankan Rule Engine atau Update Rule
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
+
+    // Opsi A: Update 1 Rule jika ada body.id dan body.isEdit
+    if (body.isEdit && body.id) {
+      const { id, priority, unit, akun, kata_kunci, target_field, nilai_klasifikasi, keterangan } = body;
+      const { data, error } = await supabaseAdmin
+        .from('rka_rules')
+        .update({
+          priority: parseInt(priority) || 99,
+          unit: unit || '*',
+          akun: akun || '*',
+          kata_kunci,
+          target_field,
+          nilai_klasifikasi,
+          keterangan: keterangan || '',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select();
+      if (error) throw error;
+      return NextResponse.json({ success: true, data });
+    }
+
+    // Opsi B: Jalankan Rule Engine ke seluruh rkat_pengeluaran
     const { ruleId, targetYear } = body;
 
     // Ambil rules yang akan dijalankan
@@ -113,18 +152,44 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: 'Tidak ada aturan untuk dijalankan' }, { status: 400 });
     }
 
-    // Ambil data rkat_pengeluaran
-    let pengeluaranQuery = supabaseAdmin.from('rkat_pengeluaran').select('id, unit, akun_detail, uraian_belanja, kegiatan, lingkup_kegiatan, laporan_kementerian, laporan_webometrics');
-    if (targetYear) {
-      pengeluaranQuery = pengeluaranQuery.eq('tahun_anggaran', parseInt(targetYear));
+    // Ambil seluruh data rkat_pengeluaran dengan chunking (bypass limit 1000)
+    let allBudgetRows: any[] = [];
+    let page = 0;
+    const chunkSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const from = page * chunkSize;
+      const to = from + chunkSize - 1;
+
+      let q = supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select('id, unit, akun_detail, uraian_belanja, kegiatan, lingkup_kegiatan, laporan_kementerian, laporan_webometrics')
+        .range(from, to);
+
+      if (targetYear && targetYear !== 'ALL') {
+        q = q.eq('tahun_anggaran', parseInt(targetYear));
+      }
+
+      const { data: chunk, error: chunkErr } = await q;
+      if (chunkErr) throw chunkErr;
+
+      if (chunk && chunk.length > 0) {
+        allBudgetRows = allBudgetRows.concat(chunk);
+        if (chunk.length < chunkSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
     }
-    const { data: budgetRows, error: budgetErr } = await pengeluaranQuery;
-    if (budgetErr) throw budgetErr;
 
     let updatedCount = 0;
 
-    // Evaluasi setiap rule terhadap setiap baris pengeluaran
-    for (const row of (budgetRows || [])) {
+    // Evaluasi setiap baris pengeluaran terhadap seluruh rules yang ada
+    for (const row of allBudgetRows) {
       let isUpdated = false;
       let newKemen = row.laporan_kementerian;
       let newWebo = row.laporan_webometrics;
@@ -176,8 +241,9 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Aturan berhasil diterapkan. ${updatedCount} baris data berhasil diperbarui.`,
-      updatedCount
+      message: `Rule Engine sukses dijalankan. Berhasil memetakan & memperbarui ${updatedCount} baris data dari total ${allBudgetRows.length} data.`,
+      updatedCount,
+      totalScanned: allBudgetRows.length
     });
   } catch (error: any) {
     console.error('Error applying rka_rules:', error);
