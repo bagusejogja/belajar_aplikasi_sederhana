@@ -157,7 +157,7 @@ export default function RkaLaporanPage() {
   const [isRunningEngine, setIsRunningEngine] = useState(false);
 
   // Filter States
-  const [modeLaporan, setModeLaporan] = useState<string>('laporan_kementerian');
+  const [modeLaporan, setModeLaporan] = useState<string>('proposal rkat');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [kategoriFilter, setKategoriFilter] = useState<string>('ALL');
@@ -205,6 +205,11 @@ export default function RkaLaporanPage() {
 
   // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
   const getRowClassification = (row: any, targetKey: string) => {
+    if (!row) return null;
+    if (targetKey === 'proposal rkat') {
+      return row.kategori_belanja || (row.tags && row.tags['proposal rkat']) || null;
+    }
+    if (targetKey === 'kategori_belanja') return row.kategori_belanja;
     if (targetKey === 'laporan_kementerian') return row.laporan_kementerian;
     if (targetKey === 'laporan_webometrics') return row.laporan_webometrics;
     if (targetKey === 'identifikasi_lain') return row.identifikasi_lain;
@@ -212,11 +217,10 @@ export default function RkaLaporanPage() {
       return row.tags[targetKey];
     }
     if (row[targetKey]) return row[targetKey];
-    if (targetKey === 'laporan_iku' && row.identifikasi_lain) return row.identifikasi_lain;
     return null;
   };
 
-  // Daftar Tab Format Laporan (Dinamis dari Preset, Master Rules, dan Data Belanja)
+  // Daftar Tab Format Laporan (Hanya Proposal RKAT dan format dari rules aktif)
   const availableTabs = useMemo(() => {
     const tabsMap = new Map<string, { id: string; label: string; icon: string; count: number }>();
 
@@ -230,66 +234,22 @@ export default function RkaLaporanPage() {
           .replace(/\b\w/g, (c: string) => c.toUpperCase());
         tabsMap.set(tf, {
           id: tf,
-          label: `Laporan ${pretty}`,
+          label: pretty,
           icon: '📊',
           count: 0
         });
       }
     });
 
-    // Tambahkan preset standar jika belum ada
-    if (!tabsMap.has('laporan_kementerian')) {
-      tabsMap.set('laporan_kementerian', {
-        id: 'laporan_kementerian',
-        label: 'Laporan Kementerian',
-        icon: '🏛️',
+    // Preset standar utama: Proposal RKAT jika belum ada
+    if (!tabsMap.has('proposal rkat')) {
+      tabsMap.set('proposal rkat', {
+        id: 'proposal rkat',
+        label: 'Proposal RKAT',
+        icon: '📊',
         count: 0
       });
     }
-    if (!tabsMap.has('laporan_webometrics')) {
-      tabsMap.set('laporan_webometrics', {
-        id: 'laporan_webometrics',
-        label: 'Laporan Webometrics',
-        icon: '🌐',
-        count: 0
-      });
-    }
-    if (!tabsMap.has('laporan_iku')) {
-      tabsMap.set('laporan_iku', {
-        id: 'laporan_iku',
-        label: 'Laporan IKU / Renstra',
-        icon: '📈',
-        count: 0
-      });
-    }
-    if (!tabsMap.has('laporan_sdgs')) {
-      tabsMap.set('laporan_sdgs', {
-        id: 'laporan_sdgs',
-        label: 'Laporan SDGs',
-        icon: '🌱',
-        count: 0
-      });
-    }
-
-    // Tambahkan format unik dari data tags
-    dataList.forEach(d => {
-      if (d.tags && typeof d.tags === 'object') {
-        Object.keys(d.tags).forEach(tagKey => {
-          if (!tabsMap.has(tagKey)) {
-            const pretty = tagKey
-              .replace(/^(laporan_|target_)/, '')
-              .replace(/_/g, ' ')
-              .replace(/\b\w/g, (c: string) => c.toUpperCase());
-            tabsMap.set(tagKey, {
-              id: tagKey,
-              label: `Laporan ${pretty}`,
-              icon: '🔖',
-              count: 0
-            });
-          }
-        });
-      }
-    });
 
     // Hitung jumlah baris data yang terpetakan untuk setiap format
     const tabsArray = Array.from(tabsMap.values());
@@ -722,16 +682,16 @@ export default function RkaLaporanPage() {
               </button>
             </div>
 
-            {/* Filter Kategori Khusus Tab Detail */}
+            {/* Filter Group Belanja Khusus Tab Detail */}
             {activeViewTab === 'detail' && (
               <div className="flex items-center gap-2 self-end sm:self-center">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kategori:</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Group Belanja:</span>
                 <select
                   value={kategoriFilter}
                   onChange={e => setKategoriFilter(e.target.value)}
                   className="h-8 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-lg px-2.5 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs max-w-[240px]"
                 >
-                  <option value="ALL">Semua Kategori ({categoryOptions.length})</option>
+                  <option value="ALL">Semua Group Belanja ({categoryOptions.length})</option>
                   {categoryOptions.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
@@ -864,7 +824,7 @@ export default function RkaLaporanPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
-                  {groupedData.length} Kelompok Belanja
+                  {groupedData.length} Group Belanja
                 </Badge>
                 <Badge variant="secondary" className="text-xs font-bold font-mono">
                   {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
@@ -876,11 +836,11 @@ export default function RkaLaporanPage() {
                 <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[280px]">Kelompok / Kategori Belanja</TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
                     <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
                     <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
                     <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-32">Aksi</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-24">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -898,15 +858,9 @@ export default function RkaLaporanPage() {
                           {gIdx + 1}
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-1.5">
-                              <span>🏷️</span>
-                              <span>{group.label}</span>
-                            </div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                              <span>{activeTabObj?.icon || '📊'}</span>
-                              <span>{activeTabObj?.label || 'Format Laporan'}</span>
-                            </span>
+                          <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                            <span>🏷️</span>
+                            <span>{group.label}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -937,11 +891,10 @@ export default function RkaLaporanPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewCategoryDetail(group.label)}
-                            className="h-8 px-2.5 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer"
-                            title="Buka rincian baris belanja kategori ini"
+                            className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                            title={`Buka rincian belanja ${group.label}`}
                           >
-                            <Eye size={12} />
-                            <span>Buka Rincian</span>
+                            <Eye size={15} />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -952,7 +905,7 @@ export default function RkaLaporanPage() {
                 <tfoot className="bg-gray-100/90 font-bold border-t-2 border-gray-300">
                   <tr>
                     <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-gray-800">
-                      TOTAL KESELURUHAN ({groupedData.length} KELOMPOK)
+                      TOTAL KESELURUHAN ({groupedData.length} GROUP BELANJA)
                     </td>
                     <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
                       {grandTotal.totalItems.toLocaleString('id-ID')} Baris
@@ -1017,7 +970,7 @@ export default function RkaLaporanPage() {
                       Fakultas / Unit Kerja &amp; Rincian Kegiatan
                     </TableHead>
                     <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[220px]">
-                      Kategori Format Laporan
+                      Group Belanja
                     </TableHead>
                     <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
                       Pagu Anggaran
@@ -1085,15 +1038,12 @@ export default function RkaLaporanPage() {
                             </div>
                           </TableCell>
 
-                          {/* Field 2: Format & Kategori Laporan */}
+                          {/* Field 2: Group Belanja */}
                           <TableCell className="align-top pt-3 space-y-1.5">
                             <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
-                              <div className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-700 tracking-wider">
-                                <span>{activeTabObj?.icon || '📊'}</span>
-                                <span>{activeTabObj?.label || 'Format Laporan'}</span>
-                              </div>
-                              <div className="font-bold text-xs leading-snug">
-                                {catLabel}
+                              <div className="flex items-center gap-1.5 font-bold text-xs leading-snug">
+                                <span>🏷️</span>
+                                <span>{catLabel}</span>
                               </div>
                             </div>
                           </TableCell>

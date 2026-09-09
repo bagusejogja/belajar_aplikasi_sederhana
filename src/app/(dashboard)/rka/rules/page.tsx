@@ -23,13 +23,9 @@ import {
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
-// Definisi Preset Format Laporan Bawaan
+// Definisi Preset Format Laporan (Hanya Proposal RKAT sesuai permintaan user)
 const PRESET_TARGETS = [
-  { id: 'laporan_kementerian', label: 'Laporan Kementerian' },
-  { id: 'laporan_webometrics', label: 'Laporan Webometrics' },
-  { id: 'laporan_iku', label: 'Laporan IKU / Renstra' },
-  { id: 'laporan_sdgs', label: 'Laporan SDGs' },
-  { id: 'identifikasi_lain', label: 'Identifikasi Kustom Lainnya' },
+  { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
 // Component Autocomplete Unit Kerja dengan navigasi Keyboard (↑, ↓, Enter, Esc)
@@ -94,15 +90,18 @@ function UnitAutocompleteInput({
     <div className="relative w-full" onKeyDown={handleKeyDown}>
       <div className="flex gap-1">
         <Input 
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={value === '*' ? '* (Semua Unit Kerja)' : value}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange(v === '' ? '*' : v);
+          }}
           placeholder={placeholder}
-          className="bg-gray-50 border-gray-200 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-500/20"
+          className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
         />
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
+          className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-300 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
         >
           ▼
         </button>
@@ -131,7 +130,7 @@ function UnitAutocompleteInput({
                   highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : value === '*' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
                 }`}
               >
-                * (Semua Unit Kerja)
+                🏢 * (Semua Unit Kerja) ({units.length})
               </div>
               {filtered.map((u, idx) => {
                 const itemIdx = idx + 1;
@@ -171,7 +170,7 @@ export default function RkaRulesPage() {
   const [unit, setUnit] = useState('*');
   const [akun, setAkun] = useState('*');
   const [kataKunci, setKataKunci] = useState('');
-  const [targetField, setTargetField] = useState('laporan_kementerian');
+  const [targetField, setTargetField] = useState('proposal rkat');
   const [isCustomTarget, setIsCustomTarget] = useState(false);
   const [customTargetInput, setCustomTargetInput] = useState('');
   const [showGuideModal, setShowGuideModal] = useState(false);
@@ -199,6 +198,7 @@ export default function RkaRulesPage() {
   // Filter & Search
   const [search, setSearch] = useState('');
   const [filterTarget, setFilterTarget] = useState<string>('ALL');
+  const [filterUnit, setFilterUnit] = useState<string>('*');
 
   // Format Manager Dialog State
   const [formatManagerOpen, setFormatManagerOpen] = useState(false);
@@ -565,12 +565,15 @@ export default function RkaRulesPage() {
   }, [rules]);
 
   // Metrik KPI
-  const countKemen = rules.filter(r => r.target_field === 'laporan_kementerian').length;
-  const countWebo = rules.filter(r => r.target_field === 'laporan_webometrics').length;
+  const countProposal = rules.filter(r => (r.target_field || '').toLowerCase().includes('proposal rkat')).length;
+  const countCustom = rules.filter(r => !(r.target_field || '').toLowerCase().includes('proposal rkat')).length;
 
   // Filter List Aturan
   const filteredRules = rules.filter(r => {
-    if (filterTarget !== 'ALL' && r.target_field !== filterTarget) return false;
+    if (filterTarget !== 'ALL' && (r.target_field || '').toLowerCase() !== filterTarget.toLowerCase()) return false;
+    if (filterUnit && filterUnit !== '*' && filterUnit !== 'ALL') {
+      if (r.unit !== '*' && r.unit !== filterUnit) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return (
@@ -702,46 +705,44 @@ export default function RkaRulesPage() {
           </CardContent>
         </Card>
 
-        {/* Card 2: Aturan Kementerian */}
-        <Card className="rounded-2xl border-blue-200 shadow-xs bg-gradient-to-b from-white to-blue-50/40">
+        {/* Card 2: Aturan Proposal RKAT */}
+        <Card className="rounded-2xl border-indigo-200 shadow-xs bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>🏛️</span> <span>Aturan Format Kementerian</span>
+            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
+              <span>📊</span> <span>Aturan Proposal RKAT</span>
             </span>
-            <div className="text-2xl font-black font-mono text-blue-900">
-              {countKemen} <span className="text-xs font-semibold text-blue-700 font-sans">Aturan</span>
+            <div className="text-2xl font-black font-mono text-indigo-950">
+              {countProposal} <span className="text-xs font-semibold text-indigo-700 font-sans">Aturan</span>
             </div>
-            <div className="text-xs text-blue-800 font-semibold flex items-center justify-between pt-1 border-t border-blue-200/60">
-              <span>Target: `laporan_kementerian`</span>
-              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-[10px] font-bold">
-                {rules.length > 0 ? ((countKemen / rules.length) * 100).toFixed(0) : 0}%
+            <div className="text-xs text-indigo-800 font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60">
+              <span>Target: `proposal rkat`</span>
+              <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px] font-bold">
+                {rules.length > 0 ? ((countProposal / rules.length) * 100).toFixed(0) : 0}%
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Aturan Webometrics */}
-        <Card className="rounded-2xl border-emerald-200 shadow-xs bg-gradient-to-b from-white to-emerald-50/40">
+        {/* Card 3: Target Format Aktif */}
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>🌐</span> <span>Aturan Format Webometrics</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block flex items-center gap-1">
+              <span>🔖</span> <span>Target Format Terdaftar</span>
             </span>
-            <div className="text-2xl font-black font-mono text-emerald-900">
-              {countWebo} <span className="text-xs font-semibold text-emerald-700 font-sans">Aturan</span>
+            <div className="text-2xl font-black font-mono text-gray-900">
+              {allTargetOptions.length} <span className="text-xs font-semibold text-gray-500 font-sans">Format</span>
             </div>
-            <div className="text-xs text-emerald-800 font-semibold flex items-center justify-between pt-1 border-t border-emerald-200/60">
-              <span>Target: `laporan_webometrics`</span>
-              <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-bold">
-                {rules.length > 0 ? ((countWebo / rules.length) * 100).toFixed(0) : 0}%
-              </Badge>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span>Format Utama: Proposal RKAT</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">Aktif</Badge>
             </div>
           </CardContent>
         </Card>
 
         {/* Card 4: Aksi Cepat Rule Engine */}
-        <Card className="rounded-2xl border-indigo-200 shadow-xs bg-gradient-to-b from-white to-indigo-50/40">
+        <Card className="rounded-2xl border-emerald-200 shadow-xs bg-gradient-to-b from-white to-emerald-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
               <Sparkles size={13} /> <span>Status Auto-Tagging</span>
             </span>
             <div className="text-xs text-indigo-950 font-bold leading-snug">
@@ -1126,6 +1127,16 @@ export default function RkaRulesPage() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             
+            {/* Filter Unit Kerja (Seragam dengan menu sebelumnya) */}
+            <div className="w-52 sm:w-64">
+              <UnitAutocompleteInput
+                units={units}
+                value={filterUnit}
+                onChange={setFilterUnit}
+                placeholder="Pilih atau cari unit..."
+              />
+            </div>
+
             {/* Filter Target Format Laporan */}
             <select
               value={filterTarget}
@@ -1133,13 +1144,13 @@ export default function RkaRulesPage() {
               className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
             >
               <option value="ALL">Semua Format Laporan ({rules.length})</option>
-              <option value="laporan_kementerian">🏛️ Laporan Kementerian ({countKemen})</option>
-              <option value="laporan_webometrics">🌐 Laporan Webometrics ({countWebo})</option>
-              {allTargetOptions
-                .filter(t => !['laporan_kementerian', 'laporan_webometrics'].includes(t))
-                .map(t => (
-                  <option key={t} value={t}>🔖 {t.replace(/^laporan_/, '')}</option>
-                ))}
+              {allTargetOptions.map(t => {
+                const count = rules.filter(r => (r.target_field || '').toLowerCase() === t.toLowerCase()).length;
+                const pretty = t.replace(/^(laporan_|target_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                return (
+                  <option key={t} value={t}>📊 {pretty} ({count})</option>
+                );
+              })}
             </select>
 
             {/* Search Box */}
@@ -1150,7 +1161,7 @@ export default function RkaRulesPage() {
                 placeholder="Cari kata kunci, label, akun..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 font-medium focus:bg-white transition-all w-52 sm:w-64"
+                className="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 font-medium focus:bg-white transition-all w-52 sm:w-60"
               />
             </div>
           </div>
@@ -1686,31 +1697,39 @@ export default function RkaRulesPage() {
 
                       {/* Mode Rename Form atau Action Buttons */}
                       {isEditingThis ? (
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                          <Input
-                            value={renamingFormat.newName}
-                            onChange={e => setRenamingFormat({ ...renamingFormat, newName: e.target.value })}
-                            placeholder="Ketik nama format baru..."
-                            className="h-8 text-xs font-mono font-bold w-48 rounded-lg"
-                            autoFocus
-                          />
-                          <Button
-                            size="sm"
-                            onClick={handleRenameFormat}
-                            disabled={isRenaming}
-                            className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-2.5"
-                          >
-                            Simpan
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setRenamingFormat(null)}
-                            disabled={isRenaming}
-                            className="h-8 text-xs font-bold text-gray-500 rounded-lg px-2"
-                          >
-                            Batal
-                          </Button>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto bg-indigo-50/80 p-2.5 rounded-xl border border-indigo-200">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-indigo-900 block">
+                              Edit Nama Tampilan &amp; Target Format:
+                            </label>
+                            <Input
+                              value={renamingFormat.newName}
+                              onChange={e => setRenamingFormat({ ...renamingFormat, newName: e.target.value })}
+                              placeholder="Ketik nama format laporan..."
+                              className="h-8 text-xs font-bold w-56 rounded-lg bg-white border-indigo-300 text-gray-900"
+                              autoFocus
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5 self-end sm:self-end pt-1">
+                            <Button
+                              size="sm"
+                              onClick={handleRenameFormat}
+                              disabled={isRenaming}
+                              className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 cursor-pointer shadow-2xs"
+                            >
+                              {isRenaming ? <RefreshCw className="animate-spin" size={12} /> : <Check size={12} />}
+                              <span>Simpan</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setRenamingFormat(null)}
+                              disabled={isRenaming}
+                              className="h-8 text-xs font-bold text-gray-500 rounded-lg px-2"
+                            >
+                              Batal
+                            </Button>
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-center">

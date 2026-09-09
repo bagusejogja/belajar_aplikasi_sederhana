@@ -9,15 +9,18 @@ export async function GET(request: Request) {
     const getUnits = searchParams.get('units');
 
     if (getUnits) {
-      // Ambil daftar unit unik dari rkat_pengeluaran untuk autocomplete
-      const { data: unitsData, error: uErr } = await supabaseAdmin
-        .from('rkat_pengeluaran')
-        .select('unit')
-        .order('unit');
-      if (uErr) throw uErr;
+      // Ambil daftar seluruh unit kerja dari rkat_pengeluaran dan master gov_units
+      const [{ data: rkatUnits }, { data: govUnits }] = await Promise.all([
+        supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
+        supabaseAdmin.from('gov_units').select('nama_unit').order('nama_unit')
+      ]);
 
-      const uniqueUnits = Array.from(new Set((unitsData || []).map(r => r.unit).filter(Boolean)));
-      return NextResponse.json({ success: true, units: uniqueUnits });
+      const combinedUnits = Array.from(new Set([
+        ...(rkatUnits || []).map(r => r.unit).filter(Boolean),
+        ...(govUnits || []).map(g => g.nama_unit).filter(Boolean)
+      ])).sort();
+
+      return NextResponse.json({ success: true, units: combinedUnits });
     }
 
     const { data, error } = await supabaseAdmin
