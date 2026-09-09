@@ -426,11 +426,8 @@ export default function RkaLaporanPage() {
   // Grand Totals
   const grandTotal = useMemo(() => {
     const anggaran = groupedData.reduce((acc, g) => acc + g.totalAnggaran, 0);
-    const realisasi = groupedData.reduce((acc, g) => acc + g.totalRealisasi, 0);
-    const sisa = anggaran - realisasi;
-    const pct = anggaran > 0 ? ((realisasi / anggaran) * 100).toFixed(1) : '0';
     const totalItems = groupedData.reduce((acc, g) => acc + g.rows.length, 0);
-    return { anggaran, realisasi, sisa, pct, totalItems };
+    return { anggaran, totalItems };
   }, [groupedData]);
 
   // Export Excel
@@ -449,9 +446,7 @@ export default function RkaLaporanPage() {
           'Lingkup Kegiatan': r.lingkup_kegiatan,
           'Uraian Belanja': r.uraian_belanja,
           'Akun Detail': r.akun_detail,
-          'Pagu Anggaran (Rp)': Number(r.anggaran) || 0,
-          'Realisasi (Rp)': Number(r.realisasi) || 0,
-          'Sisa Anggaran (Rp)': (Number(r.anggaran) || 0) - (Number(r.realisasi) || 0)
+          'Pagu Anggaran (Rp)': Number(r.anggaran) || 0
         });
       });
     });
@@ -564,77 +559,57 @@ export default function RkaLaporanPage() {
         </div>
       </div>
 
-      {/* KPI METRIC CARDS (SERAGAM DENGAN RKA PENGELUARAN) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI METRIC CARDS (FOKUS TOTAL PAGU ANGGARAN) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         
-        {/* Card 1: Total Kategori Terpetakan */}
+        {/* Card 1: Format Laporan Terpilih */}
         <Card className="rounded-2xl border-gray-200/80 shadow-xs">
           <CardContent className="p-5 space-y-2">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Format Laporan Terpetakan
+              Format Laporan Terpilih
             </span>
-            <div className="text-2xl font-black font-mono text-gray-900">
-              {groupedData.length} <span className="text-xs font-semibold text-gray-500 font-sans">Kategori</span>
+            <div className="text-xl font-black text-gray-900 flex items-center gap-2 truncate">
+              <span>{activeTabObj?.icon || '📊'}</span>
+              <span className="truncate">{activeTabObj?.label || 'Semua Format'}</span>
             </div>
             <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>{grandTotal.totalItems.toLocaleString('id-ID')} Baris Belanja</span>
-              <Badge variant="secondary" className="text-[10px] font-bold">TA {tahunFilter}</Badge>
+              <span>Tahun Anggaran {tahunFilter}</span>
+              <Badge variant="outline" className="text-[10px] font-bold font-mono uppercase bg-gray-50">
+                {modeLaporan}
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Total Pagu Teridentifikasi */}
+        {/* Card 2: Total Kategori Terpetakan */}
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Kategori Terpetakan
+            </span>
+            <div className="text-2xl font-black font-mono text-gray-900">
+              {groupedData.length} <span className="text-xs font-semibold text-gray-500 font-sans">Kelompok Akun</span>
+            </div>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span>{grandTotal.totalItems.toLocaleString('id-ID')} Baris Belanja</span>
+              <span className="text-indigo-600 font-medium">Siap Dilaporkan</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Total Pagu Teridentifikasi */}
         <Card className="rounded-2xl shadow-xs border-indigo-200 bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1 text-indigo-700">
-              <span>{activeTabObj?.icon || '📊'}</span>
-              <span>Total Pagu Terpetakan</span>
+              <FileSpreadsheet size={13} />
+              <span>Total Pagu Anggaran</span>
             </span>
             <div className="text-2xl font-black font-mono text-indigo-950">
               Rp {formatRp(grandTotal.anggaran)}
             </div>
             <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60 text-indigo-800">
-              <span>Format: {activeTabObj?.label || 'Laporan'}</span>
-              <span className="text-[10px] font-mono font-bold">100% Valid</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Realisasi Belanja */}
-        <Card className="rounded-2xl border-emerald-100 shadow-xs bg-gradient-to-b from-white to-emerald-50/30">
-          <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-              Total Realisasi Belanja
-            </span>
-            <div className="text-2xl font-black font-mono text-emerald-700">
-              Rp {formatRp(grandTotal.realisasi)}
-            </div>
-            <div className="text-xs text-emerald-700 font-semibold flex items-center justify-between pt-1 border-t border-emerald-100/60">
-              <span>Serapan: {grandTotal.pct}%</span>
-              <div className="w-16 bg-emerald-100 h-1.5 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-600 rounded-full"
-                  style={{ width: `${Math.min(100, parseFloat(grandTotal.pct))}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Sisa Anggaran */}
-        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
-          <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Sisa Anggaran Belanja
-            </span>
-            <div className="text-2xl font-black font-mono text-gray-900">
-              Rp {formatRp(grandTotal.sisa)}
-            </div>
-            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Belum Terealisasi</span>
-              <span className="text-[10px] font-mono text-gray-400">
-                {(100 - parseFloat(grandTotal.pct)).toFixed(1)}% Sisa
-              </span>
+              <span>Rekapitulasi Belanja</span>
+              <span className="text-[10px] font-mono font-bold">100% Pagu</span>
             </div>
           </CardContent>
         </Card>
@@ -821,11 +796,9 @@ export default function RkaLaporanPage() {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          isKemen ? 'bg-blue-50 text-blue-900 border-blue-200' : 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                        }`}>
-                          <span>{isKemen ? '🏛️' : '🌐'}</span>
-                          <span>{isKemen ? 'Format Kementerian' : 'Format Webometrics'}</span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-indigo-50 text-indigo-900 border-indigo-200">
+                          <span>{activeTabObj?.icon || '📊'}</span>
+                          <span>{activeTabObj?.label || 'Format Laporan'}</span>
                         </span>
                         <Badge variant="secondary" className="text-[10px] font-bold">
                           {group.rows.length} Item Belanja
@@ -837,34 +810,11 @@ export default function RkaLaporanPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6 self-end sm:self-center">
+                  <div className="flex items-center gap-4 self-end sm:self-center">
                     <div className="text-right">
-                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Total Pagu</span>
-                      <span className="font-black font-mono text-gray-900 text-sm">
+                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Total Pagu Anggaran</span>
+                      <span className="font-black font-mono text-indigo-950 text-base">
                         Rp {formatRp(group.totalAnggaran)}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Realisasi</span>
-                      <span className="font-bold font-mono text-emerald-700 text-sm">
-                        Rp {formatRp(group.totalRealisasi)}
-                      </span>
-                    </div>
-
-                    <div className="w-24 text-right">
-                      <div className="flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 tracking-wider">
-                        <span>Serapan</span>
-                        <span className="font-mono text-gray-600">{pct}%</span>
-                      </div>
-                      <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-1">
-                        <div 
-                          className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
-                        Sisa: Rp {formatRp(sisaGroup)}
                       </span>
                     </div>
                   </div>
@@ -886,16 +836,12 @@ export default function RkaLaporanPage() {
                             <th className="px-4 py-2.5 min-w-[200px]">Fakultas / Unit Kerja</th>
                             <th className="px-4 py-2.5 min-w-[300px]">Uraian Belanja &amp; Kegiatan</th>
                             <th className="px-3 py-2.5 min-w-[130px]">Akun Detail</th>
-                            <th className="px-4 py-2.5 text-right min-w-[120px]">Pagu</th>
-                            <th className="px-4 py-2.5 text-right min-w-[120px]">Realisasi</th>
-                            <th className="px-4 py-2.5 text-right min-w-[120px]">Sisa</th>
+                            <th className="px-4 py-2.5 text-right min-w-[140px]">Pagu Anggaran</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                           {group.rows.map((row, rIdx) => {
                             const ang = Number(row.anggaran) || 0;
-                            const rel = Number(row.realisasi) || 0;
-                            const sisa = ang - rel;
 
                             return (
                               <tr key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors">
@@ -939,14 +885,6 @@ export default function RkaLaporanPage() {
 
                                 <td className="px-4 py-3 align-top text-right font-mono font-bold text-gray-900">
                                   Rp {formatRp(ang)}
-                                </td>
-
-                                <td className="px-4 py-3 align-top text-right font-mono font-bold text-emerald-700">
-                                  Rp {formatRp(rel)}
-                                </td>
-
-                                <td className="px-4 py-3 align-top text-right font-mono text-gray-600">
-                                  Rp {formatRp(sisa)}
                                 </td>
                               </tr>
                             );
