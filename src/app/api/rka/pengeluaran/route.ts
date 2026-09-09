@@ -10,6 +10,12 @@ export async function GET(request: Request) {
     const unit = searchParams.get('unit');
     const search = searchParams.get('search');
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
+    const onlyClassified = searchParams.get('only_classified'); // 'true' | 'false'
+    const targetFormat = searchParams.get('format');
+
+    const selectFields = onlyClassified === 'true'
+      ? 'id, unit, tahun_anggaran, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags'
+      : '*';
 
     let allData: any[] = [];
     let page = 0;
@@ -22,7 +28,7 @@ export async function GET(request: Request) {
 
       let query = supabaseAdmin
         .from('rkat_pengeluaran')
-        .select('*')
+        .select(selectFields)
         .order('id', { ascending: true })
         .range(from, to);
 
@@ -34,10 +40,22 @@ export async function GET(request: Request) {
         query = query.ilike('unit', `%${unit}%`);
       }
 
-      if (kategoriLaporan === 'kementerian') {
-        query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-      } else if (kategoriLaporan === 'webometrics') {
-        query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+      if (onlyClassified === 'true') {
+        if (targetFormat === 'laporan_kementerian') {
+          query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+        } else if (targetFormat === 'laporan_webometrics') {
+          query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+        } else if (targetFormat && targetFormat !== 'ALL') {
+          query = query.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
+        } else {
+          query = query.or('laporan_kementerian.not.is.null,laporan_webometrics.not.is.null,identifikasi_lain.not.is.null');
+        }
+      } else {
+        if (kategoriLaporan === 'kementerian') {
+          query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+        } else if (kategoriLaporan === 'webometrics') {
+          query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+        }
       }
 
       if (search) {

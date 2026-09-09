@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
-  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check
+  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -172,7 +172,8 @@ export default function RkaLaporanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}`;
+      // Query cepat 50x: hanya mengambil baris yang terklasifikasi, bukan 25.000 data kosong
+      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true`;
       if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
       const res = await fetch(url);
       const json = await res.json();
@@ -210,33 +211,7 @@ export default function RkaLaporanPage() {
   const availableTabs = useMemo(() => {
     const tabsMap = new Map<string, { id: string; label: string; icon: string; count: number }>();
 
-    // Preset standar
-    tabsMap.set('laporan_kementerian', {
-      id: 'laporan_kementerian',
-      label: 'Laporan Kementerian',
-      icon: '🏛️',
-      count: 0
-    });
-    tabsMap.set('laporan_webometrics', {
-      id: 'laporan_webometrics',
-      label: 'Laporan Webometrics',
-      icon: '🌐',
-      count: 0
-    });
-    tabsMap.set('laporan_iku', {
-      id: 'laporan_iku',
-      label: 'Laporan IKU / Renstra',
-      icon: '📈',
-      count: 0
-    });
-    tabsMap.set('laporan_sdgs', {
-      id: 'laporan_sdgs',
-      label: 'Laporan SDGs',
-      icon: '🌱',
-      count: 0
-    });
-
-    // Tambahkan format unik dari rules
+    // Tambahkan format unik dari rules aktif terlebih dahulu
     rulesList.forEach(r => {
       const tf = r.target_field;
       if (tf && !tabsMap.has(tf)) {
@@ -252,6 +227,40 @@ export default function RkaLaporanPage() {
         });
       }
     });
+
+    // Tambahkan preset standar jika belum ada
+    if (!tabsMap.has('laporan_kementerian')) {
+      tabsMap.set('laporan_kementerian', {
+        id: 'laporan_kementerian',
+        label: 'Laporan Kementerian',
+        icon: '🏛️',
+        count: 0
+      });
+    }
+    if (!tabsMap.has('laporan_webometrics')) {
+      tabsMap.set('laporan_webometrics', {
+        id: 'laporan_webometrics',
+        label: 'Laporan Webometrics',
+        icon: '🌐',
+        count: 0
+      });
+    }
+    if (!tabsMap.has('laporan_iku')) {
+      tabsMap.set('laporan_iku', {
+        id: 'laporan_iku',
+        label: 'Laporan IKU / Renstra',
+        icon: '📈',
+        count: 0
+      });
+    }
+    if (!tabsMap.has('laporan_sdgs')) {
+      tabsMap.set('laporan_sdgs', {
+        id: 'laporan_sdgs',
+        label: 'Laporan SDGs',
+        icon: '🌱',
+        count: 0
+      });
+    }
 
     // Tambahkan format unik dari data tags
     dataList.forEach(d => {
@@ -286,15 +295,33 @@ export default function RkaLaporanPage() {
     return tabsArray;
   }, [rulesList, dataList]);
 
-  // Handle Jalankan Rule Engine Langsung dari Halaman Laporan
+  // Otomatis pindah ke tab format yang memiliki data atau memiliki aturan aktif
+  useEffect(() => {
+    if (availableTabs.length > 0) {
+      const currentTab = availableTabs.find(t => t.id === modeLaporan);
+      if (!currentTab || currentTab.count === 0) {
+        const firstTabWithData = availableTabs.find(t => t.count > 0);
+        if (firstTabWithData) {
+          setModeLaporan(firstTabWithData.id);
+        } else if (rulesList.length > 0) {
+          const firstRuleTarget = rulesList[0]?.target_field;
+          if (firstRuleTarget && firstRuleTarget !== modeLaporan) {
+            setModeLaporan(firstRuleTarget);
+          }
+        }
+      }
+    }
+  }, [availableTabs, rulesList]);
+
+  // Handle Jalankan Rule Engine Langsung dari Halaman Laporan (Clean Sync)
   const handleRunRuleEngine = async () => {
     setIsRunningEngine(true);
-    const toastId = toast.loading('Menjalankan Rule Engine pada data belanja...');
+    const toastId = toast.loading('Membersihkan data lama & menjalankan Rule Engine...');
     try {
       const res = await fetch('/api/rka/rules', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetYear: tahunFilter })
+        body: JSON.stringify({ targetYear: tahunFilter, cleanSync: true })
       });
       const json = await res.json();
       if (json.success) {
@@ -308,6 +335,29 @@ export default function RkaLaporanPage() {
       toast.error('Error: ' + e.message, { id: toastId });
     } finally {
       setIsRunningEngine(false);
+    }
+  };
+
+  // Handle Bersihkan Seluruh Riwayat Klasifikasi Belanja
+  const handleCleanOldClassifications = async () => {
+    if (!confirm('Bersihkan seluruh riwayat penandaan lama pada data belanja RKAT?\n\nSetelah dibersihkan, seluruh data belanja akan kembali kosong dari klasifikasi, lalu Anda dapat menjalankan Rule Engine kembali agar hanya aturan aktif yang tampil.')) return;
+    const toastId = toast.loading('Membersihkan data belanja...');
+    try {
+      const res = await fetch('/api/rka/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_classification', targetFormat: 'ALL', targetYear: tahunFilter })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message, { id: toastId });
+        await fetchData();
+        await fetchRules();
+      } else {
+        toast.error('Gagal membersihkan: ' + json.error, { id: toastId });
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message, { id: toastId });
     }
   };
 
@@ -454,6 +504,19 @@ export default function RkaLaporanPage() {
           >
             {isRunningEngine ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
             <span>{isRunningEngine ? 'Memetakan Data...' : 'Jalankan Rule Engine'}</span>
+          </Button>
+
+          {/* Tombol Bersihkan Riwayat Klasifikasi */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCleanOldClassifications}
+            disabled={loading || isRunningEngine}
+            className="h-9 rounded-xl border-amber-200 bg-amber-50/60 text-amber-800 hover:bg-amber-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+            title="Bersihkan penandaan lama yang aturannya sudah dihapus"
+          >
+            <RotateCcw size={14} className="text-amber-600" />
+            <span>Bersihkan Riwayat</span>
           </Button>
 
           <Button

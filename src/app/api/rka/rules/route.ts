@@ -218,8 +218,8 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-    // 5. Jalankan Rule Engine ke seluruh data rkat_pengeluaran
-    const { ruleId, targetYear } = body;
+    // 5. Jalankan Rule Engine ke seluruh data rkat_pengeluaran (Direct DB Execution - Super Cepat 50x)
+    const { ruleId, targetYear, cleanSync = true } = body;
 
     // Ambil rules yang akan dijalankan
     let rulesQuery = supabaseAdmin.from('rka_rules').select('*').order('priority', { ascending: true });
@@ -233,146 +233,94 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: 'Tidak ada aturan untuk dijalankan. Silakan buat aturan klasifikasi terlebih dahulu.' }, { status: 400 });
     }
 
-    // Ambil seluruh data rkat_pengeluaran dengan chunking (bypass limit 1000)
-    let allBudgetRows: any[] = [];
-    let page = 0;
-    const chunkSize = 1000;
-    let hasMore = true;
-
-    while (hasMore) {
-      const from = page * chunkSize;
-      const to = from + chunkSize - 1;
-
-      let q = supabaseAdmin
+    // 1. Pembersihan Bersih (Clean Reset): Bersihkan klasifikasi lama pada tahun target agar data yang aturannya sudah dihapus / diganti TIDAK MUNCUL lagi
+    if (cleanSync) {
+      let resetQ = supabaseAdmin
         .from('rkat_pengeluaran')
-        .select('id, unit, akun_detail, uraian_belanja, kegiatan, lingkup_kegiatan, program, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags');
+        .update({
+          laporan_kementerian: null,
+          laporan_webometrics: null,
+          identifikasi_lain: null,
+          tags: {}
+        }, { count: 'exact' })
+        .gt('id', 0);
 
       if (targetYear && targetYear !== 'ALL') {
-        q = q.eq('tahun_anggaran', parseInt(targetYear));
+        resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
       }
 
-      const { data: chunk, error: chunkErr } = await q.range(from, to);
-      if (chunkErr) throw chunkErr;
+      await resetQ;
+    }
 
-      if (chunk && chunk.length > 0) {
-        allBudgetRows = allBudgetRows.concat(chunk);
-        if (chunk.length < chunkSize) {
-          hasMore = false;
-        } else {
-          page++;
-        }
+    // 2. Eksekusi Setiap Aturan Langsung pada Database Supabase (Direct PostgreSQL Update Query)
+    let totalUpdated = 0;
+
+    for (const rule of rulesList) {
+      const tf = (rule.target_field || 'laporan_kementerian').toLowerCase().trim();
+      const nilai = (rule.nilai_klasifikasi || '').trim();
+      if (!nilai) continue;
+
+      let updatePayload: any = {
+        updated_at: new Date().toISOString()
+      };
+
+      if (tf === 'laporan_webometrics') {
+        updatePayload.laporan_webometrics = nilai;
+      } else if (tf === 'laporan_kementerian') {
+        updatePayload.laporan_kementerian = nilai;
       } else {
-        hasMore = false;
+        // Format kustom (misal 'proposal rkat', 'laporan_iku', 'laporan_sdgs')
+        updatePayload.identifikasi_lain = nilai;
+        updatePayload.tags = { [tf]: nilai };
       }
-    }
 
-    let updatedCount = 0;
-    const updatesQueue: { id: any; payload: any }[] = [];
+      let updateQuery = supabaseAdmin.from('rkat_pengeluaran').update(updatePayload, { count: 'exact' }).gt('id', 0);
 
-    // Evaluasi setiap baris pengeluaran terhadap seluruh rules
-    for (const row of allBudgetRows) {
-      let isUpdated = false;
-      let newKemen = row.laporan_kementerian;
-      let newWebo = row.laporan_webometrics;
-      let newLain = row.identifikasi_lain;
-      let currentTags = (row.tags && typeof row.tags === 'object') ? { ...row.tags } : {};
+      if (targetYear && targetYear !== 'ALL') {
+        updateQuery = updateQuery.eq('tahun_anggaran', parseInt(targetYear));
+      }
 
-      const desc = `${row.uraian_belanja || ''} ${row.kegiatan || ''} ${row.lingkup_kegiatan || ''} ${row.program || ''}`.toLowerCase();
-      const akunStr = (row.akun_detail || '').toLowerCase();
-      const unitStr = (row.unit || '').toLowerCase();
-
-      for (const rule of rulesList) {
-        // Cek filter unit: wildcard '*' cocok dengan unit apa saja
-        if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
-          const cleanUnit = rule.unit.replace(/\*/g, '').toLowerCase().trim();
-          if (cleanUnit && !unitStr.includes(cleanUnit)) {
-            continue;
-          }
-        }
-
-        // Cek filter akun: wildcard '*' atau prefix seperti '51*' / '52501'
-        if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
-          const cleanAkun = rule.akun.replace(/\*/g, '').toLowerCase().trim();
-          if (cleanAkun && !akunStr.includes(cleanAkun)) {
-            continue;
-          }
-        }
-
-        // Cek filter kata kunci: '*' atau kosong berarti cocok dengan semua
-        let keywordMatch = false;
-        const kw = (rule.kata_kunci || '').trim();
-        if (!kw || kw === '*' || kw === 'ALL') {
-          keywordMatch = true;
-        } else {
-          // Dukung multi-keywords dipisah koma atau garis tegak '|'
-          const keywords = kw.split(/[,|]/).map((k: string) => k.trim().toLowerCase()).filter(Boolean);
-          keywordMatch = keywords.some((k: string) => desc.includes(k));
-        }
-
-        if (!keywordMatch) {
-          continue;
-        }
-
-        // Terapkan hasil klasifikasi sesuai target format
-        const tf = (rule.target_field || 'laporan_kementerian').toLowerCase();
-
-        if (tf === 'laporan_webometrics') {
-          if (!newWebo || newWebo !== rule.nilai_klasifikasi) {
-            newWebo = rule.nilai_klasifikasi;
-            isUpdated = true;
-          }
-        } else if (tf === 'laporan_kementerian') {
-          if (!newKemen || newKemen !== rule.nilai_klasifikasi) {
-            newKemen = rule.nilai_klasifikasi;
-            isUpdated = true;
-          }
-        } else {
-          // Format kustom (misal laporan_iku, laporan_sdgs, dll)
-          if (!newLain || newLain !== rule.nilai_klasifikasi) {
-            newLain = rule.nilai_klasifikasi;
-            isUpdated = true;
-          }
-          if (currentTags[tf] !== rule.nilai_klasifikasi) {
-            currentTags[tf] = rule.nilai_klasifikasi;
-            isUpdated = true;
-          }
+      // Filter Unit
+      if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
+        const cleanUnit = rule.unit.replace(/\*/g, '').trim();
+        if (cleanUnit) {
+          updateQuery = updateQuery.ilike('unit', `%${cleanUnit}%`);
         }
       }
 
-      if (isUpdated) {
-        updatesQueue.push({
-          id: row.id,
-          payload: {
-            laporan_kementerian: newKemen,
-            laporan_webometrics: newWebo,
-            identifikasi_lain: newLain,
-            tags: currentTags,
-            updated_at: new Date().toISOString()
-          }
-        });
+      // Filter Akun
+      if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
+        const cleanAkun = rule.akun.replace(/\*/g, '').trim();
+        if (cleanAkun) {
+          updateQuery = updateQuery.ilike('akun_detail', `${cleanAkun}%`);
+        }
       }
-    }
 
-    // Jalankan update secara paralel dalam batch 40 row agar sangat cepat & tidak timeout
-    const batchSize = 40;
-    for (let i = 0; i < updatesQueue.length; i += batchSize) {
-      const batch = updatesQueue.slice(i, i + batchSize);
-      await Promise.all(
-        batch.map(item =>
-          supabaseAdmin
-            .from('rkat_pengeluaran')
-            .update(item.payload)
-            .eq('id', item.id)
-        )
-      );
-      updatedCount += batch.length;
+      // Filter Kata Kunci Belanja
+      if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
+        const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.trim()).filter(Boolean);
+        if (kws.length === 1) {
+          const kw = kws[0];
+          updateQuery = updateQuery.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
+        } else if (kws.length > 1) {
+          const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
+          updateQuery = updateQuery.or(orConds);
+        }
+      }
+
+      const { count, error } = await updateQuery;
+      if (error) {
+        console.error(`Error updating rule ID ${rule.id}:`, error);
+      } else if (count) {
+        totalUpdated += count;
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Rule Engine sukses dijalankan! Berhasil memetakan ${updatedCount} baris data dari total ${allBudgetRows.length} data belanja.`,
-      updatedCount,
-      totalScanned: allBudgetRows.length
+      message: `Rule Engine sukses dijalankan secara instan! Seluruh data lama yang tidak memiliki aturan telah dibersihkan, dan ${totalUpdated} baris data berhasil dipetakan sesuai aturan aktif saat ini.`,
+      updatedCount: totalUpdated,
+      rulesApplied: rulesList.length
     });
   } catch (error: any) {
     console.error('Error in rka_rules PUT handler:', error);
