@@ -1,15 +1,133 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FolderTree, Search, Plus, Upload, Download, RefreshCw, 
   Trash2, Edit3, CheckCircle2, AlertCircle, Building2, 
   Sparkles, Layers, Landmark, Wallet, Filter, X, ArrowUpDown,
-  BookOpen, Eye, Save, ExternalLink
+  BookOpen, Eye, Save, ExternalLink, ChevronLeft, ChevronRight,
+  PieChart, BarChart3, CheckSquare, ShieldCheck
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+
+// Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter seperti di modul review-anggaran)
+function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const filteredUnits = useMemo(() => {
+    return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
+  }, [units, query]);
+
+  const allOptions = useMemo(() => {
+    return ['ALL', ...filteredUnits];
+  }, [filteredUnits]);
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+        onSelect(allOptions[highlightedIndex]);
+        setIsOpen(false);
+        setQuery('');
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative inline-block text-left" onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[200px]"
+      >
+        <span className="truncate">
+          {selectedUnit === 'ALL' ? `🏢 Semua Unit (${units.length})` : selectedUnit}
+        </span>
+        <span className="text-[10px] opacity-60">▼</span>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 mt-1 w-72 rounded-2xl bg-white border border-gray-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
+            <input
+              type="text"
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="w-full px-2.5 py-1.5 mb-2 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
+            />
+            <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar pr-1">
+              <div
+                onClick={() => {
+                  onSelect('ALL');
+                  setIsOpen(false);
+                  setQuery('');
+                }}
+                className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors ${
+                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : selectedUnit === 'ALL' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-100 text-gray-800'
+                }`}
+              >
+                🏢 Semua Unit ({units.length})
+              </div>
+              {filteredUnits.map((u, idx) => {
+                const itemIdx = idx + 1;
+                const isHighlighted = highlightedIndex === itemIdx;
+                const isSelected = selectedUnit === u;
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      onSelect(u);
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg cursor-pointer font-medium transition-colors ${
+                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {u}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function RkaPengeluaranPage() {
   const [dataList, setDataList] = useState<any[]>([]);
@@ -21,6 +139,10 @@ export default function RkaPengeluaranPage() {
   const [activeTab, setActiveTab] = useState<'semua' | 'kementerian' | 'webometrics' | 'unmapped'>('semua');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'ID' | 'ANGGARAN' | 'UNIT'>('ID');
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
   // Modals
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
@@ -83,7 +205,7 @@ export default function RkaPengeluaranPage() {
     fetchData();
   }, [tahunFilter, unitFilter]);
 
-  // Handle Search Debounce / Trigger
+  // Handle Search Debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchData();
@@ -93,7 +215,7 @@ export default function RkaPengeluaranPage() {
 
   // List Units unik untuk filter dropdown
   const unitOptions = useMemo(() => {
-    return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean)));
+    return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean))) as string[];
   }, [dataList]);
 
   // Filter Data berdasarkan Tab
@@ -118,6 +240,19 @@ export default function RkaPengeluaranPage() {
 
     return list;
   }, [dataList, activeTab, sortBy]);
+
+  // Pagination Logic
+  const totalItems = filteredData.length;
+  const totalPages = pageSize === 'ALL' ? 1 : Math.ceil(totalItems / (pageSize as number)) || 1;
+  const paginatedData = useMemo(() => {
+    if (pageSize === 'ALL') return filteredData;
+    const start = (currentPage - 1) * (pageSize as number);
+    return filteredData.slice(start, start + (pageSize as number));
+  }, [filteredData, currentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, tahunFilter, unitFilter, search, pageSize]);
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -302,364 +437,483 @@ export default function RkaPengeluaranPage() {
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-300">
       
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded-full text-xs font-bold uppercase tracking-wider">
-              <FolderTree size={14} /> Modul RKA UGM
+      {/* Header Halaman (Seragam dengan Modul Lain) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+              <FolderTree size={20} />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Data RKAT Pengeluaran & Identifikasi Laporan
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl font-medium leading-relaxed">
-              Database baku rencana kegiatan & anggaran belanja unit kerja UGM, dilengkapi tagging otomatis untuk format pelaporan Kementerian dan Webometrics.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
+                  RKAT Pengeluaran &amp; Identifikasi Laporan
+                </h1>
+                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold uppercase">
+                  TA {tahunFilter}
+                </Badge>
+              </div>
+              <p className="text-xs text-gray-500 font-medium">
+                Data terstruktur Rencana Kerja &amp; Anggaran Pengeluaran Unit Kerja UGM
+              </p>
+            </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => setPasteModalOpen(true)}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold shadow-md transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPasteModalOpen(true)}
+            className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
+          >
+            <Upload size={14} className="text-indigo-600" />
+            <span>Paste TSV / Excel</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAddModalOpen(true)}
+            className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
+          >
+            <Plus size={14} className="text-emerald-600" />
+            <span>Tambah Data</span>
+          </Button>
+
+          <Link href="/rka/rules">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs"
             >
-              <Upload size={14} /> Paste Zone TSV / Excel
-            </button>
-            <button
-              onClick={() => setAddModalOpen(true)}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold shadow-md transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
-            >
-              <Plus size={14} /> Tambah Data
-            </button>
-            <Link
-              href="/rka/rules"
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-400/30 rounded-2xl text-xs font-bold transition-all flex items-center gap-2"
-            >
-              <Sparkles size={14} /> Rule Engine
-            </Link>
-          </div>
+              <Sparkles size={14} className="text-indigo-600" />
+              <span>Rule Engine</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+          >
+            <Download size={14} className="text-emerald-600" />
+            <span>Export Excel</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            disabled={loading}
+            className="h-9 w-9 p-0 rounded-xl border-gray-300 text-gray-600 hover:bg-gray-50 shadow-2xs"
+            title="Refresh Data"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          </Button>
         </div>
       </div>
 
-      {/* KPI Stats Card */}
+      {/* KPI Stats Cards (Seragam dengan Card shadcn/ui) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-2">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Total Pagu Anggaran</span>
-          <div className="text-2xl font-black font-mono text-slate-900">
-            Rp {formatRp(metrics.totalAnggaran)}
-          </div>
-          <div className="text-xs text-slate-500 font-bold flex items-center justify-between">
-            <span>{metrics.totalCount} Usulan Belanja</span>
-            <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold">TA {tahunFilter}</span>
-          </div>
-        </div>
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+              Total Pagu Anggaran
+            </span>
+            <div className="text-2xl font-black font-mono text-gray-900">
+              Rp {formatRp(metrics.totalAnggaran)}
+            </div>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span>{metrics.totalCount.toLocaleString('id-ID')} Baris Data</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">TA {tahunFilter}</Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-5 rounded-3xl border border-emerald-200 shadow-2xs space-y-2">
-          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block">Total Realisasi Belanja</span>
-          <div className="text-2xl font-black font-mono text-emerald-700">
-            Rp {formatRp(metrics.totalRealisasi)}
-          </div>
-          <div className="text-xs text-emerald-600 font-bold flex items-center justify-between">
-            <span>Serapan: {metrics.persenSerapan}%</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Aktif</span>
-          </div>
-        </div>
+        <Card className="rounded-2xl border-emerald-100 shadow-xs bg-gradient-to-b from-white to-emerald-50/30">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
+              Total Realisasi Belanja
+            </span>
+            <div className="text-2xl font-black font-mono text-emerald-700">
+              Rp {formatRp(metrics.totalRealisasi)}
+            </div>
+            <div className="text-xs text-emerald-700 font-semibold flex items-center justify-between pt-1 border-t border-emerald-100/60">
+              <span>Serapan: {metrics.persenSerapan}%</span>
+              <span className="text-[10px] text-gray-500 font-mono">Sisa: Rp {formatRp(metrics.sisaAnggaran)}</span>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-5 rounded-3xl border border-indigo-200 shadow-2xs space-y-2">
-          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block">Laporan Kementerian</span>
-          <div className="text-2xl font-black font-mono text-indigo-700">
-            Rp {formatRp(metrics.kemenTotal)}
-          </div>
-          <div className="text-xs text-indigo-600 font-bold flex items-center justify-between">
-            <span>{metrics.kemenCount} Item Teridentifikasi</span>
-            <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold">Kemen</span>
-          </div>
-        </div>
+        <Card className="rounded-2xl border-indigo-100 shadow-xs bg-gradient-to-b from-white to-indigo-50/30">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">
+              🏛️ Laporan Kementerian
+            </span>
+            <div className="text-2xl font-black font-mono text-indigo-700">
+              Rp {formatRp(metrics.kemenTotal)}
+            </div>
+            <div className="text-xs text-indigo-700 font-semibold flex items-center justify-between pt-1 border-t border-indigo-100/60">
+              <span>{metrics.kemenCount.toLocaleString('id-ID')} Teridentifikasi</span>
+              <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]">
+                {metrics.totalCount > 0 ? ((metrics.kemenCount / metrics.totalCount) * 100).toFixed(1) : 0}% Data
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white p-5 rounded-3xl border border-amber-200 shadow-2xs space-y-2">
-          <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block">Laporan Webometrics</span>
-          <div className="text-2xl font-black font-mono text-amber-700">
-            Rp {formatRp(metrics.weboTotal)}
-          </div>
-          <div className="text-xs text-amber-600 font-bold flex items-center justify-between">
-            <span>{metrics.weboCount} Item Teridentifikasi</span>
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Webometrics</span>
-          </div>
-        </div>
+        <Card className="rounded-2xl border-amber-100 shadow-xs bg-gradient-to-b from-white to-amber-50/30">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
+              🌐 Laporan Webometrics
+            </span>
+            <div className="text-2xl font-black font-mono text-amber-700">
+              Rp {formatRp(metrics.weboTotal)}
+            </div>
+            <div className="text-xs text-amber-700 font-semibold flex items-center justify-between pt-1 border-t border-amber-100/60">
+              <span>{metrics.weboCount.toLocaleString('id-ID')} Teridentifikasi</span>
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                {metrics.totalCount > 0 ? ((metrics.weboCount / metrics.totalCount) * 100).toFixed(1) : 0}% Data
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filter & Controls Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          
-          {/* Tabs Filter */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 overflow-x-auto">
-            {[
-              { id: 'semua', label: 'Semua Belanja' },
-              { id: 'kementerian', label: '🏛️ Laporan Kementerian' },
-              { id: 'webometrics', label: '🌐 Laporan Webometrics' },
-              { id: 'unmapped', label: '⚠️ Belum Teridentifikasi' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  activeTab === tab.id
-                    ? 'bg-white text-indigo-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Tahun Filter */}
-            <select
-              value={tahunFilter}
-              onChange={e => setTahunFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-2xl px-3.5 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="2027">Tahun Anggaran 2027</option>
-              <option value="2026">Tahun Anggaran 2026</option>
-              <option value="2025">Tahun Anggaran 2025</option>
-              <option value="ALL">Semua Tahun</option>
-            </select>
-
-            {/* Unit Filter */}
-            <select
-              value={unitFilter}
-              onChange={e => setUnitFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-2xl px-3.5 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer max-w-[200px] truncate"
-            >
-              <option value="ALL">Semua Unit Kerja</option>
-              {unitOptions.map(u => (
-                <option key={u} value={u}>{u}</option>
+      {/* Filter Bar & Controls */}
+      <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
+              {[
+                { id: 'semua', label: 'Semua Belanja' },
+                { id: 'kementerian', label: '🏛️ Laporan Kementerian' },
+                { id: 'webometrics', label: '🌐 Laporan Webometrics' },
+                { id: 'unmapped', label: '⚠️ Belum Teridentifikasi' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    activeTab === tab.id
+                      ? 'bg-white text-indigo-700 shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
               ))}
-            </select>
+            </div>
 
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as any)}
-              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold rounded-2xl px-3.5 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="ID">Urut ID</option>
-              <option value="ANGGARAN">Nominal Tertinggi</option>
-              <option value="UNIT">Nama Unit</option>
-            </select>
+            {/* Filter Dropdown & Unit Autocomplete */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Tahun Filter */}
+              <select
+                value={tahunFilter}
+                onChange={e => setTahunFilter(e.target.value)}
+                className="h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+              >
+                <option value="2027">Tahun 2027</option>
+                <option value="2026">Tahun 2026</option>
+                <option value="2025">Tahun 2025</option>
+                <option value="ALL">Semua Tahun</option>
+              </select>
 
-            <button
-              onClick={handleExportExcel}
-              className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <Download size={14} /> Export Excel
-            </button>
+              {/* Unit Autocomplete Filter */}
+              <UnitAutocompleteFilter
+                units={unitOptions}
+                selectedUnit={unitFilter}
+                onSelect={(u) => setUnitFilter(u)}
+              />
+
+              {/* Sort Order */}
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+              >
+                <option value="ID">Urut ID Default</option>
+                <option value="ANGGARAN">Pagu Nominal Tertinggi</option>
+                <option value="UNIT">Nama Unit Kerja</option>
+              </select>
+            </div>
           </div>
 
-        </div>
+          {/* Search Box & Summary Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-100">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+              <input
+                type="text"
+                placeholder="Cari kata kunci uraian belanja, program, kegiatan, akun detail, nama unit..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl py-2 pl-9 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-xs font-medium focus:bg-white transition-all"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
 
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            type="text"
-            placeholder="Cari uraian belanja, program, kegiatan, akun detail, nama unit..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full bg-slate-50/80 border border-slate-200 text-slate-900 placeholder-slate-400 rounded-2xl py-2.5 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
-          />
-        </div>
-      </div>
+            {/* Per Page Selector */}
+            <div className="flex items-center gap-2 text-xs text-gray-500 font-medium shrink-0">
+              <span>Tampilkan:</span>
+              <select
+                value={pageSize}
+                onChange={e => setPageSize(e.target.value === 'ALL' ? 'ALL' : parseInt(e.target.value))}
+                className="h-8 bg-white border border-gray-200 rounded-lg px-2 text-xs font-bold text-gray-700 outline-none focus:ring-1 focus:ring-indigo-600"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+                <option value={500}>500</option>
+                <option value="ALL">Semua ({totalItems.toLocaleString('id-ID')})</option>
+              </select>
+              <span>baris</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Data Table */}
-      <div className="bg-white rounded-[2rem] border border-slate-200/90 shadow-sm overflow-hidden">
+      {/* Main Data Table */}
+      <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-3">
-            <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs font-bold text-slate-500">Memuat data RKAT Pengeluaran...</span>
+            <RefreshCw size={28} className="animate-spin text-indigo-600" />
+            <span className="text-xs font-bold text-gray-500">Memuat seluruh baris data RKAT Pengeluaran...</span>
           </div>
         ) : filteredData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
-            <FolderTree size={48} className="text-slate-300" />
-            <h3 className="text-base font-black text-slate-700">Belum ada data pengeluaran yang cocok</h3>
-            <p className="text-xs text-slate-500 max-w-md">
-              Pastikan tabel database <code>rkat_pengeluaran</code> sudah dibuat di Supabase SQL Editor via berkas <code>supabase_rka_migration.sql</code> atau gunakan tombol Paste Zone TSV di atas.
+            <FolderTree size={40} className="text-gray-300" />
+            <h3 className="text-sm font-bold text-gray-700">Tidak ada data belanja yang cocok</h3>
+            <p className="text-xs text-gray-400 max-w-md">
+              Pastikan tabel <code>rkat_pengeluaran</code> sudah dieksekusi di Supabase atau coba ubah kata kunci filter Anda.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-600 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3.5 w-12 text-center">No</th>
-                  <th className="px-4 py-3.5 min-w-[200px]">Unit Kerja & Program</th>
-                  <th className="px-4 py-3.5 min-w-[260px]">Kegiatan & Uraian Belanja</th>
-                  <th className="px-4 py-3.5 min-w-[180px]">Akun Belanja</th>
-                  <th className="px-4 py-3.5 text-right min-w-[140px]">Pagu Anggaran</th>
-                  <th className="px-4 py-3.5 text-right min-w-[130px]">Realisasi</th>
-                  <th className="px-4 py-3.5 min-w-[170px]">🏛️ Laporan Kementerian</th>
-                  <th className="px-4 py-3.5 min-w-[170px]">🌐 Laporan Webometrics</th>
-                  <th className="px-4 py-3.5 text-center w-20">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {filteredData.map((row, idx) => {
-                  const anggaran = Number(row.anggaran) || 0;
-                  const realisasi = Number(row.realisasi) || 0;
-                  const sisa = anggaran - realisasi;
-                  const pct = anggaran > 0 ? Math.min(100, Math.round((realisasi / anggaran) * 100)) : 0;
+          <div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-gray-50 text-gray-600 uppercase font-bold text-[10px] tracking-wider border-b border-gray-200 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-3.5 py-3 w-12 text-center">#</th>
+                    <th className="px-4 py-3 min-w-[200px]">Unit Kerja &amp; Program</th>
+                    <th className="px-4 py-3 min-w-[260px]">Kegiatan &amp; Uraian Belanja</th>
+                    <th className="px-4 py-3 min-w-[160px]">Akun Belanja</th>
+                    <th className="px-4 py-3 text-right min-w-[130px]">Pagu Anggaran</th>
+                    <th className="px-4 py-3 text-right min-w-[130px]">Realisasi</th>
+                    <th className="px-4 py-3 min-w-[170px]">🏛️ Laporan Kementerian</th>
+                    <th className="px-4 py-3 min-w-[170px]">🌐 Laporan Webometrics</th>
+                    <th className="px-3 py-3 text-center w-16">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
+                  {paginatedData.map((row, idx) => {
+                    const rowNumber = pageSize === 'ALL' ? idx + 1 : (currentPage - 1) * (pageSize as number) + idx + 1;
+                    const anggaran = Number(row.anggaran) || 0;
+                    const realisasi = Number(row.realisasi) || 0;
+                    const sisa = anggaran - realisasi;
+                    const pct = anggaran > 0 ? Math.min(100, Math.round((realisasi / anggaran) * 100)) : 0;
 
-                  return (
-                    <tr key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-3 text-center text-slate-400 font-bold font-mono align-top pt-4">
-                        {idx + 1}
-                      </td>
+                    return (
+                      <tr key={row.id || idx} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-3.5 py-3 text-center text-gray-400 font-mono text-[11px] align-top pt-3.5">
+                          {rowNumber}
+                        </td>
 
-                      {/* Unit & Program */}
-                      <td className="px-4 py-3 align-top space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <Building2 size={13} className="text-indigo-600 shrink-0" />
-                          <span className="font-black text-slate-900 text-xs">{row.unit || 'Unit UGM'}</span>
-                        </div>
-                        {row.program && (
-                          <div className="text-[11px] text-slate-600 font-medium line-clamp-2">
-                            {row.program}
+                        {/* Unit & Program */}
+                        <td className="px-4 py-3 align-top space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 size={13} className="text-indigo-600 shrink-0" />
+                            <span className="font-bold text-gray-900 text-xs">{row.unit || 'Unit UGM'}</span>
                           </div>
-                        )}
-                        <div className="text-[10px] text-slate-400">
-                          TA {row.tahun_anggaran || 2027} • Prioritas: <span className="font-bold text-slate-600">{row.prioritas || '-'}</span>
-                        </div>
-                      </td>
-
-                      {/* Kegiatan & Uraian Belanja */}
-                      <td className="px-4 py-3 align-top space-y-1">
-                        <div className="font-bold text-slate-900 text-xs leading-snug">
-                          {row.uraian_belanja || row.kegiatan || '-'}
-                        </div>
-                        {row.lingkup_kegiatan && (
-                          <div className="text-[11px] text-indigo-700 font-medium">
-                            Lingkup: {row.lingkup_kegiatan}
+                          {row.program && (
+                            <div className="text-[11px] text-gray-600 font-normal line-clamp-2">
+                              {row.program}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                            <span>TA {row.tahun_anggaran || 2027}</span>
+                            <span>•</span>
+                            <span>Prioritas: <strong>{row.prioritas || '-'}</strong></span>
                           </div>
-                        )}
-                        {row.kegiatan && (
-                          <div className="text-[10px] text-slate-400 font-mono line-clamp-1">
-                            {row.kegiatan}
+                        </td>
+
+                        {/* Kegiatan & Uraian Belanja */}
+                        <td className="px-4 py-3 align-top space-y-1">
+                          <div className="font-bold text-gray-900 text-xs leading-snug">
+                            {row.uraian_belanja || row.kegiatan || '-'}
                           </div>
-                        )}
-                      </td>
+                          {row.lingkup_kegiatan && (
+                            <div className="text-[11px] text-indigo-700 font-medium">
+                              Lingkup: {row.lingkup_kegiatan}
+                            </div>
+                          )}
+                          {row.kegiatan && (
+                            <div className="text-[10px] text-gray-400 font-mono line-clamp-1">
+                              {row.kegiatan}
+                            </div>
+                          )}
+                        </td>
 
-                      {/* Akun Belanja */}
-                      <td className="px-4 py-3 align-top space-y-1">
-                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-mono font-bold inline-block">
-                          {row.akun_detail || row.sub_akun || row.akun_utama || '-'}
-                        </span>
-                        <div className="text-[10px] text-slate-500">
-                          {row.sumber_dana_nama || '-'}
-                        </div>
-                      </td>
-
-                      {/* Anggaran */}
-                      <td className="px-4 py-3 text-right align-top space-y-0.5">
-                        <div className="font-black font-mono text-slate-900 text-xs">
-                          Rp {formatRp(anggaran)}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono">
-                          Sisa: Rp {formatRp(sisa)}
-                        </div>
-                      </td>
-
-                      {/* Realisasi & Serapan */}
-                      <td className="px-4 py-3 text-right align-top space-y-1">
-                        <div className="font-bold font-mono text-emerald-700 text-xs">
-                          Rp {formatRp(realisasi)}
-                        </div>
-                        <div className="flex items-center justify-end gap-1.5">
-                          <div className="w-14 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
-                              style={{ width: `${pct}%` }}
-                            />
+                        {/* Akun Belanja */}
+                        <td className="px-4 py-3 align-top space-y-1">
+                          <Badge variant="outline" className="font-mono text-[10px] font-bold bg-gray-50 text-gray-800 border-gray-200 block w-fit">
+                            {row.akun_detail || row.sub_akun || row.akun_utama || '-'}
+                          </Badge>
+                          <div className="text-[10px] text-gray-500 line-clamp-1">
+                            {row.sumber_dana_nama || '-'}
                           </div>
-                          <span className="text-[10px] font-bold text-slate-500 font-mono">{pct}%</span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Laporan Kementerian */}
-                      <td className="px-4 py-3 align-top">
-                        {row.laporan_kementerian ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-xl text-[11px] font-bold">
-                            🏛️ {row.laporan_kementerian}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Belum diset</span>
-                        )}
-                      </td>
+                        {/* Anggaran */}
+                        <td className="px-4 py-3 text-right align-top space-y-0.5">
+                          <div className="font-black font-mono text-gray-900 text-xs">
+                            Rp {formatRp(anggaran)}
+                          </div>
+                          <div className="text-[10px] text-gray-400 font-mono">
+                            Sisa: Rp {formatRp(sisa)}
+                          </div>
+                        </td>
 
-                      {/* Laporan Webometrics */}
-                      <td className="px-4 py-3 align-top">
-                        {row.laporan_webometrics ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-[11px] font-bold">
-                            🌐 {row.laporan_webometrics}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">Belum diset</span>
-                        )}
-                      </td>
+                        {/* Realisasi & Serapan */}
+                        <td className="px-4 py-3 text-right align-top space-y-1">
+                          <div className="font-bold font-mono text-emerald-700 text-xs">
+                            Rp {formatRp(realisasi)}
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div className="w-14 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] font-bold text-gray-500 font-mono">{pct}%</span>
+                          </div>
+                        </td>
 
-                      {/* Aksi */}
-                      <td className="px-4 py-3 text-center align-top pt-3.5">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingRow({ ...row });
-                              setEditModalOpen(true);
-                            }}
-                            className="p-1.5 bg-slate-100 hover:bg-indigo-600 text-slate-600 hover:text-white rounded-lg transition-all"
-                            title="Edit Data & Tagging Laporan"
-                          >
-                            <Edit3 size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRow(row.id)}
-                            className="p-1.5 bg-slate-100 hover:bg-rose-600 text-slate-600 hover:text-white rounded-lg transition-all"
-                            title="Hapus Baris Data"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {/* Laporan Kementerian */}
+                        <td className="px-4 py-3 align-top">
+                          {row.laporan_kementerian ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-lg text-[10px] font-bold leading-tight">
+                              🏛️ {row.laporan_kementerian}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 italic">Belum diset</span>
+                          )}
+                        </td>
+
+                        {/* Laporan Webometrics */}
+                        <td className="px-4 py-3 align-top">
+                          {row.laporan_webometrics ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-[10px] font-bold leading-tight">
+                              🌐 {row.laporan_webometrics}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 italic">Belum diset</span>
+                          )}
+                        </td>
+
+                        {/* Aksi */}
+                        <td className="px-3 py-3 text-center align-top pt-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingRow({ ...row });
+                                setEditModalOpen(true);
+                              }}
+                              className="p-1.5 bg-gray-100 hover:bg-indigo-600 text-gray-600 hover:text-white rounded-lg transition-all cursor-pointer"
+                              title="Edit Data & Tagging Laporan"
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRow(row.id)}
+                              className="p-1.5 bg-gray-100 hover:bg-rose-600 text-gray-600 hover:text-white rounded-lg transition-all cursor-pointer"
+                              title="Hapus Baris Data"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls Footer */}
+            <div className="p-4 bg-gray-50/70 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium">
+              <div>
+                Menampilkan <strong>{pageSize === 'ALL' ? totalItems : Math.min((currentPage - 1) * (pageSize as number) + 1, totalItems)}</strong> sampai <strong>{pageSize === 'ALL' ? totalItems : Math.min(currentPage * (pageSize as number), totalItems)}</strong> dari <strong>{totalItems.toLocaleString('id-ID')}</strong> total baris data
+              </div>
+
+              {pageSize !== 'ALL' && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-2 rounded-lg text-xs"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Sebelumnya</span>
+                  </Button>
+
+                  <div className="px-3 py-1 font-bold text-gray-700 bg-white border border-gray-200 rounded-lg text-xs">
+                    Halaman {currentPage} dari {totalPages}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-2 rounded-lg text-xs"
+                  >
+                    <span>Berikutnya</span>
+                    <ChevronRight size={14} />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* MODAL 1: PASTE ZONE TSV BULK IMPORT */}
       {pasteModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <Upload className="text-indigo-600" size={20} />
-                <h3 className="font-black text-slate-900 text-base">Paste Zone Data RKAT Pengeluaran (TSV / Excel)</h3>
+                <h3 className="font-bold text-gray-900 text-sm">Paste Zone Data RKAT Pengeluaran (TSV / Excel)</h3>
               </div>
-              <button onClick={() => setPasteModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl">
+              <button onClick={() => setPasteModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700 rounded-lg">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="bg-slate-50 p-4 rounded-2xl text-xs text-slate-600 space-y-1.5 font-sans border border-slate-200">
-              <p className="font-bold text-slate-800">Format Kolom Baku (Sesuai Urutan Tab Delimited):</p>
-              <p className="font-mono text-[11px] text-slate-500 overflow-x-auto whitespace-nowrap">
+            <div className="bg-gray-50 p-3.5 rounded-xl text-xs text-gray-600 space-y-1 border border-gray-200">
+              <p className="font-bold text-gray-800">Format Kolom Baku (Tab-Delimited dari Excel):</p>
+              <p className="font-mono text-[10px] text-gray-500 overflow-x-auto whitespace-nowrap">
                 Tahun_Anggaran • Unit • Tujuan • Sasaran • Program • IndikatorProgram • target • cascading_kinerja_target_satuan • Kelompok_Indikator_Program • cascading_kinerja_iku • Kegiatan • Lingkup_Kegiatan • sumberdanaNama • Prioritas • AkunUtama • SubAkun • AkunDetail • Uraian_belanja • Anggaran • Realisasi • rncnpengeluaranIsAprove
               </p>
               <p className="text-[11px] text-indigo-600 font-medium">
-                Tip: Cukup salin (copy) baris-baris dari Excel lalu tempelkan (paste) langsung pada kolom di bawah. Header otomatis dideteksi.
+                Cukup salin (copy) seluruh baris dari spreadsheet Excel lalu paste ke textarea di bawah. Sistem akan otomatis membagi per kolom dan menyimpannya ke database.
               </p>
             </div>
 
@@ -668,24 +922,27 @@ export default function RkaPengeluaranPage() {
               placeholder="Paste baris data TSV / Excel di sini..."
               value={pasteText}
               onChange={e => setPasteText(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-2xl p-4 text-xs font-mono text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3.5 text-xs font-mono text-gray-800 outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
             />
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setPasteModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="h-9 text-xs"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
+                size="sm"
                 onClick={handleBulkImport}
                 disabled={isImporting || !pasteText.trim()}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                className="h-9 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold gap-1.5 shadow-sm"
               >
                 {isImporting ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
-                {isImporting ? 'Sedang Menyimpan...' : 'Simpan Data Pengeluaran'}
-              </button>
+                {isImporting ? 'Menyimpan...' : 'Simpan Seluruh Data'}
+              </Button>
             </div>
           </div>
         </div>
@@ -694,132 +951,135 @@ export default function RkaPengeluaranPage() {
       {/* MODAL 2: EDIT ROW & TAGGING */}
       {editModalOpen && editingRow && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Edit3 className="text-indigo-600" size={20} />
-                <h3 className="font-black text-slate-900 text-base">Edit Pengeluaran & Identifikasi Laporan</h3>
+                <Edit3 className="text-indigo-600" size={18} />
+                <h3 className="font-bold text-gray-900 text-sm">Edit Baris Pengeluaran &amp; Identifikasi Laporan</h3>
               </div>
-              <button onClick={() => setEditModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl">
+              <button onClick={() => setEditModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700 rounded-lg">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleEditSubmit} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tahun Anggaran</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Tahun Anggaran</label>
+                  <Input
                     type="number"
                     value={editingRow.tahun_anggaran || 2027}
                     onChange={e => setEditingRow({ ...editingRow, tahun_anggaran: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold"
+                    className="h-9 text-xs font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Unit Kerja</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Unit Kerja</label>
+                  <Input
                     type="text"
                     value={editingRow.unit || ''}
                     onChange={e => setEditingRow({ ...editingRow, unit: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Uraian Belanja</label>
+                <label className="font-bold text-gray-700 block mb-1">Uraian Belanja</label>
                 <textarea
                   rows={2}
                   value={editingRow.uraian_belanja || ''}
                   onChange={e => setEditingRow({ ...editingRow, uraian_belanja: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                  className="w-full bg-white border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-indigo-600 outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Akun Detail</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Akun Detail</label>
+                  <Input
                     type="text"
                     value={editingRow.akun_detail || ''}
                     onChange={e => setEditingRow({ ...editingRow, akun_detail: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs font-mono"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Lingkup Kegiatan</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Lingkup Kegiatan</label>
+                  <Input
                     type="text"
                     value={editingRow.lingkup_kegiatan || ''}
                     onChange={e => setEditingRow({ ...editingRow, lingkup_kegiatan: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Pagu Anggaran (Rp)</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Pagu Anggaran (Rp)</label>
+                  <Input
                     type="number"
                     value={editingRow.anggaran || 0}
                     onChange={e => setEditingRow({ ...editingRow, anggaran: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono font-bold"
+                    className="h-9 text-xs font-mono font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Realisasi (Rp)</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Realisasi (Rp)</label>
+                  <Input
                     type="number"
                     value={editingRow.realisasi || 0}
                     onChange={e => setEditingRow({ ...editingRow, realisasi: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono font-bold"
+                    className="h-9 text-xs font-mono font-bold"
                   />
                 </div>
               </div>
 
               {/* Tagging / Identifikasi Laporan */}
-              <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-3">
-                <span className="font-black text-indigo-900 block text-xs">Identifikasi & Pengelompokan Laporan</span>
+              <div className="p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2.5">
+                <span className="font-bold text-indigo-950 block text-xs">Identifikasi Format Laporan Khusus</span>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">🏛️ Format Laporan Kementerian</label>
-                  <input
+                  <label className="font-semibold text-gray-700 block mb-1 text-[11px]">🏛️ Format Laporan Kementerian</label>
+                  <Input
                     type="text"
-                    placeholder="Contoh: Beasiswa Mahasiswa Asing (MBKM) / Publikasi Ilmiah..."
+                    placeholder="Contoh: Beasiswa Mahasiswa Asing / Publikasi..."
                     value={editingRow.laporan_kementerian || ''}
                     onChange={e => setEditingRow({ ...editingRow, laporan_kementerian: e.target.value })}
-                    className="w-full bg-white border border-indigo-200 rounded-xl p-2.5 font-medium text-indigo-950"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">🌐 Format Laporan Webometrics</label>
-                  <input
+                  <label className="font-semibold text-gray-700 block mb-1 text-[11px]">🌐 Format Laporan Webometrics</label>
+                  <Input
                     type="text"
                     placeholder="Contoh: International Student Mobility / Web Visibility..."
                     value={editingRow.laporan_webometrics || ''}
                     onChange={e => setEditingRow({ ...editingRow, laporan_webometrics: e.target.value })}
-                    className="w-full bg-white border border-indigo-200 rounded-xl p-2.5 font-medium text-indigo-950"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setEditModalOpen(false)}
-                  className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="h-9 text-xs"
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  size="sm"
                   disabled={isSaving}
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  className="h-9 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold gap-1.5"
                 >
                   {isSaving ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
                   Simpan Perubahan
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -829,138 +1089,141 @@ export default function RkaPengeluaranPage() {
       {/* MODAL 3: TAMBAH DATA MANUAL */}
       {addModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Plus className="text-emerald-600" size={20} />
-                <h3 className="font-black text-slate-900 text-base">Tambah Pengeluaran RKA Baru</h3>
+                <Plus className="text-emerald-600" size={18} />
+                <h3 className="font-bold text-gray-900 text-sm">Tambah Pengeluaran RKA Baru</h3>
               </div>
-              <button onClick={() => setAddModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl">
+              <button onClick={() => setAddModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700 rounded-lg">
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
+            <form onSubmit={handleAddSubmit} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tahun Anggaran</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Tahun Anggaran</label>
+                  <Input
                     type="number"
                     value={newRow.tahun_anggaran}
                     onChange={e => setNewRow({ ...newRow, tahun_anggaran: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold"
+                    className="h-9 text-xs font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Unit Kerja</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Unit Kerja</label>
+                  <Input
                     type="text"
                     placeholder="Contoh: 05000010 Fakultas Filsafat"
                     value={newRow.unit}
                     onChange={e => setNewRow({ ...newRow, unit: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Uraian Belanja</label>
+                <label className="font-bold text-gray-700 block mb-1">Uraian Belanja</label>
                 <textarea
                   rows={2}
                   placeholder="Deskripsi uraian belanja..."
                   value={newRow.uraian_belanja}
                   onChange={e => setNewRow({ ...newRow, uraian_belanja: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                  className="w-full bg-white border border-gray-200 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-indigo-600 outline-none"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Akun Detail</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Akun Detail</label>
+                  <Input
                     type="text"
                     placeholder="Contoh: 52501 Beasiswa Mahasiswa"
                     value={newRow.akun_detail}
                     onChange={e => setNewRow({ ...newRow, akun_detail: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs font-mono"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Lingkup Kegiatan</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Lingkup Kegiatan</label>
+                  <Input
                     type="text"
                     placeholder="Contoh: Beasiswa bagi mahasiswa asing"
                     value={newRow.lingkup_kegiatan}
                     onChange={e => setNewRow({ ...newRow, lingkup_kegiatan: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium"
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Pagu Anggaran (Rp)</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Pagu Anggaran (Rp)</label>
+                  <Input
                     type="number"
                     value={newRow.anggaran}
                     onChange={e => setNewRow({ ...newRow, anggaran: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono font-bold"
+                    className="h-9 text-xs font-mono font-bold"
                     required
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Realisasi (Rp)</label>
-                  <input
+                  <label className="font-bold text-gray-700 block mb-1">Realisasi (Rp)</label>
+                  <Input
                     type="number"
                     value={newRow.realisasi}
                     onChange={e => setNewRow({ ...newRow, realisasi: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono font-bold"
+                    className="h-9 text-xs font-mono font-bold"
                   />
                 </div>
               </div>
 
-              <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 space-y-3">
-                <span className="font-black text-emerald-900 block text-xs">Identifikasi & Pengelompokan Laporan</span>
+              <div className="p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-100 space-y-2.5">
+                <span className="font-bold text-emerald-950 block text-xs">Identifikasi Format Laporan Khusus</span>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">🏛️ Format Laporan Kementerian</label>
-                  <input
+                  <label className="font-semibold text-gray-700 block mb-1 text-[11px]">🏛️ Format Laporan Kementerian</label>
+                  <Input
                     type="text"
                     placeholder="Format kementerian..."
                     value={newRow.laporan_kementerian}
                     onChange={e => setNewRow({ ...newRow, laporan_kementerian: e.target.value })}
-                    className="w-full bg-white border border-emerald-200 rounded-xl p-2.5 font-medium"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">🌐 Format Laporan Webometrics</label>
-                  <input
+                  <label className="font-semibold text-gray-700 block mb-1 text-[11px]">🌐 Format Laporan Webometrics</label>
+                  <Input
                     type="text"
                     placeholder="Format webometrics..."
                     value={newRow.laporan_webometrics}
                     onChange={e => setNewRow({ ...newRow, laporan_webometrics: e.target.value })}
-                    className="w-full bg-white border border-emerald-200 rounded-xl p-2.5 font-medium"
+                    className="h-8 text-xs bg-white"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setAddModalOpen(false)}
-                  className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                  className="h-9 text-xs"
                 >
                   Batal
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
+                  size="sm"
                   disabled={isSaving}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                  className="h-9 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5"
                 >
                   {isSaving ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
                   Simpan Data
-                </button>
+                </Button>
               </div>
             </form>
           </div>

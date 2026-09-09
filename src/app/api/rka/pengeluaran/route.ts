@@ -11,33 +11,57 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
 
-    let query = supabaseAdmin
-      .from('rkat_pengeluaran')
-      .select('*')
-      .order('id', { ascending: true });
+    let allData: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (tahun && tahun !== 'ALL') {
-      query = query.eq('tahun_anggaran', parseInt(tahun));
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select('*')
+        .order('id', { ascending: true })
+        .range(from, to);
+
+      if (tahun && tahun !== 'ALL') {
+        query = query.eq('tahun_anggaran', parseInt(tahun));
+      }
+
+      if (unit && unit !== 'ALL' && unit !== '*') {
+        query = query.ilike('unit', `%${unit}%`);
+      }
+
+      if (kategoriLaporan === 'kementerian') {
+        query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+      } else if (kategoriLaporan === 'webometrics') {
+        query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+      }
+
+      if (search) {
+        query = query.or(`uraian_belanja.ilike.%${search}%,kegiatan.ilike.%${search}%,program.ilike.%${search}%,akun_detail.ilike.%${search}%,unit.ilike.%${search}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allData = allData.concat(data);
+
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+      }
     }
 
-    if (unit && unit !== 'ALL' && unit !== '*') {
-      query = query.ilike('unit', `%${unit}%`);
-    }
-
-    if (kategoriLaporan === 'kementerian') {
-      query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-    } else if (kategoriLaporan === 'webometrics') {
-      query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
-    }
-
-    if (search) {
-      query = query.or(`uraian_belanja.ilike.%${search}%,kegiatan.ilike.%${search}%,program.ilike.%${search}%,akun_detail.ilike.%${search}%,unit.ilike.%${search}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, data: allData });
   } catch (error: any) {
     console.error('Error fetching rkat_pengeluaran:', error);
     return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
