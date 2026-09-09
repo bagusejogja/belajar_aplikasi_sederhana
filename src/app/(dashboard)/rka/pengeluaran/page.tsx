@@ -6,12 +6,14 @@ import {
   Trash2, Edit3, CheckCircle2, AlertCircle, Building2, 
   Sparkles, Layers, Landmark, Wallet, Filter, X, ArrowUpDown,
   BookOpen, Eye, Save, ExternalLink, ChevronLeft, ChevronRight,
-  PieChart, BarChart3, CheckSquare, ShieldCheck, Tag, RotateCcw
+  PieChart, BarChart3, CheckSquare, ShieldCheck, Tag, RotateCcw,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -147,7 +149,8 @@ export default function RkaPengeluaranPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
-  // Modals State
+  // Paste Zone & Modals State
+  const [showInlinePasteZone, setShowInlinePasteZone] = useState(true);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -340,6 +343,69 @@ export default function RkaPengeluaranPage() {
     return new Intl.NumberFormat('id-ID').format(Math.round(num));
   };
 
+  // Parser Real-Time untuk Paste Zone RKAT Pengeluaran
+  const parsedPasteLines = useMemo(() => {
+    if (!pasteText.trim()) return [];
+    const lines = pasteText.trim().split('\n');
+    let startIndex = 0;
+    const firstLine = lines[0].toLowerCase();
+    if (
+      firstLine.includes('tahun') || 
+      firstLine.includes('unit') || 
+      firstLine.includes('anggaran') || 
+      firstLine.includes('uraian') ||
+      firstLine.includes('akun')
+    ) {
+      startIndex = 1;
+    }
+
+    const parseCleanNum = (val: any) => {
+      if (!val || val === '\\N' || val === '-') return 0;
+      const cleaned = val.toString().replace(/[^\d.,-]/g, '').replace(/,/g, '');
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    };
+
+    const items: any[] = [];
+    for (let i = startIndex; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const cols = line.split('\t').map((c: string) => c.trim().replace(/^"|"$/g, ''));
+      
+      const thn = parseInt(cols[0]) || 2027;
+      const unit = cols[1] || 'Unit Kerja UGM';
+      const kegiatan = cols[10] || '-';
+      const lingkup = cols[11] || '-';
+      const akun = cols[16] || '-';
+      const uraian = cols[17] || '-';
+      const ang = parseCleanNum(cols[18]);
+      const rel = parseCleanNum(cols[19]);
+
+      if (uraian !== '-' || ang > 0) {
+        items.push({
+          tahun: thn,
+          unit,
+          kegiatan,
+          lingkup,
+          akun,
+          uraian,
+          anggaran: ang,
+          realisasi: rel
+        });
+      }
+    }
+    return items;
+  }, [pasteText]);
+
+  // Contoh Data TSV untuk Paste Zone RKAT Pengeluaran
+  const handleFillSampleTSV = () => {
+    const sample = `Tahun_Anggaran\tUnit\tTujuan\tSasaran\tProgram\tIndikatorProgram\ttarget\tcascading_kinerja_target_satuan\tKelompok_Indikator_Program\tcascading_kinerja_iku\tKegiatan\tLingkup_Kegiatan\tsumberdanaNama\tPrioritas\tAkunUtama\tSubAkun\tAkunDetail\tUraian_belanja\tAnggaran\tRealisasi\trncnpengeluaranIsAprove
+2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tBeasiswa bagi mahasiswa asing\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tBeasiswa Perintis Prestasi Bidang Keagamaan Mahasiswa Asing\t12000000\t0\t1
+2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tProgram Student Inbound\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tProgram Mobilitas International Student Inbound Fakultas\t25000000\t0\t1`;
+    setPasteText(sample);
+    toast.success('Contoh format TSV RKAT Pengeluaran berhasil dimuat ke Paste Zone!');
+  };
+
   // Bulk Import TSV
   const handleBulkImport = async () => {
     if (!pasteText.trim()) return toast.error('Silakan paste data TSV terlebih dahulu');
@@ -507,11 +573,23 @@ export default function RkaPengeluaranPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setShowInlinePasteZone(!showInlinePasteZone)}
+            className={`h-9 rounded-xl text-xs font-bold gap-1.5 shadow-2xs transition-colors ${
+              showInlinePasteZone ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <FileSpreadsheet size={14} className="text-indigo-600" />
+            <span>{showInlinePasteZone ? 'Sembunyikan Paste Zone' : 'Buka Paste Zone (TSV)'}</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setPasteModalOpen(true)}
             className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
           >
             <Upload size={14} className="text-indigo-600" />
-            <span>Paste TSV / Excel</span>
+            <span>Paste Modal</span>
           </Button>
 
           <Button
@@ -624,6 +702,155 @@ export default function RkaPengeluaranPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ========================================================================= */}
+      {/* DEDICATED INLINE PASTE ZONE SECTION RKAT PENGELUARAN                     */}
+      {/* ========================================================================= */}
+      {showInlinePasteZone && (
+        <Card className="rounded-2xl border-indigo-200/80 shadow-xs bg-gradient-to-b from-white to-indigo-50/15 overflow-hidden animate-in fade-in duration-200">
+          <CardHeader className="p-5 pb-3 border-b border-indigo-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
+                  <FileSpreadsheet size={16} />
+                </div>
+                <CardTitle className="text-sm font-black text-gray-900">
+                  Paste Zone: Import Massal RKAT Pengeluaran (TSV / Excel)
+                </CardTitle>
+              </div>
+              <CardDescription className="text-xs text-gray-500 font-medium">
+                Salin seluruh baris belanja dari spreadsheet Excel lalu paste langsung ke kotak di bawah ini.
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleFillSampleTSV}
+                className="h-8 rounded-xl border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 text-xs font-bold gap-1 shadow-2xs"
+              >
+                <Sparkles size={13} className="text-indigo-600" />
+                <span>✨ Isi Contoh Format TSV</span>
+              </Button>
+
+              {pasteText && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPasteText('')}
+                  className="h-8 rounded-xl text-gray-500 hover:text-gray-700 text-xs font-bold"
+                >
+                  <X size={13} />
+                  <span>Bersihkan</span>
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowInlinePasteZone(false)}
+                className="h-8 w-8 p-0 rounded-xl text-gray-400 hover:text-gray-700"
+                title="Tutup Paste Zone"
+              >
+                <X size={15} />
+              </Button>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-5 space-y-4">
+            
+            {/* Petunjuk Format Kolom */}
+            <div className="bg-white/80 p-3 rounded-xl border border-indigo-100 text-xs text-gray-600 space-y-1">
+              <div className="font-bold text-gray-900 flex items-center justify-between">
+                <span>📋 Format Kolom TSV RKAT Pengeluaran:</span>
+                <span className="text-[11px] text-indigo-600 font-semibold font-mono">21 Kolom Standar UGM</span>
+              </div>
+              <div className="overflow-x-auto py-1">
+                <code className="text-[11px] font-mono text-indigo-900 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 block whitespace-nowrap">
+                  Tahun_Anggaran [Tab] Unit [Tab] Tujuan [Tab] Sasaran [Tab] Program ... [Tab] Kegiatan [Tab] Lingkup [Tab] AkunDetail [Tab] Uraian_belanja [Tab] Anggaran [Tab] Realisasi [Tab] isApprove
+                </code>
+              </div>
+              <p className="text-[10px] text-gray-500">
+                • Header baris pertama dari Excel akan otomatis dideteksi dan dilewati. Format angka titik/koma otomatis dibersihkan.
+              </p>
+            </div>
+
+            {/* Textarea Paste Zone */}
+            <div className="relative">
+              <Textarea
+                rows={6}
+                placeholder="Salin data baris dari Excel lalu paste di sini..."
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                className="w-full bg-white border-gray-300 text-gray-900 font-mono text-xs rounded-xl p-3.5 focus:ring-2 focus:ring-indigo-600 shadow-2xs max-w-full leading-relaxed"
+              />
+            </div>
+
+            {/* Live Preview Indicator & Save Button */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className={`text-xs font-bold px-2.5 py-1 ${
+                  parsedPasteLines.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-500 border-gray-200'
+                }`}>
+                  {parsedPasteLines.length > 0 ? `✓ Ditemukan ${parsedPasteLines.length} baris belanja valid` : 'Menunggu data dipaste...'}
+                </Badge>
+                {parsedPasteLines.length > 0 && (
+                  <span className="text-xs text-gray-500 font-medium">
+                    (Siap disimpan ke database rkat_pengeluaran)
+                  </span>
+                )}
+              </div>
+
+              <Button
+                onClick={handleBulkImport}
+                disabled={isImporting || parsedPasteLines.length === 0}
+                className="h-10 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md disabled:opacity-50 gap-2 cursor-pointer active:scale-95"
+              >
+                {isImporting ? <RefreshCw className="animate-spin" size={15} /> : <Save size={15} />}
+                <span>{isImporting ? 'Mengimpor Data...' : `Simpan ${parsedPasteLines.length} Baris Belanja ke Database`}</span>
+              </Button>
+            </div>
+
+            {/* Tabel Pratinjau Mini */}
+            {parsedPasteLines.length > 0 && (
+              <div className="border border-indigo-100 rounded-xl overflow-hidden bg-white mt-3">
+                <div className="px-3 py-2 bg-indigo-50/50 border-b border-indigo-100 text-[11px] font-bold text-indigo-900 flex items-center justify-between">
+                  <span>Pratinjau Pembacaan Data ({parsedPasteLines.length} baris):</span>
+                  <span className="text-[10px] text-indigo-600 font-normal">Menampilkan maks 5 baris pertama</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-50 text-gray-600 text-[10px] uppercase font-bold border-b border-gray-100">
+                      <tr>
+                        <th className="px-3 py-2">TA</th>
+                        <th className="px-3 py-2">Fakultas / Unit Kerja</th>
+                        <th className="px-3 py-2">Uraian Belanja</th>
+                        <th className="px-3 py-2">Kegiatan</th>
+                        <th className="px-3 py-2">Akun Detail</th>
+                        <th className="px-3 py-2 text-right">Pagu Anggaran</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-[11px] font-medium">
+                      {parsedPasteLines.slice(0, 5).map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-3 py-1.5 font-mono text-gray-500">{row.tahun}</td>
+                          <td className="px-3 py-1.5 font-bold text-gray-900 truncate max-w-[160px]">{row.unit}</td>
+                          <td className="px-3 py-1.5 font-semibold text-gray-950 truncate max-w-[240px]">{row.uraian}</td>
+                          <td className="px-3 py-1.5 text-gray-600 truncate max-w-[180px]">{row.kegiatan}</td>
+                          <td className="px-3 py-1.5 font-mono text-gray-600">{row.akun}</td>
+                          <td className="px-3 py-1.5 font-mono font-bold text-right text-gray-900">Rp {formatRp(row.anggaran)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+          </CardContent>
+        </Card>
+      )}
 
       {/* FILTER CONTROL SECTION LENGKAP */}
       <Card className="rounded-2xl border-gray-200/80 shadow-xs">
