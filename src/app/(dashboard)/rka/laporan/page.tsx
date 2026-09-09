@@ -4,12 +4,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
-  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw
+  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
+  ChevronLeft, ChevronRight, Eye, Filter
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { 
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell 
+} from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -156,8 +160,13 @@ export default function RkaLaporanPage() {
   const [modeLaporan, setModeLaporan] = useState<string>('laporan_kementerian');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
+  const [kategoriFilter, setKategoriFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  
+  // Tampilan Tabel Seragam (Summary vs Detail)
+  const [activeViewTab, setActiveViewTab] = useState<'summary' | 'detail'>('summary');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
   const fetchRules = async () => {
     try {
@@ -405,18 +414,54 @@ export default function RkaLaporanPage() {
     return Object.values(groups).sort((a, b) => b.totalAnggaran - a.totalAnggaran);
   }, [dataList, modeLaporan, search]);
 
-  const toggleGroup = (label: string) => {
-    setExpandedGroups(prev => 
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-    );
-  };
+  // Daftar opsi kategori untuk filter dropdown
+  const categoryOptions = useMemo(() => {
+    return Array.from(new Set(groupedData.map(g => g.label))).sort();
+  }, [groupedData]);
 
-  const expandAll = () => {
-    setExpandedGroups(groupedData.map(g => g.label));
-  };
+  // Semua baris belanja valid yang terklasifikasi sesuai filter
+  const allDetailRows = useMemo(() => {
+    return dataList.filter(d => {
+      const val = getRowClassification(d, modeLaporan);
+      if (!val || val.trim() === '') return false;
+      if (kategoriFilter !== 'ALL' && val !== kategoriFilter) return false;
+      if (search) {
+        const lower = search.toLowerCase();
+        return (
+          val.toLowerCase().includes(lower) ||
+          (d.uraian_belanja && d.uraian_belanja.toLowerCase().includes(lower)) ||
+          (d.kegiatan && d.kegiatan.toLowerCase().includes(lower)) ||
+          (d.lingkup_kegiatan && d.lingkup_kegiatan.toLowerCase().includes(lower)) ||
+          (d.akun_detail && d.akun_detail.toLowerCase().includes(lower)) ||
+          (d.unit && d.unit.toLowerCase().includes(lower))
+        );
+      }
+      return true;
+    });
+  }, [dataList, modeLaporan, kategoriFilter, search]);
 
-  const collapseAll = () => {
-    setExpandedGroups([]);
+  // Paginated Rows untuk Tab Detail
+  const paginatedRows = useMemo(() => {
+    if (pageSize === 'ALL') return allDetailRows;
+    const start = (currentPage - 1) * pageSize;
+    return allDetailRows.slice(start, start + pageSize);
+  }, [allDetailRows, currentPage, pageSize]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'ALL') return 1;
+    return Math.ceil(allDetailRows.length / pageSize) || 1;
+  }, [allDetailRows.length, pageSize]);
+
+  // Reset pagination saat filter berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [modeLaporan, tahunFilter, unitFilter, kategoriFilter, search, pageSize]);
+
+  // Aksi Klik Kategori dari Ringkasan untuk membuka Rincian
+  const handleViewCategoryDetail = (catLabel: string) => {
+    setKategoriFilter(catLabel);
+    setActiveViewTab('detail');
+    setCurrentPage(1);
   };
 
   const formatRp = (num: number) => {
@@ -646,28 +691,66 @@ export default function RkaLaporanPage() {
                 );
               })}
             </div>
-
-            <div className="flex items-center gap-2 self-end sm:self-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={expandAll}
-                className="h-8 text-xs font-bold rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50"
-              >
-                Buka Semua
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={collapseAll}
-                className="h-8 text-xs font-bold rounded-xl border-gray-200 text-gray-700 hover:bg-gray-50"
-              >
-                Tutup Semua
-              </Button>
-            </div>
           </div>
 
-          {/* Baris 2: Filter Tahun, Fakultas Autocomplete, dan Search Bar */}
+          {/* Baris 2: Pilihan Tampilan Tabel (Seragam dengan Menu Lain) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-max border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setActiveViewTab('summary')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeViewTab === 'summary'
+                    ? 'bg-white text-gray-900 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <FileSpreadsheet size={14} className="text-indigo-600" />
+                <span>🏢 Ringkasan Kelompok Belanja ({groupedData.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveViewTab('detail')}
+                className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeViewTab === 'detail'
+                    ? 'bg-white text-gray-900 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <BookOpen size={14} className="text-indigo-600" />
+                <span>📋 Tabel Rincian Belanja ({allDetailRows.length.toLocaleString('id-ID')})</span>
+              </button>
+            </div>
+
+            {/* Filter Kategori Khusus Tab Detail */}
+            {activeViewTab === 'detail' && (
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kategori:</span>
+                <select
+                  value={kategoriFilter}
+                  onChange={e => setKategoriFilter(e.target.value)}
+                  className="h-8 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-lg px-2.5 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs max-w-[240px]"
+                >
+                  <option value="ALL">Semua Kategori ({categoryOptions.length})</option>
+                  {categoryOptions.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+                {kategoriFilter !== 'ALL' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setKategoriFilter('ALL')}
+                    className="h-8 px-2 text-[10px] text-rose-600 hover:text-rose-700 font-bold hover:bg-rose-50"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Baris 3: Filter Tahun, Fakultas Autocomplete, dan Search Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             
             {/* Filter Tahun */}
@@ -709,7 +792,7 @@ export default function RkaLaporanPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input
                   type="text"
-                  placeholder="Cari format laporan, uraian belanja, kegiatan, unit..."
+                  placeholder="Cari uraian belanja, kegiatan, lingkup, akun, unit..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="w-full h-9 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl pl-8 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-600 text-xs font-medium focus:bg-white transition-all shadow-2xs"
@@ -730,13 +813,13 @@ export default function RkaLaporanPage() {
         </CardContent>
       </Card>
 
-      {/* DAFTAR KATEGORI LAPORAN & ACCORDION BREAKDOWN */}
-      <div className="space-y-3.5">
+      {/* TABEL REKAPITULASI & TABEL DETAIL DATA (SERAGAM DENGAN MODUL LAIN) */}
+      <div className="space-y-4">
         {loading ? (
           <Card className="rounded-2xl border-gray-200/80 shadow-xs">
             <CardContent className="p-16 flex flex-col items-center justify-center space-y-3">
               <RefreshCw className="animate-spin text-indigo-600" size={30} />
-              <span className="text-xs font-bold text-gray-500">Menyusun rekapitulasi laporan...</span>
+              <span className="text-xs font-bold text-gray-500">Menyusun tabel laporan belanja...</span>
             </CardContent>
           </Card>
         ) : groupedData.length === 0 ? (
@@ -764,139 +847,311 @@ export default function RkaLaporanPage() {
               </div>
             </CardContent>
           </Card>
+        ) : activeViewTab === 'summary' ? (
+          /* ======================================================== */
+          /* TAB VIEW 1: TABEL RINGKASAN PER KELOMPOK BELANJA (SUMMARY) */
+          /* ======================================================== */
+          <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
+                  <span>{activeTabObj?.icon || '📊'}</span>
+                  <span>Tabel Rekapitulasi {activeTabObj?.label || 'Format Laporan'}</span>
+                </CardTitle>
+                <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
+                  Rekapitulasi total alokasi pagu belanja dan akumulasi item belanja per kelompok akun pelaporan
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
+                  {groupedData.length} Kelompok Belanja
+                </Badge>
+                <Badge variant="secondary" className="text-xs font-bold font-mono">
+                  {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[280px]">Kelompok / Kategori Belanja</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
+                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-32">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupedData.map((group, gIdx) => {
+                    const proporsiPct = grandTotal.anggaran > 0 
+                      ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
+                      : '0';
+
+                    return (
+                      <TableRow 
+                        key={group.label || gIdx} 
+                        className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
+                      >
+                        <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                          {gIdx + 1}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-1.5">
+                              <span>🏷️</span>
+                              <span>{group.label}</span>
+                            </div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                              <span>{activeTabObj?.icon || '📊'}</span>
+                              <span>{activeTabObj?.label || 'Format Laporan'}</span>
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-800 rounded-lg text-xs font-bold font-mono">
+                            {group.rows.length.toLocaleString('id-ID')} Baris
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-black font-mono text-gray-950 text-sm">
+                            Rp {formatRp(group.totalAnggaran)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="space-y-1 max-w-[110px] mx-auto">
+                            <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
+                              {proporsiPct}%
+                            </div>
+                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-indigo-600 rounded-full"
+                                style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewCategoryDetail(group.label)}
+                            className="h-8 px-2.5 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer"
+                            title="Buka rincian baris belanja kategori ini"
+                          >
+                            <Eye size={12} />
+                            <span>Buka Rincian</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                {/* Footer Total Keseluruhan */}
+                <tfoot className="bg-gray-100/90 font-bold border-t-2 border-gray-300">
+                  <tr>
+                    <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-gray-800">
+                      TOTAL KESELURUHAN ({groupedData.length} KELOMPOK)
+                    </td>
+                    <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
+                      {grandTotal.totalItems.toLocaleString('id-ID')} Baris
+                    </td>
+                    <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
+                      Rp {formatRp(grandTotal.anggaran)}
+                    </td>
+                    <td className="p-4 text-center text-xs font-black font-mono text-gray-700">
+                      100%
+                    </td>
+                    <td className="p-4 text-center text-gray-400 text-xs font-bold">
+                      -
+                    </td>
+                  </tr>
+                </tfoot>
+              </Table>
+            </CardContent>
+          </Card>
         ) : (
-          groupedData.map((group, gIdx) => {
-            const isExpanded = expandedGroups.includes(group.label);
-            const pct = group.totalAnggaran > 0 ? Math.min(100, Math.round((group.totalRealisasi / group.totalAnggaran) * 100)) : 0;
-            const sisaGroup = group.totalAnggaran - group.totalRealisasi;
+          /* ======================================================== */
+          /* TAB VIEW 2: TABEL RINCIAN BARIS BELANJA DETAIL (DETAIL)   */
+          /* ======================================================== */
+          <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
+            <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
+                  <BookOpen size={16} className="text-indigo-600" />
+                  <span>Tabel Rincian Baris Belanja ({allDetailRows.length.toLocaleString('id-ID')} Data)</span>
+                </CardTitle>
+                <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
+                  Daftar seluruh item belanja usulan RKA/RKAT yang terklasifikasi ke dalam format {activeTabObj?.label}
+                  {kategoriFilter !== 'ALL' && <span className="font-bold text-indigo-600"> • Filter Kategori: {kategoriFilter}</span>}
+                </CardDescription>
+              </div>
 
-            return (
-              <Card 
-                key={group.label || gIdx} 
-                className={`rounded-2xl shadow-xs transition-all overflow-hidden border ${
-                  isExpanded 
-                    ? isKemen ? 'border-blue-300' : 'border-emerald-300'
-                    : 'border-gray-200/80 hover:border-gray-300'
-                }`}
-              >
-                {/* Header Group Accordion */}
-                <div 
-                  onClick={() => toggleGroup(group.label)}
-                  className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-colors ${
-                    isExpanded 
-                      ? isKemen ? 'bg-blue-50/40' : 'bg-emerald-50/40'
-                      : 'hover:bg-gray-50/80 bg-white'
-                  }`}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per hal:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => {
+                    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                    setPageSize(val);
+                    setCurrentPage(1);
+                  }}
+                  className="h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold ${
-                      isKemen ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </div>
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-indigo-50 text-indigo-900 border-indigo-200">
-                          <span>{activeTabObj?.icon || '📊'}</span>
-                          <span>{activeTabObj?.label || 'Format Laporan'}</span>
-                        </span>
-                        <Badge variant="secondary" className="text-[10px] font-bold">
-                          {group.rows.length} Item Belanja
-                        </Badge>
-                      </div>
-                      <h3 className="font-black text-gray-900 text-sm mt-1">
-                        {group.label}
-                      </h3>
-                    </div>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                  <option value="ALL">Semua</option>
+                </select>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[420px]">
+                      Fakultas / Unit Kerja &amp; Rincian Kegiatan
+                    </TableHead>
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[220px]">
+                      Kategori Format Laporan
+                    </TableHead>
+                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
+                      Pagu Anggaran
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-12 text-gray-400 font-medium">
+                        Tidak ada baris data belanja yang sesuai kriteria filter.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedRows.map((row, rIdx) => {
+                      const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
+                      const ang = Number(row.anggaran) || 0;
+                      const catLabel = getRowClassification(row, modeLaporan) || 'Lainnya';
+
+                      return (
+                        <TableRow key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors border-b border-gray-100">
+                          {/* No */}
+                          <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
+                            {rowNum}
+                          </TableCell>
+
+                          {/* Field 1: Unit & Uraian Belanja Kegiatan */}
+                          <TableCell className="align-top pt-3 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                <Building2 size={13} className="text-indigo-600 shrink-0" />
+                                <span>{row.unit}</span>
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-mono">
+                                TA {row.tahun_anggaran} • Prioritas: <strong>{row.prioritas || '-'}</strong>
+                              </span>
+                            </div>
+
+                            {/* Kegiatan & Lingkup Kegiatan */}
+                            {(row.kegiatan || row.lingkup_kegiatan) && (
+                              <div className="bg-gray-50/90 p-2 rounded-xl border border-gray-100 space-y-0.5">
+                                {row.kegiatan && (
+                                  <div className="text-[11px] text-gray-800 leading-relaxed font-medium">
+                                    <span className="font-bold text-gray-900">Kegiatan:</span> {row.kegiatan}
+                                  </div>
+                                )}
+                                {row.lingkup_kegiatan && (
+                                  <div className="text-[10px] text-indigo-800 font-medium">
+                                    <span className="font-bold text-indigo-950">Lingkup:</span> {row.lingkup_kegiatan}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Akun Detail & Uraian Belanja */}
+                            <div className="space-y-1">
+                              {row.akun_detail && (
+                                <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold">
+                                  {row.akun_detail}
+                                </span>
+                              )}
+                              <div className="font-bold text-gray-950 text-xs leading-snug">
+                                {row.uraian_belanja || '-'}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Field 2: Format & Kategori Laporan */}
+                          <TableCell className="align-top pt-3 space-y-1.5">
+                            <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
+                              <div className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-700 tracking-wider">
+                                <span>{activeTabObj?.icon || '📊'}</span>
+                                <span>{activeTabObj?.label || 'Format Laporan'}</span>
+                              </div>
+                              <div className="font-bold text-xs leading-snug">
+                                {catLabel}
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Field 3: Pagu Anggaran */}
+                          <TableCell className="align-top pt-3 text-right">
+                            <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider mb-1">
+                              Pagu Anggaran
+                            </span>
+                            <span className="font-black font-mono text-gray-950 text-sm">
+                              Rp {formatRp(ang)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+
+            {/* Pagination Controls Footer (Seragam dengan /rka/pengeluaran) */}
+            <div className="p-4 bg-gray-50/70 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium">
+              <div>
+                Menampilkan <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min(currentPage * (pageSize as number), allDetailRows.length)}</strong> dari <strong>{allDetailRows.length.toLocaleString('id-ID')}</strong> total baris belanja
+              </div>
+
+              {pageSize !== 'ALL' && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-2 rounded-lg text-xs"
+                  >
+                    <ChevronLeft size={14} />
+                    <span>Sebelumnya</span>
+                  </Button>
+
+                  <div className="px-3 py-1 font-bold text-gray-700 bg-white border border-gray-200 rounded-lg text-xs">
+                    Halaman {currentPage} dari {totalPages}
                   </div>
 
-                  <div className="flex items-center gap-4 self-end sm:self-center">
-                    <div className="text-right">
-                      <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Total Pagu Anggaran</span>
-                      <span className="font-black font-mono text-indigo-950 text-base">
-                        Rp {formatRp(group.totalAnggaran)}
-                      </span>
-                    </div>
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 px-2 rounded-lg text-xs"
+                  >
+                    <span>Berikutnya</span>
+                    <ChevronRight size={14} />
+                  </Button>
                 </div>
-
-                {/* Body Details Accordion (3-Field Breakdown Table) */}
-                {isExpanded && (
-                  <div className="border-t border-gray-100 bg-gray-50/50 p-4 sm:p-5 space-y-2">
-                    <div className="text-xs font-bold text-gray-700 flex items-center justify-between px-1">
-                      <span>Rincian Baris Belanja ({group.rows.length} Data):</span>
-                      <span className="text-[10px] text-gray-400 font-normal">Klik judul baris di atas untuk menutup</span>
-                    </div>
-
-                    <div className="overflow-x-auto bg-white rounded-xl border border-gray-200">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-gray-50 text-gray-600 uppercase font-bold text-[10px] tracking-wider border-b border-gray-200">
-                          <tr>
-                            <th className="px-3 py-2.5 w-10 text-center">#</th>
-                            <th className="px-4 py-2.5 min-w-[200px]">Fakultas / Unit Kerja</th>
-                            <th className="px-4 py-2.5 min-w-[300px]">Uraian Belanja &amp; Kegiatan</th>
-                            <th className="px-3 py-2.5 min-w-[130px]">Akun Detail</th>
-                            <th className="px-4 py-2.5 text-right min-w-[140px]">Pagu Anggaran</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-                          {group.rows.map((row, rIdx) => {
-                            const ang = Number(row.anggaran) || 0;
-
-                            return (
-                              <tr key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors">
-                                <td className="px-3 py-3 text-center text-gray-400 font-mono text-[11px] align-top">
-                                  {rIdx + 1}
-                                </td>
-                                
-                                <td className="px-4 py-3 align-top">
-                                  <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                                    <Building2 size={12} className="text-indigo-600 shrink-0" />
-                                    <span>{row.unit}</span>
-                                  </div>
-                                  <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
-                                    TA {row.tahun_anggaran} • Prioritas: {row.prioritas || '-'}
-                                  </span>
-                                </td>
-
-                                <td className="px-4 py-3 align-top space-y-1">
-                                  <div className="font-bold text-gray-950 leading-snug">
-                                    {row.uraian_belanja || '-'}
-                                  </div>
-                                  {row.kegiatan && (
-                                    <div className="text-[11px] text-gray-600 leading-tight">
-                                      <span className="font-semibold text-gray-700">Kegiatan:</span> {row.kegiatan}
-                                    </div>
-                                  )}
-                                  {row.lingkup_kegiatan && (
-                                    <div className="text-[10px] text-indigo-700 font-medium">
-                                      Lingkup: {row.lingkup_kegiatan}
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="px-3 py-3 align-top font-mono text-xs">
-                                  {row.akun_detail ? (
-                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded text-[10px] font-bold inline-block">
-                                      {row.akun_detail}
-                                    </span>
-                                  ) : '-'}
-                                </td>
-
-                                <td className="px-4 py-3 align-top text-right font-mono font-bold text-gray-900">
-                                  Rp {formatRp(ang)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            );
-          })
+              )}
+            </div>
+          </Card>
         )}
       </div>
 
