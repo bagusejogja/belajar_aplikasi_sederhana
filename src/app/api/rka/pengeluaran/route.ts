@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         } else if (targetFormat && targetFormat !== 'ALL') {
           query = query.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
         } else {
-          query = query.or('laporan_kementerian.not.is.null,laporan_webometrics.not.is.null,identifikasi_lain.not.is.null');
+          query = query.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
         }
       } else {
         if (kategoriLaporan === 'kementerian') {

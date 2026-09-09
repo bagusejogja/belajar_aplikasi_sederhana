@@ -187,8 +187,8 @@ export default function RkaLaporanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Query cepat 50x: hanya mengambil baris yang terklasifikasi, bukan 25.000 data kosong
-      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true`;
+      // Query cepat: kirimkan target format agar server bisa filter langsung di DB
+      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true&format=${encodeURIComponent(modeLaporan)}`;
       if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
       const res = await fetch(url);
       const json = await res.json();
@@ -211,13 +211,13 @@ export default function RkaLaporanPage() {
 
   useEffect(() => {
     fetchData();
-  }, [tahunFilter, unitFilter]);
+  }, [tahunFilter, unitFilter, modeLaporan]);
 
   // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
   const getRowClassification = (row: any, targetKey: string) => {
     if (!row) return null;
     if (targetKey === 'proposal rkat') {
-      return row.kategori_belanja || (row.tags && row.tags['proposal rkat']) || null;
+      return (row.tags && row.tags['proposal rkat']) || row.identifikasi_lain || row.kategori_belanja || null;
     }
     if (targetKey === 'kategori_belanja') return row.kategori_belanja;
     if (targetKey === 'laporan_kementerian') return row.laporan_kementerian;
@@ -226,6 +226,7 @@ export default function RkaLaporanPage() {
     if (row.tags && typeof row.tags === 'object' && row.tags[targetKey]) {
       return row.tags[targetKey];
     }
+    if (row.identifikasi_lain) return row.identifikasi_lain;
     if (row[targetKey]) return row[targetKey];
     return null;
   };

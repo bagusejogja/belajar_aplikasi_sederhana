@@ -139,7 +139,8 @@ export default function RkaPengeluaranPage() {
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [kelompokFilter, setKelompokFilter] = useState<string>('ALL');
   const [akunFilter, setAkunFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'semua' | 'kementerian' | 'webometrics' | 'unmapped'>('semua');
+  const [activeTab, setActiveTab] = useState<'semua' | 'proposal_rkat' | 'kementerian' | 'webometrics' | 'unmapped'>('semua');
+  const [kategoriProposalFilter, setKategoriProposalFilter] = useState<string>('ALL');
   const [kategoriKemenFilter, setKategoriKemenFilter] = useState<string>('ALL');
   const [kategoriWeboFilter, setKategoriWeboFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
@@ -240,19 +241,31 @@ export default function RkaPengeluaranPage() {
     return Array.from(new Set(dataList.map(d => d.laporan_webometrics).filter(Boolean))).sort() as string[];
   }, [dataList]);
 
+  const proposalOptions = useMemo(() => {
+    const set = new Set<string>();
+    dataList.forEach(d => {
+      const val = d.tags?.['proposal rkat'] || d.identifikasi_lain;
+      if (val && typeof val === 'string' && val.trim() !== '') {
+        set.add(val.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [dataList]);
+
   // Reset Filters
   const handleResetFilters = () => {
     setUnitFilter('ALL');
     setKelompokFilter('ALL');
     setAkunFilter('ALL');
     setActiveTab('semua');
+    setKategoriProposalFilter('ALL');
     setKategoriKemenFilter('ALL');
     setKategoriWeboFilter('ALL');
     setSearch('');
     setSortBy('ID');
   };
 
-  const hasActiveFilters = unitFilter !== 'ALL' || kelompokFilter !== 'ALL' || akunFilter !== 'ALL' || activeTab !== 'semua' || kategoriKemenFilter !== 'ALL' || kategoriWeboFilter !== 'ALL' || search !== '';
+  const hasActiveFilters = unitFilter !== 'ALL' || kelompokFilter !== 'ALL' || akunFilter !== 'ALL' || activeTab !== 'semua' || kategoriProposalFilter !== 'ALL' || kategoriKemenFilter !== 'ALL' || kategoriWeboFilter !== 'ALL' || search !== '';
 
   // Filter Data
   const filteredData = useMemo(() => {
@@ -269,12 +282,24 @@ export default function RkaPengeluaranPage() {
     }
 
     // Filter Tab Jenis Laporan
-    if (activeTab === 'kementerian') {
+    if (activeTab === 'proposal_rkat') {
+      list = list.filter(d => (d.tags?.['proposal rkat'] && d.tags['proposal rkat'].trim() !== '') || (d.identifikasi_lain && d.identifikasi_lain.trim() !== ''));
+    } else if (activeTab === 'kementerian') {
       list = list.filter(d => d.laporan_kementerian && d.laporan_kementerian.trim() !== '');
     } else if (activeTab === 'webometrics') {
       list = list.filter(d => d.laporan_webometrics && d.laporan_webometrics.trim() !== '');
     } else if (activeTab === 'unmapped') {
-      list = list.filter(d => (!d.laporan_kementerian || d.laporan_kementerian.trim() === '') && (!d.laporan_webometrics || d.laporan_webometrics.trim() === ''));
+      list = list.filter(d => 
+        (!d.laporan_kementerian || d.laporan_kementerian.trim() === '') && 
+        (!d.laporan_webometrics || d.laporan_webometrics.trim() === '') &&
+        (!d.identifikasi_lain || d.identifikasi_lain.trim() === '') &&
+        (!d.tags || Object.keys(d.tags).length === 0)
+      );
+    }
+
+    // Filter Spesifik Kategori Proposal RKAT
+    if (kategoriProposalFilter !== 'ALL') {
+      list = list.filter(d => (d.tags?.['proposal rkat'] === kategoriProposalFilter) || (d.identifikasi_lain === kategoriProposalFilter));
     }
 
     // Filter Spesifik Kategori Kementerian
@@ -297,7 +322,7 @@ export default function RkaPengeluaranPage() {
     }
 
     return list;
-  }, [dataList, kelompokFilter, akunFilter, activeTab, kategoriKemenFilter, kategoriWeboFilter, sortBy]);
+  }, [dataList, kelompokFilter, akunFilter, activeTab, kategoriProposalFilter, kategoriKemenFilter, kategoriWeboFilter, sortBy]);
 
   // Pagination Logic
   const totalItems = filteredData.length;
@@ -310,7 +335,7 @@ export default function RkaPengeluaranPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, tahunFilter, unitFilter, kelompokFilter, akunFilter, kategoriKemenFilter, kategoriWeboFilter, search, pageSize]);
+  }, [activeTab, tahunFilter, unitFilter, kelompokFilter, akunFilter, kategoriProposalFilter, kategoriKemenFilter, kategoriWeboFilter, search, pageSize]);
 
   // KPI Metrics
   const metrics = useMemo(() => {
@@ -318,6 +343,17 @@ export default function RkaPengeluaranPage() {
     const totalRealisasi = dataList.reduce((acc, d) => acc + (Number(d.realisasi) || 0), 0);
     const sisaAnggaran = totalAnggaran - totalRealisasi;
     const persenSerapan = totalAnggaran > 0 ? ((totalRealisasi / totalAnggaran) * 100).toFixed(2) : '0';
+
+    const proposalRows = dataList.filter(d => (d.tags?.['proposal rkat'] && d.tags['proposal rkat'].trim() !== '') || (d.identifikasi_lain && d.identifikasi_lain.trim() !== ''));
+    const proposalTotal = proposalRows.reduce((acc, d) => acc + (Number(d.anggaran) || 0), 0);
+
+    const unmappedRows = dataList.filter(d => 
+      (!d.laporan_kementerian || d.laporan_kementerian.trim() === '') && 
+      (!d.laporan_webometrics || d.laporan_webometrics.trim() === '') &&
+      (!d.identifikasi_lain || d.identifikasi_lain.trim() === '') &&
+      (!d.tags || Object.keys(d.tags).length === 0)
+    );
+    const unmappedTotal = unmappedRows.reduce((acc, d) => acc + (Number(d.anggaran) || 0), 0);
 
     const kemenRows = dataList.filter(d => d.laporan_kementerian && d.laporan_kementerian.trim() !== '');
     const kemenTotal = kemenRows.reduce((acc, d) => acc + (Number(d.anggaran) || 0), 0);
@@ -331,6 +367,10 @@ export default function RkaPengeluaranPage() {
       totalRealisasi,
       sisaAnggaran,
       persenSerapan,
+      proposalCount: proposalRows.length,
+      proposalTotal,
+      unmappedCount: unmappedRows.length,
+      unmappedTotal,
       kemenCount: kemenRows.length,
       kemenTotal,
       weboCount: weboRows.length,
@@ -533,6 +573,7 @@ export default function RkaPengeluaranPage() {
       'Pagu Anggaran (Rp)': Number(d.anggaran) || 0,
       'Realisasi (Rp)': Number(d.realisasi) || 0,
       'Sisa Anggaran (Rp)': (Number(d.anggaran) || 0) - (Number(d.realisasi) || 0),
+      'Proposal RKAT': d.tags?.['proposal rkat'] || d.identifikasi_lain || '-',
       'Laporan Kementerian': d.laporan_kementerian || '-',
       'Laporan Webometrics': d.laporan_webometrics || '-'
     }));
@@ -668,35 +709,35 @@ export default function RkaPengeluaranPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-blue-200 shadow-xs bg-gradient-to-b from-white to-blue-50/40">
+        <Card className="rounded-2xl border-indigo-200 shadow-xs bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>🏛️</span> <span>Laporan Kementerian</span>
+            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
+              <span>📊</span> <span>Proposal RKAT Teridentifikasi</span>
             </span>
-            <div className="text-2xl font-black font-mono text-blue-900">
-              Rp {formatRp(metrics.kemenTotal)}
+            <div className="text-2xl font-black font-mono text-indigo-950">
+              Rp {formatRp(metrics.proposalTotal)}
             </div>
-            <div className="text-xs text-blue-800 font-semibold flex items-center justify-between pt-1 border-t border-blue-200/60">
-              <span>{metrics.kemenCount.toLocaleString('id-ID')} Teridentifikasi</span>
-              <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-[10px] font-bold">
-                {metrics.totalCount > 0 ? ((metrics.kemenCount / metrics.totalCount) * 100).toFixed(1) : 0}%
+            <div className="text-xs text-indigo-800 font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60">
+              <span>{metrics.proposalCount.toLocaleString('id-ID')} Teridentifikasi</span>
+              <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px] font-bold">
+                {metrics.totalCount > 0 ? ((metrics.proposalCount / metrics.totalCount) * 100).toFixed(1) : 0}%
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-emerald-200 shadow-xs bg-gradient-to-b from-white to-emerald-50/40">
+        <Card className="rounded-2xl border-amber-200 shadow-xs bg-gradient-to-b from-white to-amber-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>🌐</span> <span>Laporan Webometrics</span>
+            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block flex items-center gap-1">
+              <span>⚠️</span> <span>Belum Teridentifikasi</span>
             </span>
-            <div className="text-2xl font-black font-mono text-emerald-900">
-              Rp {formatRp(metrics.weboTotal)}
+            <div className="text-2xl font-black font-mono text-amber-950">
+              Rp {formatRp(metrics.unmappedTotal)}
             </div>
-            <div className="text-xs text-emerald-800 font-semibold flex items-center justify-between pt-1 border-t border-emerald-200/60">
-              <span>{metrics.weboCount.toLocaleString('id-ID')} Teridentifikasi</span>
-              <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-bold">
-                {metrics.totalCount > 0 ? ((metrics.weboCount / metrics.totalCount) * 100).toFixed(1) : 0}%
+            <div className="text-xs text-amber-800 font-semibold flex items-center justify-between pt-1 border-t border-amber-200/60">
+              <span>{metrics.unmappedCount.toLocaleString('id-ID')} Belum Dipetakan</span>
+              <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] font-bold">
+                {metrics.totalCount > 0 ? ((metrics.unmappedCount / metrics.totalCount) * 100).toFixed(1) : 0}%
               </Badge>
             </div>
           </CardContent>
@@ -861,9 +902,10 @@ export default function RkaPengeluaranPage() {
             <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
               {[
                 { id: 'semua', label: 'Semua Belanja' },
+                { id: 'proposal_rkat', label: '📊 Proposal RKAT' },
+                { id: 'unmapped', label: '⚠️ Belum Teridentifikasi' },
                 { id: 'kementerian', label: '🏛️ Laporan Kementerian' },
-                { id: 'webometrics', label: '🌐 Laporan Webometrics' },
-                { id: 'unmapped', label: '⚠️ Belum Teridentifikasi' }
+                { id: 'webometrics', label: '🌐 Laporan Webometrics' }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -958,8 +1000,25 @@ export default function RkaPengeluaranPage() {
             </div>
           </div>
 
-          {/* Baris 3: Filter Spesifik Format Laporan & Search */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+          {/* Baris 3: Filter Spesifik Format Laporan & Urutan */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            {/* Format Proposal RKAT */}
+            <div>
+              <label className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block mb-1">
+                📊 Format Proposal RKAT
+              </label>
+              <select
+                value={kategoriProposalFilter}
+                onChange={e => setKategoriProposalFilter(e.target.value)}
+                className="w-full h-9 bg-indigo-50/50 border border-indigo-200 text-indigo-950 text-xs font-semibold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs truncate"
+              >
+                <option value="ALL">Semua Format Proposal ({proposalOptions.length})</option>
+                {proposalOptions.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Format Laporan Kementerian */}
             <div>
               <label className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">
@@ -1088,7 +1147,7 @@ export default function RkaPengeluaranPage() {
 
                     {/* FIELD 3: Laporan */}
                     <th className="px-5 py-3 min-w-[280px]">
-                      Identifikasi Laporan (Kementerian &amp; Webometrics)
+                      Identifikasi Format Laporan (Proposal RKAT, dll)
                     </th>
 
                     {/* AKSI */}
@@ -1205,11 +1264,36 @@ export default function RkaPengeluaranPage() {
                         </td>
 
                         {/* ======================================================== */}
-                        {/* FIELD 3: LAPORAN (WARNA IDENTIK MASING-MASING)           */}
-                        {/* Laporan Kementerian (Biru) & Webometrics (Hijau/Teal)   */}
+                        {/* FIELD 3: LAPORAN                                         */}
+                        {/* Proposal RKAT, Kementerian, Webometrics                 */}
                         {/* ======================================================== */}
                         <td className="px-5 py-4 align-top space-y-2">
                           
+                          {/* Laporan Proposal RKAT / Dinamis */}
+                          {row.tags && Object.keys(row.tags).length > 0 ? (
+                            Object.entries(row.tags).map(([key, val]) => (
+                              <div key={key} className="p-2.5 rounded-xl bg-indigo-50/90 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
+                                <div className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-700 tracking-wider">
+                                  <span>📊</span>
+                                  <span>{key}</span>
+                                </div>
+                                <div className="font-bold text-xs leading-snug">
+                                  {String(val)}
+                                </div>
+                              </div>
+                            ))
+                          ) : row.identifikasi_lain ? (
+                            <div className="p-2.5 rounded-xl bg-indigo-50/90 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
+                              <div className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-700 tracking-wider">
+                                <span>📊</span>
+                                <span>Proposal RKAT</span>
+                              </div>
+                              <div className="font-bold text-xs leading-snug">
+                                {row.identifikasi_lain}
+                              </div>
+                            </div>
+                          ) : null}
+
                           {/* Laporan Kementerian (Warna Identik Biru/Indigo) */}
                           {row.laporan_kementerian ? (
                             <div className="p-2.5 rounded-xl bg-blue-50/90 border border-blue-200 text-blue-950 space-y-1 shadow-2xs">
@@ -1237,13 +1321,13 @@ export default function RkaPengeluaranPage() {
                           ) : null}
 
                           {/* Status Belum Teridentifikasi */}
-                          {!row.laporan_kementerian && !row.laporan_webometrics && (
+                          {!row.laporan_kementerian && !row.laporan_webometrics && !row.identifikasi_lain && (!row.tags || Object.keys(row.tags).length === 0) && (
                             <div className="p-2.5 rounded-xl bg-gray-50 border border-dashed border-gray-300 text-gray-400 text-center text-xs space-y-1">
                               <span className="text-[9px] font-bold uppercase tracking-wider block text-gray-400">
                                 ⚠️ Belum Teridentifikasi
                               </span>
                               <p className="text-[10px] text-gray-400 leading-tight">
-                                Belum dipetakan ke format kementerian / webometrics
+                                Belum dipetakan oleh aturan klasifikasi
                               </p>
                             </div>
                           )}
@@ -1488,6 +1572,25 @@ export default function RkaPengeluaranPage() {
               <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-3">
                 <span className="font-bold text-gray-900 block text-xs">Identifikasi Format Laporan Khusus</span>
                 
+                {/* Proposal RKAT */}
+                <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200 space-y-1">
+                  <label className="font-bold text-indigo-900 block text-[11px]">📊 Format Proposal RKAT</label>
+                  <Input
+                    type="text"
+                    placeholder="Contoh: PRIME STeP, Belanja Barang & Jasa..."
+                    value={editingRow.tags?.['proposal rkat'] || editingRow.identifikasi_lain || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setEditingRow({
+                        ...editingRow,
+                        identifikasi_lain: val,
+                        tags: { ...(editingRow.tags || {}), 'proposal rkat': val }
+                      });
+                    }}
+                    className="h-8 text-xs bg-white border-indigo-300 text-indigo-950 font-bold"
+                  />
+                </div>
+
                 {/* Laporan Kementerian */}
                 <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200 space-y-1">
                   <label className="font-bold text-blue-900 block text-[11px]">🏛️ Format Laporan Kementerian</label>
@@ -1659,6 +1762,24 @@ export default function RkaPengeluaranPage() {
               <div className="p-3.5 bg-slate-50 rounded-xl border border-gray-200 space-y-3">
                 <span className="font-bold text-gray-900 block text-xs">Identifikasi Format Laporan Khusus</span>
                 
+                <div className="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200 space-y-1">
+                  <label className="font-bold text-indigo-900 block text-[11px]">📊 Format Proposal RKAT</label>
+                  <Input
+                    type="text"
+                    placeholder="Contoh: PRIME STeP, Belanja Barang & Jasa..."
+                    value={newRow.identifikasi_lain || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNewRow({
+                        ...newRow,
+                        identifikasi_lain: val,
+                        tags: { ...(newRow.tags || {}), 'proposal rkat': val }
+                      });
+                    }}
+                    className="h-8 text-xs bg-white border-indigo-300 text-indigo-950 font-bold"
+                  />
+                </div>
+
                 <div className="p-2.5 rounded-lg bg-blue-50/70 border border-blue-200 space-y-1">
                   <label className="font-bold text-blue-900 block text-[11px]">🏛️ Format Laporan Kementerian</label>
                   <Input

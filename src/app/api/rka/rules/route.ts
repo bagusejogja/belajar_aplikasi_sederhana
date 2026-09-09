@@ -233,8 +233,8 @@ export async function PUT(request: Request) {
     // 5. Jalankan Rule Engine ke seluruh data rkat_pengeluaran (Direct DB Execution - Super Cepat 50x)
     const { ruleId, targetYear, cleanSync = true } = body;
 
-    // Ambil rules yang akan dijalankan
-    let rulesQuery = supabaseAdmin.from('rka_rules').select('*').order('priority', { ascending: true });
+    // Ambil rules yang akan dijalankan: Urutkan priority DESCENDING agar aturan umum (priority #2, #3, dst) dieksekusi duluan, dan aturan spesifik (priority #1) dieksekusi terakhir sehingga MENIMPA / MENANG atas aturan umum.
+    let rulesQuery = supabaseAdmin.from('rka_rules').select('*').order('priority', { ascending: false }).order('id', { ascending: true });
     if (ruleId) {
       rulesQuery = rulesQuery.eq('id', ruleId);
     }
