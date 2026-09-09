@@ -128,8 +128,7 @@ export async function PUT(request: Request) {
           kata_kunci,
           target_field,
           nilai_klasifikasi,
-          keterangan: keterangan || '',
-          updated_at: new Date().toISOString()
+          keterangan: keterangan || ''
         })
         .eq('id', id)
         .select();

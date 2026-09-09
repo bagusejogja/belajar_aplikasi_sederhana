@@ -163,6 +163,10 @@ export default function RkaRulesPage() {
   const [akun, setAkun] = useState('*');
   const [kataKunci, setKataKunci] = useState('');
   const [targetField, setTargetField] = useState('laporan_kementerian');
+  const [isCustomTarget, setIsCustomTarget] = useState(false);
+  const [customTargetInput, setCustomTargetInput] = useState('');
+  const [showGuideModal, setShowGuideModal] = useState(false);
+
   const [nilaiKlasifikasi, setNilaiKlasifikasi] = useState('');
   const [keterangan, setKeterangan] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -170,6 +174,8 @@ export default function RkaRulesPage() {
   // Edit Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
+  const [isEditCustomTarget, setIsEditCustomTarget] = useState(false);
+  const [customEditTargetInput, setCustomEditTargetInput] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Paste Zone State
@@ -183,7 +189,7 @@ export default function RkaRulesPage() {
 
   // Filter & Search
   const [search, setSearch] = useState('');
-  const [filterTarget, setFilterTarget] = useState<'ALL' | 'laporan_kementerian' | 'laporan_webometrics'>('ALL');
+  const [filterTarget, setFilterTarget] = useState<string>('ALL');
 
   // Fetch Data Rules & Units
   const fetchRules = async () => {
@@ -219,6 +225,13 @@ export default function RkaRulesPage() {
     fetchRules();
     fetchUnits();
   }, []);
+
+  // Opsi Target Format yang terdaftar di sistem
+  const allTargetOptions = useMemo(() => {
+    const list = Array.from(new Set(rules.map(r => r.target_field).filter(Boolean)));
+    const defaults = ['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'];
+    return Array.from(new Set([...defaults, ...list]));
+  }, [rules]);
 
   // Parser helper untuk Paste Zone
   const parsedPasteLines = useMemo(() => {
@@ -267,6 +280,8 @@ export default function RkaRulesPage() {
       return toast.error('Kata Kunci dan Nilai Klasifikasi wajib diisi!');
     }
 
+    const finalTarget = isCustomTarget ? (customTargetInput.trim() || 'laporan_kementerian') : targetField;
+
     setIsAdding(true);
     try {
       const payload = {
@@ -274,7 +289,7 @@ export default function RkaRulesPage() {
         unit: unit || '*',
         akun: akun || '*',
         kata_kunci: kataKunci.trim(),
-        target_field: targetField,
+        target_field: finalTarget,
         nilai_klasifikasi: nilaiKlasifikasi.trim(),
         keterangan: keterangan.trim()
       };
@@ -290,6 +305,10 @@ export default function RkaRulesPage() {
         setKataKunci('');
         setNilaiKlasifikasi('');
         setKeterangan('');
+        if (isCustomTarget) {
+          setIsCustomTarget(false);
+          setCustomTargetInput('');
+        }
         fetchRules();
       } else {
         toast.error('Gagal menambah aturan: ' + json.error);
@@ -349,6 +368,10 @@ export default function RkaRulesPage() {
       return toast.error('Kata Kunci dan Nilai Klasifikasi wajib diisi!');
     }
 
+    const finalTarget = isEditCustomTarget 
+      ? (customEditTargetInput.trim() || 'laporan_kementerian') 
+      : editingRule.target_field;
+
     setIsSavingEdit(true);
     try {
       const res = await fetch('/api/rka/rules', {
@@ -356,7 +379,8 @@ export default function RkaRulesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           isEdit: true,
-          ...editingRule
+          ...editingRule,
+          target_field: finalTarget
         })
       });
       const json = await res.json();
@@ -364,6 +388,7 @@ export default function RkaRulesPage() {
         toast.success('Aturan berhasil diperbarui!');
         setEditModalOpen(false);
         setEditingRule(null);
+        setIsEditCustomTarget(false);
         fetchRules();
       } else {
         toast.error('Gagal menyimpan perubahan: ' + json.error);
@@ -775,17 +800,75 @@ export default function RkaRulesPage() {
               
               {/* Target Format Laporan */}
               <div>
-                <label className="font-bold text-gray-700 block mb-1">
-                  Target Format Laporan *
-                </label>
-                <select
-                  value={targetField}
-                  onChange={e => setTargetField(e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
-                >
-                  <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
-                  <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-gray-700 block">
+                    Target Format Laporan *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuideModal(true)}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <BookOpen size={11} />
+                    <span>Panduan Format</span>
+                  </button>
+                </div>
+
+                {!isCustomTarget ? (
+                  <select
+                    value={targetField}
+                    onChange={e => {
+                      if (e.target.value === '__CUSTOM__') {
+                        setIsCustomTarget(true);
+                        setCustomTargetInput('');
+                      } else {
+                        setTargetField(e.target.value);
+                      }
+                    }}
+                    className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
+                  >
+                    <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
+                    <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
+                    <option value="laporan_iku">📈 Laporan IKU / Renstra</option>
+                    <option value="laporan_sdgs">🌱 Laporan SDGs</option>
+                    <option value="identifikasi_lain">🔖 Identifikasi Kustom Lainnya</option>
+                    {allTargetOptions
+                      .filter(t => !['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'].includes(t))
+                      .map(t => (
+                        <option key={t} value={t}>✨ {t}</option>
+                      ))}
+                    <option value="__CUSTOM__">➕ Ketik / Buat Format Laporan Baru...</option>
+                  </select>
+                ) : (
+                  <div className="space-y-1 animate-in fade-in duration-150">
+                    <div className="flex gap-1">
+                      <Input
+                        type="text"
+                        placeholder="Ketik nama format laporan baru..."
+                        value={customTargetInput}
+                        onChange={e => setCustomTargetInput(e.target.value)}
+                        className="bg-white border-indigo-300 text-gray-900 text-xs font-bold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setIsCustomTarget(false);
+                          setTargetField('laporan_kementerian');
+                        }}
+                        className="h-9 px-2 text-xs text-gray-500 hover:text-gray-700"
+                        title="Batal custom format"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                    <span className="text-[10px] text-indigo-600 font-medium block">
+                      Format baru ini akan disimpan sebagai target kategori laporan.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Kata Kunci Belanja */}
@@ -912,12 +995,17 @@ export default function RkaRulesPage() {
             {/* Filter Target Format Laporan */}
             <select
               value={filterTarget}
-              onChange={e => setFilterTarget(e.target.value as any)}
+              onChange={e => setFilterTarget(e.target.value)}
               className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
             >
               <option value="ALL">Semua Format Laporan ({rules.length})</option>
               <option value="laporan_kementerian">🏛️ Laporan Kementerian ({countKemen})</option>
               <option value="laporan_webometrics">🌐 Laporan Webometrics ({countWebo})</option>
+              {allTargetOptions
+                .filter(t => !['laporan_kementerian', 'laporan_webometrics'].includes(t))
+                .map(t => (
+                  <option key={t} value={t}>🔖 {t.replace(/^laporan_/, '')}</option>
+                ))}
             </select>
 
             {/* Search Box */}
@@ -985,10 +1073,25 @@ export default function RkaRulesPage() {
                           <span>🌐</span>
                           <span>Laporan Webometrics</span>
                         </div>
-                      ) : (
+                      ) : rule.target_field === 'laporan_kementerian' ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold shadow-2xs">
                           <span>🏛️</span>
                           <span>Laporan Kementerian</span>
+                        </div>
+                      ) : rule.target_field === 'laporan_sdgs' ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 border border-teal-200 rounded-lg text-xs font-bold shadow-2xs">
+                          <span>🌱</span>
+                          <span>Laporan SDGs</span>
+                        </div>
+                      ) : rule.target_field === 'laporan_iku' ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-lg text-xs font-bold shadow-2xs">
+                          <span>📈</span>
+                          <span>Laporan IKU</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-900 border border-purple-200 rounded-lg text-xs font-bold shadow-2xs">
+                          <span>🔖</span>
+                          <span className="capitalize">{rule.target_field ? rule.target_field.replace(/^laporan_/, '') : 'Kustom'}</span>
                         </div>
                       )}
                     </td>
@@ -1085,15 +1188,67 @@ export default function RkaRulesPage() {
             <div className="py-2 space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">Target Format Laporan</label>
-                  <select
-                    value={editingRule.target_field}
-                    onChange={e => setEditingRule({ ...editingRule, target_field: e.target.value })}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
-                  >
-                    <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
-                    <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-gray-700 block">Target Format Laporan *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowGuideModal(true)}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <BookOpen size={11} />
+                      <span>Panduan</span>
+                    </button>
+                  </div>
+
+                  {!isEditCustomTarget ? (
+                    <select
+                      value={allTargetOptions.includes(editingRule.target_field) ? editingRule.target_field : '__CUSTOM__'}
+                      onChange={e => {
+                        if (e.target.value === '__CUSTOM__') {
+                          setIsEditCustomTarget(true);
+                          setCustomEditTargetInput(editingRule.target_field || '');
+                        } else {
+                          setEditingRule({ ...editingRule, target_field: e.target.value });
+                        }
+                      }}
+                      className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
+                    >
+                      <option value="laporan_kementerian">🏛️ Laporan Kementerian</option>
+                      <option value="laporan_webometrics">🌐 Laporan Webometrics</option>
+                      <option value="laporan_iku">📈 Laporan IKU / Renstra</option>
+                      <option value="laporan_sdgs">🌱 Laporan SDGs</option>
+                      <option value="identifikasi_lain">🔖 Identifikasi Kustom Lainnya</option>
+                      {allTargetOptions
+                        .filter(t => !['laporan_kementerian', 'laporan_webometrics', 'laporan_iku', 'laporan_sdgs', 'identifikasi_lain'].includes(t))
+                        .map(t => (
+                          <option key={t} value={t}>✨ {t}</option>
+                        ))}
+                      <option value="__CUSTOM__">➕ Ketik / Buat Format Baru...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-1 animate-in fade-in duration-150">
+                      <Input
+                        type="text"
+                        placeholder="Ketik nama format laporan baru..."
+                        value={customEditTargetInput}
+                        onChange={e => setCustomEditTargetInput(e.target.value)}
+                        className="bg-white border-indigo-300 text-gray-900 text-xs font-bold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setIsEditCustomTarget(false);
+                          setEditingRule({ ...editingRule, target_field: 'laporan_kementerian' });
+                        }}
+                        className="h-9 px-2 text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        <X size={14} />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1240,6 +1395,97 @@ export default function RkaRulesPage() {
                   Simpan Aturan
                 </Button>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================================================================= */}
+      {/* MODAL PANDUAN CARA MENAMBAHKAN TARGET FORMAT LAPORAN                      */}
+      {/* ========================================================================= */}
+      <Dialog open={showGuideModal} onOpenChange={setShowGuideModal}>
+        <DialogContent className="sm:max-w-[650px] w-full">
+          <DialogHeader>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <BookOpen size={18} />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-black text-gray-900">
+                    Panduan &amp; Cara Kerja: Target Format Laporan
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-gray-500">
+                    Memahami perbedaan Target Format Laporan dengan Nilai Klasifikasi pada Rule Engine RKA.
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* Konsep Dasar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-black text-blue-950 text-xs">
+                  <span>🏛️</span> <span>1. Target Format Laporan</span>
+                </div>
+                <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
+                  Merupakan <strong>wadah / kelompok pelaporan besar</strong>. Pilihan standarnya adalah:
+                </p>
+                <ul className="text-[11px] text-blue-800 list-disc list-inside space-y-0.5">
+                  <li><strong>Laporan Kementerian</strong> (data belanja untuk Kemendikbudristek)</li>
+                  <li><strong>Laporan Webometrics</strong> (data belanja indikator perangkingan)</li>
+                  <li><strong>Format Baru (Custom)</strong>: SDGs, IKU, Akreditasi, dsb.</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-black text-emerald-950 text-xs">
+                  <span>🏷️</span> <span>2. Nilai Klasifikasi</span>
+                </div>
+                <p className="text-[11px] text-emerald-900 leading-relaxed font-medium">
+                  Merupakan <strong>nama label spesifik</strong> yang akan dicantumkan di dalam laporan tersebut.
+                </p>
+                <ul className="text-[11px] text-emerald-800 list-disc list-inside space-y-0.5">
+                  <li><em>Beasiswa Mahasiswa Asing (MBKM / Internasional)</em></li>
+                  <li><em>International Student Inbound</em></li>
+                  <li><em>Bantuan Konferensi Internasional</em></li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Langkah Praktis */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-2.5">
+              <span className="font-black text-gray-900 text-xs block">
+                🚀 Langkah Menambahkan Format Laporan Baru:
+              </span>
+              <ol className="list-decimal list-inside text-gray-700 space-y-1.5 leading-relaxed font-medium">
+                <li>
+                  Pada dropdown <strong>Target Format Laporan</strong>, pilih <em>Laporan Kementerian</em>, <em>Webometrics</em>, atau pilih <strong>➕ Ketik / Buat Format Laporan Baru...</strong> jika ingin membuat kelompok laporan kustom.
+                </li>
+                <li>
+                  Ketik <strong>Kata Kunci Belanja</strong> yang dicari pada rincian belanja (misal: <code>asing</code>, <code>inbound</code>, <code>jurnal</code>).
+                </li>
+                <li>
+                  Ketik <strong>Nilai Klasifikasi</strong> sebagai nama resmi label laporan yang Anda inginkan.
+                </li>
+                <li>
+                  (Opsional) Filter berdasarkan <strong>Kode Akun</strong> (misal <code>52501</code>) atau <strong>Unit Kerja</strong> jika aturan hanya berlaku untuk fakultas tertentu.
+                </li>
+                <li>
+                  Klik <strong>Simpan Aturan</strong>, lalu klik tombol hijau <strong>⚡ Jalankan Rule Engine</strong> di bagian atas. Seluruh data belanja RKAT akan otomatis dipindai dan diberi label!
+                </li>
+              </ol>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                onClick={() => setShowGuideModal(false)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl px-5 cursor-pointer"
+              >
+                Saya Mengerti
+              </Button>
             </div>
           </div>
         </DialogContent>
