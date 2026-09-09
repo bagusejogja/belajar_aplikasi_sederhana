@@ -23,6 +23,15 @@ import {
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+// Definisi Preset Format Laporan Bawaan
+const PRESET_TARGETS = [
+  { id: 'laporan_kementerian', label: 'Laporan Kementerian' },
+  { id: 'laporan_webometrics', label: 'Laporan Webometrics' },
+  { id: 'laporan_iku', label: 'Laporan IKU / Renstra' },
+  { id: 'laporan_sdgs', label: 'Laporan SDGs' },
+  { id: 'identifikasi_lain', label: 'Identifikasi Kustom Lainnya' },
+];
+
 // Component Autocomplete Unit Kerja dengan navigasi Keyboard (↑, ↓, Enter, Esc)
 function UnitAutocompleteInput({ 
   units, 
@@ -190,6 +199,11 @@ export default function RkaRulesPage() {
   // Filter & Search
   const [search, setSearch] = useState('');
   const [filterTarget, setFilterTarget] = useState<string>('ALL');
+
+  // Format Manager Dialog State
+  const [formatManagerOpen, setFormatManagerOpen] = useState(false);
+  const [renamingFormat, setRenamingFormat] = useState<{ oldName: string; newName: string } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
 
   // Fetch Data Rules & Units
   const fetchRules = async () => {
@@ -441,6 +455,115 @@ export default function RkaRulesPage() {
     }
   };
 
+  // Handle Rename Format Laporan
+  const handleRenameFormat = async () => {
+    if (!renamingFormat || !renamingFormat.newName.trim()) return;
+    const oldFmt = renamingFormat.oldName;
+    const newFmt = renamingFormat.newName.trim().toLowerCase();
+    if (oldFmt === newFmt) {
+      setRenamingFormat(null);
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      const res = await fetch('/api/rka/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'rename_format',
+          oldFormat: oldFmt,
+          newFormat: newFmt
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message);
+        setRenamingFormat(null);
+        fetchRules();
+      } else {
+        toast.error('Gagal mengubah nama: ' + json.error);
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  // Handle Hapus Semua Aturan dalam Satu Format
+  const handleDeleteFormat = async (targetFormat: string) => {
+    if (!confirm(`Hapus seluruh aturan yang menggunakan format '${targetFormat}'?`)) return;
+    const resetPengeluaran = confirm(`Bersihkan juga hasil klasifikasi '${targetFormat}' pada data belanja?`);
+
+    try {
+      const res = await fetch('/api/rka/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_format',
+          targetFormat,
+          resetPengeluaran
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message);
+        fetchRules();
+      } else {
+        toast.error('Gagal menghapus format: ' + json.error);
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    }
+  };
+
+  // Handle Reset Klasifikasi Belanja
+  const handleResetClassification = async (targetFormat: string) => {
+    if (!confirm(`Bersihkan penandaan '${targetFormat}' pada seluruh data belanja RKAT? (Aturan tidak dihapus, hanya kolom laporan di data belanja yang dikosongkan)`)) return;
+    try {
+      const res = await fetch('/api/rka/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reset_classification',
+          targetFormat
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message);
+      } else {
+        toast.error('Gagal membersihkan: ' + json.error);
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message);
+    }
+  };
+
+  // Statistik Target Format Laporan Aktif
+  const formatStats = useMemo(() => {
+    const map: Record<string, { id: string; name: string; count: number; isPreset: boolean }> = {};
+
+    PRESET_TARGETS.forEach(p => {
+      map[p.id] = { id: p.id, name: p.label, count: 0, isPreset: true };
+    });
+
+    rules.forEach(r => {
+      const tf = r.target_field || 'laporan_kementerian';
+      if (!map[tf]) {
+        const pretty = tf
+          .replace(/^(laporan_|target_)/, '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+        map[tf] = { id: tf, name: `Laporan ${pretty}`, count: 0, isPreset: false };
+      }
+      map[tf].count++;
+    });
+
+    return Object.values(map);
+  }, [rules]);
+
   // Metrik KPI
   const countKemen = rules.filter(r => r.target_field === 'laporan_kementerian').length;
   const countWebo = rules.filter(r => r.target_field === 'laporan_webometrics').length;
@@ -497,6 +620,17 @@ export default function RkaRulesPage() {
           >
             {isApplying ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
             <span>{isApplying ? 'Memproses Data...' : 'Jalankan Rule Engine'}</span>
+          </Button>
+
+          {/* Tombol Kelola Format Laporan */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFormatManagerOpen(true)}
+            className="h-9 rounded-xl border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <Layers size={14} className="text-indigo-600" />
+            <span>Kelola Format Laporan</span>
           </Button>
 
           {/* Tombol Buka/Tutup Paste Zone */}
@@ -1485,6 +1619,172 @@ export default function RkaRulesPage() {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl px-5 cursor-pointer"
               >
                 Saya Mengerti
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ========================================================================= */}
+      {/* MODAL MANAJEMEN / KELOLA TARGET FORMAT LAPORAN (EDIT & HAPUS FORMAT)      */}
+      {/* ========================================================================= */}
+      <Dialog open={formatManagerOpen} onOpenChange={setFormatManagerOpen}>
+        <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Layers size={20} />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-black text-gray-900">
+                    Manajemen Target Format Laporan
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-gray-500">
+                    Ubah nama (rename) format pada seluruh aturan sekaligus, hapus format, atau bersihkan riwayat penandaan belanja.
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3 text-blue-900 leading-relaxed font-medium">
+              💡 <strong>Tips Pengelolaan:</strong> Jika Anda mengubah nama format di sini, seluruh aturan yang menggunakan format tersebut akan otomatis diperbarui. Anda juga bisa mengosongkan penandaan pada data belanja jika ingin memperbarui hasil klasifikasi.
+            </div>
+
+            {/* List Format */}
+            <div className="space-y-2.5">
+              <span className="font-bold text-gray-900 block text-xs uppercase tracking-wider">
+                Daftar Format Laporan Aktif:
+              </span>
+
+              <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden bg-white">
+                {formatStats.map((fmt) => {
+                  const isEditingThis = renamingFormat?.oldName === fmt.id;
+
+                  return (
+                    <div key={fmt.id} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/80 transition-colors">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md text-[11px]">
+                            {fmt.id}
+                          </span>
+                          <Badge variant="outline" className={`text-[10px] font-bold ${
+                            fmt.isPreset ? 'border-blue-200 text-blue-700 bg-blue-50' : 'border-purple-200 text-purple-700 bg-purple-50'
+                          }`}>
+                            {fmt.isPreset ? 'Bawaan' : 'Kustom'}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px] font-bold">
+                            {fmt.count} Aturan
+                          </Badge>
+                        </div>
+                        <p className="text-[11px] text-gray-600 font-medium">
+                          Nama Tampilan: <strong className="text-gray-900">{fmt.name}</strong>
+                        </p>
+                      </div>
+
+                      {/* Mode Rename Form atau Action Buttons */}
+                      {isEditingThis ? (
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <Input
+                            value={renamingFormat.newName}
+                            onChange={e => setRenamingFormat({ ...renamingFormat, newName: e.target.value })}
+                            placeholder="Ketik nama format baru..."
+                            className="h-8 text-xs font-mono font-bold w-48 rounded-lg"
+                            autoFocus
+                          />
+                          <Button
+                            size="sm"
+                            onClick={handleRenameFormat}
+                            disabled={isRenaming}
+                            className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-2.5"
+                          >
+                            Simpan
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRenamingFormat(null)}
+                            disabled={isRenaming}
+                            className="h-8 text-xs font-bold text-gray-500 rounded-lg px-2"
+                          >
+                            Batal
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-center">
+                          {/* Tombol Rename */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRenamingFormat({ oldName: fmt.id, newName: fmt.id })}
+                            className="h-7 text-[11px] font-bold text-gray-700 border-gray-200 hover:bg-gray-100 rounded-lg gap-1 px-2"
+                            title="Ganti nama format pada semua aturan"
+                          >
+                            <Edit2 size={11} />
+                            <span>Rename</span>
+                          </Button>
+
+                          {/* Tombol Bersihkan Belanja */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResetClassification(fmt.id)}
+                            className="h-7 text-[11px] font-bold text-amber-700 border-amber-200 bg-amber-50/50 hover:bg-amber-100 rounded-lg gap-1 px-2"
+                            title="Kosongkan hasil tagging format ini di tabel belanja"
+                          >
+                            <RefreshCw size={11} />
+                            <span>Reset Belanja</span>
+                          </Button>
+
+                          {/* Tombol Hapus Format (Jika ada aturan) */}
+                          {fmt.count > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteFormat(fmt.id)}
+                              className="h-7 text-[11px] font-bold text-red-600 border-red-200 bg-red-50/50 hover:bg-red-100 rounded-lg gap-1 px-2"
+                              title="Hapus seluruh aturan format ini"
+                            >
+                              <Trash2 size={11} />
+                              <span>Hapus</span>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Opsi Reset Global */}
+            <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="font-bold text-gray-900 block text-xs">
+                  Pembersihan Menyeluruh:
+                </span>
+                <p className="text-[11px] text-gray-500 font-medium">
+                  Kosongkan seluruh kolom klasifikasi laporan di data belanja jika ingin menjalankan ulang Rule Engine dari awal.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleResetClassification('ALL')}
+                className="h-8 text-xs font-bold text-red-700 border-red-200 bg-red-50 hover:bg-red-100 rounded-xl shrink-0"
+              >
+                Reset Semua Klasifikasi Belanja
+              </Button>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <Button
+                onClick={() => setFormatManagerOpen(false)}
+                className="bg-gray-900 hover:bg-black text-white font-bold text-xs rounded-xl px-5 cursor-pointer"
+              >
+                Tutup
               </Button>
             </div>
           </div>

@@ -148,14 +148,26 @@ function UnitAutocompleteInput({
 
 export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
+  const [rulesList, setRulesList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRunningEngine, setIsRunningEngine] = useState(false);
 
   // Filter States
-  const [modeLaporan, setModeLaporan] = useState<'kementerian' | 'webometrics'>('kementerian');
+  const [modeLaporan, setModeLaporan] = useState<string>('laporan_kementerian');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+
+  const fetchRules = async () => {
+    try {
+      const res = await fetch('/api/rka/rules');
+      const json = await res.json();
+      if (json.success) {
+        setRulesList(json.data || []);
+      }
+    } catch (e) {}
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -178,7 +190,126 @@ export default function RkaLaporanPage() {
 
   useEffect(() => {
     fetchData();
+    fetchRules();
   }, [tahunFilter, unitFilter]);
+
+  // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
+  const getRowClassification = (row: any, targetKey: string) => {
+    if (targetKey === 'laporan_kementerian') return row.laporan_kementerian;
+    if (targetKey === 'laporan_webometrics') return row.laporan_webometrics;
+    if (targetKey === 'identifikasi_lain') return row.identifikasi_lain;
+    if (row.tags && typeof row.tags === 'object' && row.tags[targetKey]) {
+      return row.tags[targetKey];
+    }
+    if (row[targetKey]) return row[targetKey];
+    if (targetKey === 'laporan_iku' && row.identifikasi_lain) return row.identifikasi_lain;
+    return null;
+  };
+
+  // Daftar Tab Format Laporan (Dinamis dari Preset, Master Rules, dan Data Belanja)
+  const availableTabs = useMemo(() => {
+    const tabsMap = new Map<string, { id: string; label: string; icon: string; count: number }>();
+
+    // Preset standar
+    tabsMap.set('laporan_kementerian', {
+      id: 'laporan_kementerian',
+      label: 'Laporan Kementerian',
+      icon: '🏛️',
+      count: 0
+    });
+    tabsMap.set('laporan_webometrics', {
+      id: 'laporan_webometrics',
+      label: 'Laporan Webometrics',
+      icon: '🌐',
+      count: 0
+    });
+    tabsMap.set('laporan_iku', {
+      id: 'laporan_iku',
+      label: 'Laporan IKU / Renstra',
+      icon: '📈',
+      count: 0
+    });
+    tabsMap.set('laporan_sdgs', {
+      id: 'laporan_sdgs',
+      label: 'Laporan SDGs',
+      icon: '🌱',
+      count: 0
+    });
+
+    // Tambahkan format unik dari rules
+    rulesList.forEach(r => {
+      const tf = r.target_field;
+      if (tf && !tabsMap.has(tf)) {
+        const pretty = tf
+          .replace(/^(laporan_|target_)/, '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+        tabsMap.set(tf, {
+          id: tf,
+          label: `Laporan ${pretty}`,
+          icon: '📊',
+          count: 0
+        });
+      }
+    });
+
+    // Tambahkan format unik dari data tags
+    dataList.forEach(d => {
+      if (d.tags && typeof d.tags === 'object') {
+        Object.keys(d.tags).forEach(tagKey => {
+          if (!tabsMap.has(tagKey)) {
+            const pretty = tagKey
+              .replace(/^(laporan_|target_)/, '')
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
+            tabsMap.set(tagKey, {
+              id: tagKey,
+              label: `Laporan ${pretty}`,
+              icon: '🔖',
+              count: 0
+            });
+          }
+        });
+      }
+    });
+
+    // Hitung jumlah baris data yang terpetakan untuk setiap format
+    const tabsArray = Array.from(tabsMap.values());
+    tabsArray.forEach(tab => {
+      const matchCount = dataList.filter(row => {
+        const val = getRowClassification(row, tab.id);
+        return Boolean(val && val.trim());
+      }).length;
+      tab.count = matchCount;
+    });
+
+    return tabsArray;
+  }, [rulesList, dataList]);
+
+  // Handle Jalankan Rule Engine Langsung dari Halaman Laporan
+  const handleRunRuleEngine = async () => {
+    setIsRunningEngine(true);
+    const toastId = toast.loading('Menjalankan Rule Engine pada data belanja...');
+    try {
+      const res = await fetch('/api/rka/rules', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetYear: tahunFilter })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(json.message, { id: toastId, duration: 6000 });
+        await fetchData();
+        await fetchRules();
+      } else {
+        toast.error('Gagal menjalankan Rule Engine: ' + json.error, { id: toastId });
+      }
+    } catch (e: any) {
+      toast.error('Error: ' + e.message, { id: toastId });
+    } finally {
+      setIsRunningEngine(false);
+    }
+  };
 
   const unitOptions = useMemo(() => {
     return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean)));
@@ -186,11 +317,9 @@ export default function RkaLaporanPage() {
 
   // Kelompokkan data per Kategori Laporan yang dipilih
   const groupedData = useMemo(() => {
-    const fieldName = modeLaporan === 'kementerian' ? 'laporan_kementerian' : 'laporan_webometrics';
-    
     // Hanya ambil data yang field laporannya terisi
     const validRows = dataList.filter(d => {
-      const val = d[fieldName];
+      const val = getRowClassification(d, modeLaporan);
       if (!val || val.trim() === '') return false;
       if (search) {
         const lower = search.toLowerCase();
@@ -209,7 +338,7 @@ export default function RkaLaporanPage() {
     const groups: Record<string, { label: string; rows: any[]; totalAnggaran: number; totalRealisasi: number }> = {};
 
     validRows.forEach(row => {
-      const label = row[fieldName] || 'Lainnya';
+      const label = getRowClassification(row, modeLaporan) || 'Lainnya';
       if (!groups[label]) {
         groups[label] = {
           label,
@@ -279,13 +408,15 @@ export default function RkaLaporanPage() {
 
     const ws = XLSX.utils.json_to_sheet(flatRows);
     const wb = XLSX.utils.book_new();
-    const sheetName = modeLaporan === 'kementerian' ? 'Rekap_Kementerian' : 'Rekap_Webometrics';
+    const curTab = availableTabs.find(t => t.id === modeLaporan);
+    const sheetName = (curTab?.label || 'Rekap').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 30);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
     XLSX.writeFile(wb, `Rekap_RKA_${sheetName}_${tahunFilter}.xlsx`);
     toast.success('File Excel rekapitulasi berhasil diexport!');
   };
 
-  const isKemen = modeLaporan === 'kementerian';
+  const activeTabObj = availableTabs.find(t => t.id === modeLaporan) || availableTabs[0];
+  const isKemen = modeLaporan === 'laporan_kementerian';
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-300">
@@ -299,7 +430,7 @@ export default function RkaLaporanPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">
-                Rekapitulasi Laporan Kementerian &amp; Webometrics
+                Rekapitulasi {activeTabObj?.label || 'Format Laporan'}
               </h1>
               <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold uppercase">
                 REKAP RKA
@@ -314,6 +445,17 @@ export default function RkaLaporanPage() {
         {/* Action Buttons Top Bar */}
         <div className="flex flex-wrap items-center gap-2">
           
+          {/* Tombol Jalankan Rule Engine */}
+          <Button
+            size="sm"
+            onClick={handleRunRuleEngine}
+            disabled={isRunningEngine || loading}
+            className="h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-black gap-1.5 shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
+          >
+            {isRunningEngine ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
+            <span>{isRunningEngine ? 'Memetakan Data...' : 'Jalankan Rule Engine'}</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -379,23 +521,17 @@ export default function RkaLaporanPage() {
         </Card>
 
         {/* Card 2: Total Pagu Teridentifikasi */}
-        <Card className={`rounded-2xl shadow-xs ${
-          isKemen ? 'border-blue-200 bg-gradient-to-b from-white to-blue-50/40' : 'border-emerald-200 bg-gradient-to-b from-white to-emerald-50/40'
-        }`}>
+        <Card className="rounded-2xl shadow-xs border-indigo-200 bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className={`text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1 ${
-              isKemen ? 'text-blue-700' : 'text-emerald-700'
-            }`}>
-              <span>{isKemen ? '🏛️' : '🌐'}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1 text-indigo-700">
+              <span>{activeTabObj?.icon || '📊'}</span>
               <span>Total Pagu Terpetakan</span>
             </span>
-            <div className={`text-2xl font-black font-mono ${isKemen ? 'text-blue-950' : 'text-emerald-950'}`}>
+            <div className="text-2xl font-black font-mono text-indigo-950">
               Rp {formatRp(grandTotal.anggaran)}
             </div>
-            <div className={`text-xs font-semibold flex items-center justify-between pt-1 border-t ${
-              isKemen ? 'border-blue-200/60 text-blue-800' : 'border-emerald-200/60 text-emerald-800'
-            }`}>
-              <span>Format: {isKemen ? 'Kementerian' : 'Webometrics'}</span>
+            <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60 text-indigo-800">
+              <span>Format: {activeTabObj?.label || 'Laporan'}</span>
               <span className="text-[10px] font-mono font-bold">100% Valid</span>
             </div>
           </CardContent>
@@ -446,32 +582,31 @@ export default function RkaLaporanPage() {
       <Card className="rounded-2xl border-gray-200/80 shadow-xs">
         <CardContent className="p-4 sm:p-5 space-y-4">
           
-          {/* Baris 1: Mode Switcher Tab Laporan */}
+          {/* Baris 1: Mode Switcher Tab Laporan Dinamis */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
-              <button
-                onClick={() => setModeLaporan('kementerian')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  modeLaporan === 'kementerian'
-                    ? 'bg-blue-600 text-white shadow-xs font-black'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }`}
-              >
-                <span>🏛️</span>
-                <span>Laporan Kementerian</span>
-              </button>
-
-              <button
-                onClick={() => setModeLaporan('webometrics')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  modeLaporan === 'webometrics'
-                    ? 'bg-emerald-600 text-white shadow-xs font-black'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }`}
-              >
-                <span>🌐</span>
-                <span>Laporan Webometrics</span>
-              </button>
+            <div className="flex items-center gap-1.5 bg-gray-100 p-1.5 rounded-xl border border-gray-200 overflow-x-auto max-w-full">
+              {availableTabs.map((tab) => {
+                const isActive = modeLaporan === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setModeLaporan(tab.id)}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                    <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono ${
+                      isActive ? 'bg-white/20 text-white font-black' : 'bg-gray-200 text-gray-700 font-bold'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex items-center gap-2 self-end sm:self-center">
@@ -570,15 +705,22 @@ export default function RkaLaporanPage() {
           <Card className="rounded-2xl border-gray-200/80 shadow-xs">
             <CardContent className="p-16 text-center space-y-3">
               <Layers size={42} className="mx-auto text-gray-300" />
-              <h3 className="text-sm font-bold text-gray-700">Belum ada data belanja yang terpetakan untuk format ini</h3>
+              <h3 className="text-sm font-bold text-gray-700">Belum ada data belanja yang terpetakan untuk format {activeTabObj?.label || ''}</h3>
               <p className="text-xs text-gray-400 max-w-md mx-auto">
-                Gunakan menu <strong>Rule Engine Klasifikasi</strong> untuk memetakan kata kunci belanja secara otomatis ke format {isKemen ? 'Laporan Kementerian' : 'Laporan Webometrics'}.
+                Aturan klasifikasi mungkin belum dijalankan pada data belanja, atau belum ada kata kunci belanja yang sesuai dengan kriteria aturan.
               </p>
-              <div className="pt-2">
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button
+                  onClick={handleRunRuleEngine}
+                  disabled={isRunningEngine}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl gap-1.5 cursor-pointer"
+                >
+                  <Sparkles size={14} className={isRunningEngine ? 'animate-spin' : ''} />
+                  <span>{isRunningEngine ? 'Memetakan Data...' : '⚡ Jalankan Rule Engine Sekarang'}</span>
+                </Button>
                 <Link href="/rka/rules">
-                  <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl gap-1.5">
-                    <Sparkles size={14} />
-                    <span>Buka Rule Engine</span>
+                  <Button variant="outline" size="sm" className="text-xs font-bold rounded-xl gap-1.5">
+                    <span>Atur Rule Engine</span>
                   </Button>
                 </Link>
               </div>
