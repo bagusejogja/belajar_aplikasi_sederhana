@@ -6,7 +6,7 @@ import {
   RefreshCw, CheckCircle2, ShieldCheck, Database, Layers,
   Building2, ArrowRight, ArrowLeft, Loader2, Sparkles, X, Save,
   FolderTree, BookOpen, AlertCircle, FileSpreadsheet, Check,
-  Copy
+  Copy, Wallet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -748,6 +748,18 @@ export default function RkaRulesPage() {
             <span>Paste Modal</span>
           </Button>
 
+          {/* Link ke RKA Penerimaan */}
+          <Link href="/rka/penerimaan">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+            >
+              <Wallet size={14} className="text-emerald-600" />
+              <span>RKA Penerimaan</span>
+            </Button>
+          </Link>
+
           {/* Link ke RKA Pengeluaran */}
           <Link href="/rka/pengeluaran">
             <Button
@@ -756,7 +768,7 @@ export default function RkaRulesPage() {
               className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
             >
               <FolderTree size={14} className="text-gray-600" />
-              <span>Lihat Data RKA</span>
+              <span>RKA Pengeluaran</span>
             </Button>
           </Link>
 

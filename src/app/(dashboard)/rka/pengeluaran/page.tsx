@@ -211,10 +211,24 @@ export default function RkaPengeluaranPage() {
     fetchData();
   }, [tahunFilter, unitFilter]);
 
-  // Options untuk masing-masing filter
+  const [masterUnits, setMasterUnits] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/rka/rules?units=1')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.units) {
+          setMasterUnits(json.units);
+        }
+      })
+      .catch(err => console.error('Error loading master units:', err));
+  }, []);
+
+  // Options untuk masing-masing filter (KODE & NAMA UNIT KERJA diurutkan A-Z)
   const unitOptions = useMemo(() => {
-    return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean))).sort() as string[];
-  }, [dataList]);
+    const combined = new Set<string>([...masterUnits, ...dataList.map(d => d.unit).filter(Boolean)]);
+    return Array.from(combined).sort((a, b) => a.localeCompare(b, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [dataList, masterUnits]);
 
   const kelompokOptions = useMemo(() => {
     return Array.from(new Set(dataList.map(d => d.kelompok_indikator_program).filter(Boolean))).sort() as string[];
@@ -650,6 +664,17 @@ export default function RkaPengeluaranPage() {
             <Plus size={14} className="text-emerald-600" />
             <span>Tambah Data</span>
           </Button>
+
+          <Link href="/rka/penerimaan">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+            >
+              <Wallet size={14} className="text-emerald-600" />
+              <span>RKA Penerimaan</span>
+            </Button>
+          </Link>
 
           <Link href="/rka/rules">
             <Button
@@ -1203,12 +1228,12 @@ export default function RkaPengeluaranPage() {
                         TA {row.tahun_anggaran || 2027} • Prioritas: <strong className="text-gray-700">{row.prioritas || '-'}</strong>
                       </div>
 
-                      {/* 4. Konteks Kegiatan & Lingkup Kegiatan (jika ada) */}
+                      {/* 4. Konteks Kegiatan & Lingkup Kegiatan (tanpa background) */}
                       {(row.kegiatan || row.lingkup_kegiatan) && (
-                        <div className="bg-gray-50/90 p-2.5 rounded-xl border border-gray-100 space-y-1 text-xs">
+                        <div className="space-y-0.5 text-xs py-0.5">
                           {row.kegiatan && (
                             <div className="text-[11px] text-gray-700 leading-relaxed font-medium">
-                              <span className="font-bold text-gray-900">📌 Kegiatan:</span> {row.kegiatan}
+                              <span className="font-bold text-gray-800">📌 Kegiatan:</span> {row.kegiatan}
                             </div>
                           )}
                           {row.lingkup_kegiatan && (
@@ -1219,10 +1244,10 @@ export default function RkaPengeluaranPage() {
                         </div>
                       )}
 
-                      {/* 5. Akun Detail & Uraian Belanja (DITARUH PALING BAWAH) */}
-                      <div className="pt-1 space-y-1">
+                      {/* 5. Akun Detail & Uraian Belanja (DITARUH PALING BAWAH - tanpa background) */}
+                      <div className="pt-1 space-y-0.5">
                         {row.akun_detail && (
-                          <div className="font-mono text-[11px] font-bold text-amber-900 bg-amber-50/90 border border-amber-200 px-2 py-0.5 rounded-md w-max">
+                          <div className="font-mono text-[11px] font-bold text-gray-800">
                             {row.akun_detail}
                           </div>
                         )}

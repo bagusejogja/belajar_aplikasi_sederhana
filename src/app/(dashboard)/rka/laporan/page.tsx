@@ -5,7 +5,7 @@ import {
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
-  ChevronLeft, ChevronRight, Eye, Filter
+  ChevronLeft, ChevronRight, Eye, Filter, Wallet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -180,7 +180,10 @@ export default function RkaLaporanPage() {
       const res = await fetch('/api/rka/rules?units=1');
       const json = await res.json();
       if (json.success) {
-        if (json.units) setUnitsList(json.units);
+        if (json.units) {
+          const sorted = [...json.units].sort((a: string, b: string) => a.localeCompare(b, 'id', { numeric: true, sensitivity: 'base' }));
+          setUnitsList(sorted);
+        }
         if (json.govUnits) setGovUnitsList(json.govUnits);
       }
     } catch (e) {}
@@ -559,7 +562,8 @@ export default function RkaLaporanPage() {
       unitMap[u].surplusDefisit = 0; // Anggaran berimbang
     });
 
-    return Object.values(unitMap).sort((a, b) => b.totalPengeluaran - a.totalPengeluaran);
+    // Diurutkan A-Z berdasarkan KODE & NAMA UNIT KERJA sesuai permintaan pengguna
+    return Object.values(unitMap).sort((a, b) => a.unit.localeCompare(b.unit, 'id', { numeric: true, sensitivity: 'base' }));
   }, [dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList]);
 
   // Data Rekapitulasi Dikelompokkan per Group Org dari master gov_units
@@ -841,6 +845,17 @@ export default function RkaLaporanPage() {
             </Button>
           </Link>
 
+          <Link href="/rka/penerimaan">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+            >
+              <Wallet size={14} className="text-emerald-600" />
+              <span>RKA Penerimaan</span>
+            </Button>
+          </Link>
+
           <Link href="/rka/pengeluaran">
             <Button
               variant="outline"
@@ -848,7 +863,7 @@ export default function RkaLaporanPage() {
               className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
             >
               <FolderTree size={14} className="text-gray-600" />
-              <span>Data Belanja</span>
+              <span>RKA Pengeluaran</span>
             </Button>
           </Link>
 
