@@ -272,7 +272,7 @@ export default function RkaRulesPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Paste Zone State
-  const [showInlinePasteZone, setShowInlinePasteZone] = useState(true);
+  const [showInlinePasteZone, setShowInlinePasteZone] = useState(false);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isImporting, setIsImporting] = useState(false);

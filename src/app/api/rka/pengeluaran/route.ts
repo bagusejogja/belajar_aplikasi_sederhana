@@ -12,11 +12,33 @@ export async function GET(request: Request) {
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
     const onlyClassified = searchParams.get('only_classified'); // 'true' | 'false'
     const targetFormat = searchParams.get('format');
+    const selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags';
 
-    const selectFields = onlyClassified === 'true'
-      ? 'id, unit, tahun_anggaran, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags'
-      : '*';
+    // 1. Pencarian Cepat Teroptimasi (jika ada parameter search)
+    if (search && search.trim()) {
+      const qText = search.trim();
+      let query = supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select(selectFields)
+        .order('id', { ascending: true })
+        .limit(500);
 
+      if (tahun && tahun !== 'ALL') {
+        query = query.eq('tahun_anggaran', parseInt(tahun));
+      }
+
+      if (unit && unit !== 'ALL' && unit !== '*') {
+        query = query.ilike('unit', `%${unit}%`);
+      }
+
+      query = query.or(`uraian_belanja.ilike.%${qText}%,kegiatan.ilike.%${qText}%,akun_detail.ilike.%${qText}%`);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return NextResponse.json({ success: true, data: data || [] });
+    }
+
+    // 2. Fetch seluruh baris data secara bertahap yang aman
     let allData: any[] = [];
     let page = 0;
     const pageSize = 1000;
@@ -50,16 +72,6 @@ export async function GET(request: Request) {
         } else {
           query = query.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
         }
-      } else {
-        if (kategoriLaporan === 'kementerian') {
-          query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-        } else if (kategoriLaporan === 'webometrics') {
-          query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
-        }
-      }
-
-      if (search) {
-        query = query.or(`uraian_belanja.ilike.%${search}%,kegiatan.ilike.%${search}%,program.ilike.%${search}%,akun_detail.ilike.%${search}%,unit.ilike.%${search}%`);
       }
 
       const { data, error } = await query;

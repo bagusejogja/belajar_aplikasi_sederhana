@@ -150,8 +150,8 @@ export default function RkaPengeluaranPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
-  // Paste Zone & Modals State
-  const [showInlinePasteZone, setShowInlinePasteZone] = useState(true);
+  // Paste Zone & Modals State (Default Tertutup sesuai permintaan pengguna)
+  const [showInlinePasteZone, setShowInlinePasteZone] = useState(false);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -192,12 +192,11 @@ export default function RkaPengeluaranPage() {
     try {
       let url = `/api/rka/pengeluaran?tahun=${tahunFilter}`;
       if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
-      if (search) url += `&search=${encodeURIComponent(search)}`;
 
       const res = await fetch(url);
       const json = await res.json();
       if (json.success) {
-        setDataList(json.data);
+        setDataList(json.data || []);
       } else {
         toast.error('Gagal memuat data: ' + json.error);
       }
@@ -211,14 +210,6 @@ export default function RkaPengeluaranPage() {
   useEffect(() => {
     fetchData();
   }, [tahunFilter, unitFilter]);
-
-  // Handle Search Debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
 
   // Options untuk masing-masing filter
   const unitOptions = useMemo(() => {
@@ -312,6 +303,22 @@ export default function RkaPengeluaranPage() {
       list = list.filter(d => d.laporan_webometrics === kategoriWeboFilter);
     }
 
+    // Filter Pencarian Teks Instan (In-Memory 0ms, Bebas Timeout & Bebas Lag)
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(d => {
+        return (
+          (d.uraian_belanja && d.uraian_belanja.toLowerCase().includes(q)) ||
+          (d.kegiatan && d.kegiatan.toLowerCase().includes(q)) ||
+          (d.lingkup_kegiatan && d.lingkup_kegiatan.toLowerCase().includes(q)) ||
+          (d.akun_detail && d.akun_detail.toLowerCase().includes(q)) ||
+          (d.unit && d.unit.toLowerCase().includes(q)) ||
+          (d.identifikasi_lain && d.identifikasi_lain.toLowerCase().includes(q)) ||
+          (d.tags?.['proposal rkat'] && d.tags['proposal rkat'].toLowerCase().includes(q))
+        );
+      });
+    }
+
     // Sort
     if (sortBy === 'ANGGARAN') {
       list.sort((a, b) => (Number(b.anggaran) || 0) - (Number(a.anggaran) || 0));
@@ -322,7 +329,7 @@ export default function RkaPengeluaranPage() {
     }
 
     return list;
-  }, [dataList, kelompokFilter, akunFilter, activeTab, kategoriProposalFilter, kategoriKemenFilter, kategoriWeboFilter, sortBy]);
+  }, [dataList, kelompokFilter, akunFilter, activeTab, kategoriProposalFilter, kategoriKemenFilter, kategoriWeboFilter, sortBy, search]);
 
   // Pagination Logic
   const totalItems = filteredData.length;
@@ -897,28 +904,24 @@ export default function RkaPengeluaranPage() {
       <Card className="rounded-2xl border-gray-200/80 shadow-xs">
         <CardContent className="p-4 sm:p-5 space-y-4">
           
-          {/* Baris 1: Filter Tab Jenis Laporan */}
+          {/* Baris 1: Dropdown Target Format Laporan & Tombol Reset */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 overflow-x-auto">
-              {[
-                { id: 'semua', label: 'Semua Belanja' },
-                { id: 'proposal_rkat', label: '📊 Proposal RKAT' },
-                { id: 'unmapped', label: '⚠️ Belum Teridentifikasi' },
-                { id: 'kementerian', label: '🏛️ Laporan Kementerian' },
-                { id: 'webometrics', label: '🌐 Laporan Webometrics' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    activeTab === tab.id
-                      ? 'bg-white text-indigo-700 shadow-2xs'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5 shrink-0">
+                <Layers size={14} className="text-indigo-600" />
+                <span>Filter Format / Status Laporan:</span>
+              </label>
+              <select
+                value={activeTab}
+                onChange={e => setActiveTab(e.target.value as any)}
+                className="h-9 bg-indigo-50/60 border border-indigo-200 text-indigo-950 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs min-w-[240px]"
+              >
+                <option value="semua">📋 Semua Belanja</option>
+                <option value="proposal_rkat">📊 Proposal RKAT</option>
+                <option value="unmapped">⚠️ Belum Teridentifikasi</option>
+                <option value="kementerian">🏛️ Laporan Kementerian</option>
+                <option value="webometrics">🌐 Laporan Webometrics</option>
+              </select>
             </div>
 
             <div className="flex items-center gap-2 justify-end">
@@ -1136,13 +1139,13 @@ export default function RkaPengeluaranPage() {
                     <th className="px-3.5 py-3 w-12 text-center">#</th>
                     
                     {/* FIELD 1: Fakultas, Kelompok Indikator, Kegiatan, Lingkup, Akun, Uraian Belanja */}
-                    <th className="px-5 py-3 min-w-[360px]">
-                      Fakultas / Unit, Program, Kegiatan &amp; Uraian Belanja
+                    <th className="px-5 py-3 min-w-[380px]">
+                      Fakultas / Unit Kerja, Kegiatan &amp; Uraian Belanja
                     </th>
 
-                    {/* FIELD 2: Anggaran */}
-                    <th className="px-4 py-3 text-right w-52">
-                      Pagu, Realisasi &amp; Serapan
+                    {/* FIELD 2: Anggaran (Hanya Pagu Anggaran murni sesuai permintaan pengguna) */}
+                    <th className="px-5 py-3 text-right w-48">
+                      Pagu Anggaran
                     </th>
 
                     {/* FIELD 3: Laporan */}
@@ -1158,9 +1161,6 @@ export default function RkaPengeluaranPage() {
                   {paginatedData.map((row, idx) => {
                     const rowNumber = pageSize === 'ALL' ? idx + 1 : (currentPage - 1) * (pageSize as number) + idx + 1;
                     const anggaran = Number(row.anggaran) || 0;
-                    const realisasi = Number(row.realisasi) || 0;
-                    const sisa = anggaran - realisasi;
-                    const pct = anggaran > 0 ? Math.min(100, Math.round((realisasi / anggaran) * 100)) : 0;
 
                     return (
                       <tr key={row.id || idx} className="hover:bg-gray-50/80 transition-colors">
@@ -1171,15 +1171,15 @@ export default function RkaPengeluaranPage() {
                         </td>
 
                         {/* ======================================================== */}
-                        {/* FIELD 1: GABUNGAN SATU FIELD                             */}
+                        {/* FIELD 1: TERTATA RAPI & ELEGAN                           */}
                         {/* Fakultas, Kelompok Indikator Program, Kegiatan,          */}
                         {/* Lingkup Kegiatan, Akun Detail, Uraian Belanja            */}
                         {/* ======================================================== */}
                         <td className="px-5 py-4 align-top space-y-2.5">
                           
-                          {/* 1. Fakultas / Unit & Kelompok Indikator Program */}
+                          {/* 1. Header Baris: Fakultas / Unit & Meta Tag */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex items-center gap-1.5 font-black text-gray-900 text-xs">
+                            <div className="flex items-center gap-1.5 font-black text-gray-900 text-xs bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200">
                               <Building2 size={13} className="text-indigo-600 shrink-0" />
                               <span>{row.unit || 'Unit Kerja UGM'}</span>
                             </div>
@@ -1190,75 +1190,53 @@ export default function RkaPengeluaranPage() {
                               </span>
                             )}
 
-                            <span className="text-[10px] text-gray-400 font-mono">
+                            <span className="text-[10px] text-gray-400 font-mono ml-auto">
                               TA {row.tahun_anggaran || 2027} • Prioritas: <strong>{row.prioritas || '-'}</strong>
                             </span>
                           </div>
 
-                          {/* 2. Kegiatan & Lingkup Kegiatan */}
-                          <div className="bg-gray-50/90 p-2.5 rounded-xl border border-gray-100 space-y-1">
-                            {row.kegiatan && (
-                              <div className="text-[11px] text-gray-800 leading-relaxed font-medium">
-                                <span className="font-bold text-gray-900">Kegiatan:</span> {row.kegiatan}
+                          {/* 2. Headline Belanja: Kode Akun + Uraian Belanja Utama */}
+                          <div className="space-y-1 pt-0.5">
+                            <div className="flex items-start gap-2">
+                              {row.akun_detail && (
+                                <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold shrink-0 mt-0.5">
+                                  {row.akun_detail}
+                                </span>
+                              )}
+                              <div className="font-bold text-gray-950 text-sm leading-snug">
+                                {row.uraian_belanja || '-'}
                               </div>
-                            )}
-                            {row.lingkup_kegiatan && (
-                              <div className="text-[11px] text-indigo-800 font-medium">
-                                <span className="font-bold text-indigo-950">Lingkup Kegiatan:</span> {row.lingkup_kegiatan}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 3. Akun Detail & Uraian Belanja */}
-                          <div className="space-y-1">
-                            {row.akun_detail && (
-                              <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold">
-                                {row.akun_detail}
-                              </span>
-                            )}
-                            <div className="font-bold text-gray-950 text-xs leading-snug">
-                              {row.uraian_belanja || '-'}
                             </div>
                           </div>
+
+                          {/* 3. Konteks Program: Kegiatan & Lingkup Kegiatan */}
+                          {(row.kegiatan || row.lingkup_kegiatan) && (
+                            <div className="bg-gray-50/90 p-2.5 rounded-xl border border-gray-100 space-y-1 text-xs">
+                              {row.kegiatan && (
+                                <div className="text-[11px] text-gray-700 leading-relaxed font-medium">
+                                  <span className="font-bold text-gray-900">📌 Kegiatan:</span> {row.kegiatan}
+                                </div>
+                              )}
+                              {row.lingkup_kegiatan && (
+                                <div className="text-[11px] text-indigo-900 font-medium">
+                                  <span className="font-bold text-indigo-950">🎯 Lingkup Kegiatan:</span> {row.lingkup_kegiatan}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                         </td>
 
                         {/* ======================================================== */}
-                        {/* FIELD 2: ANGGARAN                                        */}
-                        {/* Pagu Anggaran, Realisasi, Sisa & Serapan %               */}
+                        {/* FIELD 2: PAGU ANGGARAN (MURNI & BERSIH)                  */}
                         {/* ======================================================== */}
-                        <td className="px-4 py-4 align-top space-y-2 text-right">
-                          <div>
-                            <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">
+                        <td className="px-5 py-4 align-top text-right">
+                          <div className="space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block">
                               Pagu Anggaran
                             </span>
-                            <div className="font-black font-mono text-gray-900 text-sm">
+                            <div className="font-black font-mono text-gray-950 text-sm sm:text-base">
                               Rp {formatRp(anggaran)}
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">
-                              Realisasi Belanja
-                            </span>
-                            <div className="font-bold font-mono text-emerald-700 text-xs">
-                              Rp {formatRp(realisasi)}
-                            </div>
-                          </div>
-
-                          <div className="pt-1.5 border-t border-gray-100 space-y-1">
-                            <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
-                              <span>Sisa:</span>
-                              <span className="font-bold text-gray-700">Rp {formatRp(sisa)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 justify-end">
-                              <div className="w-16 bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full rounded-full ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-indigo-500' : 'bg-amber-500'}`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-bold text-gray-600 font-mono">{pct}%</span>
                             </div>
                           </div>
                         </td>
