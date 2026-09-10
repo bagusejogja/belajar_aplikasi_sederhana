@@ -8,10 +8,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const getUnits = searchParams.get('units');
 
+    const modul = searchParams.get('modul') || 'pengeluaran';
+
     if (getUnits) {
-      // Ambil daftar seluruh unit kerja dari rkat_pengeluaran dan master gov_units dengan format kode unit & " " & nama unit
-      const [{ data: rkatUnits }, { data: govUnits }] = await Promise.all([
+      // Ambil daftar seluruh unit kerja dari rkat_pengeluaran, rkat_penerimaan, dan master gov_units
+      const [{ data: rkatUnits }, { data: rkatPenerimaanUnits }, { data: govUnits }] = await Promise.all([
         supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
+        supabaseAdmin.from('rkat_penerimaan').select('unit_kerja').limit(100000),
         supabaseAdmin.from('gov_units').select('kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true })
       ]);
 
@@ -26,17 +29,25 @@ export async function GET(request: Request) {
 
       const combinedUnits = Array.from(new Set([
         ...formattedGovUnits,
-        ...(rkatUnits || []).map(r => r.unit?.trim()).filter(Boolean)
+        ...(rkatUnits || []).map(r => r.unit?.trim()).filter(Boolean),
+        ...(rkatPenerimaanUnits || []).map(r => r.unit_kerja?.trim()).filter(Boolean)
       ])).filter(Boolean).sort();
 
       return NextResponse.json({ success: true, units: combinedUnits, govUnits: govUnits || [] });
     }
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('rka_rules')
       .select('*')
       .order('priority', { ascending: true });
 
+    if (modul === 'penerimaan') {
+      query = query.eq('modul', 'penerimaan');
+    } else {
+      query = query.or('modul.eq.pengeluaran,modul.is.null');
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error: any) {
@@ -58,6 +69,7 @@ export async function POST(request: Request) {
         startIndex = 1;
       }
 
+      const modul = body.modul || 'pengeluaran';
       const rulesToInsert = [];
       for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -70,13 +82,14 @@ export async function POST(request: Request) {
         const aVal = cols[2] || '*';
         const kVal = cols[3] || '';
         const rawTarget = (cols[4] || '').toLowerCase();
-        const targetField = (rawTarget.includes('webo') || rawTarget.includes('webometrics')) ? 'laporan_webometrics' : 'laporan_kementerian';
+        const targetField = cols[4] ? cols[4].trim().toLowerCase() : (modul === 'penerimaan' ? 'format_proposal' : 'laporan_kementerian');
         const nilaiVal = cols[5] || '';
         const ket = cols[6] || '';
 
         if (kVal && nilaiVal) {
           rulesToInsert.push({
             priority: pVal,
+            modul,
             unit: uVal,
             akun: aVal,
             kata_kunci: kVal,
@@ -98,6 +111,7 @@ export async function POST(request: Request) {
 
     // 2. Single Rule Insertion
     const { priority, unit, akun, kata_kunci, target_field, nilai_klasifikasi, keterangan } = body;
+    const modul = body.modul || 'pengeluaran';
     if (!kata_kunci || !nilai_klasifikasi) {
       return NextResponse.json({ success: false, error: 'Kata kunci dan Nilai Klasifikasi wajib diisi' }, { status: 400 });
     }
@@ -106,10 +120,11 @@ export async function POST(request: Request) {
       .from('rka_rules')
       .insert([{
         priority: parseInt(priority) || 99,
+        modul,
         unit: unit || '*',
         akun: akun || '*',
         kata_kunci,
-        target_field: target_field || 'laporan_kementerian',
+        target_field: target_field || (modul === 'penerimaan' ? 'format_proposal' : 'laporan_kementerian'),
         nilai_klasifikasi,
         keterangan: keterangan || ''
       }])
@@ -213,10 +228,12 @@ export async function PUT(request: Request) {
     // 4. Update 1 Rule jika ada body.isEdit dan body.id
     if (body.isEdit && body.id) {
       const { id, priority, unit, akun, kata_kunci, target_field, nilai_klasifikasi, keterangan } = body;
+      const modul = body.modul || 'pengeluaran';
       const { data, error } = await supabaseAdmin
         .from('rka_rules')
         .update({
           priority: parseInt(priority) || 99,
+          modul,
           unit: unit || '*',
           akun: akun || '*',
           kata_kunci,
@@ -230,11 +247,17 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: true, data });
     }
 
-    // 5. Jalankan Rule Engine ke seluruh data rkat_pengeluaran (Direct DB Execution - Super Cepat 50x)
-    const { ruleId, targetYear, cleanSync = true } = body;
+    // 5. Jalankan Rule Engine (Direct DB Execution - Super Cepat 50x)
+    const { ruleId, targetYear, cleanSync = true, modul = 'pengeluaran' } = body;
 
-    // Ambil rules yang akan dijalankan: Urutkan priority DESCENDING agar aturan umum (priority #2, #3, dst) dieksekusi duluan, dan aturan spesifik (priority #1) dieksekusi terakhir sehingga MENIMPA / MENANG atas aturan umum.
+    // Ambil rules yang akan dijalankan: Urutkan priority DESCENDING agar aturan umum dieksekusi duluan, dan aturan spesifik (priority #1) dieksekusi terakhir sehingga MENIMPA / MENANG atas aturan umum.
     let rulesQuery = supabaseAdmin.from('rka_rules').select('*').order('priority', { ascending: false }).order('id', { ascending: true });
+    if (modul === 'penerimaan') {
+      rulesQuery = rulesQuery.eq('modul', 'penerimaan');
+    } else {
+      rulesQuery = rulesQuery.or('modul.eq.pengeluaran,modul.is.null');
+    }
+
     if (ruleId) {
       rulesQuery = rulesQuery.eq('id', ruleId);
     }
@@ -242,10 +265,99 @@ export async function PUT(request: Request) {
     if (rulesErr) throw rulesErr;
 
     if (!rulesList || rulesList.length === 0) {
-      return NextResponse.json({ success: false, error: 'Tidak ada aturan untuk dijalankan. Silakan buat aturan klasifikasi terlebih dahulu.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: `Tidak ada aturan untuk modul ${modul}. Silakan buat aturan klasifikasi terlebih dahulu.` }, { status: 400 });
     }
 
-    // 1. Pembersihan Bersih (Clean Reset): Bersihkan klasifikasi lama pada tahun target agar data yang aturannya sudah dihapus / diganti TIDAK MUNCUL lagi
+    let totalUpdated = 0;
+
+    // A. EKSEKUSI KHUSUS MODUL PENERIMAAN
+    if (modul === 'penerimaan') {
+      if (cleanSync) {
+        let resetQ = supabaseAdmin
+          .from('rkat_penerimaan')
+          .update({
+            format_proposal: null,
+            kelompok_penerimaan: null,
+            tags: {}
+          }, { count: 'exact' })
+          .gt('id', 0);
+
+        if (targetYear && targetYear !== 'ALL') {
+          resetQ = resetQ.eq('tahun', parseInt(targetYear));
+        }
+        await resetQ;
+      }
+
+      for (const rule of rulesList) {
+        const tf = (rule.target_field || 'format_proposal').toLowerCase().trim();
+        const nilai = (rule.nilai_klasifikasi || '').trim();
+        if (!nilai) continue;
+
+        let updatePayload: any = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (tf === 'kelompok_penerimaan') {
+          updatePayload.kelompok_penerimaan = nilai;
+        } else {
+          updatePayload.format_proposal = nilai;
+          updatePayload.tags = { ['proposal rkat']: nilai };
+        }
+
+        let updateQuery = supabaseAdmin.from('rkat_penerimaan').update(updatePayload, { count: 'exact' }).gt('id', 0);
+
+        if (targetYear && targetYear !== 'ALL') {
+          updateQuery = updateQuery.eq('tahun', parseInt(targetYear));
+        }
+
+        if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
+          const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
+          if (units.length === 1) {
+            updateQuery = updateQuery.ilike('unit_kerja', `%${units[0]}%`);
+          } else if (units.length > 1) {
+            const unitConds = units.map((u: string) => `unit_kerja.ilike.%${u}%`).join(',');
+            updateQuery = updateQuery.or(unitConds);
+          }
+        }
+
+        if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
+          const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
+          if (akuns.length === 1) {
+            updateQuery = updateQuery.ilike('nama_akun_penerimaan', `${akuns[0]}%`);
+          } else if (akuns.length > 1) {
+            const akunConds = akuns.map((a: string) => `nama_akun_penerimaan.ilike.${a}%`).join(',');
+            updateQuery = updateQuery.or(akunConds);
+          }
+        }
+
+        if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
+          const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.trim()).filter(Boolean);
+          if (kws.length === 1) {
+            const kw = kws[0];
+            updateQuery = updateQuery.or(`nama_akun_penerimaan.ilike.%${kw}%,keterangan.ilike.%${kw}%,sumber_dana.ilike.%${kw}%`);
+          } else if (kws.length > 1) {
+            const orConds = kws.map((kw: string) => `nama_akun_penerimaan.ilike.%${kw}%,keterangan.ilike.%${kw}%,sumber_dana.ilike.%${kw}%`).join(',');
+            updateQuery = updateQuery.or(orConds);
+          }
+        }
+
+        const { count, error } = await updateQuery;
+        if (error) {
+          console.error(`Error updating penerimaan rule ID ${rule.id}:`, error);
+        } else if (count) {
+          totalUpdated += count;
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Rule Engine Penerimaan sukses dijalankan! Sebanyak ${totalUpdated} baris data penerimaan berhasil dipetakan sesuai aturan aktif.`,
+        updatedCount: totalUpdated,
+        rulesApplied: rulesList.length
+      });
+    }
+
+    // B. EKSEKUSI KHUSUS MODUL PENGELUARAN
     if (cleanSync) {
       let resetQ = supabaseAdmin
         .from('rkat_pengeluaran')
@@ -265,7 +377,7 @@ export async function PUT(request: Request) {
     }
 
     // 2. Eksekusi Setiap Aturan Langsung pada Database Supabase (Direct PostgreSQL Update Query)
-    let totalUpdated = 0;
+    totalUpdated = 0;
 
     for (const rule of rulesList) {
       const tf = (rule.target_field || 'laporan_kementerian').toLowerCase().trim();

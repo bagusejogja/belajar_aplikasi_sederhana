@@ -5,7 +5,7 @@ import {
   Wallet, Search, Plus, Upload, Download, RefreshCw, 
   Trash2, Edit3, CheckCircle2, AlertCircle, Building2, 
   Layers, FolderTree, Sparkles, X, ArrowUpDown, FileSpreadsheet,
-  Save, RotateCcw, Copy, Check
+  Save, RotateCcw, Copy, Check, Wand2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -120,6 +120,9 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
                   </div>
                 );
               })}
+              {filteredUnits.length === 0 && (
+                <div className="p-3 text-gray-400 text-center italic">Fakultas / Unit tidak ditemukan</div>
+              )}
             </div>
           </div>
         </>
@@ -136,6 +139,7 @@ export default function RkaPenerimaanPage() {
   // Filters State
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
+  const [formatFilter, setFormatFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'ID' | 'PAGU' | 'UNIT'>('ID');
@@ -226,6 +230,16 @@ export default function RkaPenerimaanPage() {
     return new Intl.NumberFormat('id-ID').format(Math.round(num));
   };
 
+  // Options Format Proposal / Klasifikasi
+  const allFormatOptions = useMemo(() => {
+    const set = new Set<string>();
+    dataList.forEach(d => {
+      if (d.format_proposal) set.add(d.format_proposal);
+      if (d.tags?.['proposal rkat']) set.add(d.tags['proposal rkat']);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [dataList]);
+
   // Filter & Search Data
   const filteredData = useMemo(() => {
     let result = [...dataList];
@@ -241,6 +255,17 @@ export default function RkaPenerimaanPage() {
       );
     }
 
+    if (formatFilter !== 'ALL') {
+      if (formatFilter === '__UNIDENTIFIED__') {
+        result = result.filter(d => !d.format_proposal && !d.tags?.['proposal rkat']);
+      } else {
+        result = result.filter(d => 
+          (d.format_proposal && d.format_proposal.toLowerCase() === formatFilter.toLowerCase()) ||
+          (d.tags?.['proposal rkat'] && d.tags['proposal rkat'].toLowerCase() === formatFilter.toLowerCase())
+        );
+      }
+    }
+
     if (sortBy === 'PAGU') {
       result.sort((a, b) => (Number(b.renterima_pagu) || 0) - (Number(a.renterima_pagu) || 0));
     } else if (sortBy === 'UNIT') {
@@ -250,7 +275,7 @@ export default function RkaPenerimaanPage() {
     }
 
     return result;
-  }, [dataList, search, sortBy]);
+  }, [dataList, search, formatFilter, sortBy]);
 
   // Perhitungan KPI Stats Dinamis
   const metrics = useMemo(() => {
@@ -296,7 +321,7 @@ export default function RkaPenerimaanPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tahunFilter, unitFilter, statusFilter, search, pageSize, sortBy]);
+  }, [tahunFilter, unitFilter, formatFilter, statusFilter, search, pageSize, sortBy]);
 
   // Parser Paste TSV
   const parsedPasteLines = useMemo(() => {
@@ -570,6 +595,16 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               <span>RKA Pengeluaran</span>
             </Button>
           </Link>
+             <Link href="/rka/rules">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 rounded-xl border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+            >
+              <Wand2 size={14} className="text-emerald-700" />
+              <span>Rule Engine Penerimaan</span>
+            </Button>
+          </Link>
 
           <Link href="/rka/laporan">
             <Button
@@ -719,93 +754,96 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               </CardDescription>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleFillSampleTSV}
-                className="h-8 rounded-xl border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-bold gap-1 shadow-2xs"
+                className="h-8 rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs font-bold"
               >
-                <span>Contoh Data FIB (2027)</span>
+                ✨ Isi Format Contoh
               </Button>
-              {pasteText && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setPasteText('')}
-                  className="h-8 rounded-xl text-xs text-gray-500 hover:text-gray-900"
-                >
-                  <RotateCcw size={13} className="mr-1" />
-                  <span>Bersihkan</span>
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowInlinePasteZone(false)}
+                className="h-8 px-2 text-gray-400 hover:text-gray-600 rounded-xl"
+              >
+                <X size={14} />
+              </Button>
             </div>
           </CardHeader>
 
-          <CardContent className="p-5 space-y-3">
-            <div>
+          <CardContent className="p-5 pt-3 space-y-4">
+            <div className="space-y-1.5">
               <Textarea
                 rows={6}
-                placeholder="Salin baris data dari Excel lalu paste di sini..."
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
-                className="w-full bg-white border-gray-300 text-gray-900 font-mono text-xs rounded-xl p-3.5 focus:ring-2 focus:ring-emerald-600 shadow-2xs max-w-full leading-relaxed"
+                placeholder="Paste data TSV dari Excel di sini..."
+                className="font-mono text-xs bg-white border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-600 custom-scrollbar"
               />
-            </div>
-
-            {/* Live Preview Indicator & Save Button */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className={`text-xs font-bold px-2.5 py-1 ${
-                  parsedPasteLines.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-500 border-gray-200'
-                }`}>
-                  {parsedPasteLines.length > 0 ? `✓ Ditemukan ${parsedPasteLines.length} baris penerimaan valid` : 'Menunggu data dipaste...'}
-                </Badge>
-                {parsedPasteLines.length > 0 && (
-                  <span className="text-xs text-gray-500 font-medium">
-                    (Siap disimpan ke database rkat_penerimaan)
-                  </span>
+              <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
+                <span>
+                  {parsedPasteLines.length > 0 ? (
+                    <strong className="text-emerald-700 font-mono">
+                      ✓ Terdeteksi {parsedPasteLines.length} baris data siap impor
+                    </strong>
+                  ) : (
+                    <span>💡 Tip: Pastikan urutan 12 kolom sesuai panduan di atas</span>
+                  )}
+                </span>
+                {pasteText && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPasteText('')}
+                    className="h-6 px-2 text-[11px] text-gray-400 hover:text-rose-600"
+                  >
+                    Bersihkan
+                  </Button>
                 )}
               </div>
-
-              <Button
-                onClick={handleBulkImport}
-                disabled={isImporting || parsedPasteLines.length === 0}
-                className="h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md disabled:opacity-50 gap-2 cursor-pointer active:scale-95"
-              >
-                {isImporting ? <RefreshCw className="animate-spin" size={15} /> : <Save size={15} />}
-                <span>{isImporting ? 'Mengimpor Data...' : `Simpan ${parsedPasteLines.length} Baris Penerimaan ke Database`}</span>
-              </Button>
             </div>
 
-            {/* Pratinjau Mini */}
             {parsedPasteLines.length > 0 && (
-              <div className="border border-emerald-100 rounded-xl overflow-hidden bg-white mt-3">
-                <div className="px-3 py-2 bg-emerald-50/50 border-b border-emerald-100 text-[11px] font-bold text-emerald-900 flex items-center justify-between">
-                  <span>Pratinjau Pembacaan Data ({parsedPasteLines.length} baris):</span>
-                  <span className="text-[10px] text-emerald-600 font-normal">Maks 5 baris pertama</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700">
+                    Preview Data Impor ({parsedPasteLines.length} baris):
+                  </span>
+                  <Button
+                    onClick={handleBulkImport}
+                    disabled={isImporting}
+                    size="sm"
+                    className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs"
+                  >
+                    {isImporting ? <RefreshCw className="animate-spin mr-1" size={13} /> : <CheckCircle2 className="mr-1" size={13} />}
+                    <span>{isImporting ? 'Mengimpor...' : `Simpan ${parsedPasteLines.length} Data ke Database`}</span>
+                  </Button>
                 </div>
-                <div className="overflow-x-auto">
+
+                <div className="max-h-48 overflow-y-auto border border-emerald-100 rounded-xl bg-white shadow-inner">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 text-gray-600 text-[10px] uppercase font-bold border-b border-gray-100">
+                    <thead className="bg-emerald-50/70 text-emerald-900 font-bold sticky top-0 border-b border-emerald-100 text-[10px] uppercase">
                       <tr>
-                        <th className="px-3 py-2">ID RKA</th>
-                        <th className="px-3 py-2">Fakultas / Unit Kerja</th>
+                        <th className="px-3 py-2">ID</th>
+                        <th className="px-3 py-2">Unit Kerja</th>
                         <th className="px-3 py-2">Akun Penerimaan</th>
-                        <th className="px-3 py-2 text-center">Vol</th>
+                        <th className="px-3 py-2 text-right">Vol</th>
                         <th className="px-3 py-2 text-right">Tarif</th>
-                        <th className="px-3 py-2 text-right">Pagu Penerimaan</th>
+                        <th className="px-3 py-2 text-right">Pagu</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 text-[11px] font-medium">
-                      {parsedPasteLines.slice(0, 5).map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-3 py-1.5 font-mono text-gray-500">{row.renterimaId}</td>
-                          <td className="px-3 py-1.5 font-bold text-gray-900 truncate max-w-[180px]">{row.unit_kerja}</td>
-                          <td className="px-3 py-1.5 font-semibold text-gray-950 truncate max-w-[260px]">{row.nama_akun_penerimaan}</td>
-                          <td className="px-3 py-1.5 text-center font-mono text-gray-700">{row.renterimaVolume}</td>
-                          <td className="px-3 py-1.5 font-mono text-right text-gray-600">Rp {formatRp(row.renterimaTarif)}</td>
-                          <td className="px-3 py-1.5 font-mono font-bold text-right text-emerald-700">Rp {formatRp(row.renterimaPagu)}</td>
+                    <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
+                      {parsedPasteLines.slice(0, 15).map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-1.5 text-gray-500">{row.renterimaId || '-'}</td>
+                          <td className="px-3 py-1.5 font-sans font-medium text-gray-800 truncate max-w-[150px]">{row.unit_kerja}</td>
+                          <td className="px-3 py-1.5 font-sans text-gray-800 truncate max-w-[200px]">{row.nama_akun_penerimaan}</td>
+                          <td className="px-3 py-1.5 text-right text-gray-600">{row.renterimaVolume}</td>
+                          <td className="px-3 py-1.5 text-right text-gray-600">Rp {formatRp(row.renterimaTarif)}</td>
+                          <td className="px-3 py-1.5 text-right font-bold text-emerald-700">Rp {formatRp(row.renterimaPagu)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -820,7 +858,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
       {/* FILTER CONTROL SECTION */}
       <Card className="rounded-2xl border-gray-200/80 shadow-xs">
         <CardContent className="p-4 sm:p-5 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             {/* 1. Tahun */}
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
@@ -850,7 +888,25 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               />
             </div>
 
-            {/* 3. Status */}
+            {/* 3. Format Proposal Penerimaan */}
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Format Proposal
+              </label>
+              <select
+                value={formatFilter}
+                onChange={e => setFormatFilter(e.target.value)}
+                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-2xs"
+              >
+                <option value="ALL">Semua Format ({dataList.length})</option>
+                <option value="__UNIDENTIFIED__">⚠️ Belum Teridentifikasi</option>
+                {allFormatOptions.map(fmt => (
+                  <option key={fmt} value={fmt}>📊 {fmt}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Status */}
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
                 Status Usulan
@@ -867,7 +923,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               </select>
             </div>
 
-            {/* 4. Urutkan */}
+            {/* 5. Urutkan */}
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
                 Urutkan Data
@@ -904,12 +960,13 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               )}
             </div>
 
-            {(unitFilter !== 'ALL' || statusFilter !== 'ALL' || search !== '') && (
+            {(unitFilter !== 'ALL' || formatFilter !== 'ALL' || statusFilter !== 'ALL' || search !== '') && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setUnitFilter('ALL');
+                  setFormatFilter('ALL');
                   setStatusFilter('ALL');
                   setSearch('');
                   setSortBy('ID');
@@ -981,6 +1038,33 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                             TA {row.tahun || 2027} • ID: {row.renterima_id || row.id}
                           </span>
                         </div>
+
+                        {/* 1b. Klasifikasi Rule Penerimaan Badges */}
+                        {(row.format_proposal || row.kelompok_penerimaan || (row.tags && Object.keys(row.tags).length > 0)) ? (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                            {row.format_proposal && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[10px]">
+                                <span>📊</span>
+                                <span>{row.format_proposal}</span>
+                              </span>
+                            )}
+                            {row.kelompok_penerimaan && row.kelompok_penerimaan !== row.format_proposal && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-[10px]">
+                                <span>🏷️</span>
+                                <span>{row.kelompok_penerimaan}</span>
+                              </span>
+                            )}
+                            {row.tags && typeof row.tags === 'object' && Object.entries(row.tags).map(([k, v]) => {
+                              if (k === 'proposal rkat' || k === 'format_proposal') return null;
+                              return (
+                                <span key={k} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/80 font-bold text-[10px]">
+                                  <span>✨</span>
+                                  <span>{String(v)}</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : null}
 
                         {/* 2. Sumber Dana */}
                         <div className="text-[11px] text-gray-500 font-mono">

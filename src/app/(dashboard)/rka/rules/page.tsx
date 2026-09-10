@@ -250,6 +250,9 @@ export default function RkaRulesPage() {
   const [units, setUnits] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Modul Aktif: 'pengeluaran' | 'penerimaan'
+  const [activeModul, setActiveModul] = useState<'pengeluaran' | 'penerimaan'>('pengeluaran');
+
   // Form State (Tambah Manual)
   const [priority, setPriority] = useState('99');
   const [unit, setUnit] = useState('*');
@@ -290,11 +293,11 @@ export default function RkaRulesPage() {
   const [renamingFormat, setRenamingFormat] = useState<{ oldName: string; newName: string } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
 
-  // Fetch Data Rules & Units
-  const fetchRules = async () => {
+  // Fetch Data Rules & Units berdasarkan Modul Aktif
+  const fetchRules = async (modulToFetch = activeModul) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/rka/rules');
+      const res = await fetch(`/api/rka/rules?modul=${modulToFetch}`);
       const json = await res.json();
       if (json.success) {
         setRules(json.data || []);
@@ -321,15 +324,36 @@ export default function RkaRulesPage() {
   };
 
   useEffect(() => {
-    fetchRules();
+    fetchRules(activeModul);
     fetchUnits();
-  }, []);
+    // Sesuaikan default target field saat modul berganti
+    if (activeModul === 'penerimaan') {
+      setTargetField('format_proposal');
+    } else {
+      setTargetField('proposal rkat');
+    }
+    setFilterTarget('ALL');
+  }, [activeModul]);
 
-  // Opsi Target Format yang terdaftar di sistem (Hanya Proposal RKAT dan format kustom pengguna)
+  // Preset Targets berdasarkan Modul
+  const presetTargets = useMemo(() => {
+    if (activeModul === 'penerimaan') {
+      return [
+        { id: 'format_proposal', label: 'Proposal RKAT Penerimaan' },
+        { id: 'kelompok_penerimaan', label: 'Kelompok Pendapatan' }
+      ];
+    }
+    return [
+      { id: 'proposal rkat', label: 'Proposal RKAT' }
+    ];
+  }, [activeModul]);
+
+  // Opsi Target Format yang terdaftar di sistem
   const allTargetOptions = useMemo(() => {
     const list = Array.from(new Set(rules.map(r => r.target_field).filter(Boolean)));
-    return Array.from(new Set(['proposal rkat', ...list]));
-  }, [rules]);
+    const base = activeModul === 'penerimaan' ? ['format_proposal', 'kelompok_penerimaan'] : ['proposal rkat'];
+    return Array.from(new Set([...base, ...list]));
+  }, [rules, activeModul]);
 
   // Parser helper untuk Paste Zone
   const parsedPasteLines = useMemo(() => {
@@ -378,12 +402,14 @@ export default function RkaRulesPage() {
       return toast.error('Kata Kunci dan Nilai Klasifikasi wajib diisi!');
     }
 
-    const finalTarget = isCustomTarget ? (customTargetInput.trim() || 'laporan_kementerian') : targetField;
+    const defaultTarget = activeModul === 'penerimaan' ? 'format_proposal' : 'proposal rkat';
+    const finalTarget = isCustomTarget ? (customTargetInput.trim() || defaultTarget) : targetField;
 
     setIsAdding(true);
     try {
       const payload = {
         priority: parseInt(priority) || 99,
+        modul: activeModul,
         unit: unit || '*',
         akun: akun || '*',
         kata_kunci: kataKunci.trim(),
@@ -399,7 +425,7 @@ export default function RkaRulesPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('Aturan klasifikasi berhasil ditambahkan!');
+        toast.success(`Aturan klasifikasi ${activeModul === 'penerimaan' ? 'penerimaan' : 'pengeluaran'} berhasil ditambahkan!`);
         setKataKunci('');
         setNilaiKlasifikasi('');
         setKeterangan('');
@@ -430,11 +456,11 @@ export default function RkaRulesPage() {
       const res = await fetch('/api/rka/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText: pasteText })
+        body: JSON.stringify({ rawText: pasteText, modul: activeModul })
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(`Berhasil mengimpor ${json.count} aturan klasifikasi ke database!`);
+        toast.success(`Berhasil mengimpor ${json.count} aturan klasifikasi ${activeModul} ke database!`);
         setPasteModalOpen(false);
         setPasteText('');
         fetchRules();
@@ -450,13 +476,28 @@ export default function RkaRulesPage() {
 
   // Isi Contoh Format TSV
   const handleFillSampleTSV = () => {
+    if (activeModul === 'penerimaan') {
+      const samplePenerimaan = `Prioritas\tUnit\tAkun\tKataKunci\tTargetField\tNilaiKlasifikasi\tKeterangan
+1\t*\t41101.04*\tUKT\tformat_proposal\tPenerimaan UKT Sarjana (S1)\tKlasifikasi UKT S1
+2\t*\t41101.05*\tUKT\tformat_proposal\tPenerimaan UKT Vokasi / Terapan\tKlasifikasi UKT Sarjana Terapan / Vokasi
+3\t*\t41102*\tIPI|Mandiri\tformat_proposal\tIuran Pengembangan Institusi (IPI)\tKlasifikasi IPI Seleksi Mandiri
+4\t*\t41101*\tPascasarjana|Magister|Doktor|S2|S3\tformat_proposal\tPenerimaan Pascasarjana & Profesi\tPenerimaan S2, S3 & Profesi
+5\t*\t412*\tKerjasama|Riset|Penelitian|Hibah\tformat_proposal\tPenerimaan Kerjasama & Hibah Riset\tPenerimaan kerjasama riset
+6\t*\t413*\tSewa|Kantin|Usaha|Komersial\tformat_proposal\tPenerimaan Hasil Usaha & Layanan Bisnis\tPemanfaatan aset & unit usaha`;
+      setPasteText(samplePenerimaan);
+      toast.success('Contoh aturan Penerimaan berhasil dimuat ke Paste Zone!');
+      return;
+    }
+
     const sample = `Prioritas\tUnit\tAkun\tKataKunci\tTargetField\tNilaiKlasifikasi\tKeterangan
-1\t*\t*\tBeasiswa Mahasiswa Asing\tlaporan_kementerian\tBeasiswa Mahasiswa Asing (MBKM / Internasional)\tOtomatis dari kata kunci beasiswa mhs asing
-2\t*\t*\tStudent Inbound\tlaporan_webometrics\tInternational Student Inbound\tProgram inbound mhs asing
-3\t*\t52501\tAsing\tlaporan_kementerian\tBeasiswa Mahasiswa Asing (MBKM / Internasional)\tBerdasar kode akun 52501 dan kata asing
-4\t*\t*\tStudent Outbound\tlaporan_webometrics\tInternational Student Outbound\tProgram outbound mhs asing`;
+1\t010810 Direktorat Pengembangan Usaha\t*\tPrime\tproposal rkat\tPRIME STeP\tPrime Step
+2\t*\t51*\t*\tproposal rkat\tBelanja Pegawai\tBelanja Pegawai
+2\t*\t52*\t*\tproposal rkat\tBelanja Barang & Jasa\tBelanja Barang & Jasa
+2\t*\t53*\t*\tproposal rkat\tBelanja Perbaikan dan Pemeliharaan\tBelanja Perbaikan dan Pemeliharaan
+2\t*\t54*\t*\tproposal rkat\tBelanja Perjalanan\tBelanja Perjalanan
+2\t*\t55*\t*\tproposal rkat\tBelanja Modal\tBelanja Modal`;
     setPasteText(sample);
-    toast.success('Contoh format TSV berhasil dimuat ke Paste Zone!');
+    toast.success('Contoh aturan Pengeluaran berhasil dimuat ke Paste Zone!');
   };
 
   // Handle Update Edit Rule
@@ -466,8 +507,9 @@ export default function RkaRulesPage() {
       return toast.error('Kata Kunci dan Nilai Klasifikasi wajib diisi!');
     }
 
+    const defaultTarget = (editingRule.modul || activeModul) === 'penerimaan' ? 'format_proposal' : 'proposal rkat';
     const finalTarget = isEditCustomTarget 
-      ? (customEditTargetInput.trim() || 'laporan_kementerian') 
+      ? (customEditTargetInput.trim() || defaultTarget) 
       : editingRule.target_field;
 
     setIsSavingEdit(true);
@@ -478,6 +520,7 @@ export default function RkaRulesPage() {
         body: JSON.stringify({
           isEdit: true,
           ...editingRule,
+          modul: editingRule.modul || activeModul,
           target_field: finalTarget
         })
       });
@@ -498,16 +541,18 @@ export default function RkaRulesPage() {
     }
   };
 
-  // Handle Terapkan Rule Engine ke Seluruh Data Pengeluaran
+  // Handle Terapkan Rule Engine ke Seluruh Data (Pengeluaran atau Penerimaan)
   const handleApplyRules = async () => {
-    if (!confirm('Jalankan Rule Engine Klasifikasi ke seluruh data RKAT Pengeluaran?\n\nSistem akan memindai seluruh uraian belanja, kegiatan, kode akun, dan unit kerja untuk mengisi format Laporan Kementerian dan Laporan Webometrics secara otomatis.')) return;
+    const isPenerimaan = activeModul === 'penerimaan';
+    const targetName = isPenerimaan ? 'RKAT Penerimaan' : 'RKAT Pengeluaran';
+    if (!confirm(`Jalankan Rule Engine Klasifikasi ke seluruh data ${targetName}?\n\nSistem akan memindai seluruh ${isPenerimaan ? 'nama akun penerimaan, keterangan, tarif & unit kerja' : 'uraian belanja, kegiatan, kode akun, dan unit kerja'} untuk memetakan format laporan secara otomatis.`)) return;
 
     setIsApplying(true);
     try {
       const res = await fetch('/api/rka/rules', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({ modul: activeModul })
       });
       const json = await res.json();
       if (json.success) {
@@ -629,12 +674,12 @@ export default function RkaRulesPage() {
   const formatStats = useMemo(() => {
     const map: Record<string, { id: string; name: string; count: number; isPreset: boolean }> = {};
 
-    PRESET_TARGETS.forEach(p => {
+    presetTargets.forEach(p => {
       map[p.id] = { id: p.id, name: p.label, count: 0, isPreset: true };
     });
 
     rules.forEach(r => {
-      const tf = r.target_field || 'laporan_kementerian';
+      const tf = r.target_field || (activeModul === 'penerimaan' ? 'format_proposal' : 'proposal rkat');
       if (!map[tf]) {
         const pretty = tf
           .replace(/^(laporan_|target_)/, '')
@@ -646,11 +691,23 @@ export default function RkaRulesPage() {
     });
 
     return Object.values(map);
-  }, [rules]);
+  }, [rules, presetTargets, activeModul]);
 
   // Metrik KPI
-  const countProposal = rules.filter(r => (r.target_field || '').toLowerCase().includes('proposal rkat')).length;
-  const countCustom = rules.filter(r => !(r.target_field || '').toLowerCase().includes('proposal rkat')).length;
+  const countProposal = rules.filter(r => {
+    const tf = (r.target_field || '').toLowerCase();
+    if (activeModul === 'penerimaan') {
+      return tf.includes('format_proposal') || tf.includes('proposal') || tf.includes('kelompok');
+    }
+    return tf.includes('proposal rkat');
+  }).length;
+  const countCustom = rules.filter(r => {
+    const tf = (r.target_field || '').toLowerCase();
+    if (activeModul === 'penerimaan') {
+      return !tf.includes('format_proposal') && !tf.includes('proposal') && !tf.includes('kelompok');
+    }
+    return !tf.includes('proposal rkat');
+  }).length;
 
   // Filter List Aturan
   const filteredRules = rules.filter(r => {
@@ -710,7 +767,7 @@ export default function RkaRulesPage() {
             className="h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-black gap-1.5 shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
           >
             {isApplying ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
-            <span>{isApplying ? 'Memproses Data...' : 'Jalankan Rule Engine'}</span>
+            <span>{isApplying ? 'Memproses Data...' : activeModul === 'penerimaan' ? 'Jalankan Rule Penerimaan' : 'Jalankan Rule Pengeluaran'}</span>
           </Button>
 
           {/* Tombol Kelola Format Laporan */}
@@ -776,13 +833,62 @@ export default function RkaRulesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchRules}
+            onClick={() => fetchRules()}
             disabled={loading}
-            className="h-9 w-9 p-0 rounded-xl border-gray-300 text-gray-600 hover:bg-gray-50 shadow-2xs"
+            className="h-9 w-9 p-0 rounded-xl border-gray-300 text-gray-600 hover:bg-gray-50 shadow-2xs cursor-pointer"
             title="Refresh Aturan"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </Button>
+        </div>
+      </div>
+
+      {/* TAB PILIHAN MODUL: PENGELUARAN VS PENERIMAAN */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-gray-200/80 shadow-2xs">
+        <div className="flex items-center gap-2 bg-gray-100/80 p-1.5 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setActiveModul('pengeluaran')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeModul === 'pengeluaran'
+                ? 'bg-white text-indigo-900 shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+            }`}
+          >
+            <FolderTree size={14} className={activeModul === 'pengeluaran' ? 'text-indigo-600' : 'text-gray-500'} />
+            <span>Rule Belanja / Pengeluaran</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+              activeModul === 'pengeluaran' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-600'
+            }`}>
+              {activeModul === 'pengeluaran' ? rules.length : ''}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveModul('penerimaan')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeModul === 'penerimaan'
+                ? 'bg-white text-emerald-900 shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+            }`}
+          >
+            <Wallet size={14} className={activeModul === 'penerimaan' ? 'text-emerald-600' : 'text-gray-500'} />
+            <span>Rule Pendapatan / Penerimaan</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
+              activeModul === 'penerimaan' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+            }`}>
+              {activeModul === 'penerimaan' ? rules.length : ''}
+            </span>
+          </button>
+        </div>
+
+        <div className="text-xs text-gray-500 font-medium px-2">
+          {activeModul === 'penerimaan' ? (
+            <span>💡 Mode Rule Penerimaan: Menargetkan akun <code>41*</code>, UKT, IPI, Kerjasama &amp; Layanan Bisnis</span>
+          ) : (
+            <span>💡 Mode Rule Pengeluaran: Menargetkan akun <code>51* - 55*</code>, PRIME STeP, Operasional &amp; Modal</span>
+          )}
         </div>
       </div>
 
@@ -805,17 +911,17 @@ export default function RkaRulesPage() {
           </CardContent>
         </Card>
 
-        {/* Card 2: Aturan Proposal RKAT */}
+        {/* Card 2: Aturan Proposal RKAT / Penerimaan */}
         <Card className="rounded-2xl border-indigo-200 shadow-xs bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
             <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>📊</span> <span>Aturan Proposal RKAT</span>
+              <span>📊</span> <span>{activeModul === 'penerimaan' ? 'Aturan Proposal Penerimaan' : 'Aturan Proposal RKAT'}</span>
             </span>
             <div className="text-2xl font-black font-mono text-indigo-950">
               {countProposal} <span className="text-xs font-semibold text-indigo-700 font-sans">Aturan</span>
             </div>
             <div className="text-xs text-indigo-800 font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60">
-              <span>Target: `proposal rkat`</span>
+              <span>Target: `{activeModul === 'penerimaan' ? 'format_proposal' : 'proposal rkat'}`</span>
               <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px] font-bold">
                 {rules.length > 0 ? ((countProposal / rules.length) * 100).toFixed(0) : 0}%
               </Badge>
@@ -833,7 +939,7 @@ export default function RkaRulesPage() {
               {allTargetOptions.length} <span className="text-xs font-semibold text-gray-500 font-sans">Format</span>
             </div>
             <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Format Utama: Proposal RKAT</span>
+              <span>Format Utama: {activeModul === 'penerimaan' ? 'Proposal Penerimaan' : 'Proposal RKAT'}</span>
               <Badge variant="secondary" className="text-[10px] font-bold">Aktif</Badge>
             </div>
           </CardContent>
@@ -846,14 +952,16 @@ export default function RkaRulesPage() {
               <Sparkles size={13} /> <span>Status Auto-Tagging</span>
             </span>
             <div className="text-xs text-indigo-950 font-bold leading-snug">
-              Siap memindai belanja &amp; memberi label laporan
+              {activeModul === 'penerimaan'
+                ? 'Siap memindai penerimaan & memberi label laporan'
+                : 'Siap memindai belanja & memberi label laporan'}
             </div>
             <div className="pt-2 border-t border-indigo-100/80">
               <Button
                 size="sm"
                 onClick={handleApplyRules}
                 disabled={isApplying}
-                className="w-full h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs"
+                className="w-full h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer"
               >
                 {isApplying ? 'Sedang Memindai...' : '⚡ Jalankan Sekarang'}
               </Button>
@@ -1062,9 +1170,11 @@ export default function RkaRulesPage() {
                     }}
                     className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
                   >
-                    <option value="proposal rkat">📊 Proposal RKAT</option>
+                    {presetTargets.map(p => (
+                      <option key={p.id} value={p.id}>{p.id.includes('proposal') ? '📊' : '🏷️'} {p.label}</option>
+                    ))}
                     {allTargetOptions
-                      .filter(t => t !== 'proposal rkat')
+                      .filter(t => !presetTargets.some(p => p.id === t))
                       .map(t => (
                         <option key={t} value={t}>✨ {t}</option>
                       ))}
@@ -1465,9 +1575,11 @@ export default function RkaRulesPage() {
                       }}
                       className="w-full bg-white border border-gray-300 rounded-xl px-3 h-9 font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer text-xs"
                     >
-                      <option value="proposal rkat">📊 Proposal RKAT</option>
+                      {presetTargets.map(p => (
+                        <option key={p.id} value={p.id}>{p.id.includes('proposal') ? '📊' : '🏷️'} {p.label}</option>
+                      ))}
                       {allTargetOptions
-                        .filter(t => t !== 'proposal rkat')
+                        .filter(t => !presetTargets.some(p => p.id === t))
                         .map(t => (
                           <option key={t} value={t}>✨ {t}</option>
                         ))}
