@@ -931,8 +931,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
             <thead className="bg-gray-50/80 text-gray-600 font-bold border-b border-gray-200 text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="px-4 py-3.5 w-12 text-center">#</th>
-                <th className="px-5 py-3.5 min-w-[320px]">Fakultas / Unit Kerja &amp; Akun Penerimaan</th>
-                <th className="px-4 py-3.5 min-w-[280px]">Rincian Kuantitas, Tarif &amp; Keterangan</th>
+                <th className="px-5 py-3.5">Fakultas / Unit Kerja, Akun, Kuantitas &amp; Uraian Penerimaan</th>
                 <th className="px-5 py-3.5 text-right min-w-[160px]">Pagu Penerimaan</th>
                 <th className="px-4 py-3.5 text-center min-w-[120px]">Status</th>
                 <th className="px-3 py-3.5 text-center w-20">Aksi</th>
@@ -941,14 +940,14 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">
+                  <td colSpan={5} className="text-center py-12 text-gray-400">
                     <RefreshCw className="animate-spin mx-auto mb-2 text-emerald-600" size={24} />
                     <span className="font-semibold text-xs">Memuat data RKAT penerimaan...</span>
                   </td>
                 </tr>
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-16 text-gray-400">
+                  <td colSpan={5} className="text-center py-16 text-gray-400">
                     <Wallet size={36} className="mx-auto mb-2 opacity-30 text-emerald-600" />
                     <p className="font-bold text-gray-600">Belum ada data penerimaan yang cocok</p>
                     <p className="text-[11px] text-gray-400 mt-0.5">
@@ -970,11 +969,11 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                         {no}
                       </td>
 
-                      {/* KOLOM 1: UNIT KERJA & AKUN PENERIMAAN */}
+                      {/* FIELD 1: FAKULTAS / UNIT KERJA, AKUN, KUANTITAS & URAIAN PENERIMAAN (DIGABUNGKAN & SERAGAM) */}
                       <td className="px-5 py-4 align-top space-y-1.5">
-                        {/* Unit Kerja Badge */}
+                        {/* 1. Unit Kerja Badge & ID */}
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs">
                             <Building2 size={12} className="text-emerald-700" />
                             <span>{row.unit_kerja || 'Unit Kerja Belum Diisi'}</span>
                           </span>
@@ -983,28 +982,30 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                           </span>
                         </div>
 
-                        {/* Akun Penerimaan (Bersih tanpa background box) */}
-                        <div className="font-bold text-gray-950 text-xs sm:text-sm leading-snug">
+                        {/* 2. Sumber Dana */}
+                        <div className="text-[11px] text-gray-500 font-mono">
+                          Sumber Dana: <strong className="text-gray-700">{row.sumber_dana || 'Dana Masyarakat Tidak Mengikat'}</strong>
+                        </div>
+
+                        {/* 3. Akun Penerimaan (Teks tebal, bersih tanpa background) */}
+                        <div className="font-bold text-gray-900 text-xs sm:text-sm leading-snug">
                           {row.nama_akun_penerimaan || '-'}
                         </div>
 
-                        {/* Sumber Dana */}
-                        <div className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-                          <span className="font-bold text-gray-600">Sumber Dana:</span>
-                          <span>{row.sumber_dana || 'Dana Masyarakat Tidak Mengikat'}</span>
-                        </div>
-                      </td>
-
-                      {/* KOLOM 2: KUANTITAS, TARIF & KETERANGAN */}
-                      <td className="px-4 py-4 align-top space-y-1">
-                        {/* Rincian Perhitungan */}
-                        <div className="text-xs font-mono font-semibold text-gray-800">
-                          {vol.toLocaleString('id-ID')} Vol × Rp {formatRp(tarif)}
+                        {/* 4. Rincian Kuantitas & Tarif (tanpa background) */}
+                        <div className="text-[11px] font-mono text-gray-600 font-medium">
+                          <span>📊 Target: </span>
+                          <strong className="text-gray-800">{vol.toLocaleString('id-ID')} Vol</strong>
+                          <span> × </span>
+                          <strong className="text-gray-800">Rp {formatRp(tarif)}</strong>
+                          {vol > 1 && (
+                            <span className="text-gray-400 ml-1.5">(Total Hitung: Rp {formatRp(vol * tarif)})</span>
+                          )}
                         </div>
 
-                        {/* Keterangan */}
+                        {/* 5. Keterangan / Uraian (DITARUH PALING BAWAH) */}
                         {row.keterangan && (
-                          <div className="text-[11px] text-gray-600 font-medium leading-relaxed">
+                          <div className="pt-0.5 text-xs text-gray-700 font-medium leading-relaxed">
                             {row.keterangan}
                           </div>
                         )}
