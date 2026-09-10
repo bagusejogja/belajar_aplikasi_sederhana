@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       // Ambil daftar seluruh unit kerja dari rkat_pengeluaran dan master gov_units dengan format kode unit & " " & nama unit
       const [{ data: rkatUnits }, { data: govUnits }] = await Promise.all([
         supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
-        supabaseAdmin.from('gov_units').select('kode_unit, nama_unit').order('kode_unit', { ascending: true })
+        supabaseAdmin.from('gov_units').select('kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true })
       ]);
 
       const formattedGovUnits = (govUnits || []).map((g: any) => {
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
         ...(rkatUnits || []).map(r => r.unit?.trim()).filter(Boolean)
       ])).filter(Boolean).sort();
 
-      return NextResponse.json({ success: true, units: combinedUnits });
+      return NextResponse.json({ success: true, units: combinedUnits, govUnits: govUnits || [] });
     }
 
     const { data, error } = await supabaseAdmin

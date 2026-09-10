@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
@@ -149,6 +149,7 @@ export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
   const [rulesList, setRulesList] = useState<any[]>([]);
   const [unitsList, setUnitsList] = useState<string[]>([]);
+  const [govUnitsList, setGovUnitsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRunningEngine, setIsRunningEngine] = useState(false);
 
@@ -178,8 +179,9 @@ export default function RkaLaporanPage() {
     try {
       const res = await fetch('/api/rka/rules?units=1');
       const json = await res.json();
-      if (json.success && json.units) {
-        setUnitsList(json.units);
+      if (json.success) {
+        if (json.units) setUnitsList(json.units);
+        if (json.govUnits) setGovUnitsList(json.govUnits);
       }
     } catch (e) {}
   };
@@ -443,6 +445,31 @@ export default function RkaLaporanPage() {
     setCurrentPage(1);
   };
 
+  // Helper mendapatkan Group Organisasi dari master gov_units
+  const getUnitGroupOrg = (unitStr: string): string => {
+    if (!unitStr) return 'Lainnya';
+    const uTrim = unitStr.trim();
+    
+    // 1. Cocokkan kode unit dari gov_units
+    const matchByCode = govUnitsList.find(g => g.kode_unit && uTrim.startsWith(g.kode_unit));
+    if (matchByCode?.group_org) return matchByCode.group_org;
+
+    // 2. Cocokkan nama unit
+    const matchByName = govUnitsList.find(g => g.nama_unit && (
+      uTrim.toLowerCase().includes(g.nama_unit.toLowerCase()) || 
+      g.nama_unit.toLowerCase().includes(uTrim.toLowerCase())
+    ));
+    if (matchByName?.group_org) return matchByName.group_org;
+
+    // 3. Heuristik berdasarkan kata kunci nama unit
+    const uLower = uTrim.toLowerCase();
+    if (uLower.includes('fakultas')) return 'Fakultas';
+    if (uLower.includes('sekolah')) return 'Sekolah';
+    if (uLower.includes('direktorat') || uLower.includes('biro') || uLower.includes('kptu') || uLower.includes('kantor') || uLower.includes('sekretaris') || uLower.includes('satuan') || uLower.includes('badan')) return 'KPTU';
+    if (uLower.includes('pusat') || uLower.includes('laboratorium') || uLower.includes('perpustakaan') || uLower.includes('arsip') || uLower.includes('rumah sakit')) return 'Unit Penunjang';
+    return 'Lainnya';
+  };
+
   // Rekapitulasi per Unit Kerja: Pengeluaran Operasional, Belanja Modal, Surplus/Defisit
   const unitRekapData = useMemo(() => {
     // Ambil baris yang terklasifikasi valid sesuai format laporan yang aktif
@@ -467,6 +494,7 @@ export default function RkaLaporanPage() {
 
     const unitMap: Record<string, {
       unit: string;
+      groupOrg: string;
       operasional: number;
       modal: number;
       totalPengeluaran: number;
@@ -486,6 +514,7 @@ export default function RkaLaporanPage() {
       if (!unitMap[u]) {
         unitMap[u] = {
           unit: u,
+          groupOrg: getUnitGroupOrg(u),
           operasional: 0,
           modal: 0,
           totalPengeluaran: 0,
@@ -531,7 +560,48 @@ export default function RkaLaporanPage() {
     });
 
     return Object.values(unitMap).sort((a, b) => b.totalPengeluaran - a.totalPengeluaran);
-  }, [dataList, modeLaporan, unitFilter, kategoriFilter, search]);
+  }, [dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList]);
+
+  // Data Rekapitulasi Dikelompokkan per Group Org dari master gov_units
+  const groupedByOrg = useMemo(() => {
+    const groups: Record<string, {
+      groupOrg: string;
+      units: typeof unitRekapData;
+      totalOperasional: number;
+      totalModal: number;
+      totalPengeluaran: number;
+      totalCount: number;
+    }> = {};
+
+    unitRekapData.forEach(item => {
+      const g = item.groupOrg || 'Lainnya';
+      if (!groups[g]) {
+        groups[g] = {
+          groupOrg: g,
+          units: [],
+          totalOperasional: 0,
+          totalModal: 0,
+          totalPengeluaran: 0,
+          totalCount: 0
+        };
+      }
+      groups[g].units.push(item);
+      groups[g].totalOperasional += item.operasional;
+      groups[g].totalModal += item.modal;
+      groups[g].totalPengeluaran += item.totalPengeluaran;
+      groups[g].totalCount += item.count;
+    });
+
+    const groupOrder = ['Fakultas', 'Sekolah', 'KPTU', 'Unit Penunjang', 'Lainnya'];
+    return Object.values(groups).sort((a, b) => {
+      const idxA = groupOrder.indexOf(a.groupOrg);
+      const idxB = groupOrder.indexOf(b.groupOrg);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.groupOrg.localeCompare(b.groupOrg);
+    });
+  }, [unitRekapData]);
 
   const unitRekapTotals = useMemo(() => {
     let totalOperasional = 0;
@@ -558,40 +628,105 @@ export default function RkaLaporanPage() {
     return { anggaran, totalItems };
   }, [groupedData]);
 
-  // Export Excel Rekap Unit Kerja
+  // Export Excel Rekap Unit Kerja (Format Rapi & Elegan Siap Tayang / Print)
   const handleExportExcelUnitRekap = () => {
     if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
 
-    const rows = unitRekapData.map((item, idx) => ({
-      'No': idx + 1,
-      'Unit Kerja': item.unit,
-      'Pengeluaran Operasional (Rp)': item.operasional,
-      'Belanja Pegawai (Rp)': item.breakdown.pegawai,
-      'Belanja Barang & Jasa (Rp)': item.breakdown.barangJasa,
-      'Belanja Pemeliharaan (Rp)': item.breakdown.pemeliharaan,
-      'Belanja Perjalanan (Rp)': item.breakdown.perjalanan,
-      'Belanja Operasional Lainnya (Rp)': item.breakdown.lainnya,
-      'Belanja Modal (Rp)': item.modal,
-      'Total Pengeluaran (Rp)': item.totalPengeluaran,
-      'Surplus / (Defisit) Anggaran (Rp)': 0
-    }));
+    const aoa: any[][] = [];
 
-    // Tambahkan baris TOTAL KESELURUHAN
-    rows.push({
-      'No': '' as any,
-      'Unit Kerja': 'TOTAL KESELURUHAN',
-      'Pengeluaran Operasional (Rp)': unitRekapTotals.totalOperasional,
-      'Belanja Pegawai (Rp)': unitRekapData.reduce((acc, u) => acc + u.breakdown.pegawai, 0),
-      'Belanja Barang & Jasa (Rp)': unitRekapData.reduce((acc, u) => acc + u.breakdown.barangJasa, 0),
-      'Belanja Pemeliharaan (Rp)': unitRekapData.reduce((acc, u) => acc + u.breakdown.pemeliharaan, 0),
-      'Belanja Perjalanan (Rp)': unitRekapData.reduce((acc, u) => acc + u.breakdown.perjalanan, 0),
-      'Belanja Operasional Lainnya (Rp)': unitRekapData.reduce((acc, u) => acc + u.breakdown.lainnya, 0),
-      'Belanja Modal (Rp)': unitRekapTotals.totalModal,
-      'Total Pengeluaran (Rp)': unitRekapTotals.grandTotalPengeluaran,
-      'Surplus / (Defisit) Anggaran (Rp)': 0
+    // 1. Header Judul Laporan yang Rapi & Formal
+    aoa.push(['UNIVERSITAS GADJAH MADA']);
+    aoa.push([`REKAPITULASI USULAN PROPOSAL RKAT PER UNIT KERJA TAHUN ANGGARAN ${tahunFilter}`]);
+    aoa.push([`Format Laporan: Proposal RKAT  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`]);
+    aoa.push([]); // Baris kosong
+
+    // 2. Header Kolom Tabel
+    aoa.push([
+      'NO',
+      'GROUP ORGANISASI',
+      'KODE & NAMA UNIT KERJA',
+      'PENGELUARAN OPERASIONAL (RP)',
+      'BELANJA MODAL (RP)',
+      'TOTAL PENGELUARAN (RP)',
+      'SURPLUS / (DEFISIT) ANGGARAN (RP)'
+    ]);
+
+    let rowNumber = 1;
+
+    // 3. Baris Data per Group Org
+    groupedByOrg.forEach(group => {
+      // Header Group
+      aoa.push([
+        '',
+        group.groupOrg.toUpperCase(),
+        `--- ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA) ---`,
+        '',
+        '',
+        '',
+        ''
+      ]);
+
+      // Baris per Unit Kerja dalam grup
+      group.units.forEach(u => {
+        aoa.push([
+          rowNumber++,
+          group.groupOrg,
+          u.unit,
+          u.operasional,
+          u.modal,
+          u.totalPengeluaran,
+          0
+        ]);
+      });
+
+      // Subtotal per Group Org
+      aoa.push([
+        '',
+        `SUBTOTAL ${group.groupOrg}`,
+        `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+        group.totalOperasional,
+        group.totalModal,
+        group.totalPengeluaran,
+        0
+      ]);
+
+      aoa.push([]); // Spacer baris kosong antar group
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    // 4. Baris TOTAL KESELURUHAN
+    aoa.push([
+      '',
+      'TOTAL KESELURUHAN',
+      `TOTAL SELURUH UNIT KERJA (${unitRekapData.length} UNIT KERJA)`,
+      unitRekapTotals.totalOperasional,
+      unitRekapTotals.totalModal,
+      unitRekapTotals.grandTotalPengeluaran,
+      0
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // 5. Atur Lebar Kolom agar tidak ada teks terpotong / tanda ###
+    ws['!cols'] = [
+      { wch: 6 },  // NO
+      { wch: 22 }, // GROUP ORGANISASI
+      { wch: 55 }, // KODE & NAMA UNIT KERJA
+      { wch: 30 }, // PENGELUARAN OPERASIONAL (RP)
+      { wch: 26 }, // BELANJA MODAL (RP)
+      { wch: 28 }, // TOTAL PENGELUARAN (RP)
+      { wch: 24 }  // SURPLUS / (DEFISIT) ANGGARAN (RP)
+    ];
+
+    // Format seluruh sel nominal angka dengan format desimal mata uang standar Excel
+    for (let r = 4; r < aoa.length; r++) {
+      for (let c = 3; c <= 6; c++) {
+        const cellRef = XLSX.utils.encode_cell({ r, c });
+        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+          ws[cellRef].z = '#,##0'; // format number with thousands separator
+        }
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Rekap_Unit_Kerja');
     XLSX.writeFile(wb, `Rekap_Proposal_RKAT_Unit_Kerja_${tahunFilter}.xlsx`);
@@ -1156,106 +1291,155 @@ export default function RkaLaporanPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {unitRekapData.length === 0 ? (
+                  {groupedByOrg.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-12 text-gray-400 font-medium">
                         Tidak ada data unit kerja yang sesuai kriteria filter.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    unitRekapData.map((item, uIdx) => {
-                      const pctOperasional = item.totalPengeluaran > 0 
-                        ? ((item.operasional / item.totalPengeluaran) * 100).toFixed(1)
-                        : '0';
-                      const pctModal = item.totalPengeluaran > 0 
-                        ? ((item.modal / item.totalPengeluaran) * 100).toFixed(1)
-                        : '0';
-
+                    groupedByOrg.map((group) => {
                       return (
-                        <TableRow 
-                          key={item.unit || uIdx}
-                          className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
-                        >
-                          <TableCell className="text-center font-mono font-bold text-gray-400 text-xs align-top pt-3.5">
-                            {uIdx + 1}
-                          </TableCell>
-
-                          {/* Unit Kerja */}
-                          <TableCell className="align-top pt-3">
-                            <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-start gap-2">
-                              <Building2 size={15} className="text-indigo-600 shrink-0 mt-0.5" />
-                              <div>
-                                <span>{item.unit}</span>
-                                <div className="text-[10px] text-gray-400 font-mono font-medium mt-0.5">
-                                  {item.count.toLocaleString('id-ID')} usulan rincian belanja
+                        <React.Fragment key={group.groupOrg}>
+                          {/* Header Group Organisasi dari Master gov_units */}
+                          <TableRow className="bg-indigo-50/80 border-t-2 border-b border-indigo-200 hover:bg-indigo-50/90">
+                            <TableCell colSpan={7} className="px-4 py-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 font-black text-xs text-indigo-950 uppercase tracking-wide">
+                                  <Building2 size={15} className="text-indigo-600" />
+                                  <span>GROUP ORGANISASI: {group.groupOrg}</span>
+                                  <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                                    {group.units.length} Unit Kerja
+                                  </span>
+                                </div>
+                                <div className="text-[11px] font-bold font-mono text-indigo-900 flex items-center gap-3">
+                                  <span>Operasional: Rp {formatRp(group.totalOperasional)}</span>
+                                  <span>•</span>
+                                  <span>Modal: Rp {formatRp(group.totalModal)}</span>
+                                  <span>•</span>
+                                  <span className="text-indigo-950 font-black">Subtotal: Rp {formatRp(group.totalPengeluaran)}</span>
                                 </div>
                               </div>
-                            </div>
-                          </TableCell>
+                            </TableCell>
+                          </TableRow>
 
-                          {/* Pengeluaran Operasional */}
-                          <TableCell className="text-right align-top pt-3 space-y-1">
-                            <span className="font-black font-mono text-gray-950 text-xs sm:text-sm block">
-                              Rp {formatRp(item.operasional)}
-                            </span>
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700">
-                              {pctOperasional}% Operasional
-                            </span>
-                            {/* Mini Breakdown Pegawai */}
-                            {item.breakdown.pegawai > 0 && (
-                              <div className="text-[9px] text-gray-400 font-mono hidden sm:block">
-                                Pegawai: {formatRp(item.breakdown.pegawai)}
-                              </div>
-                            )}
-                          </TableCell>
+                          {/* Baris per Unit Kerja dalam Group */}
+                          {group.units.map((item, uIdx) => {
+                            const pctOperasional = item.totalPengeluaran > 0 
+                              ? ((item.operasional / item.totalPengeluaran) * 100).toFixed(1)
+                              : '0';
+                            const pctModal = item.totalPengeluaran > 0 
+                              ? ((item.modal / item.totalPengeluaran) * 100).toFixed(1)
+                              : '0';
 
-                          {/* Belanja Modal */}
-                          <TableCell className="text-right align-top pt-3 space-y-1">
-                            <span className="font-black font-mono text-gray-950 text-xs sm:text-sm block">
-                              Rp {formatRp(item.modal)}
-                            </span>
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                              item.modal > 0 ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              {pctModal}% Modal
-                            </span>
-                          </TableCell>
+                            return (
+                              <TableRow 
+                                key={item.unit || uIdx}
+                                className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors"
+                              >
+                                <TableCell className="text-center font-mono font-bold text-gray-400 text-xs align-top pt-3.5">
+                                  {uIdx + 1}
+                                </TableCell>
 
-                          {/* Total Pengeluaran */}
-                          <TableCell className="text-right align-top pt-3">
-                            <span className="font-black font-mono text-indigo-950 text-sm block">
-                              Rp {formatRp(item.totalPengeluaran)}
-                            </span>
-                            <span className="text-[10px] text-gray-400 font-mono">
-                              {unitRekapTotals.grandTotalPengeluaran > 0 
-                                ? ((item.totalPengeluaran / unitRekapTotals.grandTotalPengeluaran) * 100).toFixed(1) + '% dari Total'
-                                : '0%'}
-                            </span>
-                          </TableCell>
+                                {/* Unit Kerja */}
+                                <TableCell className="align-top pt-3">
+                                  <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-start gap-2">
+                                    <span className="text-indigo-600 font-bold shrink-0 mt-0.5">•</span>
+                                    <div>
+                                      <span>{item.unit}</span>
+                                      <div className="text-[10px] text-gray-400 font-mono font-medium mt-0.5">
+                                        {item.count.toLocaleString('id-ID')} usulan rincian belanja
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
 
-                          {/* Surplus / Defisit Anggaran */}
-                          <TableCell className="text-center align-top pt-3">
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold font-mono">
-                              Rp 0 (Berimbang)
-                            </Badge>
-                            <div className="text-[9px] text-gray-400 mt-1">
-                              Alokasi Sesuai Pagu
-                            </div>
-                          </TableCell>
+                                {/* Pengeluaran Operasional */}
+                                <TableCell className="text-right align-top pt-3 space-y-1">
+                                  <span className="font-black font-mono text-gray-950 text-xs sm:text-sm block">
+                                    Rp {formatRp(item.operasional)}
+                                  </span>
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700">
+                                    {pctOperasional}% Operasional
+                                  </span>
+                                  {/* Mini Breakdown Pegawai */}
+                                  {item.breakdown.pegawai > 0 && (
+                                    <div className="text-[9px] text-gray-400 font-mono hidden sm:block">
+                                      Pegawai: {formatRp(item.breakdown.pegawai)}
+                                    </div>
+                                  )}
+                                </TableCell>
 
-                          {/* Aksi */}
-                          <TableCell className="text-center align-top pt-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleViewUnitDetail(item.unit)}
-                              className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                              title={`Buka rincian belanja ${item.unit}`}
-                            >
-                              <Eye size={15} />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                                {/* Belanja Modal */}
+                                <TableCell className="text-right align-top pt-3 space-y-1">
+                                  <span className="font-black font-mono text-gray-950 text-xs sm:text-sm block">
+                                    Rp {formatRp(item.modal)}
+                                  </span>
+                                  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                    item.modal > 0 ? 'bg-amber-50 text-amber-800' : 'bg-gray-100 text-gray-500'
+                                  }`}>
+                                    {pctModal}% Modal
+                                  </span>
+                                </TableCell>
+
+                                {/* Total Pengeluaran */}
+                                <TableCell className="text-right align-top pt-3">
+                                  <span className="font-black font-mono text-indigo-950 text-sm block">
+                                    Rp {formatRp(item.totalPengeluaran)}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-mono">
+                                    {unitRekapTotals.grandTotalPengeluaran > 0 
+                                      ? ((item.totalPengeluaran / unitRekapTotals.grandTotalPengeluaran) * 100).toFixed(1) + '% dari Total'
+                                      : '0%'}
+                                  </span>
+                                </TableCell>
+
+                                {/* Surplus / Defisit Anggaran */}
+                                <TableCell className="text-center align-top pt-3">
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold font-mono">
+                                    Rp 0 (Berimbang)
+                                  </Badge>
+                                  <div className="text-[9px] text-gray-400 mt-1">
+                                    Alokasi Sesuai Pagu
+                                  </div>
+                                </TableCell>
+
+                                {/* Aksi */}
+                                <TableCell className="text-center align-top pt-3">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleViewUnitDetail(item.unit)}
+                                    className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                    title={`Buka rincian belanja ${item.unit}`}
+                                  >
+                                    <Eye size={15} />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+
+                          {/* Subtotal Baris per Group Org */}
+                          <TableRow className="bg-slate-100/80 font-bold border-b-2 border-slate-200 text-slate-800">
+                            <TableCell colSpan={2} className="px-4 py-2.5 text-[11px] font-black uppercase text-right tracking-wider">
+                              SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} Unit)
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-slate-900">
+                              Rp {formatRp(group.totalOperasional)}
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-amber-900">
+                              Rp {formatRp(group.totalModal)}
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-indigo-950">
+                              Rp {formatRp(group.totalPengeluaran)}
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-center text-xs font-mono font-bold text-emerald-700">
+                              Rp 0
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-center text-gray-300">-</TableCell>
+                          </TableRow>
+                        </React.Fragment>
                       );
                     })
                   )}
