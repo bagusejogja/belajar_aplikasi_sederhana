@@ -5,7 +5,7 @@ import {
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
-  ChevronLeft, ChevronRight, Eye, Filter, Wallet
+  ChevronLeft, ChevronRight, Eye, Filter, Wallet, TrendingUp, TrendingDown
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -147,6 +147,7 @@ function UnitAutocompleteFilter({
 
 export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
+  const [penerimaanList, setPenerimaanList] = useState<any[]>([]);
   const [rulesList, setRulesList] = useState<any[]>([]);
   const [unitsList, setUnitsList] = useState<string[]>([]);
   const [govUnitsList, setGovUnitsList] = useState<any[]>([]);
@@ -162,6 +163,7 @@ export default function RkaLaporanPage() {
   
   // Tampilan Tabel Seragam (Summary vs Rekap Unit vs Detail)
   const [activeViewTab, setActiveViewTab] = useState<'summary' | 'rekap_unit' | 'detail'>('summary');
+  const [activeDetailSubtab, setActiveDetailSubtab] = useState<'belanja' | 'penerimaan'>('belanja');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
 
@@ -192,15 +194,31 @@ export default function RkaLaporanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Query cepat: kirimkan target format agar server bisa filter langsung di DB
-      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true&format=${encodeURIComponent(modeLaporan)}`;
-      if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.success) {
-        setDataList(json.data || []);
+      // 1. Query Pengeluaran / Belanja
+      let urlPengeluaran = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true&format=${encodeURIComponent(modeLaporan)}`;
+      if (unitFilter !== 'ALL') urlPengeluaran += `&unit=${encodeURIComponent(unitFilter)}`;
+
+      // 2. Query Penerimaan / Pendapatan
+      let urlPenerimaan = `/api/rka/penerimaan?tahun=${tahunFilter}`;
+      if (unitFilter !== 'ALL') urlPenerimaan += `&unit=${encodeURIComponent(unitFilter)}`;
+
+      const [resPeng, resPen] = await Promise.all([
+        fetch(urlPengeluaran),
+        fetch(urlPenerimaan)
+      ]);
+      const [jsonPeng, jsonPen] = await Promise.all([
+        resPeng.json(),
+        resPen.json()
+      ]);
+
+      if (jsonPeng.success) {
+        setDataList(jsonPeng.data || []);
       } else {
-        toast.error('Gagal memuat data: ' + json.error);
+        toast.error('Gagal memuat data pengeluaran: ' + jsonPeng.error);
+      }
+
+      if (jsonPen.success) {
+        setPenerimaanList(jsonPen.data || []);
       }
     } catch (e: any) {
       toast.error('Error: ' + e.message);
@@ -348,10 +366,57 @@ export default function RkaLaporanPage() {
 
   const unitOptions = useMemo(() => {
     if (unitsList.length > 0) return unitsList;
-    return Array.from(new Set(dataList.map(d => d.unit).filter(Boolean)));
-  }, [unitsList, dataList]);
+    const combined = new Set<string>([
+      ...dataList.map(d => d.unit).filter(Boolean),
+      ...penerimaanList.map(p => p.unit_kerja).filter(Boolean)
+    ]);
+    return Array.from(combined).sort((a, b) => a.localeCompare(b, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [unitsList, dataList, penerimaanList]);
 
-  // Kelompokkan data per Kategori Laporan yang dipilih
+  // Kelompokkan data Penerimaan per Format Proposal / Kelompok Penerimaan (Bagian Atas)
+  const groupedPenerimaan = useMemo(() => {
+    const validRows = penerimaanList.filter(d => {
+      if (search) {
+        const lower = search.toLowerCase();
+        return (
+          (d.unit_kerja && d.unit_kerja.toLowerCase().includes(lower)) ||
+          (d.nama_akun_penerimaan && d.nama_akun_penerimaan.toLowerCase().includes(lower)) ||
+          (d.keterangan && d.keterangan.toLowerCase().includes(lower)) ||
+          (d.sumber_dana && d.sumber_dana.toLowerCase().includes(lower)) ||
+          (d.format_proposal && d.format_proposal.toLowerCase().includes(lower)) ||
+          (d.kelompok_penerimaan && d.kelompok_penerimaan.toLowerCase().includes(lower))
+        );
+      }
+      return true;
+    });
+
+    const groups: Record<string, { label: string; rows: any[]; totalPagu: number; totalVolume: number }> = {};
+
+    validRows.forEach(row => {
+      const label = (row.format_proposal || row.kelompok_penerimaan || 'Penerimaan Lainnya').trim();
+      if (!groups[label]) {
+        groups[label] = {
+          label,
+          rows: [],
+          totalPagu: 0,
+          totalVolume: 0
+        };
+      }
+      groups[label].rows.push(row);
+      groups[label].totalPagu += Number(row.renterima_pagu) || 0;
+      groups[label].totalVolume += Number(row.renterima_volume) || 0;
+    });
+
+    return Object.values(groups).sort((a, b) => b.totalPagu - a.totalPagu);
+  }, [penerimaanList, search]);
+
+  const grandTotalPenerimaan = useMemo(() => {
+    const totalPagu = groupedPenerimaan.reduce((acc, g) => acc + g.totalPagu, 0);
+    const totalItems = groupedPenerimaan.reduce((acc, g) => acc + g.rows.length, 0);
+    return { totalPagu, totalItems };
+  }, [groupedPenerimaan]);
+
+  // Kelompokkan data Belanja per Kategori Laporan yang dipilih (Bagian Bawah)
   const groupedData = useMemo(() => {
     // Hanya ambil data yang field laporannya terisi
     const validRows = dataList.filter(d => {
@@ -417,6 +482,24 @@ export default function RkaLaporanPage() {
     });
   }, [dataList, modeLaporan, kategoriFilter, search]);
 
+  // Semua baris penerimaan valid sesuai filter
+  const allDetailPenerimaanRows = useMemo(() => {
+    return penerimaanList.filter(d => {
+      if (search) {
+        const lower = search.toLowerCase();
+        return (
+          (d.unit_kerja && d.unit_kerja.toLowerCase().includes(lower)) ||
+          (d.nama_akun_penerimaan && d.nama_akun_penerimaan.toLowerCase().includes(lower)) ||
+          (d.keterangan && d.keterangan.toLowerCase().includes(lower)) ||
+          (d.sumber_dana && d.sumber_dana.toLowerCase().includes(lower)) ||
+          (d.format_proposal && d.format_proposal.toLowerCase().includes(lower)) ||
+          (d.kelompok_penerimaan && d.kelompok_penerimaan.toLowerCase().includes(lower))
+        );
+      }
+      return true;
+    });
+  }, [penerimaanList, search]);
+
   // Paginated Rows untuk Tab Detail
   const paginatedRows = useMemo(() => {
     if (pageSize === 'ALL') return allDetailRows;
@@ -424,10 +507,17 @@ export default function RkaLaporanPage() {
     return allDetailRows.slice(start, start + pageSize);
   }, [allDetailRows, currentPage, pageSize]);
 
+  const paginatedPenerimaanRows = useMemo(() => {
+    if (pageSize === 'ALL') return allDetailPenerimaanRows;
+    const start = (currentPage - 1) * pageSize;
+    return allDetailPenerimaanRows.slice(start, start + pageSize);
+  }, [allDetailPenerimaanRows, currentPage, pageSize]);
+
   const totalPages = useMemo(() => {
+    const list = activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows : allDetailRows;
     if (pageSize === 'ALL') return 1;
-    return Math.ceil(allDetailRows.length / pageSize) || 1;
-  }, [allDetailRows.length, pageSize]);
+    return Math.ceil(list.length / pageSize) || 1;
+  }, [activeDetailSubtab, allDetailPenerimaanRows.length, allDetailRows.length, pageSize]);
 
   // Reset pagination saat filter berubah
   useEffect(() => {
@@ -473,10 +563,72 @@ export default function RkaLaporanPage() {
     return 'Lainnya';
   };
 
-  // Rekapitulasi per Unit Kerja: Pengeluaran Operasional, Belanja Modal, Surplus/Defisit
+  // Rekapitulasi per Unit Kerja: Usulan Penerimaan, Pengeluaran Operasional, Belanja Modal, Surplus/Defisit
   const unitRekapData = useMemo(() => {
-    // Ambil baris yang terklasifikasi valid sesuai format laporan yang aktif
-    const validRows = dataList.filter(d => {
+    const unitMap: Record<string, {
+      unit: string;
+      groupOrg: string;
+      penerimaan: number;
+      operasional: number;
+      modal: number;
+      totalPengeluaran: number;
+      surplusDefisit: number;
+      count: number;
+      penerimaanCount: number;
+      breakdown: {
+        pegawai: number;
+        barangJasa: number;
+        pemeliharaan: number;
+        perjalanan: number;
+        lainnya: number;
+      };
+    }> = {};
+
+    const getOrCreateUnit = (u: string) => {
+      const uTrim = (u || 'Lainnya').trim();
+      if (!unitMap[uTrim]) {
+        unitMap[uTrim] = {
+          unit: uTrim,
+          groupOrg: getUnitGroupOrg(uTrim),
+          penerimaan: 0,
+          operasional: 0,
+          modal: 0,
+          totalPengeluaran: 0,
+          surplusDefisit: 0,
+          count: 0,
+          penerimaanCount: 0,
+          breakdown: {
+            pegawai: 0,
+            barangJasa: 0,
+            pemeliharaan: 0,
+            perjalanan: 0,
+            lainnya: 0
+          }
+        };
+      }
+      return unitMap[uTrim];
+    };
+
+    // 1. Akumulasi Usulan Penerimaan / Pendapatan
+    penerimaanList.forEach(row => {
+      const u = (row.unit_kerja || 'Lainnya').trim();
+      if (unitFilter !== 'ALL' && u !== unitFilter) return;
+      if (search) {
+        const lower = search.toLowerCase();
+        const match = u.toLowerCase().includes(lower) ||
+          (row.nama_akun_penerimaan && row.nama_akun_penerimaan.toLowerCase().includes(lower)) ||
+          (row.keterangan && row.keterangan.toLowerCase().includes(lower)) ||
+          (row.sumber_dana && row.sumber_dana.toLowerCase().includes(lower));
+        if (!match) return;
+      }
+      const item = getOrCreateUnit(u);
+      const pagu = Number(row.renterima_pagu) || 0;
+      item.penerimaan += pagu;
+      item.penerimaanCount += 1;
+    });
+
+    // 2. Akumulasi Usulan Pengeluaran / Belanja
+    const validBelanjaRows = dataList.filter(d => {
       const val = getRowClassification(d, modeLaporan);
       if (!val || val.trim() === '') return false;
       if (unitFilter !== 'ALL' && d.unit !== unitFilter) return false;
@@ -495,43 +647,9 @@ export default function RkaLaporanPage() {
       return true;
     });
 
-    const unitMap: Record<string, {
-      unit: string;
-      groupOrg: string;
-      operasional: number;
-      modal: number;
-      totalPengeluaran: number;
-      surplusDefisit: number;
-      count: number;
-      breakdown: {
-        pegawai: number;
-        barangJasa: number;
-        pemeliharaan: number;
-        perjalanan: number;
-        lainnya: number;
-      };
-    }> = {};
-
-    validRows.forEach(row => {
+    validBelanjaRows.forEach(row => {
       const u = (row.unit || 'Lainnya').trim();
-      if (!unitMap[u]) {
-        unitMap[u] = {
-          unit: u,
-          groupOrg: getUnitGroupOrg(u),
-          operasional: 0,
-          modal: 0,
-          totalPengeluaran: 0,
-          surplusDefisit: 0,
-          count: 0,
-          breakdown: {
-            pegawai: 0,
-            barangJasa: 0,
-            pemeliharaan: 0,
-            perjalanan: 0,
-            lainnya: 0
-          }
-        };
-      }
+      const item = getOrCreateUnit(u);
 
       const ang = Number(row.anggaran) || 0;
       const akun = (row.akun_detail || '').trim();
@@ -540,40 +658,46 @@ export default function RkaLaporanPage() {
       // Identifikasi Belanja Modal: Akun 55* atau label mengandung 'modal'
       const isModal = akun.startsWith('55') || val.includes('modal');
 
-      unitMap[u].count += 1;
+      item.count += 1;
       if (isModal) {
-        unitMap[u].modal += ang;
+        item.modal += ang;
       } else {
-        unitMap[u].operasional += ang;
+        item.operasional += ang;
         if (akun.startsWith('51') || val.includes('pegawai')) {
-          unitMap[u].breakdown.pegawai += ang;
+          item.breakdown.pegawai += ang;
         } else if (akun.startsWith('52') || val.includes('barang') || val.includes('jasa')) {
-          unitMap[u].breakdown.barangJasa += ang;
+          item.breakdown.barangJasa += ang;
         } else if (akun.startsWith('53') || val.includes('pemeliharaan') || val.includes('perbaikan')) {
-          unitMap[u].breakdown.pemeliharaan += ang;
+          item.breakdown.pemeliharaan += ang;
         } else if (akun.startsWith('54') || val.includes('perjalanan')) {
-          unitMap[u].breakdown.perjalanan += ang;
+          item.breakdown.perjalanan += ang;
         } else {
-          unitMap[u].breakdown.lainnya += ang;
+          item.breakdown.lainnya += ang;
         }
       }
 
-      unitMap[u].totalPengeluaran += ang;
-      unitMap[u].surplusDefisit = 0; // Anggaran berimbang
+      item.totalPengeluaran += ang;
+    });
+
+    // 3. Kalkulasi Posisi Surplus / (Defisit) Riil
+    Object.values(unitMap).forEach(u => {
+      u.surplusDefisit = u.penerimaan - u.totalPengeluaran;
     });
 
     // Diurutkan A-Z berdasarkan KODE & NAMA UNIT KERJA sesuai permintaan pengguna
     return Object.values(unitMap).sort((a, b) => a.unit.localeCompare(b.unit, 'id', { numeric: true, sensitivity: 'base' }));
-  }, [dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList]);
+  }, [penerimaanList, dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList]);
 
   // Data Rekapitulasi Dikelompokkan per Group Org dari master gov_units
   const groupedByOrg = useMemo(() => {
     const groups: Record<string, {
       groupOrg: string;
       units: typeof unitRekapData;
+      totalPenerimaan: number;
       totalOperasional: number;
       totalModal: number;
       totalPengeluaran: number;
+      totalSurplusDefisit: number;
       totalCount: number;
     }> = {};
 
@@ -583,16 +707,20 @@ export default function RkaLaporanPage() {
         groups[g] = {
           groupOrg: g,
           units: [],
+          totalPenerimaan: 0,
           totalOperasional: 0,
           totalModal: 0,
           totalPengeluaran: 0,
+          totalSurplusDefisit: 0,
           totalCount: 0
         };
       }
       groups[g].units.push(item);
+      groups[g].totalPenerimaan += item.penerimaan;
       groups[g].totalOperasional += item.operasional;
       groups[g].totalModal += item.modal;
       groups[g].totalPengeluaran += item.totalPengeluaran;
+      groups[g].totalSurplusDefisit += item.surplusDefisit;
       groups[g].totalCount += item.count;
     });
 
@@ -608,17 +736,21 @@ export default function RkaLaporanPage() {
   }, [unitRekapData]);
 
   const unitRekapTotals = useMemo(() => {
+    let grandTotalPenerimaan = 0;
     let totalOperasional = 0;
     let totalModal = 0;
     let grandTotalPengeluaran = 0;
+    let grandTotalSurplusDefisit = 0;
     let totalItems = 0;
     unitRekapData.forEach(item => {
+      grandTotalPenerimaan += item.penerimaan;
       totalOperasional += item.operasional;
       totalModal += item.modal;
       grandTotalPengeluaran += item.totalPengeluaran;
+      grandTotalSurplusDefisit += item.surplusDefisit;
       totalItems += item.count;
     });
-    return { totalOperasional, totalModal, grandTotalPengeluaran, totalItems };
+    return { grandTotalPenerimaan, totalOperasional, totalModal, grandTotalPengeluaran, grandTotalSurplusDefisit, totalItems };
   }, [unitRekapData]);
 
   const formatRp = (num: number) => {
@@ -649,6 +781,7 @@ export default function RkaLaporanPage() {
       'NO',
       'GROUP ORGANISASI',
       'KODE & NAMA UNIT KERJA',
+      'PENERIMAAN / PENDAPATAN (RP)',
       'PENGELUARAN OPERASIONAL (RP)',
       'BELANJA MODAL (RP)',
       'TOTAL PENGELUARAN (RP)',
@@ -667,6 +800,7 @@ export default function RkaLaporanPage() {
         '',
         '',
         '',
+        '',
         ''
       ]);
 
@@ -676,10 +810,11 @@ export default function RkaLaporanPage() {
           rowNumber++,
           group.groupOrg,
           u.unit,
+          u.penerimaan,
           u.operasional,
           u.modal,
           u.totalPengeluaran,
-          0
+          u.surplusDefisit
         ]);
       });
 
@@ -688,10 +823,11 @@ export default function RkaLaporanPage() {
         '',
         `SUBTOTAL ${group.groupOrg}`,
         `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+        group.totalPenerimaan,
         group.totalOperasional,
         group.totalModal,
         group.totalPengeluaran,
-        0
+        group.totalSurplusDefisit
       ]);
 
       aoa.push([]); // Spacer baris kosong antar group
@@ -702,10 +838,11 @@ export default function RkaLaporanPage() {
       '',
       'TOTAL KESELURUHAN',
       `TOTAL SELURUH UNIT KERJA (${unitRekapData.length} UNIT KERJA)`,
+      unitRekapTotals.grandTotalPenerimaan,
       unitRekapTotals.totalOperasional,
       unitRekapTotals.totalModal,
       unitRekapTotals.grandTotalPengeluaran,
-      0
+      unitRekapTotals.grandTotalSurplusDefisit
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -715,15 +852,16 @@ export default function RkaLaporanPage() {
       { wch: 6 },  // NO
       { wch: 22 }, // GROUP ORGANISASI
       { wch: 55 }, // KODE & NAMA UNIT KERJA
+      { wch: 30 }, // PENERIMAAN / PENDAPATAN (RP)
       { wch: 30 }, // PENGELUARAN OPERASIONAL (RP)
       { wch: 26 }, // BELANJA MODAL (RP)
       { wch: 28 }, // TOTAL PENGELUARAN (RP)
-      { wch: 24 }  // SURPLUS / (DEFISIT) ANGGARAN (RP)
+      { wch: 30 }  // SURPLUS / (DEFISIT) ANGGARAN (RP)
     ];
 
     // Format seluruh sel nominal angka dengan format desimal mata uang standar Excel
     for (let r = 4; r < aoa.length; r++) {
-      for (let c = 3; c <= 6; c++) {
+      for (let c = 3; c <= 7; c++) {
         const cellRef = XLSX.utils.encode_cell({ r, c });
         if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
           ws[cellRef].z = '#,##0'; // format number with thousands separator
@@ -880,57 +1018,108 @@ export default function RkaLaporanPage() {
         </div>
       </div>
 
-      {/* KPI METRIC CARDS (FOKUS TOTAL PAGU ANGGARAN) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* KPI METRIC CARDS (FOKUS TOTAL PENERIMAAN, PENGELUARAN & SURPLUS/DEFISIT) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: Format Laporan Terpilih */}
-        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+        {/* Card 1: Total Usulan Penerimaan */}
+        <Card className="rounded-2xl shadow-xs border-emerald-200 bg-gradient-to-b from-white to-emerald-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Format Laporan Terpilih
-            </span>
-            <div className="text-xl font-black text-gray-900 flex items-center gap-2 truncate">
-              <span>{activeTabObj?.icon || '📊'}</span>
-              <span className="truncate">{activeTabObj?.label || 'Semua Format'}</span>
-            </div>
-            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Tahun Anggaran {tahunFilter}</span>
-              <Badge variant="outline" className="text-[10px] font-bold font-mono uppercase bg-gray-50">
-                {modeLaporan}
+            <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center justify-between text-emerald-700">
+              <span className="flex items-center gap-1">
+                <Wallet size={13} />
+                <span>Usulan Penerimaan</span>
+              </span>
+              <Badge variant="outline" className="bg-emerald-100/60 text-emerald-800 border-emerald-300 text-[9px] font-mono font-bold">
+                PENDAPATAN
               </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Total Kategori Terpetakan */}
-        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
-          <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Kategori Terpetakan
             </span>
-            <div className="text-2xl font-black font-mono text-gray-900">
-              {groupedData.length} <span className="text-xs font-semibold text-gray-500 font-sans">Kelompok Akun</span>
+            <div className="text-xl sm:text-2xl font-black font-mono text-emerald-950">
+              Rp {formatRp(unitRekapTotals.grandTotalPenerimaan)}
             </div>
-            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>{grandTotal.totalItems.toLocaleString('id-ID')} Baris Belanja</span>
-              <span className="text-indigo-600 font-medium">Siap Dilaporkan</span>
+            <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-emerald-200/60 text-emerald-800">
+              <span>{grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Rincian Akun</span>
+              <span className="text-[10px] font-mono font-bold">Pagu Penerimaan</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Total Pagu Teridentifikasi */}
+        {/* Card 2: Total Usulan Belanja */}
         <Card className="rounded-2xl shadow-xs border-indigo-200 bg-gradient-to-b from-white to-indigo-50/40">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center gap-1 text-indigo-700">
-              <FileSpreadsheet size={13} />
-              <span>Total Pagu Anggaran</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center justify-between text-indigo-700">
+              <span className="flex items-center gap-1">
+                <FileSpreadsheet size={13} />
+                <span>Usulan Belanja</span>
+              </span>
+              <Badge variant="outline" className="bg-indigo-100/60 text-indigo-800 border-indigo-300 text-[9px] font-mono font-bold">
+                PENGELUARAN
+              </Badge>
             </span>
-            <div className="text-2xl font-black font-mono text-indigo-950">
-              Rp {formatRp(grandTotal.anggaran)}
+            <div className="text-xl sm:text-2xl font-black font-mono text-indigo-950">
+              Rp {formatRp(unitRekapTotals.grandTotalPengeluaran)}
             </div>
             <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60 text-indigo-800">
-              <span>Rekapitulasi Belanja</span>
-              <span className="text-[10px] font-mono font-bold">100% Pagu</span>
+              <span>{grandTotal.totalItems.toLocaleString('id-ID')} Rincian Belanja</span>
+              <span className="text-[10px] font-mono font-bold">Pagu Belanja</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Posisi Surplus / Defisit Anggaran Riil */}
+        <Card className={`rounded-2xl shadow-xs border ${
+          unitRekapTotals.grandTotalSurplusDefisit >= 0 
+            ? 'border-teal-200 bg-gradient-to-b from-white to-teal-50/40' 
+            : 'border-rose-200 bg-gradient-to-b from-white to-rose-50/40'
+        }`}>
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider block flex items-center justify-between">
+              <span className={`flex items-center gap-1 ${
+                unitRekapTotals.grandTotalSurplusDefisit >= 0 ? 'text-teal-700' : 'text-rose-700'
+              }`}>
+                {unitRekapTotals.grandTotalSurplusDefisit >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                <span>Surplus / (Defisit)</span>
+              </span>
+              <Badge 
+                variant="outline" 
+                className={`text-[9px] font-mono font-bold ${
+                  unitRekapTotals.grandTotalSurplusDefisit >= 0 
+                    ? 'bg-teal-100 text-teal-800 border-teal-300' 
+                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                }`}
+              >
+                {unitRekapTotals.grandTotalSurplusDefisit >= 0 ? 'SURPLUS' : 'DEFISIT'}
+              </Badge>
+            </span>
+            <div className={`text-xl sm:text-2xl font-black font-mono ${
+              unitRekapTotals.grandTotalSurplusDefisit >= 0 ? 'text-teal-950' : 'text-rose-950'
+            }`}>
+              {unitRekapTotals.grandTotalSurplusDefisit < 0 && '- '}Rp {formatRp(Math.abs(unitRekapTotals.grandTotalSurplusDefisit))}
+            </div>
+            <div className={`text-xs font-semibold flex items-center justify-between pt-1 border-t ${
+              unitRekapTotals.grandTotalSurplusDefisit >= 0 ? 'border-teal-200/60 text-teal-800' : 'border-rose-200/60 text-rose-800'
+            }`}>
+              <span>Penerimaan vs Pengeluaran</span>
+              <span className="text-[10px] font-mono font-bold">Posisi Kas</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Format Laporan & Unit Terdaftar */}
+        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block flex items-center justify-between">
+              <span>Unit Kerja &amp; Format</span>
+              <Badge variant="outline" className="text-[9px] font-mono font-bold bg-gray-50">
+                TA {tahunFilter}
+              </Badge>
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-gray-900 font-mono flex items-center gap-1.5">
+              <span>{unitRekapData.length}</span>
+              <span className="text-xs font-semibold text-gray-500 font-sans">Unit Kerja</span>
+            </div>
+            <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
+              <span className="truncate max-w-[140px]">{activeTabObj?.label || 'Proposal RKAT'}</span>
+              <span className="text-indigo-600 font-medium">Siap Dilaporkan</span>
             </div>
           </CardContent>
         </Card>
@@ -982,7 +1171,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <FileSpreadsheet size={14} className="text-indigo-600" />
-                <span>📊 Ringkasan Kelompok Belanja ({groupedData.length})</span>
+                <span>📊 Ringkasan Usulan (Atas: Penerimaan, Bawah: Belanja)</span>
               </button>
               <button
                 type="button"
@@ -994,7 +1183,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <Building2 size={14} className="text-indigo-600" />
-                <span>🏛️ Rekap Unit Kerja (Operasional &amp; Modal) ({unitRekapData.length})</span>
+                <span>🏛️ Rekap Unit Kerja (Penerimaan, Belanja &amp; Surplus/Defisit) ({unitRekapData.length})</span>
               </button>
               <button
                 type="button"
@@ -1006,7 +1195,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <BookOpen size={14} className="text-indigo-600" />
-                <span>📋 Tabel Rincian Belanja ({allDetailRows.length.toLocaleString('id-ID')})</span>
+                <span>📋 Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
               </button>
             </div>
 
@@ -1136,124 +1325,257 @@ export default function RkaLaporanPage() {
           </Card>
         ) : activeViewTab === 'summary' ? (
           /* ======================================================== */
-          /* TAB VIEW 1: TABEL RINGKASAN PER KELOMPOK BELANJA (SUMMARY) */
+          /* TAB VIEW 1: ATAS BAWAH (ATAS: PENERIMAAN, BAWAH: BELANJA) */
           /* ======================================================== */
-          <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
-            <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
-                  <span>{activeTabObj?.icon || '📊'}</span>
-                  <span>Tabel Rekapitulasi {activeTabObj?.label || 'Format Laporan'}</span>
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  Rekapitulasi total alokasi pagu belanja dan akumulasi item belanja per kelompok akun pelaporan
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
-                  {groupedData.length} Group Belanja
-                </Badge>
-                <Badge variant="secondary" className="text-xs font-bold font-mono">
-                  {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
-                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-24">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupedData.map((group, gIdx) => {
-                    const proporsiPct = grandTotal.anggaran > 0 
-                      ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
-                      : '0';
-
-                    return (
-                      <TableRow 
-                        key={group.label || gIdx} 
-                        className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
-                      >
-                        <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
-                          {gIdx + 1}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
-                            <span>🏷️</span>
-                            <span>{group.label}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-800 rounded-lg text-xs font-bold font-mono">
-                            {group.rows.length.toLocaleString('id-ID')} Baris
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="font-black font-mono text-gray-950 text-sm">
-                            Rp {formatRp(group.totalAnggaran)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="space-y-1 max-w-[110px] mx-auto">
-                            <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
-                              {proporsiPct}%
-                            </div>
-                            <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-indigo-600 rounded-full"
-                                style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
-                              />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewCategoryDetail(group.label)}
-                            className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                            title={`Buka rincian belanja ${group.label}`}
-                          >
-                            <Eye size={15} />
-                          </Button>
+          <div className="space-y-6">
+            
+            {/* BAGIAN ATAS: RINGKASAN USULAN PENERIMAAN / PENDAPATAN */}
+            <Card className="rounded-2xl border-emerald-200/90 shadow-xs overflow-hidden">
+              <CardHeader className="bg-emerald-50/70 p-4 sm:p-5 border-b border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm sm:text-base font-black text-emerald-950 flex items-center gap-2">
+                    <Wallet size={18} className="text-emerald-600" />
+                    <span>1. Ringkasan Alokasi Usulan Penerimaan / Pendapatan</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-emerald-800 font-medium mt-0.5">
+                    Akumulasi alokasi usulan pagu penerimaan per format / kelompok pendapatan
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-emerald-800 border-emerald-200">
+                    {groupedPenerimaan.length} Kelompok Penerimaan
+                  </Badge>
+                  <Badge className="bg-emerald-600 text-white text-xs font-bold font-mono">
+                    {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Total Baris
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-emerald-50/40 border-b border-emerald-100 text-emerald-800 font-black uppercase text-[10px] tracking-wider">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-emerald-800 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-emerald-800 text-xs uppercase font-bold min-w-[280px]">Format / Kelompok Penerimaan</TableHead>
+                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
+                      <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Penerimaan</TableHead>
+                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">% Proporsi Penerimaan</TableHead>
+                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedPenerimaan.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-10 text-gray-400 font-medium">
+                          Tidak ada data penerimaan yang sesuai kriteria filter.
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-                {/* Footer Total Keseluruhan */}
-                <tfoot className="bg-gray-100/90 font-bold border-t-2 border-gray-300">
-                  <tr>
-                    <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-gray-800">
-                      TOTAL KESELURUHAN ({groupedData.length} GROUP BELANJA)
-                    </td>
-                    <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
-                      {grandTotal.totalItems.toLocaleString('id-ID')} Baris
-                    </td>
-                    <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
-                      Rp {formatRp(grandTotal.anggaran)}
-                    </td>
-                    <td className="p-4 text-center text-xs font-black font-mono text-gray-700">
-                      100%
-                    </td>
-                    <td className="p-4 text-center text-gray-400 text-xs font-bold">
-                      -
-                    </td>
-                  </tr>
-                </tfoot>
-              </Table>
-            </CardContent>
-          </Card>
+                    ) : (
+                      groupedPenerimaan.map((group, gIdx) => {
+                        const proporsiPct = grandTotalPenerimaan.totalPagu > 0 
+                          ? ((group.totalPagu / grandTotalPenerimaan.totalPagu) * 100).toFixed(1)
+                          : '0';
+
+                        return (
+                          <TableRow 
+                            key={group.label || gIdx} 
+                            className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors"
+                          >
+                            <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                              {gIdx + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                                <span>💰</span>
+                                <span>{group.label}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold font-mono border border-emerald-100">
+                                {group.rows.length.toLocaleString('id-ID')} Baris
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-black font-mono text-emerald-950 text-sm">
+                                Rp {formatRp(group.totalPagu)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="space-y-1 max-w-[110px] mx-auto">
+                                <div className="text-[11px] font-bold font-mono text-emerald-800 text-right">
+                                  {proporsiPct}%
+                                </div>
+                                <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-emerald-600 rounded-full"
+                                    style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setActiveDetailSubtab('penerimaan');
+                                  setActiveViewTab('detail');
+                                  setSearch(group.label);
+                                }}
+                                className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                title={`Buka rincian penerimaan ${group.label}`}
+                              >
+                                <Eye size={15} />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                  <tfoot className="bg-emerald-50/80 font-bold border-t-2 border-emerald-200">
+                    <tr>
+                      <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-emerald-950">
+                        TOTAL KESELURUHAN PENERIMAAN ({groupedPenerimaan.length} KELOMPOK)
+                      </td>
+                      <td className="p-4 text-center text-xs font-black font-mono text-emerald-900">
+                        {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Baris
+                      </td>
+                      <td className="p-4 text-right text-sm font-black font-mono text-emerald-950">
+                        Rp {formatRp(grandTotalPenerimaan.totalPagu)}
+                      </td>
+                      <td className="p-4 text-center text-xs font-black font-mono text-emerald-800">
+                        100%
+                      </td>
+                      <td className="p-4 text-center text-gray-400 text-xs font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* BAGIAN BAWAH: RINGKASAN USULAN PENGELUARAN / BELANJA */}
+            <Card className="rounded-2xl border-indigo-200/90 shadow-xs overflow-hidden">
+              <CardHeader className="bg-indigo-50/70 p-4 sm:p-5 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm sm:text-base font-black text-indigo-950 flex items-center gap-2">
+                    <span>{activeTabObj?.icon || '📊'}</span>
+                    <span>2. Ringkasan Alokasi Usulan Pengeluaran / Belanja ({activeTabObj?.label || 'Format Laporan'})</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-indigo-800 font-medium mt-0.5">
+                    Rekapitulasi total alokasi pagu belanja dan akumulasi item belanja per kelompok akun pelaporan
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-indigo-800 border-indigo-200">
+                    {groupedData.length} Group Belanja
+                  </Badge>
+                  <Badge className="bg-indigo-600 text-white text-xs font-bold font-mono">
+                    {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-indigo-50/40 border-b border-indigo-100 text-indigo-800 font-black uppercase text-[10px] tracking-wider">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-indigo-800 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-indigo-800 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
+                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
+                      <TableHead className="text-right text-indigo-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
+                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
+                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedData.map((group, gIdx) => {
+                      const proporsiPct = grandTotal.anggaran > 0 
+                        ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
+                        : '0';
+
+                      return (
+                        <TableRow 
+                          key={group.label || gIdx} 
+                          className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
+                        >
+                          <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                            {gIdx + 1}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                              <span>🏷️</span>
+                              <span>{group.label}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-bold font-mono border border-indigo-100">
+                              {group.rows.length.toLocaleString('id-ID')} Baris
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="font-black font-mono text-gray-950 text-sm">
+                              Rp {formatRp(group.totalAnggaran)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="space-y-1 max-w-[110px] mx-auto">
+                              <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
+                                {proporsiPct}%
+                              </div>
+                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-indigo-600 rounded-full"
+                                  style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setActiveDetailSubtab('belanja');
+                                handleViewCategoryDetail(group.label);
+                              }}
+                              className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                              title={`Buka rincian belanja ${group.label}`}
+                            >
+                              <Eye size={15} />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  <tfoot className="bg-indigo-50/80 font-bold border-t-2 border-indigo-200">
+                    <tr>
+                      <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-indigo-950">
+                        TOTAL KESELURUHAN PENGELUARAN ({groupedData.length} GROUP BELANJA)
+                      </td>
+                      <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
+                        {grandTotal.totalItems.toLocaleString('id-ID')} Baris
+                      </td>
+                      <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
+                        Rp {formatRp(grandTotal.anggaran)}
+                      </td>
+                      <td className="p-4 text-center text-xs font-black font-mono text-gray-700">
+                        100%
+                      </td>
+                      <td className="p-4 text-center text-gray-400 text-xs font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                </Table>
+              </CardContent>
+            </Card>
+
+          </div>
         ) : activeViewTab === 'rekap_unit' ? (
           /* ======================================================== */
-          /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA (OPERASIONAL & MODAL) */
+          /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA (PENERIMAAN, OPERASIONAL & MODAL) */
           /* ======================================================== */
           <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
             <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1263,7 +1585,7 @@ export default function RkaLaporanPage() {
                   <span>Rekapitulasi Usulan RKAT per Unit Kerja</span>
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  Format Laporan Usulan Proposal RKAT memuat Nama Unit Kerja, Pengeluaran Operasional, Belanja Modal, dan Surplus/Defisit
+                  Format Usulan Proposal RKAT memuat Nama Unit Kerja, Usulan Penerimaan, Pengeluaran Operasional, Belanja Modal, dan Surplus/Defisit
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -1289,18 +1611,21 @@ export default function RkaLaporanPage() {
                 <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[260px]">Unit Kerja / Fakultas</TableHead>
-                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[160px]">
-                      Pengeluaran Operasional
+                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[240px]">Unit Kerja / Fakultas</TableHead>
+                    <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[160px]">
+                      Usulan Penerimaan
                     </TableHead>
                     <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
+                      Pengeluaran Operasional
+                    </TableHead>
+                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[140px]">
                       Belanja Modal
                     </TableHead>
                     <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[160px]">
                       Total Pengeluaran
                     </TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold min-w-[140px]">
-                      Surplus / Defisit
+                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold min-w-[160px]">
+                      Surplus / (Defisit)
                     </TableHead>
                     <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-20">Aksi</TableHead>
                   </TableRow>
@@ -1308,7 +1633,7 @@ export default function RkaLaporanPage() {
                 <TableBody>
                   {groupedByOrg.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-gray-400 font-medium">
+                      <TableCell colSpan={8} className="text-center py-12 text-gray-400 font-medium">
                         Tidak ada data unit kerja yang sesuai kriteria filter.
                       </TableCell>
                     </TableRow>
@@ -1318,7 +1643,7 @@ export default function RkaLaporanPage() {
                         <React.Fragment key={group.groupOrg}>
                           {/* Header Group Organisasi dari Master gov_units */}
                           <TableRow className="bg-indigo-50/80 border-t-2 border-b border-indigo-200 hover:bg-indigo-50/90">
-                            <TableCell colSpan={7} className="px-4 py-2.5">
+                            <TableCell colSpan={8} className="px-4 py-2.5">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 font-black text-xs text-indigo-950 uppercase tracking-wide">
                                   <Building2 size={15} className="text-indigo-600" />
@@ -1328,11 +1653,13 @@ export default function RkaLaporanPage() {
                                   </span>
                                 </div>
                                 <div className="text-[11px] font-bold font-mono text-indigo-900 flex items-center gap-3">
+                                  <span className="text-emerald-800 font-black">Penerimaan: Rp {formatRp(group.totalPenerimaan)}</span>
+                                  <span>•</span>
                                   <span>Operasional: Rp {formatRp(group.totalOperasional)}</span>
                                   <span>•</span>
                                   <span>Modal: Rp {formatRp(group.totalModal)}</span>
                                   <span>•</span>
-                                  <span className="text-indigo-950 font-black">Subtotal: Rp {formatRp(group.totalPengeluaran)}</span>
+                                  <span className="text-indigo-950 font-black">Pengeluaran: Rp {formatRp(group.totalPengeluaran)}</span>
                                 </div>
                               </div>
                             </TableCell>
@@ -1362,11 +1689,25 @@ export default function RkaLaporanPage() {
                                     <span className="text-indigo-600 font-bold shrink-0 mt-0.5">•</span>
                                     <div>
                                       <span>{item.unit}</span>
-                                      <div className="text-[10px] text-gray-400 font-mono font-medium mt-0.5">
-                                        {item.count.toLocaleString('id-ID')} usulan rincian belanja
+                                      <div className="text-[10px] text-gray-400 font-mono font-medium mt-0.5 flex items-center gap-2">
+                                        <span>{item.count.toLocaleString('id-ID')} usulan belanja</span>
+                                        <span>•</span>
+                                        <span className="text-emerald-700 font-semibold">{item.penerimaanCount.toLocaleString('id-ID')} akun penerimaan</span>
                                       </div>
                                     </div>
                                   </div>
+                                </TableCell>
+
+                                {/* Usulan Penerimaan / Pendapatan */}
+                                <TableCell className="text-right align-top pt-3 space-y-1">
+                                  <span className="font-black font-mono text-emerald-950 text-xs sm:text-sm block">
+                                    Rp {formatRp(item.penerimaan)}
+                                  </span>
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700">
+                                    {unitRekapTotals.grandTotalPenerimaan > 0
+                                      ? ((item.penerimaan / unitRekapTotals.grandTotalPenerimaan) * 100).toFixed(1) + '% Pagu'
+                                      : '0%'}
+                                  </span>
                                 </TableCell>
 
                                 {/* Pengeluaran Operasional */}
@@ -1411,12 +1752,25 @@ export default function RkaLaporanPage() {
 
                                 {/* Surplus / Defisit Anggaran */}
                                 <TableCell className="text-center align-top pt-3">
-                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold font-mono">
-                                    Rp 0 (Berimbang)
-                                  </Badge>
-                                  <div className="text-[9px] text-gray-400 mt-1">
-                                    Alokasi Sesuai Pagu
-                                  </div>
+                                  {item.surplusDefisit >= 0 ? (
+                                    <div className="space-y-0.5">
+                                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px] font-bold font-mono">
+                                        + Rp {formatRp(item.surplusDefisit)}
+                                      </Badge>
+                                      <div className="text-[9px] text-emerald-700 font-bold">
+                                        Surplus Anggaran
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-0.5">
+                                      <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-300 text-[10px] font-bold font-mono">
+                                        - Rp {formatRp(Math.abs(item.surplusDefisit))}
+                                      </Badge>
+                                      <div className="text-[9px] text-rose-700 font-bold">
+                                        Defisit Anggaran
+                                      </div>
+                                    </div>
+                                  )}
                                 </TableCell>
 
                                 {/* Aksi */}
@@ -1440,6 +1794,9 @@ export default function RkaLaporanPage() {
                             <TableCell colSpan={2} className="px-4 py-2.5 text-[11px] font-black uppercase text-right tracking-wider">
                               SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} Unit)
                             </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-emerald-800">
+                              Rp {formatRp(group.totalPenerimaan)}
+                            </TableCell>
                             <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-slate-900">
                               Rp {formatRp(group.totalOperasional)}
                             </TableCell>
@@ -1449,8 +1806,10 @@ export default function RkaLaporanPage() {
                             <TableCell className="px-4 py-2.5 text-right font-black font-mono text-xs text-indigo-950">
                               Rp {formatRp(group.totalPengeluaran)}
                             </TableCell>
-                            <TableCell className="px-4 py-2.5 text-center text-xs font-mono font-bold text-emerald-700">
-                              Rp 0
+                            <TableCell className={`px-4 py-2.5 text-center text-xs font-mono font-bold ${
+                              group.totalSurplusDefisit >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                            }`}>
+                              {group.totalSurplusDefisit < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisit))}
                             </TableCell>
                             <TableCell className="px-4 py-2.5 text-center text-gray-300">-</TableCell>
                           </TableRow>
@@ -1466,6 +1825,9 @@ export default function RkaLaporanPage() {
                     <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-gray-800">
                       TOTAL KESELURUHAN ({unitRekapData.length} UNIT KERJA)
                     </td>
+                    <td className="p-4 text-right text-xs sm:text-sm font-black font-mono text-emerald-800">
+                      Rp {formatRp(unitRekapTotals.grandTotalPenerimaan)}
+                    </td>
                     <td className="p-4 text-right text-xs sm:text-sm font-black font-mono text-gray-900">
                       Rp {formatRp(unitRekapTotals.totalOperasional)}
                     </td>
@@ -1475,8 +1837,10 @@ export default function RkaLaporanPage() {
                     <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
                       Rp {formatRp(unitRekapTotals.grandTotalPengeluaran)}
                     </td>
-                    <td className="p-4 text-center text-xs font-black font-mono text-emerald-700">
-                      Rp 0 (Berimbang)
+                    <td className={`p-4 text-center text-xs font-black font-mono ${
+                      unitRekapTotals.grandTotalSurplusDefisit >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                    }`}>
+                      {unitRekapTotals.grandTotalSurplusDefisit < 0 && '- '}Rp {formatRp(Math.abs(unitRekapTotals.grandTotalSurplusDefisit))}
                     </td>
                     <td className="p-4 text-center text-gray-400 text-xs font-bold">
                       -
@@ -1488,149 +1852,298 @@ export default function RkaLaporanPage() {
           </Card>
         ) : (
           /* ======================================================== */
-          /* TAB VIEW 2: TABEL RINCIAN BARIS BELANJA DETAIL (DETAIL)   */
+          /* TAB VIEW 3: TABEL RINCIAN DETAIL (BELANJA & PENERIMAAN)   */
           /* ======================================================== */
           <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
             <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
                   <BookOpen size={16} className="text-indigo-600" />
-                  <span>Tabel Rincian Baris Belanja ({allDetailRows.length.toLocaleString('id-ID')} Data)</span>
+                  <span>
+                    {activeDetailSubtab === 'penerimaan'
+                      ? `Tabel Rincian Penerimaan (${allDetailPenerimaanRows.length.toLocaleString('id-ID')} Data)`
+                      : `Tabel Rincian Belanja (${allDetailRows.length.toLocaleString('id-ID')} Data)`}
+                  </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  Daftar seluruh item belanja usulan RKA/RKAT yang terklasifikasi ke dalam format {activeTabObj?.label}
-                  {kategoriFilter !== 'ALL' && <span className="font-bold text-indigo-600"> • Filter Kategori: {kategoriFilter}</span>}
+                  {activeDetailSubtab === 'penerimaan'
+                    ? 'Daftar rincian usulan akun penerimaan / pendapatan RKAT'
+                    : `Daftar seluruh item belanja usulan RKA/RKAT yang terklasifikasi ke dalam format ${activeTabObj?.label}`}
+                  {kategoriFilter !== 'ALL' && activeDetailSubtab === 'belanja' && (
+                    <span className="font-bold text-indigo-600"> • Filter Kategori: {kategoriFilter}</span>
+                  )}
                 </CardDescription>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per hal:</span>
-                <select
-                  value={pageSize}
-                  onChange={e => {
-                    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
-                    setPageSize(val);
-                    setCurrentPage(1);
-                  }}
-                  className="h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={250}>250</option>
-                  <option value="ALL">Semua</option>
-                </select>
+              {/* Subtab Toggle: Belanja vs Penerimaan */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-gray-200/70 p-1 rounded-xl border border-gray-300/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDetailSubtab('belanja');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeDetailSubtab === 'belanja'
+                        ? 'bg-white text-indigo-950 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    📋 Rincian Belanja ({allDetailRows.length.toLocaleString('id-ID')})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDetailSubtab('penerimaan');
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      activeDetailSubtab === 'penerimaan'
+                        ? 'bg-white text-emerald-950 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    💰 Rincian Penerimaan ({allDetailPenerimaanRows.length.toLocaleString('id-ID')})
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase">Baris:</span>
+                  <select
+                    value={pageSize}
+                    onChange={e => {
+                      const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                      setPageSize(val);
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={250}>250</option>
+                    <option value="ALL">Semua</option>
+                  </select>
+                </div>
               </div>
             </CardHeader>
 
             <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[420px]">
-                      Fakultas / Unit Kerja &amp; Rincian Kegiatan
-                    </TableHead>
-                    <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[220px]">
-                      Group Belanja
-                    </TableHead>
-                    <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
-                      Pagu Anggaran
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-12 text-gray-400 font-medium">
-                        Tidak ada baris data belanja yang sesuai kriteria filter.
-                      </TableCell>
+              {activeDetailSubtab === 'penerimaan' ? (
+                /* TABEL RINCIAN PENERIMAAN */
+                <Table>
+                  <TableHeader className="bg-emerald-50/50 border-b border-emerald-100 text-emerald-900 font-black uppercase text-[10px] tracking-wider">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-emerald-900 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-emerald-900 text-xs uppercase font-bold min-w-[380px]">
+                        Fakultas / Unit Kerja &amp; Akun Penerimaan
+                      </TableHead>
+                      <TableHead className="text-center text-emerald-900 text-xs uppercase font-bold w-36">
+                        Volume &amp; Tarif
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-900 text-xs uppercase font-bold min-w-[170px]">
+                        Pagu Penerimaan
+                      </TableHead>
+                      <TableHead className="text-center text-emerald-900 text-xs uppercase font-bold min-w-[170px]">
+                        Status &amp; Sumber Dana
+                      </TableHead>
                     </TableRow>
-                  ) : (
-                    paginatedRows.map((row, rIdx) => {
-                      const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
-                      const ang = Number(row.anggaran) || 0;
-                      const catLabel = getRowClassification(row, modeLaporan) || 'Lainnya';
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedPenerimaanRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12 text-gray-400 font-medium">
+                          Tidak ada baris data penerimaan yang sesuai kriteria filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedPenerimaanRows.map((row, rIdx) => {
+                        const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
+                        const pagu = Number(row.renterima_pagu) || 0;
+                        const tarif = Number(row.renterima_tarif) || 0;
+                        const vol = Number(row.renterima_volume) || 0;
 
-                      return (
-                        <TableRow key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors border-b border-gray-100">
-                          {/* No */}
-                          <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
-                            {rowNum}
-                          </TableCell>
+                        return (
+                          <TableRow key={row.renterima_id || rIdx} className="hover:bg-emerald-50/30 transition-colors border-b border-gray-100">
+                            <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
+                              {rowNum}
+                            </TableCell>
 
-                          {/* Field 1: Unit & Uraian Belanja Kegiatan */}
-                          <TableCell className="align-top pt-3 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
+                            {/* Unit Kerja & Akun Penerimaan */}
+                            <TableCell className="align-top pt-3 space-y-1.5">
                               <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                                <Building2 size={13} className="text-indigo-600 shrink-0" />
-                                <span>{row.unit}</span>
-                              </div>
-                              <span className="text-[10px] text-gray-400 font-mono">
-                                TA {row.tahun_anggaran} • Prioritas: <strong>{row.prioritas || '-'}</strong>
-                              </span>
-                            </div>
-
-                            {/* Kegiatan & Lingkup Kegiatan */}
-                            {(row.kegiatan || row.lingkup_kegiatan) && (
-                              <div className="bg-gray-50/90 p-2 rounded-xl border border-gray-100 space-y-0.5">
-                                {row.kegiatan && (
-                                  <div className="text-[11px] text-gray-800 leading-relaxed font-medium">
-                                    <span className="font-bold text-gray-900">Kegiatan:</span> {row.kegiatan}
-                                  </div>
-                                )}
-                                {row.lingkup_kegiatan && (
-                                  <div className="text-[10px] text-indigo-800 font-medium">
-                                    <span className="font-bold text-indigo-950">Lingkup:</span> {row.lingkup_kegiatan}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Akun Detail & Uraian Belanja */}
-                            <div className="space-y-1">
-                              {row.akun_detail && (
-                                <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold">
-                                  {row.akun_detail}
+                                <Building2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>{row.unit_kerja}</span>
+                                <span className="text-[10px] text-gray-400 font-mono font-medium ml-1">
+                                  TA {row.tahun}
                                 </span>
+                              </div>
+                              <div className="font-mono text-xs font-bold text-emerald-900">
+                                {row.nama_akun_penerimaan}
+                              </div>
+                              {row.keterangan && (
+                                <div className="text-[11px] text-gray-600 italic bg-gray-50 p-1.5 rounded-lg border border-gray-100">
+                                  {row.keterangan}
+                                </div>
                               )}
-                              <div className="font-bold text-gray-950 text-xs leading-snug">
-                                {row.uraian_belanja || '-'}
-                              </div>
-                            </div>
-                          </TableCell>
+                            </TableCell>
 
-                          {/* Field 2: Group Belanja */}
-                          <TableCell className="align-top pt-3 space-y-1.5">
-                            <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
-                              <div className="flex items-center gap-1.5 font-bold text-xs leading-snug">
-                                <span>🏷️</span>
-                                <span>{catLabel}</span>
+                            {/* Volume & Tarif */}
+                            <TableCell className="align-top pt-3 text-center space-y-1">
+                              <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-mono text-xs font-bold">
+                                {vol.toLocaleString('id-ID')} Vol
+                              </span>
+                              <div className="text-[11px] text-gray-500 font-mono">
+                                @ Rp {formatRp(tarif)}
                               </div>
-                            </div>
-                          </TableCell>
+                            </TableCell>
 
-                          {/* Field 3: Pagu Anggaran */}
-                          <TableCell className="align-top pt-3 text-right">
-                            <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider mb-1">
-                              Pagu Anggaran
-                            </span>
-                            <span className="font-black font-mono text-gray-950 text-sm">
-                              Rp {formatRp(ang)}
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                            {/* Pagu Penerimaan */}
+                            <TableCell className="align-top pt-3 text-right">
+                              <span className="text-[9px] uppercase font-bold text-emerald-700 block tracking-wider mb-1">
+                                Pagu Penerimaan
+                              </span>
+                              <span className="font-black font-mono text-emerald-950 text-sm">
+                                Rp {formatRp(pagu)}
+                              </span>
+                            </TableCell>
+
+                            {/* Status & Sumber Dana */}
+                            <TableCell className="align-top pt-3 text-center space-y-1">
+                              <div>
+                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                                  {row.status || 'Aktif'}
+                                </Badge>
+                              </div>
+                              <div className="text-[10px] text-gray-500 font-medium">
+                                {row.sumber_dana || 'Dana Masyarakat'}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              ) : (
+                /* TABEL RINCIAN BELANJA */
+                <Table>
+                  <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[420px]">
+                        Fakultas / Unit Kerja &amp; Rincian Kegiatan
+                      </TableHead>
+                      <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[220px]">
+                        Group Belanja
+                      </TableHead>
+                      <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
+                        Pagu Anggaran
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-12 text-gray-400 font-medium">
+                          Tidak ada baris data belanja yang sesuai kriteria filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedRows.map((row, rIdx) => {
+                        const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
+                        const ang = Number(row.anggaran) || 0;
+                        const catLabel = getRowClassification(row, modeLaporan) || 'Lainnya';
+
+                        return (
+                          <TableRow key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors border-b border-gray-100">
+                            {/* No */}
+                            <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
+                              {rowNum}
+                            </TableCell>
+
+                            {/* Field 1: Unit & Uraian Belanja Kegiatan */}
+                            <TableCell className="align-top pt-3 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                  <Building2 size={13} className="text-indigo-600 shrink-0" />
+                                  <span>{row.unit}</span>
+                                </div>
+                                <span className="text-[10px] text-gray-400 font-mono">
+                                  TA {row.tahun_anggaran} • Prioritas: <strong>{row.prioritas || '-'}</strong>
+                                </span>
+                              </div>
+
+                              {/* Kegiatan & Lingkup Kegiatan */}
+                              {(row.kegiatan || row.lingkup_kegiatan) && (
+                                <div className="bg-gray-50/90 p-2 rounded-xl border border-gray-100 space-y-0.5">
+                                  {row.kegiatan && (
+                                    <div className="text-[11px] text-gray-800 leading-relaxed font-medium">
+                                      <span className="font-bold text-gray-900">Kegiatan:</span> {row.kegiatan}
+                                    </div>
+                                  )}
+                                  {row.lingkup_kegiatan && (
+                                    <div className="text-[10px] text-indigo-800 font-medium">
+                                      <span className="font-bold text-indigo-950">Lingkup:</span> {row.lingkup_kegiatan}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Akun Detail & Uraian Belanja */}
+                              <div className="space-y-1">
+                                {row.akun_detail && (
+                                  <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold">
+                                    {row.akun_detail}
+                                  </span>
+                                )}
+                                <div className="font-bold text-gray-950 text-xs leading-snug">
+                                  {row.uraian_belanja || '-'}
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* Field 2: Group Belanja */}
+                            <TableCell className="align-top pt-3 space-y-1.5">
+                              <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
+                                <div className="flex items-center gap-1.5 font-bold text-xs leading-snug">
+                                  <span>🏷️</span>
+                                  <span>{catLabel}</span>
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* Field 3: Pagu Anggaran */}
+                            <TableCell className="align-top pt-3 text-right">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider mb-1">
+                                Pagu Anggaran
+                              </span>
+                              <span className="font-black font-mono text-gray-950 text-sm">
+                                Rp {formatRp(ang)}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
 
             {/* Pagination Controls Footer (Seragam dengan /rka/pengeluaran) */}
             <div className="p-4 bg-gray-50/70 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium">
               <div>
-                Menampilkan <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min(currentPage * (pageSize as number), allDetailRows.length)}</strong> dari <strong>{allDetailRows.length.toLocaleString('id-ID')}</strong> total baris belanja
+                {activeDetailSubtab === 'penerimaan' ? (
+                  <span>
+                    Menampilkan <strong>{pageSize === 'ALL' ? allDetailPenerimaanRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailPenerimaanRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailPenerimaanRows.length : Math.min(currentPage * (pageSize as number), allDetailPenerimaanRows.length)}</strong> dari <strong>{allDetailPenerimaanRows.length.toLocaleString('id-ID')}</strong> total baris penerimaan
+                  </span>
+                ) : (
+                  <span>
+                    Menampilkan <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min(currentPage * (pageSize as number), allDetailRows.length)}</strong> dari <strong>{allDetailRows.length.toLocaleString('id-ID')}</strong> total baris belanja
+                  </span>
+                )}
               </div>
 
               {pageSize !== 'ALL' && totalPages > 1 && (
@@ -1670,3 +2183,4 @@ export default function RkaLaporanPage() {
     </div>
   );
 }
+
