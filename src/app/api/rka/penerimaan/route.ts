@@ -11,43 +11,67 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
     const status = searchParams.get('status');
 
-    let query = supabaseAdmin
-      .from('rkat_penerimaan')
-      .select('*')
-      .order('id', { ascending: true });
+    let allData: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (tahun && tahun !== 'ALL') {
-      query = query.eq('tahun', parseInt(tahun));
-    }
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
 
-    if (unit && unit !== 'ALL' && unit !== '*') {
-      query = query.ilike('unit_kerja', `%${unit}%`);
-    }
+      let query = supabaseAdmin
+        .from('rkat_penerimaan')
+        .select('*')
+        .order('id', { ascending: true })
+        .range(from, to);
 
-    if (status && status !== 'ALL') {
-      query = query.eq('status', status);
-    }
-
-    if (search && search.trim()) {
-      const q = search.trim();
-      query = query.or(`keterangan.ilike.%${q}%,nama_akun_penerimaan.ilike.%${q}%,unit_kerja.ilike.%${q}%,sumber_dana.ilike.%${q}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      // Jika tabel belum dibuat di Supabase, kembalikan status informatif
-      if (error.code === 'PGRST205' || error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          tableNotCreated: true,
-          message: 'Tabel rkat_penerimaan belum dibuat di Supabase. Silakan jalankan script supabase_rka_penerimaan_migration.sql di Supabase SQL Editor.'
-        });
+      if (tahun && tahun !== 'ALL') {
+        query = query.eq('tahun', parseInt(tahun));
       }
-      throw error;
+
+      if (unit && unit !== 'ALL' && unit !== '*') {
+        query = query.ilike('unit_kerja', `%${unit}%`);
+      }
+
+      if (status && status !== 'ALL') {
+        query = query.eq('status', status);
+      }
+
+      if (search && search.trim()) {
+        const q = search.trim();
+        query = query.or(`keterangan.ilike.%${q}%,nama_akun_penerimaan.ilike.%${q}%,unit_kerja.ilike.%${q}%,sumber_dana.ilike.%${q}%`);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        // Jika tabel belum dibuat di Supabase, kembalikan status informatif
+        if (error.code === 'PGRST205' || error.message?.includes('schema cache') || error.message?.includes('does not exist')) {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            tableNotCreated: true,
+            message: 'Tabel rkat_penerimaan belum dibuat di Supabase. Silakan jalankan script supabase_rka_penerimaan_migration.sql di Supabase SQL Editor.'
+          });
+        }
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allData = allData.concat(data);
+
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+      }
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    return NextResponse.json({ success: true, data: allData });
   } catch (error: any) {
     console.error('Error fetching rkat_penerimaan:', error);
     return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
