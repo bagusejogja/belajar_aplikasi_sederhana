@@ -22,8 +22,6 @@ interface GovUnit {
   is_active: boolean;
 }
 
-export type HighlightColor = 'green' | 'blue' | 'rose';
-
 export default function GovUnitsPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +36,7 @@ export default function GovUnitsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
-  // Checklist State (Alat bantu cek data visual - tidak disimpan ke database)
+  // Checklist State (Alat bantu cek data visual - tidak disimpan ke database, default merah soft)
   const [checkedUnitIds, setCheckedUnitIds] = useState<Set<string | number>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -49,64 +47,12 @@ export default function GovUnitsPage() {
     return new Set();
   });
 
-  const [highlightColor, setHighlightColor] = useState<HighlightColor>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('gov_units_highlight_color') as HighlightColor) || 'green';
-    }
-    return 'green';
-  });
-
   // Simpan temporary checks di sessionStorage agar tidak hilang saat navigasi/paging/filter
   useEffect(() => {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('gov_units_checked_ids', JSON.stringify(Array.from(checkedUnitIds)));
     }
   }, [checkedUnitIds]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gov_units_highlight_color', highlightColor);
-    }
-  }, [highlightColor]);
-
-  // Konfigurasi tema warna soft untuk baris yang diceklis
-  const colorStyles: Record<HighlightColor, {
-    rowBg: string;
-    badgeChecked: string;
-    borderAccent: string;
-    textTitle: string;
-    checkboxAccent: string;
-    label: string;
-    icon: string;
-  }> = {
-    green: {
-      rowBg: 'bg-emerald-50/75 hover:bg-emerald-100/70',
-      badgeChecked: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      borderAccent: 'border-l-4 border-l-emerald-500',
-      textTitle: 'text-emerald-950 font-black',
-      checkboxAccent: 'accent-emerald-600 focus:ring-emerald-500',
-      label: 'Hijau Soft',
-      icon: '🟢'
-    },
-    blue: {
-      rowBg: 'bg-sky-50/75 hover:bg-sky-100/70',
-      badgeChecked: 'bg-sky-100 text-sky-800 border-sky-300',
-      borderAccent: 'border-l-4 border-l-sky-500',
-      textTitle: 'text-sky-950 font-black',
-      checkboxAccent: 'accent-sky-600 focus:ring-sky-500',
-      label: 'Biru Soft',
-      icon: '🔵'
-    },
-    rose: {
-      rowBg: 'bg-rose-50/75 hover:bg-rose-100/70',
-      badgeChecked: 'bg-rose-100 text-rose-800 border-rose-300',
-      borderAccent: 'border-l-4 border-l-rose-500',
-      textTitle: 'text-rose-950 font-black',
-      checkboxAccent: 'accent-rose-600 focus:ring-rose-500',
-      label: 'Merah Soft',
-      icon: '🔴'
-    }
-  };
 
   const toggleCheck = (id: string | number) => {
     setCheckedUnitIds(prev => {
@@ -406,48 +352,25 @@ export default function GovUnitsPage() {
       </div>
 
       {/* QUICK STATUS INFO */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-2 text-xs font-bold text-gray-500">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
+        <div className="flex items-center gap-3">
           <span>Menampilkan <strong className="text-gray-900">{filteredUnits.length}</strong> unit kerja</span>
           {checkedUnitIds.size > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-white border border-gray-200 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-gray-700">
-                <strong className="text-gray-900">{checkedUnitIds.size}</strong> unit ditandai
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-rose-50 border border-rose-200 shadow-2xs text-rose-700">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span>
+                <strong className="text-rose-900">{checkedUnitIds.size}</strong> unit ditandai
               </span>
               <button
                 type="button"
                 onClick={handleClearAllChecks}
-                className="ml-1 px-1.5 py-0.5 rounded text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-[10px] font-black uppercase tracking-wider transition-colors"
+                className="ml-1 px-1.5 py-0.5 rounded text-rose-600 hover:text-rose-800 hover:bg-rose-100 text-[10px] font-black uppercase tracking-wider transition-colors"
                 title="Hapus semua centang visual"
               >
                 Reset Cek
               </button>
             </span>
           )}
-        </div>
-
-        {/* Pilihan Warna Highlight Ceklis */}
-        <div className="flex items-center gap-1.5 bg-white p-1 px-2.5 rounded-xl border border-gray-200 shadow-2xs text-xs self-start sm:self-auto">
-          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mr-1 flex items-center gap-1">
-            Warna Cek:
-          </span>
-          {(['green', 'blue', 'rose'] as HighlightColor[]).map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => setHighlightColor(c)}
-              className={`px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                highlightColor === c 
-                  ? `${colorStyles[c].badgeChecked} ring-1 ring-black/5 shadow-2xs scale-105` 
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-              title={`Ubah warna baris yang dicek ke ${colorStyles[c].label}`}
-            >
-              <span className="text-xs leading-none">{colorStyles[c].icon}</span>
-              <span>{colorStyles[c].label}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -468,7 +391,7 @@ export default function GovUnitsPage() {
                      <th className="px-5 py-3">Grup & Jenis</th>
                      <th className="px-5 py-3">Penanggung Jawab (PIC)</th>
                      <th className="px-5 py-3 text-center">Status</th>
-                     <th className="px-5 py-3 text-center w-36 whitespace-nowrap">Aksi</th>
+                     <th className="px-5 py-3 text-center w-28 whitespace-nowrap">Aksi</th>
                   </tr>
                </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -480,7 +403,7 @@ export default function GovUnitsPage() {
                            key={unitKey || i} 
                            className={`transition-colors group ${
                               isChecked 
-                                 ? `${colorStyles[highlightColor].rowBg} ${colorStyles[highlightColor].borderAccent}`
+                                 ? 'bg-rose-50/75 hover:bg-rose-100/70 border-l-4 border-l-rose-500'
                                  : 'hover:bg-sky-50/30'
                            }`}
                         >
@@ -495,7 +418,7 @@ export default function GovUnitsPage() {
                            <td className="px-5 py-3">
                               <p className={`text-xs md:text-sm transition-colors ${
                                  isChecked 
-                                    ? colorStyles[highlightColor].textTitle 
+                                    ? 'text-rose-950 font-black' 
                                     : 'font-black text-gray-900 group-hover:text-sky-700'
                               }`}>
                                  {u.nama_unit}
@@ -552,25 +475,24 @@ export default function GovUnitsPage() {
 
                            {/* Aksi */}
                            <td className="px-5 py-3 text-center whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5 justify-center">
-                                 {/* Checklist Tool (Alat bantu cek visual - tidak tersimpan ke DB) */}
+                              <div className="inline-flex items-center gap-2 justify-center">
+                                 {/* Checklist Tool (Hanya checkbox tanpa teks - alat bantu cek visual) */}
                                  <button
                                     type="button"
                                     onClick={() => toggleCheck(unitKey)}
-                                    className={`h-8 px-2.5 rounded-lg border text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs select-none active:scale-95 cursor-pointer ${
+                                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all shadow-2xs select-none active:scale-95 cursor-pointer ${
                                        isChecked
-                                          ? `${colorStyles[highlightColor].badgeChecked} ring-1 ring-black/5 shadow-xs font-black`
-                                          : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-300 hover:border-gray-400'
+                                          ? 'bg-rose-100 border-rose-300 ring-1 ring-rose-300 shadow-xs'
+                                          : 'bg-white hover:bg-gray-50 text-gray-400 border-gray-300 hover:border-gray-400'
                                     }`}
-                                    title={isChecked ? 'Klik untuk batal ceklis' : 'Klik untuk ceklis (memberi warna soft pada baris)'}
+                                    title={isChecked ? 'Klik untuk batal ceklis' : 'Klik untuk ceklis (baris menjadi merah soft)'}
                                  >
                                     <input
                                        type="checkbox"
                                        checked={isChecked}
-                                       onChange={() => {}} // event handled on parent button
-                                       className={`w-3.5 h-3.5 rounded pointer-events-none ${colorStyles[highlightColor].checkboxAccent}`}
+                                       onChange={() => {}} // event handled by button
+                                       className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer pointer-events-none"
                                     />
-                                    <span className="text-[11px] leading-none">{isChecked ? 'Dicek' : 'Cek'}</span>
                                  </button>
 
                                  {/* Edit Button */}
