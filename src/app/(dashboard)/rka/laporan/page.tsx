@@ -5,7 +5,8 @@ import {
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
-  ChevronLeft, ChevronRight, Eye, Filter, Wallet, TrendingUp, TrendingDown
+  ChevronLeft, ChevronRight, Eye, Filter, Wallet, TrendingUp, TrendingDown,
+  Settings2, Plus, Trash2, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,66 @@ import {
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+
+// Definisi Struktur Template Slide / PPT Proposal RKAT
+export interface PptTemplateItem {
+  id: string;
+  label: string;
+  matchKeys: string[];
+}
+
+export interface PptTemplateSection {
+  id: string;
+  title: string;
+  items: PptTemplateItem[];
+}
+
+export interface PptTemplateConfig {
+  penerimaanTitle: string;
+  penerimaanSections: PptTemplateSection[];
+  penerimaanLainnyaLabel: string;
+  pengeluaranTitle: string;
+  pengeluaranItems: PptTemplateItem[];
+  pengeluaranLainnyaLabel: string;
+}
+
+export const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
+  penerimaanTitle: 'Jumlah Penerimaan Dana Masyarakat',
+  penerimaanSections: [
+    {
+      id: 'pendidikan',
+      title: 'Penerimaan Pendidikan',
+      items: [
+        { id: 'pend_utama', label: 'Penerimaan Pendidikan Utama', matchKeys: ['pendidikan utama'] },
+        { id: 'pend_lainnya', label: 'Penerimaan Pendidikan Lainnya', matchKeys: ['pendidikan lainnya'] },
+      ]
+    },
+    {
+      id: 'non_pendidikan',
+      title: 'Penerimaan Non Pendidikan',
+      items: [
+        { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'] },
+        { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'] },
+        { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'] },
+        { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'] },
+        { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'] },
+      ]
+    }
+  ],
+  penerimaanLainnyaLabel: 'Penerimaan Lainnya / Surplus TA Lalu',
+  pengeluaranTitle: 'PENGELUARAN',
+  pengeluaranItems: [
+    { id: 'pegawai', label: 'Belanja Pegawai', matchKeys: ['pegawai'] },
+    { id: 'barang_jasa', label: 'Belanja Barang & Jasa', matchKeys: ['barang'] },
+    { id: 'pemeliharaan', label: 'Belanja Perbaikan dan Pemeliharaan', matchKeys: ['pemeliharaan', 'perbaikan'] },
+    { id: 'perjalanan', label: 'Belanja Perjalanan', matchKeys: ['perjalanan'] },
+    { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal'] },
+    { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK -ADB', matchKeys: ['techno', 'adb'] },
+    { id: 'puapt', label: 'Belanja PUAPT', matchKeys: ['puapt'] },
+    { id: 'equity', label: 'EQUITY', matchKeys: ['equity'] },
+  ],
+  pengeluaranLainnyaLabel: 'Belanja Lainnya / Penunjang'
+};
 
 // Autocomplete Filter Unit Kerja Component (Persis seperti di tambah-pagu dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ 
@@ -43,13 +104,15 @@ function UnitAutocompleteFilter({
   }, [filteredUnits]);
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [query, isOpen]);
+    if (!isOpen) {
+      setQuery('');
+      setHighlightedIndex(0);
+    }
+  }, [isOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
         setIsOpen(true);
       }
       return;
@@ -57,80 +120,97 @@ function UnitAutocompleteFilter({
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+      setHighlightedIndex(prev => (prev + 1) % allOptions.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+      setHighlightedIndex(prev => (prev - 1 + allOptions.length) % allOptions.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+      if (allOptions[highlightedIndex]) {
         onSelect(allOptions[highlightedIndex]);
         setIsOpen(false);
-        setQuery('');
       }
     } else if (e.key === 'Escape') {
-      e.preventDefault();
       setIsOpen(false);
     }
   };
 
   return (
-    <div className="relative inline-block text-left w-full" onKeyDown={handleKeyDown}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-9 px-3.5 rounded-xl bg-gray-50 hover:bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+    <div className="relative w-full sm:w-64">
+      <div 
+        onClick={() => setIsOpen(true)}
+        className="w-full h-8 px-2.5 py-1 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer flex items-center justify-between transition-all"
       >
-        <span className="truncate font-bold">
-          {isAll ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
+        <span className="truncate font-semibold text-gray-700">
+          {isAll ? 'Semua Unit Kerja' : selectedUnit}
         </span>
-        <span className="text-[10px] opacity-60">▼</span>
-      </button>
+        <ChevronDown size={14} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-1 w-full min-w-[280px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <input
-              type="text"
-              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus
-              className="w-full px-3 py-2 mb-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-            />
-            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+            <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-1.5">
+              <Search size={14} className="text-gray-400 ml-1" />
+              <input
+                type="text"
+                autoFocus
+                value={query}
+                onChange={e => {
+                  setQuery(e.target.value);
+                  setHighlightedIndex(0);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Ketik cari nama unit..."
+                className="w-full bg-transparent border-none text-xs font-semibold focus:outline-hidden text-gray-800 placeholder:text-gray-400"
+              />
+              {query && (
+                <button 
+                  onClick={() => setQuery('')}
+                  className="p-1 hover:bg-gray-200 rounded-md text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-y-auto divide-y divide-gray-50 max-h-60 text-xs">
               <div
                 onClick={() => {
                   onSelect('ALL');
                   setIsOpen(false);
-                  setQuery('');
                 }}
-                className={`px-3 py-2 rounded-xl cursor-pointer font-bold transition-colors flex items-center justify-between ${
-                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : isAll ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-100 text-slate-800'
-                }`}
+                onMouseEnter={() => setHighlightedIndex(0)}
+                className={`p-2.5 font-bold cursor-pointer transition-colors flex items-center justify-between ${
+                  isAll ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                } ${highlightedIndex === 0 ? 'bg-blue-50/70 text-blue-800' : ''}`}
               >
-                <span>🏢 Semua Unit Kerja ({units.length})</span>
-                {isAll && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                <span>🏢 Semua Unit Kerja</span>
+                {isAll && <Check size={14} className="text-blue-600" />}
               </div>
-              {filteredUnits.map((u, idx) => {
-                const itemIdx = idx + 1;
-                const isHighlighted = highlightedIndex === itemIdx;
-                const isSelected = selectedUnit === u;
+
+              {filteredUnits.map((unit, idx) => {
+                const optIndex = idx + 1;
+                const isSelected = selectedUnit === unit;
+                const isHighlighted = highlightedIndex === optIndex;
                 return (
                   <div
-                    key={u}
+                    key={unit}
                     onClick={() => {
-                      onSelect(u);
+                      onSelect(unit);
                       setIsOpen(false);
-                      setQuery('');
                     }}
-                    className={`px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors flex items-center justify-between ${
-                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
-                    }`}
+                    onMouseEnter={() => setHighlightedIndex(optIndex)}
+                    className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
+                      isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
+                    } ${isHighlighted ? 'bg-blue-50/70 text-blue-800' : ''}`}
                   >
-                    <span className="truncate">{u}</span>
-                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                    <span className="truncate">{unit}</span>
+                    {isSelected && <Check size={14} className="text-blue-600 shrink-0 ml-1" />}
                   </div>
                 );
               })}
@@ -167,6 +247,27 @@ export default function RkaLaporanPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
   const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
+
+  // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
+  const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('rka_ppt_template_config');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.penerimaanSections && parsed.pengeluaranItems) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_PPT_TEMPLATE;
+  });
+
+  // Modal Atur Susunan Template Slide State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [tempTemplate, setTempTemplate] = useState<PptTemplateConfig>(DEFAULT_PPT_TEMPLATE);
+  const [activeTemplateTab, setActiveTemplateTab] = useState<'penerimaan' | 'pengeluaran'>('penerimaan');
 
   const fetchRules = async () => {
     try {
@@ -417,7 +518,7 @@ export default function RkaLaporanPage() {
     return { totalPagu, totalItems };
   }, [groupedPenerimaan]);
 
-  // Struktur Hirarkis Khusus Format Proposal RKAT (Persis Format Slide / PowerPoint RKAT)
+  // Struktur Hirarkis Khusus Format Proposal RKAT (Dinamis Berdasarkan Pengaturan Template Slide PPT)
   const pptProposalData = useMemo(() => {
     // 1. Data Penerimaan
     const pMap: Record<string, { totalPagu: number; count: number; rows: any[] }> = {};
@@ -438,49 +539,61 @@ export default function RkaLaporanPage() {
       pMap[label].rows.push(r);
     });
 
-    const getP = (keyPart: string) => {
-      let totalPagu = 0;
-      let count = 0;
-      let rows: any[] = [];
-      Object.keys(pMap).forEach(k => {
-        if (k.toLowerCase().includes(keyPart.toLowerCase())) {
-          totalPagu += pMap[k].totalPagu;
-          count += pMap[k].count;
-          rows.push(...pMap[k].rows);
-        }
+    const usedPKeys = new Set<string>();
+
+    const computedSections = (pptTemplate.penerimaanSections || []).map(sec => {
+      let secSubtotal = 0;
+      let secCount = 0;
+      const secItems = (sec.items || []).map(item => {
+        let itemTotal = 0;
+        let itemCount = 0;
+        let itemRows: any[] = [];
+        
+        Object.keys(pMap).forEach(k => {
+          const kLower = k.toLowerCase();
+          const isMatch = (item.matchKeys || []).some(mk => mk.trim() !== '' && kLower.includes(mk.trim().toLowerCase()));
+          if (isMatch) {
+            itemTotal += pMap[k].totalPagu;
+            itemCount += pMap[k].count;
+            itemRows.push(...pMap[k].rows);
+            usedPKeys.add(k);
+          }
+        });
+        
+        secSubtotal += itemTotal;
+        secCount += itemCount;
+        return {
+          id: item.id,
+          label: item.label,
+          matchKeys: item.matchKeys,
+          totalPagu: itemTotal,
+          count: itemCount,
+          rows: itemRows
+        };
       });
-      return { totalPagu, count, rows };
-    };
 
-    // Sub-kelompok Penerimaan Pendidikan
-    const pPendUtama = getP('pendidikan utama');
-    const pPendLainnya = getP('pendidikan lainnya');
-    const subtotalPendidikan = pPendUtama.totalPagu + pPendLainnya.totalPagu;
-    const countPendidikan = pPendUtama.count + pPendLainnya.count;
+      return {
+        id: sec.id,
+        title: sec.title,
+        subtotal: secSubtotal,
+        count: secCount,
+        items: secItems
+      };
+    });
 
-    // Sub-kelompok Penerimaan Non Pendidikan
-    const pHibah = getP('hibah');
-    const pJasa = getP('jasa universitas');
-    const pAset = getP('aset');
-    const pKerjasama = getP('kerjasama');
-    const pUpu = getP('upu');
-    const subtotalNonPendidikan = pHibah.totalPagu + pJasa.totalPagu + pAset.totalPagu + pKerjasama.totalPagu + pUpu.totalPagu;
-    const countNonPendidikan = pHibah.count + pJasa.count + pAset.count + pKerjasama.count + pUpu.count;
-
-    // Penerimaan Lainnya / Surplus TA Lalu / Transfer
+    // Penerimaan yang belum terpetakan ke kelompok manapun
     let pLainnyaTotal = 0;
     let pLainnyaCount = 0;
     let pLainnyaRows: any[] = [];
     Object.keys(pMap).forEach(k => {
-      const lower = k.toLowerCase();
-      if (!lower.includes('pendidikan') && !lower.includes('hibah') && !lower.includes('jasa') && !lower.includes('aset') && !lower.includes('kerjasama') && !lower.includes('upu')) {
+      if (!usedPKeys.has(k)) {
         pLainnyaTotal += pMap[k].totalPagu;
         pLainnyaCount += pMap[k].count;
         pLainnyaRows.push(...pMap[k].rows);
       }
     });
 
-    const totalPenerimaan = subtotalPendidikan + subtotalNonPendidikan + pLainnyaTotal;
+    const totalPenerimaan = computedSections.reduce((acc, s) => acc + s.subtotal, 0) + pLainnyaTotal;
 
     // 2. Data Pengeluaran / Belanja
     const bMap: Record<string, { totalAnggaran: number; count: number; rows: any[] }> = {};
@@ -504,68 +617,52 @@ export default function RkaLaporanPage() {
       bMap[label].rows.push(r);
     });
 
-    const getB = (keyPart: string) => {
-      let totalAnggaran = 0;
-      let count = 0;
-      let rows: any[] = [];
+    const usedBKeys = new Set<string>();
+    const computedPengeluaranItems = (pptTemplate.pengeluaranItems || []).map(item => {
+      let itemTotal = 0;
+      let itemCount = 0;
+      let itemRows: any[] = [];
       Object.keys(bMap).forEach(k => {
-        if (k.toLowerCase().includes(keyPart.toLowerCase())) {
-          totalAnggaran += bMap[k].totalAnggaran;
-          count += bMap[k].count;
-          rows.push(...bMap[k].rows);
+        const kLower = k.toLowerCase();
+        const isMatch = (item.matchKeys || []).some(mk => mk.trim() !== '' && kLower.includes(mk.trim().toLowerCase()));
+        if (isMatch) {
+          itemTotal += bMap[k].totalAnggaran;
+          itemCount += bMap[k].count;
+          itemRows.push(...bMap[k].rows);
+          usedBKeys.add(k);
         }
       });
-      return { totalAnggaran, count, rows };
-    };
+      return {
+        id: item.id,
+        label: item.label,
+        matchKeys: item.matchKeys,
+        totalAnggaran: itemTotal,
+        count: itemCount,
+        rows: itemRows
+      };
+    });
 
-    const bPegawai = getB('pegawai');
-    const bBarangJasa = getB('barang');
-    const bPemeliharaan = getB('pemeliharaan');
-    const bPerjalanan = getB('perjalanan');
-    const bModal = getB('modal');
-    const bScienceTechno = getB('techno');
-    const bPuapt = getB('puapt');
-    const bEquity = getB('equity');
-
+    // Belanja yang belum terpetakan ke pos manapun
     let bLainnyaTotal = 0;
     let bLainnyaCount = 0;
     let bLainnyaRows: any[] = [];
     Object.keys(bMap).forEach(k => {
-      const lower = k.toLowerCase();
-      if (!lower.includes('pegawai') && !lower.includes('barang') && !lower.includes('pemeliharaan') && !lower.includes('perjalanan') && !lower.includes('modal') && !lower.includes('techno') && !lower.includes('puapt') && !lower.includes('equity')) {
+      if (!usedBKeys.has(k)) {
         bLainnyaTotal += bMap[k].totalAnggaran;
         bLainnyaCount += bMap[k].count;
         bLainnyaRows.push(...bMap[k].rows);
       }
     });
 
-    const totalPengeluaran = bPegawai.totalAnggaran + bBarangJasa.totalAnggaran + bPemeliharaan.totalAnggaran + bPerjalanan.totalAnggaran + bModal.totalAnggaran + bScienceTechno.totalAnggaran + bPuapt.totalAnggaran + bEquity.totalAnggaran + bLainnyaTotal;
-
+    const totalPengeluaran = computedPengeluaranItems.reduce((acc, it) => acc + it.totalAnggaran, 0) + bLainnyaTotal;
     const surplusDefisit = totalPenerimaan - totalPengeluaran;
 
     return {
       penerimaan: {
-        pendidikan: {
-          subtotal: subtotalPendidikan,
-          count: countPendidikan,
-          items: [
-            { label: 'Penerimaan Pendidikan Utama', ...pPendUtama },
-            { label: 'Penerimaan Pendidikan Lainnya', ...pPendLainnya }
-          ]
-        },
-        nonPendidikan: {
-          subtotal: subtotalNonPendidikan,
-          count: countNonPendidikan,
-          items: [
-            { label: 'Penerimaan Hibah dan Donasi', ...pHibah },
-            { label: 'Penerimaan Jasa Universitas', ...pJasa },
-            { label: 'Penerimaan Pemanfaatan Aset', ...pAset },
-            { label: 'Penerimaan Kerjasama', ...pKerjasama },
-            { label: 'Penerimaan dari UPU', ...pUpu }
-          ]
-        },
+        title: pptTemplate.penerimaanTitle || 'Jumlah Penerimaan Dana Masyarakat',
+        sections: computedSections,
         lainnya: {
-          label: 'Penerimaan Lainnya / Surplus TA Lalu',
+          label: pptTemplate.penerimaanLainnyaLabel || 'Penerimaan Lainnya / Surplus TA Lalu',
           totalPagu: pLainnyaTotal,
           count: pLainnyaCount,
           rows: pLainnyaRows
@@ -573,22 +670,19 @@ export default function RkaLaporanPage() {
         totalPenerimaan
       },
       pengeluaran: {
-        items: [
-          { label: 'Belanja Pegawai', ...bPegawai },
-          { label: 'Belanja Barang & Jasa', ...bBarangJasa },
-          { label: 'Belanja Perbaikan dan Pemeliharaan', ...bPemeliharaan },
-          { label: 'Belanja Perjalanan', ...bPerjalanan },
-          { label: 'Belanja Modal', ...bModal },
-          { label: 'Belanja SCIENCE TECHNO PARK -ADB', ...bScienceTechno },
-          { label: 'Belanja PUAPT', ...bPuapt },
-          { label: 'EQUITY', ...bEquity },
-          ...(bLainnyaTotal > 0 ? [{ label: 'Belanja Lainnya / Penunjang', totalAnggaran: bLainnyaTotal, count: bLainnyaCount, rows: bLainnyaRows }] : [])
-        ],
+        title: pptTemplate.pengeluaranTitle || 'PENGELUARAN',
+        items: computedPengeluaranItems,
+        lainnya: {
+          label: pptTemplate.pengeluaranLainnyaLabel || 'Belanja Lainnya / Penunjang',
+          totalAnggaran: bLainnyaTotal,
+          count: bLainnyaCount,
+          rows: bLainnyaRows
+        },
         totalPengeluaran
       },
       surplusDefisit
     };
-  }, [penerimaanList, dataList, unitFilter, kategoriFilter, search]);
+  }, [penerimaanList, dataList, unitFilter, kategoriFilter, search, pptTemplate]);
 
   // Kelompokkan data Belanja per Kategori Laporan yang dipilih (Bagian Bawah)
   const groupedData = useMemo(() => {
@@ -1060,20 +1154,15 @@ export default function RkaLaporanPage() {
     aoa.push(['URAIAN PROPOSAL RKAT', 'JUMLAH BARIS', 'PAGU USULAN (RP)', '% PROPORSI']);
 
     // PENERIMAAN
-    aoa.push(['JUMLAH PENERIMAAN DANA MASYARAKAT', '', '', '']);
+    aoa.push([pptProposalData.penerimaan.title || 'JUMLAH PENERIMAAN DANA MASYARAKAT', '', '', '']);
     
-    // Pendidikan
-    aoa.push(['  Penerimaan Pendidikan', pptProposalData.penerimaan.pendidikan.count, pptProposalData.penerimaan.pendidikan.subtotal, '']);
-    pptProposalData.penerimaan.pendidikan.items.forEach(it => {
-      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
-    });
-
-    // Non Pendidikan
-    aoa.push(['  Penerimaan Non Pendidikan', pptProposalData.penerimaan.nonPendidikan.count, pptProposalData.penerimaan.nonPendidikan.subtotal, '']);
-    pptProposalData.penerimaan.nonPendidikan.items.forEach(it => {
-      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+    pptProposalData.penerimaan.sections.forEach(sec => {
+      const secPct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`  ${sec.title}`, sec.count, sec.subtotal, secPct]);
+      sec.items.forEach(it => {
+        const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+        aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+      });
     });
 
     if (pptProposalData.penerimaan.lainnya.totalPagu > 0) {
@@ -1085,11 +1174,15 @@ export default function RkaLaporanPage() {
     aoa.push([]);
 
     // PENGELUARAN
-    aoa.push(['PENGELUARAN', '', '', '']);
+    aoa.push([pptProposalData.pengeluaran.title || 'PENGELUARAN', '', '', '']);
     pptProposalData.pengeluaran.items.forEach(it => {
       const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((it.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
       aoa.push([`  ${it.label}`, it.count, it.totalAnggaran, pct]);
     });
+    if (pptProposalData.pengeluaran.lainnya.totalAnggaran > 0) {
+      const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`  ${pptProposalData.pengeluaran.lainnya.label}`, pptProposalData.pengeluaran.lainnya.count, pptProposalData.pengeluaran.lainnya.totalAnggaran, pct]);
+    }
     aoa.push(['JUMLAH PENGELUARAN', '', pptProposalData.pengeluaran.totalPengeluaran, '100%']);
     aoa.push([]);
 
@@ -1641,8 +1734,20 @@ export default function RkaLaporanPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => {
+                        setTempTemplate(JSON.parse(JSON.stringify(pptTemplate)));
+                        setIsTemplateModalOpen(true);
+                      }}
+                      className="h-8 rounded-xl border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <Settings2 size={13} className="text-indigo-600" />
+                      <span>Atur Susunan Slide</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleExportExcelPptFormat}
-                      className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs"
+                      className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <Download size={13} className="text-blue-600" />
                       <span>Export Format PPT</span>
@@ -1672,128 +1777,75 @@ export default function RkaLaporanPage() {
                     </TableHeader>
                     <TableBody>
                       {/* 1. SECTION PENERIMAAN */}
-                      {/* Header Utama: Jumlah Penerimaan Dana Masyarakat */}
+                      {/* Header Utama: Judul Penerimaan */}
                       <TableRow className="bg-slate-100/90 font-black border-b border-slate-200">
                         <TableCell colSpan={5} className="py-2.5 px-4 text-xs font-black text-slate-950 uppercase tracking-wide">
-                          Jumlah Penerimaan Dana Masyarakat
+                          {pptProposalData.penerimaan.title}
                         </TableCell>
                       </TableRow>
 
-                      {/* Sub-Header: Penerimaan Pendidikan */}
-                      <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
-                        <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
-                          Penerimaan Pendidikan
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
-                          {pptProposalData.penerimaan.pendidikan.count.toLocaleString('id-ID')} Akun
-                        </TableCell>
-                        <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
-                          Rp {formatRp(pptProposalData.penerimaan.pendidikan.subtotal)}
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
-                          {pptProposalData.penerimaan.totalPenerimaan > 0 
-                            ? ((pptProposalData.penerimaan.pendidikan.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
-                            : '0%'}
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-gray-300">-</TableCell>
-                      </TableRow>
-
-                      {/* Rincian Penerimaan Pendidikan */}
-                      {pptProposalData.penerimaan.pendidikan.items.map((item, idx) => {
-                        const pct = pptProposalData.penerimaan.totalPenerimaan > 0
-                          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
-                          : '0';
-                        return (
-                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
-                              <span className="text-slate-400">•</span>
-                              <span>{item.label}</span>
+                      {/* Kelompok-Kelompok Penerimaan Dinamis */}
+                      {pptProposalData.penerimaan.sections.map((sec) => (
+                        <React.Fragment key={sec.id}>
+                          {/* Sub-Header Kelompok */}
+                          <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
+                            <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
+                              {sec.title}
                             </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {item.count.toLocaleString('id-ID')} Akun
+                            <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
+                              {sec.count.toLocaleString('id-ID')} Akun
                             </TableCell>
-                            <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
-                              Rp {formatRp(item.totalPagu)}
+                            <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
+                              Rp {formatRp(sec.subtotal)}
                             </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {pct}%
+                            <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
+                              {pptProposalData.penerimaan.totalPenerimaan > 0 
+                                ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+                                : '0%'}
                             </TableCell>
-                            <TableCell className="py-2 text-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setActiveDetailSubtab('penerimaan');
-                                  setActiveViewTab('detail');
-                                  setSearch(item.label);
-                                }}
-                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
-                                title={`Buka rincian ${item.label}`}
-                              >
-                                <Eye size={13} />
-                              </Button>
-                            </TableCell>
+                            <TableCell className="py-2 text-center text-gray-300">-</TableCell>
                           </TableRow>
-                        );
-                      })}
 
-                      {/* Sub-Header: Penerimaan Non Pendidikan */}
-                      <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
-                        <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
-                          Penerimaan Non Pendidikan
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
-                          {pptProposalData.penerimaan.nonPendidikan.count.toLocaleString('id-ID')} Akun
-                        </TableCell>
-                        <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
-                          Rp {formatRp(pptProposalData.penerimaan.nonPendidikan.subtotal)}
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
-                          {pptProposalData.penerimaan.totalPenerimaan > 0 
-                            ? ((pptProposalData.penerimaan.nonPendidikan.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
-                            : '0%'}
-                        </TableCell>
-                        <TableCell className="py-2 text-center text-gray-300">-</TableCell>
-                      </TableRow>
-
-                      {/* Rincian Penerimaan Non Pendidikan */}
-                      {pptProposalData.penerimaan.nonPendidikan.items.map((item, idx) => {
-                        const pct = pptProposalData.penerimaan.totalPenerimaan > 0
-                          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
-                          : '0';
-                        return (
-                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
-                              <span className="text-slate-400">•</span>
-                              <span>{item.label}</span>
-                            </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {item.count.toLocaleString('id-ID')} Akun
-                            </TableCell>
-                            <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
-                              Rp {formatRp(item.totalPagu)}
-                            </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {pct}%
-                            </TableCell>
-                            <TableCell className="py-2 text-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setActiveDetailSubtab('penerimaan');
-                                  setActiveViewTab('detail');
-                                  setSearch(item.label);
-                                }}
-                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
-                                title={`Buka rincian ${item.label}`}
-                              >
-                                <Eye size={13} />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                          {/* Rincian Pos-Pos dalam Kelompok */}
+                          {sec.items.map((item, idx) => {
+                            const pct = pptProposalData.penerimaan.totalPenerimaan > 0
+                              ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
+                              : '0';
+                            return (
+                              <TableRow key={item.id || item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
+                                  <span className="text-slate-400">•</span>
+                                  <span>{item.label}</span>
+                                </TableCell>
+                                <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                  {item.count.toLocaleString('id-ID')} Akun
+                                </TableCell>
+                                <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                                  Rp {formatRp(item.totalPagu)}
+                                </TableCell>
+                                <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                  {pct}%
+                                </TableCell>
+                                <TableCell className="py-2 text-center">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setActiveDetailSubtab('penerimaan');
+                                      setActiveViewTab('detail');
+                                      setSearch(item.label);
+                                    }}
+                                    className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                    title={`Buka rincian ${item.label}`}
+                                  >
+                                    <Eye size={13} />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
 
                       {/* Penerimaan Lainnya / Surplus TA Lalu jika ada */}
                       {pptProposalData.penerimaan.lainnya.totalPagu > 0 && (
@@ -1854,17 +1906,17 @@ export default function RkaLaporanPage() {
                       {/* 2. SECTION PENGELUARAN */}
                       <TableRow className="bg-slate-100/90 font-black border-b border-slate-200">
                         <TableCell colSpan={5} className="py-2.5 px-4 text-xs font-black text-slate-950 uppercase tracking-wide">
-                          PENGELUARAN
+                          {pptProposalData.pengeluaran.title}
                         </TableCell>
                       </TableRow>
 
-                      {/* Baris Rincian Belanja Sesuai Gambar */}
+                      {/* Baris Rincian Belanja Sesuai Konfigurasi Template */}
                       {pptProposalData.pengeluaran.items.map((item, idx) => {
                         const pct = pptProposalData.pengeluaran.totalPengeluaran > 0
                           ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
                           : '0';
                         return (
-                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <TableRow key={item.id || item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                             <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
                               <span className="text-slate-400">•</span>
                               <span>{item.label}</span>
@@ -1895,6 +1947,40 @@ export default function RkaLaporanPage() {
                           </TableRow>
                         );
                       })}
+
+                      {/* Belanja Lainnya jika ada */}
+                      {pptProposalData.pengeluaran.lainnya.totalAnggaran > 0 && (
+                        <TableRow className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                            <span className="text-slate-400">•</span>
+                            <span>{pptProposalData.pengeluaran.lainnya.label}</span>
+                          </TableCell>
+                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                            {pptProposalData.pengeluaran.lainnya.count.toLocaleString('id-ID')} Baris
+                          </TableCell>
+                          <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
+                            Rp {formatRp(pptProposalData.pengeluaran.lainnya.totalAnggaran)}
+                          </TableCell>
+                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                            {pptProposalData.pengeluaran.totalPengeluaran > 0 
+                              ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+                              : '0%'}
+                          </TableCell>
+                          <TableCell className="py-2 text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setActiveDetailSubtab('belanja');
+                                setActiveViewTab('detail');
+                              }}
+                              className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                            >
+                              <Eye size={13} />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )}
 
                       {/* BANNER BIRU JUMLAH PENGELUARAN (PERSIS SEPERTI GAMBAR) */}
                       <TableRow className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors border-y-2 border-blue-700">
@@ -2797,6 +2883,483 @@ export default function RkaLaporanPage() {
         )}
       </div>
 
+      {/* ========================================================================= */}
+      {/* MODAL PENGATURAN SUSUNAN TEMPLATE SLIDE / PPT PROPOSAL RKAT               */}
+      {/* ========================================================================= */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <Settings2 size={20} className="text-indigo-300" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-2">
+                    <span>Pengaturan Susunan Template Slide PPT RKAT</span>
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    Atur tata urutan pos, label tampilan, atau kata kunci pemetaan usulan RKAT
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tab Navigation in Modal */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveTemplateTab('penerimaan')}
+                className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                  activeTemplateTab === 'penerimaan'
+                    ? 'border-indigo-600 text-indigo-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <span>📥 Bagian Penerimaan</span>
+                <Badge variant="outline" className="text-[10px] bg-white border-slate-200">
+                  {tempTemplate.penerimaanSections?.reduce((acc, s) => acc + (s.items?.length || 0), 0) || 0} Pos
+                </Badge>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTemplateTab('pengeluaran')}
+                className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
+                  activeTemplateTab === 'pengeluaran'
+                    ? 'border-indigo-600 text-indigo-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <span>📤 Bagian Pengeluaran / Belanja</span>
+                <Badge variant="outline" className="text-[10px] bg-white border-slate-200">
+                  {tempTemplate.pengeluaranItems?.length || 0} Pos
+                </Badge>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+              {activeTemplateTab === 'penerimaan' ? (
+                /* TAB 1: PENERIMAAN */
+                <div className="space-y-5">
+                  {/* Judul Utama Penerimaan */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Judul Header Penerimaan:
+                    </label>
+                    <Input
+                      type="text"
+                      value={tempTemplate.penerimaanTitle}
+                      onChange={(e) => setTempTemplate({ ...tempTemplate, penerimaanTitle: e.target.value })}
+                      className="h-9 text-xs font-bold bg-white"
+                      placeholder="Contoh: Jumlah Penerimaan Dana Masyarakat"
+                    />
+                  </div>
+
+                  {/* Kelompok-Kelompok Penerimaan */}
+                  <div className="space-y-4">
+                    {tempTemplate.penerimaanSections.map((sec, secIdx) => (
+                      <div key={sec.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3">
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                          <div className="flex-1">
+                            <span className="text-[10px] font-extrabold uppercase text-indigo-600 tracking-wider block">
+                              Kelompok {secIdx + 1}
+                            </span>
+                            <Input
+                              type="text"
+                              value={sec.title}
+                              onChange={(e) => {
+                                const copy = { ...tempTemplate };
+                                copy.penerimaanSections[secIdx].title = e.target.value;
+                                setTempTemplate(copy);
+                              }}
+                              className="h-8 text-xs font-black bg-white mt-1"
+                              placeholder="Nama Kelompok (contoh: Penerimaan Pendidikan)"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1 self-end mb-0.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={secIdx === 0}
+                              onClick={() => {
+                                const copy = { ...tempTemplate };
+                                const temp = copy.penerimaanSections[secIdx - 1];
+                                copy.penerimaanSections[secIdx - 1] = copy.penerimaanSections[secIdx];
+                                copy.penerimaanSections[secIdx] = temp;
+                                setTempTemplate(copy);
+                              }}
+                              className="h-7 w-7 p-0 rounded-lg"
+                              title="Pindahkan Kelompok ke Atas"
+                            >
+                              <ArrowUp size={12} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={secIdx === tempTemplate.penerimaanSections.length - 1}
+                              onClick={() => {
+                                const copy = { ...tempTemplate };
+                                const temp = copy.penerimaanSections[secIdx + 1];
+                                copy.penerimaanSections[secIdx + 1] = copy.penerimaanSections[secIdx];
+                                copy.penerimaanSections[secIdx] = temp;
+                                setTempTemplate(copy);
+                              }}
+                              className="h-7 w-7 p-0 rounded-lg"
+                              title="Pindahkan Kelompok ke Bawah"
+                            >
+                              <ArrowDown size={12} />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const copy = { ...tempTemplate };
+                                copy.penerimaanSections.splice(secIdx, 1);
+                                setTempTemplate(copy);
+                              }}
+                              className="h-7 w-7 p-0 rounded-lg text-rose-600 hover:bg-rose-50"
+                              title="Hapus Kelompok"
+                            >
+                              <Trash2 size={12} />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* List of Items inside Section */}
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Daftar Baris Pos Penerimaan:
+                          </span>
+                          {sec.items.map((item, itemIdx) => (
+                            <div key={item.id} className="p-2.5 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                    Label Tampilan di Slide:
+                                  </label>
+                                  <Input
+                                    type="text"
+                                    value={item.label}
+                                    onChange={(e) => {
+                                      const copy = { ...tempTemplate };
+                                      copy.penerimaanSections[secIdx].items[itemIdx].label = e.target.value;
+                                      setTempTemplate(copy);
+                                    }}
+                                    className="h-7 text-xs font-semibold"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                    Kata Kunci Klasifikasi:
+                                  </label>
+                                  <Input
+                                    type="text"
+                                    value={item.matchKeys.join(', ')}
+                                    onChange={(e) => {
+                                      const copy = { ...tempTemplate };
+                                      copy.penerimaanSections[secIdx].items[itemIdx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                                      setTempTemplate(copy);
+                                    }}
+                                    placeholder="pisah dengan koma, misal: pendidikan utama"
+                                    className="h-7 text-xs font-mono"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 self-end sm:self-center">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={itemIdx === 0}
+                                  onClick={() => {
+                                    const copy = { ...tempTemplate };
+                                    const items = copy.penerimaanSections[secIdx].items;
+                                    const temp = items[itemIdx - 1];
+                                    items[itemIdx - 1] = items[itemIdx];
+                                    items[itemIdx] = temp;
+                                    setTempTemplate(copy);
+                                  }}
+                                  className="h-6 w-6 p-0 rounded-md"
+                                >
+                                  <ArrowUp size={11} />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={itemIdx === sec.items.length - 1}
+                                  onClick={() => {
+                                    const copy = { ...tempTemplate };
+                                    const items = copy.penerimaanSections[secIdx].items;
+                                    const temp = items[itemIdx + 1];
+                                    items[itemIdx + 1] = items[itemIdx];
+                                    items[itemIdx] = temp;
+                                    setTempTemplate(copy);
+                                  }}
+                                  className="h-6 w-6 p-0 rounded-md"
+                                >
+                                  <ArrowDown size={11} />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const copy = { ...tempTemplate };
+                                    copy.penerimaanSections[secIdx].items.splice(itemIdx, 1);
+                                    setTempTemplate(copy);
+                                  }}
+                                  className="h-6 w-6 p-0 rounded-md text-rose-500 hover:text-rose-700"
+                                >
+                                  <Trash2 size={11} />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const copy = { ...tempTemplate };
+                              copy.penerimaanSections[secIdx].items.push({
+                                id: 'item_' + Date.now(),
+                                label: 'Pos Penerimaan Baru',
+                                matchKeys: ['kata kunci']
+                              });
+                              setTempTemplate(copy);
+                            }}
+                            className="h-7 text-xs font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-indigo-50 w-full gap-1"
+                          >
+                            <Plus size={12} />
+                            <span>Tambah Pos di {sec.title || 'Kelompok Ini'}</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const copy = { ...tempTemplate };
+                        copy.penerimaanSections.push({
+                          id: 'sec_' + Date.now(),
+                          title: 'Kelompok Penerimaan Baru',
+                          items: [
+                            {
+                              id: 'item_' + Date.now(),
+                              label: 'Pos Baru',
+                              matchKeys: ['kata kunci']
+                            }
+                          ]
+                        });
+                        setTempTemplate(copy);
+                      }}
+                      className="h-8 text-xs font-bold text-indigo-800 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/50 w-full gap-1.5"
+                    >
+                      <Plus size={13} />
+                      <span>Tambah Kelompok Penerimaan Baru</span>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* TAB 2: PENGELUARAN / BELANJA */
+                <div className="space-y-5">
+                  {/* Judul Utama Pengeluaran */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Judul Header Pengeluaran:
+                    </label>
+                    <Input
+                      type="text"
+                      value={tempTemplate.pengeluaranTitle}
+                      onChange={(e) => setTempTemplate({ ...tempTemplate, pengeluaranTitle: e.target.value })}
+                      className="h-9 text-xs font-bold bg-white"
+                      placeholder="Contoh: PENGELUARAN"
+                    />
+                  </div>
+
+                  {/* List of Pengeluaran Items */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Urutan Pos Belanja Pengeluaran:
+                    </span>
+                    {tempTemplate.pengeluaranItems.map((item, idx) => (
+                      <div key={item.id} className="p-3 bg-white rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                Label Tampilan di Slide:
+                              </label>
+                              <Input
+                                type="text"
+                                value={item.label}
+                                onChange={(e) => {
+                                  const copy = { ...tempTemplate };
+                                  copy.pengeluaranItems[idx].label = e.target.value;
+                                  setTempTemplate(copy);
+                                }}
+                                className="h-7 text-xs font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                Kata Kunci Klasifikasi:
+                              </label>
+                              <Input
+                                type="text"
+                                value={item.matchKeys.join(', ')}
+                                onChange={(e) => {
+                                  const copy = { ...tempTemplate };
+                                  copy.pengeluaranItems[idx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                                  setTempTemplate(copy);
+                                }}
+                                placeholder="misal: pegawai, atau: techno, adb"
+                                className="h-7 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 self-end sm:self-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={idx === 0}
+                            onClick={() => {
+                              const copy = { ...tempTemplate };
+                              const temp = copy.pengeluaranItems[idx - 1];
+                              copy.pengeluaranItems[idx - 1] = copy.pengeluaranItems[idx];
+                              copy.pengeluaranItems[idx] = temp;
+                              setTempTemplate(copy);
+                            }}
+                            className="h-7 w-7 p-0 rounded-lg"
+                            title="Naikkan Urutan"
+                          >
+                            <ArrowUp size={12} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={idx === tempTemplate.pengeluaranItems.length - 1}
+                            onClick={() => {
+                              const copy = { ...tempTemplate };
+                              const temp = copy.pengeluaranItems[idx + 1];
+                              copy.pengeluaranItems[idx + 1] = copy.pengeluaranItems[idx];
+                              copy.pengeluaranItems[idx] = temp;
+                              setTempTemplate(copy);
+                            }}
+                            className="h-7 w-7 p-0 rounded-lg"
+                            title="Turunkan Urutan"
+                          >
+                            <ArrowDown size={12} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const copy = { ...tempTemplate };
+                              copy.pengeluaranItems.splice(idx, 1);
+                              setTempTemplate(copy);
+                            }}
+                            className="h-7 w-7 p-0 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                            title="Hapus Pos"
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const copy = { ...tempTemplate };
+                        copy.pengeluaranItems.push({
+                          id: 'b_' + Date.now(),
+                          label: 'Pos Belanja Baru',
+                          matchKeys: ['kata kunci']
+                        });
+                        setTempTemplate(copy);
+                      }}
+                      className="h-8 text-xs font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-indigo-50 w-full gap-1.5"
+                    >
+                      <Plus size={13} />
+                      <span>Tambah Pos Belanja Pengeluaran Baru</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setTempTemplate(JSON.parse(JSON.stringify(DEFAULT_PPT_TEMPLATE)));
+                  toast.success('Susunan dikembalikan ke Format Default Asli');
+                }}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 border-slate-300 w-full sm:w-auto"
+              >
+                <RotateCcw size={13} className="mr-1.5" />
+                <span>Reset ke Template Default</span>
+              </Button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTemplateModalOpen(false)}
+                  className="text-xs font-bold border-slate-300 flex-1 sm:flex-initial"
+                >
+                  Batal
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setPptTemplate(tempTemplate);
+                    try {
+                      localStorage.setItem('rka_ppt_template_config', JSON.stringify(tempTemplate));
+                    } catch (e) {}
+                    setIsTemplateModalOpen(false);
+                    toast.success('Susunan template slide berhasil disimpan dan diterapkan!');
+                  }}
+                  className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex-1 sm:flex-initial"
+                >
+                  <Check size={13} className="mr-1.5" />
+                  <span>Simpan &amp; Terapkan Susunan</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
