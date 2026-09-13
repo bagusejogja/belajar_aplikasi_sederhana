@@ -225,6 +225,208 @@ function UnitAutocompleteFilter({
   );
 }
 
+// Definisi Tipe dan Komponen Struktur 3-Level Collapsible untuk Tab Detail
+export interface DetailGroupUnit {
+  unit: string;
+  totalPagu: number;
+  count: number;
+  rows: any[];
+}
+
+export interface DetailGroupAkun {
+  namaAkun: string;
+  totalPagu: number;
+  totalUnits: number;
+  totalRows: number;
+  units: DetailGroupUnit[];
+}
+
+function DetailUnitAccordionItem({
+  unitGroup,
+  akunKey,
+  subtab,
+  isUnitOpen,
+  onToggleUnit,
+  formatRp
+}: {
+  unitGroup: DetailGroupUnit;
+  akunKey: string;
+  subtab: 'belanja' | 'penerimaan';
+  isUnitOpen: boolean;
+  onToggleUnit: () => void;
+  formatRp: (val: number) => string;
+}) {
+  const [page, setPage] = useState(1);
+  const rowsPerPage = 10;
+  const totalRows = unitGroup.rows.length;
+  const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+  const paginatedRows = useMemo(() => {
+    return unitGroup.rows.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  }, [unitGroup.rows, page]);
+
+  return (
+    <div className="border border-slate-200/90 rounded-xl overflow-hidden bg-white shadow-2xs transition-all">
+      {/* Level 2: Header Unit */}
+      <div
+        onClick={onToggleUnit}
+        className={`p-2.5 sm:p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors select-none ${
+          isUnitOpen ? 'bg-slate-100/90 font-bold border-b border-slate-200' : 'hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-transform ${isUnitOpen ? 'rotate-90 text-indigo-600' : 'text-slate-400'}`}>
+            <ChevronRight size={14} />
+          </div>
+          <Building2 size={15} className="text-slate-500 shrink-0" />
+          <span className="font-bold text-xs text-slate-800 truncate">{unitGroup.unit}</span>
+          <Badge variant="outline" className="text-[10px] font-mono bg-white text-slate-600 border-slate-200 shrink-0">
+            {unitGroup.count.toLocaleString('id-ID')} Rincian
+          </Badge>
+        </div>
+        <div className="text-right shrink-0">
+          <span className="font-black font-mono text-xs text-slate-900">
+            Rp {formatRp(unitGroup.totalPagu)}
+          </span>
+        </div>
+      </div>
+
+      {/* Level 3: Detail Rincian dengan Paging */}
+      {isUnitOpen && (
+        <div className="p-0 bg-white">
+          {subtab === 'penerimaan' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-emerald-50/70 text-emerald-900 font-bold border-b border-emerald-100 uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-2 px-3 text-center w-10">#</th>
+                    <th className="py-2 px-3 min-w-[280px]">Keterangan &amp; Rincian Usulan</th>
+                    <th className="py-2 px-3 w-40 text-center">Volume &amp; Tarif</th>
+                    <th className="py-2 px-3 w-36 text-center">Status &amp; Sumber Dana</th>
+                    <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Penerimaan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-50/60 bg-white">
+                  {paginatedRows.map((row, idx) => {
+                    const num = (page - 1) * rowsPerPage + idx + 1;
+                    const pagu = Number(row.renterima_pagu) || 0;
+                    const tarif = Number(row.renterima_tarif) || 0;
+                    const vol = Number(row.renterima_volume) || 0;
+                    return (
+                      <tr key={row.renterima_id || idx} className="hover:bg-emerald-50/30 transition-colors">
+                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
+                        <td className="py-2.5 px-3 align-top space-y-1">
+                          <div className="font-bold text-slate-900 text-xs leading-snug">{row.keterangan || row.nama_akun_penerimaan || '-'}</div>
+                          <span className="text-[10px] text-slate-400 font-mono">TA {row.tahun || '-'}</span>
+                        </td>
+                        <td className="py-2.5 px-3 align-top text-center space-y-0.5">
+                          <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded font-mono text-xs font-bold border border-emerald-100">
+                            {vol.toLocaleString('id-ID')} Vol
+                          </span>
+                          <div className="text-[10px] text-slate-500 font-mono">@ Rp {formatRp(tarif)}</div>
+                        </td>
+                        <td className="py-2.5 px-3 align-top text-center space-y-1">
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                            {row.status || 'Aktif'}
+                          </Badge>
+                          <div className="text-[10px] text-slate-500 font-medium">{row.sumber_dana || 'Dana Masyarakat'}</div>
+                        </td>
+                        <td className="py-2.5 px-3 align-top text-right pr-4">
+                          <span className="font-black font-mono text-emerald-950 text-xs">Rp {formatRp(pagu)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="py-2 px-3 text-center w-10">#</th>
+                    <th className="py-2 px-3 min-w-[260px]">Kegiatan &amp; Lingkup</th>
+                    <th className="py-2 px-3 min-w-[280px]">Uraian Belanja</th>
+                    <th className="py-2 px-3 w-36 text-center">Prioritas &amp; TA</th>
+                    <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Anggaran</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {paginatedRows.map((row, idx) => {
+                    const num = (page - 1) * rowsPerPage + idx + 1;
+                    const ang = Number(row.anggaran) || 0;
+                    return (
+                      <tr key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
+                        <td className="py-2.5 px-3 align-top space-y-1">
+                          <div className="font-bold text-slate-900 text-xs leading-snug">{row.kegiatan || '-'}</div>
+                          {row.lingkup_kegiatan && (
+                            <div className="text-[10px] text-indigo-700 font-medium">
+                              <span className="font-bold text-indigo-900">Lingkup:</span> {row.lingkup_kegiatan}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 align-top">
+                          <div className="font-medium text-slate-800 text-xs leading-relaxed">{row.uraian_belanja || '-'}</div>
+                        </td>
+                        <td className="py-2.5 px-3 align-top text-center space-y-1">
+                          <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold font-mono">
+                            TA {row.tahun_anggaran || '-'}
+                          </span>
+                          {row.prioritas && (
+                            <div className="text-[10px] text-slate-500 font-medium">Prioritas: {row.prioritas}</div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 align-top text-right pr-4">
+                          <span className="font-black font-mono text-slate-950 text-xs">Rp {formatRp(ang)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Level 3: Pagination Controls per Unit */}
+          {totalRows > rowsPerPage && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 bg-slate-50/90 border-t border-slate-200 text-[11px] text-slate-600 font-medium">
+              <span>
+                Menampilkan rincian <strong>{(page - 1) * rowsPerPage + 1}</strong> s.d. <strong>{Math.min(page * rowsPerPage, totalRows)}</strong> dari <strong>{totalRows}</strong> total baris
+              </span>
+              <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300"
+                >
+                  ‹ Sebelumnya
+                </Button>
+                <span className="px-2 py-0.5 font-bold font-mono text-slate-700 bg-white rounded border border-slate-200">
+                  Hal {page} / {totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300"
+                >
+                  Berikutnya ›
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RkaLaporanPage() {
   const [dataList, setDataList] = useState<any[]>([]);
   const [penerimaanList, setPenerimaanList] = useState<any[]>([]);
@@ -768,35 +970,182 @@ export default function RkaLaporanPage() {
     });
   }, [penerimaanList, search]);
 
-  // Paginated Rows untuk Tab Detail
-  const paginatedRows = useMemo(() => {
-    if (pageSize === 'ALL') return allDetailRows;
-    const start = (currentPage - 1) * pageSize;
-    return allDetailRows.slice(start, start + pageSize);
-  }, [allDetailRows, currentPage, pageSize]);
+  // Kelompokkan Detail Belanja Secara Hirarkis: Akun (Anak 1) -> Unit (Anak 2) -> Detail Rows (Anak 3)
+  const groupedDetailBelanja = useMemo(() => {
+    const akunMap: Record<string, {
+      namaAkun: string;
+      totalPagu: number;
+      totalRows: number;
+      unitMap: Record<string, { unit: string; totalPagu: number; count: number; rows: any[] }>;
+    }> = {};
 
-  const paginatedPenerimaanRows = useMemo(() => {
-    if (pageSize === 'ALL') return allDetailPenerimaanRows;
-    const start = (currentPage - 1) * pageSize;
-    return allDetailPenerimaanRows.slice(start, start + pageSize);
-  }, [allDetailPenerimaanRows, currentPage, pageSize]);
+    allDetailRows.forEach(row => {
+      const namaAkun = (row.akun_detail || row.nama_akun || 'Akun Belanja Tidak Terdefinisi').trim();
+      const unit = (row.unit || 'Unit Kerja Tidak Terdefinisi').trim();
+      const pagu = Number(row.anggaran) || 0;
 
-  const totalPages = useMemo(() => {
-    const list = activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows : allDetailRows;
-    if (pageSize === 'ALL') return 1;
-    return Math.ceil(list.length / pageSize) || 1;
-  }, [activeDetailSubtab, allDetailPenerimaanRows.length, allDetailRows.length, pageSize]);
+      if (!akunMap[namaAkun]) {
+        akunMap[namaAkun] = {
+          namaAkun,
+          totalPagu: 0,
+          totalRows: 0,
+          unitMap: {}
+        };
+      }
+
+      akunMap[namaAkun].totalPagu += pagu;
+      akunMap[namaAkun].totalRows += 1;
+
+      if (!akunMap[namaAkun].unitMap[unit]) {
+        akunMap[namaAkun].unitMap[unit] = {
+          unit,
+          totalPagu: 0,
+          count: 0,
+          rows: []
+        };
+      }
+
+      akunMap[namaAkun].unitMap[unit].totalPagu += pagu;
+      akunMap[namaAkun].unitMap[unit].count += 1;
+      akunMap[namaAkun].unitMap[unit].rows.push(row);
+    });
+
+    const result: DetailGroupAkun[] = Object.values(akunMap).map(a => {
+      const units: DetailGroupUnit[] = Object.values(a.unitMap).sort((u1, u2) => 
+        u1.unit.localeCompare(u2.unit, 'id', { numeric: true, sensitivity: 'base' })
+      );
+      return {
+        namaAkun: a.namaAkun,
+        totalPagu: a.totalPagu,
+        totalUnits: units.length,
+        totalRows: a.totalRows,
+        units
+      };
+    });
+
+    // Urutkan Akun secara alfabet A-Z
+    return result.sort((a, b) => a.namaAkun.localeCompare(b.namaAkun, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [allDetailRows]);
+
+  // Kelompokkan Detail Penerimaan Secara Hirarkis: Akun (Anak 1) -> Unit (Anak 2) -> Detail Rows (Anak 3)
+  const groupedDetailPenerimaan = useMemo(() => {
+    const akunMap: Record<string, {
+      namaAkun: string;
+      totalPagu: number;
+      totalRows: number;
+      unitMap: Record<string, { unit: string; totalPagu: number; count: number; rows: any[] }>;
+    }> = {};
+
+    allDetailPenerimaanRows.forEach(row => {
+      const namaAkun = (row.nama_akun_penerimaan || 'Akun Penerimaan Tidak Terdefinisi').trim();
+      const unit = (row.unit_kerja || 'Unit Kerja Tidak Terdefinisi').trim();
+      const pagu = Number(row.renterima_pagu) || 0;
+
+      if (!akunMap[namaAkun]) {
+        akunMap[namaAkun] = {
+          namaAkun,
+          totalPagu: 0,
+          totalRows: 0,
+          unitMap: {}
+        };
+      }
+
+      akunMap[namaAkun].totalPagu += pagu;
+      akunMap[namaAkun].totalRows += 1;
+
+      if (!akunMap[namaAkun].unitMap[unit]) {
+        akunMap[namaAkun].unitMap[unit] = {
+          unit,
+          totalPagu: 0,
+          count: 0,
+          rows: []
+        };
+      }
+
+      akunMap[namaAkun].unitMap[unit].totalPagu += pagu;
+      akunMap[namaAkun].unitMap[unit].count += 1;
+      akunMap[namaAkun].unitMap[unit].rows.push(row);
+    });
+
+    const result: DetailGroupAkun[] = Object.values(akunMap).map(a => {
+      const units: DetailGroupUnit[] = Object.values(a.unitMap).sort((u1, u2) => 
+        u1.unit.localeCompare(u2.unit, 'id', { numeric: true, sensitivity: 'base' })
+      );
+      return {
+        namaAkun: a.namaAkun,
+        totalPagu: a.totalPagu,
+        totalUnits: units.length,
+        totalRows: a.totalRows,
+        units
+      };
+    });
+
+    // Urutkan Akun secara alfabet A-Z
+    return result.sort((a, b) => a.namaAkun.localeCompare(b.namaAkun, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [allDetailPenerimaanRows]);
+
+  // State Collapse untuk Hirarki Detail (Default Tertutup / Collapsed Kosong)
+  const [openAkunSet, setOpenAkunSet] = useState<Set<string>>(new Set());
+  const [openUnitSet, setOpenUnitSet] = useState<Set<string>>(new Set());
+
+  // Pagination untuk Level 1: Akun
+  const [akunPageSize, setAkunPageSize] = useState<number | 'ALL'>(15);
+  const [currentAkunPage, setCurrentAkunPage] = useState(1);
+
+  const activeAkunList = activeDetailSubtab === 'penerimaan' ? groupedDetailPenerimaan : groupedDetailBelanja;
+  const totalAkunPages = akunPageSize === 'ALL' ? 1 : Math.ceil(activeAkunList.length / (akunPageSize as number)) || 1;
+
+  const paginatedAkunList = useMemo(() => {
+    if (akunPageSize === 'ALL') return activeAkunList;
+    const start = (currentAkunPage - 1) * (akunPageSize as number);
+    return activeAkunList.slice(start, start + (akunPageSize as number));
+  }, [activeAkunList, currentAkunPage, akunPageSize]);
+
+  // Helper fungsi toggle expand/collapse
+  const toggleAkun = (namaAkun: string) => {
+    setOpenAkunSet(prev => {
+      const next = new Set(prev);
+      if (next.has(namaAkun)) next.delete(namaAkun);
+      else next.add(namaAkun);
+      return next;
+    });
+  };
+
+  const toggleUnit = (key: string) => {
+    setOpenUnitSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const expandAllAkun = () => {
+    const all = new Set(activeAkunList.map(a => a.namaAkun));
+    setOpenAkunSet(all);
+  };
+
+  const collapseAll = () => {
+    setOpenAkunSet(new Set());
+    setOpenUnitSet(new Set());
+  };
 
   // Reset pagination saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
-  }, [modeLaporan, tahunFilter, unitFilter, kategoriFilter, search, pageSize]);
+    setCurrentAkunPage(1);
+    setOpenAkunSet(new Set());
+    setOpenUnitSet(new Set());
+  }, [modeLaporan, tahunFilter, unitFilter, kategoriFilter, search, pageSize, akunPageSize, activeDetailSubtab]);
 
   // Aksi Klik Kategori dari Ringkasan untuk membuka Rincian
   const handleViewCategoryDetail = (catLabel: string) => {
     setKategoriFilter(catLabel);
     setActiveViewTab('detail');
     setCurrentPage(1);
+    setCurrentAkunPage(1);
+    setOpenAkunSet(new Set());
+    setOpenUnitSet(new Set());
   };
 
   // Aksi Klik Unit Kerja dari Rekap untuk membuka Rincian
@@ -804,6 +1153,9 @@ export default function RkaLaporanPage() {
     setUnitFilter(unitName);
     setActiveViewTab('detail');
     setCurrentPage(1);
+    setCurrentAkunPage(1);
+    setOpenAkunSet(new Set());
+    setOpenUnitSet(new Set());
   };
 
   // Helper mendapatkan Group Organisasi dari master gov_units
@@ -2555,42 +2907,44 @@ export default function RkaLaporanPage() {
           </Card>
         ) : (
           /* ======================================================== */
-          /* TAB VIEW 3: TABEL RINCIAN DETAIL (BELANJA & PENERIMAAN)   */
+          /* TAB VIEW 3: HIRARKI 3-LEVEL COLLAPSIBLE (AKUN > UNIT > DETAIL) */
           /* ======================================================== */
-          <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
-            <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <Card className="rounded-2xl border-slate-200 shadow-xs overflow-hidden">
+            <CardHeader className="bg-slate-50/80 p-4 sm:p-5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
-                  <BookOpen size={16} className="text-indigo-600" />
+                <CardTitle className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                  <FolderTree size={18} className="text-indigo-600" />
                   <span>
                     {activeDetailSubtab === 'penerimaan'
-                      ? `Tabel Rincian Penerimaan (${allDetailPenerimaanRows.length.toLocaleString('id-ID')} Data)`
-                      : `Tabel Rincian Belanja (${allDetailRows.length.toLocaleString('id-ID')} Data)`}
+                      ? `Struktur Usulan Penerimaan (${allDetailPenerimaanRows.length.toLocaleString('id-ID')} Rincian Data)`
+                      : `Struktur Usulan Belanja (${allDetailRows.length.toLocaleString('id-ID')} Rincian Data)`}
                   </span>
                 </CardTitle>
-                <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  {activeDetailSubtab === 'penerimaan'
-                    ? 'Daftar rincian usulan akun penerimaan / pendapatan RKAT'
-                    : `Daftar seluruh item belanja usulan RKA/RKAT yang terklasifikasi ke dalam format ${activeTabObj?.label}`}
+                <CardDescription className="text-xs text-slate-600 font-medium mt-1">
+                  Format Hierarkis: <strong>Akun (Anak 1)</strong> ➔ <strong>Unit Kerja (Anak 2)</strong> ➔ <strong>Rincian Detail Transaksi (Anak 3)</strong>
                   {kategoriFilter !== 'ALL' && activeDetailSubtab === 'belanja' && (
-                    <span className="font-bold text-indigo-600"> • Filter Kategori: {kategoriFilter}</span>
+                    <span className="font-bold text-indigo-700"> • Filter Kategori: {kategoriFilter}</span>
+                  )}
+                  {unitFilter !== 'ALL' && (
+                    <span className="font-bold text-blue-700"> • Filter Unit: {unitFilter}</span>
                   )}
                 </CardDescription>
               </div>
 
-              {/* Subtab Toggle: Belanja vs Penerimaan */}
+              {/* Subtab Toggle & Control Buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1 bg-gray-200/70 p-1 rounded-xl border border-gray-300/60">
+                {/* Subtab Toggle */}
+                <div className="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl border border-slate-300">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveDetailSubtab('belanja');
-                      setCurrentPage(1);
+                      setCurrentAkunPage(1);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeDetailSubtab === 'belanja'
                         ? 'bg-white text-indigo-950 shadow-xs font-black'
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     📋 Rincian Belanja ({allDetailRows.length.toLocaleString('id-ID')})
@@ -2599,282 +2953,197 @@ export default function RkaLaporanPage() {
                     type="button"
                     onClick={() => {
                       setActiveDetailSubtab('penerimaan');
-                      setCurrentPage(1);
+                      setCurrentAkunPage(1);
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       activeDetailSubtab === 'penerimaan'
                         ? 'bg-white text-emerald-950 shadow-xs font-black'
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     💰 Rincian Penerimaan ({allDetailPenerimaanRows.length.toLocaleString('id-ID')})
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-gray-400 font-bold uppercase">Baris:</span>
+                {/* Expand / Collapse All */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={expandAllAkun}
+                    className="h-8 px-2.5 text-xs font-bold rounded-xl border-slate-300 bg-white hover:bg-slate-100 shadow-2xs cursor-pointer"
+                    title="Buka seluruh akun (Level 1)"
+                  >
+                    📂 Buka Semua Akun
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={collapseAll}
+                    className="h-8 px-2.5 text-xs font-bold rounded-xl border-slate-300 bg-white hover:bg-slate-100 shadow-2xs cursor-pointer"
+                    title="Tutup seluruh level"
+                  >
+                    📁 Tutup Semua
+                  </Button>
+                </div>
+
+                {/* Akun Page Size Selector */}
+                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-bold uppercase">Akun/Hal:</span>
                   <select
-                    value={pageSize}
+                    value={akunPageSize}
                     onChange={e => {
                       const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
-                      setPageSize(val);
-                      setCurrentPage(1);
+                      setAkunPageSize(val);
+                      setCurrentAkunPage(1);
                     }}
-                    className="h-8 px-2.5 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+                    className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
                   >
+                    <option value={10}>10</option>
+                    <option value={15}>15</option>
                     <option value={25}>25</option>
                     <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={250}>250</option>
                     <option value="ALL">Semua</option>
                   </select>
                 </div>
               </div>
             </CardHeader>
 
-            <CardContent className="p-0">
-              {activeDetailSubtab === 'penerimaan' ? (
-                /* TABEL RINCIAN PENERIMAAN */
-                <Table>
-                  <TableHeader className="bg-emerald-50/50 border-b border-emerald-100 text-emerald-900 font-black uppercase text-[10px] tracking-wider">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12 text-center text-emerald-900 text-xs uppercase font-bold">#</TableHead>
-                      <TableHead className="text-emerald-900 text-xs uppercase font-bold min-w-[380px]">
-                        Fakultas / Unit Kerja &amp; Akun Penerimaan
-                      </TableHead>
-                      <TableHead className="text-center text-emerald-900 text-xs uppercase font-bold w-36">
-                        Volume &amp; Tarif
-                      </TableHead>
-                      <TableHead className="text-right text-emerald-900 text-xs uppercase font-bold min-w-[170px]">
-                        Pagu Penerimaan
-                      </TableHead>
-                      <TableHead className="text-center text-emerald-900 text-xs uppercase font-bold min-w-[170px]">
-                        Status &amp; Sumber Dana
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedPenerimaanRows.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-12 text-gray-400 font-medium">
-                          Tidak ada baris data penerimaan yang sesuai kriteria filter.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedPenerimaanRows.map((row, rIdx) => {
-                        const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
-                        const pagu = Number(row.renterima_pagu) || 0;
-                        const tarif = Number(row.renterima_tarif) || 0;
-                        const vol = Number(row.renterima_volume) || 0;
-
-                        return (
-                          <TableRow key={row.renterima_id || rIdx} className="hover:bg-emerald-50/30 transition-colors border-b border-gray-100">
-                            <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
-                              {rowNum}
-                            </TableCell>
-
-                            {/* Unit Kerja & Akun Penerimaan */}
-                            <TableCell className="align-top pt-3 space-y-1.5">
-                              <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                                <Building2 size={13} className="text-emerald-600 shrink-0" />
-                                <span>{row.unit_kerja}</span>
-                                <span className="text-[10px] text-gray-400 font-mono font-medium ml-1">
-                                  TA {row.tahun}
-                                </span>
-                              </div>
-                              <div className="font-mono text-xs font-bold text-emerald-900">
-                                {row.nama_akun_penerimaan}
-                              </div>
-                              {row.keterangan && (
-                                <div className="text-[11px] text-gray-600 italic bg-gray-50 p-1.5 rounded-lg border border-gray-100">
-                                  {row.keterangan}
-                                </div>
-                              )}
-                            </TableCell>
-
-                            {/* Volume & Tarif */}
-                            <TableCell className="align-top pt-3 text-center space-y-1">
-                              <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-800 rounded font-mono text-xs font-bold">
-                                {vol.toLocaleString('id-ID')} Vol
-                              </span>
-                              <div className="text-[11px] text-gray-500 font-mono">
-                                @ Rp {formatRp(tarif)}
-                              </div>
-                            </TableCell>
-
-                            {/* Pagu Penerimaan */}
-                            <TableCell className="align-top pt-3 text-right">
-                              <span className="text-[9px] uppercase font-bold text-emerald-700 block tracking-wider mb-1">
-                                Pagu Penerimaan
-                              </span>
-                              <span className="font-black font-mono text-emerald-950 text-sm">
-                                Rp {formatRp(pagu)}
-                              </span>
-                            </TableCell>
-
-                            {/* Status & Sumber Dana */}
-                            <TableCell className="align-top pt-3 text-center space-y-1">
-                              <div>
-                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                                  {row.status || 'Aktif'}
-                                </Badge>
-                              </div>
-                              <div className="text-[10px] text-gray-500 font-medium">
-                                {row.sumber_dana || 'Dana Masyarakat'}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+            <CardContent className="p-4 sm:p-6 bg-slate-50/50">
+              {paginatedAkunList.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8 space-y-2">
+                  <div className="text-4xl">📂</div>
+                  <div className="font-bold text-slate-700 text-sm">Tidak ada data akun yang sesuai filter</div>
+                  <div className="text-xs text-slate-400">Silakan sesuaikan pencarian atau filter unit / kategori di atas.</div>
+                </div>
               ) : (
-                /* TABEL RINCIAN BELANJA */
-                <Table>
-                  <TableHeader className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                      <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[420px]">
-                        Fakultas / Unit Kerja &amp; Rincian Kegiatan
-                      </TableHead>
-                      <TableHead className="text-gray-500 text-xs uppercase font-bold min-w-[220px]">
-                        Group Belanja
-                      </TableHead>
-                      <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[150px]">
-                        Pagu Anggaran
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedRows.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-12 text-gray-400 font-medium">
-                          Tidak ada baris data belanja yang sesuai kriteria filter.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedRows.map((row, rIdx) => {
-                        const rowNum = pageSize === 'ALL' ? rIdx + 1 : (currentPage - 1) * pageSize + rIdx + 1;
-                        const ang = Number(row.anggaran) || 0;
-                        const catLabel = getRowClassification(row, modeLaporan) || 'Lainnya';
-
-                        return (
-                          <TableRow key={row.id || rIdx} className="hover:bg-gray-50/80 transition-colors border-b border-gray-100">
-                            {/* No */}
-                            <TableCell className="text-center text-gray-400 font-mono text-xs align-top pt-3.5">
-                              {rowNum}
-                            </TableCell>
-
-                            {/* Field 1: Unit & Uraian Belanja Kegiatan */}
-                            <TableCell className="align-top pt-3 space-y-2">
+                <div className="space-y-3.5">
+                  {paginatedAkunList.map((akunGroup) => {
+                    const isAkunOpen = openAkunSet.has(akunGroup.namaAkun);
+                    return (
+                      <div
+                        key={akunGroup.namaAkun}
+                        className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs transition-all"
+                      >
+                        {/* Level 1: Header Akun (Collapsible, Default Tertutup) */}
+                        <div
+                          onClick={() => toggleAkun(akunGroup.namaAkun)}
+                          className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors select-none ${
+                            isAkunOpen
+                              ? 'bg-gradient-to-r from-slate-100 via-indigo-50/60 to-slate-100 border-b border-indigo-200/70'
+                              : 'hover:bg-slate-50/90 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center transition-transform shadow-2xs ${
+                                isAkunOpen
+                                  ? 'rotate-90 bg-indigo-600 text-white'
+                                  : 'bg-slate-100 text-slate-500 border border-slate-200'
+                              }`}
+                            >
+                              <ChevronRight size={15} />
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                                  <Building2 size={13} className="text-indigo-600 shrink-0" />
-                                  <span>{row.unit}</span>
-                                </div>
-                                <span className="text-[10px] text-gray-400 font-mono">
-                                  TA {row.tahun_anggaran} • Prioritas: <strong>{row.prioritas || '-'}</strong>
+                                <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight leading-snug">
+                                  {akunGroup.namaAkun}
                                 </span>
                               </div>
-
-                              {/* Kegiatan & Lingkup Kegiatan */}
-                              {(row.kegiatan || row.lingkup_kegiatan) && (
-                                <div className="bg-gray-50/90 p-2 rounded-xl border border-gray-100 space-y-0.5">
-                                  {row.kegiatan && (
-                                    <div className="text-[11px] text-gray-800 leading-relaxed font-medium">
-                                      <span className="font-bold text-gray-900">Kegiatan:</span> {row.kegiatan}
-                                    </div>
-                                  )}
-                                  {row.lingkup_kegiatan && (
-                                    <div className="text-[10px] text-indigo-800 font-medium">
-                                      <span className="font-bold text-indigo-950">Lingkup:</span> {row.lingkup_kegiatan}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Akun Detail & Uraian Belanja */}
-                              <div className="space-y-1">
-                                {row.akun_detail && (
-                                  <span className="inline-block px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md font-mono text-[10px] font-bold">
-                                    {row.akun_detail}
-                                  </span>
-                                )}
-                                <div className="font-bold text-gray-950 text-xs leading-snug">
-                                  {row.uraian_belanja || '-'}
-                                </div>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
+                                <span className="inline-flex items-center gap-1 font-bold text-slate-700">
+                                  <Building2 size={12} className="text-indigo-600" />
+                                  <span>{akunGroup.totalUnits.toLocaleString('id-ID')} Unit Kerja</span>
+                                </span>
+                                <span>•</span>
+                                <span className="inline-flex items-center gap-1 font-bold text-slate-700">
+                                  <span>📄</span>
+                                  <span>{akunGroup.totalRows.toLocaleString('id-ID')} Rincian Transaksi</span>
+                                </span>
                               </div>
-                            </TableCell>
+                            </div>
+                          </div>
 
-                            {/* Field 2: Group Belanja */}
-                            <TableCell className="align-top pt-3 space-y-1.5">
-                              <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1 shadow-2xs">
-                                <div className="flex items-center gap-1.5 font-bold text-xs leading-snug">
-                                  <span>🏷️</span>
-                                  <span>{catLabel}</span>
-                                </div>
-                              </div>
-                            </TableCell>
+                          <div className="text-right shrink-0">
+                            <span className="text-[9px] font-extrabold uppercase text-slate-400 block tracking-wider">
+                              Subtotal Akun
+                            </span>
+                            <span className="font-black font-mono text-xs sm:text-sm text-indigo-950">
+                              Rp {formatRp(akunGroup.totalPagu)}
+                            </span>
+                          </div>
+                        </div>
 
-                            {/* Field 3: Pagu Anggaran */}
-                            <TableCell className="align-top pt-3 text-right">
-                              <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider mb-1">
-                                Pagu Anggaran
+                        {/* Level 2: List of Units under this Akun (Collapsible, Default Tertutup) */}
+                        {isAkunOpen && (
+                          <div className="p-3 sm:p-4 bg-slate-50/50 space-y-2.5 border-t border-slate-100 animate-in fade-in duration-100">
+                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-1 flex items-center justify-between">
+                              <span>Daftar Unit Kerja ({akunGroup.units.length} Unit):</span>
+                              <span className="italic normal-case text-slate-400 font-normal">
+                                Klik nama unit untuk melihat rincian detail (Anak 3)
                               </span>
-                              <span className="font-black font-mono text-gray-950 text-sm">
-                                Rp {formatRp(ang)}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                            </div>
+
+                            {akunGroup.units.map((unitGroup) => {
+                              const unitKey = `${akunGroup.namaAkun}:::${unitGroup.unit}`;
+                              const isUnitOpen = openUnitSet.has(unitKey);
+                              return (
+                                <DetailUnitAccordionItem
+                                  key={unitKey}
+                                  unitGroup={unitGroup}
+                                  akunKey={akunGroup.namaAkun}
+                                  subtab={activeDetailSubtab}
+                                  isUnitOpen={isUnitOpen}
+                                  onToggleUnit={() => toggleUnit(unitKey)}
+                                  formatRp={formatRp}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
 
-            {/* Pagination Controls Footer (Seragam dengan /rka/pengeluaran) */}
-            <div className="p-4 bg-gray-50/70 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500 font-medium">
+            {/* Pagination Controls Footer untuk Level 1: Akun */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
               <div>
-                {activeDetailSubtab === 'penerimaan' ? (
-                  <span>
-                    Menampilkan <strong>{pageSize === 'ALL' ? allDetailPenerimaanRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailPenerimaanRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailPenerimaanRows.length : Math.min(currentPage * (pageSize as number), allDetailPenerimaanRows.length)}</strong> dari <strong>{allDetailPenerimaanRows.length.toLocaleString('id-ID')}</strong> total baris penerimaan
-                  </span>
-                ) : (
-                  <span>
-                    Menampilkan <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min((currentPage - 1) * (pageSize as number) + 1, allDetailRows.length)}</strong> sampai <strong>{pageSize === 'ALL' ? allDetailRows.length : Math.min(currentPage * (pageSize as number), allDetailRows.length)}</strong> dari <strong>{allDetailRows.length.toLocaleString('id-ID')}</strong> total baris belanja
-                  </span>
-                )}
+                <span>
+                  Menampilkan Akun <strong>{akunPageSize === 'ALL' ? 1 : Math.min((currentAkunPage - 1) * (akunPageSize as number) + 1, activeAkunList.length)}</strong> s.d. <strong>{akunPageSize === 'ALL' ? activeAkunList.length : Math.min(currentAkunPage * (akunPageSize as number), activeAkunList.length)}</strong> dari <strong>{activeAkunList.length.toLocaleString('id-ID')}</strong> total akun usulan
+                </span>
               </div>
 
-              {pageSize !== 'ALL' && totalPages > 1 && (
-                <div className="flex items-center gap-1">
+              {akunPageSize !== 'ALL' && totalAkunPages > 1 && (
+                <div className="flex items-center gap-1.5">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 px-2 rounded-lg text-xs"
+                    onClick={() => setCurrentAkunPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentAkunPage === 1}
+                    className="h-8 px-2.5 rounded-xl text-xs font-bold border-slate-300 bg-white hover:bg-slate-100 cursor-pointer"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={14} className="mr-1" />
                     <span>Sebelumnya</span>
                   </Button>
 
-                  <div className="px-3 py-1 font-bold text-gray-700 bg-white border border-gray-200 rounded-lg text-xs">
-                    Halaman {currentPage} dari {totalPages}
+                  <div className="px-3 py-1 font-bold text-slate-800 bg-white border border-slate-200 rounded-xl text-xs font-mono shadow-2xs">
+                    Halaman {currentAkunPage} dari {totalAkunPages}
                   </div>
 
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 px-2 rounded-lg text-xs"
+                    onClick={() => setCurrentAkunPage(prev => Math.min(totalAkunPages, prev + 1))}
+                    disabled={currentAkunPage === totalAkunPages}
+                    className="h-8 px-2.5 rounded-xl text-xs font-bold border-slate-300 bg-white hover:bg-slate-100 cursor-pointer"
                   >
                     <span>Berikutnya</span>
-                    <ChevronRight size={14} />
+                    <ChevronRight size={14} className="ml-1" />
                   </Button>
                 </div>
               )}
