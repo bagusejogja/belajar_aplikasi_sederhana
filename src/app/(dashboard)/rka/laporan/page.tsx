@@ -166,6 +166,7 @@ export default function RkaLaporanPage() {
   const [activeDetailSubtab, setActiveDetailSubtab] = useState<'belanja' | 'penerimaan'>('belanja');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
+  const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
 
   const fetchRules = async () => {
     try {
@@ -415,6 +416,179 @@ export default function RkaLaporanPage() {
     const totalItems = groupedPenerimaan.reduce((acc, g) => acc + g.rows.length, 0);
     return { totalPagu, totalItems };
   }, [groupedPenerimaan]);
+
+  // Struktur Hirarkis Khusus Format Proposal RKAT (Persis Format Slide / PowerPoint RKAT)
+  const pptProposalData = useMemo(() => {
+    // 1. Data Penerimaan
+    const pMap: Record<string, { totalPagu: number; count: number; rows: any[] }> = {};
+    penerimaanList.forEach(r => {
+      if (unitFilter !== 'ALL' && r.unit_kerja !== unitFilter) return;
+      if (search) {
+        const lower = search.toLowerCase();
+        const match = (r.unit_kerja && r.unit_kerja.toLowerCase().includes(lower)) ||
+          (r.nama_akun_penerimaan && r.nama_akun_penerimaan.toLowerCase().includes(lower)) ||
+          (r.keterangan && r.keterangan.toLowerCase().includes(lower)) ||
+          (r.format_proposal && r.format_proposal.toLowerCase().includes(lower));
+        if (!match) return;
+      }
+      const label = (r.format_proposal || r.kelompok_penerimaan || 'Penerimaan Lainnya').trim();
+      if (!pMap[label]) pMap[label] = { totalPagu: 0, count: 0, rows: [] };
+      pMap[label].totalPagu += Number(r.renterima_pagu) || 0;
+      pMap[label].count += 1;
+      pMap[label].rows.push(r);
+    });
+
+    const getP = (keyPart: string) => {
+      let totalPagu = 0;
+      let count = 0;
+      let rows: any[] = [];
+      Object.keys(pMap).forEach(k => {
+        if (k.toLowerCase().includes(keyPart.toLowerCase())) {
+          totalPagu += pMap[k].totalPagu;
+          count += pMap[k].count;
+          rows.push(...pMap[k].rows);
+        }
+      });
+      return { totalPagu, count, rows };
+    };
+
+    // Sub-kelompok Penerimaan Pendidikan
+    const pPendUtama = getP('pendidikan utama');
+    const pPendLainnya = getP('pendidikan lainnya');
+    const subtotalPendidikan = pPendUtama.totalPagu + pPendLainnya.totalPagu;
+    const countPendidikan = pPendUtama.count + pPendLainnya.count;
+
+    // Sub-kelompok Penerimaan Non Pendidikan
+    const pHibah = getP('hibah');
+    const pJasa = getP('jasa universitas');
+    const pAset = getP('aset');
+    const pKerjasama = getP('kerjasama');
+    const pUpu = getP('upu');
+    const subtotalNonPendidikan = pHibah.totalPagu + pJasa.totalPagu + pAset.totalPagu + pKerjasama.totalPagu + pUpu.totalPagu;
+    const countNonPendidikan = pHibah.count + pJasa.count + pAset.count + pKerjasama.count + pUpu.count;
+
+    // Penerimaan Lainnya / Surplus TA Lalu / Transfer
+    let pLainnyaTotal = 0;
+    let pLainnyaCount = 0;
+    let pLainnyaRows: any[] = [];
+    Object.keys(pMap).forEach(k => {
+      const lower = k.toLowerCase();
+      if (!lower.includes('pendidikan') && !lower.includes('hibah') && !lower.includes('jasa') && !lower.includes('aset') && !lower.includes('kerjasama') && !lower.includes('upu')) {
+        pLainnyaTotal += pMap[k].totalPagu;
+        pLainnyaCount += pMap[k].count;
+        pLainnyaRows.push(...pMap[k].rows);
+      }
+    });
+
+    const totalPenerimaan = subtotalPendidikan + subtotalNonPendidikan + pLainnyaTotal;
+
+    // 2. Data Pengeluaran / Belanja
+    const bMap: Record<string, { totalAnggaran: number; count: number; rows: any[] }> = {};
+    dataList.forEach(r => {
+      if (unitFilter !== 'ALL' && r.unit !== unitFilter) return;
+      const label = (getRowClassification(r, 'proposal rkat') || 'Lainnya').trim();
+      if (!label || label === '') return;
+      if (kategoriFilter !== 'ALL' && label !== kategoriFilter) return;
+      if (search) {
+        const lower = search.toLowerCase();
+        const match = (r.unit && r.unit.toLowerCase().includes(lower)) ||
+          (r.uraian_belanja && r.uraian_belanja.toLowerCase().includes(lower)) ||
+          (r.kegiatan && r.kegiatan.toLowerCase().includes(lower)) ||
+          (r.akun_detail && r.akun_detail.toLowerCase().includes(lower)) ||
+          label.toLowerCase().includes(lower);
+        if (!match) return;
+      }
+      if (!bMap[label]) bMap[label] = { totalAnggaran: 0, count: 0, rows: [] };
+      bMap[label].totalAnggaran += Number(r.anggaran) || 0;
+      bMap[label].count += 1;
+      bMap[label].rows.push(r);
+    });
+
+    const getB = (keyPart: string) => {
+      let totalAnggaran = 0;
+      let count = 0;
+      let rows: any[] = [];
+      Object.keys(bMap).forEach(k => {
+        if (k.toLowerCase().includes(keyPart.toLowerCase())) {
+          totalAnggaran += bMap[k].totalAnggaran;
+          count += bMap[k].count;
+          rows.push(...bMap[k].rows);
+        }
+      });
+      return { totalAnggaran, count, rows };
+    };
+
+    const bPegawai = getB('pegawai');
+    const bBarangJasa = getB('barang');
+    const bPemeliharaan = getB('pemeliharaan');
+    const bPerjalanan = getB('perjalanan');
+    const bModal = getB('modal');
+    const bScienceTechno = getB('techno');
+    const bPuapt = getB('puapt');
+    const bEquity = getB('equity');
+
+    let bLainnyaTotal = 0;
+    let bLainnyaCount = 0;
+    let bLainnyaRows: any[] = [];
+    Object.keys(bMap).forEach(k => {
+      const lower = k.toLowerCase();
+      if (!lower.includes('pegawai') && !lower.includes('barang') && !lower.includes('pemeliharaan') && !lower.includes('perjalanan') && !lower.includes('modal') && !lower.includes('techno') && !lower.includes('puapt') && !lower.includes('equity')) {
+        bLainnyaTotal += bMap[k].totalAnggaran;
+        bLainnyaCount += bMap[k].count;
+        bLainnyaRows.push(...bMap[k].rows);
+      }
+    });
+
+    const totalPengeluaran = bPegawai.totalAnggaran + bBarangJasa.totalAnggaran + bPemeliharaan.totalAnggaran + bPerjalanan.totalAnggaran + bModal.totalAnggaran + bScienceTechno.totalAnggaran + bPuapt.totalAnggaran + bEquity.totalAnggaran + bLainnyaTotal;
+
+    const surplusDefisit = totalPenerimaan - totalPengeluaran;
+
+    return {
+      penerimaan: {
+        pendidikan: {
+          subtotal: subtotalPendidikan,
+          count: countPendidikan,
+          items: [
+            { label: 'Penerimaan Pendidikan Utama', ...pPendUtama },
+            { label: 'Penerimaan Pendidikan Lainnya', ...pPendLainnya }
+          ]
+        },
+        nonPendidikan: {
+          subtotal: subtotalNonPendidikan,
+          count: countNonPendidikan,
+          items: [
+            { label: 'Penerimaan Hibah dan Donasi', ...pHibah },
+            { label: 'Penerimaan Jasa Universitas', ...pJasa },
+            { label: 'Penerimaan Pemanfaatan Aset', ...pAset },
+            { label: 'Penerimaan Kerjasama', ...pKerjasama },
+            { label: 'Penerimaan dari UPU', ...pUpu }
+          ]
+        },
+        lainnya: {
+          label: 'Penerimaan Lainnya / Surplus TA Lalu',
+          totalPagu: pLainnyaTotal,
+          count: pLainnyaCount,
+          rows: pLainnyaRows
+        },
+        totalPenerimaan
+      },
+      pengeluaran: {
+        items: [
+          { label: 'Belanja Pegawai', ...bPegawai },
+          { label: 'Belanja Barang & Jasa', ...bBarangJasa },
+          { label: 'Belanja Perbaikan dan Pemeliharaan', ...bPemeliharaan },
+          { label: 'Belanja Perjalanan', ...bPerjalanan },
+          { label: 'Belanja Modal', ...bModal },
+          { label: 'Belanja SCIENCE TECHNO PARK -ADB', ...bScienceTechno },
+          { label: 'Belanja PUAPT', ...bPuapt },
+          { label: 'EQUITY', ...bEquity },
+          ...(bLainnyaTotal > 0 ? [{ label: 'Belanja Lainnya / Penunjang', totalAnggaran: bLainnyaTotal, count: bLainnyaCount, rows: bLainnyaRows }] : [])
+        ],
+        totalPengeluaran
+      },
+      surplusDefisit
+    };
+  }, [penerimaanList, dataList, unitFilter, kategoriFilter, search]);
 
   // Kelompokkan data Belanja per Kategori Laporan yang dipilih (Bagian Bawah)
   const groupedData = useMemo(() => {
@@ -875,10 +1049,86 @@ export default function RkaLaporanPage() {
     toast.success('File Excel Rekapitulasi Unit Kerja berhasil diexport!');
   };
 
+  // Export Excel Khusus Struktur Format PPT Proposal RKAT
+  const handleExportExcelPptFormat = () => {
+    const aoa: any[][] = [];
+    aoa.push(['UNIVERSITAS GADJAH MADA']);
+    aoa.push([`FORMAT USULAN PROPOSAL RKAT TAHUN ANGGARAN ${tahunFilter}`]);
+    aoa.push([`Standar Presentasi Eksekutif / Slide PPT  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`]);
+    aoa.push([]);
+
+    aoa.push(['URAIAN PROPOSAL RKAT', 'JUMLAH BARIS', 'PAGU USULAN (RP)', '% PROPORSI']);
+
+    // PENERIMAAN
+    aoa.push(['JUMLAH PENERIMAAN DANA MASYARAKAT', '', '', '']);
+    
+    // Pendidikan
+    aoa.push(['  Penerimaan Pendidikan', pptProposalData.penerimaan.pendidikan.count, pptProposalData.penerimaan.pendidikan.subtotal, '']);
+    pptProposalData.penerimaan.pendidikan.items.forEach(it => {
+      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+    });
+
+    // Non Pendidikan
+    aoa.push(['  Penerimaan Non Pendidikan', pptProposalData.penerimaan.nonPendidikan.count, pptProposalData.penerimaan.nonPendidikan.subtotal, '']);
+    pptProposalData.penerimaan.nonPendidikan.items.forEach(it => {
+      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+    });
+
+    if (pptProposalData.penerimaan.lainnya.totalPagu > 0) {
+      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`  ${pptProposalData.penerimaan.lainnya.label}`, pptProposalData.penerimaan.lainnya.count, pptProposalData.penerimaan.lainnya.totalPagu, pct]);
+    }
+
+    aoa.push(['JUMLAH PENERIMAAN', '', pptProposalData.penerimaan.totalPenerimaan, '100%']);
+    aoa.push([]);
+
+    // PENGELUARAN
+    aoa.push(['PENGELUARAN', '', '', '']);
+    pptProposalData.pengeluaran.items.forEach(it => {
+      const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((it.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`  ${it.label}`, it.count, it.totalAnggaran, pct]);
+    });
+    aoa.push(['JUMLAH PENGELUARAN', '', pptProposalData.pengeluaran.totalPengeluaran, '100%']);
+    aoa.push([]);
+
+    aoa.push([
+      `SURPLUS / (DEFISIT) ANGGARAN: ${pptProposalData.surplusDefisit >= 0 ? 'SURPLUS' : 'DEFISIT'}`,
+      '',
+      pptProposalData.surplusDefisit,
+      ''
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [
+      { wch: 50 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 16 }
+    ];
+
+    // Format number
+    for (let r = 4; r < aoa.length; r++) {
+      const cellRef = XLSX.utils.encode_cell({ r, c: 2 });
+      if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
+        ws[cellRef].z = '#,##0';
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Format_PPT_Proposal_RKAT');
+    XLSX.writeFile(wb, `Format_PPT_Proposal_RKAT_${tahunFilter}.xlsx`);
+    toast.success('File Excel Format Slide PPT Proposal RKAT berhasil diexport!');
+  };
+
   // Export Excel (Switchable based on active view)
   const handleExportExcel = () => {
     if (activeViewTab === 'rekap_unit') {
       return handleExportExcelUnitRekap();
+    }
+    if (modeLaporan === 'proposal rkat' && summaryStyle === 'ppt') {
+      return handleExportExcelPptFormat();
     }
     if (groupedData.length === 0) return toast.error('Tidak ada data untuk di-export');
 
@@ -1325,252 +1575,619 @@ export default function RkaLaporanPage() {
           </Card>
         ) : activeViewTab === 'summary' ? (
           /* ======================================================== */
-          /* TAB VIEW 1: ATAS BAWAH (ATAS: PENERIMAAN, BAWAH: BELANJA) */
+          /* TAB VIEW 1: RINGKASAN FORMAT LAPORAN (PPT VS STANDAR)   */
           /* ======================================================== */
           <div className="space-y-6">
             
-            {/* BAGIAN ATAS: RINGKASAN USULAN PENERIMAAN / PENDAPATAN */}
-            <Card className="rounded-2xl border-emerald-200/90 shadow-xs overflow-hidden">
-              <CardHeader className="bg-emerald-50/70 p-4 sm:p-5 border-b border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-sm sm:text-base font-black text-emerald-950 flex items-center gap-2">
-                    <Wallet size={18} className="text-emerald-600" />
-                    <span>1. Ringkasan Alokasi Usulan Penerimaan / Pendapatan</span>
-                  </CardTitle>
-                  <CardDescription className="text-xs text-emerald-800 font-medium mt-0.5">
-                    Akumulasi alokasi usulan pagu penerimaan per format / kelompok pendapatan
-                  </CardDescription>
-                </div>
+            {/* SWITCHER TAMPILAN KHUSUS PROPOSAL RKAT */}
+            {modeLaporan === 'proposal rkat' && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-blue-200 shadow-2xs">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-emerald-800 border-emerald-200">
-                    {groupedPenerimaan.length} Kelompok Penerimaan
+                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs font-bold font-mono">
+                    PROPOSAL RKAT
                   </Badge>
-                  <Badge className="bg-emerald-600 text-white text-xs font-bold font-mono">
-                    {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Total Baris
-                  </Badge>
+                  <span className="text-xs font-bold text-gray-800">
+                    Pilihan Gaya Tampilan Proposal:
+                  </span>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="bg-emerald-50/40 border-b border-emerald-100 text-emerald-800 font-black uppercase text-[10px] tracking-wider">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12 text-center text-emerald-800 text-xs uppercase font-bold">#</TableHead>
-                      <TableHead className="text-emerald-800 text-xs uppercase font-bold min-w-[280px]">Format / Kelompok Penerimaan</TableHead>
-                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
-                      <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Penerimaan</TableHead>
-                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">% Proporsi Penerimaan</TableHead>
-                      <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groupedPenerimaan.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-10 text-gray-400 font-medium">
-                          Tidak ada data penerimaan yang sesuai kriteria filter.
+                <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setSummaryStyle('ppt')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      summaryStyle === 'ppt'
+                        ? 'bg-blue-600 text-white shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <span>🖥️</span>
+                    <span>Format Slide / PPT RKAT</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSummaryStyle('standard')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      summaryStyle === 'standard'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <span>📊</span>
+                    <span>Format Tabel Standar (Atas-Bawah)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {modeLaporan === 'proposal rkat' && summaryStyle === 'ppt' ? (
+              /* ========================================================================= */
+              /* TAMPILAN KHUSUS: FORMAT PRESENTASI SLIDE / PPT PROPOSAL RKAT (SESUAI GAMBAR) */
+              /* ========================================================================= */
+              <Card className="rounded-2xl border-slate-300 shadow-xs overflow-hidden">
+                <CardHeader className="bg-slate-50 p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
+                      <span>🏛️</span>
+                      <span>Format Usulan Proposal RKAT (Standar Slide Presentasi / PPT)</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-600 font-medium mt-0.5">
+                      Struktur hierarkis Penerimaan Dana Masyarakat &amp; Pengeluaran Belanja Usulan RKAT Universitas
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-blue-700 border-blue-300">
+                      TA {tahunFilter}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleExportExcelPptFormat}
+                      className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs"
+                    >
+                      <Download size={13} className="text-blue-600" />
+                      <span>Export Format PPT</span>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-100 border-b-2 border-slate-300 text-slate-800 font-black uppercase text-[10px] tracking-wider">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="text-slate-900 text-xs uppercase font-black min-w-[340px] pl-4">
+                          Uraian / Format Proposal RKAT
+                        </TableHead>
+                        <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-32">
+                          Jumlah Data
+                        </TableHead>
+                        <TableHead className="text-right text-slate-900 text-xs uppercase font-black min-w-[190px] pr-4">
+                          Pagu Usulan (Rp)
+                        </TableHead>
+                        <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-28">
+                          % Proporsi
+                        </TableHead>
+                        <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-20">
+                          Aksi
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* 1. SECTION PENERIMAAN */}
+                      {/* Header Utama: Jumlah Penerimaan Dana Masyarakat */}
+                      <TableRow className="bg-slate-100/90 font-black border-b border-slate-200">
+                        <TableCell colSpan={5} className="py-2.5 px-4 text-xs font-black text-slate-950 uppercase tracking-wide">
+                          Jumlah Penerimaan Dana Masyarakat
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      groupedPenerimaan.map((group, gIdx) => {
-                        const proporsiPct = grandTotalPenerimaan.totalPagu > 0 
-                          ? ((group.totalPagu / grandTotalPenerimaan.totalPagu) * 100).toFixed(1)
-                          : '0';
 
+                      {/* Sub-Header: Penerimaan Pendidikan */}
+                      <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
+                        <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
+                          Penerimaan Pendidikan
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
+                          {pptProposalData.penerimaan.pendidikan.count.toLocaleString('id-ID')} Akun
+                        </TableCell>
+                        <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
+                          Rp {formatRp(pptProposalData.penerimaan.pendidikan.subtotal)}
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
+                          {pptProposalData.penerimaan.totalPenerimaan > 0 
+                            ? ((pptProposalData.penerimaan.pendidikan.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+                            : '0%'}
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-gray-300">-</TableCell>
+                      </TableRow>
+
+                      {/* Rincian Penerimaan Pendidikan */}
+                      {pptProposalData.penerimaan.pendidikan.items.map((item, idx) => {
+                        const pct = pptProposalData.penerimaan.totalPenerimaan > 0
+                          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
+                          : '0';
                         return (
-                          <TableRow 
-                            key={group.label || gIdx} 
-                            className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors"
-                          >
-                            <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
-                              {gIdx + 1}
+                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                            <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
+                              <span className="text-slate-400">•</span>
+                              <span>{item.label}</span>
                             </TableCell>
-                            <TableCell>
-                              <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
-                                <span>💰</span>
-                                <span>{group.label}</span>
-                              </div>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {item.count.toLocaleString('id-ID')} Akun
                             </TableCell>
-                            <TableCell className="text-center">
-                              <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold font-mono border border-emerald-100">
-                                {group.rows.length.toLocaleString('id-ID')} Baris
-                              </span>
+                            <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                              Rp {formatRp(item.totalPagu)}
                             </TableCell>
-                            <TableCell className="text-right">
-                              <span className="font-black font-mono text-emerald-950 text-sm">
-                                Rp {formatRp(group.totalPagu)}
-                              </span>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {pct}%
                             </TableCell>
-                            <TableCell className="text-center">
-                              <div className="space-y-1 max-w-[110px] mx-auto">
-                                <div className="text-[11px] font-bold font-mono text-emerald-800 text-right">
-                                  {proporsiPct}%
-                                </div>
-                                <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-emerald-600 rounded-full"
-                                    style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
+                            <TableCell className="py-2 text-center">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   setActiveDetailSubtab('penerimaan');
                                   setActiveViewTab('detail');
-                                  setSearch(group.label);
+                                  setSearch(item.label);
                                 }}
-                                className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                                title={`Buka rincian penerimaan ${group.label}`}
+                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                title={`Buka rincian ${item.label}`}
                               >
-                                <Eye size={15} />
+                                <Eye size={13} />
                               </Button>
                             </TableCell>
                           </TableRow>
                         );
-                      })
-                    )}
-                  </TableBody>
-                  <tfoot className="bg-emerald-50/80 font-bold border-t-2 border-emerald-200">
-                    <tr>
-                      <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-emerald-950">
-                        TOTAL KESELURUHAN PENERIMAAN ({groupedPenerimaan.length} KELOMPOK)
-                      </td>
-                      <td className="p-4 text-center text-xs font-black font-mono text-emerald-900">
-                        {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Baris
-                      </td>
-                      <td className="p-4 text-right text-sm font-black font-mono text-emerald-950">
-                        Rp {formatRp(grandTotalPenerimaan.totalPagu)}
-                      </td>
-                      <td className="p-4 text-center text-xs font-black font-mono text-emerald-800">
-                        100%
-                      </td>
-                      <td className="p-4 text-center text-gray-400 text-xs font-bold">
-                        -
-                      </td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </CardContent>
-            </Card>
+                      })}
 
-            {/* BAGIAN BAWAH: RINGKASAN USULAN PENGELUARAN / BELANJA */}
-            <Card className="rounded-2xl border-indigo-200/90 shadow-xs overflow-hidden">
-              <CardHeader className="bg-indigo-50/70 p-4 sm:p-5 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-sm sm:text-base font-black text-indigo-950 flex items-center gap-2">
-                    <span>{activeTabObj?.icon || '📊'}</span>
-                    <span>2. Ringkasan Alokasi Usulan Pengeluaran / Belanja ({activeTabObj?.label || 'Format Laporan'})</span>
-                  </CardTitle>
-                  <CardDescription className="text-xs text-indigo-800 font-medium mt-0.5">
-                    Rekapitulasi total alokasi pagu belanja dan akumulasi item belanja per kelompok akun pelaporan
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-indigo-800 border-indigo-200">
-                    {groupedData.length} Group Belanja
-                  </Badge>
-                  <Badge className="bg-indigo-600 text-white text-xs font-bold font-mono">
-                    {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="bg-indigo-50/40 border-b border-indigo-100 text-indigo-800 font-black uppercase text-[10px] tracking-wider">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-12 text-center text-indigo-800 text-xs uppercase font-bold">#</TableHead>
-                      <TableHead className="text-indigo-800 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
-                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
-                      <TableHead className="text-right text-indigo-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
-                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
-                      <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {groupedData.map((group, gIdx) => {
-                      const proporsiPct = grandTotal.anggaran > 0 
-                        ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
-                        : '0';
+                      {/* Sub-Header: Penerimaan Non Pendidikan */}
+                      <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
+                        <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
+                          Penerimaan Non Pendidikan
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
+                          {pptProposalData.penerimaan.nonPendidikan.count.toLocaleString('id-ID')} Akun
+                        </TableCell>
+                        <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
+                          Rp {formatRp(pptProposalData.penerimaan.nonPendidikan.subtotal)}
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
+                          {pptProposalData.penerimaan.totalPenerimaan > 0 
+                            ? ((pptProposalData.penerimaan.nonPendidikan.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+                            : '0%'}
+                        </TableCell>
+                        <TableCell className="py-2 text-center text-gray-300">-</TableCell>
+                      </TableRow>
 
-                      return (
-                        <TableRow 
-                          key={group.label || gIdx} 
-                          className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
-                        >
-                          <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
-                            {gIdx + 1}
+                      {/* Rincian Penerimaan Non Pendidikan */}
+                      {pptProposalData.penerimaan.nonPendidikan.items.map((item, idx) => {
+                        const pct = pptProposalData.penerimaan.totalPenerimaan > 0
+                          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
+                          : '0';
+                        return (
+                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                            <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
+                              <span className="text-slate-400">•</span>
+                              <span>{item.label}</span>
+                            </TableCell>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {item.count.toLocaleString('id-ID')} Akun
+                            </TableCell>
+                            <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                              Rp {formatRp(item.totalPagu)}
+                            </TableCell>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {pct}%
+                            </TableCell>
+                            <TableCell className="py-2 text-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setActiveDetailSubtab('penerimaan');
+                                  setActiveViewTab('detail');
+                                  setSearch(item.label);
+                                }}
+                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                title={`Buka rincian ${item.label}`}
+                              >
+                                <Eye size={13} />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+
+                      {/* Penerimaan Lainnya / Surplus TA Lalu jika ada */}
+                      {pptProposalData.penerimaan.lainnya.totalPagu > 0 && (
+                        <TableRow className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                          <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                            <span className="text-slate-400">•</span>
+                            <span>{pptProposalData.penerimaan.lainnya.label}</span>
                           </TableCell>
-                          <TableCell>
-                            <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
-                              <span>🏷️</span>
-                              <span>{group.label}</span>
-                            </div>
+                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                            {pptProposalData.penerimaan.lainnya.count.toLocaleString('id-ID')} Akun
                           </TableCell>
-                          <TableCell className="text-center">
-                            <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-bold font-mono border border-indigo-100">
-                              {group.rows.length.toLocaleString('id-ID')} Baris
-                            </span>
+                          <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                            Rp {formatRp(pptProposalData.penerimaan.lainnya.totalPagu)}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <span className="font-black font-mono text-gray-950 text-sm">
-                              Rp {formatRp(group.totalAnggaran)}
-                            </span>
+                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                            {pptProposalData.penerimaan.totalPenerimaan > 0
+                              ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+                              : '0%'}
                           </TableCell>
-                          <TableCell className="text-center">
-                            <div className="space-y-1 max-w-[110px] mx-auto">
-                              <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
-                                {proporsiPct}%
-                              </div>
-                              <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-indigo-600 rounded-full"
-                                  style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
-                                />
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="py-2 text-center">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setActiveDetailSubtab('belanja');
-                                handleViewCategoryDetail(group.label);
+                                setActiveDetailSubtab('penerimaan');
+                                setActiveViewTab('detail');
                               }}
-                              className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                              title={`Buka rincian belanja ${group.label}`}
+                              className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
                             >
-                              <Eye size={15} />
+                              <Eye size={13} />
                             </Button>
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                  <tfoot className="bg-indigo-50/80 font-bold border-t-2 border-indigo-200">
-                    <tr>
-                      <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-indigo-950">
-                        TOTAL KESELURUHAN PENGELUARAN ({groupedData.length} GROUP BELANJA)
-                      </td>
-                      <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
-                        {grandTotal.totalItems.toLocaleString('id-ID')} Baris
-                      </td>
-                      <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
-                        Rp {formatRp(grandTotal.anggaran)}
-                      </td>
-                      <td className="p-4 text-center text-xs font-black font-mono text-gray-700">
-                        100%
-                      </td>
-                      <td className="p-4 text-center text-gray-400 text-xs font-bold">
-                        -
-                      </td>
-                    </tr>
-                  </tfoot>
-                </Table>
-              </CardContent>
-            </Card>
+                      )}
+
+                      {/* BANNER BIRU JUMLAH PENERIMAAN (PERSIS SEPERTI GAMBAR) */}
+                      <TableRow className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors border-y-2 border-blue-700">
+                        <TableCell className="py-3 px-4 text-xs font-black uppercase tracking-wider text-white">
+                          JUMLAH PENERIMAAN
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-xs font-mono font-bold text-blue-100">
+                          {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Akun
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-black font-mono text-sm text-white pr-4">
+                          Rp {formatRp(pptProposalData.penerimaan.totalPenerimaan)}
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-xs font-mono font-bold text-blue-100">
+                          100%
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-blue-200">-</TableCell>
+                      </TableRow>
+
+                      {/* SPACER ROW KOSONG SESUAI GAMBAR */}
+                      <TableRow className="bg-white hover:bg-white border-b border-slate-200">
+                        <TableCell colSpan={5} className="py-2"></TableCell>
+                      </TableRow>
+
+                      {/* 2. SECTION PENGELUARAN */}
+                      <TableRow className="bg-slate-100/90 font-black border-b border-slate-200">
+                        <TableCell colSpan={5} className="py-2.5 px-4 text-xs font-black text-slate-950 uppercase tracking-wide">
+                          PENGELUARAN
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Baris Rincian Belanja Sesuai Gambar */}
+                      {pptProposalData.pengeluaran.items.map((item, idx) => {
+                        const pct = pptProposalData.pengeluaran.totalPengeluaran > 0
+                          ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
+                          : '0';
+                        return (
+                          <TableRow key={item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                            <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                              <span className="text-slate-400">•</span>
+                              <span>{item.label}</span>
+                            </TableCell>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {item.count.toLocaleString('id-ID')} Baris
+                            </TableCell>
+                            <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
+                              Rp {formatRp(item.totalAnggaran)}
+                            </TableCell>
+                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                              {pct}%
+                            </TableCell>
+                            <TableCell className="py-2 text-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setActiveDetailSubtab('belanja');
+                                  handleViewCategoryDetail(item.label);
+                                }}
+                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                                title={`Buka rincian ${item.label}`}
+                              >
+                                <Eye size={13} />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+
+                      {/* BANNER BIRU JUMLAH PENGELUARAN (PERSIS SEPERTI GAMBAR) */}
+                      <TableRow className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors border-y-2 border-blue-700">
+                        <TableCell className="py-3 px-4 text-xs font-black uppercase tracking-wider text-white">
+                          JUMLAH PENGELUARAN
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-xs font-mono font-bold text-blue-100">
+                          {grandTotal.totalItems.toLocaleString('id-ID')} Baris
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-black font-mono text-sm text-white pr-4">
+                          Rp {formatRp(pptProposalData.pengeluaran.totalPengeluaran)}
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-xs font-mono font-bold text-blue-100">
+                          100%
+                        </TableCell>
+                        <TableCell className="py-3 text-center text-blue-200">-</TableCell>
+                      </TableRow>
+
+                      {/* SURPLUS / (DEFISIT) ANGGARAN (BARIS POSISI KEUANGAN AKHIR) */}
+                      <TableRow className={`${
+                        pptProposalData.surplusDefisit >= 0 
+                          ? 'bg-emerald-700 hover:bg-emerald-800' 
+                          : 'bg-rose-700 hover:bg-rose-800'
+                      } text-white transition-colors border-t-2 border-white`}>
+                        <TableCell className="py-3.5 px-4 text-xs font-black uppercase tracking-wider text-white">
+                          POSISI SURPLUS / (DEFISIT) ANGGARAN
+                        </TableCell>
+                        <TableCell className="py-3.5 text-center text-xs font-mono font-bold text-white/90">
+                          {pptProposalData.surplusDefisit >= 0 ? 'SURPLUS' : 'DEFISIT'}
+                        </TableCell>
+                        <TableCell className="py-3.5 text-right font-black font-mono text-sm text-white pr-4">
+                          {pptProposalData.surplusDefisit < 0 && '- '}Rp {formatRp(Math.abs(pptProposalData.surplusDefisit))}
+                        </TableCell>
+                        <TableCell className="py-3.5 text-center text-xs font-mono font-bold text-white/90">
+                          {pptProposalData.penerimaan.totalPenerimaan > 0 
+                            ? ((pptProposalData.surplusDefisit / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+                            : '0%'}
+                        </TableCell>
+                        <TableCell className="py-3.5 text-center text-white/70">-</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ) : (
+              /* ========================================================================= */
+              /* TAMPILAN STANDAR ATAS-BAWAH (UNTUK FORMAT LAPORAN STANDAR / LAINNYA)     */
+              /* ========================================================================= */
+              <>
+                {/* BAGIAN ATAS: RINGKASAN USULAN PENERIMAAN / PENDAPATAN */}
+                <Card className="rounded-2xl border-emerald-200/90 shadow-xs overflow-hidden">
+                  <CardHeader className="bg-emerald-50/70 p-4 sm:p-5 border-b border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-sm sm:text-base font-black text-emerald-950 flex items-center gap-2">
+                        <Wallet size={18} className="text-emerald-600" />
+                        <span>1. Ringkasan Alokasi Usulan Penerimaan / Pendapatan</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-emerald-800 font-medium mt-0.5">
+                        Akumulasi alokasi usulan pagu penerimaan per format / kelompok pendapatan
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-emerald-800 border-emerald-200">
+                        {groupedPenerimaan.length} Kelompok Penerimaan
+                      </Badge>
+                      <Badge className="bg-emerald-600 text-white text-xs font-bold font-mono">
+                        {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Total Baris
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader className="bg-emerald-50/40 border-b border-emerald-100 text-emerald-800 font-black uppercase text-[10px] tracking-wider">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-12 text-center text-emerald-800 text-xs uppercase font-bold">#</TableHead>
+                          <TableHead className="text-emerald-800 text-xs uppercase font-bold min-w-[280px]">Format / Kelompok Penerimaan</TableHead>
+                          <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
+                          <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Penerimaan</TableHead>
+                          <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">% Proporsi Penerimaan</TableHead>
+                          <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {groupedPenerimaan.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-10 text-gray-400 font-medium">
+                              Tidak ada data penerimaan yang sesuai kriteria filter.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          groupedPenerimaan.map((group, gIdx) => {
+                            const proporsiPct = grandTotalPenerimaan.totalPagu > 0 
+                              ? ((group.totalPagu / grandTotalPenerimaan.totalPagu) * 100).toFixed(1)
+                              : '0';
+
+                            return (
+                              <TableRow 
+                                key={group.label || gIdx} 
+                                className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors"
+                              >
+                                <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                                  {gIdx + 1}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                                    <span>💰</span>
+                                    <span>{group.label}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold font-mono border border-emerald-100">
+                                    {group.rows.length.toLocaleString('id-ID')} Baris
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="font-black font-mono text-emerald-950 text-sm">
+                                    Rp {formatRp(group.totalPagu)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="space-y-1 max-w-[110px] mx-auto">
+                                    <div className="text-[11px] font-bold font-mono text-emerald-800 text-right">
+                                      {proporsiPct}%
+                                    </div>
+                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full bg-emerald-600 rounded-full"
+                                        style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setActiveDetailSubtab('penerimaan');
+                                      setActiveViewTab('detail');
+                                      setSearch(group.label);
+                                    }}
+                                    className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                    title={`Buka rincian penerimaan ${group.label}`}
+                                  >
+                                    <Eye size={15} />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                      <tfoot className="bg-emerald-50/80 font-bold border-t-2 border-emerald-200">
+                        <tr>
+                          <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-emerald-950">
+                            TOTAL KESELURUHAN PENERIMAAN ({groupedPenerimaan.length} KELOMPOK)
+                          </td>
+                          <td className="p-4 text-center text-xs font-black font-mono text-emerald-900">
+                            {grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Baris
+                          </td>
+                          <td className="p-4 text-right text-sm font-black font-mono text-emerald-950">
+                            Rp {formatRp(grandTotalPenerimaan.totalPagu)}
+                          </td>
+                          <td className="p-4 text-center text-xs font-black font-mono text-emerald-800">
+                            100%
+                          </td>
+                          <td className="p-4 text-center text-gray-400 text-xs font-bold">
+                            -
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                {/* BAGIAN BAWAH: RINGKASAN USULAN PENGELUARAN / BELANJA */}
+                <Card className="rounded-2xl border-indigo-200/90 shadow-xs overflow-hidden">
+                  <CardHeader className="bg-indigo-50/70 p-4 sm:p-5 border-b border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-sm sm:text-base font-black text-indigo-950 flex items-center gap-2">
+                        <span>{activeTabObj?.icon || '📊'}</span>
+                        <span>2. Ringkasan Alokasi Usulan Pengeluaran / Belanja ({activeTabObj?.label || 'Format Laporan'})</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs text-indigo-800 font-medium mt-0.5">
+                        Rekapitulasi total alokasi pagu belanja dan akumulasi item belanja per kelompok akun pelaporan
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-indigo-800 border-indigo-200">
+                        {groupedData.length} Group Belanja
+                      </Badge>
+                      <Badge className="bg-indigo-600 text-white text-xs font-bold font-mono">
+                        {grandTotal.totalItems.toLocaleString('id-ID')} Total Baris
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader className="bg-indigo-50/40 border-b border-indigo-100 text-indigo-800 font-black uppercase text-[10px] tracking-wider">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-12 text-center text-indigo-800 text-xs uppercase font-bold">#</TableHead>
+                          <TableHead className="text-indigo-800 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
+                          <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
+                          <TableHead className="text-right text-indigo-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
+                          <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">% Proporsi Pagu</TableHead>
+                          <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-24">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {groupedData.map((group, gIdx) => {
+                          const proporsiPct = grandTotal.anggaran > 0 
+                            ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
+                            : '0';
+
+                          return (
+                            <TableRow 
+                              key={group.label || gIdx} 
+                              className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
+                            >
+                              <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                                {gIdx + 1}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                                  <span>🏷️</span>
+                                  <span>{group.label}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-bold font-mono border border-indigo-100">
+                                  {group.rows.length.toLocaleString('id-ID')} Baris
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-black font-mono text-gray-950 text-sm">
+                                  Rp {formatRp(group.totalAnggaran)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="space-y-1 max-w-[110px] mx-auto">
+                                  <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
+                                    {proporsiPct}%
+                                  </div>
+                                  <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-indigo-600 rounded-full"
+                                      style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setActiveDetailSubtab('belanja');
+                                    handleViewCategoryDetail(group.label);
+                                  }}
+                                  className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                  title={`Buka rincian belanja ${group.label}`}
+                                >
+                                  <Eye size={15} />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                      <tfoot className="bg-indigo-50/80 font-bold border-t-2 border-indigo-200">
+                        <tr>
+                          <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-indigo-950">
+                            TOTAL KESELURUHAN PENGELUARAN ({groupedData.length} GROUP BELANJA)
+                          </td>
+                          <td className="p-4 text-center text-xs font-black font-mono text-gray-900">
+                            {grandTotal.totalItems.toLocaleString('id-ID')} Baris
+                          </td>
+                          <td className="p-4 text-right text-sm font-black font-mono text-indigo-950">
+                            Rp {formatRp(grandTotal.anggaran)}
+                          </td>
+                          <td className="p-4 text-center text-xs font-black font-mono text-gray-700">
+                            100%
+                          </td>
+                          <td className="p-4 text-center text-gray-400 text-xs font-bold">
+                            -
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </>
+            )}
 
           </div>
         ) : activeViewTab === 'rekap_unit' ? (
