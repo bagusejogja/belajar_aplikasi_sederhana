@@ -41,6 +41,29 @@ export interface PptTemplateConfig {
   pengeluaranLainnyaLabel: string;
 }
 
+// Helper pencocokan kata kunci template PPT yang akurat:
+// Mencegah kata 'jasa' mencocokkan 'kerjasama' (karena substring 'jasa' terdapat di dalam kata 'kerJASAma')
+export function isPptKeyMatch(label: string, matchKeys: string[]): boolean {
+  if (!label || !matchKeys || matchKeys.length === 0) return false;
+  const kLower = label.toLowerCase().trim();
+  return matchKeys.some(rawMk => {
+    const mk = rawMk.toLowerCase().trim();
+    if (!mk) return false;
+    // Khusus kata kunci 'jasa': jangan pernah mencocokkan kata 'kerjasama'
+    if (mk === 'jasa') {
+      const regex = /(?:^|[^a-zA-Z0-9])jasa(?:[^a-zA-Z0-9]|$)/i;
+      return regex.test(kLower);
+    }
+    // Untuk kata tunggal tanpa spasi, gunakan pembatas kata agar tidak mencaplok kata lain
+    if (!mk.includes(' ')) {
+      const escaped = mk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i');
+      return regex.test(kLower);
+    }
+    return kLower.includes(mk);
+  });
+}
+
 export const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
   penerimaanTitle: 'Jumlah Penerimaan Dana Masyarakat',
   penerimaanSections: [
@@ -59,6 +82,7 @@ export const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
         { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'] },
         { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'] },
         { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'] },
+        { id: 'beasiswa_pemerintah', label: 'Beasiswa dan Kontrak Kerjasama Pemerintah', matchKeys: ['beasiswa'] },
         { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'] },
         { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'] },
       ]
@@ -914,8 +938,8 @@ export default function RkaLaporanPage() {
         let itemRows: any[] = [];
         
         Object.keys(pMap).forEach(k => {
-          const kLower = k.toLowerCase();
-          const isMatch = (item.matchKeys || []).some(mk => mk.trim() !== '' && kLower.includes(mk.trim().toLowerCase()));
+          if (usedPKeys.has(k)) return;
+          const isMatch = isPptKeyMatch(k, item.matchKeys || []);
           if (isMatch) {
             itemTotal += pMap[k].totalPagu;
             itemCount += pMap[k].count;
@@ -987,8 +1011,8 @@ export default function RkaLaporanPage() {
       let itemCount = 0;
       let itemRows: any[] = [];
       Object.keys(bMap).forEach(k => {
-        const kLower = k.toLowerCase();
-        const isMatch = (item.matchKeys || []).some(mk => mk.trim() !== '' && kLower.includes(mk.trim().toLowerCase()));
+        if (usedBKeys.has(k)) return;
+        const isMatch = isPptKeyMatch(k, item.matchKeys || []);
         if (isMatch) {
           itemTotal += bMap[k].totalAnggaran;
           itemCount += bMap[k].count;
