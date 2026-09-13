@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Landmark, Plus, Search, Edit2, Loader2, Save, X, AlertTriangle, Building2, 
-  Filter, User as UserIcon, Layers, RefreshCw, CheckCircle2, XCircle
+  Filter, User as UserIcon, Layers, RefreshCw, CheckCircle2, XCircle,
+  CheckSquare, Square, RotateCcw, Check
 } from 'lucide-react';
 import Select from 'react-select';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +22,8 @@ interface GovUnit {
   is_active: boolean;
 }
 
+export type HighlightColor = 'green' | 'blue' | 'rose';
+
 export default function GovUnitsPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +37,93 @@ export default function GovUnitsPage() {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  // Checklist State (Alat bantu cek data visual - tidak disimpan ke database)
+  const [checkedUnitIds, setCheckedUnitIds] = useState<Set<string | number>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('gov_units_checked_ids');
+        if (saved) return new Set(JSON.parse(saved));
+      } catch (e) {}
+    }
+    return new Set();
+  });
+
+  const [highlightColor, setHighlightColor] = useState<HighlightColor>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('gov_units_highlight_color') as HighlightColor) || 'green';
+    }
+    return 'green';
+  });
+
+  // Simpan temporary checks di sessionStorage agar tidak hilang saat navigasi/paging/filter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('gov_units_checked_ids', JSON.stringify(Array.from(checkedUnitIds)));
+    }
+  }, [checkedUnitIds]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gov_units_highlight_color', highlightColor);
+    }
+  }, [highlightColor]);
+
+  // Konfigurasi tema warna soft untuk baris yang diceklis
+  const colorStyles: Record<HighlightColor, {
+    rowBg: string;
+    badgeChecked: string;
+    borderAccent: string;
+    textTitle: string;
+    checkboxAccent: string;
+    label: string;
+    icon: string;
+  }> = {
+    green: {
+      rowBg: 'bg-emerald-50/75 hover:bg-emerald-100/70',
+      badgeChecked: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      borderAccent: 'border-l-4 border-l-emerald-500',
+      textTitle: 'text-emerald-950 font-black',
+      checkboxAccent: 'accent-emerald-600 focus:ring-emerald-500',
+      label: 'Hijau Soft',
+      icon: '🟢'
+    },
+    blue: {
+      rowBg: 'bg-sky-50/75 hover:bg-sky-100/70',
+      badgeChecked: 'bg-sky-100 text-sky-800 border-sky-300',
+      borderAccent: 'border-l-4 border-l-sky-500',
+      textTitle: 'text-sky-950 font-black',
+      checkboxAccent: 'accent-sky-600 focus:ring-sky-500',
+      label: 'Biru Soft',
+      icon: '🔵'
+    },
+    rose: {
+      rowBg: 'bg-rose-50/75 hover:bg-rose-100/70',
+      badgeChecked: 'bg-rose-100 text-rose-800 border-rose-300',
+      borderAccent: 'border-l-4 border-l-rose-500',
+      textTitle: 'text-rose-950 font-black',
+      checkboxAccent: 'accent-rose-600 focus:ring-rose-500',
+      label: 'Merah Soft',
+      icon: '🔴'
+    }
+  };
+
+  const toggleCheck = (id: string | number) => {
+    setCheckedUnitIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleClearAllChecks = () => {
+    setCheckedUnitIds(new Set());
+    toast.success('Semua tanda ceklis visual dibersihkan');
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -316,8 +406,49 @@ export default function GovUnitsPage() {
       </div>
 
       {/* QUICK STATUS INFO */}
-      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
-        <span>Menampilkan <strong>{filteredUnits.length}</strong> unit kerja</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-2 text-xs font-bold text-gray-500">
+        <div className="flex flex-wrap items-center gap-3">
+          <span>Menampilkan <strong className="text-gray-900">{filteredUnits.length}</strong> unit kerja</span>
+          {checkedUnitIds.size > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-white border border-gray-200 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-gray-700">
+                <strong className="text-gray-900">{checkedUnitIds.size}</strong> unit ditandai
+              </span>
+              <button
+                type="button"
+                onClick={handleClearAllChecks}
+                className="ml-1 px-1.5 py-0.5 rounded text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-[10px] font-black uppercase tracking-wider transition-colors"
+                title="Hapus semua centang visual"
+              >
+                Reset Cek
+              </button>
+            </span>
+          )}
+        </div>
+
+        {/* Pilihan Warna Highlight Ceklis */}
+        <div className="flex items-center gap-1.5 bg-white p-1 px-2.5 rounded-xl border border-gray-200 shadow-2xs text-xs self-start sm:self-auto">
+          <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mr-1 flex items-center gap-1">
+            Warna Cek:
+          </span>
+          {(['green', 'blue', 'rose'] as HighlightColor[]).map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setHighlightColor(c)}
+              className={`px-2 py-0.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                highlightColor === c 
+                  ? `${colorStyles[c].badgeChecked} ring-1 ring-black/5 shadow-2xs scale-105` 
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+              title={`Ubah warna baris yang dicek ke ${colorStyles[c].label}`}
+            >
+              <span className="text-xs leading-none">{colorStyles[c].icon}</span>
+              <span>{colorStyles[c].label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* TABLE DATA */}
@@ -337,87 +468,125 @@ export default function GovUnitsPage() {
                      <th className="px-5 py-3">Grup & Jenis</th>
                      <th className="px-5 py-3">Penanggung Jawab (PIC)</th>
                      <th className="px-5 py-3 text-center">Status</th>
-                     <th className="px-5 py-3 text-center w-24">Aksi</th>
+                     <th className="px-5 py-3 text-center w-36 whitespace-nowrap">Aksi</th>
                   </tr>
                </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {paginatedUnits.map((u, i) => (
-                     <tr key={u.id || i} className="hover:bg-sky-50/30 transition-colors group">
-                        {/* Kode Unit */}
-                        <td className="px-5 py-3 whitespace-nowrap">
-                           <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/80 font-bold text-xs">
-                              {u.kode_unit}
-                           </span>
-                        </td>
+                  {paginatedUnits.map((u, i) => {
+                     const unitKey = u.id || u.kode_unit;
+                     const isChecked = checkedUnitIds.has(unitKey);
+                     return (
+                        <tr 
+                           key={unitKey || i} 
+                           className={`transition-colors group ${
+                              isChecked 
+                                 ? `${colorStyles[highlightColor].rowBg} ${colorStyles[highlightColor].borderAccent}`
+                                 : 'hover:bg-sky-50/30'
+                           }`}
+                        >
+                           {/* Kode Unit */}
+                           <td className="px-5 py-3 whitespace-nowrap">
+                              <span className="font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/80 font-bold text-xs">
+                                 {u.kode_unit}
+                              </span>
+                           </td>
 
-                        {/* Nama Unit */}
-                        <td className="px-5 py-3">
-                           <p className="font-black text-gray-900 text-xs md:text-sm group-hover:text-sky-700 transition-colors">
-                              {u.nama_unit}
-                           </p>
-                           {u.catatan && (
-                              <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1 italic">
-                                 {u.catatan}
+                           {/* Nama Unit */}
+                           <td className="px-5 py-3">
+                              <p className={`text-xs md:text-sm transition-colors ${
+                                 isChecked 
+                                    ? colorStyles[highlightColor].textTitle 
+                                    : 'font-black text-gray-900 group-hover:text-sky-700'
+                              }`}>
+                                 {u.nama_unit}
                               </p>
-                           )}
-                        </td>
-
-                        {/* Grup & Jenis */}
-                        <td className="px-5 py-3">
-                           <div className="flex flex-wrap items-center gap-1.5">
-                              {u.group_org && (
-                                 <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100">
-                                    {u.group_org}
-                                 </span>
+                              {u.catatan && (
+                                 <p className="text-[10px] text-gray-400 mt-0.5 line-clamp-1 italic">
+                                    {u.catatan}
+                                 </p>
                               )}
-                              {u.jenis && (
-                                 <span className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
-                                    {u.jenis}
-                                 </span>
-                              )}
-                           </div>
-                        </td>
+                           </td>
 
-                        {/* PIC */}
-                        <td className="px-5 py-3">
-                           {u.pic ? (
-                              <div className="flex items-center gap-2">
-                                 <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-xs shrink-0">
-                                    {u.pic.charAt(0).toUpperCase()}
-                                 </div>
-                                 <span className="text-xs font-bold text-gray-700">{u.pic}</span>
+                           {/* Grup & Jenis */}
+                           <td className="px-5 py-3">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                 {u.group_org && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100">
+                                       {u.group_org}
+                                    </span>
+                                 )}
+                                 {u.jenis && (
+                                    <span className="text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-200">
+                                       {u.jenis}
+                                    </span>
+                                 )}
                               </div>
-                           ) : (
-                              <span className="text-gray-300 text-xs italic">-</span>
-                           )}
-                        </td>
+                           </td>
 
-                        {/* Status */}
-                        <td className="px-5 py-3 text-center">
-                           {u.is_active ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black">
-                                 <CheckCircle2 size={11} /> Aktif
-                              </span>
-                           ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black">
-                                 <XCircle size={11} /> Nonaktif
-                              </span>
-                           )}
-                        </td>
+                           {/* PIC */}
+                           <td className="px-5 py-3">
+                              {u.pic ? (
+                                 <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-xs shrink-0">
+                                       {u.pic.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-bold text-gray-700">{u.pic}</span>
+                                 </div>
+                              ) : (
+                                 <span className="text-gray-300 text-xs italic">-</span>
+                              )}
+                           </td>
 
-                        {/* Aksi */}
-                        <td className="px-5 py-3 text-center">
-                           <button 
-                              onClick={() => handleOpenModal(u)} 
-                              className="h-8 px-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 shadow-2xs active:scale-95" 
-                              title="Edit Data Unit"
-                           >
-                              <Edit2 size={12} />
-                              <span>Edit</span>
-                           </button>
-                        </td>
-                     </tr>
-                  ))}
+                           {/* Status */}
+                           <td className="px-5 py-3 text-center">
+                              {u.is_active ? (
+                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black">
+                                    <CheckCircle2 size={11} /> Aktif
+                                 </span>
+                              ) : (
+                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black">
+                                    <XCircle size={11} /> Nonaktif
+                                 </span>
+                              )}
+                           </td>
+
+                           {/* Aksi */}
+                           <td className="px-5 py-3 text-center whitespace-nowrap">
+                              <div className="inline-flex items-center gap-1.5 justify-center">
+                                 {/* Checklist Tool (Alat bantu cek visual - tidak tersimpan ke DB) */}
+                                 <button
+                                    type="button"
+                                    onClick={() => toggleCheck(unitKey)}
+                                    className={`h-8 px-2.5 rounded-lg border text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs select-none active:scale-95 cursor-pointer ${
+                                       isChecked
+                                          ? `${colorStyles[highlightColor].badgeChecked} ring-1 ring-black/5 shadow-xs font-black`
+                                          : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-300 hover:border-gray-400'
+                                    }`}
+                                    title={isChecked ? 'Klik untuk batal ceklis' : 'Klik untuk ceklis (memberi warna soft pada baris)'}
+                                 >
+                                    <input
+                                       type="checkbox"
+                                       checked={isChecked}
+                                       onChange={() => {}} // event handled on parent button
+                                       className={`w-3.5 h-3.5 rounded pointer-events-none ${colorStyles[highlightColor].checkboxAccent}`}
+                                    />
+                                    <span className="text-[11px] leading-none">{isChecked ? 'Dicek' : 'Cek'}</span>
+                                 </button>
+
+                                 {/* Edit Button */}
+                                 <button 
+                                    onClick={() => handleOpenModal(u)} 
+                                    className="h-8 px-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1 shadow-2xs active:scale-95" 
+                                    title="Edit Data Unit"
+                                 >
+                                    <Edit2 size={12} />
+                                    <span>Edit</span>
+                                 </button>
+                              </div>
+                           </td>
+                        </tr>
+                     );
+                  })}
                   {filteredUnits.length === 0 && (
                      <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
