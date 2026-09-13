@@ -5,8 +5,8 @@ import {
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
-  ChevronLeft, ChevronRight, Eye, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Trash2, ArrowUp, ArrowDown
+  ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -225,7 +225,7 @@ function UnitAutocompleteFilter({
   );
 }
 
-// Definisi Tipe dan Komponen Struktur 3-Level Collapsible untuk Tab Detail
+// Definisi Tipe dan Komponen Struktur 3-Level Hierarkis Murni (Tabel Tanpa Kotak-Kotak Sesuai /review)
 export interface DetailGroupUnit {
   unit: string;
   totalPagu: number;
@@ -241,19 +241,14 @@ export interface DetailGroupAkun {
   units: DetailGroupUnit[];
 }
 
-function DetailUnitAccordionItem({
+// Komponen Level 3: Rincian Transaksi dengan Paging Mandiri per Unit Kerja
+function InlineUnitDetailRows({
   unitGroup,
-  akunKey,
   subtab,
-  isUnitOpen,
-  onToggleUnit,
   formatRp
 }: {
   unitGroup: DetailGroupUnit;
-  akunKey: string;
   subtab: 'belanja' | 'penerimaan';
-  isUnitOpen: boolean;
-  onToggleUnit: () => void;
   formatRp: (val: number) => string;
 }) {
   const [page, setPage] = useState(1);
@@ -265,164 +260,331 @@ function DetailUnitAccordionItem({
   }, [unitGroup.rows, page]);
 
   return (
-    <div className="border border-slate-200/90 rounded-xl overflow-hidden bg-white shadow-2xs transition-all">
-      {/* Level 2: Header Unit */}
-      <div
-        onClick={onToggleUnit}
-        className={`p-2.5 sm:p-3 flex items-center justify-between gap-3 cursor-pointer transition-colors select-none ${
-          isUnitOpen ? 'bg-slate-100/90 font-bold border-b border-slate-200' : 'hover:bg-slate-50'
-        }`}
-      >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-transform ${isUnitOpen ? 'rotate-90 text-indigo-600' : 'text-slate-400'}`}>
-            <ChevronRight size={14} />
-          </div>
-          <Building2 size={15} className="text-slate-500 shrink-0" />
-          <span className="font-bold text-xs text-slate-800 truncate">{unitGroup.unit}</span>
-          <Badge variant="outline" className="text-[10px] font-mono bg-white text-slate-600 border-slate-200 shrink-0">
-            {unitGroup.count.toLocaleString('id-ID')} Rincian
-          </Badge>
-        </div>
-        <div className="text-right shrink-0">
-          <span className="font-black font-mono text-xs text-slate-900">
-            Rp {formatRp(unitGroup.totalPagu)}
-          </span>
-        </div>
+    <div className="w-full bg-slate-50/70 p-2 sm:p-3 border-y border-slate-200">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+        <table className="w-full text-xs text-left border-collapse">
+          {subtab === 'penerimaan' ? (
+            <>
+              <thead className="bg-[#1f73a5] text-white font-bold text-[11px] border-b border-[#185c84] uppercase tracking-wider">
+                <tr>
+                  <th className="py-2 px-3 text-center w-10">#</th>
+                  <th className="py-2 px-3 min-w-[280px]">Keterangan &amp; Rincian Penerimaan</th>
+                  <th className="py-2 px-3 w-40 text-center">Volume &amp; Tarif</th>
+                  <th className="py-2 px-3 w-36 text-center">Sumber Dana</th>
+                  <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Penerimaan</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {paginatedRows.map((row, idx) => {
+                  const num = (page - 1) * rowsPerPage + idx + 1;
+                  const pagu = Number(row.renterima_pagu) || 0;
+                  const tarif = Number(row.renterima_tarif) || 0;
+                  const vol = Number(row.renterima_volume) || 0;
+                  return (
+                    <tr key={row.renterima_id || idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
+                      <td className="py-2.5 px-3 align-top space-y-1">
+                        <div className="font-bold text-slate-900 text-xs leading-snug">{row.keterangan || row.nama_akun_penerimaan || '-'}</div>
+                        <span className="text-[10px] text-slate-400 font-mono">TA {row.tahun || '-'}</span>
+                      </td>
+                      <td className="py-2.5 px-3 align-top text-center space-y-0.5">
+                        <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded font-mono text-xs font-bold border border-emerald-100">
+                          {vol.toLocaleString('id-ID')} Vol
+                        </span>
+                        <div className="text-[10px] text-slate-500 font-mono">@ Rp {formatRp(tarif)}</div>
+                      </td>
+                      <td className="py-2.5 px-3 align-top text-center space-y-1">
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                          {row.status || 'Aktif'}
+                        </Badge>
+                        <div className="text-[10px] text-slate-500 font-medium">{row.sumber_dana || 'Dana Masyarakat'}</div>
+                      </td>
+                      <td className="py-2.5 px-3 align-top text-right pr-4">
+                        <span className="font-black font-mono text-emerald-950 text-xs">Rp {formatRp(pagu)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </>
+          ) : (
+            <>
+              <thead className="bg-[#1f73a5] text-white font-bold text-[11px] border-b border-[#185c84] uppercase tracking-wider">
+                <tr>
+                  <th className="py-2 px-3 text-center w-10">#</th>
+                  <th className="py-2 px-3 min-w-[260px]">Kegiatan &amp; Lingkup</th>
+                  <th className="py-2 px-3 min-w-[280px]">Uraian Belanja</th>
+                  <th className="py-2 px-3 w-36 text-center">Prioritas &amp; TA</th>
+                  <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Anggaran</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {paginatedRows.map((row, idx) => {
+                  const num = (page - 1) * rowsPerPage + idx + 1;
+                  const ang = Number(row.anggaran) || 0;
+                  return (
+                    <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
+                      <td className="py-2.5 px-3 align-top space-y-1">
+                        <div className="font-bold text-slate-900 text-xs leading-snug">{row.kegiatan || '-'}</div>
+                        {row.lingkup_kegiatan && (
+                          <div className="text-[10px] text-indigo-700 font-medium">
+                            <span className="font-bold text-indigo-900">Lingkup:</span> {row.lingkup_kegiatan}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 align-top">
+                        <div className="font-medium text-slate-800 text-xs leading-relaxed">{row.uraian_belanja || '-'}</div>
+                      </td>
+                      <td className="py-2.5 px-3 align-top text-center space-y-1">
+                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold font-mono">
+                          TA {row.tahun_anggaran || '-'}
+                        </span>
+                        {row.prioritas && (
+                          <div className="text-[10px] text-slate-500 font-medium">Prioritas: {row.prioritas}</div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 align-top text-right pr-4">
+                        <span className="font-black font-mono text-slate-950 text-xs">Rp {formatRp(ang)}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </>
+          )}
+        </table>
       </div>
 
-      {/* Level 3: Detail Rincian dengan Paging */}
-      {isUnitOpen && (
-        <div className="p-0 bg-white">
-          {subtab === 'penerimaan' ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-emerald-50/70 text-emerald-900 font-bold border-b border-emerald-100 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="py-2 px-3 text-center w-10">#</th>
-                    <th className="py-2 px-3 min-w-[280px]">Keterangan &amp; Rincian Usulan</th>
-                    <th className="py-2 px-3 w-40 text-center">Volume &amp; Tarif</th>
-                    <th className="py-2 px-3 w-36 text-center">Status &amp; Sumber Dana</th>
-                    <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Penerimaan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-emerald-50/60 bg-white">
-                  {paginatedRows.map((row, idx) => {
-                    const num = (page - 1) * rowsPerPage + idx + 1;
-                    const pagu = Number(row.renterima_pagu) || 0;
-                    const tarif = Number(row.renterima_tarif) || 0;
-                    const vol = Number(row.renterima_volume) || 0;
-                    return (
-                      <tr key={row.renterima_id || idx} className="hover:bg-emerald-50/30 transition-colors">
-                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
-                        <td className="py-2.5 px-3 align-top space-y-1">
-                          <div className="font-bold text-slate-900 text-xs leading-snug">{row.keterangan || row.nama_akun_penerimaan || '-'}</div>
-                          <span className="text-[10px] text-slate-400 font-mono">TA {row.tahun || '-'}</span>
-                        </td>
-                        <td className="py-2.5 px-3 align-top text-center space-y-0.5">
-                          <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded font-mono text-xs font-bold border border-emerald-100">
-                            {vol.toLocaleString('id-ID')} Vol
-                          </span>
-                          <div className="text-[10px] text-slate-500 font-mono">@ Rp {formatRp(tarif)}</div>
-                        </td>
-                        <td className="py-2.5 px-3 align-top text-center space-y-1">
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                            {row.status || 'Aktif'}
-                          </Badge>
-                          <div className="text-[10px] text-slate-500 font-medium">{row.sumber_dana || 'Dana Masyarakat'}</div>
-                        </td>
-                        <td className="py-2.5 px-3 align-top text-right pr-4">
-                          <span className="font-black font-mono text-emerald-950 text-xs">Rp {formatRp(pagu)}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="py-2 px-3 text-center w-10">#</th>
-                    <th className="py-2 px-3 min-w-[260px]">Kegiatan &amp; Lingkup</th>
-                    <th className="py-2 px-3 min-w-[280px]">Uraian Belanja</th>
-                    <th className="py-2 px-3 w-36 text-center">Prioritas &amp; TA</th>
-                    <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Anggaran</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {paginatedRows.map((row, idx) => {
-                    const num = (page - 1) * rowsPerPage + idx + 1;
-                    const ang = Number(row.anggaran) || 0;
-                    return (
-                      <tr key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
-                        <td className="py-2.5 px-3 align-top space-y-1">
-                          <div className="font-bold text-slate-900 text-xs leading-snug">{row.kegiatan || '-'}</div>
-                          {row.lingkup_kegiatan && (
-                            <div className="text-[10px] text-indigo-700 font-medium">
-                              <span className="font-bold text-indigo-900">Lingkup:</span> {row.lingkup_kegiatan}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 align-top">
-                          <div className="font-medium text-slate-800 text-xs leading-relaxed">{row.uraian_belanja || '-'}</div>
-                        </td>
-                        <td className="py-2.5 px-3 align-top text-center space-y-1">
-                          <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold font-mono">
-                            TA {row.tahun_anggaran || '-'}
-                          </span>
-                          {row.prioritas && (
-                            <div className="text-[10px] text-slate-500 font-medium">Prioritas: {row.prioritas}</div>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-3 align-top text-right pr-4">
-                          <span className="font-black font-mono text-slate-950 text-xs">Rp {formatRp(ang)}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Level 3: Pagination Controls per Unit */}
-          {totalRows > rowsPerPage && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 bg-slate-50/90 border-t border-slate-200 text-[11px] text-slate-600 font-medium">
-              <span>
-                Menampilkan rincian <strong>{(page - 1) * rowsPerPage + 1}</strong> s.d. <strong>{Math.min(page * rowsPerPage, totalRows)}</strong> dari <strong>{totalRows}</strong> total baris
-              </span>
-              <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300"
-                >
-                  ‹ Sebelumnya
-                </Button>
-                <span className="px-2 py-0.5 font-bold font-mono text-slate-700 bg-white rounded border border-slate-200">
-                  Hal {page} / {totalPages}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={page === totalPages}
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300"
-                >
-                  Berikutnya ›
-                </Button>
-              </div>
-            </div>
-          )}
+      {/* Pagination Controls Level 3 */}
+      {totalRows > rowsPerPage && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2 pt-2 text-[11px] text-slate-600 font-medium">
+          <span>
+            Menampilkan rincian <strong>{(page - 1) * rowsPerPage + 1}</strong> s.d. <strong>{Math.min(page * rowsPerPage, totalRows)}</strong> dari <strong>{totalRows}</strong> total transaksi
+          </span>
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300 cursor-pointer"
+            >
+              ‹ Sebelumnya
+            </Button>
+            <span className="px-2 py-0.5 font-bold font-mono text-slate-700 bg-white rounded border border-slate-200">
+              Hal {page} / {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="h-6 px-2 text-[11px] font-bold rounded-md bg-white hover:bg-slate-100 border-slate-300 cursor-pointer"
+            >
+              Berikutnya ›
+            </Button>
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Komponen Tabel Hierarki Terpadu (Akun -> Unit -> Detail dengan Paging)
+export function HierarchicalInlineTable({
+  rows,
+  type,
+  formatRp
+}: {
+  rows: any[];
+  type: 'belanja' | 'penerimaan';
+  formatRp: (val: number) => string;
+}) {
+  const [openAkunSet, setOpenAkunSet] = useState<Set<string>>(new Set());
+  const [openUnitSet, setOpenUnitSet] = useState<Set<string>>(new Set());
+
+  // Kelompokkan data secara hierarkis: Akun -> Unit -> Rows
+  const groupedAkunList: DetailGroupAkun[] = useMemo(() => {
+    const akunMap: Record<string, {
+      namaAkun: string;
+      totalPagu: number;
+      totalRows: number;
+      unitMap: Record<string, { unit: string; totalPagu: number; count: number; rows: any[] }>;
+    }> = {};
+
+    rows.forEach(r => {
+      const namaAkun = (type === 'penerimaan' 
+        ? (r.nama_akun_penerimaan || r.akun || 'Akun Penerimaan Tidak Terdefinisi')
+        : (r.akun_detail || r.nama_akun || r.akun || 'Akun Belanja Tidak Terdefinisi')).trim();
+      const unit = (type === 'penerimaan'
+        ? (r.unit_kerja || 'Unit Kerja Tidak Terdefinisi')
+        : (r.unit || 'Unit Kerja Tidak Terdefinisi')).trim();
+      const pagu = type === 'penerimaan' ? (Number(r.renterima_pagu) || 0) : (Number(r.anggaran) || 0);
+
+      if (!akunMap[namaAkun]) {
+        akunMap[namaAkun] = { namaAkun, totalPagu: 0, totalRows: 0, unitMap: {} };
+      }
+      akunMap[namaAkun].totalPagu += pagu;
+      akunMap[namaAkun].totalRows += 1;
+
+      if (!akunMap[namaAkun].unitMap[unit]) {
+        akunMap[namaAkun].unitMap[unit] = { unit, totalPagu: 0, count: 0, rows: [] };
+      }
+      akunMap[namaAkun].unitMap[unit].totalPagu += pagu;
+      akunMap[namaAkun].unitMap[unit].count += 1;
+      akunMap[namaAkun].unitMap[unit].rows.push(r);
+    });
+
+    const result = Object.values(akunMap).map(a => {
+      const units = Object.values(a.unitMap).sort((u1, u2) =>
+        u1.unit.localeCompare(u2.unit, 'id', { numeric: true, sensitivity: 'base' })
+      );
+      return {
+        namaAkun: a.namaAkun,
+        totalPagu: a.totalPagu,
+        totalUnits: units.length,
+        totalRows: a.totalRows,
+        units
+      };
+    });
+
+    return result.sort((a, b) => a.namaAkun.localeCompare(b.namaAkun, 'id', { numeric: true, sensitivity: 'base' }));
+  }, [rows, type]);
+
+  const toggleAkun = (namaAkun: string) => {
+    setOpenAkunSet(prev => {
+      const next = new Set(prev);
+      if (next.has(namaAkun)) next.delete(namaAkun);
+      else next.add(namaAkun);
+      return next;
+    });
+  };
+
+  const toggleUnit = (key: string) => {
+    setOpenUnitSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  if (groupedAkunList.length === 0) {
+    return (
+      <div className="p-4 text-center text-xs text-slate-400 italic bg-white rounded-lg border border-slate-200">
+        Tidak ada data rincian untuk pos ini.
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full overflow-x-auto rounded-xl border border-slate-300 bg-white shadow-xs">
+      <table className="w-full text-xs text-left border-collapse">
+        <thead>
+          <tr className="bg-slate-200/90 text-slate-800 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wide">
+            <th className="w-12 px-3 py-2.5 text-center">#</th>
+            <th className="px-4 py-2.5">Akun (Anak 1) / Unit Kerja (Anak 2) / Detail Transaksi (Anak 3)</th>
+            <th className="px-4 py-2.5 text-center w-36">Jumlah Data</th>
+            <th className="px-4 py-2.5 text-right w-44 pr-4">Pagu Anggaran</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {groupedAkunList.map((akun, aIdx) => {
+            const isAkunOpen = openAkunSet.has(akun.namaAkun);
+
+            return (
+              <React.Fragment key={akun.namaAkun + aIdx}>
+                {/* LEVEL 1: NAMA_AKUN */}
+                <tr 
+                  onClick={() => toggleAkun(akun.namaAkun)}
+                  className="bg-[#eef5fa] hover:bg-[#e2edf5] border-b border-slate-200 cursor-pointer transition-colors font-bold text-slate-900 select-none"
+                >
+                  <td className="px-3 py-2.5 text-center align-middle">
+                    <button 
+                      type="button" 
+                      onClick={(e) => { e.stopPropagation(); toggleAkun(akun.namaAkun); }}
+                      className="w-5 h-5 rounded flex items-center justify-center bg-blue-200 hover:bg-blue-300 text-blue-900 text-xs font-bold transition-colors shadow-2xs mx-auto cursor-pointer"
+                    >
+                      {isAkunOpen ? <Minus size={11} /> : <Plus size={11} />}
+                    </button>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2 font-black text-slate-900 text-xs">
+                      <Tag size={13} className="text-blue-600 shrink-0" />
+                      <span>{akun.namaAkun}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100/80 text-blue-900 border border-blue-200 font-mono">
+                        {akun.units.length} Unit Kerja
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-center font-mono text-slate-600 text-xs font-semibold">
+                    {akun.totalRows.toLocaleString('id-ID')} Rincian
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono font-black text-slate-900 text-xs pr-4">
+                    Rp {formatRp(akun.totalPagu)}
+                  </td>
+                </tr>
+
+                {/* LEVEL 2: UNIT (BILA AKUN DIBUKA) */}
+                {isAkunOpen && akun.units.map((unitGroup, uIdx) => {
+                  const unitKey = `${akun.namaAkun}___${unitGroup.unit}`;
+                  const isUnitOpen = openUnitSet.has(unitKey);
+
+                  return (
+                    <React.Fragment key={unitKey + uIdx}>
+                      <tr 
+                        onClick={() => toggleUnit(unitKey)}
+                        className="bg-white hover:bg-slate-50/80 border-b border-slate-100 cursor-pointer transition-colors text-slate-800 select-none"
+                      >
+                        <td className="px-3 py-2 text-center align-middle pl-6">
+                          <button 
+                            type="button" 
+                            onClick={(e) => { e.stopPropagation(); toggleUnit(unitKey); }}
+                            className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors shadow-2xs mx-auto cursor-pointer"
+                          >
+                            {isUnitOpen ? <Minus size={9} /> : <Plus size={9} />}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2 pl-8">
+                          <div className="flex items-center gap-2 font-bold text-slate-800 text-xs">
+                            <Building2 size={13} className="text-slate-500 shrink-0" />
+                            <span>{unitGroup.unit}</span>
+                            <span className="text-[10px] font-normal px-2 py-0.2 rounded bg-slate-100 text-slate-600 font-mono border border-slate-200">
+                              {unitGroup.rows.length} Transaksi
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-center font-mono text-slate-500 text-xs">
+                          {unitGroup.rows.length} Transaksi
+                        </td>
+                        <td className="px-4 py-2 text-right font-mono font-bold text-slate-800 text-xs pr-4">
+                          Rp {formatRp(unitGroup.totalPagu)}
+                        </td>
+                      </tr>
+
+                      {/* LEVEL 3: DETAIL TABLE DENGAN PAGINATION (BILA UNIT DIBUKA) */}
+                      {isUnitOpen && (
+                        <tr>
+                          <td colSpan={4} className="p-0 border-b-2 border-slate-200">
+                            <InlineUnitDetailRows
+                              unitGroup={unitGroup}
+                              subtab={type}
+                              formatRp={formatRp}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1088,6 +1250,50 @@ export default function RkaLaporanPage() {
   const [openAkunSet, setOpenAkunSet] = useState<Set<string>>(new Set());
   const [openUnitSet, setOpenUnitSet] = useState<Set<string>>(new Set());
 
+  // State collapse untuk baris Format Slide / PPT RKAT
+  const [expandedPptPenerimaanSet, setExpandedPptPenerimaanSet] = useState<Set<string>>(new Set());
+  const [expandedPptPengeluaranSet, setExpandedPptPengeluaranSet] = useState<Set<string>>(new Set());
+
+  // State collapse untuk baris Format Tabel Standar (Atas-Bawah)
+  const [expandedStdPenerimaanSet, setExpandedStdPenerimaanSet] = useState<Set<string>>(new Set());
+  const [expandedStdBelanjaSet, setExpandedStdBelanjaSet] = useState<Set<string>>(new Set());
+
+  const togglePptPenerimaan = (key: string) => {
+    setExpandedPptPenerimaanSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const togglePptPengeluaran = (key: string) => {
+    setExpandedPptPengeluaranSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleStdPenerimaan = (key: string) => {
+    setExpandedStdPenerimaanSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleStdBelanja = (key: string) => {
+    setExpandedStdBelanjaSet(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   // Pagination untuk Level 1: Akun
   const [akunPageSize, setAkunPageSize] = useState<number | 'ALL'>(15);
   const [currentAkunPage, setCurrentAkunPage] = useState(1);
@@ -1130,13 +1336,17 @@ export default function RkaLaporanPage() {
     setOpenUnitSet(new Set());
   };
 
-  // Reset pagination saat filter berubah
+  // Reset pagination & collapse saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
     setCurrentAkunPage(1);
     setOpenAkunSet(new Set());
     setOpenUnitSet(new Set());
-  }, [modeLaporan, tahunFilter, unitFilter, kategoriFilter, search, pageSize, akunPageSize, activeDetailSubtab]);
+    setExpandedPptPenerimaanSet(new Set());
+    setExpandedPptPengeluaranSet(new Set());
+    setExpandedStdPenerimaanSet(new Set());
+    setExpandedStdBelanjaSet(new Set());
+  }, [modeLaporan, tahunFilter, unitFilter, kategoriFilter, search, pageSize, akunPageSize, activeDetailSubtab, summaryStyle]);
 
   // Aksi Klik Kategori dari Ringkasan untuk membuka Rincian
   const handleViewCategoryDetail = (catLabel: string) => {
@@ -2158,80 +2368,135 @@ export default function RkaLaporanPage() {
                             <TableCell className="py-2 text-center text-gray-300">-</TableCell>
                           </TableRow>
 
-                          {/* Rincian Pos-Pos dalam Kelompok */}
+                          {/* Rincian Pos-Pos dalam Kelompok (Bisa di-Expand Langsung) */}
                           {sec.items.map((item, idx) => {
+                            const itemKey = item.id || item.label || `sec_item_${idx}`;
+                            const isExpanded = expandedPptPenerimaanSet.has(itemKey);
                             const pct = pptProposalData.penerimaan.totalPenerimaan > 0
                               ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
                               : '0';
                             return (
-                              <TableRow key={item.id || item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
-                                  <span className="text-slate-400">•</span>
-                                  <span>{item.label}</span>
-                                </TableCell>
-                                <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                                  {item.count.toLocaleString('id-ID')} Akun
-                                </TableCell>
-                                <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
-                                  Rp {formatRp(item.totalPagu)}
-                                </TableCell>
-                                <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                                  {pct}%
-                                </TableCell>
-                                <TableCell className="py-2 text-center">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setActiveDetailSubtab('penerimaan');
-                                      setActiveViewTab('detail');
-                                      setSearch(item.label);
-                                    }}
-                                    className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
-                                    title={`Buka rincian ${item.label}`}
-                                  >
-                                    <Eye size={13} />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
+                              <React.Fragment key={itemKey}>
+                                <TableRow 
+                                  onClick={() => togglePptPenerimaan(itemKey)}
+                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-blue-50/50' : ''}`}
+                                >
+                                  <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
+                                    <button 
+                                      type="button" 
+                                      onClick={(e) => { e.stopPropagation(); togglePptPenerimaan(itemKey); }}
+                                      className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                    >
+                                      {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
+                                    </button>
+                                    <span className="font-semibold text-slate-900">{item.label}</span>
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                    {item.count.toLocaleString('id-ID')} Akun
+                                  </TableCell>
+                                  <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                                    Rp {formatRp(item.totalPagu)}
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                    {pct}%
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => togglePptPenerimaan(itemKey)}
+                                      className={`h-7 px-2 rounded-lg border text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer ${
+                                        isExpanded 
+                                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                                          : 'border-slate-200 hover:bg-blue-50 text-slate-700 hover:text-blue-700'
+                                      }`}
+                                      title={isExpanded ? `Tutup rincian ${item.label}` : `Buka rincian ${item.label}`}
+                                    >
+                                      {isExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                      <span className="text-[10px] hidden sm:inline">{isExpanded ? 'Tutup' : 'Rincian'}</span>
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
+                                {isExpanded && (
+                                  <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                    <TableCell colSpan={5} className="p-2 sm:p-4">
+                                      <HierarchicalInlineTable
+                                        rows={item.rows}
+                                        type="penerimaan"
+                                        formatRp={formatRp}
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
                             );
                           })}
                         </React.Fragment>
                       ))}
 
                       {/* Penerimaan Lainnya / Surplus TA Lalu jika ada */}
-                      {pptProposalData.penerimaan.lainnya.totalPagu > 0 && (
-                        <TableRow className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
-                            <span className="text-slate-400">•</span>
-                            <span>{pptProposalData.penerimaan.lainnya.label}</span>
-                          </TableCell>
-                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                            {pptProposalData.penerimaan.lainnya.count.toLocaleString('id-ID')} Akun
-                          </TableCell>
-                          <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
-                            Rp {formatRp(pptProposalData.penerimaan.lainnya.totalPagu)}
-                          </TableCell>
-                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                            {pptProposalData.penerimaan.totalPenerimaan > 0
-                              ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
-                              : '0%'}
-                          </TableCell>
-                          <TableCell className="py-2 text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActiveDetailSubtab('penerimaan');
-                                setActiveViewTab('detail');
-                              }}
-                              className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                      {pptProposalData.penerimaan.lainnya.totalPagu > 0 && (() => {
+                        const isLainnyaOpen = expandedPptPenerimaanSet.has('p_lainnya');
+                        return (
+                          <React.Fragment>
+                            <TableRow 
+                              onClick={() => togglePptPenerimaan('p_lainnya')}
+                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isLainnyaOpen ? 'bg-blue-50/50' : ''}`}
                             >
-                              <Eye size={13} />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                              <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); togglePptPenerimaan('p_lainnya'); }}
+                                  className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                >
+                                  {isLainnyaOpen ? <Minus size={10} /> : <Plus size={10} />}
+                                </button>
+                                <span>{pptProposalData.penerimaan.lainnya.label}</span>
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {pptProposalData.penerimaan.lainnya.count.toLocaleString('id-ID')} Akun
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                                Rp {formatRp(pptProposalData.penerimaan.lainnya.totalPagu)}
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {pptProposalData.penerimaan.totalPenerimaan > 0
+                                  ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+                                  : '0%'}
+                              </TableCell>
+                              <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => togglePptPenerimaan('p_lainnya')}
+                                  className={`h-7 px-2 rounded-lg border text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer ${
+                                    isLainnyaOpen 
+                                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                                      : 'border-slate-200 hover:bg-blue-50 text-slate-700 hover:text-blue-700'
+                                  }`}
+                                  title={isLainnyaOpen ? 'Tutup rincian' : 'Buka rincian'}
+                                >
+                                  {isLainnyaOpen ? <EyeOff size={13} /> : <Eye size={13} />}
+                                  <span className="text-[10px] hidden sm:inline">{isLainnyaOpen ? 'Tutup' : 'Rincian'}</span>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isLainnyaOpen && (
+                              <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                <TableCell colSpan={5} className="p-2 sm:p-4">
+                                  <HierarchicalInlineTable
+                                    rows={pptProposalData.penerimaan.lainnya.rows}
+                                    type="penerimaan"
+                                    formatRp={formatRp}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })()}
 
                       {/* BANNER BIRU JUMLAH PENERIMAAN (PERSIS SEPERTI GAMBAR) */}
                       <TableRow className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors border-y-2 border-blue-700">
@@ -2262,77 +2527,133 @@ export default function RkaLaporanPage() {
                         </TableCell>
                       </TableRow>
 
-                      {/* Baris Rincian Belanja Sesuai Konfigurasi Template */}
+                      {/* Baris Rincian Belanja Sesuai Konfigurasi Template (Bisa di-Expand Langsung) */}
                       {pptProposalData.pengeluaran.items.map((item, idx) => {
+                        const itemKey = item.id || item.label || `b_item_${idx}`;
+                        const isExpanded = expandedPptPengeluaranSet.has(itemKey);
                         const pct = pptProposalData.pengeluaran.totalPengeluaran > 0
                           ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
                           : '0';
                         return (
-                          <TableRow key={item.id || item.label || idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                            <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
-                              <span className="text-slate-400">•</span>
-                              <span>{item.label}</span>
-                            </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {item.count.toLocaleString('id-ID')} Baris
-                            </TableCell>
-                            <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
-                              Rp {formatRp(item.totalAnggaran)}
-                            </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                              {pct}%
-                            </TableCell>
-                            <TableCell className="py-2 text-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setActiveDetailSubtab('belanja');
-                                  handleViewCategoryDetail(item.label);
-                                }}
-                                className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
-                                title={`Buka rincian ${item.label}`}
-                              >
-                                <Eye size={13} />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={itemKey}>
+                            <TableRow 
+                              onClick={() => togglePptPengeluaran(itemKey)}
+                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-indigo-50/50' : ''}`}
+                            >
+                              <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); togglePptPengeluaran(itemKey); }}
+                                  className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                >
+                                  {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
+                                </button>
+                                <span>{item.label}</span>
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {item.count.toLocaleString('id-ID')} Baris
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
+                                Rp {formatRp(item.totalAnggaran)}
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {pct}%
+                              </TableCell>
+                              <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => togglePptPengeluaran(itemKey)}
+                                  className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
+                                    isExpanded 
+                                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' 
+                                      : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
+                                  }`}
+                                  title={isExpanded ? `Tutup rincian ${item.label}` : `Buka rincian ${item.label}`}
+                                >
+                                  {isExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                  <span className="text-[10px] hidden sm:inline">{isExpanded ? 'Tutup' : 'Rincian'}</span>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
+                            {isExpanded && (
+                              <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                <TableCell colSpan={5} className="p-2 sm:p-4">
+                                  <HierarchicalInlineTable
+                                    rows={item.rows}
+                                    type="belanja"
+                                    formatRp={formatRp}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
                         );
                       })}
 
                       {/* Belanja Lainnya jika ada */}
-                      {pptProposalData.pengeluaran.lainnya.totalAnggaran > 0 && (
-                        <TableRow className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                          <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
-                            <span className="text-slate-400">•</span>
-                            <span>{pptProposalData.pengeluaran.lainnya.label}</span>
-                          </TableCell>
-                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                            {pptProposalData.pengeluaran.lainnya.count.toLocaleString('id-ID')} Baris
-                          </TableCell>
-                          <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
-                            Rp {formatRp(pptProposalData.pengeluaran.lainnya.totalAnggaran)}
-                          </TableCell>
-                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                            {pptProposalData.pengeluaran.totalPengeluaran > 0 
-                              ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
-                              : '0%'}
-                          </TableCell>
-                          <TableCell className="py-2 text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setActiveDetailSubtab('belanja');
-                                setActiveViewTab('detail');
-                              }}
-                              className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-blue-600 hover:text-white transition-all shadow-2xs inline-flex items-center justify-center cursor-pointer"
+                      {pptProposalData.pengeluaran.lainnya.totalAnggaran > 0 && (() => {
+                        const isBLainnyaOpen = expandedPptPengeluaranSet.has('b_lainnya');
+                        return (
+                          <React.Fragment>
+                            <TableRow 
+                              onClick={() => togglePptPengeluaran('b_lainnya')}
+                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isBLainnyaOpen ? 'bg-indigo-50/50' : ''}`}
                             >
-                              <Eye size={13} />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                              <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
+                                <button 
+                                  type="button" 
+                                  onClick={(e) => { e.stopPropagation(); togglePptPengeluaran('b_lainnya'); }}
+                                  className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                >
+                                  {isBLainnyaOpen ? <Minus size={10} /> : <Plus size={10} />}
+                                </button>
+                                <span>{pptProposalData.pengeluaran.lainnya.label}</span>
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {pptProposalData.pengeluaran.lainnya.count.toLocaleString('id-ID')} Baris
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
+                                Rp {formatRp(pptProposalData.pengeluaran.lainnya.totalAnggaran)}
+                              </TableCell>
+                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                {pptProposalData.pengeluaran.totalPengeluaran > 0 
+                                  ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+                                  : '0%'}
+                              </TableCell>
+                              <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => togglePptPengeluaran('b_lainnya')}
+                                  className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
+                                    isBLainnyaOpen 
+                                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' 
+                                      : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
+                                  }`}
+                                  title={isBLainnyaOpen ? 'Tutup rincian' : 'Buka rincian'}
+                                >
+                                  {isBLainnyaOpen ? <EyeOff size={13} /> : <Eye size={13} />}
+                                  <span className="text-[10px] hidden sm:inline">{isBLainnyaOpen ? 'Tutup' : 'Rincian'}</span>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {isBLainnyaOpen && (
+                              <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                <TableCell colSpan={5} className="p-2 sm:p-4">
+                                  <HierarchicalInlineTable
+                                    rows={pptProposalData.pengeluaran.lainnya.rows}
+                                    type="belanja"
+                                    formatRp={formatRp}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })()}
 
                       {/* BANNER BIRU JUMLAH PENGELUARAN (PERSIS SEPERTI GAMBAR) */}
                       <TableRow className="bg-[#2563eb] text-white hover:bg-[#1d4ed8] transition-colors border-y-2 border-blue-700">
@@ -2424,63 +2745,86 @@ export default function RkaLaporanPage() {
                           </TableRow>
                         ) : (
                           groupedPenerimaan.map((group, gIdx) => {
+                            const isGroupOpen = expandedStdPenerimaanSet.has(group.label);
                             const proporsiPct = grandTotalPenerimaan.totalPagu > 0 
                               ? ((group.totalPagu / grandTotalPenerimaan.totalPagu) * 100).toFixed(1)
                               : '0';
 
                             return (
-                              <TableRow 
-                                key={group.label || gIdx} 
-                                className="border-b border-gray-100 hover:bg-emerald-50/40 transition-colors"
-                              >
-                                <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
-                                  {gIdx + 1}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
-                                    <span>💰</span>
-                                    <span>{group.label}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold font-mono border border-emerald-100">
-                                    {group.rows.length.toLocaleString('id-ID')} Baris
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <span className="font-black font-mono text-emerald-950 text-sm">
-                                    Rp {formatRp(group.totalPagu)}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <div className="space-y-1 max-w-[110px] mx-auto">
-                                    <div className="text-[11px] font-bold font-mono text-emerald-800 text-right">
-                                      {proporsiPct}%
+                              <React.Fragment key={group.label || gIdx}>
+                                <TableRow 
+                                  onClick={() => toggleStdPenerimaan(group.label)}
+                                  className={`border-b border-gray-100 hover:bg-emerald-50/40 transition-colors cursor-pointer select-none ${isGroupOpen ? 'bg-emerald-50/50' : ''}`}
+                                >
+                                  <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                                    <button 
+                                      type="button" 
+                                      onClick={(e) => { e.stopPropagation(); toggleStdPenerimaan(group.label); }}
+                                      className="w-5 h-5 rounded flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-bold mx-auto shadow-2xs cursor-pointer"
+                                    >
+                                      {isGroupOpen ? <Minus size={10} /> : <Plus size={10} />}
+                                    </button>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                                      <span>💰</span>
+                                      <span>{group.label}</span>
                                     </div>
-                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                      <div 
-                                        className="h-full bg-emerald-600 rounded-full"
-                                        style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span className="inline-block px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold font-mono border border-emerald-100">
+                                      {group.rows.length.toLocaleString('id-ID')} Baris
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <span className="font-black font-mono text-emerald-950 text-sm">
+                                      Rp {formatRp(group.totalPagu)}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="space-y-1 max-w-[110px] mx-auto">
+                                      <div className="text-[11px] font-bold font-mono text-emerald-800 text-right">
+                                        {proporsiPct}%
+                                      </div>
+                                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                        <div 
+                                          className="h-full bg-emerald-600 rounded-full"
+                                          style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => toggleStdPenerimaan(group.label)}
+                                      className={`h-8 px-2.5 rounded-xl border text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto ${
+                                        isGroupOpen
+                                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                                          : 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-600 text-emerald-700 hover:text-white'
+                                      }`}
+                                      title={isGroupOpen ? `Tutup rincian penerimaan ${group.label}` : `Buka rincian penerimaan ${group.label}`}
+                                    >
+                                      {isGroupOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+                                      <span className="text-[10px] hidden sm:inline">{isGroupOpen ? 'Tutup' : 'Rincian'}</span>
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
+                                {isGroupOpen && (
+                                  <TableRow className="bg-emerald-50/20 border-b border-emerald-100 p-0">
+                                    <TableCell colSpan={6} className="p-2 sm:p-4">
+                                      <HierarchicalInlineTable
+                                        rows={group.rows}
+                                        type="penerimaan"
+                                        formatRp={formatRp}
                                       />
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setActiveDetailSubtab('penerimaan');
-                                      setActiveViewTab('detail');
-                                      setSearch(group.label);
-                                    }}
-                                    className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                                    title={`Buka rincian penerimaan ${group.label}`}
-                                  >
-                                    <Eye size={15} />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
                             );
                           })
                         )}
@@ -2543,62 +2887,86 @@ export default function RkaLaporanPage() {
                       </TableHeader>
                       <TableBody>
                         {groupedData.map((group, gIdx) => {
+                          const isGroupOpen = expandedStdBelanjaSet.has(group.label);
                           const proporsiPct = grandTotal.anggaran > 0 
                             ? ((group.totalAnggaran / grandTotal.anggaran) * 100).toFixed(1)
                             : '0';
 
                           return (
-                            <TableRow 
-                              key={group.label || gIdx} 
-                              className="border-b border-gray-100 hover:bg-indigo-50/40 transition-colors"
-                            >
-                              <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
-                                {gIdx + 1}
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
-                                  <span>🏷️</span>
-                                  <span>{group.label}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-bold font-mono border border-indigo-100">
-                                  {group.rows.length.toLocaleString('id-ID')} Baris
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <span className="font-black font-mono text-gray-950 text-sm">
-                                  Rp {formatRp(group.totalAnggaran)}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <div className="space-y-1 max-w-[110px] mx-auto">
-                                  <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
-                                    {proporsiPct}%
+                            <React.Fragment key={group.label || gIdx}>
+                              <TableRow 
+                                onClick={() => toggleStdBelanja(group.label)}
+                                className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors cursor-pointer select-none ${isGroupOpen ? 'bg-indigo-50/50' : ''}`}
+                              >
+                                <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
+                                  <button 
+                                    type="button" 
+                                    onClick={(e) => { e.stopPropagation(); toggleStdBelanja(group.label); }}
+                                    className="w-5 h-5 rounded flex items-center justify-center bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-[10px] font-bold mx-auto shadow-2xs cursor-pointer"
+                                  >
+                                    {isGroupOpen ? <Minus size={10} /> : <Plus size={10} />}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
+                                    <span>🏷️</span>
+                                    <span>{group.label}</span>
                                   </div>
-                                  <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                    <div 
-                                      className="h-full bg-indigo-600 rounded-full"
-                                      style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-bold font-mono border border-indigo-100">
+                                    {group.rows.length.toLocaleString('id-ID')} Baris
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="font-black font-mono text-gray-950 text-sm">
+                                    Rp {formatRp(group.totalAnggaran)}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="space-y-1 max-w-[110px] mx-auto">
+                                    <div className="text-[11px] font-bold font-mono text-gray-700 text-right">
+                                      {proporsiPct}%
+                                    </div>
+                                    <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                      <div 
+                                        className="h-full bg-indigo-600 rounded-full"
+                                        style={{ width: `${Math.min(100, parseFloat(proporsiPct))}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => toggleStdBelanja(group.label)}
+                                    className={`h-8 px-2.5 rounded-xl border text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto ${
+                                      isGroupOpen
+                                        ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                        : 'border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white'
+                                    }`}
+                                    title={isGroupOpen ? `Tutup rincian belanja ${group.label}` : `Buka rincian belanja ${group.label}`}
+                                  >
+                                    {isGroupOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    <span className="text-[10px] hidden sm:inline">{isGroupOpen ? 'Tutup' : 'Rincian'}</span>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+
+                              {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
+                              {isGroupOpen && (
+                                <TableRow className="bg-indigo-50/20 border-b border-indigo-100 p-0">
+                                  <TableCell colSpan={6} className="p-2 sm:p-4">
+                                    <HierarchicalInlineTable
+                                      rows={group.rows}
+                                      type="belanja"
+                                      formatRp={formatRp}
                                     />
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setActiveDetailSubtab('belanja');
-                                    handleViewCategoryDetail(group.label);
-                                  }}
-                                  className="h-8 w-8 p-0 rounded-xl border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
-                                  title={`Buka rincian belanja ${group.label}`}
-                                >
-                                  <Eye size={15} />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </TableBody>
@@ -2965,189 +3333,16 @@ export default function RkaLaporanPage() {
                   </button>
                 </div>
 
-                {/* Expand / Collapse All */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={expandAllAkun}
-                    className="h-8 px-2.5 text-xs font-bold rounded-xl border-slate-300 bg-white hover:bg-slate-100 shadow-2xs cursor-pointer"
-                    title="Buka seluruh akun (Level 1)"
-                  >
-                    📂 Buka Semua Akun
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={collapseAll}
-                    className="h-8 px-2.5 text-xs font-bold rounded-xl border-slate-300 bg-white hover:bg-slate-100 shadow-2xs cursor-pointer"
-                    title="Tutup seluruh level"
-                  >
-                    📁 Tutup Semua
-                  </Button>
-                </div>
-
-                {/* Akun Page Size Selector */}
-                <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-2xs">
-                  <span className="text-[11px] text-slate-500 font-bold uppercase">Akun/Hal:</span>
-                  <select
-                    value={akunPageSize}
-                    onChange={e => {
-                      const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
-                      setAkunPageSize(val);
-                      setCurrentAkunPage(1);
-                    }}
-                    className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
-                  >
-                    <option value={10}>10</option>
-                    <option value={15}>15</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value="ALL">Semua</option>
-                  </select>
-                </div>
               </div>
             </CardHeader>
 
             <CardContent className="p-4 sm:p-6 bg-slate-50/50">
-              {paginatedAkunList.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8 space-y-2">
-                  <div className="text-4xl">📂</div>
-                  <div className="font-bold text-slate-700 text-sm">Tidak ada data akun yang sesuai filter</div>
-                  <div className="text-xs text-slate-400">Silakan sesuaikan pencarian atau filter unit / kategori di atas.</div>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {paginatedAkunList.map((akunGroup) => {
-                    const isAkunOpen = openAkunSet.has(akunGroup.namaAkun);
-                    return (
-                      <div
-                        key={akunGroup.namaAkun}
-                        className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs transition-all"
-                      >
-                        {/* Level 1: Header Akun (Collapsible, Default Tertutup) */}
-                        <div
-                          onClick={() => toggleAkun(akunGroup.namaAkun)}
-                          className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-colors select-none ${
-                            isAkunOpen
-                              ? 'bg-gradient-to-r from-slate-100 via-indigo-50/60 to-slate-100 border-b border-indigo-200/70'
-                              : 'hover:bg-slate-50/90 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div
-                              className={`w-7 h-7 rounded-xl flex items-center justify-center transition-transform shadow-2xs ${
-                                isAkunOpen
-                                  ? 'rotate-90 bg-indigo-600 text-white'
-                                  : 'bg-slate-100 text-slate-500 border border-slate-200'
-                              }`}
-                            >
-                              <ChevronRight size={15} />
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-black text-xs sm:text-sm text-slate-900 tracking-tight leading-snug">
-                                  {akunGroup.namaAkun}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
-                                <span className="inline-flex items-center gap-1 font-bold text-slate-700">
-                                  <Building2 size={12} className="text-indigo-600" />
-                                  <span>{akunGroup.totalUnits.toLocaleString('id-ID')} Unit Kerja</span>
-                                </span>
-                                <span>•</span>
-                                <span className="inline-flex items-center gap-1 font-bold text-slate-700">
-                                  <span>📄</span>
-                                  <span>{akunGroup.totalRows.toLocaleString('id-ID')} Rincian Transaksi</span>
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span className="text-[9px] font-extrabold uppercase text-slate-400 block tracking-wider">
-                              Subtotal Akun
-                            </span>
-                            <span className="font-black font-mono text-xs sm:text-sm text-indigo-950">
-                              Rp {formatRp(akunGroup.totalPagu)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Level 2: List of Units under this Akun (Collapsible, Default Tertutup) */}
-                        {isAkunOpen && (
-                          <div className="p-3 sm:p-4 bg-slate-50/50 space-y-2.5 border-t border-slate-100 animate-in fade-in duration-100">
-                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 px-1 flex items-center justify-between">
-                              <span>Daftar Unit Kerja ({akunGroup.units.length} Unit):</span>
-                              <span className="italic normal-case text-slate-400 font-normal">
-                                Klik nama unit untuk melihat rincian detail (Anak 3)
-                              </span>
-                            </div>
-
-                            {akunGroup.units.map((unitGroup) => {
-                              const unitKey = `${akunGroup.namaAkun}:::${unitGroup.unit}`;
-                              const isUnitOpen = openUnitSet.has(unitKey);
-                              return (
-                                <DetailUnitAccordionItem
-                                  key={unitKey}
-                                  unitGroup={unitGroup}
-                                  akunKey={akunGroup.namaAkun}
-                                  subtab={activeDetailSubtab}
-                                  isUnitOpen={isUnitOpen}
-                                  onToggleUnit={() => toggleUnit(unitKey)}
-                                  formatRp={formatRp}
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <HierarchicalInlineTable
+                rows={activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows : allDetailRows}
+                type={activeDetailSubtab}
+                formatRp={formatRp}
+              />
             </CardContent>
-
-            {/* Pagination Controls Footer untuk Level 1: Akun */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600 font-medium">
-              <div>
-                <span>
-                  Menampilkan Akun <strong>{akunPageSize === 'ALL' ? 1 : Math.min((currentAkunPage - 1) * (akunPageSize as number) + 1, activeAkunList.length)}</strong> s.d. <strong>{akunPageSize === 'ALL' ? activeAkunList.length : Math.min(currentAkunPage * (akunPageSize as number), activeAkunList.length)}</strong> dari <strong>{activeAkunList.length.toLocaleString('id-ID')}</strong> total akun usulan
-                </span>
-              </div>
-
-              {akunPageSize !== 'ALL' && totalAkunPages > 1 && (
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentAkunPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentAkunPage === 1}
-                    className="h-8 px-2.5 rounded-xl text-xs font-bold border-slate-300 bg-white hover:bg-slate-100 cursor-pointer"
-                  >
-                    <ChevronLeft size={14} className="mr-1" />
-                    <span>Sebelumnya</span>
-                  </Button>
-
-                  <div className="px-3 py-1 font-bold text-slate-800 bg-white border border-slate-200 rounded-xl text-xs font-mono shadow-2xs">
-                    Halaman {currentAkunPage} dari {totalAkunPages}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentAkunPage(prev => Math.min(totalAkunPages, prev + 1))}
-                    disabled={currentAkunPage === totalAkunPages}
-                    className="h-8 px-2.5 rounded-xl text-xs font-bold border-slate-300 bg-white hover:bg-slate-100 cursor-pointer"
-                  >
-                    <span>Berikutnya</span>
-                    <ChevronRight size={14} className="ml-1" />
-                  </Button>
-                </div>
-              )}
-            </div>
           </Card>
         )}
       </div>
