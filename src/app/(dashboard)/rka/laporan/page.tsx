@@ -102,6 +102,7 @@ const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
     { id: 'pemeliharaan', label: 'Belanja Perbaikan dan Pemeliharaan', matchKeys: ['pemeliharaan', 'perbaikan'] },
     { id: 'perjalanan', label: 'Belanja Perjalanan', matchKeys: ['perjalanan'] },
     { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal'] },
+    { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'] },
     { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK -ADB', matchKeys: ['techno', 'adb'] },
     { id: 'puapt', label: 'Belanja PUAPT', matchKeys: ['puapt'] },
     { id: 'equity', label: 'EQUITY', matchKeys: ['equity'] },
@@ -652,6 +653,9 @@ export default function RkaLaporanPage() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.penerimaanSections && parsed.pengeluaranItems) {
+            if (!parsed.pengeluaranItems.some((i: any) => i.id === 'antar_unit')) {
+              parsed.pengeluaranItems.splice(5, 0, { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'] });
+            }
             return parsed;
           }
         }

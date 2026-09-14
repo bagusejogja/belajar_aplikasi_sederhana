@@ -490,12 +490,12 @@ export default function RkaRulesPage() {
     }
 
     const sample = `Prioritas\tUnit\tAkun\tKataKunci\tTargetField\tNilaiKlasifikasi\tKeterangan
-1\t010810 Direktorat Pengembangan Usaha\t*\tPrime\tproposal rkat\tPRIME STeP\tPrime Step
 2\t*\t51*\t*\tproposal rkat\tBelanja Pegawai\tBelanja Pegawai
 2\t*\t52*\t*\tproposal rkat\tBelanja Barang & Jasa\tBelanja Barang & Jasa
 2\t*\t53*\t*\tproposal rkat\tBelanja Perbaikan dan Pemeliharaan\tBelanja Perbaikan dan Pemeliharaan
 2\t*\t54*\t*\tproposal rkat\tBelanja Perjalanan\tBelanja Perjalanan
-2\t*\t55*\t*\tproposal rkat\tBelanja Modal\tBelanja Modal`;
+2\t*\t55*\t*\tproposal rkat\tBelanja Modal\tBelanja Modal
+2\t*\t56*\t*\tproposal rkat\tBelanja Transfer Antar Unit\tBelanja Antar Unit`;
     setPasteText(sample);
     toast.success('Contoh aturan Pengeluaran berhasil dimuat ke Paste Zone!');
   };
