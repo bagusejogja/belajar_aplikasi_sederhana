@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Layers, Download, RefreshCw, Building2, Search, 
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
-  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, Check, RotateCcw,
+  PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
   Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash
 } from 'lucide-react';
@@ -17,6 +17,11 @@ import {
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import { 
+  Document, Packer, Paragraph, Table as DocxTable, TableCell as DocxTableCell, 
+  TableRow as DocxTableRow, WidthType, BorderStyle, TextRun, AlignmentType, 
+  PageOrientation, ShadingType, VerticalAlign
+} from 'docx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -637,7 +642,7 @@ export default function RkaLaporanPage() {
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
   const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
   const [rekapGroupFilter, setRekapGroupFilter] = useState<string>('ALL');
-  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi'>('fakultas');
+  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi' | 'upu'>('fakultas');
 
   // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
@@ -1417,7 +1422,7 @@ export default function RkaLaporanPage() {
     if (uLower.includes('sekolah')) return 'Sekolah';
     if (uLower.includes('pusat studi') || uLower.includes('pusdi') || uLower.includes('(ps)') || uLower.startsWith('ps ') || uLower.startsWith('400')) return 'Pusat Studi';
     if (uLower.includes('direktorat') || uLower.includes('biro') || uLower.includes('kptu') || uLower.includes('kantor') || uLower.includes('sekretaris') || uLower.includes('satuan') || uLower.includes('badan')) return 'KPTU';
-    if (uLower.includes('pusat') || uLower.includes('laboratorium') || uLower.includes('perpustakaan') || uLower.includes('arsip') || uLower.includes('rumah sakit')) return 'Unit Penunjang';
+    if (uLower.includes('upu') || uLower.includes('penunjang') || uLower.includes('pusat') || uLower.includes('laboratorium') || uLower.includes('perpustakaan') || uLower.includes('arsip') || uLower.includes('rumah sakit')) return 'Unit Penunjang Universitas - UPU';
     return 'Lainnya';
   };
 
@@ -1646,7 +1651,7 @@ export default function RkaLaporanPage() {
       groups[g].totalCount += item.count;
     });
 
-    const groupOrder = ['Fakultas', 'Sekolah', 'Pusat Studi', 'KPTU', 'Unit Penunjang', 'Lainnya'];
+    const groupOrder = ['Fakultas', 'Sekolah', 'Pusat Studi', 'Unit Penunjang Universitas - UPU', 'Unit Penunjang', 'KPTU', 'Tempat Ibadah', 'Lainnya'];
     return Object.values(groups).sort((a, b) => {
       const idxA = groupOrder.indexOf(a.groupOrg);
       const idxB = groupOrder.indexOf(b.groupOrg);
@@ -1762,7 +1767,8 @@ export default function RkaLaporanPage() {
       wb.created = new Date();
 
       const isPusdi = rekapFormat === 'pusdi';
-      const sheetName = isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
+      const isUpu = rekapFormat === 'upu';
+      const sheetName = isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
       const ws = wb.addWorksheet(sheetName, {
         views: [{ showGridLines: true }]
       });
@@ -1771,7 +1777,9 @@ export default function RkaLaporanPage() {
       const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
       titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
       
-      const subTitleText = isPusdi
+      const subTitleText = isUpu
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
+        : isPusdi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
         : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
       const subTitleRow = ws.addRow([subTitleText]);
@@ -1785,7 +1793,22 @@ export default function RkaLaporanPage() {
       ws.addRow([]); // Blank spacer
 
       // 2. Table Headers
-      const headers = isPusdi
+      const headers = isUpu
+        ? [
+            'NO',
+            'GROUP',
+            '0. UNIT KERJA',
+            '1. SUBSIDI (RP)',
+            '2. PENERIMAAN (RP)',
+            '3. LUNCURAN (RP)',
+            '4. JML SUMBER PEMBIAYAAN (1+2+3) (RP)',
+            '5. PENGELUARAN OPERASIONAL (RP)',
+            '6. INVESTASI (BELANJA MODAL) (RP)',
+            '7. TOTAL PENGELUARAN (5+6) (RP)',
+            '8. SURPLUS / (DEFISIT) OPS (1+2-5) (RP)',
+            '9. SURPLUS / (DEFISIT) ANGGARAN (RP)'
+          ]
+        : isPusdi
         ? [
             'NO',
             'GROUP',
@@ -1834,7 +1857,9 @@ export default function RkaLaporanPage() {
       });
 
       // Column number indicators row
-      const colIndicators = isPusdi
+      const colIndicators = isUpu
+        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
+        : isPusdi
         ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
         : ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
 
@@ -1884,7 +1909,22 @@ export default function RkaLaporanPage() {
 
         // Unit rows
         group.units.forEach(u => {
-          const rowValues = isPusdi
+          const rowValues = isUpu
+            ? [
+                rowNum++,
+                group.groupOrg,
+                u.unit,
+                0, // 1. Subsidi dikosongi dahulu
+                u.jumlahPenerimaan,
+                u.luncuran,
+                u.sumberPembiayaan,
+                u.operasional,
+                u.modal,
+                u.totalPengeluaran,
+                u.surplusDefisitOperasional,
+                u.surplusDefisitAnggaran
+              ]
+            : isPusdi
             ? [
                 rowNum++,
                 group.groupOrg,
@@ -1936,7 +1976,13 @@ export default function RkaLaporanPage() {
               // Numerical columns
               cell.alignment = { horizontal: 'right', vertical: 'middle' };
               cell.numFmt = '#,##0';
-              if (isPusdi) {
+              if (isUpu) {
+                if (colIndex === 5 || colIndex === 7) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
+                } else if (colIndex === 10) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
+                }
+              } else if (isPusdi) {
                 if (colIndex === 4 || colIndex === 6) {
                   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
                 } else if (colIndex === 9) {
@@ -1954,7 +2000,22 @@ export default function RkaLaporanPage() {
         });
 
         // Group Subtotal row
-        const subtotalValues = isPusdi
+        const subtotalValues = isUpu
+          ? [
+              '',
+              `SUBTOTAL ${group.groupOrg}`,
+              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+              0,
+              group.totalJumlahPenerimaan,
+              group.totalLuncuran,
+              group.totalSumberPembiayaan,
+              group.totalOperasional,
+              group.totalModal,
+              group.totalPengeluaran,
+              group.totalSurplusDefisitOperasional,
+              group.totalSurplusDefisitAnggaran
+            ]
+          : isPusdi
           ? [
               '',
               `SUBTOTAL ${group.groupOrg}`,
@@ -2011,7 +2072,22 @@ export default function RkaLaporanPage() {
       });
 
       // Grand Total Row
-      const grandTotalValues = isPusdi
+      const grandTotalValues = isUpu
+        ? [
+            '',
+            'TOTAL KESELURUHAN',
+            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
+            0,
+            displayedRekapTotals.jumlahPenerimaan,
+            displayedRekapTotals.luncuran,
+            displayedRekapTotals.sumberPembiayaan,
+            displayedRekapTotals.operasional,
+            displayedRekapTotals.modal,
+            displayedRekapTotals.totalPengeluaran,
+            displayedRekapTotals.surplusDefisitOperasional,
+            displayedRekapTotals.surplusDefisitAnggaran
+          ]
+        : isPusdi
         ? [
             '',
             'TOTAL KESELURUHAN',
@@ -2065,7 +2141,22 @@ export default function RkaLaporanPage() {
       });
 
       // Column widths
-      if (isPusdi) {
+      if (isUpu) {
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 18 }, // GROUP
+          { width: 45 }, // 0. UNIT KERJA
+          { width: 16 }, // 1. SUBSIDI
+          { width: 25 }, // 2. PENERIMAAN
+          { width: 23 }, // 3. LUNCURAN
+          { width: 27 }, // 4. JML SUMBER PEMBIAYAAN
+          { width: 25 }, // 5. PENGELUARAN OPERASIONAL
+          { width: 24 }, // 6. INVESTASI (MODAL)
+          { width: 27 }, // 7. TOTAL PENGELUARAN
+          { width: 28 }, // 8. SURPLUS/DEFISIT OPS
+          { width: 28 }  // 9. SURPLUS/DEFISIT ANGGARAN
+        ];
+      } else if (isPusdi) {
         ws.columns = [
           { width: 6 },  // NO
           { width: 18 }, // GROUP
@@ -2103,16 +2194,390 @@ export default function RkaLaporanPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const fileName = isPusdi
+      const fileName = isUpu
+        ? `Rekap_Proposal_RKAT_UPU_${tahunFilter}.xlsx`
+        : isPusdi
         ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}.xlsx`
         : `Rekap_Proposal_RKAT_Fakultas_${tahunFilter}.xlsx`;
       a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success(`File Excel (${isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom'}) berhasil diexport!`);
+      const formatTag = isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom';
+      toast.success(`File Excel (${formatTag}) berhasil diexport!`);
     } catch (err: any) {
       console.error('Export Excel error:', err);
       toast.error('Gagal export Excel: ' + err.message);
+    }
+  };
+
+  // Export Word Landscape Rekap Unit Kerja (Menggunakan docx: Orientasi Landscape, Pas 1 Halaman Lebar, kebawah multi halaman)
+  const handleExportWordUnitRekap = async () => {
+    if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
+
+    try {
+      const isUpu = rekapFormat === 'upu';
+      const isPusdi = rekapFormat === 'pusdi';
+
+      const formatLabel = isUpu ? 'UPU' : isPusdi ? 'PUSDI' : 'Fakultas';
+      const formatSubtitle = isUpu
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
+        : isPusdi
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
+        : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
+
+      // Kolom Word (Kolom Group dihilangkan sesuai permintaan user agar muat rapi 1 halaman lebar)
+      const headers = isUpu
+        ? [
+            'NO',
+            '0. UNIT KERJA',
+            '1. SUBSIDI',
+            '2. PENERIMAAN',
+            '3. LUNCURAN',
+            '4. JML PEMBIAYAAN (1+2+3)',
+            '5. PENGELUARAN OPS',
+            '6. INVESTASI (MODAL)',
+            '7. TOTAL PENGELUARAN (5+6)',
+            '8. SURPLUS/(DEFISIT) OPS (1+2-5)',
+            '9. S/D ANGGARAN'
+          ]
+        : isPusdi
+        ? [
+            'NO',
+            '0. UNIT KERJA',
+            '1. PENERIMAAN',
+            '2. LUNCURAN',
+            '3. JML PEMBIAYAAN (1+2)',
+            '4. PENGELUARAN OPS',
+            '5. INVESTASI (MODAL)',
+            '6. TOTAL PENGELUARAN (4+5)',
+            '7. SURPLUS/(DEFISIT) OPS (1-4)',
+            '8. S/D ANGGARAN (3-6)'
+          ]
+        : [
+            'NO',
+            '0. UNIT KERJA',
+            '1. PEN. PENDIDIKAN',
+            '2. PEN. NON PENDIDIKAN',
+            '3. JML PENERIMAAN (1+2)',
+            '4. LUNCURAN',
+            '5. JML PEMBIAYAAN (3+4)',
+            '6. PENGELUARAN OPS',
+            '7. INVESTASI (MODAL)',
+            '8. TOTAL PENGELUARAN (6+7)',
+            '9. SURPLUS/(DEFISIT) OPS (3-6)',
+            '10. S/D ANGGARAN'
+          ];
+
+      const numCols = headers.length;
+
+      // Header row
+      const headerRow = new DocxTableRow({
+        tableHeader: true,
+        children: headers.map((h, i) => new DocxTableCell({
+          children: [new Paragraph({
+            children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 14 })],
+            alignment: i <= 1 ? AlignmentType.CENTER : AlignmentType.RIGHT,
+          })],
+          shading: { fill: '0F172A', type: ShadingType.CLEAR },
+          verticalAlign: VerticalAlign.CENTER,
+        }))
+      });
+
+      // Indicators row
+      const colIndicators = isUpu
+        ? ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
+        : isPusdi
+        ? ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
+        : ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
+
+      const indicatorRow = new DocxTableRow({
+        tableHeader: true,
+        children: colIndicators.map(ind => new DocxTableCell({
+          children: [new Paragraph({
+            children: [new TextRun({ text: ind, bold: true, color: 'E2E8F0', size: 13 })],
+            alignment: AlignmentType.CENTER,
+          })],
+          shading: { fill: '334155', type: ShadingType.CLEAR },
+          verticalAlign: VerticalAlign.CENTER,
+        }))
+      });
+
+      const displayGroups = rekapGroupFilter === 'ALL' 
+        ? groupedByOrg 
+        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase());
+
+      const tableRows: DocxTableRow[] = [headerRow, indicatorRow];
+      let rowNum = 1;
+
+      displayGroups.forEach(group => {
+        // Group Header Banner
+        const grpRow = new DocxTableRow({
+          children: [
+            new DocxTableCell({
+              columnSpan: numCols,
+              children: [new Paragraph({
+                children: [
+                  new TextRun({ 
+                    text: `GROUP: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`, 
+                    bold: true, 
+                    color: '312E81', 
+                    size: 15 
+                  })
+                ],
+                alignment: AlignmentType.LEFT,
+              })],
+              shading: { fill: 'EEF2FF', type: ShadingType.CLEAR },
+              verticalAlign: VerticalAlign.CENTER,
+            })
+          ]
+        });
+        tableRows.push(grpRow);
+
+        // Unit data rows
+        group.units.forEach(u => {
+          const cellsData = isUpu
+            ? [
+                { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
+                { text: u.unit, align: AlignmentType.LEFT, bold: true },
+                { text: 'Rp 0', align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.jumlahPenerimaan)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.luncuran)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.sumberPembiayaan)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `Rp ${formatRp(u.operasional)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.modal)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.totalPengeluaran)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `${u.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitOperasional))}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `${u.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitAnggaran))}`, align: AlignmentType.RIGHT, bold: true }
+              ]
+            : isPusdi
+            ? [
+                { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
+                { text: u.unit, align: AlignmentType.LEFT, bold: true },
+                { text: `Rp ${formatRp(u.jumlahPenerimaan)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.luncuran)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.sumberPembiayaan)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `Rp ${formatRp(u.operasional)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.modal)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.totalPengeluaran)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `${u.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitOperasional))}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `${u.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitAnggaran))}`, align: AlignmentType.RIGHT, bold: true }
+              ]
+            : [
+                { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
+                { text: u.unit, align: AlignmentType.LEFT, bold: true },
+                { text: `Rp ${formatRp(u.pendidikan)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.nonPendidikan)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.jumlahPenerimaan)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.luncuran)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.sumberPembiayaan)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `Rp ${formatRp(u.operasional)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.modal)}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `Rp ${formatRp(u.totalPengeluaran)}`, align: AlignmentType.RIGHT, bold: true },
+                { text: `${u.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitOperasional))}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `${u.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(u.surplusDefisitAnggaran))}`, align: AlignmentType.RIGHT, bold: true }
+              ];
+
+          const dRow = new DocxTableRow({
+            children: cellsData.map(c => new DocxTableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: c.text, bold: c.bold, size: 14 })],
+                alignment: c.align,
+              })],
+              verticalAlign: VerticalAlign.CENTER,
+            }))
+          });
+          tableRows.push(dRow);
+        });
+
+        // Group Subtotal row
+        const subtotalCells = isUpu
+          ? [
+              `Rp 0`,
+              `Rp ${formatRp(group.totalJumlahPenerimaan)}`,
+              `Rp ${formatRp(group.totalLuncuran)}`,
+              `Rp ${formatRp(group.totalSumberPembiayaan)}`,
+              `Rp ${formatRp(group.totalOperasional)}`,
+              `Rp ${formatRp(group.totalModal)}`,
+              `Rp ${formatRp(group.totalPengeluaran)}`,
+              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
+              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
+            ]
+          : isPusdi
+          ? [
+              `Rp ${formatRp(group.totalJumlahPenerimaan)}`,
+              `Rp ${formatRp(group.totalLuncuran)}`,
+              `Rp ${formatRp(group.totalSumberPembiayaan)}`,
+              `Rp ${formatRp(group.totalOperasional)}`,
+              `Rp ${formatRp(group.totalModal)}`,
+              `Rp ${formatRp(group.totalPengeluaran)}`,
+              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
+              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
+            ]
+          : [
+              `Rp ${formatRp(group.totalPendidikan)}`,
+              `Rp ${formatRp(group.totalNonPendidikan)}`,
+              `Rp ${formatRp(group.totalJumlahPenerimaan)}`,
+              `Rp ${formatRp(group.totalLuncuran)}`,
+              `Rp ${formatRp(group.totalSumberPembiayaan)}`,
+              `Rp ${formatRp(group.totalOperasional)}`,
+              `Rp ${formatRp(group.totalModal)}`,
+              `Rp ${formatRp(group.totalPengeluaran)}`,
+              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
+              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
+            ];
+
+        const subRow = new DocxTableRow({
+          children: [
+            new DocxTableCell({
+              columnSpan: 2,
+              children: [new Paragraph({
+                children: [new TextRun({ text: `SUBTOTAL ${group.groupOrg.toUpperCase()}`, bold: true, size: 14 })],
+                alignment: AlignmentType.RIGHT,
+              })],
+              shading: { fill: 'F1F5F9', type: ShadingType.CLEAR },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+            ...subtotalCells.map(val => new DocxTableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: val, bold: true, size: 14 })],
+                alignment: AlignmentType.RIGHT,
+              })],
+              shading: { fill: 'F1F5F9', type: ShadingType.CLEAR },
+              verticalAlign: VerticalAlign.CENTER,
+            }))
+          ]
+        });
+        tableRows.push(subRow);
+      });
+
+      // Grand Total row
+      const grandTotalCells = isUpu
+        ? [
+            `Rp 0`,
+            `Rp ${formatRp(displayedRekapTotals.jumlahPenerimaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.luncuran)}`,
+            `Rp ${formatRp(displayedRekapTotals.sumberPembiayaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.operasional)}`,
+            `Rp ${formatRp(displayedRekapTotals.modal)}`,
+            `Rp ${formatRp(displayedRekapTotals.totalPengeluaran)}`,
+            `${displayedRekapTotals.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}`,
+            `${displayedRekapTotals.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}`
+          ]
+        : isPusdi
+        ? [
+            `Rp ${formatRp(displayedRekapTotals.jumlahPenerimaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.luncuran)}`,
+            `Rp ${formatRp(displayedRekapTotals.sumberPembiayaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.operasional)}`,
+            `Rp ${formatRp(displayedRekapTotals.modal)}`,
+            `Rp ${formatRp(displayedRekapTotals.totalPengeluaran)}`,
+            `${displayedRekapTotals.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}`,
+            `${displayedRekapTotals.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}`
+          ]
+        : [
+            `Rp ${formatRp(displayedRekapTotals.pendidikan)}`,
+            `Rp ${formatRp(displayedRekapTotals.nonPendidikan)}`,
+            `Rp ${formatRp(displayedRekapTotals.jumlahPenerimaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.luncuran)}`,
+            `Rp ${formatRp(displayedRekapTotals.sumberPembiayaan)}`,
+            `Rp ${formatRp(displayedRekapTotals.operasional)}`,
+            `Rp ${formatRp(displayedRekapTotals.modal)}`,
+            `Rp ${formatRp(displayedRekapTotals.totalPengeluaran)}`,
+            `${displayedRekapTotals.surplusDefisitOperasional < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}`,
+            `${displayedRekapTotals.surplusDefisitAnggaran < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}`
+          ];
+
+      const grandRow = new DocxTableRow({
+        children: [
+          new DocxTableCell({
+            columnSpan: 2,
+            children: [new Paragraph({
+              children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14 })],
+              alignment: AlignmentType.RIGHT,
+            })],
+            shading: { fill: 'E2E8F0', type: ShadingType.CLEAR },
+            verticalAlign: VerticalAlign.CENTER,
+          }),
+          ...grandTotalCells.map(val => new DocxTableCell({
+            children: [new Paragraph({
+              children: [new TextRun({ text: val, bold: true, size: 14 })],
+              alignment: AlignmentType.RIGHT,
+            })],
+            shading: { fill: 'E2E8F0', type: ShadingType.CLEAR },
+            verticalAlign: VerticalAlign.CENTER,
+          }))
+        ]
+      });
+      tableRows.push(grandRow);
+
+      const docTable = new DocxTable({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: tableRows,
+        borders: {
+          top: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
+          bottom: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
+          left: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
+          right: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
+          insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: 'CBD5E1' },
+          insideVertical: { style: BorderStyle.SINGLE, size: 2, color: 'CBD5E1' },
+        }
+      });
+
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              size: {
+                orientation: PageOrientation.LANDSCAPE,
+              },
+              margin: {
+                top: 720,
+                bottom: 720,
+                left: 720,
+                right: 720,
+              },
+            },
+          },
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text: 'UNIVERSITAS GADJAH MADA', bold: true, size: 26, color: '0F172A' })],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 80 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: formatSubtitle, bold: true, size: 20, color: '334155' })],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 80 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}  |  Filter: ${rekapGroupFilter === 'ALL' ? 'Semua Group Unit Kerja' : rekapGroupFilter}`, 
+                  italics: true, 
+                  size: 16, 
+                  color: '64748B' 
+                })
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 240 },
+            }),
+            docTable
+          ],
+        }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `Rekap_Proposal_RKAT_${formatLabel}_${tahunFilter}.docx`;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success(`File Word Landscape (${formatLabel}) berhasil diexport!`);
+    } catch (err: any) {
+      console.error('Export Word error:', err);
+      toast.error('Gagal export Word: ' + err.message);
     }
   };
 
@@ -3417,20 +3882,24 @@ export default function RkaLaporanPage() {
                 <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
                   <Building2 size={18} className="text-indigo-600" />
                   <span>
-                    {rekapFormat === 'pusdi'
+                    {rekapFormat === 'upu'
+                      ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format UPU)'
+                      : rekapFormat === 'pusdi'
                       ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format PUSDI)'
                       : 'Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas)'}
                   </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  {rekapFormat === 'pusdi'
+                  {rekapFormat === 'upu'
+                    ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran'
+                    : rekapFormat === 'pusdi'
                     ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
                     : '11 Kolom Standar Fakultas: 0. Unit Kerja, 1. Pen. Pendidikan, 2. Pen. Non Pendidikan, 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'}
                 </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
-                {/* Format Toggle Pill: Fakultas (11 Kolom) vs PUSDI (9 Kolom) */}
+                {/* Format Toggle Pill: Fakultas (11 Kolom) vs PUSDI (9 Kolom) vs UPU (10 Kolom) */}
                 <div className="flex items-center gap-1 bg-indigo-50/80 p-1 rounded-xl border border-indigo-200/80 text-xs font-bold">
                   <button
                     type="button"
@@ -3460,6 +3929,23 @@ export default function RkaLaporanPage() {
                   >
                     <span>🔬</span>
                     <span>Format PUSDI (9 Kolom)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapFormat('upu');
+                      if (rekapGroupFilter !== 'Unit Penunjang Universitas - UPU') {
+                        setRekapGroupFilter('Unit Penunjang Universitas - UPU');
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      rekapFormat === 'upu'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-indigo-900/70 hover:text-indigo-950'
+                    }`}
+                  >
+                    <span>🏢</span>
+                    <span>Format UPU (10 Kolom)</span>
                   </button>
                 </div>
 
@@ -3506,7 +3992,27 @@ export default function RkaLaporanPage() {
                     <span>🔬</span>
                     <span>Khusus PUSDI</span>
                   </button>
-                  {groupedByOrg.filter(g => g.groupOrg.toLowerCase() !== 'fakultas' && g.groupOrg.toLowerCase() !== 'pusat studi').map((g) => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapGroupFilter('Unit Penunjang Universitas - UPU');
+                      setRekapFormat('upu');
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                      rekapGroupFilter.toLowerCase().includes('penunjang') || rekapGroupFilter.toLowerCase().includes('upu')
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-indigo-600'
+                    }`}
+                  >
+                    <span>🏢</span>
+                    <span>Khusus UPU</span>
+                  </button>
+                  {groupedByOrg.filter(g => 
+                    g.groupOrg.toLowerCase() !== 'fakultas' && 
+                    g.groupOrg.toLowerCase() !== 'pusat studi' &&
+                    !g.groupOrg.toLowerCase().includes('penunjang') &&
+                    !g.groupOrg.toLowerCase().includes('upu')
+                  ).map((g) => (
                     <button
                       key={g.groupOrg}
                       type="button"
@@ -3522,6 +4028,7 @@ export default function RkaLaporanPage() {
                   ))}
                 </div>
 
+                {/* Export Buttons: Excel & Word Landscape */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -3529,17 +4036,65 @@ export default function RkaLaporanPage() {
                   className="h-8 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Download size={13} className="text-emerald-600" />
-                  <span>Export Excel ({rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})</span>
+                  <span>Export Excel ({rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})</span>
                 </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportWordUnitRekap}
+                  className="h-8 rounded-xl border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                  title="Unduh format dokumen Word landscape rapi 1 halaman lebar"
+                >
+                  <FileText size={13} className="text-blue-600" />
+                  <span>Export Word (Landscape)</span>
+                </Button>
+
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
                   {displayedRekapTotals.totalUnits} Unit
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <Table className={rekapFormat === 'pusdi' ? 'min-w-[1350px]' : 'min-w-[1550px]'}>
+              <Table className={rekapFormat === 'pusdi' ? 'min-w-[1350px]' : rekapFormat === 'upu' ? 'min-w-[1450px]' : 'min-w-[1550px]'}>
                 <TableHeader className="bg-gray-100/90 border-b border-gray-200 text-gray-600 font-black uppercase text-[10px] tracking-wider">
-                  {rekapFormat === 'pusdi' ? (
+                  {rekapFormat === 'upu' ? (
+                    /* Header Format UPU (10 Kolom Utama: 0 Unit Kerja, 1 Subsidi, 2 Penerimaan, 3 Luncuran, 4 Jml Sumber Pembiayaan, 5 Pengeluaran Ops, 6 Investasi Modal, 7 Total Pengeluaran, 8 Surplus/Defisit Ops, 9 Surplus/Defisit Anggaran) */
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[240px]">
+                        0. Unit Kerja
+                      </TableHead>
+                      <TableHead className="text-right text-gray-500 text-xs uppercase font-bold min-w-[120px]">
+                        1. Subsidi
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
+                        2. Penerimaan
+                      </TableHead>
+                      <TableHead className="text-right text-teal-800 text-xs uppercase font-bold min-w-[140px]">
+                        3. Luncuran
+                      </TableHead>
+                      <TableHead className="text-right text-teal-950 text-xs uppercase font-black min-w-[160px] bg-teal-50/60">
+                        4. Jml Pembiayaan (1+2+3)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
+                        5. Pengeluaran Ops
+                      </TableHead>
+                      <TableHead className="text-right text-amber-800 text-xs uppercase font-bold min-w-[140px]">
+                        6. Investasi (Modal)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[150px] bg-indigo-50/60">
+                        7. Total Pengeluaran (5+6)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
+                        8. Surplus/(Defisit) Ops (1+2-5)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
+                        9. Surplus/(Defisit) Anggaran
+                      </TableHead>
+                      <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
+                    </TableRow>
+                  ) : rekapFormat === 'pusdi' ? (
                     /* Header Format PUSDI (9 Kolom Utama: 0 Unit Kerja, 1 Penerimaan, 2 Luncuran, 3 Jml Sumber Pembiayaan, 4 Pengeluaran Ops, 5 Investasi Modal, 6 Total Pengeluaran, 7 Surplus/Defisit Ops, 8 Surplus/Defisit Anggaran) */
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
@@ -3616,7 +4171,7 @@ export default function RkaLaporanPage() {
                 <TableBody>
                   {displayedRekapGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={rekapFormat === 'pusdi' ? 11 : 13} className="text-center py-12 text-gray-400 font-medium">
+                      <TableCell colSpan={rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="text-center py-12 text-gray-400 font-medium">
                         Tidak ada data unit kerja yang sesuai kriteria filter.
                       </TableCell>
                     </TableRow>
@@ -3626,7 +4181,7 @@ export default function RkaLaporanPage() {
                         <React.Fragment key={group.groupOrg}>
                           {/* Header Group Organisasi dari Master gov_units */}
                           <TableRow className="bg-indigo-50/80 border-t-2 border-b border-indigo-200 hover:bg-indigo-50/90">
-                            <TableCell colSpan={rekapFormat === 'pusdi' ? 11 : 13} className="px-4 py-2.5">
+                            <TableCell colSpan={rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="px-4 py-2.5">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 font-black text-xs text-indigo-950 uppercase tracking-wide">
                                   <Building2 size={15} className="text-indigo-600" />
@@ -3650,6 +4205,104 @@ export default function RkaLaporanPage() {
 
                           {/* Baris per Unit Kerja dalam Group */}
                           {group.units.map((item, uIdx) => {
+                            if (rekapFormat === 'upu') {
+                              return (
+                                <TableRow 
+                                  key={item.unit || uIdx}
+                                  className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors text-xs"
+                                >
+                                  <TableCell className="text-center font-mono font-bold text-gray-400 align-middle">
+                                    {uIdx + 1}
+                                  </TableCell>
+
+                                  {/* 0. Unit Kerja */}
+                                  <TableCell className="align-middle py-2.5">
+                                    <div className="font-bold text-gray-900 text-xs flex items-start gap-1.5">
+                                      <span className="text-indigo-600 font-bold shrink-0 mt-0.5">•</span>
+                                      <div>
+                                        <span>{item.unit}</span>
+                                        <div className="text-[10px] text-gray-400 font-mono font-medium flex items-center gap-1.5">
+                                          <span>{item.count.toLocaleString('id-ID')} usulan</span>
+                                          <span>•</span>
+                                          <span className="text-emerald-700 font-semibold">{item.penerimaanCount.toLocaleString('id-ID')} penerimaan</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+
+                                  {/* 1. Subsidi (Dikosongi dahulu: Rp 0) */}
+                                  <TableCell className="text-right align-middle font-mono text-gray-400 py-2.5">
+                                    Rp 0
+                                  </TableCell>
+
+                                  {/* 2. Penerimaan */}
+                                  <TableCell className="text-right align-middle font-mono font-bold text-emerald-900 bg-emerald-50/30 py-2.5">
+                                    Rp {formatRp(item.jumlahPenerimaan)}
+                                  </TableCell>
+
+                                  {/* 3. Luncuran */}
+                                  <TableCell className="text-right align-middle font-mono text-teal-800 py-2.5">
+                                    Rp {formatRp(item.luncuran)}
+                                  </TableCell>
+
+                                  {/* 4. Jml Sumber Pembiayaan (1+2+3) */}
+                                  <TableCell className="text-right align-middle font-mono font-black text-teal-950 bg-teal-50/40 py-2.5">
+                                    Rp {formatRp(item.sumberPembiayaan)}
+                                  </TableCell>
+
+                                  {/* 5. Pengeluaran Operasional */}
+                                  <TableCell className="text-right align-middle font-mono text-slate-800 py-2.5">
+                                    Rp {formatRp(item.operasional)}
+                                  </TableCell>
+
+                                  {/* 6. Investasi (Belanja Modal) */}
+                                  <TableCell className="text-right align-middle font-mono text-amber-900 py-2.5">
+                                    Rp {formatRp(item.modal)}
+                                  </TableCell>
+
+                                  {/* 7. Total Pengeluaran (5+6) */}
+                                  <TableCell className="text-right align-middle font-mono font-black text-indigo-950 bg-indigo-50/30 py-2.5">
+                                    Rp {formatRp(item.totalPengeluaran)}
+                                  </TableCell>
+
+                                  {/* 8. Surplus / (Defisit) Operasional (1+2-5) */}
+                                  <TableCell className="text-right align-middle font-mono font-bold py-2.5">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                                      item.surplusDefisitOperasional >= 0 
+                                        ? 'bg-emerald-50 text-emerald-700' 
+                                        : 'bg-rose-50 text-rose-700'
+                                    }`}>
+                                      {item.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitOperasional))}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* 9. Surplus / (Defisit) Anggaran (3-6) */}
+                                  <TableCell className="text-right align-middle font-mono font-black bg-slate-50/80 py-2.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${
+                                      item.surplusDefisitAnggaran >= 0 
+                                        ? 'bg-emerald-100/80 text-emerald-800 font-black' 
+                                        : 'bg-rose-100/80 text-rose-800 font-black'
+                                    }`}>
+                                      {item.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitAnggaran))}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Aksi */}
+                                  <TableCell className="text-center align-middle py-2.5">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleViewUnitDetail(item.unit)}
+                                      className="h-7 w-7 p-0 rounded-lg border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                      title={`Buka rincian belanja ${item.unit}`}
+                                    >
+                                      <Eye size={13} />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+
                             if (rekapFormat === 'pusdi') {
                               return (
                                 <TableRow 
@@ -3847,7 +4500,45 @@ export default function RkaLaporanPage() {
                           })}
 
                           {/* Subtotal Baris per Group Org */}
-                          {rekapFormat === 'pusdi' ? (
+                          {rekapFormat === 'upu' ? (
+                            <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
+                              <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
+                                SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-mono text-gray-400">
+                                Rp 0
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
+                                Rp {formatRp(group.totalJumlahPenerimaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-teal-800">
+                                Rp {formatRp(group.totalLuncuran)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-teal-950 bg-teal-100/50">
+                                Rp {formatRp(group.totalSumberPembiayaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
+                                Rp {formatRp(group.totalOperasional)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-amber-900">
+                                Rp {formatRp(group.totalModal)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-indigo-950 bg-indigo-100/50">
+                                Rp {formatRp(group.totalPengeluaran)}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
+                                group.totalSurplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                              }`}>
+                                {group.totalSurplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasional))}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
+                                group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                              }`}>
+                                {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
+                            </TableRow>
+                          ) : rekapFormat === 'pusdi' ? (
                             <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
                               <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
                                 SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
@@ -3931,7 +4622,49 @@ export default function RkaLaporanPage() {
                 </TableBody>
 
                 {/* Footer Total Keseluruhan */}
-                {rekapFormat === 'pusdi' ? (
+                {rekapFormat === 'upu' ? (
+                  <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
+                    <tr>
+                      <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
+                        TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
+                      </td>
+                      <td className="p-3 text-right font-mono text-gray-400">
+                        Rp 0
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
+                        Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-teal-800">
+                        Rp {formatRp(displayedRekapTotals.luncuran)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-teal-950 bg-teal-100/70">
+                        Rp {formatRp(displayedRekapTotals.sumberPembiayaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-slate-900">
+                        Rp {formatRp(displayedRekapTotals.operasional)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-amber-900">
+                        Rp {formatRp(displayedRekapTotals.modal)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-indigo-950 bg-indigo-100/70">
+                        Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
+                      </td>
+                      <td className={`p-3 text-right font-bold font-mono ${
+                        displayedRekapTotals.surplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}
+                      </td>
+                      <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
+                        displayedRekapTotals.surplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}
+                      </td>
+                      <td className="p-3 text-center text-gray-400 font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : rekapFormat === 'pusdi' ? (
                   <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
                     <tr>
                       <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
