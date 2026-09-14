@@ -16,6 +16,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell 
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -636,6 +637,7 @@ export default function RkaLaporanPage() {
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
   const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
   const [rekapGroupFilter, setRekapGroupFilter] = useState<string>('ALL');
+  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi'>('fakultas');
 
   // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
@@ -1413,6 +1415,7 @@ export default function RkaLaporanPage() {
     const uLower = uTrim.toLowerCase();
     if (uLower.includes('fakultas')) return 'Fakultas';
     if (uLower.includes('sekolah')) return 'Sekolah';
+    if (uLower.includes('pusat studi') || uLower.includes('pusdi') || uLower.includes('(ps)') || uLower.startsWith('ps ') || uLower.startsWith('400')) return 'Pusat Studi';
     if (uLower.includes('direktorat') || uLower.includes('biro') || uLower.includes('kptu') || uLower.includes('kantor') || uLower.includes('sekretaris') || uLower.includes('satuan') || uLower.includes('badan')) return 'KPTU';
     if (uLower.includes('pusat') || uLower.includes('laboratorium') || uLower.includes('perpustakaan') || uLower.includes('arsip') || uLower.includes('rumah sakit')) return 'Unit Penunjang';
     return 'Lainnya';
@@ -1643,7 +1646,7 @@ export default function RkaLaporanPage() {
       groups[g].totalCount += item.count;
     });
 
-    const groupOrder = ['Fakultas', 'Sekolah', 'KPTU', 'Unit Penunjang', 'Lainnya'];
+    const groupOrder = ['Fakultas', 'Sekolah', 'Pusat Studi', 'KPTU', 'Unit Penunjang', 'Lainnya'];
     return Object.values(groups).sort((a, b) => {
       const idxA = groupOrder.indexOf(a.groupOrg);
       const idxB = groupOrder.indexOf(b.groupOrg);
@@ -1748,150 +1751,369 @@ export default function RkaLaporanPage() {
     return { anggaran, totalItems };
   }, [groupedData]);
 
-  // Export Excel Rekap Unit Kerja (Format Rapi & Elegan Siap Tayang / Print)
-  const handleExportExcelUnitRekap = () => {
+  // Export Excel Rekap Unit Kerja (Menggunakan ExcelJS: Format Rapi, Berwarna, Border, Currency Format, Siap Tayang / Print)
+  const handleExportExcelUnitRekap = async () => {
     if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
 
-    const aoa: any[][] = [];
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Universitas Gadjah Mada';
+      wb.lastModifiedBy = 'RKAT Online';
+      wb.created = new Date();
 
-    // 1. Header Judul Laporan yang Rapi & Formal
-    aoa.push(['UNIVERSITAS GADJAH MADA']);
-    aoa.push([`REKAPITULASI USULAN PROPOSAL RKAT PER UNIT KERJA TAHUN ANGGARAN ${tahunFilter}`]);
-    aoa.push([`Format Laporan: Proposal RKAT  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`]);
-    aoa.push([]); // Baris kosong
-
-    // 2. Header Kolom Tabel (11 Kolom Standar RKAT Fakultas)
-    aoa.push([
-      'NO',
-      'GROUP ORGANISASI',
-      '0. UNIT KERJA',
-      '1. PENERIMAAN PENDIDIKAN (RP)',
-      '2. PENERIMAAN NON PENDIDIKAN (RP)',
-      '3. JUMLAH PENERIMAAN (1+2) (RP)',
-      '4. LUNCURAN / SURPLUS TA LALU (RP)',
-      '5. SUMBER PEMBIAYAAN (3+4) (RP)',
-      '6. PENGELUARAN OPERASIONAL (RP)',
-      '7. INVESTASI / BELANJA MODAL (RP)',
-      '8. TOTAL PENGELUARAN (6+7) (RP)',
-      '9. SURPLUS / (DEFISIT) OPERASIONAL (3-6) (RP)',
-      '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
-    ]);
-
-    let rowNumber = 1;
-
-    // Filter group jika rekapGroupFilter aktif
-    const displayGroups = rekapGroupFilter === 'ALL' 
-      ? groupedByOrg 
-      : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase());
-
-    // 3. Baris Data per Group Org
-    displayGroups.forEach(group => {
-      // Header Group
-      aoa.push([
-        '',
-        group.groupOrg.toUpperCase(),
-        `--- GROUP: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA) ---`,
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        ''
-      ]);
-
-      // Baris per Unit Kerja dalam grup
-      group.units.forEach(u => {
-        aoa.push([
-          rowNumber++,
-          group.groupOrg,
-          u.unit,
-          u.pendidikan,
-          u.nonPendidikan,
-          u.jumlahPenerimaan,
-          u.luncuran,
-          u.sumberPembiayaan,
-          u.operasional,
-          u.modal,
-          u.totalPengeluaran,
-          u.surplusDefisitOperasional,
-          u.surplusDefisitAnggaran
-        ]);
+      const isPusdi = rekapFormat === 'pusdi';
+      const sheetName = isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
+      const ws = wb.addWorksheet(sheetName, {
+        views: [{ showGridLines: true }]
       });
 
-      // Subtotal per Group Org
-      aoa.push([
-        '',
-        `SUBTOTAL ${group.groupOrg}`,
-        `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-        group.totalPendidikan,
-        group.totalNonPendidikan,
-        group.totalJumlahPenerimaan,
-        group.totalLuncuran,
-        group.totalSumberPembiayaan,
-        group.totalOperasional,
-        group.totalModal,
-        group.totalPengeluaran,
-        group.totalSurplusDefisitOperasional,
-        group.totalSurplusDefisitAnggaran
+      // 1. Title Banner
+      const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+      titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+      
+      const subTitleText = isPusdi
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
+        : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
+      const subTitleRow = ws.addRow([subTitleText]);
+      subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
+
+      const infoRow = ws.addRow([
+        `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}  |  Filter: ${rekapGroupFilter === 'ALL' ? 'Semua Group Unit Kerja' : rekapGroupFilter}`
       ]);
+      infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
 
-      aoa.push([]); // Spacer baris kosong antar group
-    });
+      ws.addRow([]); // Blank spacer
 
-    // 4. Baris TOTAL KESELURUHAN
-    aoa.push([
-      '',
-      'TOTAL KESELURUHAN',
-      `TOTAL SELURUH UNIT KERJA (${unitRekapData.length} UNIT KERJA)`,
-      unitRekapTotals.grandTotalPendidikan,
-      unitRekapTotals.grandTotalNonPendidikan,
-      unitRekapTotals.grandTotalJumlahPenerimaan,
-      unitRekapTotals.grandTotalLuncuran,
-      unitRekapTotals.grandTotalSumberPembiayaan,
-      unitRekapTotals.totalOperasional,
-      unitRekapTotals.totalModal,
-      unitRekapTotals.grandTotalPengeluaran,
-      unitRekapTotals.grandTotalSurplusDefisitOperasional,
-      unitRekapTotals.grandTotalSurplusDefisitAnggaran
-    ]);
+      // 2. Table Headers
+      const headers = isPusdi
+        ? [
+            'NO',
+            'GROUP',
+            '0. UNIT KERJA',
+            '1. PENERIMAAN (RP)',
+            '2. LUNCURAN (RP)',
+            '3. JML SUMBER PEMBIAYAAN (1+2) (RP)',
+            '4. PENGELUARAN OPERASIONAL (RP)',
+            '5. INVESTASI (BELANJA MODAL) (RP)',
+            '6. TOTAL PENGELUARAN (4+5) (RP)',
+            '7. SURPLUS / (DEFISIT) OPS (1-4) (RP)',
+            '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+          ]
+        : [
+            'NO',
+            'GROUP',
+            '0. UNIT KERJA',
+            '1. PENERIMAAN PENDIDIKAN (RP)',
+            '2. PENERIMAAN NON PENDIDIKAN (RP)',
+            '3. JUMLAH PENERIMAAN (1+2) (RP)',
+            '4. LUNCURAN / SURPLUS TA LALU (RP)',
+            '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
+            '6. PENGELUARAN OPERASIONAL (RP)',
+            '7. INVESTASI (BELANJA MODAL) (RP)',
+            '8. TOTAL PENGELUARAN (6+7) (RP)',
+            '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)',
+            '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
+          ];
 
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const headerRow = ws.addRow(headers);
+      headerRow.height = 28;
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF0F172A' } // Dark Slate Navy
+        };
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+        };
+      });
 
-    // 5. Atur Lebar Kolom agar tidak ada teks terpotong / tanda ###
-    ws['!cols'] = [
-      { wch: 6 },  // NO
-      { wch: 20 }, // GROUP ORGANISASI
-      { wch: 50 }, // 0. UNIT KERJA
-      { wch: 25 }, // 1. PENERIMAAN PENDIDIKAN (RP)
-      { wch: 25 }, // 2. PENERIMAAN NON PENDIDIKAN (RP)
-      { wch: 28 }, // 3. JUMLAH PENERIMAAN (1+2) (RP)
-      { wch: 25 }, // 4. LUNCURAN / SURPLUS TA LALU (RP)
-      { wch: 28 }, // 5. SUMBER PEMBIAYAAN (3+4) (RP)
-      { wch: 26 }, // 6. PENGELUARAN OPERASIONAL (RP)
-      { wch: 26 }, // 7. INVESTASI / BELANJA MODAL (RP)
-      { wch: 28 }, // 8. TOTAL PENGELUARAN (6+7) (RP)
-      { wch: 30 }, // 9. SURPLUS / (DEFISIT) OPERASIONAL (3-6) (RP)
-      { wch: 30 }  // 10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)
-    ];
+      // Column number indicators row
+      const colIndicators = isPusdi
+        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
+        : ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
 
-    // Format seluruh sel nominal angka dengan format desimal mata uang standar Excel
-    for (let r = 4; r < aoa.length; r++) {
-      for (let c = 3; c <= 12; c++) {
-        const cellRef = XLSX.utils.encode_cell({ r, c });
-        if (ws[cellRef] && typeof ws[cellRef].v === 'number') {
-          ws[cellRef].z = '#,##0'; // format number with thousands separator
+      const indicatorRow = ws.addRow(colIndicators);
+      indicatorRow.height = 18;
+      indicatorRow.eachCell((cell) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF334155' }
+        };
+        cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFE2E8F0' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+        };
+      });
+
+      // Filter group jika rekapGroupFilter aktif
+      const displayGroups = rekapGroupFilter === 'ALL' 
+        ? groupedByOrg 
+        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase());
+
+      const numCols = headers.length;
+      let rowNum = 1;
+
+      displayGroups.forEach(group => {
+        // Group Header Banner
+        const groupTitle = `GROUP ORGANISASI: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`;
+        const grpRow = ws.addRow(['', group.groupOrg.toUpperCase(), groupTitle, ...Array(numCols - 3).fill('')]);
+        grpRow.height = 24;
+        grpRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFEEF2FF' } // Indigo 50
+          };
+          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF312E81' } };
+          cell.border = {
+            top: { style: 'medium', color: { argb: 'FF818CF8' } },
+            bottom: { style: 'thin', color: { argb: 'FFC7D2FE' } }
+          };
+        });
+
+        // Unit rows
+        group.units.forEach(u => {
+          const rowValues = isPusdi
+            ? [
+                rowNum++,
+                group.groupOrg,
+                u.unit,
+                u.jumlahPenerimaan,
+                u.luncuran,
+                u.sumberPembiayaan,
+                u.operasional,
+                u.modal,
+                u.totalPengeluaran,
+                u.surplusDefisitOperasional,
+                u.surplusDefisitAnggaran
+              ]
+            : [
+                rowNum++,
+                group.groupOrg,
+                u.unit,
+                u.pendidikan,
+                u.nonPendidikan,
+                u.jumlahPenerimaan,
+                u.luncuran,
+                u.sumberPembiayaan,
+                u.operasional,
+                u.modal,
+                u.totalPengeluaran,
+                u.surplusDefisitOperasional,
+                u.surplusDefisitAnggaran
+              ];
+
+          const dataRow = ws.addRow(rowValues);
+          dataRow.height = 20;
+          dataRow.eachCell((cell, colIndex) => {
+            cell.font = { name: 'Calibri', size: 9.5 };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+            };
+
+            if (colIndex === 1) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else if (colIndex === 2) {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            } else if (colIndex === 3) {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+            } else {
+              // Numerical columns
+              cell.alignment = { horizontal: 'right', vertical: 'middle' };
+              cell.numFmt = '#,##0';
+              if (isPusdi) {
+                if (colIndex === 4 || colIndex === 6) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
+                } else if (colIndex === 9) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
+                }
+              } else {
+                if (colIndex === 6 || colIndex === 8) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
+                } else if (colIndex === 11) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
+                }
+              }
+            }
+          });
+        });
+
+        // Group Subtotal row
+        const subtotalValues = isPusdi
+          ? [
+              '',
+              `SUBTOTAL ${group.groupOrg}`,
+              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+              group.totalJumlahPenerimaan,
+              group.totalLuncuran,
+              group.totalSumberPembiayaan,
+              group.totalOperasional,
+              group.totalModal,
+              group.totalPengeluaran,
+              group.totalSurplusDefisitOperasional,
+              group.totalSurplusDefisitAnggaran
+            ]
+          : [
+              '',
+              `SUBTOTAL ${group.groupOrg}`,
+              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+              group.totalPendidikan,
+              group.totalNonPendidikan,
+              group.totalJumlahPenerimaan,
+              group.totalLuncuran,
+              group.totalSumberPembiayaan,
+              group.totalOperasional,
+              group.totalModal,
+              group.totalPengeluaran,
+              group.totalSurplusDefisitOperasional,
+              group.totalSurplusDefisitAnggaran
+            ];
+
+        const subRow = ws.addRow(subtotalValues);
+        subRow.height = 22;
+        subRow.eachCell((cell, colIndex) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF1F5F9' } // Slate 100
+          };
+          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+          };
+          if (colIndex <= 3) {
+            cell.alignment = { horizontal: colIndex === 3 ? 'right' : 'left', vertical: 'middle' };
+          } else {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            cell.numFmt = '#,##0';
+          }
+        });
+
+        ws.addRow([]); // Blank spacer between groups
+      });
+
+      // Grand Total Row
+      const grandTotalValues = isPusdi
+        ? [
+            '',
+            'TOTAL KESELURUHAN',
+            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
+            displayedRekapTotals.jumlahPenerimaan,
+            displayedRekapTotals.luncuran,
+            displayedRekapTotals.sumberPembiayaan,
+            displayedRekapTotals.operasional,
+            displayedRekapTotals.modal,
+            displayedRekapTotals.totalPengeluaran,
+            displayedRekapTotals.surplusDefisitOperasional,
+            displayedRekapTotals.surplusDefisitAnggaran
+          ]
+        : [
+            '',
+            'TOTAL KESELURUHAN',
+            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
+            displayedRekapTotals.pendidikan,
+            displayedRekapTotals.nonPendidikan,
+            displayedRekapTotals.jumlahPenerimaan,
+            displayedRekapTotals.luncuran,
+            displayedRekapTotals.sumberPembiayaan,
+            displayedRekapTotals.operasional,
+            displayedRekapTotals.modal,
+            displayedRekapTotals.totalPengeluaran,
+            displayedRekapTotals.surplusDefisitOperasional,
+            displayedRekapTotals.surplusDefisitAnggaran
+          ];
+
+      const grandRow = ws.addRow(grandTotalValues);
+      grandRow.height = 26;
+      grandRow.eachCell((cell, colIndex) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE2E8F0' } // Slate 200
+        };
+        cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+        cell.border = {
+          top: { style: 'medium', color: { argb: 'FF64748B' } },
+          bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+        };
+        if (colIndex <= 3) {
+          cell.alignment = { horizontal: colIndex === 3 ? 'right' : 'left', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
         }
-      }
-    }
+      });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Rekap_Unit_Kerja');
-    XLSX.writeFile(wb, `Rekap_Proposal_RKAT_Unit_Kerja_${tahunFilter}.xlsx`);
-    toast.success('File Excel Rekapitulasi Unit Kerja berhasil diexport!');
+      // Column widths
+      if (isPusdi) {
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 18 }, // GROUP
+          { width: 45 }, // 0. UNIT KERJA
+          { width: 25 }, // 1. PENERIMAAN
+          { width: 23 }, // 2. LUNCURAN
+          { width: 27 }, // 3. JML SUMBER PEMBIAYAAN
+          { width: 25 }, // 4. PENGELUARAN OPERASIONAL
+          { width: 24 }, // 5. INVESTASI (MODAL)
+          { width: 27 }, // 6. TOTAL PENGELUARAN
+          { width: 28 }, // 7. SURPLUS/DEFISIT OPS
+          { width: 28 }  // 8. SURPLUS/DEFISIT ANGGARAN
+        ];
+      } else {
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 18 }, // GROUP
+          { width: 45 }, // 0. UNIT KERJA
+          { width: 25 }, // 1. PENERIMAAN PENDIDIKAN
+          { width: 25 }, // 2. PENERIMAAN NON PENDIDIKAN
+          { width: 27 }, // 3. JUMLAH PENERIMAAN
+          { width: 24 }, // 4. LUNCURAN
+          { width: 27 }, // 5. JML SUMBER PEMBIAYAAN
+          { width: 25 }, // 6. PENGELUARAN OPERASIONAL
+          { width: 24 }, // 7. INVESTASI (MODAL)
+          { width: 27 }, // 8. TOTAL PENGELUARAN
+          { width: 28 }, // 9. SURPLUS/DEFISIT OPS
+          { width: 28 }  // 10. SURPLUS/DEFISIT ANGGARAN
+        ];
+      }
+
+      // Trigger download
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = isPusdi
+        ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}.xlsx`
+        : `Rekap_Proposal_RKAT_Fakultas_${tahunFilter}.xlsx`;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success(`File Excel (${isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom'}) berhasil diexport!`);
+    } catch (err: any) {
+      console.error('Export Excel error:', err);
+      toast.error('Gagal export Excel: ' + err.message);
+    }
   };
 
   // Export Excel Khusus Struktur Format PPT Proposal RKAT
@@ -3194,15 +3416,54 @@ export default function RkaLaporanPage() {
               <div>
                 <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
                   <Building2 size={18} className="text-indigo-600" />
-                  <span>Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas)</span>
+                  <span>
+                    {rekapFormat === 'pusdi'
+                      ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format PUSDI)'
+                      : 'Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas)'}
+                  </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  11 Kolom Standar: Penerimaan (Pendidikan, Non Pendidikan, Luncuran), Belanja (Operasional, Investasi Modal), dan Surplus/Defisit
+                  {rekapFormat === 'pusdi'
+                    ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
+                    : '11 Kolom Standar Fakultas: 0. Unit Kerja, 1. Pen. Pendidikan, 2. Pen. Non Pendidikan, 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'}
                 </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
-                {/* Filter Group Organisasi (Focus Fakultas) */}
+                {/* Format Toggle Pill: Fakultas (11 Kolom) vs PUSDI (9 Kolom) */}
+                <div className="flex items-center gap-1 bg-indigo-50/80 p-1 rounded-xl border border-indigo-200/80 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setRekapFormat('fakultas')}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      rekapFormat === 'fakultas'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-indigo-900/70 hover:text-indigo-950'
+                    }`}
+                  >
+                    <span>🏛️</span>
+                    <span>Format Fakultas (11 Kolom)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapFormat('pusdi');
+                      if (rekapGroupFilter !== 'Pusat Studi') {
+                        setRekapGroupFilter('Pusat Studi');
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      rekapFormat === 'pusdi'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-indigo-900/70 hover:text-indigo-950'
+                    }`}
+                  >
+                    <span>🔬</span>
+                    <span>Format PUSDI (9 Kolom)</span>
+                  </button>
+                </div>
+
+                {/* Filter Group Organisasi */}
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold">
                   <button
                     type="button"
@@ -3217,7 +3478,10 @@ export default function RkaLaporanPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRekapGroupFilter('Fakultas')}
+                    onClick={() => {
+                      setRekapGroupFilter('Fakultas');
+                      setRekapFormat('fakultas');
+                    }}
                     className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
                       rekapGroupFilter.toLowerCase() === 'fakultas'
                         ? 'bg-white text-indigo-700 shadow-2xs font-black'
@@ -3227,7 +3491,22 @@ export default function RkaLaporanPage() {
                     <span>🏛️</span>
                     <span>Khusus Fakultas</span>
                   </button>
-                  {groupedByOrg.filter(g => g.groupOrg.toLowerCase() !== 'fakultas').map((g) => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapGroupFilter('Pusat Studi');
+                      setRekapFormat('pusdi');
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                      rekapGroupFilter.toLowerCase() === 'pusat studi'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-indigo-600'
+                    }`}
+                  >
+                    <span>🔬</span>
+                    <span>Khusus PUSDI</span>
+                  </button>
+                  {groupedByOrg.filter(g => g.groupOrg.toLowerCase() !== 'fakultas' && g.groupOrg.toLowerCase() !== 'pusat studi').map((g) => (
                     <button
                       key={g.groupOrg}
                       type="button"
@@ -3250,7 +3529,7 @@ export default function RkaLaporanPage() {
                   className="h-8 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
                 >
                   <Download size={13} className="text-emerald-600" />
-                  <span>Export Excel (11 Kolom)</span>
+                  <span>Export Excel ({rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})</span>
                 </Button>
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
                   {displayedRekapTotals.totalUnits} Unit
@@ -3258,50 +3537,86 @@ export default function RkaLaporanPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <Table className="min-w-[1550px]">
+              <Table className={rekapFormat === 'pusdi' ? 'min-w-[1350px]' : 'min-w-[1550px]'}>
                 <TableHeader className="bg-gray-100/90 border-b border-gray-200 text-gray-600 font-black uppercase text-[10px] tracking-wider">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
-                    <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[230px]">
-                      0. Unit Kerja
-                    </TableHead>
-                    <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[140px]">
-                      1. Pen. Pendidikan
-                    </TableHead>
-                    <TableHead className="text-right text-emerald-700 text-xs uppercase font-bold min-w-[140px]">
-                      2. Pen. Non Pendidikan
-                    </TableHead>
-                    <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
-                      3. Jml Penerimaan (1+2)
-                    </TableHead>
-                    <TableHead className="text-right text-teal-800 text-xs uppercase font-bold min-w-[140px]">
-                      4. Luncuran
-                    </TableHead>
-                    <TableHead className="text-right text-teal-950 text-xs uppercase font-black min-w-[160px] bg-teal-50/60">
-                      5. Jml Pembiayaan (3+4)
-                    </TableHead>
-                    <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
-                      6. Pengeluaran Ops
-                    </TableHead>
-                    <TableHead className="text-right text-amber-800 text-xs uppercase font-bold min-w-[140px]">
-                      7. Investasi (Modal)
-                    </TableHead>
-                    <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[150px] bg-indigo-50/60">
-                      8. Total Pengeluaran (6+7)
-                    </TableHead>
-                    <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
-                      9. Surplus/(Defisit) Ops (3-6)
-                    </TableHead>
-                    <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
-                      10. Surplus/(Defisit) Anggaran (5-8)
-                    </TableHead>
-                    <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
-                  </TableRow>
+                  {rekapFormat === 'pusdi' ? (
+                    /* Header Format PUSDI (9 Kolom Utama: 0 Unit Kerja, 1 Penerimaan, 2 Luncuran, 3 Jml Sumber Pembiayaan, 4 Pengeluaran Ops, 5 Investasi Modal, 6 Total Pengeluaran, 7 Surplus/Defisit Ops, 8 Surplus/Defisit Anggaran) */
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[240px]">
+                        0. Unit Kerja
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
+                        1. Penerimaan
+                      </TableHead>
+                      <TableHead className="text-right text-teal-800 text-xs uppercase font-bold min-w-[140px]">
+                        2. Luncuran
+                      </TableHead>
+                      <TableHead className="text-right text-teal-950 text-xs uppercase font-black min-w-[160px] bg-teal-50/60">
+                        3. Jml Sumber Pembiayaan (1+2)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
+                        4. Pengeluaran Operasional
+                      </TableHead>
+                      <TableHead className="text-right text-amber-800 text-xs uppercase font-bold min-w-[140px]">
+                        5. Investasi (Belanja Modal)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[150px] bg-indigo-50/60">
+                        6. Total Pengeluaran (4+5)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
+                        7. Surplus/(Defisit) Ops (1-4)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
+                        8. Surplus/(Defisit) Anggaran (3-6)
+                      </TableHead>
+                      <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
+                    </TableRow>
+                  ) : (
+                    /* Header Format Fakultas (11 Kolom Standar: 0 Unit, 1 Pendidikan, 2 Non Pendidikan, 3 Jml Penerimaan, 4 Luncuran, 5 Jml Pembiayaan, 6 Ops, 7 Modal, 8 Total Pengeluaran, 9 S/D Ops, 10 S/D Anggaran) */
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[230px]">
+                        0. Unit Kerja
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[140px]">
+                        1. Pen. Pendidikan
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-700 text-xs uppercase font-bold min-w-[140px]">
+                        2. Pen. Non Pendidikan
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
+                        3. Jml Penerimaan (1+2)
+                      </TableHead>
+                      <TableHead className="text-right text-teal-800 text-xs uppercase font-bold min-w-[140px]">
+                        4. Luncuran
+                      </TableHead>
+                      <TableHead className="text-right text-teal-950 text-xs uppercase font-black min-w-[160px] bg-teal-50/60">
+                        5. Jml Pembiayaan (3+4)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
+                        6. Pengeluaran Ops
+                      </TableHead>
+                      <TableHead className="text-right text-amber-800 text-xs uppercase font-bold min-w-[140px]">
+                        7. Investasi (Modal)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[150px] bg-indigo-50/60">
+                        8. Total Pengeluaran (6+7)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
+                        9. Surplus/(Defisit) Ops (3-6)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
+                        10. Surplus/(Defisit) Anggaran (5-8)
+                      </TableHead>
+                      <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
+                    </TableRow>
+                  )}
                 </TableHeader>
                 <TableBody>
                   {displayedRekapGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center py-12 text-gray-400 font-medium">
+                      <TableCell colSpan={rekapFormat === 'pusdi' ? 11 : 13} className="text-center py-12 text-gray-400 font-medium">
                         Tidak ada data unit kerja yang sesuai kriteria filter.
                       </TableCell>
                     </TableRow>
@@ -3311,7 +3626,7 @@ export default function RkaLaporanPage() {
                         <React.Fragment key={group.groupOrg}>
                           {/* Header Group Organisasi dari Master gov_units */}
                           <TableRow className="bg-indigo-50/80 border-t-2 border-b border-indigo-200 hover:bg-indigo-50/90">
-                            <TableCell colSpan={13} className="px-4 py-2.5">
+                            <TableCell colSpan={rekapFormat === 'pusdi' ? 11 : 13} className="px-4 py-2.5">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 font-black text-xs text-indigo-950 uppercase tracking-wide">
                                   <Building2 size={15} className="text-indigo-600" />
@@ -3335,6 +3650,100 @@ export default function RkaLaporanPage() {
 
                           {/* Baris per Unit Kerja dalam Group */}
                           {group.units.map((item, uIdx) => {
+                            if (rekapFormat === 'pusdi') {
+                              return (
+                                <TableRow 
+                                  key={item.unit || uIdx}
+                                  className="border-b border-gray-100 hover:bg-indigo-50/30 transition-colors text-xs"
+                                >
+                                  <TableCell className="text-center font-mono font-bold text-gray-400 align-middle">
+                                    {uIdx + 1}
+                                  </TableCell>
+
+                                  {/* 0. Unit Kerja */}
+                                  <TableCell className="align-middle py-2.5">
+                                    <div className="font-bold text-gray-900 text-xs flex items-start gap-1.5">
+                                      <span className="text-indigo-600 font-bold shrink-0 mt-0.5">•</span>
+                                      <div>
+                                        <span>{item.unit}</span>
+                                        <div className="text-[10px] text-gray-400 font-mono font-medium flex items-center gap-1.5">
+                                          <span>{item.count.toLocaleString('id-ID')} usulan</span>
+                                          <span>•</span>
+                                          <span className="text-emerald-700 font-semibold">{item.penerimaanCount.toLocaleString('id-ID')} penerimaan</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+
+                                  {/* 1. Penerimaan */}
+                                  <TableCell className="text-right align-middle font-mono font-bold text-emerald-900 bg-emerald-50/30 py-2.5">
+                                    Rp {formatRp(item.jumlahPenerimaan)}
+                                  </TableCell>
+
+                                  {/* 2. Luncuran */}
+                                  <TableCell className="text-right align-middle font-mono text-teal-800 py-2.5">
+                                    Rp {formatRp(item.luncuran)}
+                                  </TableCell>
+
+                                  {/* 3. Jml Sumber Pembiayaan (1+2) */}
+                                  <TableCell className="text-right align-middle font-mono font-black text-teal-950 bg-teal-50/40 py-2.5">
+                                    Rp {formatRp(item.sumberPembiayaan)}
+                                  </TableCell>
+
+                                  {/* 4. Pengeluaran Operasional */}
+                                  <TableCell className="text-right align-middle font-mono text-slate-800 py-2.5">
+                                    Rp {formatRp(item.operasional)}
+                                  </TableCell>
+
+                                  {/* 5. Investasi (Belanja Modal) */}
+                                  <TableCell className="text-right align-middle font-mono text-amber-900 py-2.5">
+                                    Rp {formatRp(item.modal)}
+                                  </TableCell>
+
+                                  {/* 6. Total Pengeluaran (4+5) */}
+                                  <TableCell className="text-right align-middle font-mono font-black text-indigo-950 bg-indigo-50/30 py-2.5">
+                                    Rp {formatRp(item.totalPengeluaran)}
+                                  </TableCell>
+
+                                  {/* 7. Surplus / (Defisit) Operasional (1-4) */}
+                                  <TableCell className="text-right align-middle font-mono font-bold py-2.5">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                                      item.surplusDefisitOperasional >= 0 
+                                        ? 'bg-emerald-50 text-emerald-700' 
+                                        : 'bg-rose-50 text-rose-700'
+                                    }`}>
+                                      {item.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitOperasional))}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* 8. Surplus / (Defisit) Anggaran (3-6) */}
+                                  <TableCell className="text-right align-middle font-mono font-black bg-slate-50/80 py-2.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${
+                                      item.surplusDefisitAnggaran >= 0 
+                                        ? 'bg-emerald-100/80 text-emerald-800 font-black' 
+                                        : 'bg-rose-100/80 text-rose-800 font-black'
+                                    }`}>
+                                      {item.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitAnggaran))}
+                                    </span>
+                                  </TableCell>
+
+                                  {/* Aksi */}
+                                  <TableCell className="text-center align-middle py-2.5">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleViewUnitDetail(item.unit)}
+                                      className="h-7 w-7 p-0 rounded-lg border-indigo-200 bg-indigo-50/60 hover:bg-indigo-600 text-indigo-700 hover:text-white transition-all shadow-2xs cursor-pointer inline-flex items-center justify-center mx-auto"
+                                      title={`Buka rincian belanja ${item.unit}`}
+                                    >
+                                      <Eye size={13} />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+
+                            // Format Fakultas (Original 11 Kolom)
                             return (
                               <TableRow 
                                 key={item.unit || uIdx}
@@ -3438,46 +3847,83 @@ export default function RkaLaporanPage() {
                           })}
 
                           {/* Subtotal Baris per Group Org */}
-                          <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
-                            <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
-                              SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-900">
-                              Rp {formatRp(group.totalPendidikan)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-800">
-                              Rp {formatRp(group.totalNonPendidikan)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
-                              Rp {formatRp(group.totalJumlahPenerimaan)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-bold font-mono text-teal-800">
-                              Rp {formatRp(group.totalLuncuran)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-black font-mono text-teal-950 bg-teal-100/50">
-                              Rp {formatRp(group.totalSumberPembiayaan)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
-                              Rp {formatRp(group.totalOperasional)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-bold font-mono text-amber-900">
-                              Rp {formatRp(group.totalModal)}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-right font-black font-mono text-indigo-950 bg-indigo-100/50">
-                              Rp {formatRp(group.totalPengeluaran)}
-                            </TableCell>
-                            <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
-                              group.totalSurplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                            }`}>
-                              {group.totalSurplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasional))}
-                            </TableCell>
-                            <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
-                              group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
-                            }`}>
-                              {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
-                          </TableRow>
+                          {rekapFormat === 'pusdi' ? (
+                            <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
+                              <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
+                                SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
+                                Rp {formatRp(group.totalJumlahPenerimaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-teal-800">
+                                Rp {formatRp(group.totalLuncuran)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-teal-950 bg-teal-100/50">
+                                Rp {formatRp(group.totalSumberPembiayaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
+                                Rp {formatRp(group.totalOperasional)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-amber-900">
+                                Rp {formatRp(group.totalModal)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-indigo-950 bg-indigo-100/50">
+                                Rp {formatRp(group.totalPengeluaran)}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
+                                group.totalSurplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                              }`}>
+                                {group.totalSurplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasional))}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
+                                group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                              }`}>
+                                {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
+                            </TableRow>
+                          ) : (
+                            <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
+                              <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
+                                SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-900">
+                                Rp {formatRp(group.totalPendidikan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-800">
+                                Rp {formatRp(group.totalNonPendidikan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
+                                Rp {formatRp(group.totalJumlahPenerimaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-teal-800">
+                                Rp {formatRp(group.totalLuncuran)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-teal-950 bg-teal-100/50">
+                                Rp {formatRp(group.totalSumberPembiayaan)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
+                                Rp {formatRp(group.totalOperasional)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-amber-900">
+                                Rp {formatRp(group.totalModal)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-indigo-950 bg-indigo-100/50">
+                                Rp {formatRp(group.totalPengeluaran)}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
+                                group.totalSurplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                              }`}>
+                                {group.totalSurplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasional))}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
+                                group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                              }`}>
+                                {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
+                            </TableRow>
+                          )}
                         </React.Fragment>
                       );
                     })
@@ -3485,50 +3931,91 @@ export default function RkaLaporanPage() {
                 </TableBody>
 
                 {/* Footer Total Keseluruhan */}
-                <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
-                  <tr>
-                    <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
-                      TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
-                    </td>
-                    <td className="p-3 text-right font-bold font-mono text-emerald-900">
-                      Rp {formatRp(displayedRekapTotals.pendidikan)}
-                    </td>
-                    <td className="p-3 text-right font-bold font-mono text-emerald-800">
-                      Rp {formatRp(displayedRekapTotals.nonPendidikan)}
-                    </td>
-                    <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
-                      Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
-                    </td>
-                    <td className="p-3 text-right font-bold font-mono text-teal-800">
-                      Rp {formatRp(displayedRekapTotals.luncuran)}
-                    </td>
-                    <td className="p-3 text-right font-black font-mono text-teal-950 bg-teal-100/70">
-                      Rp {formatRp(displayedRekapTotals.sumberPembiayaan)}
-                    </td>
-                    <td className="p-3 text-right font-bold font-mono text-slate-900">
-                      Rp {formatRp(displayedRekapTotals.operasional)}
-                    </td>
-                    <td className="p-3 text-right font-bold font-mono text-amber-900">
-                      Rp {formatRp(displayedRekapTotals.modal)}
-                    </td>
-                    <td className="p-3 text-right font-black font-mono text-indigo-950 bg-indigo-100/70">
-                      Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
-                    </td>
-                    <td className={`p-3 text-right font-bold font-mono ${
-                      displayedRekapTotals.surplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                    }`}>
-                      {displayedRekapTotals.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}
-                    </td>
-                    <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
-                      displayedRekapTotals.surplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
-                    }`}>
-                      {displayedRekapTotals.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}
-                    </td>
-                    <td className="p-3 text-center text-gray-400 font-bold">
-                      -
-                    </td>
-                  </tr>
-                </tfoot>
+                {rekapFormat === 'pusdi' ? (
+                  <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
+                    <tr>
+                      <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
+                        TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
+                        Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-teal-800">
+                        Rp {formatRp(displayedRekapTotals.luncuran)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-teal-950 bg-teal-100/70">
+                        Rp {formatRp(displayedRekapTotals.sumberPembiayaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-slate-900">
+                        Rp {formatRp(displayedRekapTotals.operasional)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-amber-900">
+                        Rp {formatRp(displayedRekapTotals.modal)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-indigo-950 bg-indigo-100/70">
+                        Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
+                      </td>
+                      <td className={`p-3 text-right font-bold font-mono ${
+                        displayedRekapTotals.surplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}
+                      </td>
+                      <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
+                        displayedRekapTotals.surplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}
+                      </td>
+                      <td className="p-3 text-center text-gray-400 font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : (
+                  <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
+                    <tr>
+                      <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
+                        TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-emerald-900">
+                        Rp {formatRp(displayedRekapTotals.pendidikan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-emerald-800">
+                        Rp {formatRp(displayedRekapTotals.nonPendidikan)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
+                        Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-teal-800">
+                        Rp {formatRp(displayedRekapTotals.luncuran)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-teal-950 bg-teal-100/70">
+                        Rp {formatRp(displayedRekapTotals.sumberPembiayaan)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-slate-900">
+                        Rp {formatRp(displayedRekapTotals.operasional)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-amber-900">
+                        Rp {formatRp(displayedRekapTotals.modal)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-indigo-950 bg-indigo-100/70">
+                        Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
+                      </td>
+                      <td className={`p-3 text-right font-bold font-mono ${
+                        displayedRekapTotals.surplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}
+                      </td>
+                      <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
+                        displayedRekapTotals.surplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                      }`}>
+                        {displayedRekapTotals.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}
+                      </td>
+                      <td className="p-3 text-center text-gray-400 font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </Table>
             </CardContent>
           </Card>
