@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
@@ -109,17 +110,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Data teks kosong' }, { status: 400 });
       }
 
-      // Deteksi baris pertama apakah header
+      // Deteksi baris pertama apakah header (lewati jika chunk isHeaderless)
       let startIndex = 0;
-      const firstLine = lines[0].toLowerCase();
-      if (
-        firstLine.includes('tahun') || 
-        firstLine.includes('unit') || 
-        firstLine.includes('anggaran') || 
-        firstLine.includes('uraian') ||
-        firstLine.includes('akun')
-      ) {
-        startIndex = 1;
+      if (!body.isHeaderless) {
+        const firstLine = lines[0].toLowerCase();
+        if (
+          firstLine.includes('tahun') || 
+          firstLine.includes('unit') || 
+          firstLine.includes('anggaran') || 
+          firstLine.includes('uraian') ||
+          firstLine.includes('akun')
+        ) {
+          startIndex = 1;
+        }
       }
 
       const rowsToInsert = [];
@@ -215,7 +218,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, count: insertedCount });
     }
 
-    // 2. Single Insertion
+    // 2. Direct Array Bulk Insertion: { bulk: true, rows: [...] }
+    if (body.bulk && Array.isArray(body.rows)) {
+      const rows = body.rows;
+      if (rows.length === 0) {
+        return NextResponse.json({ success: false, error: 'Tidak ada baris data untuk diimpor' }, { status: 400 });
+      }
+
+      const chunkSize = 200;
+      let insertedCount = 0;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
+        if (error) throw error;
+        insertedCount += chunk.length;
+      }
+
+      return NextResponse.json({ success: true, count: insertedCount });
+    }
+
+    // 3. Single Insertion
     const { data, error } = await supabaseAdmin
       .from('rkat_pengeluaran')
       .insert([body])

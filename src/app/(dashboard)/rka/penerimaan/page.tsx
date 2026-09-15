@@ -155,6 +155,13 @@ export default function RkaPenerimaanPage() {
   const [showInlinePasteZone, setShowInlinePasteZone] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+    batch: number;
+    totalBatches: number;
+  } | null>(null);
 
   // Add / Edit Modal State
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -480,30 +487,77 @@ export default function RkaPenerimaanPage() {
     setPasteText(sample);
   };
 
-  // Bulk Import
+  // Bulk Import dengan Batching (Menghindari limit payload Request Entity Too Large 413)
   const handleBulkImport = async () => {
     if (parsedPasteLines.length === 0) return toast.error('Tidak ada baris data TSV yang valid');
+    
+    const BATCH_SIZE = 1000;
+    const totalLines = parsedPasteLines.length;
+    const totalBatches = Math.ceil(totalLines / BATCH_SIZE);
+
     setIsImporting(true);
+    setImportProgress({
+      current: 0,
+      total: totalLines,
+      percent: 0,
+      batch: 1,
+      totalBatches
+    });
+
+    let totalInserted = 0;
+
     try {
-      const res = await fetch('/api/rka/penerimaan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bulk: true, rows: parsedPasteLines })
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(`Berhasil mengimpor ${json.count || parsedPasteLines.length} baris penerimaan!`);
-        setPasteText('');
-        setShowInlinePasteZone(false);
-        fetchData();
-      } else {
-        if (json.tableNotCreated) setTableNotCreated(true);
-        toast.error('Gagal impor: ' + json.error);
+      for (let b = 0; b < totalBatches; b++) {
+        const start = b * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, totalLines);
+        const batchRows = parsedPasteLines.slice(start, end);
+        const currentBatchNum = b + 1;
+
+        const res = await fetch('/api/rka/penerimaan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bulk: true, rows: batchRows })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          let errMsg = errText;
+          try {
+            const errJson = JSON.parse(errText);
+            errMsg = errJson.error || errText;
+          } catch {}
+          throw new Error(`Batch ${currentBatchNum}/${totalBatches} gagal (${res.status}): ${errMsg.slice(0, 150)}`);
+        }
+
+        const json = await res.json();
+        if (!json.success) {
+          if (json.tableNotCreated) setTableNotCreated(true);
+          throw new Error(`Batch ${currentBatchNum}/${totalBatches} gagal: ${json.error}`);
+        }
+
+        totalInserted += json.count || batchRows.length;
+
+        const currentProcessed = end;
+        const percent = Math.round((currentProcessed / totalLines) * 100);
+
+        setImportProgress({
+          current: currentProcessed,
+          total: totalLines,
+          percent,
+          batch: Math.min(currentBatchNum + 1, totalBatches),
+          totalBatches
+        });
       }
+
+      toast.success(`🎉 Berhasil mengimpor total ${totalInserted.toLocaleString('id-ID')} baris penerimaan!`, { duration: 5000 });
+      setPasteText('');
+      setShowInlinePasteZone(false);
+      fetchData();
     } catch (err: any) {
-      toast.error('Error saat impor: ' + err.message);
+      toast.error('Error saat impor: ' + err.message, { duration: 7000 });
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -915,11 +969,36 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
               </div>
             </div>
 
+            {/* Progress Bar saat Mengimpor Data */}
+            {isImporting && importProgress && (
+              <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs font-bold text-emerald-950">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="animate-spin text-emerald-600" size={15} />
+                    <span>Sedang mengimpor data penerimaan...</span>
+                  </div>
+                  <span className="font-mono text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                    {importProgress.percent}% ({importProgress.current.toLocaleString('id-ID')} / {importProgress.total.toLocaleString('id-ID')} baris)
+                  </span>
+                </div>
+                <div className="w-full bg-emerald-200/60 rounded-full h-2.5 overflow-hidden p-0.5">
+                  <div 
+                    className="bg-emerald-600 h-full rounded-full transition-all duration-300 ease-out" 
+                    style={{ width: `${importProgress.percent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-emerald-700">
+                  <span>Batch {importProgress.batch} dari {importProgress.totalBatches}</span>
+                  <span className="font-medium text-amber-700">Mohon jangan menutup halaman ini hingga selesai</span>
+                </div>
+              </div>
+            )}
+
             {parsedPasteLines.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-700">
-                    Preview Data Impor ({parsedPasteLines.length} baris):
+                    Preview Data Impor ({parsedPasteLines.length.toLocaleString('id-ID')} baris):
                   </span>
                   <Button
                     onClick={handleBulkImport}
@@ -928,7 +1007,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                     className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs"
                   >
                     {isImporting ? <RefreshCw className="animate-spin mr-1" size={13} /> : <CheckCircle2 className="mr-1" size={13} />}
-                    <span>{isImporting ? 'Mengimpor...' : `Simpan ${parsedPasteLines.length} Data ke Database`}</span>
+                    <span>{isImporting ? `Mengimpor (${importProgress?.percent || 0}%)...` : `Simpan ${parsedPasteLines.length.toLocaleString('id-ID')} Data ke Database`}</span>
                   </Button>
                 </div>
 

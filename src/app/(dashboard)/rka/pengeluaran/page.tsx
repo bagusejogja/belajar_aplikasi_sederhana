@@ -155,6 +155,13 @@ export default function RkaPengeluaranPage() {
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+    batch: number;
+    totalBatches: number;
+  } | null>(null);
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<any>(null);
@@ -405,20 +412,22 @@ export default function RkaPengeluaranPage() {
     return new Intl.NumberFormat('id-ID').format(Math.round(num));
   };
 
-  // Parser Real-Time untuk Paste Zone RKAT Pengeluaran
-  const parsedPasteLines = useMemo(() => {
-    if (!pasteText.trim()) return [];
-    const lines = pasteText.trim().split('\n');
+  // Parser Real-Time untuk Paste Zone RKAT Pengeluaran (Teroptimasi untuk puluhan ribu baris data)
+  const pasteAnalysis = useMemo(() => {
+    if (!pasteText.trim()) return { count: 0, preview: [] };
+    const lines = pasteText.trim().split(/\r?\n/);
     let startIndex = 0;
-    const firstLine = lines[0].toLowerCase();
-    if (
-      firstLine.includes('tahun') || 
-      firstLine.includes('unit') || 
-      firstLine.includes('anggaran') || 
-      firstLine.includes('uraian') ||
-      firstLine.includes('akun')
-    ) {
-      startIndex = 1;
+    if (lines.length > 0) {
+      const firstLine = lines[0].toLowerCase();
+      if (
+        firstLine.includes('tahun') || 
+        firstLine.includes('unit') || 
+        firstLine.includes('anggaran') || 
+        firstLine.includes('uraian') ||
+        firstLine.includes('akun')
+      ) {
+        startIndex = 1;
+      }
     }
 
     const parseCleanNum = (val: any) => {
@@ -428,36 +437,33 @@ export default function RkaPengeluaranPage() {
       return isNaN(num) ? 0 : num;
     };
 
-    const items: any[] = [];
+    let count = 0;
+    const preview: any[] = [];
+
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      const cols = line.split('\t').map((c: string) => c.trim().replace(/^"|"$/g, ''));
-      
-      const thn = parseInt(cols[0]) || 2027;
-      const unit = cols[1] || 'Unit Kerja UGM';
-      const kegiatan = cols[10] || '-';
-      const lingkup = cols[11] || '-';
-      const akun = cols[16] || '-';
-      const uraian = cols[17] || '-';
-      const ang = parseCleanNum(cols[18]);
-      const rel = parseCleanNum(cols[19]);
-
-      if (uraian !== '-' || ang > 0) {
-        items.push({
-          tahun: thn,
-          unit,
-          kegiatan,
-          lingkup,
-          akun,
-          uraian,
-          anggaran: ang,
-          realisasi: rel
+      count++;
+      // Batasi preview hanya 5 baris pertama agar memori dan render tetap super cepat
+      if (preview.length < 5) {
+        const cols = line.split('\t').map((c: string) => c.trim().replace(/^"|"$/g, ''));
+        preview.push({
+          tahun: parseInt(cols[0]) || 2027,
+          unit: cols[1] || 'Unit Kerja UGM',
+          kegiatan: cols[10] || '-',
+          lingkup: cols[11] || '-',
+          akun: cols[16] || '-',
+          uraian: cols[17] || cols[10] || 'Belanja',
+          anggaran: parseCleanNum(cols[18]),
+          realisasi: parseCleanNum(cols[19])
         });
       }
     }
-    return items;
+    return { count, preview };
   }, [pasteText]);
+
+  const parsedPasteLines = pasteAnalysis.preview;
+  const pasteCount = pasteAnalysis.count;
 
   // Contoh Data TSV untuk Paste Zone RKAT Pengeluaran
   const handleFillSampleTSV = () => {
@@ -468,29 +474,106 @@ export default function RkaPengeluaranPage() {
     toast.success('Contoh format TSV RKAT Pengeluaran berhasil dimuat ke Paste Zone!');
   };
 
-  // Bulk Import TSV
+  // Bulk Import TSV (Chunking & Batching untuk puluhan ribu data tanpa HTTP 413)
   const handleBulkImport = async () => {
     if (!pasteText.trim()) return toast.error('Silakan paste data TSV terlebih dahulu');
+
+    // 1. Ekstrak baris dan deteksi header
+    const allLines = pasteText.trim().split(/\r?\n/);
+    if (allLines.length === 0) return toast.error('Data teks kosong');
+
+    let startIndex = 0;
+    const firstLine = allLines[0].toLowerCase();
+    if (
+      firstLine.includes('tahun') || 
+      firstLine.includes('unit') || 
+      firstLine.includes('anggaran') || 
+      firstLine.includes('uraian') ||
+      firstLine.includes('akun')
+    ) {
+      startIndex = 1;
+    }
+
+    const dataLines = allLines.slice(startIndex).filter(line => line.trim().length > 0);
+    const totalLines = dataLines.length;
+
+    if (totalLines === 0) {
+      return toast.error('Tidak ditemukan baris data belanja yang valid untuk disimpan');
+    }
+
+    // 2. Bagi ke dalam batch (1.000 baris per request agar payload aman < 400KB dan terhindar dari Request Entity Too Large 413)
+    const BATCH_SIZE = 1000;
+    const totalBatches = Math.ceil(totalLines / BATCH_SIZE);
+
     setIsImporting(true);
+    setImportProgress({
+      current: 0,
+      total: totalLines,
+      percent: 0,
+      batch: 1,
+      totalBatches
+    });
+
+    let totalInserted = 0;
+
     try {
-      const res = await fetch('/api/rka/pengeluaran', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rawText: pasteText })
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(`Berhasil mengimpor ${json.count} baris data RKAT Pengeluaran!`);
-        setPasteModalOpen(false);
-        setPasteText('');
-        fetchData();
-      } else {
-        toast.error('Gagal mengimpor: ' + json.error);
+      for (let b = 0; b < totalBatches; b++) {
+        const start = b * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, totalLines);
+        const batchLines = dataLines.slice(start, end);
+        const chunkText = batchLines.join('\n');
+
+        const currentBatchNum = b + 1;
+
+        const res = await fetch('/api/rka/pengeluaran', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rawText: chunkText,
+            isHeaderless: true
+          })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          let errMsg = errText;
+          try {
+            const errJson = JSON.parse(errText);
+            errMsg = errJson.error || errText;
+          } catch {}
+          throw new Error(`Batch ${currentBatchNum}/${totalBatches} gagal (${res.status}): ${errMsg.slice(0, 150)}`);
+        }
+
+        const json = await res.json();
+        if (!json.success) {
+          throw new Error(`Batch ${currentBatchNum}/${totalBatches} gagal: ${json.error}`);
+        }
+
+        totalInserted += json.count || batchLines.length;
+
+        const currentProcessed = end;
+        const percent = Math.round((currentProcessed / totalLines) * 100);
+
+        setImportProgress({
+          current: currentProcessed,
+          total: totalLines,
+          percent,
+          batch: Math.min(currentBatchNum + 1, totalBatches),
+          totalBatches
+        });
       }
+
+      toast.success(`🎉 Berhasil mengimpor total ${totalInserted.toLocaleString('id-ID')} baris data RKAT Pengeluaran!`, { duration: 5000 });
+      setPasteText('');
+      setPasteModalOpen(false);
+      setShowInlinePasteZone(false);
+      fetchData();
     } catch (e: any) {
-      toast.error('Gagal import: ' + e.message);
+      console.error('Bulk import error:', e);
+      toast.error('Gagal import: ' + e.message, { duration: 7000 });
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -861,15 +944,40 @@ export default function RkaPengeluaranPage() {
               />
             </div>
 
+            {/* Progress Bar saat Mengimpor Data Puluhan Ribu Baris */}
+            {isImporting && importProgress && (
+              <div className="bg-indigo-50/90 border border-indigo-200 rounded-xl p-4 space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs font-bold text-indigo-950">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="animate-spin text-indigo-600" size={16} />
+                    <span>Sedang mengimpor data ke database...</span>
+                  </div>
+                  <span className="font-mono text-indigo-700 bg-white px-2.5 py-0.5 rounded-md border border-indigo-200 shadow-2xs">
+                    {importProgress.percent}% ({importProgress.current.toLocaleString('id-ID')} / {importProgress.total.toLocaleString('id-ID')} baris)
+                  </span>
+                </div>
+                <div className="w-full bg-indigo-200/60 rounded-full h-3 overflow-hidden p-0.5">
+                  <div 
+                    className="bg-indigo-600 h-full rounded-full transition-all duration-300 ease-out shadow-xs" 
+                    style={{ width: `${importProgress.percent}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-indigo-700">
+                  <span>Batch {importProgress.batch} dari {importProgress.totalBatches} ({Math.min(1000, importProgress.total)} baris/batch)</span>
+                  <span className="font-medium text-amber-700">Mohon jangan menutup halaman ini hingga selesai</span>
+                </div>
+              </div>
+            )}
+
             {/* Live Preview Indicator & Save Button */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={`text-xs font-bold px-2.5 py-1 ${
-                  parsedPasteLines.length > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-500 border-gray-200'
+                  pasteCount > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-500 border-gray-200'
                 }`}>
-                  {parsedPasteLines.length > 0 ? `✓ Ditemukan ${parsedPasteLines.length} baris belanja valid` : 'Menunggu data dipaste...'}
+                  {pasteCount > 0 ? `✓ Ditemukan ${pasteCount.toLocaleString('id-ID')} baris belanja valid` : 'Menunggu data dipaste...'}
                 </Badge>
-                {parsedPasteLines.length > 0 && (
+                {pasteCount > 0 && (
                   <span className="text-xs text-gray-500 font-medium">
                     (Siap disimpan ke database rkat_pengeluaran)
                   </span>
@@ -878,20 +986,20 @@ export default function RkaPengeluaranPage() {
 
               <Button
                 onClick={handleBulkImport}
-                disabled={isImporting || parsedPasteLines.length === 0}
+                disabled={isImporting || pasteCount === 0}
                 className="h-10 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md disabled:opacity-50 gap-2 cursor-pointer active:scale-95"
               >
                 {isImporting ? <RefreshCw className="animate-spin" size={15} /> : <Save size={15} />}
-                <span>{isImporting ? 'Mengimpor Data...' : `Simpan ${parsedPasteLines.length} Baris Belanja ke Database`}</span>
+                <span>{isImporting ? `Mengimpor (${importProgress?.percent || 0}%)...` : `Simpan ${pasteCount.toLocaleString('id-ID')} Baris Belanja ke Database`}</span>
               </Button>
             </div>
 
             {/* Tabel Pratinjau Mini */}
-            {parsedPasteLines.length > 0 && (
+            {pasteCount > 0 && (
               <div className="border border-indigo-100 rounded-xl overflow-hidden bg-white mt-3">
                 <div className="px-3 py-2 bg-indigo-50/50 border-b border-indigo-100 text-[11px] font-bold text-indigo-900 flex items-center justify-between">
-                  <span>Pratinjau Pembacaan Data ({parsedPasteLines.length} baris):</span>
-                  <span className="text-[10px] text-indigo-600 font-normal">Menampilkan maks 5 baris pertama</span>
+                  <span>Pratinjau Pembacaan Data (Total {pasteCount.toLocaleString('id-ID')} baris):</span>
+                  <span className="text-[10px] text-indigo-600 font-normal">Menampilkan 5 baris pertama</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -1438,11 +1546,25 @@ export default function RkaPengeluaranPage() {
               className="w-full bg-gray-50 border border-gray-300 rounded-xl p-3.5 text-xs font-mono text-gray-800 outline-none focus:ring-2 focus:ring-indigo-600 focus:bg-white"
             />
 
+            {/* Progress Bar Modal 1 */}
+            {isImporting && importProgress && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-indigo-900">
+                  <span>Mengimpor data...</span>
+                  <span>{importProgress.percent}% ({importProgress.current.toLocaleString('id-ID')} / {importProgress.total.toLocaleString('id-ID')})</span>
+                </div>
+                <div className="w-full bg-indigo-100 rounded-full h-2 overflow-hidden">
+                  <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300" style={{ width: `${importProgress.percent}%` }} />
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setPasteModalOpen(false)}
+                disabled={isImporting}
                 className="h-9 text-xs"
               >
                 Batal
@@ -1454,7 +1576,7 @@ export default function RkaPengeluaranPage() {
                 className="h-9 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold gap-1.5 shadow-sm"
               >
                 {isImporting ? <RefreshCw className="animate-spin" size={14} /> : <Save size={14} />}
-                {isImporting ? 'Menyimpan...' : 'Simpan Seluruh Data'}
+                {isImporting ? `Menyimpan (${importProgress?.percent || 0}%)...` : 'Simpan Seluruh Data'}
               </Button>
             </div>
           </div>
