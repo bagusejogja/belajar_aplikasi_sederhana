@@ -358,25 +358,33 @@ export async function PUT(request: Request) {
     }
 
     // B. EKSEKUSI KHUSUS MODUL PENGELUARAN
+    // Cari rentang ID tertinggi pada rkat_pengeluaran untuk chunking presisi (mencegah Statement Timeout PostgreSQL 8 detik)
+    const { data: maxRow } = await supabaseAdmin.from('rkat_pengeluaran').select('id').order('id', { ascending: false }).limit(1);
+    const maxTableId = maxRow?.[0]?.id || 30000;
+    const CHUNK_SIZE = 2000;
+
     if (cleanSync) {
-      let resetQ = supabaseAdmin
-        .from('rkat_pengeluaran')
-        .update({
-          laporan_kementerian: null,
-          laporan_webometrics: null,
-          identifikasi_lain: null,
-          tags: {}
-        }, { count: 'exact' })
-        .gt('id', 0);
+      for (let s = 1; s <= maxTableId + 1000; s += CHUNK_SIZE) {
+        let resetQ = supabaseAdmin
+          .from('rkat_pengeluaran')
+          .update({
+            laporan_kementerian: null,
+            laporan_webometrics: null,
+            identifikasi_lain: null,
+            tags: {}
+          })
+          .gte('id', s)
+          .lt('id', s + CHUNK_SIZE);
 
-      if (targetYear && targetYear !== 'ALL') {
-        resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
+        if (targetYear && targetYear !== 'ALL') {
+          resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
+        }
+
+        await resetQ;
       }
-
-      await resetQ;
     }
 
-    // 2. Eksekusi Setiap Aturan Langsung pada Database Supabase (Direct PostgreSQL Update Query)
+    // 2. Eksekusi Setiap Aturan Langsung pada Database Supabase (dengan ID Range Chunking agar tidak timeout)
     totalUpdated = 0;
 
     for (const rule of rulesList) {
@@ -398,51 +406,59 @@ export async function PUT(request: Request) {
         updatePayload.tags = { [tf]: nilai };
       }
 
-      let updateQuery = supabaseAdmin.from('rkat_pengeluaran').update(updatePayload, { count: 'exact' }).gt('id', 0);
+      // Jalankan per potongan ID agar query dijamin < 1 detik dan aman dari batas timeout Supabase 8 detik
+      for (let startId = 1; startId <= maxTableId + 1000; startId += CHUNK_SIZE) {
+        const endId = startId + CHUNK_SIZE;
+        let chunkQ = supabaseAdmin
+          .from('rkat_pengeluaran')
+          .update(updatePayload, { count: 'exact' })
+          .gte('id', startId)
+          .lt('id', endId);
 
-      if (targetYear && targetYear !== 'ALL') {
-        updateQuery = updateQuery.eq('tahun_anggaran', parseInt(targetYear));
-      }
-
-      // Filter Unit (Mendukung satu atau beberapa unit dipisahkan koma atau |)
-      if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
-        const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
-        if (units.length === 1) {
-          updateQuery = updateQuery.ilike('unit', `%${units[0]}%`);
-        } else if (units.length > 1) {
-          const unitConds = units.map((u: string) => `unit.ilike.%${u}%`).join(',');
-          updateQuery = updateQuery.or(unitConds);
+        if (targetYear && targetYear !== 'ALL') {
+          chunkQ = chunkQ.eq('tahun_anggaran', parseInt(targetYear));
         }
-      }
 
-      // Filter Akun (Mendukung satu atau beberapa kode akun dipisahkan koma atau |)
-      if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
-        const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
-        if (akuns.length === 1) {
-          updateQuery = updateQuery.ilike('akun_detail', `${akuns[0]}%`);
-        } else if (akuns.length > 1) {
-          const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
-          updateQuery = updateQuery.or(akunConds);
+        // Filter Unit (Mendukung satu atau beberapa unit dipisahkan koma atau |)
+        if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
+          const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
+          if (units.length === 1) {
+            chunkQ = chunkQ.ilike('unit', `%${units[0]}%`);
+          } else if (units.length > 1) {
+            const unitConds = units.map((u: string) => `unit.ilike.%${u}%`).join(',');
+            chunkQ = chunkQ.or(unitConds);
+          }
         }
-      }
 
-      // Filter Kata Kunci Belanja (Mendukung satu atau beberapa kata kunci dipisahkan koma atau |)
-      if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
-        const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.trim()).filter(Boolean);
-        if (kws.length === 1) {
-          const kw = kws[0];
-          updateQuery = updateQuery.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
-        } else if (kws.length > 1) {
-          const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
-          updateQuery = updateQuery.or(orConds);
+        // Filter Akun (Mendukung satu atau beberapa kode akun dipisahkan koma atau |)
+        if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
+          const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
+          if (akuns.length === 1) {
+            chunkQ = chunkQ.ilike('akun_detail', `${akuns[0]}%`);
+          } else if (akuns.length > 1) {
+            const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
+            chunkQ = chunkQ.or(akunConds);
+          }
         }
-      }
 
-      const { count, error } = await updateQuery;
-      if (error) {
-        console.error(`Error updating rule ID ${rule.id}:`, error);
-      } else if (count) {
-        totalUpdated += count;
+        // Filter Kata Kunci Belanja (Mendukung satu atau beberapa kata kunci dipisahkan koma atau |)
+        if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
+          const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
+          if (kws.length === 1) {
+            const kw = kws[0];
+            chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
+          } else if (kws.length > 1) {
+            const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
+            chunkQ = chunkQ.or(orConds);
+          }
+        }
+
+        const { count, error } = await chunkQ;
+        if (error) {
+          console.error(`Error updating rule ID ${rule.id} chunk [${startId}-${endId}]:`, error);
+        } else if (count) {
+          totalUpdated += count;
+        }
       }
     }
 
