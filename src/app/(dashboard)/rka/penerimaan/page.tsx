@@ -323,51 +323,160 @@ export default function RkaPenerimaanPage() {
     setCurrentPage(1);
   }, [tahunFilter, unitFilter, formatFilter, statusFilter, search, pageSize, sortBy]);
 
-  // Parser Paste TSV
+  // Parser Paste TSV yang cerdas (Mendukung Dynamic Header Detection & Auto-Merge Kolom Akun)
   const parsedPasteLines = useMemo(() => {
     if (!pasteText.trim()) return [];
     const lines = pasteText.trim().split(/\r?\n/);
     if (lines.length === 0) return [];
 
-    const firstLineCols = lines[0].split('\t').map(c => c.trim().toLowerCase());
+    const firstLineCols = lines[0].split('\t').map(c => c.trim().toLowerCase().replace(/[\s_]/g, ''));
     const isHeader = firstLineCols.some(c => 
       c.includes('renterimaid') || 
-      c.includes('unit_kerja') || 
-      c.includes('nama_akun') || 
+      c.includes('unitkerja') || 
+      c.includes('namaakun') || 
+      c.includes('akun') ||
       c.includes('pagu') ||
       c.includes('volume')
     );
+
+    let headerMap: Record<string, number> = {};
+
+    if (isHeader) {
+      firstLineCols.forEach((col, idx) => {
+        if (col.includes('renterimaid') || col === 'id') headerMap['renterimaId'] = idx;
+        else if (col.includes('unitkerja') || col === 'unit') headerMap['unit_kerja'] = idx;
+        else if (col === 'akun' || col.includes('kodeakun') || col === 'kode') headerMap['akun'] = idx;
+        else if (col.includes('namaakun') || col.includes('akunpenerimaan') || col.includes('uraianakun')) headerMap['nama_akun_penerimaan'] = idx;
+        else if (col.includes('tahun')) headerMap['tahun'] = idx;
+        else if (col.includes('isaktif') || col.includes('statusaktif')) headerMap['renterimaIsAktif'] = idx;
+        else if (col.includes('volume') || col === 'vol') headerMap['renterimaVolume'] = idx;
+        else if (col.includes('tarif')) headerMap['renterimaTarif'] = idx;
+        else if (col.includes('jumlah') || col === 'total') headerMap['renterimaJumlah'] = idx;
+        else if (col.includes('pagu')) headerMap['renterimaPagu'] = idx;
+        else if (col === 'status') headerMap['status'] = idx;
+        else if (col.includes('keterangan') || col === 'ket') headerMap['keterangan'] = idx;
+        else if (col.includes('sumberdana') || col === 'sumber') headerMap['sumber_dana'] = idx;
+      });
+    }
 
     const dataRows = isHeader ? lines.slice(1) : lines;
     const parsed: any[] = [];
 
     dataRows.forEach(line => {
       if (!line.trim()) return;
-      const cols = line.split('\t').map(c => c.trim());
-      if (cols.length >= 4) {
+      const cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < 3) return;
+
+      if (isHeader && Object.keys(headerMap).length > 0) {
+        // Mode A: Mapping dinamis berdasarkan nama header
+        const getCol = (key: string, defaultVal: string = '') => {
+          const idx = headerMap[key];
+          return (idx !== undefined && cols[idx] !== undefined) ? cols[idx] : defaultVal;
+        };
+
+        const akunVal = getCol('akun', '');
+        let namaAkunVal = getCol('nama_akun_penerimaan', '');
+        if (akunVal && namaAkunVal && !namaAkunVal.startsWith(akunVal)) {
+          namaAkunVal = `${akunVal} ${namaAkunVal}`;
+        } else if (!namaAkunVal && akunVal) {
+          namaAkunVal = akunVal;
+        }
+
+        const volVal = parseFloat(getCol('renterimaVolume', '0').replace(/,/g, '.')) || 0;
+        const tarifVal = parseFloat(getCol('renterimaTarif', '0').replace(/,/g, '.')) || 0;
+        const jmlVal = parseFloat(getCol('renterimaJumlah', '0').replace(/,/g, '.')) || (volVal * tarifVal);
+        const paguVal = parseFloat(getCol('renterimaPagu', '0').replace(/,/g, '.')) || jmlVal;
+
         parsed.push({
-          renterimaId: cols[0] || '',
-          unit_kerja: cols[1] || '',
-          nama_akun_penerimaan: cols[2] || '',
-          tahun: parseInt(cols[3]) || 2027,
-          renterimaIsAktif: cols[4] !== undefined ? parseInt(cols[4]) || 1 : 1,
-          renterimaVolume: cols[5] !== undefined ? parseFloat(cols[5].replace(/,/g, '.')) || 0 : 0,
-          renterimaTarif: cols[6] !== undefined ? parseFloat(cols[6].replace(/,/g, '.')) || 0 : 0,
-          renterimaJumlah: cols[7] !== undefined ? parseFloat(cols[7].replace(/,/g, '.')) || 0 : 0,
-          renterimaPagu: cols[8] !== undefined ? parseFloat(cols[8].replace(/,/g, '.')) || 0 : 0,
-          status: cols[9] || 'Sedang Diproses',
-          keterangan: cols[10] || '',
-          sumber_dana: cols[11] || 'Dana Masyarakat Tidak Mengikat'
+          renterimaId: getCol('renterimaId', ''),
+          unit_kerja: getCol('unit_kerja', ''),
+          nama_akun_penerimaan: namaAkunVal,
+          tahun: parseInt(getCol('tahun', '2027')) || 2027,
+          renterimaIsAktif: parseInt(getCol('renterimaIsAktif', '1')) || 1,
+          renterimaVolume: volVal,
+          renterimaTarif: tarifVal,
+          renterimaJumlah: jmlVal,
+          renterimaPagu: paguVal,
+          status: getCol('status', 'Sedang Diproses'),
+          keterangan: getCol('keterangan', ''),
+          sumber_dana: getCol('sumber_dana', 'Dana Masyarakat Tidak Mengikat')
         });
+      } else {
+        // Mode B: Fallback jika tanpa baris header
+        // Cek apakah 13 kolom (ada kolom akun terpisah di index 2)
+        if (cols.length >= 13) {
+          const kodeAkun = cols[2];
+          let namaAkun = cols[3];
+          if (kodeAkun && namaAkun && !namaAkun.startsWith(kodeAkun)) {
+            namaAkun = `${kodeAkun} ${namaAkun}`;
+          }
+
+          const vol = parseFloat(cols[6].replace(/,/g, '.')) || 0;
+          const tarif = parseFloat(cols[7].replace(/,/g, '.')) || 0;
+          const jml = parseFloat(cols[8].replace(/,/g, '.')) || (vol * tarif);
+          const pagu = parseFloat(cols[9].replace(/,/g, '.')) || jml;
+
+          parsed.push({
+            renterimaId: cols[0] || '',
+            unit_kerja: cols[1] || '',
+            nama_akun_penerimaan: namaAkun || cols[3] || cols[2] || '',
+            tahun: parseInt(cols[4]) || 2027,
+            renterimaIsAktif: cols[5] !== undefined ? parseInt(cols[5]) || 1 : 1,
+            renterimaVolume: vol,
+            renterimaTarif: tarif,
+            renterimaJumlah: jml,
+            renterimaPagu: pagu,
+            status: cols[10] || 'Sedang Diproses',
+            keterangan: cols[11] || '',
+            sumber_dana: cols[12] || 'Dana Masyarakat Tidak Mengikat'
+          });
+        } else if (cols.length >= 12) {
+          // Format standar 12 kolom
+          const vol = parseFloat(cols[5].replace(/,/g, '.')) || 0;
+          const tarif = parseFloat(cols[6].replace(/,/g, '.')) || 0;
+          const jml = parseFloat(cols[7].replace(/,/g, '.')) || (vol * tarif);
+          const pagu = parseFloat(cols[8].replace(/,/g, '.')) || jml;
+
+          parsed.push({
+            renterimaId: cols[0] || '',
+            unit_kerja: cols[1] || '',
+            nama_akun_penerimaan: cols[2] || '',
+            tahun: parseInt(cols[3]) || 2027,
+            renterimaIsAktif: cols[4] !== undefined ? parseInt(cols[4]) || 1 : 1,
+            renterimaVolume: vol,
+            renterimaTarif: tarif,
+            renterimaJumlah: jml,
+            renterimaPagu: pagu,
+            status: cols[9] || 'Sedang Diproses',
+            keterangan: cols[10] || '',
+            sumber_dana: cols[11] || 'Dana Masyarakat Tidak Mengikat'
+          });
+        } else if (cols.length >= 4) {
+          // Minimal 4 kolom
+          parsed.push({
+            renterimaId: cols[0] || '',
+            unit_kerja: cols[1] || '',
+            nama_akun_penerimaan: cols[2] || '',
+            tahun: parseInt(cols[3]) || 2027,
+            renterimaIsAktif: 1,
+            renterimaVolume: 1,
+            renterimaTarif: parseFloat((cols[4] || '0').replace(/,/g, '.')) || 0,
+            renterimaJumlah: parseFloat((cols[5] || '0').replace(/,/g, '.')) || 0,
+            renterimaPagu: parseFloat((cols[6] || '0').replace(/,/g, '.')) || 0,
+            status: cols[7] || 'Sedang Diproses',
+            keterangan: cols[8] || '',
+            sumber_dana: cols[9] || 'Dana Masyarakat Tidak Mengikat'
+          });
+        }
       }
     });
 
     return parsed;
   }, [pasteText]);
 
-  // Isi contoh TSV sesuai permintaan pengguna
+  // Isi contoh TSV sesuai format spreadsheet pengguna
   const handleFillSampleTSV = () => {
-    const sample = `renterimaId\tunit_kerja\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tstatus\tketerangan\tsumber_dana\n114717\t08000010 Fakultas Ilmu Budaya\t41101.04.03.02 Penerimaan UKT S1 | UKT Pendidikan Unggul Bersubsidi 25%\t2027\t1\t24\t5700000.00\t136800000.00\t136800000.00\tSedang Diproses\tS1 BAHASA DAN SASTRA INDONESIA - tahun anggaran 2027 - angkatan 2026\tDana Masyarakat Tidak Mengikat`;
+    const sample = `renterimaId\tunit_kerja\takun\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tstatus\tketerangan\tsumber_dana\n116893\t10000010 Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t41101.04.03.01\tPenerimaan UKT S1 | UKT Pendidikan Unggul\t2027\t1\t240\t24700000.00\t5928000000.00\t5928000000.00\tDisetujui\tPRODI PD - S1 KEDOKTERAN - tahun anggaran 2027 - angkatan 2023\tDana Masyarakat Tidak Mengikat`;
     setPasteText(sample);
   };
 
@@ -750,7 +859,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 </CardTitle>
               </div>
               <CardDescription className="text-xs text-gray-500 font-medium">
-                Salin kolom dari spreadsheet Excel: <code>renterimaId, unit_kerja, nama_akun_penerimaan, tahun, renterimaIsAktif, renterimaVolume, renterimaTarif, renterimaJumlah, renterimaPagu, status, keterangan, sumber_dana</code>
+                Salin kolom dari spreadsheet Excel: <code>renterimaId, unit_kerja, akun, nama_akun_penerimaan, tahun, renterimaIsAktif, renterimaVolume, renterimaTarif, renterimaJumlah, renterimaPagu, status, keterangan, sumber_dana</code>
               </CardDescription>
             </div>
 

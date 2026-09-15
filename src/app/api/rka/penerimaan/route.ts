@@ -91,21 +91,31 @@ export async function POST(request: Request) {
       }
 
       // Normalisasi kolom penerimaan
-      const formatted = rows.map((r: any) => ({
-        renterima_id: r.renterimaId ? parseInt(String(r.renterimaId).replace(/\D/g, '')) || null : r.renterima_id || null,
-        unit_kerja: String(r.unit_kerja || r.unitKerja || r.unit || '').trim(),
-        nama_akun_penerimaan: String(r.nama_akun_penerimaan || r.namaAkunPenerimaan || r.akun || '').trim(),
-        tahun: parseInt(String(r.tahun || r.tahun_anggaran || '2027')) || 2027,
-        renterima_is_aktif: parseInt(String(r.renterimaIsAktif ?? r.renterima_is_aktif ?? 1)) || 1,
-        renterima_volume: parseFloat(String(r.renterimaVolume ?? r.renterima_volume ?? 0).replace(/,/g, '.')) || 0,
-        renterima_tarif: parseFloat(String(r.renterimaTarif ?? r.renterima_tarif ?? 0).replace(/,/g, '.')) || 0,
-        renterima_jumlah: parseFloat(String(r.renterimaJumlah ?? r.renterima_jumlah ?? 0).replace(/,/g, '.')) || 0,
-        renterima_pagu: parseFloat(String(r.renterimaPagu ?? r.renterima_pagu ?? 0).replace(/,/g, '.')) || 0,
-        status: String(r.status || 'Sedang Diproses').trim(),
-        keterangan: String(r.keterangan || '').trim(),
-        sumber_dana: String(r.sumber_dana || r.sumberDana || 'Dana Masyarakat Tidak Mengikat').trim(),
-        updated_at: new Date().toISOString()
-      }));
+      const formatted = rows.map((r: any) => {
+        let namaAkun = String(r.nama_akun_penerimaan || r.namaAkunPenerimaan || '').trim();
+        const kodeAkun = String(r.akun || r.kode_akun || '').trim();
+        if (kodeAkun && namaAkun && !namaAkun.startsWith(kodeAkun)) {
+          namaAkun = `${kodeAkun} ${namaAkun}`;
+        } else if (!namaAkun && kodeAkun) {
+          namaAkun = kodeAkun;
+        }
+
+        return {
+          renterima_id: r.renterimaId ? parseInt(String(r.renterimaId).replace(/\D/g, '')) || null : r.renterima_id || null,
+          unit_kerja: String(r.unit_kerja || r.unitKerja || r.unit || '').trim(),
+          nama_akun_penerimaan: namaAkun,
+          tahun: parseInt(String(r.tahun || r.tahun_anggaran || '2027')) || 2027,
+          renterima_is_aktif: parseInt(String(r.renterimaIsAktif ?? r.renterima_is_aktif ?? 1)) || 1,
+          renterima_volume: parseFloat(String(r.renterimaVolume ?? r.renterima_volume ?? 0).replace(/,/g, '.')) || 0,
+          renterima_tarif: parseFloat(String(r.renterimaTarif ?? r.renterima_tarif ?? 0).replace(/,/g, '.')) || 0,
+          renterima_jumlah: parseFloat(String(r.renterimaJumlah ?? r.renterima_jumlah ?? 0).replace(/,/g, '.')) || 0,
+          renterima_pagu: parseFloat(String(r.renterimaPagu ?? r.renterima_pagu ?? 0).replace(/,/g, '.')) || 0,
+          status: String(r.status || 'Sedang Diproses').trim(),
+          keterangan: String(r.keterangan || '').trim(),
+          sumber_dana: String(r.sumber_dana || r.sumberDana || 'Dana Masyarakat Tidak Mengikat').trim(),
+          updated_at: new Date().toISOString()
+        };
+      });
 
       // Insert dalam batch/chunks untuk stabilitas
       const chunkSize = 100;
