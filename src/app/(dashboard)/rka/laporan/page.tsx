@@ -2272,45 +2272,174 @@ export default function RkaLaporanPage() {
             '10. S/D ANGGARAN'
           ];
 
-      const numCols = headers.length;
+      const numCols = isUpu ? 11 : isPusdi ? 10 : 12;
 
-      // Header row
-      const headerRow = new DocxTableRow({
-        tableHeader: true,
-        children: headers.map((h, i) => new DocxTableCell({
-          children: [new Paragraph({
-            children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 14 })],
-            alignment: i <= 1 ? AlignmentType.CENTER : AlignmentType.RIGHT,
-          })],
-          shading: { fill: '0F172A', type: ShadingType.CLEAR },
+      // Header Fill Color and Cell Borders (sesuai gambar: Light Blue #9DC3E6 dengan border hitam solid)
+      const headerFill = '9DC3E6';
+      const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+      const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
+
+      const makeHeaderCell = ({
+        text,
+        rowSpan,
+        columnSpan,
+        align = AlignmentType.CENTER,
+        bold = true,
+        size = 15
+      }: {
+        text: string;
+        rowSpan?: number;
+        columnSpan?: number;
+        align?: any;
+        bold?: boolean;
+        size?: number;
+      }) => {
+        return new DocxTableCell({
+          rowSpan,
+          columnSpan,
+          children: [
+            new Paragraph({
+              children: [new TextRun({ text, bold, size, color: '000000' })],
+              alignment: align,
+            })
+          ],
+          shading: { fill: headerFill, type: ShadingType.CLEAR },
           verticalAlign: VerticalAlign.CENTER,
-        }))
-      });
+          borders: cellBorders,
+        });
+      };
 
-      // Indicators row
-      const colIndicators = isUpu
-        ? ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
-        : isPusdi
-        ? ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
-        : ['#', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
+      // Table Header Rows
+      let headerRowsList: DocxTableRow[] = [];
 
-      const indicatorRow = new DocxTableRow({
-        tableHeader: true,
-        children: colIndicators.map(ind => new DocxTableCell({
-          children: [new Paragraph({
-            children: [new TextRun({ text: ind, bold: true, color: 'E2E8F0', size: 13 })],
-            alignment: AlignmentType.CENTER,
-          })],
-          shading: { fill: '334155', type: ShadingType.CLEAR },
-          verticalAlign: VerticalAlign.CENTER,
-        }))
-      });
+      if (!isUpu && !isPusdi) {
+        // === FORMAT FAKULTAS (Persis seperti gambar lampiran user) ===
+        // Baris 1: Header Utama (No & Unit Kerja rowSpan 2, Penerimaan colSpan 3, Kolom lain rowSpan 2)
+        const fHeaderRow1 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: 'No', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, size: 15 }),
+            makeHeaderCell({ text: 'Luncuran', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', rowSpan: 2, size: 15 }),
+          ]
+        });
+
+        // Baris 2: Sub-kolom Penerimaan (Pendidikan, Non Pendidikan, Jumlah)
+        const fHeaderRow2 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: 'Pendidikan', size: 14 }),
+            makeHeaderCell({ text: 'Non Pendidikan', size: 14 }),
+            makeHeaderCell({ text: 'Jumlah', size: 14 }),
+          ]
+        });
+
+        // Baris 3: Nomor Kolom & Formula (1, 2, 3 (1+2), 4, 5 (3+4), 6, 7, 8 (6+7), 9 (3-6), 10 (3+4-8))
+        const fHeaderRow3 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '1', size: 13 }),
+            makeHeaderCell({ text: '2', size: 13 }),
+            makeHeaderCell({ text: '3 (1+2)', size: 13 }),
+            makeHeaderCell({ text: '4', size: 13 }),
+            makeHeaderCell({ text: '5 (3+4)', size: 13 }),
+            makeHeaderCell({ text: '6', size: 13 }),
+            makeHeaderCell({ text: '7', size: 13 }),
+            makeHeaderCell({ text: '8 (6+7)', size: 13 }),
+            makeHeaderCell({ text: '9 (3-6)', size: 13 }),
+            makeHeaderCell({ text: '10 (3+4-8)', size: 13 }),
+          ]
+        });
+
+        headerRowsList = [fHeaderRow1, fHeaderRow2, fHeaderRow3];
+      } else if (isPusdi) {
+        // === FORMAT PUSDI (9 Kolom Data, Mengikuti Desain Dasar) ===
+        const pHeaderRow1 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: 'No', size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan', size: 15 }),
+            makeHeaderCell({ text: 'Luncuran', size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', size: 15 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', size: 15 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', size: 15 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', size: 15 }),
+          ]
+        });
+
+        const pHeaderRow2 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '1', size: 13 }),
+            makeHeaderCell({ text: '2', size: 13 }),
+            makeHeaderCell({ text: '3 (1+2)', size: 13 }),
+            makeHeaderCell({ text: '4', size: 13 }),
+            makeHeaderCell({ text: '5', size: 13 }),
+            makeHeaderCell({ text: '6 (4+5)', size: 13 }),
+            makeHeaderCell({ text: '7 (1-4)', size: 13 }),
+            makeHeaderCell({ text: '8 (3-6)', size: 13 }),
+          ]
+        });
+
+        headerRowsList = [pHeaderRow1, pHeaderRow2];
+      } else {
+        // === FORMAT UPU (10 Kolom Data, Mengikuti Desain Dasar) ===
+        const uHeaderRow1 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: 'No', size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', size: 15 }),
+            makeHeaderCell({ text: 'Subsidi', size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan', size: 15 }),
+            makeHeaderCell({ text: 'Luncuran', size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', size: 15 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', size: 15 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', size: 15 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', size: 15 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', size: 15 }),
+          ]
+        });
+
+        const uHeaderRow2 = new DocxTableRow({
+          tableHeader: true,
+          children: [
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '', size: 13 }),
+            makeHeaderCell({ text: '1', size: 13 }),
+            makeHeaderCell({ text: '2', size: 13 }),
+            makeHeaderCell({ text: '3', size: 13 }),
+            makeHeaderCell({ text: '4 (1+2+3)', size: 13 }),
+            makeHeaderCell({ text: '5', size: 13 }),
+            makeHeaderCell({ text: '6', size: 13 }),
+            makeHeaderCell({ text: '7 (5+6)', size: 13 }),
+            makeHeaderCell({ text: '8 (1+2-5)', size: 13 }),
+            makeHeaderCell({ text: '9 (3-6)', size: 13 }),
+          ]
+        });
+
+        headerRowsList = [uHeaderRow1, uHeaderRow2];
+      }
 
       const displayGroups = rekapGroupFilter === 'ALL' 
         ? groupedByOrg 
         : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase());
 
-      const tableRows: DocxTableRow[] = [headerRow, indicatorRow];
+      const tableRows: DocxTableRow[] = [...headerRowsList];
       let rowNum = 1;
 
       displayGroups.forEach(group => {
@@ -2324,14 +2453,15 @@ export default function RkaLaporanPage() {
                   new TextRun({ 
                     text: `GROUP: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`, 
                     bold: true, 
-                    color: '312E81', 
+                    color: '1E3A8A', 
                     size: 15 
                   })
                 ],
                 alignment: AlignmentType.LEFT,
               })],
-              shading: { fill: 'EEF2FF', type: ShadingType.CLEAR },
+              shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
+              borders: cellBorders,
             })
           ]
         });
@@ -2388,6 +2518,7 @@ export default function RkaLaporanPage() {
                 alignment: c.align,
               })],
               verticalAlign: VerticalAlign.CENTER,
+              borders: cellBorders,
             }))
           });
           tableRows.push(dRow);
@@ -2438,16 +2569,18 @@ export default function RkaLaporanPage() {
                 children: [new TextRun({ text: `SUBTOTAL ${group.groupOrg.toUpperCase()}`, bold: true, size: 14 })],
                 alignment: AlignmentType.RIGHT,
               })],
-              shading: { fill: 'F1F5F9', type: ShadingType.CLEAR },
+              shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
+              borders: cellBorders,
             }),
             ...subtotalCells.map(val => new DocxTableCell({
               children: [new Paragraph({
                 children: [new TextRun({ text: val, bold: true, size: 14 })],
                 alignment: AlignmentType.RIGHT,
               })],
-              shading: { fill: 'F1F5F9', type: ShadingType.CLEAR },
+              shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
+              borders: cellBorders,
             }))
           ]
         });
@@ -2499,16 +2632,18 @@ export default function RkaLaporanPage() {
               children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
             })],
-            shading: { fill: 'E2E8F0', type: ShadingType.CLEAR },
+            shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,
+            borders: cellBorders,
           }),
           ...grandTotalCells.map(val => new DocxTableCell({
             children: [new Paragraph({
               children: [new TextRun({ text: val, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
             })],
-            shading: { fill: 'E2E8F0', type: ShadingType.CLEAR },
+            shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,
+            borders: cellBorders,
           }))
         ]
       });
@@ -2518,12 +2653,12 @@ export default function RkaLaporanPage() {
         width: { size: 100, type: WidthType.PERCENTAGE },
         rows: tableRows,
         borders: {
-          top: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
-          bottom: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
-          left: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
-          right: { style: BorderStyle.SINGLE, size: 4, color: '94A3B8' },
-          insideHorizontal: { style: BorderStyle.SINGLE, size: 2, color: 'CBD5E1' },
-          insideVertical: { style: BorderStyle.SINGLE, size: 2, color: 'CBD5E1' },
+          top: borderSingle,
+          bottom: borderSingle,
+          left: borderSingle,
+          right: borderSingle,
+          insideHorizontal: borderSingle,
+          insideVertical: borderSingle,
         }
       });
 
