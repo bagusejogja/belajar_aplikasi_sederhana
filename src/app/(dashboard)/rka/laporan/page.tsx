@@ -20,7 +20,7 @@ import ExcelJS from 'exceljs';
 import { 
   Document, Packer, Paragraph, Table as DocxTable, TableCell as DocxTableCell, 
   TableRow as DocxTableRow, WidthType, BorderStyle, TextRun, AlignmentType, 
-  PageOrientation, ShadingType, VerticalAlign
+  PageOrientation, ShadingType, VerticalAlign, HeightRule
 } from 'docx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
@@ -2274,22 +2274,33 @@ export default function RkaLaporanPage() {
 
       const numCols = isUpu ? 11 : isPusdi ? 10 : 12;
 
-      // Header Fill Color and Cell Borders (sesuai gambar: Light Blue #9DC3E6 dengan border hitam solid)
+      // Lebar kolom tabel: Kolom berisikan nominal angka diseragamkan lebarnya secara presisi
+      const colWidths: number[] = isUpu
+        ? [550, 3650, 1244, 1244, 1244, 1244, 1244, 1244, 1244, 1244, 1246]
+        : isPusdi
+        ? [550, 3650, 1400, 1400, 1400, 1400, 1400, 1400, 1400, 1398]
+        : [550, 3400, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1143];
+
+      // Header Fill Color and Cell Borders (Light Blue #9DC3E6 dengan border hitam solid)
       const headerFill = '9DC3E6';
       const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
       const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
+      const cellMargins = { top: 120, bottom: 120, left: 80, right: 80 };
+      const pSpacing = { before: 30, after: 30 };
 
       const makeHeaderCell = ({
         text,
         rowSpan,
         columnSpan,
+        width,
         align = AlignmentType.CENTER,
         bold = true,
-        size = 15
+        size = 14
       }: {
         text: string;
         rowSpan?: number;
         columnSpan?: number;
+        width?: number;
         align?: any;
         bold?: boolean;
         size?: number;
@@ -2297,10 +2308,13 @@ export default function RkaLaporanPage() {
         return new DocxTableCell({
           rowSpan,
           columnSpan,
+          width: width ? { size: width, type: WidthType.DXA } : undefined,
+          margins: cellMargins,
           children: [
             new Paragraph({
               children: [new TextRun({ text, bold, size, color: '000000' })],
               alignment: align,
+              spacing: pSpacing
             })
           ],
           shading: { fill: headerFill, type: ShadingType.CLEAR },
@@ -2317,46 +2331,52 @@ export default function RkaLaporanPage() {
         // Baris 1: Header Utama (No & Unit Kerja rowSpan 2, Penerimaan colSpan 3, Kolom lain rowSpan 2)
         const fHeaderRow1 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 400, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, size: 15 }),
-            makeHeaderCell({ text: 'Luncuran', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', rowSpan: 2, size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', rowSpan: 2, size: 15 }),
+            makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 14 }),
+            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 14 }),
+            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, width: colWidths[2] + colWidths[3] + colWidths[4], size: 14 }),
+            makeHeaderCell({ text: 'Luncuran', rowSpan: 2, width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', rowSpan: 2, width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', rowSpan: 2, width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', rowSpan: 2, width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', rowSpan: 2, width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', rowSpan: 2, width: colWidths[10], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', rowSpan: 2, width: colWidths[11], size: 14 }),
           ]
         });
 
         // Baris 2: Sub-kolom Penerimaan (Pendidikan, Non Pendidikan, Jumlah)
         const fHeaderRow2 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 380, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'Pendidikan', size: 14 }),
-            makeHeaderCell({ text: 'Non Pendidikan', size: 14 }),
-            makeHeaderCell({ text: 'Jumlah', size: 14 }),
+            makeHeaderCell({ text: 'Pendidikan', width: colWidths[2], size: 13 }),
+            makeHeaderCell({ text: 'Non Pendidikan', width: colWidths[3], size: 13 }),
+            makeHeaderCell({ text: 'Jumlah', width: colWidths[4], size: 13 }),
           ]
         });
 
         // Baris 3: Nomor Kolom & Formula (1, 2, 3 (1+2), 4, 5 (3+4), 6, 7, 8 (6+7), 9 (3-6), 10 (3+4-8))
         const fHeaderRow3 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 360, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '1', size: 13 }),
-            makeHeaderCell({ text: '2', size: 13 }),
-            makeHeaderCell({ text: '3 (1+2)', size: 13 }),
-            makeHeaderCell({ text: '4', size: 13 }),
-            makeHeaderCell({ text: '5 (3+4)', size: 13 }),
-            makeHeaderCell({ text: '6', size: 13 }),
-            makeHeaderCell({ text: '7', size: 13 }),
-            makeHeaderCell({ text: '8 (6+7)', size: 13 }),
-            makeHeaderCell({ text: '9 (3-6)', size: 13 }),
-            makeHeaderCell({ text: '10 (3+4-8)', size: 13 }),
+            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
+            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
+            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
+            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
+            makeHeaderCell({ text: '3 (1+2)', width: colWidths[4], size: 12 }),
+            makeHeaderCell({ text: '4', width: colWidths[5], size: 12 }),
+            makeHeaderCell({ text: '5 (3+4)', width: colWidths[6], size: 12 }),
+            makeHeaderCell({ text: '6', width: colWidths[7], size: 12 }),
+            makeHeaderCell({ text: '7', width: colWidths[8], size: 12 }),
+            makeHeaderCell({ text: '8 (6+7)', width: colWidths[9], size: 12 }),
+            makeHeaderCell({ text: '9 (3-6)', width: colWidths[10], size: 12 }),
+            makeHeaderCell({ text: '10 (3+4-8)', width: colWidths[11], size: 12 }),
           ]
         });
 
@@ -2365,33 +2385,37 @@ export default function RkaLaporanPage() {
         // === FORMAT PUSDI (9 Kolom Data, Mengikuti Desain Dasar) ===
         const pHeaderRow1 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 400, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', size: 15 }),
-            makeHeaderCell({ text: 'Penerimaan', size: 15 }),
-            makeHeaderCell({ text: 'Luncuran', size: 15 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', size: 15 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', size: 15 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', size: 15 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', size: 15 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
+            makeHeaderCell({ text: 'Penerimaan', width: colWidths[2], size: 14 }),
+            makeHeaderCell({ text: 'Luncuran', width: colWidths[3], size: 14 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', width: colWidths[4], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', width: colWidths[9], size: 14 }),
           ]
         });
 
         const pHeaderRow2 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 360, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '1', size: 13 }),
-            makeHeaderCell({ text: '2', size: 13 }),
-            makeHeaderCell({ text: '3 (1+2)', size: 13 }),
-            makeHeaderCell({ text: '4', size: 13 }),
-            makeHeaderCell({ text: '5', size: 13 }),
-            makeHeaderCell({ text: '6 (4+5)', size: 13 }),
-            makeHeaderCell({ text: '7 (1-4)', size: 13 }),
-            makeHeaderCell({ text: '8 (3-6)', size: 13 }),
+            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
+            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
+            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
+            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
+            makeHeaderCell({ text: '3 (1+2)', width: colWidths[4], size: 12 }),
+            makeHeaderCell({ text: '4', width: colWidths[5], size: 12 }),
+            makeHeaderCell({ text: '5', width: colWidths[6], size: 12 }),
+            makeHeaderCell({ text: '6 (4+5)', width: colWidths[7], size: 12 }),
+            makeHeaderCell({ text: '7 (1-4)', width: colWidths[8], size: 12 }),
+            makeHeaderCell({ text: '8 (3-6)', width: colWidths[9], size: 12 }),
           ]
         });
 
@@ -2400,35 +2424,39 @@ export default function RkaLaporanPage() {
         // === FORMAT UPU (10 Kolom Data, Mengikuti Desain Dasar) ===
         const uHeaderRow1 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 400, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', size: 15 }),
-            makeHeaderCell({ text: 'Subsidi', size: 15 }),
-            makeHeaderCell({ text: 'Penerimaan', size: 15 }),
-            makeHeaderCell({ text: 'Luncuran', size: 15 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', size: 15 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', size: 15 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', size: 15 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', size: 15 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', size: 15 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
+            makeHeaderCell({ text: 'Subsidi', width: colWidths[2], size: 14 }),
+            makeHeaderCell({ text: 'Penerimaan', width: colWidths[3], size: 14 }),
+            makeHeaderCell({ text: 'Luncuran', width: colWidths[4], size: 14 }),
+            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran Operasional', width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Investasi (Belanja Modal)', width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Total Pengeluaran', width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Operasional', width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', width: colWidths[10], size: 14 }),
           ]
         });
 
         const uHeaderRow2 = new DocxTableRow({
           tableHeader: true,
+          cantSplit: true,
+          height: { value: 360, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '', size: 13 }),
-            makeHeaderCell({ text: '1', size: 13 }),
-            makeHeaderCell({ text: '2', size: 13 }),
-            makeHeaderCell({ text: '3', size: 13 }),
-            makeHeaderCell({ text: '4 (1+2+3)', size: 13 }),
-            makeHeaderCell({ text: '5', size: 13 }),
-            makeHeaderCell({ text: '6', size: 13 }),
-            makeHeaderCell({ text: '7 (5+6)', size: 13 }),
-            makeHeaderCell({ text: '8 (1+2-5)', size: 13 }),
-            makeHeaderCell({ text: '9 (3-6)', size: 13 }),
+            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
+            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
+            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
+            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
+            makeHeaderCell({ text: '3', width: colWidths[4], size: 12 }),
+            makeHeaderCell({ text: '4 (1+2+3)', width: colWidths[5], size: 12 }),
+            makeHeaderCell({ text: '5', width: colWidths[6], size: 12 }),
+            makeHeaderCell({ text: '6', width: colWidths[7], size: 12 }),
+            makeHeaderCell({ text: '7 (5+6)', width: colWidths[8], size: 12 }),
+            makeHeaderCell({ text: '8 (1+2-5)', width: colWidths[9], size: 12 }),
+            makeHeaderCell({ text: '9 (3-6)', width: colWidths[10], size: 12 }),
           ]
         });
 
@@ -2445,9 +2473,12 @@ export default function RkaLaporanPage() {
       displayGroups.forEach(group => {
         // Group Header Banner
         const grpRow = new DocxTableRow({
+          cantSplit: true,
+          height: { value: 380, rule: HeightRule.ATLEAST },
           children: [
             new DocxTableCell({
               columnSpan: numCols,
+              margins: cellMargins,
               children: [new Paragraph({
                 children: [
                   new TextRun({ 
@@ -2458,6 +2489,7 @@ export default function RkaLaporanPage() {
                   })
                 ],
                 alignment: AlignmentType.LEFT,
+                spacing: pSpacing
               })],
               shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
@@ -2512,10 +2544,15 @@ export default function RkaLaporanPage() {
               ];
 
           const dRow = new DocxTableRow({
-            children: cellsData.map(c => new DocxTableCell({
+            cantSplit: true,
+            height: { value: 380, rule: HeightRule.ATLEAST },
+            children: cellsData.map((c, cIdx) => new DocxTableCell({
+              width: { size: colWidths[cIdx], type: WidthType.DXA },
+              margins: cellMargins,
               children: [new Paragraph({
                 children: [new TextRun({ text: c.text, bold: c.bold, size: 14 })],
                 alignment: c.align,
+                spacing: pSpacing
               })],
               verticalAlign: VerticalAlign.CENTER,
               borders: cellBorders,
@@ -2562,21 +2599,29 @@ export default function RkaLaporanPage() {
             ];
 
         const subRow = new DocxTableRow({
+          cantSplit: true,
+          height: { value: 380, rule: HeightRule.ATLEAST },
           children: [
             new DocxTableCell({
               columnSpan: 2,
+              width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
+              margins: cellMargins,
               children: [new Paragraph({
                 children: [new TextRun({ text: `SUBTOTAL ${group.groupOrg.toUpperCase()}`, bold: true, size: 14 })],
                 alignment: AlignmentType.RIGHT,
+                spacing: pSpacing
               })],
               shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
               borders: cellBorders,
             }),
-            ...subtotalCells.map(val => new DocxTableCell({
+            ...subtotalCells.map((val, sIdx) => new DocxTableCell({
+              width: { size: colWidths[sIdx + 2], type: WidthType.DXA },
+              margins: cellMargins,
               children: [new Paragraph({
                 children: [new TextRun({ text: val, bold: true, size: 14 })],
                 alignment: AlignmentType.RIGHT,
+                spacing: pSpacing
               })],
               shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
               verticalAlign: VerticalAlign.CENTER,
@@ -2625,21 +2670,29 @@ export default function RkaLaporanPage() {
           ];
 
       const grandRow = new DocxTableRow({
+        cantSplit: true,
+        height: { value: 400, rule: HeightRule.ATLEAST },
         children: [
           new DocxTableCell({
             columnSpan: 2,
+            width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
+            margins: cellMargins,
             children: [new Paragraph({
               children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
+              spacing: pSpacing
             })],
             shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,
             borders: cellBorders,
           }),
-          ...grandTotalCells.map(val => new DocxTableCell({
+          ...grandTotalCells.map((val, gIdx) => new DocxTableCell({
+            width: { size: colWidths[gIdx + 2], type: WidthType.DXA },
+            margins: cellMargins,
             children: [new Paragraph({
               children: [new TextRun({ text: val, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
+              spacing: pSpacing
             })],
             shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,
@@ -2651,6 +2704,7 @@ export default function RkaLaporanPage() {
 
       const docTable = new DocxTable({
         width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: colWidths,
         rows: tableRows,
         borders: {
           top: borderSingle,
@@ -4074,26 +4128,25 @@ export default function RkaLaporanPage() {
                   ))}
                 </div>
 
-                {/* Export Buttons: Excel & Word Landscape */}
+                {/* Export Buttons: Excel & Word Landscape (Icon Only) */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleExportExcelUnitRekap}
-                  className="h-8 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                  className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 shadow-2xs cursor-pointer flex items-center justify-center"
+                  title={`Export Excel (${rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})`}
                 >
-                  <Download size={13} className="text-emerald-600" />
-                  <span>Export Excel ({rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})</span>
+                  <Download size={14} className="text-emerald-600" />
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleExportWordUnitRekap}
-                  className="h-8 rounded-xl border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                  title="Unduh format dokumen Word landscape rapi 1 halaman lebar"
+                  className="h-8 w-8 p-0 rounded-xl border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 shadow-2xs cursor-pointer flex items-center justify-center"
+                  title="Export Word (Landscape)"
                 >
-                  <FileText size={13} className="text-blue-600" />
-                  <span>Export Word (Landscape)</span>
+                  <FileText size={14} className="text-blue-600" />
                 </Button>
 
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">

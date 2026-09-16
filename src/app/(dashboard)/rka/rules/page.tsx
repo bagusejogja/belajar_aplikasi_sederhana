@@ -770,17 +770,6 @@ export default function RkaRulesPage() {
             <span>{isApplying ? 'Memproses Data...' : activeModul === 'penerimaan' ? 'Jalankan Rule Penerimaan' : 'Jalankan Rule Pengeluaran'}</span>
           </Button>
 
-          {/* Tombol Kelola Format Laporan */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFormatManagerOpen(true)}
-            className="h-9 rounded-xl border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-          >
-            <Layers size={14} className="text-indigo-600" />
-            <span>Kelola Format Laporan</span>
-          </Button>
-
           {/* Tombol Buka/Tutup Paste Zone */}
           <Button
             variant="outline"
@@ -793,41 +782,6 @@ export default function RkaRulesPage() {
             <FileSpreadsheet size={14} className="text-indigo-600" />
             <span>{showInlinePasteZone ? 'Sembunyikan Paste Zone' : 'Buka Paste Zone'}</span>
           </Button>
-
-          {/* Tombol Quick Paste Modal */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPasteModalOpen(true)}
-            className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
-          >
-            <Upload size={14} className="text-indigo-600" />
-            <span>Paste Modal</span>
-          </Button>
-
-          {/* Link ke RKA Penerimaan */}
-          <Link href="/rka/penerimaan">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <Wallet size={14} className="text-emerald-600" />
-              <span>RKA Penerimaan</span>
-            </Button>
-          </Link>
-
-          {/* Link ke RKA Pengeluaran */}
-          <Link href="/rka/pengeluaran">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <FolderTree size={14} className="text-gray-600" />
-              <span>RKA Pengeluaran</span>
-            </Button>
-          </Link>
 
           {/* Refresh Button */}
           <Button
@@ -905,8 +859,8 @@ export default function RkaRulesPage() {
               {rules.length} <span className="text-xs font-semibold text-gray-500 font-sans">Aturan</span>
             </div>
             <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Prioritas: 1 (Tertinggi) s/d 99</span>
-              <Badge variant="secondary" className="text-[10px] font-bold">Rule Set</Badge>
+              <span>Urutan Evaluasi Aturan</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">Prioritas #1 (Utama)</Badge>
             </div>
           </CardContent>
         </Card>
