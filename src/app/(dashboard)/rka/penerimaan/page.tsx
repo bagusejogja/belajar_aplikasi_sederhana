@@ -754,17 +754,6 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
             <span>Tambah Data</span>
           </Button>
 
-          <Link href="/rka/rules">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <Wand2 size={14} className="text-emerald-700" />
-              <span>Rule Engine Penerimaan</span>
-            </Button>
-          </Link>
-
           <Button
             variant="outline"
             size="sm"

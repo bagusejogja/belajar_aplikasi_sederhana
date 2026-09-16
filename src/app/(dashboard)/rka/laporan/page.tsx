@@ -2285,8 +2285,10 @@ export default function RkaLaporanPage() {
       const headerFill = '9DC3E6';
       const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
       const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
-      const cellMargins = { top: 120, bottom: 120, left: 80, right: 80 };
-      const pSpacing = { before: 30, after: 30 };
+      const headerCellMargins = { top: 60, bottom: 60, left: 50, right: 50 };
+      const headerSpacing = { before: 10, after: 10 };
+      const dataCellMargins = { top: 75, bottom: 75, left: 60, right: 60 };
+      const dataSpacing = { before: 15, after: 15 };
 
       const makeHeaderCell = ({
         text,
@@ -2309,12 +2311,12 @@ export default function RkaLaporanPage() {
           rowSpan,
           columnSpan,
           width: width ? { size: width, type: WidthType.DXA } : undefined,
-          margins: cellMargins,
+          margins: headerCellMargins,
           children: [
             new Paragraph({
               children: [new TextRun({ text, bold, size, color: '000000' })],
               alignment: align,
-              spacing: pSpacing
+              spacing: headerSpacing
             })
           ],
           shading: { fill: headerFill, type: ShadingType.CLEAR },
@@ -2332,7 +2334,7 @@ export default function RkaLaporanPage() {
         const fHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 400, rule: HeightRule.ATLEAST },
+          height: { value: 280, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 14 }),
             makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 14 }),
@@ -2351,7 +2353,7 @@ export default function RkaLaporanPage() {
         const fHeaderRow2 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 380, rule: HeightRule.ATLEAST },
+          height: { value: 250, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: 'Pendidikan', width: colWidths[2], size: 13 }),
             makeHeaderCell({ text: 'Non Pendidikan', width: colWidths[3], size: 13 }),
@@ -2363,7 +2365,7 @@ export default function RkaLaporanPage() {
         const fHeaderRow3 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 360, rule: HeightRule.ATLEAST },
+          height: { value: 230, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
             makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
@@ -2386,7 +2388,7 @@ export default function RkaLaporanPage() {
         const pHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 400, rule: HeightRule.ATLEAST },
+          height: { value: 280, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
             makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
@@ -2404,7 +2406,7 @@ export default function RkaLaporanPage() {
         const pHeaderRow2 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 360, rule: HeightRule.ATLEAST },
+          height: { value: 230, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
             makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
@@ -2425,7 +2427,7 @@ export default function RkaLaporanPage() {
         const uHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 400, rule: HeightRule.ATLEAST },
+          height: { value: 280, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
             makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
@@ -2444,7 +2446,7 @@ export default function RkaLaporanPage() {
         const uHeaderRow2 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 360, rule: HeightRule.ATLEAST },
+          height: { value: 230, rule: HeightRule.ATLEAST },
           children: [
             makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
             makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
@@ -2471,35 +2473,7 @@ export default function RkaLaporanPage() {
       let rowNum = 1;
 
       displayGroups.forEach(group => {
-        // Group Header Banner
-        const grpRow = new DocxTableRow({
-          cantSplit: true,
-          height: { value: 380, rule: HeightRule.ATLEAST },
-          children: [
-            new DocxTableCell({
-              columnSpan: numCols,
-              margins: cellMargins,
-              children: [new Paragraph({
-                children: [
-                  new TextRun({ 
-                    text: `GROUP: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`, 
-                    bold: true, 
-                    color: '1E3A8A', 
-                    size: 15 
-                  })
-                ],
-                alignment: AlignmentType.LEFT,
-                spacing: pSpacing
-              })],
-              shading: { fill: 'D9E1F2', type: ShadingType.CLEAR },
-              verticalAlign: VerticalAlign.CENTER,
-              borders: cellBorders,
-            })
-          ]
-        });
-        tableRows.push(grpRow);
-
-        // Unit data rows
+        // Unit data rows (langsung list unit tanpa banner grup dan subtotal grup)
         group.units.forEach(u => {
           const cellsData = isUpu
             ? [
@@ -2545,14 +2519,14 @@ export default function RkaLaporanPage() {
 
           const dRow = new DocxTableRow({
             cantSplit: true,
-            height: { value: 380, rule: HeightRule.ATLEAST },
+            height: { value: 310, rule: HeightRule.ATLEAST },
             children: cellsData.map((c, cIdx) => new DocxTableCell({
               width: { size: colWidths[cIdx], type: WidthType.DXA },
-              margins: cellMargins,
+              margins: dataCellMargins,
               children: [new Paragraph({
                 children: [new TextRun({ text: c.text, bold: c.bold, size: 14 })],
                 alignment: c.align,
-                spacing: pSpacing
+                spacing: dataSpacing
               })],
               verticalAlign: VerticalAlign.CENTER,
               borders: cellBorders,
@@ -2560,76 +2534,6 @@ export default function RkaLaporanPage() {
           });
           tableRows.push(dRow);
         });
-
-        // Group Subtotal row
-        const subtotalCells = isUpu
-          ? [
-              `0`,
-              formatRp(group.totalJumlahPenerimaan),
-              formatRp(group.totalLuncuran),
-              formatRp(group.totalSumberPembiayaan),
-              formatRp(group.totalOperasional),
-              formatRp(group.totalModal),
-              formatRp(group.totalPengeluaran),
-              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
-              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
-            ]
-          : isPusdi
-          ? [
-              formatRp(group.totalJumlahPenerimaan),
-              formatRp(group.totalLuncuran),
-              formatRp(group.totalSumberPembiayaan),
-              formatRp(group.totalOperasional),
-              formatRp(group.totalModal),
-              formatRp(group.totalPengeluaran),
-              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
-              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
-            ]
-          : [
-              formatRp(group.totalPendidikan),
-              formatRp(group.totalNonPendidikan),
-              formatRp(group.totalJumlahPenerimaan),
-              formatRp(group.totalLuncuran),
-              formatRp(group.totalSumberPembiayaan),
-              formatRp(group.totalOperasional),
-              formatRp(group.totalModal),
-              formatRp(group.totalPengeluaran),
-              `${group.totalSurplusDefisitOperasional < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitOperasional))}`,
-              `${group.totalSurplusDefisitAnggaran < 0 ? '- ' : ''}${formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}`
-            ];
-
-        const subRow = new DocxTableRow({
-          cantSplit: true,
-          height: { value: 380, rule: HeightRule.ATLEAST },
-          children: [
-            new DocxTableCell({
-              columnSpan: 2,
-              width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
-              margins: cellMargins,
-              children: [new Paragraph({
-                children: [new TextRun({ text: `SUBTOTAL ${group.groupOrg.toUpperCase()}`, bold: true, size: 14 })],
-                alignment: AlignmentType.RIGHT,
-                spacing: pSpacing
-              })],
-              shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
-              verticalAlign: VerticalAlign.CENTER,
-              borders: cellBorders,
-            }),
-            ...subtotalCells.map((val, sIdx) => new DocxTableCell({
-              width: { size: colWidths[sIdx + 2], type: WidthType.DXA },
-              margins: cellMargins,
-              children: [new Paragraph({
-                children: [new TextRun({ text: val, bold: true, size: 14 })],
-                alignment: AlignmentType.RIGHT,
-                spacing: pSpacing
-              })],
-              shading: { fill: 'F2F2F2', type: ShadingType.CLEAR },
-              verticalAlign: VerticalAlign.CENTER,
-              borders: cellBorders,
-            }))
-          ]
-        });
-        tableRows.push(subRow);
       });
 
       // Grand Total row
@@ -2671,16 +2575,16 @@ export default function RkaLaporanPage() {
 
       const grandRow = new DocxTableRow({
         cantSplit: true,
-        height: { value: 400, rule: HeightRule.ATLEAST },
+        height: { value: 330, rule: HeightRule.ATLEAST },
         children: [
           new DocxTableCell({
             columnSpan: 2,
             width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
-            margins: cellMargins,
+            margins: dataCellMargins,
             children: [new Paragraph({
               children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
-              spacing: pSpacing
+              spacing: dataSpacing
             })],
             shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,
@@ -2688,11 +2592,11 @@ export default function RkaLaporanPage() {
           }),
           ...grandTotalCells.map((val, gIdx) => new DocxTableCell({
             width: { size: colWidths[gIdx + 2], type: WidthType.DXA },
-            margins: cellMargins,
+            margins: dataCellMargins,
             children: [new Paragraph({
               children: [new TextRun({ text: val, bold: true, size: 14 })],
               alignment: AlignmentType.RIGHT,
-              spacing: pSpacing
+              spacing: dataSpacing
             })],
             shading: { fill: 'BDD7EE', type: ShadingType.CLEAR },
             verticalAlign: VerticalAlign.CENTER,

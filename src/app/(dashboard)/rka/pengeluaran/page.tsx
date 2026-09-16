@@ -747,17 +747,6 @@ export default function RkaPengeluaranPage() {
             <span>Tambah Data</span>
           </Button>
 
-          <Link href="/rka/rules">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <Sparkles size={14} className="text-indigo-600" />
-              <span>Rule Engine</span>
-            </Button>
-          </Link>
-
           <Button
             variant="outline"
             size="sm"
