@@ -292,6 +292,8 @@ export default function RkaPenerimaanPage() {
     let totalSedangDiproses = 0;
     let totalDisetujui = 0;
     const unitsSet = new Set<string>();
+    const akunSet = new Set<string>();
+    const sumberDanaSet = new Set<string>();
 
     filteredData.forEach(d => {
       const pagu = Number(d.renterima_pagu) || 0;
@@ -301,6 +303,8 @@ export default function RkaPenerimaanPage() {
       totalVolume += vol;
       totalJumlah += jml;
       if (d.unit_kerja) unitsSet.add(d.unit_kerja);
+      if (d.nama_akun_penerimaan) akunSet.add(d.nama_akun_penerimaan);
+      if (d.sumber_dana) sumberDanaSet.add(d.sumber_dana);
       if (d.status === 'Sedang Diproses') totalSedangDiproses++;
       else if (d.status === 'Disetujui' || d.status === 'Selesai') totalDisetujui++;
     });
@@ -312,6 +316,8 @@ export default function RkaPenerimaanPage() {
       totalSedangDiproses,
       totalDisetujui,
       unitCount: unitsSet.size,
+      akunCount: akunSet.size,
+      sumberDanaCount: sumberDanaSet.size,
       totalCount: filteredData.length,
       grandTotalCount: dataList.length
     };
@@ -748,17 +754,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
             <span>Tambah Data</span>
           </Button>
 
-          <Link href="/rka/pengeluaran">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <FolderTree size={14} className="text-indigo-600" />
-              <span>RKA Pengeluaran</span>
-            </Button>
-          </Link>
-             <Link href="/rka/rules">
+          <Link href="/rka/rules">
             <Button
               variant="outline"
               size="sm"
@@ -766,17 +762,6 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
             >
               <Wand2 size={14} className="text-emerald-700" />
               <span>Rule Engine Penerimaan</span>
-            </Button>
-          </Link>
-
-          <Link href="/rka/laporan">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <Layers size={14} className="text-gray-600" />
-              <span>Rekap Laporan</span>
             </Button>
           </Link>
 
@@ -851,15 +836,15 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
 
         <Card className="rounded-2xl border-emerald-100 shadow-xs bg-gradient-to-b from-white to-emerald-50/30">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-              Total Volume / Kuantitas Target
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block flex items-center gap-1">
+              <span>📋</span> <span>Ragam Akun Penerimaan</span>
             </span>
             <div className="text-2xl font-black font-mono text-emerald-700">
-              {metrics.totalVolume.toLocaleString('id-ID')} Target
+              {metrics.akunCount} <span className="text-sm font-semibold text-emerald-600">Akun</span>
             </div>
             <div className="text-xs text-emerald-700 font-semibold flex items-center justify-between pt-1 border-t border-emerald-100/60">
-              <span>Total Hitung: Rp {formatRp(metrics.totalJumlah)}</span>
-              <span className="text-[10px] text-gray-500">Vol × Tarif</span>
+              <span>{metrics.sumberDanaCount} Sumber Dana Terdata</span>
+              <span className="text-[10px] text-gray-500">{metrics.totalCount.toLocaleString('id-ID')} Baris</span>
             </div>
           </CardContent>
         </Card>

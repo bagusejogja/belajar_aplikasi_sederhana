@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
     const onlyClassified = searchParams.get('only_classified'); // 'true' | 'false'
     const targetFormat = searchParams.get('format');
-    const selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags';
+    const selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
 
     // 1. Pencarian Cepat Teroptimasi (jika ada parameter search)
     if (search && search.trim()) {

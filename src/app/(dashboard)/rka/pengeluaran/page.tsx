@@ -389,6 +389,13 @@ export default function RkaPengeluaranPage() {
     const weboRows = filteredData.filter(d => d.laporan_webometrics && d.laporan_webometrics.trim() !== '');
     const weboTotal = weboRows.reduce((acc, d) => acc + (Number(d.anggaran) || 0), 0);
 
+    const unitSet = new Set<string>();
+    const sumberDanaSet = new Set<string>();
+    filteredData.forEach(d => {
+      if (d.unit) unitSet.add(d.unit);
+      if (d.sumber_dana_nama) sumberDanaSet.add(d.sumber_dana_nama);
+    });
+
     return {
       totalCount: filteredData.length,
       grandTotalCount: dataList.length,
@@ -396,6 +403,8 @@ export default function RkaPengeluaranPage() {
       totalRealisasi,
       sisaAnggaran,
       persenSerapan,
+      unitCount: unitSet.size,
+      sumberDanaCount: sumberDanaSet.size,
       proposalCount: proposalRows.length,
       proposalTotal,
       unmappedCount: unmappedRows.length,
@@ -731,33 +740,12 @@ export default function RkaPengeluaranPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPasteModalOpen(true)}
-            className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
-          >
-            <Upload size={14} className="text-indigo-600" />
-            <span>Paste Modal</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setAddModalOpen(true)}
             className="h-9 rounded-xl border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold gap-1.5 shadow-2xs"
           >
             <Plus size={14} className="text-emerald-600" />
             <span>Tambah Data</span>
           </Button>
-
-          <Link href="/rka/penerimaan">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
-            >
-              <Wallet size={14} className="text-emerald-600" />
-              <span>RKA Penerimaan</span>
-            </Button>
-          </Link>
 
           <Link href="/rka/rules">
             <Button
@@ -812,15 +800,17 @@ export default function RkaPengeluaranPage() {
 
         <Card className="rounded-2xl border-emerald-100 shadow-xs bg-gradient-to-b from-white to-emerald-50/30">
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
-              Total Realisasi Belanja
+            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block flex items-center gap-1">
+              <span>🏢</span> <span>Unit Kerja & Ragam Sumber Dana</span>
             </span>
             <div className="text-2xl font-black font-mono text-emerald-700">
-              Rp {formatRp(metrics.totalRealisasi)}
+              {metrics.unitCount} <span className="text-sm font-semibold text-emerald-600">Unit Terdata</span>
             </div>
             <div className="text-xs text-emerald-700 font-semibold flex items-center justify-between pt-1 border-t border-emerald-100/60">
-              <span>Serapan: {metrics.persenSerapan}%</span>
-              <span className="text-[10px] text-gray-500 font-mono">Sisa: Rp {formatRp(metrics.sisaAnggaran)}</span>
+              <span>{metrics.sumberDanaCount} Ragam Sumber Dana</span>
+              <span className="text-[10px] text-gray-500 font-mono">
+                Rp {metrics.unitCount > 0 ? formatRp(metrics.totalAnggaran / metrics.unitCount) : 0} / unit
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -1312,36 +1302,47 @@ export default function RkaPengeluaranPage() {
                     {/* 2. Rencana Strategis (Kelompok Indikator Program)        */}
                     {/* 3. TA • Prioritas (Rata Kiri)                            */}
                     {/* 4. Kegiatan & Lingkup (Konteks)                          */}
-                    {/* 5. Akun Detail & Uraian Belanja (PALING BAWAH)           */}
                     {/* ======================================================== */}
-                    <td className="px-5 py-4 align-top space-y-2">
+                    {/* 1. Unit Kerja, Kegiatan, Akun & Uraian Belanja           */}
+                    {/* ======================================================== */}
+                    <td className="px-5 py-4 align-top space-y-2.5">
                       
-                      {/* 1. Unit Kerja */}
-                      <div className="flex items-center gap-1.5 font-black text-gray-900 text-xs bg-slate-100/90 px-2.5 py-1 rounded-lg border border-slate-200 w-max">
-                        <Building2 size={13} className="text-indigo-600 shrink-0" />
-                        <span>{row.unit || 'Unit Kerja UGM'}</span>
+                      {/* 1. Unit Kerja & Sumber Dana */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1.5 font-bold text-slate-800 text-xs bg-slate-100/95 px-2.5 py-1 rounded-lg border border-slate-200/90 shadow-2xs">
+                          <Building2 size={13} className="text-indigo-600 shrink-0" />
+                          <span>{row.unit || 'Unit Kerja UGM'}</span>
+                        </div>
+                        {row.sumber_dana_nama && (
+                          <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span className="truncate max-w-[280px]" title={row.sumber_dana_nama}>{row.sumber_dana_nama}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* 2. Rencana Strategis / Kelompok Indikator Program */}
                       {row.kelompok_indikator_program && (
                         <div>
-                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[11px] font-bold">
+                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[11px] font-semibold">
                             {row.kelompok_indikator_program}
                           </span>
                         </div>
                       )}
 
-                      {/* 3. TA & Prioritas (Rata Kiri, tidak menjorok) */}
-                      <div className="text-[11px] text-gray-500 font-mono">
-                        TA {row.tahun_anggaran || 2027} • Prioritas: <strong className="text-gray-700">{row.prioritas || '-'}</strong>
+                      {/* 3. TA & Prioritas */}
+                      <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
+                        <span>TA {row.tahun_anggaran || 2027}</span>
+                        <span>•</span>
+                        <span>Prioritas: <strong className="text-slate-700">{row.prioritas || '-'}</strong></span>
                       </div>
 
-                      {/* 4. Konteks Kegiatan & Lingkup Kegiatan (tanpa background) */}
+                      {/* 4. Konteks Kegiatan & Lingkup Kegiatan */}
                       {(row.kegiatan || row.lingkup_kegiatan) && (
-                        <div className="space-y-0.5 text-xs py-0.5">
+                        <div className="space-y-1 text-xs py-0.5 border-l-2 border-slate-200 pl-2.5">
                           {row.kegiatan && (
-                            <div className="text-[11px] text-gray-700 leading-relaxed font-medium">
-                              <span className="font-bold text-gray-800">📌 Kegiatan:</span> {row.kegiatan}
+                            <div className="text-[11px] text-slate-700 leading-relaxed font-medium">
+                              <span className="font-bold text-slate-800">📌 Kegiatan:</span> {row.kegiatan}
                             </div>
                           )}
                           {row.lingkup_kegiatan && (
@@ -1352,14 +1353,14 @@ export default function RkaPengeluaranPage() {
                         </div>
                       )}
 
-                      {/* 5. Akun Detail & Uraian Belanja (DITARUH PALING BAWAH - tanpa background) */}
-                      <div className="pt-1 space-y-0.5">
+                      {/* 5. Akun Detail & Uraian Belanja */}
+                      <div className="pt-1 space-y-1">
                         {row.akun_detail && (
-                          <div className="font-mono text-[11px] font-bold text-gray-800">
+                          <div className="inline-block font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200/70">
                             {row.akun_detail}
                           </div>
                         )}
-                        <div className="font-bold text-gray-950 text-xs sm:text-sm leading-snug">
+                        <div className="font-bold text-slate-900 text-sm leading-snug tracking-tight">
                           {row.uraian_belanja || '-'}
                         </div>
                       </div>
