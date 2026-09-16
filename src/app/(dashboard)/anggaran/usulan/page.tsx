@@ -17,6 +17,7 @@ export default function UsulanAnggaranPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
   const [selectedTP, setSelectedTP] = useState<string>('');
+  const [hasSetDefaultTP, setHasSetDefaultTP] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isDownloadingMulti, setIsDownloadingMulti] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,14 +65,20 @@ export default function UsulanAnggaranPage() {
       }
     });
     // Sort descending by Year, then Period
-    return Array.from(tps).sort((a, b) => b.localeCompare(a));
+    return Array.from(tps).sort((a, b) => {
+      const partsA = a.split(' - ').map(s => parseInt(s.trim(), 10) || 0);
+      const partsB = b.split(' - ').map(s => parseInt(s.trim(), 10) || 0);
+      if (partsB[0] !== partsA[0]) return partsB[0] - partsA[0];
+      return partsB[1] - partsA[1];
+    });
   }, [rawData]);
 
   useEffect(() => {
-    if (availableTPs.length > 0 && !selectedTP) {
+    if (availableTPs.length > 0 && !hasSetDefaultTP) {
       setSelectedTP(availableTPs[0]); // default to latest
+      setHasSetDefaultTP(true);
     }
-  }, [availableTPs, selectedTP]);
+  }, [availableTPs, hasSetDefaultTP]);
 
   const handleProcess = async (id: number) => {
     if (!confirm("Tandai revisi ini sebagai Sudah Diproses?")) return;
@@ -124,7 +131,7 @@ export default function UsulanAnggaranPage() {
       const t = item.tahun || item.Tahun;
       const p = item.periode || item.Periode;
       const itemTP = (t && p) ? `${t} - ${p}` : '';
-      const matchesTP = selectedTP ? itemTP === selectedTP : true;
+      const matchesTP = (selectedTP === 'ALL' || !selectedTP) ? true : itemTP === selectedTP;
       return matchesSearch && matchesPic && matchesTP;
     });
     // sort: yang belum selesai (bukan 'Sudah Diproses') ditaruh di atas, lalu urut tanggal terbaru
@@ -400,7 +407,7 @@ export default function UsulanAnggaranPage() {
                 Usulan Revisi Terjadwal
               </h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                {filteredData.length} Pengajuan ({selectedTP || 'Semua Periode'})
+                {filteredData.length} Pengajuan ({selectedTP === 'ALL' || !selectedTP ? 'Semua Periode' : `${selectedTP}${selectedTP === availableTPs[0] ? ' (Terbaru)' : ''}`})
               </span>
             </div>
             <p className="text-gray-500 font-medium text-[11px] mt-0.5">
@@ -454,7 +461,7 @@ export default function UsulanAnggaranPage() {
             </div>
           </div>
           <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-100/60 pt-2">
-            <span>Periode {selectedTP || 'Semua'}</span>
+            <span>Periode {selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}</span>
             <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">100%</span>
           </div>
         </div>
@@ -498,7 +505,7 @@ export default function UsulanAnggaranPage() {
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
           <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
-            <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP})` : ''}
+            <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}
           </h2>
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button 
@@ -621,16 +628,18 @@ export default function UsulanAnggaranPage() {
             />
           </div>
           
-          <div className="w-full md:w-56">
+          <div className="w-full md:w-64">
             <select 
               value={selectedTP}
               onChange={(e) => setSelectedTP(e.target.value)}
-              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
             >
-              <option value="">Semua Tahun-Periode</option>
               {availableTPs.map((tp, idx) => (
-                <option key={idx} value={tp}>{tp}</option>
+                <option key={idx} value={tp}>
+                  {tp} {idx === 0 ? '★ (Terbaru)' : '(Sebelumnya)'}
+                </option>
               ))}
+              <option value="ALL">Semua Periode (Semua Tahun)</option>
             </select>
           </div>
 
