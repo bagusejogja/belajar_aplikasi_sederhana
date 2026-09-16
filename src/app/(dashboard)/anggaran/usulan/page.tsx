@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
-  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList
+  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
@@ -507,18 +507,22 @@ export default function UsulanAnggaranPage() {
           <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
             <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}
           </h2>
-          <div className="flex bg-gray-100 p-1 rounded-xl">
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/60 shadow-2xs gap-0.5">
             <button 
               onClick={() => setActiveTab('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-1.5 px-2.5 rounded-lg transition-all flex items-center justify-center ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60' : 'text-gray-400 hover:text-gray-700'}`}
+              title="Tabel Frekuensi"
+              aria-label="Tabel Frekuensi"
             >
-              Tabel Frekuensi
+              <Table2 size={16} strokeWidth={activeTab === 'table' ? 2.5 : 2} />
             </button>
             <button 
               onClick={() => setActiveTab('chart')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-1.5 px-2.5 rounded-lg transition-all flex items-center justify-center ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60' : 'text-gray-400 hover:text-gray-700'}`}
+              title="Grafik Batang"
+              aria-label="Grafik Batang"
             >
-              Grafik Batang
+              <BarChart3 size={16} strokeWidth={activeTab === 'chart' ? 2.5 : 2} />
             </button>
           </div>
         </div>
