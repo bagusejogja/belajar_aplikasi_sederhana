@@ -36,7 +36,9 @@ import {
   Box,
   Activity,
   Radio,
-  Clock
+  Clock,
+  ListTodo,
+  BarChart4
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -70,7 +72,11 @@ const iconMap: Record<string, any> = {
   Wand2,
   Activity,
   Radio,
-  Clock
+  Clock,
+  ListTodo,
+  Calendar,
+  FolderTree,
+  BarChart4
 };
 
 const groupIconMap: Record<string, any> = {

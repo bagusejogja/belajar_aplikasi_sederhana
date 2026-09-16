@@ -107,6 +107,7 @@ export const menuList: MenuItem[] = [
 
   // --- MANAJEMEN KEGIATAN ---
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
+  { title: 'Catatan & Tugas Kerja', path: '/catatan-tugas', icon: 'ListTodo', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Arsip Berjenjang', path: '/arsip-kegiatan', icon: 'FolderTree', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
 
