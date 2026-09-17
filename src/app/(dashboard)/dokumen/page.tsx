@@ -38,7 +38,8 @@ import {
   Check,
   Settings2,
   RefreshCw,
-  Hash
+  Hash,
+  Paperclip
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -81,7 +82,7 @@ const DEFAULT_JENIS_OPTIONS = [
   'Lainnya'
 ];
 
-const SUGGESTED_TAGS = [
+const DEFAULT_SUGGESTED_TAGS = [
   'akreditasi',
   'anggaran',
   'hibah',
@@ -132,12 +133,18 @@ export default function DokumenPage() {
   const [editingCatIndex, setEditingCatIndex] = useState<number | null>(null);
   const [editCatName, setEditCatName] = useState('');
 
+  // Dynamic Tags State
+  const [masterTags, setMasterTags] = useState<string[]>(DEFAULT_SUGGESTED_TAGS);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
+  const [editTagName, setEditTagName] = useState('');
+
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
   const [filterJenis, setFilterJenis] = useState('Semua');
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [filterSifat, setFilterSifat] = useState('Semua');
-  const [filterUnit, setFilterUnit] = useState('Semua');
   const [filterTag, setFilterTag] = useState('Semua');
 
   // Modals
@@ -162,7 +169,6 @@ export default function DokumenPage() {
   const [formLinkEksternal, setFormLinkEksternal] = useState('');
   const [formTags, setFormTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [formKeterangan, setFormKeterangan] = useState('');
 
   // File Upload State
@@ -204,6 +210,20 @@ export default function DokumenPage() {
     }
   };
 
+  // Load Master Tags
+  const fetchTags = () => {
+    const cached = localStorage.getItem('app_doc_tags_cache');
+    if (cached) {
+      try {
+        setMasterTags(JSON.parse(cached));
+      } catch (e) {
+        setMasterTags(DEFAULT_SUGGESTED_TAGS);
+      }
+    } else {
+      setMasterTags(DEFAULT_SUGGESTED_TAGS);
+    }
+  };
+
   // Fetch Documents
   const fetchDocuments = async () => {
     setLoading(true);
@@ -242,6 +262,7 @@ export default function DokumenPage() {
   useEffect(() => {
     fetchDocuments();
     fetchCategories();
+    fetchTags();
   }, []);
 
   // Retry Sync Button
@@ -318,15 +339,14 @@ NOTIFY pgrst, 'reload schema';`;
     setTimeout(() => setCopiedSql(false), 2500);
   };
 
-  // Helper: Status validity & countdown
+  // Helper: Status validity
   const getDocumentExpiry = (item: DocumentItem) => {
     if (!item.tanggal_berakhir) {
       return {
         status: 'Permanen',
-        label: 'Berlaku Permanen',
-        daysLeft: null,
+        label: 'Permanen',
         badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
-        iconClass: 'text-slate-500'
+        dotClass: 'bg-slate-400'
       };
     }
 
@@ -341,56 +361,35 @@ NOTIFY pgrst, 'reload schema';`;
     if (diffDays < 0) {
       return {
         status: 'Expired',
-        label: `Kadaluarsa (${Math.abs(diffDays)} hari lalu)`,
-        daysLeft: diffDays,
+        label: 'Kadaluarsa',
         badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-        iconClass: 'text-rose-600'
-      };
-    } else if (diffDays <= 30) {
-      return {
-        status: 'Akan Berakhir',
-        label: diffDays === 0 ? 'Berakhir Hari Ini' : `Sisa ${diffDays} Hari`,
-        daysLeft: diffDays,
-        badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
-        iconClass: 'text-amber-600'
+        dotClass: 'bg-rose-500'
       };
     } else {
       return {
         status: 'Aktif',
-        label: `Aktif (${diffDays} hari lagi)`,
-        daysLeft: diffDays,
+        label: 'Aktif',
         badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        iconClass: 'text-emerald-600'
+        dotClass: 'bg-emerald-500'
       };
     }
   };
 
-  // KPI Calculations
+  // KPI Calculations (Total, Aktif, Expired, Permanen)
   const stats = useMemo(() => {
     let total = documents.length;
     let aktif = 0;
-    let akanBerakhir = 0;
     let expired = 0;
     let permanen = 0;
 
     documents.forEach(doc => {
       const exp = getDocumentExpiry(doc);
       if (exp.status === 'Aktif') aktif++;
-      else if (exp.status === 'Akan Berakhir') akanBerakhir++;
       else if (exp.status === 'Expired') expired++;
       else if (exp.status === 'Permanen') permanen++;
     });
 
-    return { total, aktif, akanBerakhir, expired, permanen };
-  }, [documents]);
-
-  // Unique lists for filtering
-  const availableUnits = useMemo(() => {
-    const set = new Set<string>();
-    documents.forEach(d => {
-      if (d.unit_kerja && d.unit_kerja.trim()) set.add(d.unit_kerja.trim());
-    });
-    return Array.from(set).sort();
+    return { total, aktif, expired, permanen };
   }, [documents]);
 
   const allActiveTags = useMemo(() => {
@@ -402,9 +401,9 @@ NOTIFY pgrst, 'reload schema';`;
         });
       }
     });
-    SUGGESTED_TAGS.forEach(t => tagSet.add(t));
+    masterTags.forEach(t => tagSet.add(t));
     return Array.from(tagSet).sort();
-  }, [documents]);
+  }, [documents, masterTags]);
 
   // Filtered List
   const filteredDocuments = useMemo(() => {
@@ -439,11 +438,6 @@ NOTIFY pgrst, 'reload schema';`;
         return false;
       }
 
-      // Filter Unit
-      if (filterUnit !== 'Semua' && doc.unit_kerja !== filterUnit) {
-        return false;
-      }
-
       // Filter Tag
       if (filterTag !== 'Semua') {
         if (!doc.tags || !doc.tags.includes(filterTag)) return false;
@@ -451,7 +445,7 @@ NOTIFY pgrst, 'reload schema';`;
 
       return true;
     });
-  }, [documents, searchTerm, filterJenis, filterStatus, filterSifat, filterUnit, filterTag]);
+  }, [documents, searchTerm, filterJenis, filterStatus, filterSifat, filterTag]);
 
   // Handle Category Management
   const handleAddCategory = async () => {
@@ -485,7 +479,6 @@ NOTIFY pgrst, 'reload schema';`;
     setEditingCatIndex(null);
     localStorage.setItem('app_doc_categories_cache', JSON.stringify(updated));
 
-    // Also update current form if selected
     if (formJenis === oldName) setFormJenis(trimmed);
 
     try {
@@ -522,6 +515,50 @@ NOTIFY pgrst, 'reload schema';`;
     if (confirm('Kembalikan daftar jenis dokumen ke pengaturan awal default?')) {
       setJenisOptions(DEFAULT_JENIS_OPTIONS);
       localStorage.setItem('app_doc_categories_cache', JSON.stringify(DEFAULT_JENIS_OPTIONS));
+    }
+  };
+
+  // Handle Master Tag Management
+  const handleAddMasterTag = () => {
+    if (!newTagName.trim()) return;
+    const clean = newTagName.trim().replace(/^#/, '');
+    if (masterTags.includes(clean)) {
+      alert('Tagar ini sudah ada di daftar!');
+      return;
+    }
+    const updated = [...masterTags, clean];
+    setMasterTags(updated);
+    setNewTagName('');
+    localStorage.setItem('app_doc_tags_cache', JSON.stringify(updated));
+  };
+
+  const handleUpdateMasterTag = (oldTag: string, newTag: string) => {
+    const clean = newTag.trim().replace(/^#/, '');
+    if (!clean || clean === oldTag) {
+      setEditingTagIndex(null);
+      return;
+    }
+    const updated = masterTags.map(t => t === oldTag ? clean : t);
+    setMasterTags(updated);
+    setEditingTagIndex(null);
+    localStorage.setItem('app_doc_tags_cache', JSON.stringify(updated));
+
+    // Also update formTags if present
+    setFormTags(prev => prev.map(t => t === oldTag ? clean : t));
+  };
+
+  const handleDeleteMasterTag = (tagToDelete: string) => {
+    if (!confirm(`Hapus tagar "#${tagToDelete}" dari daftar master?`)) return;
+    const updated = masterTags.filter(t => t !== tagToDelete);
+    setMasterTags(updated);
+    localStorage.setItem('app_doc_tags_cache', JSON.stringify(updated));
+    setFormTags(prev => prev.filter(t => t !== tagToDelete));
+  };
+
+  const handleResetDefaultTags = () => {
+    if (confirm('Kembalikan daftar tagar ke pengaturan awal default?')) {
+      setMasterTags(DEFAULT_SUGGESTED_TAGS);
+      localStorage.setItem('app_doc_tags_cache', JSON.stringify(DEFAULT_SUGGESTED_TAGS));
     }
   };
 
@@ -635,7 +672,7 @@ NOTIFY pgrst, 'reload schema';`;
     setIsDetailOpen(true);
   };
 
-  // Tag Selection
+  // Tag Selection in form
   const handleAddTag = (tagToAdd: string) => {
     const clean = tagToAdd.trim().replace(/^#/, '');
     if (clean && !formTags.includes(clean)) {
@@ -795,7 +832,7 @@ NOTIFY pgrst, 'reload schema';`;
 
   return (
     <div className="min-h-screen bg-slate-50/60 p-4 md:p-8 space-y-6">
-      {/* HEADER SECTION */}
+      {/* HEADER SECTION (Judul: Dokumen) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
           <div className="flex items-center gap-3">
@@ -804,35 +841,44 @@ NOTIFY pgrst, 'reload schema';`;
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Dokumen & Masa Berlaku</h1>
+                <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Dokumen</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                   Persuratan
                 </span>
               </div>
               <p className="text-sm text-slate-500 mt-0.5">
-                Pusat pencatatan, pelacakan masa aktif surat dinas, SK, MoU, dan arsip dokumen penting.
+                Pusat pencatatan arsip persuratan, surat dinas, SK, MoU, dan pengelolaan dokumen.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
             title="Kelola Pilihan Jenis/Kategori Dokumen"
           >
             <Settings2 className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Kelola Kategori ({jenisOptions.length})</span>
+            <span>Kategori ({jenisOptions.length})</span>
+          </button>
+
+          <button
+            onClick={() => setIsTagModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
+            title="Kelola Master Tagar / Kata Kunci"
+          >
+            <Hash className="w-4 h-4 text-violet-600" />
+            <span>Tagar ({masterTags.length})</span>
           </button>
 
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
             title="Download Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">Export Excel</span>
+            <span className="hidden sm:inline">Export</span>
           </button>
 
           <button
@@ -856,7 +902,7 @@ NOTIFY pgrst, 'reload schema';`;
                   Sinkronisasi Cloud Supabase Belum Aktif
                 </p>
                 <p className="leading-relaxed text-amber-800">
-                  Tabel <code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-950 font-mono font-bold">app_documents</code> belum ada di database Supabase Anda. Semua data yang Anda simpan saat ini tersimpan aman di browser Anda (localStorage). Untuk mengaktifkan sinkronisasi cloud multi-user, jalankan skrip SQL di Supabase SQL Editor.
+                  Tabel <code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-950 font-mono font-bold">app_documents</code> belum ada di database Supabase Anda. Semua data tersimpan aman di browser (localStorage). Jalankan skrip SQL di Supabase untuk mengaktifkan sinkronisasi multi-user.
                 </p>
               </div>
             </div>
@@ -892,12 +938,12 @@ NOTIFY pgrst, 'reload schema';`;
         </div>
       )}
 
-      {/* KPI STATS CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+      {/* KPI STATS CARDS (4 Cards: Total, Aktif, Kadaluarsa, Permanen) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Total */}
         <div 
           onClick={() => setFilterStatus('Semua')}
-          className={`cursor-pointer p-4 rounded-xl border transition-all ${
+          className={`cursor-pointer p-4 rounded-2xl border transition-all ${
             filterStatus === 'Semua' 
               ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-200 shadow-xs' 
               : 'bg-white border-slate-200 hover:border-indigo-200 shadow-xs'
@@ -914,7 +960,7 @@ NOTIFY pgrst, 'reload schema';`;
         {/* Aktif */}
         <div 
           onClick={() => setFilterStatus(filterStatus === 'Aktif' ? 'Semua' : 'Aktif')}
-          className={`cursor-pointer p-4 rounded-xl border transition-all ${
+          className={`cursor-pointer p-4 rounded-2xl border transition-all ${
             filterStatus === 'Aktif' 
               ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-200 shadow-xs' 
               : 'bg-white border-slate-200 hover:border-emerald-200 shadow-xs'
@@ -925,30 +971,13 @@ NOTIFY pgrst, 'reload schema';`;
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-emerald-700 mt-2">{stats.aktif}</div>
-          <p className="text-[11px] text-emerald-600 mt-0.5">&gt; 30 hari masa berlaku</p>
-        </div>
-
-        {/* Akan Berakhir */}
-        <div 
-          onClick={() => setFilterStatus(filterStatus === 'Akan Berakhir' ? 'Semua' : 'Akan Berakhir')}
-          className={`cursor-pointer p-4 rounded-xl border transition-all ${
-            filterStatus === 'Akan Berakhir' 
-              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-200 shadow-xs' 
-              : 'bg-white border-slate-200 hover:border-amber-200 shadow-xs'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Akan Berakhir</span>
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl font-bold text-amber-700 mt-2">{stats.akanBerakhir}</div>
-          <p className="text-[11px] text-amber-600 mt-0.5">&le; 30 hari tersisa</p>
+          <p className="text-[11px] text-emerald-600 mt-0.5">Masa berlaku masih aktif</p>
         </div>
 
         {/* Expired */}
         <div 
           onClick={() => setFilterStatus(filterStatus === 'Expired' ? 'Semua' : 'Expired')}
-          className={`cursor-pointer p-4 rounded-xl border transition-all ${
+          className={`cursor-pointer p-4 rounded-2xl border transition-all ${
             filterStatus === 'Expired' 
               ? 'bg-rose-50/80 border-rose-300 ring-2 ring-rose-200 shadow-xs' 
               : 'bg-white border-slate-200 hover:border-rose-200 shadow-xs'
@@ -965,7 +994,7 @@ NOTIFY pgrst, 'reload schema';`;
         {/* Permanen */}
         <div 
           onClick={() => setFilterStatus(filterStatus === 'Permanen' ? 'Semua' : 'Permanen')}
-          className={`col-span-2 md:col-span-1 cursor-pointer p-4 rounded-xl border transition-all ${
+          className={`cursor-pointer p-4 rounded-2xl border transition-all ${
             filterStatus === 'Permanen' 
               ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-300 shadow-xs' 
               : 'bg-white border-slate-200 hover:border-slate-300 shadow-xs'
@@ -976,7 +1005,7 @@ NOTIFY pgrst, 'reload schema';`;
             <Clock className="w-4 h-4 text-slate-500" />
           </div>
           <div className="text-2xl font-bold text-slate-700 mt-2">{stats.permanen}</div>
-          <p className="text-[11px] text-slate-400 mt-0.5">Tanpa masa berakhir</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Berlaku seterusnya</p>
         </div>
       </div>
 
@@ -1019,13 +1048,13 @@ NOTIFY pgrst, 'reload schema';`;
 
           {/* Tag Filter */}
           {allActiveTags.length > 0 && (
-            <div className="w-full md:w-44">
+            <div className="w-full md:w-48">
               <select
                 value={filterTag}
                 onChange={(e) => setFilterTag(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 font-medium"
               >
-                <option value="Semua">Semua Tagar</option>
+                <option value="Semua">Semua Tagar ({allActiveTags.length})</option>
                 {allActiveTags.map(t => (
                   <option key={t} value={t}>#{t}</option>
                 ))}
@@ -1047,31 +1076,14 @@ NOTIFY pgrst, 'reload schema';`;
             </select>
           </div>
 
-          {/* Unit Dropdown */}
-          {availableUnits.length > 0 && (
-            <div className="w-full md:w-48">
-              <select
-                value={filterUnit}
-                onChange={(e) => setFilterUnit(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 font-medium"
-              >
-                <option value="Semua">Semua Unit Kerja</option>
-                {availableUnits.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Reset Filters */}
-          {(searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua' || filterSifat !== 'Semua' || filterUnit !== 'Semua' || filterTag !== 'Semua') && (
+          {(searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua' || filterSifat !== 'Semua' || filterTag !== 'Semua') && (
             <button
               onClick={() => {
                 setSearchTerm('');
                 setFilterJenis('Semua');
                 setFilterStatus('Semua');
                 setFilterSifat('Semua');
-                setFilterUnit('Semua');
                 setFilterTag('Semua');
               }}
               className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all shrink-0"
@@ -1101,12 +1113,12 @@ NOTIFY pgrst, 'reload schema';`;
         </div>
       </div>
 
-      {/* TABLE SECTION */}
+      {/* TABLE SECTION (Simplified columns, icons for files/links, and compact active status indicator) */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-slate-500 space-y-3">
             <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm">Memuat data dokumen & masa berlaku...</p>
+            <p className="text-sm">Memuat data dokumen...</p>
           </div>
         ) : filteredDocuments.length === 0 ? (
           <div className="p-12 text-center space-y-3">
@@ -1133,11 +1145,10 @@ NOTIFY pgrst, 'reload schema';`;
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                   <th className="py-3.5 px-4 w-12 text-center">No</th>
-                  <th className="py-3.5 px-4 min-w-[200px]">Nomor Surat & Tanggal</th>
-                  <th className="py-3.5 px-4 min-w-[250px]">Perihal, Kategori & Tagar</th>
-                  <th className="py-3.5 px-4 min-w-[180px]">Masa Berlaku</th>
-                  <th className="py-3.5 px-4 min-w-[160px]">Pihak & Unit Kerja</th>
-                  <th className="py-3.5 px-4 min-w-[130px]">Berkas & Tautan</th>
+                  <th className="py-3.5 px-4 min-w-[210px]">Nomor Surat & Tanggal</th>
+                  <th className="py-3.5 px-4 min-w-[280px]">Perihal & Kategori</th>
+                  <th className="py-3.5 px-4 w-28 text-center">Status</th>
+                  <th className="py-3.5 px-4 w-24 text-center">Berkas</th>
                   <th className="py-3.5 px-4 text-center w-28">Aksi</th>
                 </tr>
               </thead>
@@ -1197,7 +1208,7 @@ NOTIFY pgrst, 'reload schema';`;
                         </div>
                       </td>
 
-                      {/* Perihal & Dynamic Color Badges */}
+                      {/* Perihal, Kategori & Tagar Badges */}
                       <td className="py-4 px-4 align-top">
                         <div className="space-y-1.5">
                           <p className="font-semibold text-slate-800 leading-snug">
@@ -1233,67 +1244,26 @@ NOTIFY pgrst, 'reload schema';`;
                         </div>
                       </td>
 
-                      {/* Masa Berlaku & Countdown */}
-                      <td className="py-4 px-4 align-top">
-                        <div className="space-y-1.5">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${exp.badgeClass}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                            {exp.label}
-                          </span>
-
-                          <div className="text-xs text-slate-500 space-y-0.5">
-                            <div>
-                              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Mulai:</span>
-                              <span className="font-medium text-slate-700">{doc.tanggal_berlaku || '-'}</span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Berakhir:</span>
-                              <span className="font-medium text-slate-700">{doc.tanggal_berakhir || 'Permanen'}</span>
-                            </div>
-                          </div>
-                        </div>
+                      {/* Tanda Masih Aktif atau Tidak (Compact Status Badge) */}
+                      <td className="py-4 px-4 text-center align-top">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${exp.badgeClass}`}>
+                          <span className={`w-2 h-2 rounded-full ${exp.dotClass}`} />
+                          {exp.label}
+                        </span>
                       </td>
 
-                      {/* Pihak Terkait & Unit Kerja */}
-                      <td className="py-4 px-4 align-top">
-                        <div className="space-y-1 text-xs">
-                          {doc.unit_kerja && (
-                            <div className="flex items-center gap-1.5 font-medium text-slate-700">
-                              <Building2 className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                              <span>{doc.unit_kerja}</span>
-                            </div>
-                          )}
-
-                          {doc.pihak_terkait && (
-                            <div className="flex items-start gap-1.5 text-slate-600">
-                              <User className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                              <span>{doc.pihak_terkait}</span>
-                            </div>
-                          )}
-
-                          {doc.penandatangan && (
-                            <div className="text-[11px] text-slate-400 italic">
-                              Ttd: {doc.penandatangan}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Berkas & Link Eksternal */}
-                      <td className="py-4 px-4 align-top">
-                        <div className="flex flex-col gap-1.5">
+                      {/* Berkas & Tautan (Icons Only) */}
+                      <td className="py-4 px-4 text-center align-top">
+                        <div className="flex items-center justify-center gap-1.5">
                           {doc.file_url ? (
                             <a
                               href={doc.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors w-fit"
-                              title={doc.file_name || 'Lihat File'}
+                              className="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs"
+                              title={`Unduh / Buka Berkas: ${doc.file_name || 'Lampiran'}`}
                             >
-                              <FileCheck className="w-3.5 h-3.5" />
-                              <span className="truncate max-w-[120px]">
-                                {doc.file_name || 'Lihat File'}
-                              </span>
+                              <Paperclip className="w-4 h-4" />
                             </a>
                           ) : null}
 
@@ -1302,18 +1272,15 @@ NOTIFY pgrst, 'reload schema';`;
                               href={doc.link_eksternal}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors w-fit"
-                              title="Buka Tautan Cloud Eksternal"
+                              className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors shadow-2xs"
+                              title={`Buka Tautan Cloud Eksternal: ${doc.link_eksternal}`}
                             >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                              <span>Buka Link</span>
+                              <ExternalLink className="w-4 h-4" />
                             </a>
                           ) : null}
 
                           {!doc.file_url && !doc.link_eksternal && (
-                            <span className="text-xs text-slate-400 italic">
-                              Tanpa lampiran
-                            </span>
+                            <span className="text-slate-300 font-bold">-</span>
                           )}
                         </div>
                       </td>
@@ -1411,8 +1378,10 @@ NOTIFY pgrst, 'reload schema';`;
                     <div className="flex items-center gap-2.5">
                       <Clock className="w-5 h-5" />
                       <div>
-                        <div className="font-bold text-xs">Status Validitas: {exp.status}</div>
-                        <div className="text-[11px] opacity-90">{exp.label}</div>
+                        <div className="font-bold text-xs">Status: {exp.label}</div>
+                        <div className="text-[11px] opacity-90">
+                          {selectedDoc.tanggal_berakhir ? `Berakhir: ${selectedDoc.tanggal_berakhir}` : 'Berlaku permanen'}
+                        </div>
                       </div>
                     </div>
                     <div className="text-right text-xs">
@@ -1681,6 +1650,168 @@ NOTIFY pgrst, 'reload schema';`;
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                >
+                  Selesai
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MASTER TAG MANAGEMENT MODAL (Tambah, Edit, Hapus Tagar) */}
+      {isTagModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-xs">
+                  <Hash className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Kelola Master Tagar Dokumen</h3>
+                  <p className="text-xs text-slate-500">Tambah, ubah nama, atau hapus pilihan badge tagar warna-warni</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTagModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Add New Master Tag */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Tambah Tagar Baru
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">#</span>
+                    <input
+                      type="text"
+                      placeholder="nama-tagar-baru..."
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddMasterTag();
+                        }
+                      }}
+                      className="w-full pl-7 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddMasterTag}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
+                  >
+                    Tambah
+                  </button>
+                </div>
+              </div>
+
+              {/* Tag List */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  Daftar Tagar Aktif ({masterTags.length})
+                </label>
+
+                <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                  {masterTags.map((tag, idx) => {
+                    const color = getTagColor(tag);
+                    return (
+                      <div 
+                        key={idx}
+                        className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 transition-colors group text-sm"
+                      >
+                        {editingTagIndex === idx ? (
+                          <div className="flex items-center gap-2 flex-1 mr-2">
+                            <input
+                              type="text"
+                              value={editTagName}
+                              onChange={(e) => setEditTagName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleUpdateMasterTag(tag, editTagName);
+                                }
+                              }}
+                              className="flex-1 px-2.5 py-1 bg-white border border-violet-400 rounded-lg text-xs focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateMasterTag(tag, editTagName)}
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                              title="Simpan"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTagIndex(null)}
+                              className="p-1 text-slate-400 hover:bg-slate-200 rounded"
+                              title="Batal"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${color.bg} ${color.text} ${color.border}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+                              #{tag}
+                            </span>
+                          </div>
+                        )}
+
+                        {editingTagIndex !== idx && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingTagIndex(idx);
+                                setEditTagName(tag);
+                              }}
+                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                              title="Edit nama tagar"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteMasterTag(tag)}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                              title="Hapus tagar"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reset Defaults */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetDefaultTags}
+                  className="text-xs text-slate-500 hover:text-slate-700 underline"
+                >
+                  Reset ke Tagar Awal
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTagModalOpen(false)}
                   className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors"
                 >
                   Selesai
@@ -1995,14 +2126,21 @@ NOTIFY pgrst, 'reload schema';`;
                   </div>
                 </div>
 
-                {/* Row 8: DYNAMIC COLOR BADGE TAGS */}
+                {/* Row 8: DYNAMIC COLOR BADGE TAGS WITH TAG MANAGER */}
                 <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                       <Hash className="w-4 h-4 text-indigo-600" />
                       Tagar / Kata Kunci Pencarian (Badge Dinamis)
                     </label>
-                    <span className="text-[11px] text-slate-400">Pilih dari saran atau ketik manual</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTagModalOpen(true)}
+                      className="text-[11px] font-bold text-violet-600 hover:text-violet-800 flex items-center gap-1"
+                    >
+                      <Settings2 className="w-3 h-3" />
+                      <span>Kelola Tagar</span>
+                    </button>
                   </div>
 
                   {/* Selected Tags Display */}
@@ -2031,12 +2169,13 @@ NOTIFY pgrst, 'reload schema';`;
                     </div>
                   )}
 
-                  {/* Tag Input & Quick Suggestions */}
+                  {/* Tag Input & Quick Add */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">#</span>
                       <input
                         type="text"
-                        placeholder="Tulis tagar baru lalu tekan Tambah atau Enter (misal: pengadaan, akreditasi)..."
+                        placeholder="Tulis tagar baru lalu tekan Tambah atau Enter..."
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={(e) => {
@@ -2047,7 +2186,7 @@ NOTIFY pgrst, 'reload schema';`;
                             }
                           }
                         }}
-                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full pl-7 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <button
@@ -2061,13 +2200,12 @@ NOTIFY pgrst, 'reload schema';`;
                     </button>
                   </div>
 
-                  {/* Preset Suggestions */}
+                  {/* Preset Suggestions from Master Tags */}
                   <div className="space-y-1 pt-1">
                     <span className="text-[11px] font-semibold text-slate-400 block">Saran Tag Populer (Klik untuk tambah):</span>
                     <div className="flex flex-wrap gap-1.5">
-                      {allActiveTags
+                      {masterTags
                         .filter(t => !formTags.includes(t))
-                        .slice(0, 10)
                         .map(t => {
                           const color = getTagColor(t);
                           return (
