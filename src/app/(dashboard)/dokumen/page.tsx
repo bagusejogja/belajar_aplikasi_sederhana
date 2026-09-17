@@ -147,6 +147,15 @@ export default function DokumenPage() {
   const [filterSifat, setFilterSifat] = useState('Semua');
   const [filterTag, setFilterTag] = useState('Semua');
 
+  // Pagination State (Diseragamkan dengan Master Rekening & Tambah Pagu)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Reset page when any filter or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterJenis, filterStatus, filterSifat, filterTag, pageSize]);
+
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -446,6 +455,14 @@ NOTIFY pgrst, 'reload schema';`;
       return true;
     });
   }, [documents, searchTerm, filterJenis, filterStatus, filterSifat, filterTag]);
+
+  // Pagination Calculations
+  const totalPages = pageSize === -1 ? 1 : Math.max(1, Math.ceil(filteredDocuments.length / pageSize));
+  const paginatedDocuments = useMemo(() => {
+    if (pageSize === -1) return filteredDocuments;
+    const start = (currentPage - 1) * pageSize;
+    return filteredDocuments.slice(start, start + pageSize);
+  }, [filteredDocuments, currentPage, pageSize]);
 
   // Handle Category Management
   const handleAddCategory = async () => {
@@ -1140,7 +1157,8 @@ NOTIFY pgrst, 'reload schema';`;
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
@@ -1153,16 +1171,17 @@ NOTIFY pgrst, 'reload schema';`;
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredDocuments.map((doc, idx) => {
+                {paginatedDocuments.map((doc, idx) => {
                   const exp = getDocumentExpiry(doc);
+                  const rowNum = (pageSize === -1 ? 0 : (currentPage - 1) * pageSize) + idx + 1;
                   return (
                     <tr 
                       key={doc.id} 
                       className="hover:bg-slate-50/80 transition-colors group"
                     >
                       {/* No */}
-                      <td className="py-4 px-4 text-center text-xs font-semibold text-slate-400">
-                        {idx + 1}
+                      <td className="py-3.5 px-4 text-center text-xs font-semibold text-slate-400">
+                        {rowNum}
                       </td>
 
                       {/* Nomor Surat & Tanggal Surat */}
@@ -1317,6 +1336,77 @@ NOTIFY pgrst, 'reload schema';`;
               </tbody>
             </table>
           </div>
+
+          {/* PAGINATION FOOTER DISERAGAMKAN */}
+          {filteredDocuments.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-slate-50/80 border-t border-slate-200 text-xs font-bold text-slate-600">
+              <div className="flex items-center gap-2">
+                <span>
+                  Menampilkan <strong className="text-slate-900">{pageSize === -1 ? 1 : (currentPage - 1) * pageSize + 1}</strong> - <strong className="text-slate-900">{pageSize === -1 ? filteredDocuments.length : Math.min(currentPage * pageSize, filteredDocuments.length)}</strong> dari <strong className="text-slate-900">{filteredDocuments.length}</strong> dokumen
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-400 font-bold uppercase">Baris:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={-1}>Semua</option>
+                  </select>
+                </div>
+
+                {pageSize !== -1 && totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-slate-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Pertama"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-slate-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Sebelumnya"
+                    >
+                      ‹
+                    </button>
+                    <span className="px-2 text-xs font-semibold text-slate-600">
+                      Hal {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-slate-600 transition-colors shadow-2xs text-xs font-bold"
+                      title="Selanjutnya"
+                    >
+                      ›
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-slate-600 transition-colors shadow-2xs font-bold text-xs"
+                      title="Halaman Terakhir"
+                    >
+                      »
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
 
