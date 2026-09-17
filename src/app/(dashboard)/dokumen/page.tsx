@@ -1161,38 +1161,38 @@ NOTIFY pgrst, 'reload schema';`;
             <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
-                  <th className="py-3.5 px-4 w-12 text-center">No</th>
-                  <th className="py-3.5 px-4 min-w-[210px]">Nomor Surat & Tanggal</th>
-                  <th className="py-3.5 px-4 min-w-[280px]">Perihal & Kategori</th>
-                  <th className="py-3.5 px-4 w-28 text-center">Status</th>
-                  <th className="py-3.5 px-4 w-24 text-center">Berkas</th>
-                  <th className="py-3.5 px-4 text-center w-28">Aksi</th>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3 px-5 w-12 text-center">No</th>
+                  <th className="py-3 px-5 min-w-[210px]">Nomor Surat & Tanggal</th>
+                  <th className="py-3 px-5 min-w-[280px]">Perihal & Kategori</th>
+                  <th className="py-3 px-5 w-28 text-center">Status</th>
+                  <th className="py-3 px-5 w-24 text-center">Berkas</th>
+                  <th className="py-3 px-5 text-center w-28">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
+              <tbody className="divide-y divide-gray-100 text-xs md:text-sm">
                 {paginatedDocuments.map((doc, idx) => {
                   const exp = getDocumentExpiry(doc);
                   const rowNum = (pageSize === -1 ? 0 : (currentPage - 1) * pageSize) + idx + 1;
                   return (
                     <tr 
                       key={doc.id} 
-                      className="hover:bg-slate-50/80 transition-colors group"
+                      className="hover:bg-indigo-50/30 transition-colors group"
                     >
                       {/* No */}
-                      <td className="py-3.5 px-4 text-center text-xs font-semibold text-slate-400">
+                      <td className="py-3 px-5 text-center text-xs font-bold text-gray-400 align-top pt-3.5">
                         {rowNum}
                       </td>
 
                       {/* Nomor Surat & Tanggal Surat */}
-                      <td className="py-4 px-4 align-top">
+                      <td className="py-3 px-5 align-top">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-800 text-sm">
+                          <div className="flex items-center gap-1.5 font-bold text-gray-900 text-xs md:text-sm group-hover:text-indigo-700 transition-colors">
                             <span>{doc.nomor_surat}</span>
                             <button
                               onClick={() => handleCopyNoSurat(doc.id, doc.nomor_surat)}
                               title="Salin Nomor Surat"
-                              className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
+                              className="text-gray-400 hover:text-indigo-600 p-0.5 rounded transition-colors"
                             >
                               {copiedId === doc.id ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1202,9 +1202,9 @@ NOTIFY pgrst, 'reload schema';`;
                             </button>
                           </div>
 
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="flex items-center gap-2 text-[11px] text-gray-500">
                             <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <Calendar className="w-3 h-3 text-gray-400" />
                               {doc.tanggal_surat || 'Tgl surat: -'}
                             </span>
                             {doc.sifat_dokumen && doc.sifat_dokumen !== 'Biasa' && (
@@ -1219,8 +1219,8 @@ NOTIFY pgrst, 'reload schema';`;
                           </div>
 
                           {doc.lokasi_fisik && (
-                            <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                              <Archive className="w-3 h-3 text-slate-400" />
+                            <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                              <Archive className="w-3 h-3 text-gray-400" />
                               <span>Fisik: {doc.lokasi_fisik}</span>
                             </div>
                           )}
@@ -1228,14 +1228,14 @@ NOTIFY pgrst, 'reload schema';`;
                       </td>
 
                       {/* Perihal, Kategori & Tagar Badges */}
-                      <td className="py-4 px-4 align-top">
+                      <td className="py-3 px-5 align-top">
                         <div className="space-y-1.5">
-                          <p className="font-semibold text-slate-800 leading-snug">
+                          <p className="font-bold text-gray-900 text-xs md:text-sm leading-snug group-hover:text-indigo-700 transition-colors">
                             {doc.perihal}
                           </p>
 
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-700 border border-gray-200">
                               {doc.jenis_dokumen}
                             </span>
 
@@ -1256,7 +1256,7 @@ NOTIFY pgrst, 'reload schema';`;
                           </div>
 
                           {doc.keterangan && (
-                            <p className="text-xs text-slate-500 line-clamp-1 italic">
+                            <p className="text-[11px] text-gray-400 line-clamp-1 italic mt-0.5">
                               "{doc.keterangan}"
                             </p>
                           )}
@@ -1264,25 +1264,25 @@ NOTIFY pgrst, 'reload schema';`;
                       </td>
 
                       {/* Tanda Masih Aktif atau Tidak (Compact Status Badge) */}
-                      <td className="py-4 px-4 text-center align-top">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${exp.badgeClass}`}>
-                          <span className={`w-2 h-2 rounded-full ${exp.dotClass}`} />
+                      <td className="py-3 px-5 text-center align-top pt-3.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${exp.badgeClass}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${exp.dotClass}`} />
                           {exp.label}
                         </span>
                       </td>
 
                       {/* Berkas & Tautan (Icons Only) */}
-                      <td className="py-4 px-4 text-center align-top">
+                      <td className="py-3 px-5 text-center align-top pt-3">
                         <div className="flex items-center justify-center gap-1.5">
                           {doc.file_url ? (
                             <a
                               href={doc.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs"
+                              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs"
                               title={`Unduh / Buka Berkas: ${doc.file_name || 'Lampiran'}`}
                             >
-                              <Paperclip className="w-4 h-4" />
+                              <Paperclip className="w-3.5 h-3.5" />
                             </a>
                           ) : null}
 
@@ -1291,39 +1291,39 @@ NOTIFY pgrst, 'reload schema';`;
                               href={doc.link_eksternal}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors shadow-2xs"
+                              className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors shadow-2xs"
                               title={`Buka Tautan Cloud Eksternal: ${doc.link_eksternal}`}
                             >
-                              <ExternalLink className="w-4 h-4" />
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           ) : null}
 
                           {!doc.file_url && !doc.link_eksternal && (
-                            <span className="text-slate-300 font-bold">-</span>
+                            <span className="text-gray-300 font-bold text-xs">-</span>
                           )}
                         </div>
                       </td>
 
                       {/* Aksi */}
-                      <td className="py-4 px-4 text-center align-top">
+                      <td className="py-3 px-5 text-center align-top pt-3">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleOpenDetail(doc)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title="Detail Dokumen"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(doc)}
-                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                             title="Edit Dokumen"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(doc.id)}
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                             title="Hapus Dokumen"
                           >
                             <Trash2 className="w-4 h-4" />
