@@ -35,12 +35,15 @@ import {
   FileSpreadsheet,
   Printer,
   Copy,
-  Check
+  Check,
+  Settings2,
+  RefreshCw,
+  Hash
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 
-export interface DocumentItem {
+interface DocumentItem {
   id: number;
   jenis_dokumen: string;
   nomor_surat: string;
@@ -64,7 +67,7 @@ export interface DocumentItem {
   updated_at?: string;
 }
 
-const JENIS_DOKUMEN_OPTIONS = [
+const DEFAULT_JENIS_OPTIONS = [
   'Surat Keputusan (SK)',
   'Surat Tugas',
   'Perjanjian Kerjasama (MoU/PKS)',
@@ -78,12 +81,56 @@ const JENIS_DOKUMEN_OPTIONS = [
   'Lainnya'
 ];
 
+const SUGGESTED_TAGS = [
+  'akreditasi',
+  'anggaran',
+  'hibah',
+  'kepegawaian',
+  'kerjasama',
+  'penelitian',
+  'pengadaan',
+  'rkat',
+  'sarpras',
+  'sk-dekan',
+  'tahun-2026'
+];
+
+const TAG_COLOR_PALETTES = [
+  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+  { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', dot: 'bg-indigo-500' },
+  { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' },
+  { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' },
+  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+  { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
+  { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', dot: 'bg-cyan-500' },
+  { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', dot: 'bg-fuchsia-500' },
+  { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', dot: 'bg-teal-500' },
+  { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', dot: 'bg-orange-500' },
+];
+
+function getTagColor(tag: string) {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) {
+    hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % TAG_COLOR_PALETTES.length;
+  return TAG_COLOR_PALETTES[index];
+}
+
 const SIFAT_OPTIONS = ['Biasa', 'Penting', 'Terbatas', 'Rahasia'];
 
 export default function DokumenPage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRetryingSync, setIsRetryingSync] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+
+  // Dynamic Categories State
+  const [jenisOptions, setJenisOptions] = useState<string[]>(DEFAULT_JENIS_OPTIONS);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [editingCatIndex, setEditingCatIndex] = useState<number | null>(null);
+  const [editCatName, setEditCatName] = useState('');
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,6 +138,7 @@ export default function DokumenPage() {
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [filterSifat, setFilterSifat] = useState('Semua');
   const [filterUnit, setFilterUnit] = useState('Semua');
+  const [filterTag, setFilterTag] = useState('Semua');
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -100,7 +148,6 @@ export default function DokumenPage() {
 
   // Form State
   const [formJenis, setFormJenis] = useState('Surat Keputusan (SK)');
-  const [formCustomJenis, setFormCustomJenis] = useState('');
   const [formNomorSurat, setFormNomorSurat] = useState('');
   const [formPerihal, setFormPerihal] = useState('');
   const [formTanggalSurat, setFormTanggalSurat] = useState('');
@@ -115,6 +162,7 @@ export default function DokumenPage() {
   const [formLinkEksternal, setFormLinkEksternal] = useState('');
   const [formTags, setFormTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [formKeterangan, setFormKeterangan] = useState('');
 
   // File Upload State
@@ -125,7 +173,36 @@ export default function DokumenPage() {
 
   // Feedback State
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Load Categories (From Supabase or LocalStorage)
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_document_categories')
+        .select('nama')
+        .order('id', { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const names = data.map(d => d.nama);
+        setJenisOptions(names);
+        localStorage.setItem('app_doc_categories_cache', JSON.stringify(names));
+      } else {
+        const cached = localStorage.getItem('app_doc_categories_cache');
+        if (cached) {
+          try {
+            setJenisOptions(JSON.parse(cached));
+          } catch (e) {
+            setJenisOptions(DEFAULT_JENIS_OPTIONS);
+          }
+        }
+      }
+    } catch (e) {
+      const cached = localStorage.getItem('app_doc_categories_cache');
+      if (cached) setJenisOptions(JSON.parse(cached));
+    }
+  };
 
   // Fetch Documents
   const fetchDocuments = async () => {
@@ -151,6 +228,7 @@ export default function DokumenPage() {
       } else if (data) {
         setDocuments(data as DocumentItem[]);
         localStorage.setItem('app_documents_cache', JSON.stringify(data));
+        setDbError(null);
       }
     } catch (err: any) {
       console.error('Fetch docs error:', err);
@@ -163,7 +241,82 @@ export default function DokumenPage() {
 
   useEffect(() => {
     fetchDocuments();
+    fetchCategories();
   }, []);
+
+  // Retry Sync Button
+  const handleRetrySync = async () => {
+    setIsRetryingSync(true);
+    await fetchDocuments();
+    await fetchCategories();
+    setIsRetryingSync(false);
+  };
+
+  // Copy SQL script to clipboard
+  const handleCopySql = () => {
+    const sqlScript = `-- JALANKAN DI SUPABASE SQL EDITOR:
+CREATE TABLE IF NOT EXISTS public.app_documents (
+    id BIGSERIAL PRIMARY KEY,
+    jenis_dokumen VARCHAR(100) NOT NULL DEFAULT 'Lainnya',
+    nomor_surat VARCHAR(255) NOT NULL,
+    perihal TEXT NOT NULL,
+    tanggal_surat DATE,
+    tanggal_berlaku DATE,
+    tanggal_berakhir DATE,
+    unit_kerja VARCHAR(255),
+    pihak_terkait TEXT,
+    penandatangan VARCHAR(255),
+    sifat_dokumen VARCHAR(50) DEFAULT 'Biasa',
+    lokasi_fisik VARCHAR(255),
+    file_url TEXT,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    link_eksternal TEXT,
+    tags TEXT[] DEFAULT '{}',
+    keterangan TEXT,
+    created_by VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to app_documents" ON public.app_documents FOR SELECT USING (true);
+CREATE POLICY "Allow public insert access to app_documents" ON public.app_documents FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update access to app_documents" ON public.app_documents FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete access to app_documents" ON public.app_documents FOR DELETE USING (true);
+
+CREATE TABLE IF NOT EXISTS public.app_document_categories (
+    id BIGSERIAL PRIMARY KEY,
+    nama VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_document_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read app_document_categories" ON public.app_document_categories FOR SELECT USING (true);
+CREATE POLICY "Allow public insert app_document_categories" ON public.app_document_categories FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update app_document_categories" ON public.app_document_categories FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete app_document_categories" ON public.app_document_categories FOR DELETE USING (true);
+
+INSERT INTO public.app_document_categories (nama) VALUES
+    ('Surat Keputusan (SK)'),
+    ('Surat Tugas'),
+    ('Perjanjian Kerjasama (MoU/PKS)'),
+    ('Surat Edaran'),
+    ('Surat Perintah Kerja (SPK)'),
+    ('Surat Keterangan'),
+    ('Berita Acara'),
+    ('SOP / Pedoman'),
+    ('Kontrak / Pengadaan'),
+    ('Nota Dinas'),
+    ('Lainnya')
+ON CONFLICT (nama) DO NOTHING;
+
+NOTIFY pgrst, 'reload schema';`;
+
+    navigator.clipboard.writeText(sqlScript);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
+  };
 
   // Helper: Status validity & countdown
   const getDocumentExpiry = (item: DocumentItem) => {
@@ -240,6 +393,19 @@ export default function DokumenPage() {
     return Array.from(set).sort();
   }, [documents]);
 
+  const allActiveTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    documents.forEach(d => {
+      if (d.tags && Array.isArray(d.tags)) {
+        d.tags.forEach(t => {
+          if (t && t.trim()) tagSet.add(t.trim());
+        });
+      }
+    });
+    SUGGESTED_TAGS.forEach(t => tagSet.add(t));
+    return Array.from(tagSet).sort();
+  }, [documents]);
+
   // Filtered List
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
@@ -278,16 +444,92 @@ export default function DokumenPage() {
         return false;
       }
 
+      // Filter Tag
+      if (filterTag !== 'Semua') {
+        if (!doc.tags || !doc.tags.includes(filterTag)) return false;
+      }
+
       return true;
     });
-  }, [documents, searchTerm, filterJenis, filterStatus, filterSifat, filterUnit]);
+  }, [documents, searchTerm, filterJenis, filterStatus, filterSifat, filterUnit, filterTag]);
+
+  // Handle Category Management
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    const trimmed = newCatName.trim();
+    if (jenisOptions.includes(trimmed)) {
+      alert('Kategori ini sudah ada di dalam daftar!');
+      return;
+    }
+
+    const updated = [...jenisOptions, trimmed];
+    setJenisOptions(updated);
+    setNewCatName('');
+    localStorage.setItem('app_doc_categories_cache', JSON.stringify(updated));
+
+    try {
+      await supabase.from('app_document_categories').insert([{ nama: trimmed }]);
+    } catch (e) {
+      console.warn('Sync cat insert to supabase failed:', e);
+    }
+  };
+
+  const handleUpdateCategory = async (oldName: string, newName: string) => {
+    if (!newName.trim() || newName.trim() === oldName) {
+      setEditingCatIndex(null);
+      return;
+    }
+    const trimmed = newName.trim();
+    const updated = jenisOptions.map(cat => cat === oldName ? trimmed : cat);
+    setJenisOptions(updated);
+    setEditingCatIndex(null);
+    localStorage.setItem('app_doc_categories_cache', JSON.stringify(updated));
+
+    // Also update current form if selected
+    if (formJenis === oldName) setFormJenis(trimmed);
+
+    try {
+      await supabase
+        .from('app_document_categories')
+        .update({ nama: trimmed })
+        .eq('nama', oldName);
+    } catch (e) {
+      console.warn('Sync cat update to supabase failed:', e);
+    }
+  };
+
+  const handleDeleteCategory = async (catName: string) => {
+    if (!confirm(`Hapus kategori "${catName}" dari pilihan dropdown?`)) return;
+    const updated = jenisOptions.filter(cat => cat !== catName);
+    setJenisOptions(updated);
+    localStorage.setItem('app_doc_categories_cache', JSON.stringify(updated));
+
+    if (formJenis === catName) {
+      setFormJenis(updated[0] || 'Lainnya');
+    }
+
+    try {
+      await supabase
+        .from('app_document_categories')
+        .delete()
+        .eq('nama', catName);
+    } catch (e) {
+      console.warn('Sync cat delete to supabase failed:', e);
+    }
+  };
+
+  const handleResetDefaultCategories = () => {
+    if (confirm('Kembalikan daftar jenis dokumen ke pengaturan awal default?')) {
+      setJenisOptions(DEFAULT_JENIS_OPTIONS);
+      localStorage.setItem('app_doc_categories_cache', JSON.stringify(DEFAULT_JENIS_OPTIONS));
+    }
+  };
 
   // Handle File Upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit 25MB
     if (file.size > 25 * 1024 * 1024) {
       setUploadError('Ukuran file maksimal 25 MB');
       return;
@@ -326,8 +568,7 @@ export default function DokumenPage() {
   // Reset Form
   const resetForm = () => {
     setEditingDocId(null);
-    setFormJenis('Surat Keputusan (SK)');
-    setFormCustomJenis('');
+    setFormJenis(jenisOptions[0] || 'Surat Keputusan (SK)');
     setFormNomorSurat('');
     setFormPerihal('');
     setFormTanggalSurat('');
@@ -356,13 +597,11 @@ export default function DokumenPage() {
   // Open Edit Modal
   const handleOpenEdit = (doc: DocumentItem) => {
     setEditingDocId(doc.id);
-    const isStandardJenis = JENIS_DOKUMEN_OPTIONS.includes(doc.jenis_dokumen);
-    if (isStandardJenis) {
+    if (jenisOptions.includes(doc.jenis_dokumen)) {
       setFormJenis(doc.jenis_dokumen);
-      setFormCustomJenis('');
     } else {
-      setFormJenis('Lainnya');
-      setFormCustomJenis(doc.jenis_dokumen);
+      setJenisOptions(prev => [...prev, doc.jenis_dokumen]);
+      setFormJenis(doc.jenis_dokumen);
     }
     setFormNomorSurat(doc.nomor_surat || '');
     setFormPerihal(doc.perihal || '');
@@ -396,17 +635,17 @@ export default function DokumenPage() {
     setIsDetailOpen(true);
   };
 
-  // Add Tag
-  const handleAddTag = () => {
-    if (tagInput.trim() && !formTags.includes(tagInput.trim())) {
-      setFormTags([...formTags, tagInput.trim()]);
+  // Tag Selection
+  const handleAddTag = (tagToAdd: string) => {
+    const clean = tagToAdd.trim().replace(/^#/, '');
+    if (clean && !formTags.includes(clean)) {
+      setFormTags([...formTags, clean]);
       setTagInput('');
     }
   };
 
-  // Remove Tag
-  const handleRemoveTag = (tag: string) => {
-    setFormTags(formTags.filter(t => t !== tag));
+  const handleRemoveTag = (tagToRemove: string) => {
+    setFormTags(formTags.filter(t => t !== tagToRemove));
   };
 
   // Save Document (Insert / Update)
@@ -419,12 +658,8 @@ export default function DokumenPage() {
 
     setIsSaving(true);
 
-    const jenisToSave = formJenis === 'Lainnya' && formCustomJenis.trim() 
-      ? formCustomJenis.trim() 
-      : formJenis;
-
     const payload: Partial<DocumentItem> = {
-      jenis_dokumen: jenisToSave,
+      jenis_dokumen: formJenis,
       nomor_surat: formNomorSurat.trim(),
       perihal: formPerihal.trim(),
       tanggal_surat: formTanggalSurat || null,
@@ -446,7 +681,6 @@ export default function DokumenPage() {
 
     try {
       if (editingDocId) {
-        // Update
         const { error } = await supabase
           .from('app_documents')
           .update(payload)
@@ -461,7 +695,6 @@ export default function DokumenPage() {
           await fetchDocuments();
         }
       } else {
-        // Insert
         payload.created_at = new Date().toISOString();
         const { data, error } = await supabase
           .from('app_documents')
@@ -547,6 +780,7 @@ export default function DokumenPage() {
         'Penandatangan': doc.penandatangan || '-',
         'Sifat Dokumen': doc.sifat_dokumen,
         'Lokasi Fisik': doc.lokasi_fisik || '-',
+        'Tagar': doc.tags ? doc.tags.join(', ') : '-',
         'Link Eksternal': doc.link_eksternal || '-',
         'Ada Lampiran File': doc.file_url ? 'Ya' : 'Tidak',
         'Keterangan': doc.keterangan || '-'
@@ -582,10 +816,19 @@ export default function DokumenPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
+            title="Kelola Pilihan Jenis/Kategori Dokumen"
+          >
+            <Settings2 className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline">Kelola Kategori ({jenisOptions.length})</span>
+          </button>
+
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium border border-slate-200 transition-all shadow-xs"
             title="Download Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -602,17 +845,49 @@ export default function DokumenPage() {
         </div>
       </div>
 
-      {/* DB NOTICE IF NOT MIGRATED YET */}
+      {/* DB NOTICE IF NOT MIGRATED YET WITH 1-CLICK ACTION */}
       {dbError && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-3 shadow-xs">
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-semibold text-amber-900">
-              Sinkronisasi Cloud Supabase Belum Aktif
-            </p>
-            <p>
-              Tabel database <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono">app_documents</code> belum dijalankan di SQL Editor Supabase. Dokumen yang Anda tambahkan saat ini tersimpan otomatis di memori browser (localStorage). Jalankan script <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-mono">supabase_documents_migration.sql</code> untuk sinkronisasi multi-user.
-            </p>
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-900 text-xs shadow-sm space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-sm text-amber-950">
+                  Sinkronisasi Cloud Supabase Belum Aktif
+                </p>
+                <p className="leading-relaxed text-amber-800">
+                  Tabel <code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-950 font-mono font-bold">app_documents</code> belum ada di database Supabase Anda. Semua data yang Anda simpan saat ini tersimpan aman di browser Anda (localStorage). Untuk mengaktifkan sinkronisasi cloud multi-user, jalankan skrip SQL di Supabase SQL Editor.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleCopySql}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-200/80 hover:bg-amber-300 text-amber-900 font-bold rounded-xl transition-all shadow-xs"
+              >
+                {copiedSql ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-700" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>Salin Skrip SQL</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleRetrySync}
+                disabled={isRetryingSync}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-all shadow-xs disabled:opacity-60"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRetryingSync ? 'animate-spin' : ''}`} />
+                <span>Cek & Sinkronkan Ulang</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -713,7 +988,7 @@ export default function DokumenPage() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari nomor surat, perihal, pihak terkait, unit, penandatangan, tag..."
+              placeholder="Cari nomor surat, perihal, pihak terkait, unit, penandatangan, tagar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all placeholder:text-slate-400"
@@ -728,22 +1003,38 @@ export default function DokumenPage() {
             )}
           </div>
 
-          {/* Jenis Dropdown */}
+          {/* Dynamic Jenis Dropdown */}
           <div className="w-full md:w-56">
             <select
               value={filterJenis}
               onChange={(e) => setFilterJenis(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 font-medium"
             >
-              <option value="Semua">Semua Jenis Dokumen</option>
-              {JENIS_DOKUMEN_OPTIONS.map(opt => (
+              <option value="Semua">Semua Jenis ({jenisOptions.length})</option>
+              {jenisOptions.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
           </div>
 
+          {/* Tag Filter */}
+          {allActiveTags.length > 0 && (
+            <div className="w-full md:w-44">
+              <select
+                value={filterTag}
+                onChange={(e) => setFilterTag(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 font-medium"
+              >
+                <option value="Semua">Semua Tagar</option>
+                {allActiveTags.map(t => (
+                  <option key={t} value={t}>#{t}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Sifat Dokumen */}
-          <div className="w-full md:w-40">
+          <div className="w-full md:w-36">
             <select
               value={filterSifat}
               onChange={(e) => setFilterSifat(e.target.value)}
@@ -773,7 +1064,7 @@ export default function DokumenPage() {
           )}
 
           {/* Reset Filters */}
-          {(searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua' || filterSifat !== 'Semua' || filterUnit !== 'Semua') && (
+          {(searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua' || filterSifat !== 'Semua' || filterUnit !== 'Semua' || filterTag !== 'Semua') && (
             <button
               onClick={() => {
                 setSearchTerm('');
@@ -781,8 +1072,9 @@ export default function DokumenPage() {
                 setFilterStatus('Semua');
                 setFilterSifat('Semua');
                 setFilterUnit('Semua');
+                setFilterTag('Semua');
               }}
-              className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all"
+              className="px-3 py-2 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all shrink-0"
             >
               Reset Filter
             </button>
@@ -790,15 +1082,22 @@ export default function DokumenPage() {
         </div>
 
         {/* Active Filter Indicators */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
+        <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100 flex-wrap gap-2">
           <span>
             Menampilkan <strong className="text-slate-800">{filteredDocuments.length}</strong> dari {documents.length} dokumen
           </span>
-          {filterStatus !== 'Semua' && (
-            <span className="inline-flex items-center gap-1 font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-              Filter Status: {filterStatus}
-            </span>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {filterStatus !== 'Semua' && (
+              <span className="inline-flex items-center gap-1 font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                Status: {filterStatus}
+              </span>
+            )}
+            {filterTag !== 'Semua' && (
+              <span className="inline-flex items-center gap-1 font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-100">
+                Tagar: #{filterTag}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -816,7 +1115,7 @@ export default function DokumenPage() {
             </div>
             <h3 className="text-base font-bold text-slate-700">Belum Ada Dokumen yang Sesuai</h3>
             <p className="text-sm text-slate-500 max-w-sm mx-auto">
-              {searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua'
+              {searchTerm || filterJenis !== 'Semua' || filterStatus !== 'Semua' || filterTag !== 'Semua'
                 ? 'Tidak ada dokumen yang cocok dengan filter pencarian Anda. Silakan ubah filter.'
                 : 'Belum ada dokumen yang dicatat. Klik tombol "Tambah Dokumen" untuk mulai mencatat arsip pertama Anda.'}
             </p>
@@ -835,7 +1134,7 @@ export default function DokumenPage() {
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-[11px] font-bold uppercase tracking-wider">
                   <th className="py-3.5 px-4 w-12 text-center">No</th>
                   <th className="py-3.5 px-4 min-w-[200px]">Nomor Surat & Tanggal</th>
-                  <th className="py-3.5 px-4 min-w-[240px]">Perihal & Kategori</th>
+                  <th className="py-3.5 px-4 min-w-[250px]">Perihal, Kategori & Tagar</th>
                   <th className="py-3.5 px-4 min-w-[180px]">Masa Berlaku</th>
                   <th className="py-3.5 px-4 min-w-[160px]">Pihak & Unit Kerja</th>
                   <th className="py-3.5 px-4 min-w-[130px]">Berkas & Tautan</th>
@@ -898,7 +1197,7 @@ export default function DokumenPage() {
                         </div>
                       </td>
 
-                      {/* Perihal & Kategori */}
+                      {/* Perihal & Dynamic Color Badges */}
                       <td className="py-4 px-4 align-top">
                         <div className="space-y-1.5">
                           <p className="font-semibold text-slate-800 leading-snug">
@@ -906,18 +1205,24 @@ export default function DokumenPage() {
                           </p>
 
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                               {doc.jenis_dokumen}
                             </span>
 
-                            {doc.tags && doc.tags.map((tag, tIdx) => (
-                              <span 
-                                key={tIdx} 
-                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
+                            {doc.tags && doc.tags.map((tag, tIdx) => {
+                              const color = getTagColor(tag);
+                              return (
+                                <span 
+                                  key={tIdx} 
+                                  onClick={() => setFilterTag(tag)}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer hover:shadow-xs ${color.bg} ${color.text} ${color.border}`}
+                                  title={`Filter dokumen bertagar #${tag}`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+                                  #{tag}
+                                </span>
+                              );
+                            })}
                           </div>
 
                           {doc.keterangan && (
@@ -1148,16 +1453,20 @@ export default function DokumenPage() {
                 </div>
               </div>
 
-              {/* Tags */}
+              {/* Colorful Dynamic Tags */}
               {selectedDoc.tags && selectedDoc.tags.length > 0 && (
                 <div>
                   <span className="text-xs text-slate-400 block mb-1.5">Tagar Terkait:</span>
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedDoc.tags.map((t, idx) => (
-                      <span key={idx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-xs font-medium border border-indigo-100">
-                        #{t}
-                      </span>
-                    ))}
+                    {selectedDoc.tags.map((t, idx) => {
+                      const color = getTagColor(t);
+                      return (
+                        <span key={idx} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${color.bg} ${color.text} ${color.border}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+                          #{t}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1231,6 +1540,157 @@ export default function DokumenPage() {
         </div>
       )}
 
+      {/* CATEGORY MANAGEMENT MODAL */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Settings2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base">Kelola Jenis / Kategori Dokumen</h3>
+                  <p className="text-xs text-slate-500">Tambah, ubah nama, atau hapus pilihan dropdown kategori</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Add New Category */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Tambah Kategori Baru
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tulis nama kategori baru..."
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCategory();
+                      }
+                    }}
+                    className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
+                  >
+                    Tambah
+                  </button>
+                </div>
+              </div>
+
+              {/* Category List */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                  Daftar Kategori Aktif ({jenisOptions.length})
+                </label>
+
+                <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                  {jenisOptions.map((cat, idx) => (
+                    <div 
+                      key={idx}
+                      className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200 transition-colors group text-sm"
+                    >
+                      {editingCatIndex === idx ? (
+                        <div className="flex items-center gap-2 flex-1 mr-2">
+                          <input
+                            type="text"
+                            value={editCatName}
+                            onChange={(e) => setEditCatName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleUpdateCategory(cat, editCatName);
+                              }
+                            }}
+                            className="flex-1 px-2.5 py-1 bg-white border border-indigo-400 rounded-lg text-xs focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateCategory(cat, editCatName)}
+                            className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                            title="Simpan"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatIndex(null)}
+                            className="p-1 text-slate-400 hover:bg-slate-200 rounded"
+                            title="Batal"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-slate-800">{cat}</span>
+                      )}
+
+                      {editingCatIndex !== idx && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCatIndex(idx);
+                              setEditCatName(cat);
+                            }}
+                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                            title="Edit nama kategori"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Hapus kategori"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reset Defaults */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handleResetDefaultCategories}
+                  className="text-xs text-slate-500 hover:text-slate-700 underline"
+                >
+                  Reset ke Kategori Awal
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                >
+                  Selesai
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ADD / EDIT MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -1261,32 +1721,33 @@ export default function DokumenPage() {
             {/* Modal Form */}
             <form onSubmit={handleSaveDocument}>
               <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                {/* Row 1: Jenis Dokumen & Sifat */}
+                {/* Row 1: Dynamic Jenis Dokumen & Sifat */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="md:col-span-2 space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Jenis / Kategori Dokumen <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Jenis / Kategori Dokumen <span className="text-rose-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryModalOpen(true)}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                      >
+                        <Settings2 className="w-3 h-3" />
+                        <span>Kelola Pilihan</span>
+                      </button>
+                    </div>
+
                     <select
                       value={formJenis}
                       onChange={(e) => setFormJenis(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white font-medium"
+                      className="w-full px-3.5 py-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white font-semibold text-slate-800"
                       required
                     >
-                      {JENIS_DOKUMEN_OPTIONS.map(opt => (
+                      {jenisOptions.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
-                    {formJenis === 'Lainnya' && (
-                      <input
-                        type="text"
-                        placeholder="Tuliskan jenis dokumen lainnya..."
-                        value={formCustomJenis}
-                        onChange={(e) => setFormCustomJenis(e.target.value)}
-                        className="w-full mt-2 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        required
-                      />
-                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -1479,7 +1940,7 @@ export default function DokumenPage() {
                           <div className="truncate">
                             <div className="font-semibold text-xs text-slate-800 truncate">{uploadedFile.name}</div>
                             <div className="text-[10px] text-slate-400">
-                              {(uploadedFile.size / 1024).toFixed(1)} KB • Tersimpan di Cloud
+                              {(uploadedFile.size / 1024).toFixed(1)} KB • Tersimpan di Cloud (folder: dokumen)
                             </div>
                           </div>
                         </div>
@@ -1534,49 +1995,95 @@ export default function DokumenPage() {
                   </div>
                 </div>
 
-                {/* Row 8: Tagar / Keywords */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Tagar / Kata Kunci Pencarian
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Tulis tagar lalu tekan Tambah (misal: akreditasi, hibah, 2026)"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddTag();
-                        }
-                      }}
-                      className="flex-1 px-3.5 py-2 bg-slate-50/60 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddTag}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors"
-                    >
-                      Tambah
-                    </button>
+                {/* Row 8: DYNAMIC COLOR BADGE TAGS */}
+                <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Hash className="w-4 h-4 text-indigo-600" />
+                      Tagar / Kata Kunci Pencarian (Badge Dinamis)
+                    </label>
+                    <span className="text-[11px] text-slate-400">Pilih dari saran atau ketik manual</span>
                   </div>
+
+                  {/* Selected Tags Display */}
                   {formTags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {formTags.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          #{tag}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTag(tag)}
-                            className="hover:text-rose-600"
+                    <div className="flex flex-wrap gap-2 p-2.5 bg-white rounded-xl border border-slate-200 min-h-[42px] items-center">
+                      {formTags.map(tag => {
+                        const color = getTagColor(tag);
+                        return (
+                          <span 
+                            key={tag} 
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${color.bg} ${color.text} ${color.border}`}
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
+                            <span className={`w-1.5 h-1.5 rounded-full ${color.dot}`} />
+                            #{tag}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTag(tag)}
+                              className="ml-0.5 hover:opacity-75 transition-opacity"
+                              title="Hapus tag"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
+
+                  {/* Tag Input & Quick Suggestions */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        placeholder="Tulis tagar baru lalu tekan Tambah atau Enter (misal: pengadaan, akreditasi)..."
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (tagInput.trim()) {
+                              handleAddTag(tagInput);
+                            }
+                          }
+                        }}
+                        className="w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tagInput.trim()) handleAddTag(tagInput);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs"
+                    >
+                      Tambah Tag
+                    </button>
+                  </div>
+
+                  {/* Preset Suggestions */}
+                  <div className="space-y-1 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-400 block">Saran Tag Populer (Klik untuk tambah):</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allActiveTags
+                        .filter(t => !formTags.includes(t))
+                        .slice(0, 10)
+                        .map(t => {
+                          const color = getTagColor(t);
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => handleAddTag(t)}
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all hover:scale-105 active:scale-95 ${color.bg} ${color.text} ${color.border}`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              #{t}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Row 9: Catatan Ringkasan */}

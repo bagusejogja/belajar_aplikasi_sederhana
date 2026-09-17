@@ -1,8 +1,7 @@
 -- =========================================================================
--- MIGRATION: Table app_documents (Persuratan: Dokumen & Masa Berlaku)
+-- MIGRATION: Table app_documents & app_document_categories
+-- Modul: Persuratan -> Dokumen & Masa Berlaku
 -- Deskripsi: Pencatatan arsip dokumen persuratan lengkap dengan pelacakan masa berlaku
--- Fasilitas: No Surat, Perihal, Jenis, Tgl Surat, Masa Berlaku & Berakhir, Pihak Terkait,
---            Unit Kerja, Penandatangan, Sifat, Lokasi Fisik, File & Link Eksternal, Tags
 -- =========================================================================
 
 CREATE TABLE IF NOT EXISTS public.app_documents (
@@ -51,5 +50,44 @@ CREATE POLICY "Allow public update access to app_documents" ON public.app_docume
 
 CREATE POLICY "Allow public delete access to app_documents" ON public.app_documents
     FOR DELETE USING (true);
+
+
+-- -------------------------------------------------------------------------
+-- TABLE: app_document_categories (Daftar Dinamis Jenis / Kategori Dokumen)
+-- -------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.app_document_categories (
+    id BIGSERIAL PRIMARY KEY,
+    nama VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.app_document_categories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access to app_document_categories" ON public.app_document_categories
+    FOR SELECT USING (true);
+
+CREATE POLICY "Allow public insert access to app_document_categories" ON public.app_document_categories
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public update access to app_document_categories" ON public.app_document_categories
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete access to app_document_categories" ON public.app_document_categories
+    FOR DELETE USING (true);
+
+-- Default Initial Categories
+INSERT INTO public.app_document_categories (nama) VALUES
+    ('Surat Keputusan (SK)'),
+    ('Surat Tugas'),
+    ('Perjanjian Kerjasama (MoU/PKS)'),
+    ('Surat Edaran'),
+    ('Surat Perintah Kerja (SPK)'),
+    ('Surat Keterangan'),
+    ('Berita Acara'),
+    ('SOP / Pedoman'),
+    ('Kontrak / Pengadaan'),
+    ('Nota Dinas'),
+    ('Lainnya')
+ON CONFLICT (nama) DO NOTHING;
 
 NOTIFY pgrst, 'reload schema';
