@@ -322,7 +322,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
 
           {/* SECTION MENU FAVORIT (PERSONAL USER) */}
           {favoriteItems.length > 0 && (
-            <div className="space-y-1 pb-2.5 mb-2.5 border-b border-amber-100/80">
+            <div className="space-y-1 pb-2.5 mb-2.5 border-b border-gray-100">
               {isCollapsed ? (
                 /* Collapsed Mode: Amber Star Button with Rich Popover */
                 <div className="w-full flex items-center justify-center py-1 group/fav relative">
@@ -388,52 +388,52 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                   </div>
                 </div>
               ) : (
-                /* Expanded Mode: Collapsible Favorit Group */
+                /* Expanded Mode: Collapsible Favorit Group (Seragam dengan Grup Baku) */
                 <div className="space-y-1">
                   <button
                     onClick={() => setIsFavoritesExpanded(prev => !prev)}
-                    className="w-full px-3 py-1.5 flex items-center justify-between text-left group/favbtn hover:bg-amber-50/70 rounded-xl transition-colors bg-gradient-to-r from-amber-50/60 to-transparent border border-amber-100/70 cursor-pointer"
+                    className="w-full px-3 py-1 flex items-center justify-between text-left group/btn hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-1.5">
-                      <Star size={13} className="text-amber-500 fill-amber-400" />
-                      <h3 className="text-[10px] font-black text-amber-700 uppercase tracking-[0.15em]">
+                      <Star size={12} className="text-amber-500 fill-amber-400 shrink-0" />
+                      <h3 className="text-[10px] font-bold text-gray-400 group-hover/btn:text-indigo-600 transition-colors uppercase tracking-[0.15em]">
                         Menu Favorit
                       </h3>
-                      <span className="px-1.5 py-0.2 bg-amber-200/70 text-amber-800 rounded-full text-[9px] font-black">
+                      <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 rounded-full text-[9px] font-bold">
                         {favoriteItems.length}
                       </span>
                     </div>
                     {isFavoritesExpanded ? (
-                      <ChevronDown size={13} className="text-amber-600 group-hover/favbtn:translate-y-0.5 transition-transform" />
+                      <ChevronDown size={13} className="text-gray-400 group-hover/btn:text-indigo-600" />
                     ) : (
-                      <ChevronRight size={13} className="text-amber-600 group-hover/favbtn:translate-x-0.5 transition-transform" />
+                      <ChevronRight size={13} className="text-gray-400 group-hover/btn:text-indigo-600" />
                     )}
                   </button>
 
                   {isFavoritesExpanded && (
-                    <div className="space-y-1 pt-1">
+                    <div className="space-y-1.5 pt-0.5">
                       {favoriteItems.map(item => {
                         const Icon = iconMap[item.icon] || LayoutDashboard;
                         const isActive = pathname === item.path;
 
                         return (
-                          <div key={`fav-${item.path}`} className="relative group/favitem flex justify-center items-center">
+                          <div key={`fav-${item.path}`} className="relative group/item flex justify-center items-center">
                             <Link
                               href={item.path}
                               onClick={() => setIsOpen(false)}
                               className={cn(
-                                "flex items-center group rounded-2xl transition-all duration-200 font-medium relative justify-between px-3 py-2 w-full",
+                                "flex items-center group rounded-2xl transition-all duration-200 font-medium relative justify-between px-3 py-2.5 w-full",
                                 isActive
-                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white shadow-md shadow-amber-200 border border-amber-400 scale-[1.02]"
-                                  : "text-gray-700 hover:bg-amber-50/70 hover:text-amber-800 border border-transparent active:scale-95"
+                                  ? "bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-200 border border-indigo-500 scale-105"
+                                  : "text-gray-400 hover:bg-indigo-50/80 hover:text-indigo-600 border border-transparent active:scale-95"
                               )}
                             >
-                              <div className="flex items-center gap-2.5 overflow-hidden">
-                                <Icon size={17} className={cn(
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <Icon size={19} className={cn(
                                   "transition-colors shrink-0",
-                                  isActive ? "text-white" : "text-amber-500"
+                                  isActive ? "text-white" : "text-gray-400 group-hover:text-indigo-600"
                                 )} />
-                                <span className={cn("text-xs truncate font-bold", isActive ? "text-white" : "text-gray-800")}>
+                                <span className={cn("text-sm truncate font-bold", isActive ? "text-white" : "text-gray-700")}>
                                   {item.title}
                                 </span>
                               </div>
@@ -445,10 +445,10 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                                   title="Hapus dari Menu Favorit"
                                   className={cn(
                                     "p-1 rounded-lg transition-all cursor-pointer",
-                                    isActive ? "text-amber-100 hover:text-white" : "text-amber-500 hover:text-rose-500"
+                                    isActive ? "text-amber-300 fill-amber-300" : "text-amber-500 fill-amber-400 hover:text-rose-500"
                                   )}
                                 >
-                                  <Star size={13} className="fill-current" />
+                                  <Star size={14} className="fill-current" />
                                 </button>
                                 {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />}
                               </div>

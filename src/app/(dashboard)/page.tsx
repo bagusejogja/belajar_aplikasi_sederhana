@@ -421,21 +421,21 @@ export default function PremiumDashboard() {
       {/* ========================================================== */}
       {/* ⭐ EXECUTIVE FAVORITE MENU LAUNCHER (PERSONAL PER USER)     */}
       {/* ========================================================== */}
-      <div className="relative bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/80 rounded-3xl p-6 md:p-8 shadow-xs space-y-6">
-        {/* Header Favorit */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-amber-200/60 pb-5">
+      <div className="bg-white rounded-2xl md:rounded-3xl border border-gray-200/80 p-6 md:p-8 shadow-xs space-y-6">
+        {/* Header Favorit (Baku & Seragam) */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-5">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-200 shrink-0">
-              <Star size={24} className="fill-white" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-200 shrink-0">
+              <Star size={22} className="fill-amber-300 text-amber-300" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
                 <h3 className="text-lg font-black text-gray-900 tracking-tight">Menu Favorit Saya</h3>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300/80 text-[11px] font-black">
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold">
                   {favoriteMenuItems.length} Menu
                 </span>
               </div>
-              <p className="text-xs text-gray-600 font-medium mt-0.5">
+              <p className="text-xs text-gray-500 font-medium mt-0.5">
                 Akses cepat personal ke menu-menu yang paling sering Anda butuhkan. Tersimpan otomatis untuk akun Anda.
               </p>
             </div>
@@ -443,31 +443,31 @@ export default function PremiumDashboard() {
 
           <button
             onClick={openFavoriteModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-500 hover:text-white text-gray-700 hover:border-amber-500 border border-amber-200 rounded-2xl text-xs font-black transition-all shadow-xs group cursor-pointer active:scale-95"
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 hover:text-indigo-600 hover:border-indigo-200 border border-gray-200 rounded-xl text-xs font-bold transition-all shadow-xs group cursor-pointer active:scale-95"
             title="Pilih dan kelola menu favorit Anda"
           >
-            <SlidersHorizontal size={14} className="text-amber-500 group-hover:text-white transition-colors" />
+            <SlidersHorizontal size={14} className="text-indigo-600 transition-colors" />
             <span>Atur Menu Favorit</span>
           </button>
         </div>
 
-        {/* Favorite Cards Grid */}
+        {/* Favorite Cards Grid (Baku & Seragam) */}
         {favoriteMenuItems.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {favoriteMenuItems.map(favItem => {
               const FavIcon = iconMap[favItem.icon] || LayoutDashboard;
               const meta = groupMeta[favItem.group || 'Utama'] || {
                 icon: Layers,
-                gradient: 'from-amber-600 to-amber-700',
-                text: 'text-amber-600',
-                bg: 'bg-amber-50',
-                border: 'border-amber-200'
+                gradient: 'from-gray-700 to-slate-800',
+                text: 'text-indigo-600',
+                bg: 'bg-indigo-50',
+                border: 'border-indigo-200'
               };
 
               return (
                 <div 
                   key={`card-fav-${favItem.path}`}
-                  className="bg-white rounded-2xl border border-amber-200/70 p-4 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col justify-between group relative"
+                  className="bg-white rounded-2xl border border-gray-200/80 p-4 shadow-xs hover:shadow-md hover:border-indigo-300 transition-all flex flex-col justify-between group relative"
                 >
                   {/* Top Row: Icon + Unpin Button */}
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -487,7 +487,7 @@ export default function PremiumDashboard() {
                           handleQuickToggleFavorite(favItem.path);
                         }}
                         title="Hapus dari Menu Favorit"
-                        className="p-1.5 text-amber-500 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-amber-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       >
                         <Star size={15} className="fill-current" />
                       </button>
@@ -496,7 +496,7 @@ export default function PremiumDashboard() {
 
                   {/* Title & Path */}
                   <div className="mb-4">
-                    <h4 className="text-sm font-black text-gray-900 group-hover:text-amber-700 transition-colors line-clamp-1">
+                    <h4 className="text-sm font-black text-gray-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
                       {favItem.title}
                     </h4>
                     <p className="text-[11px] font-mono text-gray-400 truncate mt-0.5">
@@ -504,10 +504,10 @@ export default function PremiumDashboard() {
                     </p>
                   </div>
 
-                  {/* Action Link */}
+                  {/* Action Link (Seragam dengan tombol buka menu modul) */}
                   <Link
                     href={favItem.path}
-                    className="w-full py-2 px-3 bg-amber-50/70 hover:bg-amber-500 text-amber-800 hover:text-white rounded-xl text-xs font-black transition-all flex items-center justify-between group/link border border-amber-200/60 hover:border-amber-500"
+                    className="w-full py-2 px-3 bg-gray-50 hover:bg-indigo-600 hover:text-white text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center justify-between group/link border border-gray-200/80 hover:border-indigo-600"
                   >
                     <span>Buka Menu</span>
                     <ArrowRight size={13} className="group-hover/link:translate-x-1 transition-transform" />
@@ -517,10 +517,10 @@ export default function PremiumDashboard() {
             })}
           </div>
         ) : (
-          /* Empty State: Prompt to configure favorites */
-          <div className="bg-white/80 rounded-2xl p-8 border border-dashed border-amber-300 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
-              <Star size={28} />
+          /* Empty State (Seragam) */
+          <div className="bg-gray-50/60 rounded-2xl p-8 border border-dashed border-gray-200 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-xs">
+              <Star size={24} className="fill-amber-400 text-amber-500" />
             </div>
             <div className="max-w-md mx-auto space-y-1">
               <h4 className="text-sm font-black text-gray-900">Belum Ada Menu Favorit</h4>
@@ -530,9 +530,9 @@ export default function PremiumDashboard() {
             </div>
             <button
               onClick={openFavoriteModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-indigo-200 transition-all cursor-pointer active:scale-95"
             >
-              <Star size={14} className="fill-white" />
+              <Star size={14} className="fill-amber-300 text-amber-300" />
               <span>Pilih Menu Favorit Sekarang</span>
             </button>
           </div>
@@ -676,14 +676,14 @@ export default function PremiumDashboard() {
             className="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="p-5 md:p-6 border-b border-gray-100 flex items-start justify-between gap-4 bg-gradient-to-r from-amber-50/60 via-white to-orange-50/40">
+            {/* Modal Header (Baku & Seragam) */}
+            <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4 bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-200 shrink-0">
-                  <Star size={22} className="fill-white" />
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-200 shrink-0">
+                  <Star size={20} className="fill-amber-300 text-amber-300" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-gray-900 tracking-tight">Atur Menu Favorit Personal</h3>
+                  <h3 className="text-base font-bold text-gray-900 tracking-tight">Atur Menu Favorit Personal</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Pilih menu yang ingin disematkan ke daftar favorit khusus untuk akun <strong className="text-gray-800">{userName || 'Anda'}</strong>.
                   </p>
@@ -692,14 +692,14 @@ export default function PremiumDashboard() {
 
               <button
                 onClick={() => setIsFavModalOpen(false)}
-                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
                 title="Tutup"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Search & Bulk Selection Controls */}
+            {/* Search & Bulk Selection Controls (Baku & Seragam) */}
             <div className="p-4 border-b border-gray-100 bg-gray-50/60 space-y-3">
               <div className="relative">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -708,16 +708,16 @@ export default function PremiumDashboard() {
                   placeholder="Cari menu untuk difavoritkan..."
                   value={favModalSearch}
                   onChange={e => setFavModalSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all shadow-2xs"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[11px] font-black">
+                  <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold">
                     {tempFavs.length} Menu Dipilih
                   </span>
-                  <span className="text-[11px] text-gray-400">
+                  <span className="text-xs text-gray-400">
                     dari total {accessibleMenus.length} menu akses
                   </span>
                 </div>
@@ -735,7 +735,7 @@ export default function PremiumDashboard() {
                         .map(m => m.path);
                       selectAllFilteredTempFavs(filtered);
                     }}
-                    className="text-[11px] font-bold text-amber-700 hover:bg-amber-100/70 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     Pilih Semua Sesuai Pencarian
                   </button>
@@ -743,7 +743,7 @@ export default function PremiumDashboard() {
                   <button
                     type="button"
                     onClick={clearAllTempFavs}
-                    className="text-[11px] font-bold text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     Kosongkan Semua
                   </button>
@@ -786,18 +786,18 @@ export default function PremiumDashboard() {
                           onClick={() => toggleTempFav(item.path)}
                           className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer select-none ${
                             isSelected 
-                              ? 'bg-amber-50/70 border-amber-300 shadow-2xs' 
+                              ? 'bg-indigo-50/70 border-indigo-200 shadow-2xs' 
                               : 'bg-white hover:bg-gray-50/80 border-gray-200'
                           }`}
                         >
                           <div className="flex items-center gap-2.5 overflow-hidden">
                             <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                              isSelected ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'
+                              isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'
                             }`}>
                               <ItemIcon size={16} />
                             </div>
                             <div className="overflow-hidden">
-                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-amber-950 font-black' : 'text-gray-800'}`}>
+                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-indigo-950 font-black' : 'text-gray-800'}`}>
                                 {item.title}
                               </p>
                               <p className="text-[10px] font-mono text-gray-400 truncate">
@@ -808,7 +808,7 @@ export default function PremiumDashboard() {
 
                           <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                             isSelected 
-                              ? 'bg-amber-500 text-white shadow-xs' 
+                              ? 'bg-indigo-600 text-white shadow-xs' 
                               : 'border border-gray-300 text-transparent hover:border-gray-400'
                           }`}>
                             <Check size={14} className={isSelected ? 'opacity-100' : 'opacity-0'} />
