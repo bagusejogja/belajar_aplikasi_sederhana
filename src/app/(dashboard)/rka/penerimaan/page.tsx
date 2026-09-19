@@ -377,8 +377,27 @@ export default function RkaPenerimaanPage() {
 
     dataRows.forEach(line => {
       if (!line.trim()) return;
-      const cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+      let cols = line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
       if (cols.length < 3) return;
+
+      // AUTO-HEALING RESILIENSI EKSPOR MYSQL:
+      // Deteksi jika dari MySQL terselip tab ganda/kolom kosong di index 2 (antara unit_kerja dan nama_akun)
+      const isYear = (val: string | undefined) => {
+        if (!val) return false;
+        const n = parseInt(val);
+        return !isNaN(n) && n >= 2020 && n <= 2035;
+      };
+
+      // Kasus A: Ada kolom kosong di index 2 dan tahun berada di index 4
+      if (cols.length >= 13 && cols[2] === '' && isYear(cols[4])) {
+        cols.splice(2, 1);
+      } 
+      // Kasus B: Index 2 dan 3 adalah pecahan kode & nama akun, dan tahun berada di index 4
+      else if (cols.length >= 13 && !isYear(cols[3]) && isYear(cols[4])) {
+        const combined = cols[2] ? `${cols[2]} ${cols[3]}`.trim() : cols[3];
+        cols[2] = combined;
+        cols.splice(3, 1);
+      }
 
       if (isHeader && Object.keys(headerMap).length > 0) {
         // Mode A: Mapping dinamis berdasarkan nama header

@@ -100,12 +100,21 @@ export async function POST(request: Request) {
           namaAkun = kodeAkun;
         }
 
+        let thn = parseInt(String(r.tahun || r.tahun_anggaran || '2027')) || 2027;
+        let isAktif = parseInt(String(r.renterimaIsAktif ?? r.renterima_is_aktif ?? 1)) || 1;
+        // Auto-heal jika tahun terisi kode akun (misal 41101) dan isAktif terisi tahun kalender (2020-2035)
+        if (thn > 3000 && isAktif >= 2020 && isAktif <= 2035) {
+          if (!namaAkun) namaAkun = String(thn);
+          thn = isAktif;
+          isAktif = 1;
+        }
+
         return {
           renterima_id: r.renterimaId ? parseInt(String(r.renterimaId).replace(/\D/g, '')) || null : r.renterima_id || null,
           unit_kerja: String(r.unit_kerja || r.unitKerja || r.unit || '').trim(),
           nama_akun_penerimaan: namaAkun,
-          tahun: parseInt(String(r.tahun || r.tahun_anggaran || '2027')) || 2027,
-          renterima_is_aktif: parseInt(String(r.renterimaIsAktif ?? r.renterima_is_aktif ?? 1)) || 1,
+          tahun: thn,
+          renterima_is_aktif: isAktif,
           renterima_volume: parseFloat(String(r.renterimaVolume ?? r.renterima_volume ?? 0).replace(/,/g, '.')) || 0,
           renterima_tarif: parseFloat(String(r.renterimaTarif ?? r.renterima_tarif ?? 0).replace(/,/g, '.')) || 0,
           renterima_jumlah: parseFloat(String(r.renterimaJumlah ?? r.renterima_jumlah ?? 0).replace(/,/g, '.')) || 0,
