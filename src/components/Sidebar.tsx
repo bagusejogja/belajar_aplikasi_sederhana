@@ -38,8 +38,14 @@ import {
   Radio,
   Clock,
   ListTodo,
-  BarChart4
+  BarChart4,
+  Star
 } from 'lucide-react';
+import { 
+  getFavoriteUserKey, 
+  loadUserFavorites, 
+  toggleUserFavorite 
+} from '@/lib/userFavorites';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { menuList } from '../lib/mock-db';
@@ -110,6 +116,29 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
   const [menuSearch, setMenuSearch] = useState('');
   
+  // State untuk Menu Favorit Personal Pengguna
+  const [userKey, setUserKey] = useState('guest_user');
+  const [favoritePaths, setFavoritePaths] = useState<string[]>([]);
+  const [isFavoritesExpanded, setIsFavoritesExpanded] = useState(true);
+
+  // Sinkronisasi event update favorit antar komponen
+  useEffect(() => {
+    const handleFavUpdate = (e: any) => {
+      if (e.detail && (!userKey || e.detail.userKey === userKey)) {
+        setFavoritePaths(e.detail.favorites || []);
+      }
+    };
+    window.addEventListener('app_favorites_updated', handleFavUpdate);
+    return () => window.removeEventListener('app_favorites_updated', handleFavUpdate);
+  }, [userKey]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const res = await toggleUserFavorite(userKey, path);
+    setFavoritePaths(res.newFavorites);
+  };
+  
   // State untuk accordion grup
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [isGroupsInitialized, setIsGroupsInitialized] = useState(false);
@@ -156,6 +185,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
            setUserEmail(user.email || '');
+           const key = getFavoriteUserKey(user);
+           setUserKey(key);
+           loadUserFavorites(key).then(favs => setFavoritePaths(favs));
            
            // Ambil hak akses/role dari tabel app_users
            const { data: roleData } = await supabase.from('app_users').select('role').eq('id', user.id).single();
@@ -191,6 +223,17 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
       router.push('/login');
     }
   };
+
+
+  const favoriteItems = useMemo(() => {
+    const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
+    return menuList.filter(item => {
+      if (userRole === 'Pending') return false;
+      const hasAccess = isAdmin || allowedPaths.includes(item.path);
+      const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
+      return favoritePaths.includes(item.path) && hasAccess && matchesSearch;
+    });
+  }, [favoritePaths, allowedPaths, userRole, menuSearch]);
 
   const allGroupsExpanded = expandedGroups.length > 0;
 
@@ -274,6 +317,149 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                 onChange={e => setMenuSearch(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
               />
+            </div>
+          )}
+
+          {/* SECTION MENU FAVORIT (PERSONAL USER) */}
+          {favoriteItems.length > 0 && (
+            <div className="space-y-1 pb-2.5 mb-2.5 border-b border-amber-100/80">
+              {isCollapsed ? (
+                /* Collapsed Mode: Amber Star Button with Rich Popover */
+                <div className="w-full flex items-center justify-center py-1 group/fav relative">
+                  <button
+                    onClick={() => setIsFavoritesExpanded(prev => !prev)}
+                    className="w-[46px] h-[46px] rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-500 text-white shadow-md hover:from-amber-500 hover:to-amber-600 hover:shadow-lg hover:shadow-amber-500/30 transition-all flex flex-col items-center justify-center gap-0.5 relative group-hover/fav:scale-105 active:scale-95 cursor-pointer"
+                    title={`Menu Favorit Saya (${favoriteItems.length})`}
+                  >
+                    <Star size={18} className="fill-white" />
+                    <span className="text-[9px] font-black text-amber-950 bg-white/95 px-1.5 rounded-full leading-tight shadow-xs">
+                      {favoriteItems.length}
+                    </span>
+                  </button>
+
+                  {/* Flyout for Favorit in Collapsed Mode */}
+                  <div className="fixed left-20 opacity-0 invisible group-hover/fav:opacity-100 group-hover/fav:visible transition-all duration-200 z-[100] pointer-events-none group-hover/fav:pointer-events-auto">
+                    <div className="absolute inset-y-0 -left-6 w-6 bg-transparent" />
+                    <div className="bg-slate-900/95 backdrop-blur-xl text-white rounded-2xl p-3.5 shadow-2xl border border-slate-700/80 min-w-[220px] max-w-xs relative space-y-2 ml-2">
+                      <div className="absolute -left-1.5 top-5 w-3 h-3 bg-slate-900 rotate-45 border-l border-b border-slate-700" />
+                      
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <Star size={14} className="text-amber-400 fill-amber-400" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Favorit Saya</span>
+                        </div>
+                        <span className="text-[9px] font-black px-1.5 py-0.5 bg-amber-500/20 text-amber-300 rounded-md border border-amber-500/30">
+                          {favoriteItems.length} Menu
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pt-1">
+                        {favoriteItems.map(favItem => {
+                          const FavIcon = iconMap[favItem.icon] || LayoutDashboard;
+                          const isFavActive = pathname === favItem.path;
+                          return (
+                            <div key={`fav-col-${favItem.path}`} className="flex items-center justify-between group/subfav">
+                              <Link
+                                href={favItem.path}
+                                onClick={() => setIsOpen(false)}
+                                className={cn(
+                                  "flex items-center gap-2 text-xs font-bold px-2 py-1.5 rounded-xl transition-all truncate flex-1",
+                                  isFavActive 
+                                    ? "bg-amber-500 text-white shadow-sm" 
+                                    : "text-slate-300 hover:text-white hover:bg-slate-800/80"
+                                )}
+                              >
+                                <FavIcon size={14} className={isFavActive ? "text-white" : "text-amber-400"} />
+                                <span className="truncate">{favItem.title}</span>
+                              </Link>
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleFavorite(e, favItem.path)}
+                                title="Hapus dari favorit"
+                                className="p-1 text-slate-500 hover:text-rose-400 transition-colors opacity-0 group-hover/subfav:opacity-100 cursor-pointer"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Expanded Mode: Collapsible Favorit Group */
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setIsFavoritesExpanded(prev => !prev)}
+                    className="w-full px-3 py-1.5 flex items-center justify-between text-left group/favbtn hover:bg-amber-50/70 rounded-xl transition-colors bg-gradient-to-r from-amber-50/60 to-transparent border border-amber-100/70 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Star size={13} className="text-amber-500 fill-amber-400" />
+                      <h3 className="text-[10px] font-black text-amber-700 uppercase tracking-[0.15em]">
+                        Menu Favorit
+                      </h3>
+                      <span className="px-1.5 py-0.2 bg-amber-200/70 text-amber-800 rounded-full text-[9px] font-black">
+                        {favoriteItems.length}
+                      </span>
+                    </div>
+                    {isFavoritesExpanded ? (
+                      <ChevronDown size={13} className="text-amber-600 group-hover/favbtn:translate-y-0.5 transition-transform" />
+                    ) : (
+                      <ChevronRight size={13} className="text-amber-600 group-hover/favbtn:translate-x-0.5 transition-transform" />
+                    )}
+                  </button>
+
+                  {isFavoritesExpanded && (
+                    <div className="space-y-1 pt-1">
+                      {favoriteItems.map(item => {
+                        const Icon = iconMap[item.icon] || LayoutDashboard;
+                        const isActive = pathname === item.path;
+
+                        return (
+                          <div key={`fav-${item.path}`} className="relative group/favitem flex justify-center items-center">
+                            <Link
+                              href={item.path}
+                              onClick={() => setIsOpen(false)}
+                              className={cn(
+                                "flex items-center group rounded-2xl transition-all duration-200 font-medium relative justify-between px-3 py-2 w-full",
+                                isActive
+                                  ? "bg-gradient-to-tr from-amber-500 to-amber-600 text-white shadow-md shadow-amber-200 border border-amber-400 scale-[1.02]"
+                                  : "text-gray-700 hover:bg-amber-50/70 hover:text-amber-800 border border-transparent active:scale-95"
+                              )}
+                            >
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <Icon size={17} className={cn(
+                                  "transition-colors shrink-0",
+                                  isActive ? "text-white" : "text-amber-500"
+                                )} />
+                                <span className={cn("text-xs truncate font-bold", isActive ? "text-white" : "text-gray-800")}>
+                                  {item.title}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleFavorite(e, item.path)}
+                                  title="Hapus dari Menu Favorit"
+                                  className={cn(
+                                    "p-1 rounded-lg transition-all cursor-pointer",
+                                    isActive ? "text-amber-100 hover:text-white" : "text-amber-500 hover:text-rose-500"
+                                  )}
+                                >
+                                  <Star size={13} className="fill-current" />
+                                </button>
+                                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />}
+                              </div>
+                            </Link>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -361,22 +547,37 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                             {visibleItems.map(subItem => {
                               const SubIcon = iconMap[subItem.icon] || LayoutDashboard;
                               const isSubActive = pathname === subItem.path;
+                              const isSubFav = favoritePaths.includes(subItem.path);
                               return (
-                                <Link 
-                                  key={subItem.path} 
-                                  href={subItem.path}
-                                  onClick={() => setIsOpen(false)}
-                                  className={cn(
-                                    "flex items-center gap-2.5 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all truncate group/sub",
-                                    isSubActive 
-                                      ? "bg-indigo-600 text-white shadow-sm" 
-                                      : "text-slate-300 hover:text-white hover:bg-slate-800/80"
-                                  )}
-                                >
-                                  <SubIcon size={14} className={isSubActive ? "text-white" : "text-slate-400 group-hover/sub:text-indigo-400"} />
-                                  <span className="truncate">{subItem.title}</span>
-                                  {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-white ml-auto" />}
-                                </Link>
+                                <div key={subItem.path} className="flex items-center justify-between group/sub">
+                                  <Link 
+                                    href={subItem.path}
+                                    onClick={() => setIsOpen(false)}
+                                    className={cn(
+                                      "flex items-center gap-2.5 text-xs font-bold px-2.5 py-1.5 rounded-xl transition-all truncate flex-1",
+                                      isSubActive 
+                                        ? "bg-indigo-600 text-white shadow-sm" 
+                                        : "text-slate-300 hover:text-white hover:bg-slate-800/80"
+                                    )}
+                                  >
+                                    <SubIcon size={14} className={isSubActive ? "text-white" : "text-slate-400 group-hover/sub:text-indigo-400"} />
+                                    <span className="truncate">{subItem.title}</span>
+                                    {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-white ml-auto" />}
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleToggleFavorite(e, subItem.path)}
+                                    title={isSubFav ? "Hapus dari Favorit" : "Jadikan Menu Favorit"}
+                                    className={cn(
+                                      "p-1 transition-all shrink-0 cursor-pointer rounded-md",
+                                      isSubFav 
+                                        ? "text-amber-400 fill-amber-400" 
+                                        : "text-slate-500 hover:text-amber-400 opacity-0 group-hover/sub:opacity-100"
+                                    )}
+                                  >
+                                    <Star size={12} className={isSubFav ? "fill-current" : ""} />
+                                  </button>
+                                </div>
                               );
                             })}
                           </div>
@@ -424,8 +625,25 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                             )} />
                             {!isCollapsed && <span className={cn("text-sm truncate font-bold", isActive ? "text-white" : "text-gray-700")}>{item.title}</span>}
                           </div>
-                          {!isCollapsed && isActive && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                          {!isCollapsed && (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleFavorite(e, item.path)}
+                                title={favoritePaths.includes(item.path) ? "Hapus dari Menu Favorit" : "Jadikan Menu Favorit"}
+                                className={cn(
+                                  "p-1 rounded-lg transition-all cursor-pointer",
+                                  favoritePaths.includes(item.path)
+                                    ? (isActive ? "text-amber-300 fill-amber-300" : "text-amber-500 fill-amber-400 scale-105")
+                                    : (isActive ? "text-white/70 hover:text-white" : "text-gray-300 hover:text-amber-500 opacity-0 group-hover/item:opacity-100 hover:scale-110")
+                                )}
+                              >
+                                <Star size={14} className={favoritePaths.includes(item.path) ? "fill-current" : ""} />
+                              </button>
+                              {isActive && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                              )}
+                            </div>
                           )}
                         </Link>
 

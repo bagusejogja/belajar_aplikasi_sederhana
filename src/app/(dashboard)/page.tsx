@@ -8,8 +8,43 @@ import {
   LayoutDashboard, TrendingUp, Search, Bell,
   Calendar, Landmark, Wallet, Mail, FolderTree,
   Building2, PieChart, Database, FileEdit, CheckCircle,
-  Layers, Lock, ExternalLink, Activity
+  Layers, Lock, ExternalLink, Activity,
+  Star, X, Check, SlidersHorizontal, Settings2, Trash2,
+  Menu as MenuIcon, ShieldAlert, FileSpreadsheet, MessageSquare, BookOpen, Settings, Wand2, Radio, ListTodo, BarChart4
 } from 'lucide-react';
+import { 
+  getFavoriteUserKey, 
+  loadUserFavorites, 
+  saveUserFavorites, 
+  toggleUserFavorite 
+} from '@/lib/userFavorites';
+
+const iconMap: Record<string, any> = {
+  LayoutDashboard,
+  Users,
+  Building2,
+  Menu: MenuIcon,
+  CheckCircle,
+  ShieldCheck,
+  FileEdit,
+  PieChart,
+  Database,
+  ShieldAlert,
+  FileText,
+  FileSpreadsheet,
+  Layers,
+  MessageSquare,
+  BookOpen,
+  Settings,
+  Wand2,
+  Activity,
+  Radio,
+  Clock,
+  ListTodo,
+  Calendar,
+  FolderTree,
+  BarChart4
+};
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { menuList } from '@/lib/mock-db';
@@ -102,6 +137,26 @@ export default function PremiumDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
 
+  // State untuk Menu Favorit Personal Pengguna
+  const [userKey, setUserKey] = useState('guest_user');
+  const [favoritePaths, setFavoritePaths] = useState<string[]>([]);
+  const [isFavModalOpen, setIsFavModalOpen] = useState(false);
+  const [favModalSearch, setFavModalSearch] = useState('');
+  const [tempFavs, setTempFavs] = useState<string[]>([]);
+  const [isSavingFavs, setIsSavingFavs] = useState(false);
+  const [favSuccessMsg, setFavSuccessMsg] = useState('');
+
+  // Sinkronisasi event update favorit antar komponen
+  useEffect(() => {
+    const handleFavUpdate = (e: any) => {
+      if (e.detail && (!userKey || e.detail.userKey === userKey)) {
+        setFavoritePaths(e.detail.favorites || []);
+      }
+    };
+    window.addEventListener('app_favorites_updated', handleFavUpdate);
+    return () => window.removeEventListener('app_favorites_updated', handleFavUpdate);
+  }, [userKey]);
+
   // Clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -119,6 +174,11 @@ export default function PremiumDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       let role = 'ADMIN';
       let name = '';
+
+      const key = getFavoriteUserKey(user);
+      setUserKey(key);
+      const userFavs = await loadUserFavorites(key);
+      setFavoritePaths(userFavs);
 
       if (user?.email) {
         name = user.email.split('@')[0];
@@ -168,6 +228,54 @@ export default function PremiumDashboard() {
     return 'Selamat Malam';
   };
 
+  // Handler Buka Modal Pengaturan Favorit
+  const openFavoriteModal = () => {
+    setTempFavs([...favoritePaths]);
+    setFavModalSearch('');
+    setFavSuccessMsg('');
+    setIsFavModalOpen(true);
+  };
+
+  // Toggle item di dalam Modal
+  const toggleTempFav = (path: string) => {
+    setTempFavs(prev => 
+      prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]
+    );
+  };
+
+  // Pilih Semua / Kosongkan di Modal
+  const selectAllFilteredTempFavs = (pathsToSelect: string[]) => {
+    setTempFavs(prev => Array.from(new Set([...prev, ...pathsToSelect])));
+  };
+
+  const clearAllTempFavs = () => {
+    setTempFavs([]);
+  };
+
+  // Simpan Favorit dari Modal
+  const handleSaveFavorites = async () => {
+    setIsSavingFavs(true);
+    try {
+      await saveUserFavorites(userKey, tempFavs);
+      setFavoritePaths(tempFavs);
+      setFavSuccessMsg('Menu favorit berhasil disimpan!');
+      setTimeout(() => {
+        setIsFavModalOpen(false);
+        setFavSuccessMsg('');
+      }, 700);
+    } catch (err) {
+      console.error('Gagal menyimpan menu favorit:', err);
+    } finally {
+      setIsSavingFavs(false);
+    }
+  };
+
+  // Quick 1-click Toggle Langsung dari Kartu Favorit
+  const handleQuickToggleFavorite = async (path: string) => {
+    const res = await toggleUserFavorite(userKey, path);
+    setFavoritePaths(res.newFavorites);
+  };
+
   // Filter accessible menus
   const accessibleMenus = useMemo(() => {
     return menuList.filter(item => {
@@ -205,6 +313,12 @@ export default function PremiumDashboard() {
     });
     return result;
   }, [groupedAccessible, searchQuery]);
+
+
+  // Filter menu favorit dari daftar menu yang bisa diakses user
+  const favoriteMenuItems = useMemo(() => {
+    return accessibleMenus.filter(m => favoritePaths.includes(m.path));
+  }, [accessibleMenus, favoritePaths]);
 
   const totalGroupsCount = Object.keys(groupedAccessible).length;
   const totalFeaturesCount = accessibleMenus.length;
@@ -302,6 +416,127 @@ export default function PremiumDashboard() {
           </div>
 
         </div>
+      </div>
+
+      {/* ========================================================== */}
+      {/* ⭐ EXECUTIVE FAVORITE MENU LAUNCHER (PERSONAL PER USER)     */}
+      {/* ========================================================== */}
+      <div className="relative bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-orange-50/30 border border-amber-200/80 rounded-3xl p-6 md:p-8 shadow-xs space-y-6">
+        {/* Header Favorit */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-amber-200/60 pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-200 shrink-0">
+              <Star size={24} className="fill-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-lg font-black text-gray-900 tracking-tight">Menu Favorit Saya</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300/80 text-[11px] font-black">
+                  {favoriteMenuItems.length} Menu
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 font-medium mt-0.5">
+                Akses cepat personal ke menu-menu yang paling sering Anda butuhkan. Tersimpan otomatis untuk akun Anda.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={openFavoriteModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-amber-500 hover:text-white text-gray-700 hover:border-amber-500 border border-amber-200 rounded-2xl text-xs font-black transition-all shadow-xs group cursor-pointer active:scale-95"
+            title="Pilih dan kelola menu favorit Anda"
+          >
+            <SlidersHorizontal size={14} className="text-amber-500 group-hover:text-white transition-colors" />
+            <span>Atur Menu Favorit</span>
+          </button>
+        </div>
+
+        {/* Favorite Cards Grid */}
+        {favoriteMenuItems.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {favoriteMenuItems.map(favItem => {
+              const FavIcon = iconMap[favItem.icon] || LayoutDashboard;
+              const meta = groupMeta[favItem.group || 'Utama'] || {
+                icon: Layers,
+                gradient: 'from-amber-600 to-amber-700',
+                text: 'text-amber-600',
+                bg: 'bg-amber-50',
+                border: 'border-amber-200'
+              };
+
+              return (
+                <div 
+                  key={`card-fav-${favItem.path}`}
+                  className="bg-white rounded-2xl border border-amber-200/70 p-4 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col justify-between group relative"
+                >
+                  {/* Top Row: Icon + Unpin Button */}
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${meta.gradient} text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform`}>
+                      <FavIcon size={19} />
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 border border-gray-200 truncate max-w-[110px]">
+                        {favItem.group || 'Umum'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleQuickToggleFavorite(favItem.path);
+                        }}
+                        title="Hapus dari Menu Favorit"
+                        className="p-1.5 text-amber-500 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Star size={15} className="fill-current" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Title & Path */}
+                  <div className="mb-4">
+                    <h4 className="text-sm font-black text-gray-900 group-hover:text-amber-700 transition-colors line-clamp-1">
+                      {favItem.title}
+                    </h4>
+                    <p className="text-[11px] font-mono text-gray-400 truncate mt-0.5">
+                      {favItem.path}
+                    </p>
+                  </div>
+
+                  {/* Action Link */}
+                  <Link
+                    href={favItem.path}
+                    className="w-full py-2 px-3 bg-amber-50/70 hover:bg-amber-500 text-amber-800 hover:text-white rounded-xl text-xs font-black transition-all flex items-center justify-between group/link border border-amber-200/60 hover:border-amber-500"
+                  >
+                    <span>Buka Menu</span>
+                    <ArrowRight size={13} className="group-hover/link:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Empty State: Prompt to configure favorites */
+          <div className="bg-white/80 rounded-2xl p-8 border border-dashed border-amber-300 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-xs">
+              <Star size={28} />
+            </div>
+            <div className="max-w-md mx-auto space-y-1">
+              <h4 className="text-sm font-black text-gray-900">Belum Ada Menu Favorit</h4>
+              <p className="text-xs text-gray-500">
+                Pilih menu-menu yang paling sering Anda gunakan agar langsung tampil di barisan depan halaman utama ini.
+              </p>
+            </div>
+            <button
+              onClick={openFavoriteModal}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all cursor-pointer"
+            >
+              <Star size={14} className="fill-white" />
+              <span>Pilih Menu Favorit Sekarang</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* QUICK SEARCH & SECTION HEADER */}
@@ -429,6 +664,205 @@ export default function PremiumDashboard() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ========================================================== */}
+      {/* ⚙️ MODAL PENGATURAN MENU FAVORIT PERSONAL                   */}
+      {/* ========================================================== */}
+      {isFavModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div 
+            className="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl border border-gray-200 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-5 md:p-6 border-b border-gray-100 flex items-start justify-between gap-4 bg-gradient-to-r from-amber-50/60 via-white to-orange-50/40">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-200 shrink-0">
+                  <Star size={22} className="fill-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 tracking-tight">Atur Menu Favorit Personal</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Pilih menu yang ingin disematkan ke daftar favorit khusus untuk akun <strong className="text-gray-800">{userName || 'Anda'}</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsFavModalOpen(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                title="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search & Bulk Selection Controls */}
+            <div className="p-4 border-b border-gray-100 bg-gray-50/60 space-y-3">
+              <div className="relative">
+                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Cari menu untuk difavoritkan..."
+                  value={favModalSearch}
+                  onChange={e => setFavModalSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all shadow-2xs"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[11px] font-black">
+                    {tempFavs.length} Menu Dipilih
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    dari total {accessibleMenus.length} menu akses
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const filtered = accessibleMenus
+                        .filter(m => 
+                          !favModalSearch || 
+                          m.title.toLowerCase().includes(favModalSearch.toLowerCase()) || 
+                          (m.group && m.group.toLowerCase().includes(favModalSearch.toLowerCase()))
+                        )
+                        .map(m => m.path);
+                      selectAllFilteredTempFavs(filtered);
+                    }}
+                    className="text-[11px] font-bold text-amber-700 hover:bg-amber-100/70 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Pilih Semua Sesuai Pencarian
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={clearAllTempFavs}
+                    className="text-[11px] font-bold text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Kosongkan Semua
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable List of Menus Grouped by Category */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar max-h-[50vh]">
+              {Object.entries(
+                accessibleMenus
+                  .filter(m => 
+                    !favModalSearch || 
+                    m.title.toLowerCase().includes(favModalSearch.toLowerCase()) || 
+                    (m.group && m.group.toLowerCase().includes(favModalSearch.toLowerCase())) ||
+                    m.path.toLowerCase().includes(favModalSearch.toLowerCase())
+                  )
+                  .reduce((acc, item) => {
+                    const g = item.group || 'Lainnya';
+                    if (!acc[g]) acc[g] = [];
+                    acc[g].push(item);
+                    return acc;
+                  }, {} as Record<string, typeof menuList>)
+              ).map(([groupName, items]) => (
+                <div key={groupName} className="space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">{groupName}</h4>
+                    <span className="text-[10px] text-gray-400 font-bold">({items.length})</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {items.map(item => {
+                      const isSelected = tempFavs.includes(item.path);
+                      const ItemIcon = iconMap[item.icon] || LayoutDashboard;
+
+                      return (
+                        <div
+                          key={item.path}
+                          onClick={() => toggleTempFav(item.path)}
+                          className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 cursor-pointer select-none ${
+                            isSelected 
+                              ? 'bg-amber-50/70 border-amber-300 shadow-2xs' 
+                              : 'bg-white hover:bg-gray-50/80 border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 overflow-hidden">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                              isSelected ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              <ItemIcon size={16} />
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className={`text-xs font-bold truncate ${isSelected ? 'text-amber-950 font-black' : 'text-gray-800'}`}>
+                                {item.title}
+                              </p>
+                              <p className="text-[10px] font-mono text-gray-400 truncate">
+                                {item.path}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected 
+                              ? 'bg-amber-500 text-white shadow-xs' 
+                              : 'border border-gray-300 text-transparent hover:border-gray-400'
+                          }`}>
+                            <Check size={14} className={isSelected ? 'opacity-100' : 'opacity-0'} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 md:p-5 border-t border-gray-100 bg-gray-50/80 flex items-center justify-between gap-3">
+              <div>
+                {favSuccessMsg && (
+                  <p className="text-xs font-bold text-emerald-600 flex items-center gap-1.5 animate-in fade-in">
+                    <CheckCircle size={14} />
+                    <span>{favSuccessMsg}</span>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsFavModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-gray-600 hover:text-gray-800 hover:bg-gray-200/60 rounded-xl transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveFavorites}
+                  disabled={isSavingFavs}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {isSavingFavs ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} />
+                      <span>Simpan Menu Favorit</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
