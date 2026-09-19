@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.rkat_pengeluaran (
     anggaran NUMERIC(18,2) DEFAULT 0,
     realisasi NUMERIC(18,2) DEFAULT 0,
     rncn_pengeluaran_is_aprove TEXT DEFAULT 'Belum',
+    db_id TEXT,
     
     -- Kolom Tambahan Identifikasi / Grouping Laporan Khusus
     laporan_kementerian TEXT,

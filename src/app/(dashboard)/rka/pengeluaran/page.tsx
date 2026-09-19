@@ -190,9 +190,12 @@ export default function RkaPengeluaranPage() {
     anggaran: '0',
     realisasi: '0',
     rncn_pengeluaran_is_aprove: 'Belum',
+    db_id: '',
     laporan_kementerian: '',
     laporan_webometrics: ''
   });
+
+  const [hasDbIdColumn, setHasDbIdColumn] = useState<boolean | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -204,6 +207,9 @@ export default function RkaPengeluaranPage() {
       const json = await res.json();
       if (json.success) {
         setDataList(json.data || []);
+        if (typeof json.hasDbIdColumn === 'boolean') {
+          setHasDbIdColumn(json.hasDbIdColumn);
+        }
       } else {
         toast.error('Gagal memuat data: ' + json.error);
       }
@@ -334,6 +340,7 @@ export default function RkaPengeluaranPage() {
           (d.lingkup_kegiatan && d.lingkup_kegiatan.toLowerCase().includes(q)) ||
           (d.akun_detail && d.akun_detail.toLowerCase().includes(q)) ||
           (d.unit && d.unit.toLowerCase().includes(q)) ||
+          (d.db_id && String(d.db_id).toLowerCase().includes(q)) ||
           (d.identifikasi_lain && d.identifikasi_lain.toLowerCase().includes(q)) ||
           (d.tags?.['proposal rkat'] && d.tags['proposal rkat'].toLowerCase().includes(q))
         );
@@ -456,6 +463,7 @@ export default function RkaPengeluaranPage() {
       // Batasi preview hanya 5 baris pertama agar memori dan render tetap super cepat
       if (preview.length < 5) {
         const cols = line.split('\t').map((c: string) => c.trim().replace(/^"|"$/g, ''));
+        const dbIdVal = cols.length > 21 ? cols[cols.length - 1] : '-';
         preview.push({
           tahun: parseInt(cols[0]) || 2027,
           unit: cols[1] || 'Unit Kerja UGM',
@@ -464,7 +472,8 @@ export default function RkaPengeluaranPage() {
           akun: cols[16] || '-',
           uraian: cols[17] || cols[10] || 'Belanja',
           anggaran: parseCleanNum(cols[18]),
-          realisasi: parseCleanNum(cols[19])
+          realisasi: parseCleanNum(cols[19]),
+          db_id: dbIdVal
         });
       }
     }
@@ -474,13 +483,13 @@ export default function RkaPengeluaranPage() {
   const parsedPasteLines = pasteAnalysis.preview;
   const pasteCount = pasteAnalysis.count;
 
-  // Contoh Data TSV untuk Paste Zone RKAT Pengeluaran
+  // Contoh Data TSV untuk Paste Zone RKAT Pengeluaran (dengan db_id di paling belakang)
   const handleFillSampleTSV = () => {
-    const sample = `Tahun_Anggaran\tUnit\tTujuan\tSasaran\tProgram\tIndikatorProgram\ttarget\tcascading_kinerja_target_satuan\tKelompok_Indikator_Program\tcascading_kinerja_iku\tKegiatan\tLingkup_Kegiatan\tsumberdanaNama\tPrioritas\tAkunUtama\tSubAkun\tAkunDetail\tUraian_belanja\tAnggaran\tRealisasi\trncnpengeluaranIsAprove
-2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tBeasiswa bagi mahasiswa asing\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tBeasiswa Perintis Prestasi Bidang Keagamaan Mahasiswa Asing\t12000000\t0\t1
-2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tProgram Student Inbound\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tProgram Mobilitas International Student Inbound Fakultas\t25000000\t0\t1`;
+    const sample = `Tahun_Anggaran\tUnit\tTujuan\tSasaran\tProgram\tIndikatorProgram\ttarget\tcascading_kinerja_target_satuan\tKelompok_Indikator_Program\tcascading_kinerja_iku\tKegiatan\tLingkup_Kegiatan\tsumberdanaNama\tPrioritas\tAkunUtama\tSubAkun\tAkunDetail\tUraian_belanja\tAnggaran\tRealisasi\trncnpengeluaranIsAprove\tdb_id
+2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tBeasiswa bagi mahasiswa asing\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tBeasiswa Perintis Prestasi Bidang Keagamaan Mahasiswa Asing\t12000000\t0\t1\t102931
+2027\t05000010 Fakultas Filsafat\tMewujudkan pendidikan transdisiplin\t1.2.1 Meningkatnya kualitas kurikulum\t1.2.1.1.1 Pengembangan kurikulum\t1.2.1.1.1.25 Mahasiswa asing\t11.00\tmahasiswa\tRencana Strategis\t\\N\t1.2.1.1.1.25.3 Peningkatan mahasiswa asing bergelar di prodi\tProgram Student Inbound\tDana Masyarakat\tPertama\t52 Belanja Barang\t525 Beasiswa\t52501 Beasiswa, Bantuan Tridharma Mahasiswa\tProgram Mobilitas International Student Inbound Fakultas\t25000000\t0\t1\t102932`;
     setPasteText(sample);
-    toast.success('Contoh format TSV RKAT Pengeluaran berhasil dimuat ke Paste Zone!');
+    toast.success('Contoh format TSV RKAT Pengeluaran dengan db_id berhasil dimuat ke Paste Zone!');
   };
 
   // Bulk Import TSV (Chunking & Batching untuk puluhan ribu data tanpa HTTP 413)
@@ -687,6 +696,7 @@ export default function RkaPengeluaranPage() {
       'Pagu Anggaran (Rp)': Number(d.anggaran) || 0,
       'Realisasi (Rp)': Number(d.realisasi) || 0,
       'Sisa Anggaran (Rp)': (Number(d.anggaran) || 0) - (Number(d.realisasi) || 0),
+      'ID Database (db_id)': d.db_id || '-',
       'Proposal RKAT': d.tags?.['proposal rkat'] || d.identifikasi_lain || '-',
       'Laporan Kementerian': d.laporan_kementerian || '-',
       'Laporan Webometrics': d.laporan_webometrics || '-'
@@ -769,6 +779,31 @@ export default function RkaPengeluaranPage() {
           </Button>
         </div>
       </div>
+
+      {/* Migration Reminder Banner jika kolom db_id belum ditambahkan di Supabase */}
+      {hasDbIdColumn === false && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in duration-200 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle size={18} className="text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold">Kolom <code className="font-mono text-amber-950 bg-amber-100 px-1 py-0.5 rounded">db_id</code> belum terpasang di database Supabase</p>
+              <p className="text-[11px] text-amber-700">Aplikasi tetap dapat berjalan normal. Untuk menyimpan kolom <code className="font-mono">db_id</code> secara permanen, jalankan migration SQL di SQL Editor Supabase.</p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const sql = `ALTER TABLE public.rkat_pengeluaran ADD COLUMN IF NOT EXISTS db_id TEXT;\nCREATE INDEX IF NOT EXISTS idx_rkat_pengeluaran_db_id ON public.rkat_pengeluaran(db_id);\nNOTIFY pgrst, 'reload schema';`;
+              navigator.clipboard.writeText(sql);
+              toast.success('SQL migrasi berhasil disalin! Buka Supabase SQL Editor dan jalankan query.');
+            }}
+            className="h-8 rounded-xl bg-white border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold gap-1.5 shrink-0"
+          >
+            <span>📋 Salin SQL Migrasi</span>
+          </Button>
+        </div>
+      )}
 
       {/* KPI Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -900,15 +935,15 @@ export default function RkaPengeluaranPage() {
             <div className="bg-white/80 p-3 rounded-xl border border-indigo-100 text-xs text-gray-600 space-y-1">
               <div className="font-bold text-gray-900 flex items-center justify-between">
                 <span>📋 Format Kolom TSV RKAT Pengeluaran:</span>
-                <span className="text-[11px] text-indigo-600 font-semibold font-mono">21 Kolom Standar UGM</span>
+                <span className="text-[11px] text-indigo-600 font-semibold font-mono">22 Kolom Standar UGM (dengan db_id di paling belakang)</span>
               </div>
               <div className="overflow-x-auto py-1">
                 <code className="text-[11px] font-mono text-indigo-900 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-200 block whitespace-nowrap">
-                  Tahun_Anggaran [Tab] Unit [Tab] Tujuan [Tab] Sasaran [Tab] Program ... [Tab] Kegiatan [Tab] Lingkup [Tab] AkunDetail [Tab] Uraian_belanja [Tab] Anggaran [Tab] Realisasi [Tab] isApprove
+                  Tahun_Anggaran [Tab] Unit [Tab] Tujuan [Tab] Sasaran [Tab] Program ... [Tab] Kegiatan [Tab] Lingkup [Tab] AkunDetail [Tab] Uraian_belanja [Tab] Anggaran [Tab] Realisasi [Tab] isApprove [Tab] db_id
                 </code>
               </div>
               <p className="text-[10px] text-gray-500">
-                • Header baris pertama dari Excel akan otomatis dideteksi dan dilewati. Format angka titik/koma otomatis dibersihkan.
+                • Header baris pertama dari Excel akan otomatis dideteksi dan dilewati. Field <strong className="text-indigo-700 font-mono">db_id</strong> di kolom paling belakang otomatis tersimpan ke database. Format angka titik/koma otomatis dibersihkan.
               </p>
             </div>
 
@@ -916,7 +951,7 @@ export default function RkaPengeluaranPage() {
             <div className="relative">
               <Textarea
                 rows={6}
-                placeholder="Salin data baris dari Excel lalu paste di sini..."
+                placeholder="Salin data baris dari Excel (dengan db_id di kolom terakhir) lalu paste di sini..."
                 value={pasteText}
                 onChange={e => setPasteText(e.target.value)}
                 className="w-full bg-white border-gray-300 text-gray-900 font-mono text-xs rounded-xl p-3.5 focus:ring-2 focus:ring-indigo-600 shadow-2xs max-w-full leading-relaxed"
@@ -990,6 +1025,7 @@ export default function RkaPengeluaranPage() {
                         <th className="px-3 py-2">Kegiatan</th>
                         <th className="px-3 py-2">Akun Detail</th>
                         <th className="px-3 py-2 text-right">Pagu Anggaran</th>
+                        <th className="px-3 py-2 text-center text-indigo-700 font-mono">db_id</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 text-[11px] font-medium">
@@ -1001,6 +1037,15 @@ export default function RkaPengeluaranPage() {
                           <td className="px-3 py-1.5 text-gray-600 truncate max-w-[180px]">{row.kegiatan}</td>
                           <td className="px-3 py-1.5 font-mono text-gray-600">{row.akun}</td>
                           <td className="px-3 py-1.5 font-mono font-bold text-right text-gray-900">Rp {formatRp(row.anggaran)}</td>
+                          <td className="px-3 py-1.5 text-center font-mono text-[11px]">
+                            {row.db_id && row.db_id !== '-' ? (
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold">
+                                {row.db_id}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1319,11 +1364,20 @@ export default function RkaPengeluaranPage() {
                         </div>
                       )}
 
-                      {/* 3. TA & Prioritas */}
-                      <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
+                      {/* 3. TA & Prioritas & db_id */}
+                      <div className="text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-2">
                         <span>TA {row.tahun_anggaran || 2027}</span>
                         <span>•</span>
                         <span>Prioritas: <strong className="text-slate-700">{row.prioritas || '-'}</strong></span>
+                        {row.db_id && (
+                          <>
+                            <span>•</span>
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                              <Tag size={10} className="text-indigo-600" />
+                              <span>db_id: {row.db_id}</span>
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       {/* 4. Konteks Kegiatan & Lingkup Kegiatan */}
@@ -1521,10 +1575,10 @@ export default function RkaPengeluaranPage() {
             <div className="bg-gray-50 p-3.5 rounded-xl text-xs text-gray-600 space-y-1 border border-gray-200">
               <p className="font-bold text-gray-800">Format Kolom Baku (Tab-Delimited dari Excel):</p>
               <p className="font-mono text-[10px] text-gray-500 overflow-x-auto whitespace-nowrap">
-                Tahun_Anggaran • Unit • Tujuan • Sasaran • Program • IndikatorProgram • target • cascading_kinerja_target_satuan • Kelompok_Indikator_Program • cascading_kinerja_iku • Kegiatan • Lingkup_Kegiatan • sumberdanaNama • Prioritas • AkunUtama • SubAkun • AkunDetail • Uraian_belanja • Anggaran • Realisasi • rncnpengeluaranIsAprove
+                Tahun_Anggaran • Unit • Tujuan • Sasaran • Program • IndikatorProgram • target • cascading_kinerja_target_satuan • Kelompok_Indikator_Program • cascading_kinerja_iku • Kegiatan • Lingkup_Kegiatan • sumberdanaNama • Prioritas • AkunUtama • SubAkun • AkunDetail • Uraian_belanja • Anggaran • Realisasi • rncnpengeluaranIsAprove • db_id
               </p>
               <p className="text-[11px] text-indigo-600 font-medium">
-                Cukup salin (copy) seluruh baris dari spreadsheet Excel lalu paste ke textarea di bawah. Sistem akan otomatis membagi per kolom dan menyimpannya ke database.
+                Cukup salin (copy) seluruh baris dari spreadsheet Excel lalu paste ke textarea di bawah. Field <strong className="font-mono">db_id</strong> di paling belakang akan otomatis tersimpan ke database.
               </p>
             </div>
 
@@ -1678,6 +1732,31 @@ export default function RkaPengeluaranPage() {
                     value={editingRow.realisasi || 0}
                     onChange={e => setEditingRow({ ...editingRow, realisasi: e.target.value })}
                     className="h-9 text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    ID Database (db_id) <span className="text-[10px] text-indigo-600 font-normal">(Opsional)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Contoh: 102931 / ID SIMETRIS"
+                    value={editingRow.db_id || ''}
+                    onChange={e => setEditingRow({ ...editingRow, db_id: e.target.value })}
+                    className="h-9 text-xs font-mono font-bold text-indigo-950 bg-indigo-50/40 border-indigo-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Status Rencana Approve</label>
+                  <Input
+                    type="text"
+                    value={editingRow.rncn_pengeluaran_is_aprove || ''}
+                    onChange={e => setEditingRow({ ...editingRow, rncn_pengeluaran_is_aprove: e.target.value })}
+                    className="h-9 text-xs"
+                    placeholder="Contoh: 1 / Sudah / Belum"
                   />
                 </div>
               </div>
@@ -1869,6 +1948,31 @@ export default function RkaPengeluaranPage() {
                     value={newRow.realisasi}
                     onChange={e => setNewRow({ ...newRow, realisasi: e.target.value })}
                     className="h-9 text-xs font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    ID Database (db_id) <span className="text-[10px] text-indigo-600 font-normal">(Opsional)</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Contoh: 102931"
+                    value={newRow.db_id}
+                    onChange={e => setNewRow({ ...newRow, db_id: e.target.value })}
+                    className="h-9 text-xs font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Status Rencana Approve</label>
+                  <Input
+                    type="text"
+                    value={newRow.rncn_pengeluaran_is_aprove}
+                    onChange={e => setNewRow({ ...newRow, rncn_pengeluaran_is_aprove: e.target.value })}
+                    className="h-9 text-xs"
+                    placeholder="Contoh: 1 / Sudah / Belum"
                   />
                 </div>
               </div>

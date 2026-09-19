@@ -13,7 +13,16 @@ export async function GET(request: Request) {
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
     const onlyClassified = searchParams.get('only_classified'); // 'true' | 'false'
     const targetFormat = searchParams.get('format');
-    const selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
+    
+    // Probe apakah kolom db_id sudah ada di schema Supabase
+    let selectFields = 'id, db_id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
+    let hasDbIdColumn = true;
+
+    const probe = await supabaseAdmin.from('rkat_pengeluaran').select('id, db_id').limit(1);
+    if (probe.error && probe.error.message.includes('db_id')) {
+      selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
+      hasDbIdColumn = false;
+    }
 
     // 1. Pencarian Cepat Teroptimasi (jika ada parameter search)
     if (search && search.trim()) {
@@ -32,11 +41,15 @@ export async function GET(request: Request) {
         query = query.ilike('unit', `%${unit}%`);
       }
 
-      query = query.or(`uraian_belanja.ilike.%${qText}%,kegiatan.ilike.%${qText}%,akun_detail.ilike.%${qText}%`);
+      if (hasDbIdColumn) {
+        query = query.or(`uraian_belanja.ilike.%${qText}%,kegiatan.ilike.%${qText}%,akun_detail.ilike.%${qText}%,db_id.ilike.%${qText}%`);
+      } else {
+        query = query.or(`uraian_belanja.ilike.%${qText}%,kegiatan.ilike.%${qText}%,akun_detail.ilike.%${qText}%`);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
-      return NextResponse.json({ success: true, data: data || [] });
+      return NextResponse.json({ success: true, data: data || [], hasDbIdColumn });
     }
 
     // 2. Fetch seluruh baris data secara bertahap yang aman
@@ -92,7 +105,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, data: allData });
+    return NextResponse.json({ success: true, data: allData, hasDbIdColumn });
   } catch (error: any) {
     console.error('Error fetching rkat_pengeluaran:', error);
     return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
@@ -112,7 +125,8 @@ export async function POST(request: Request) {
 
       // Deteksi baris pertama apakah header (lewati jika chunk isHeaderless)
       let startIndex = 0;
-      if (!body.isHeaderless) {
+      let dbIdIndex = -1;
+      if (!body.isHeaderless && lines.length > 0) {
         const firstLine = lines[0].toLowerCase();
         if (
           firstLine.includes('tahun') || 
@@ -122,6 +136,8 @@ export async function POST(request: Request) {
           firstLine.includes('akun')
         ) {
           startIndex = 1;
+          const headers = lines[0].split('\t').map((h: string) => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+          dbIdIndex = headers.findIndex((h: string) => h === 'db_id' || h === 'dbid' || h === 'id_db' || h === 'id database');
         }
       }
 
@@ -156,8 +172,7 @@ export async function POST(request: Request) {
         // 18: Anggaran
         // 19: Realisasi
         // 20: rncnpengeluaranIsAprove
-        // [Opsional 21]: laporan_kementerian
-        // [Opsional 22]: laporan_webometrics
+        // [Kolom Paling Belakang]: db_id
 
         const parseCleanNum = (val: any) => {
           if (!val || val === '\\N' || val === '-') return 0;
@@ -171,7 +186,18 @@ export async function POST(request: Request) {
           return val;
         };
 
-        const row = {
+        // Ekstraksi db_id dari kolom paling belakang atau index header jika terdeteksi
+        let dbIdVal: string | null = null;
+        if (dbIdIndex !== -1 && cols[dbIdIndex] !== undefined) {
+          dbIdVal = cleanNull(cols[dbIdIndex]);
+        } else if (cols.length > 21) {
+          // Posisi di paling belakang (contoh 22 kolom: index 21)
+          dbIdVal = cleanNull(cols[cols.length - 1]);
+        }
+
+        const is22Cols = cols.length === 22 && dbIdIndex === -1;
+
+        const row: any = {
           tahun_anggaran: parseInt(cols[0]) || 2027,
           unit: cols[1] || 'Unit Kerja UGM',
           tujuan: cleanNull(cols[2]),
@@ -193,9 +219,10 @@ export async function POST(request: Request) {
           anggaran: parseCleanNum(cols[18]),
           realisasi: parseCleanNum(cols[19]),
           rncn_pengeluaran_is_aprove: cols[20] || 'Belum',
-          laporan_kementerian: cols[21] || null,
-          laporan_webometrics: cols[22] || null,
-          identifikasi_lain: cols[23] || null
+          db_id: dbIdVal,
+          laporan_kementerian: is22Cols ? null : (cols[21] && cols[21] !== dbIdVal ? cols[21] : null),
+          laporan_webometrics: is22Cols ? null : (cols[22] && cols[22] !== dbIdVal ? cols[22] : null),
+          identifikasi_lain: is22Cols ? null : (cols[23] && cols[23] !== dbIdVal ? cols[23] : null)
         };
 
         rowsToInsert.push(row);
@@ -205,17 +232,33 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Tidak ada baris data valid untuk disimpan' }, { status: 400 });
       }
 
-      // Chunk insertion jika data banyak (> 200 baris)
+      // Chunk insertion jika data banyak (> 200 baris) dengan fallback otomatis jika db_id belum dimigrasi di Postgres
       const chunkSize = 200;
       let insertedCount = 0;
+      let dbIdMissingInDb = false;
+
       for (let i = 0; i < rowsToInsert.length; i += chunkSize) {
-        const chunk = rowsToInsert.slice(i, i + chunkSize);
+        let chunk = rowsToInsert.slice(i, i + chunkSize);
+        if (dbIdMissingInDb) {
+          chunk = chunk.map(({ db_id, ...rest }) => rest);
+        }
+
         const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('db_id')) {
+            dbIdMissingInDb = true;
+            // Retry batch tanpa db_id agar penyimpanan tetap berhasil
+            const strippedChunk = chunk.map(({ db_id, ...rest }: any) => rest);
+            const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(strippedChunk);
+            if (retryRes.error) throw retryRes.error;
+          } else {
+            throw error;
+          }
+        }
         insertedCount += chunk.length;
       }
 
-      return NextResponse.json({ success: true, count: insertedCount });
+      return NextResponse.json({ success: true, count: insertedCount, dbIdMissingInDb });
     }
 
     // 2. Direct Array Bulk Insertion: { bulk: true, rows: [...] }
@@ -227,23 +270,49 @@ export async function POST(request: Request) {
 
       const chunkSize = 200;
       let insertedCount = 0;
+      let dbIdMissingInDb = false;
+
       for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize);
+        let chunk = rows.slice(i, i + chunkSize);
+        if (dbIdMissingInDb) {
+          chunk = chunk.map(({ db_id, ...rest }: any) => rest);
+        }
+
         const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('db_id')) {
+            dbIdMissingInDb = true;
+            const strippedChunk = chunk.map(({ db_id, ...rest }: any) => rest);
+            const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(strippedChunk);
+            if (retryRes.error) throw retryRes.error;
+          } else {
+            throw error;
+          }
+        }
         insertedCount += chunk.length;
       }
 
-      return NextResponse.json({ success: true, count: insertedCount });
+      return NextResponse.json({ success: true, count: insertedCount, dbIdMissingInDb });
     }
 
     // 3. Single Insertion
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('rkat_pengeluaran')
       .insert([body])
       .select();
 
-    if (error) throw error;
+    if (error && error.message.includes('db_id')) {
+      const { db_id, ...rest } = body;
+      const retry = await supabaseAdmin
+        .from('rkat_pengeluaran')
+        .insert([rest])
+        .select();
+      if (retry.error) throw retry.error;
+      data = retry.data;
+    } else if (error) {
+      throw error;
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error('Error inserting rkat_pengeluaran:', error);
@@ -262,13 +331,25 @@ export async function PUT(request: Request) {
 
     updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('rkat_pengeluaran')
       .update(updateData)
       .eq('id', id)
       .select();
 
-    if (error) throw error;
+    if (error && error.message.includes('db_id')) {
+      const { db_id, ...rest } = updateData;
+      const retry = await supabaseAdmin
+        .from('rkat_pengeluaran')
+        .update(rest)
+        .eq('id', id)
+        .select();
+      if (retry.error) throw retry.error;
+      data = retry.data;
+    } else if (error) {
+      throw error;
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
     console.error('Error updating rkat_pengeluaran:', error);
