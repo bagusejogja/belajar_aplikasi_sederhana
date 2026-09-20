@@ -291,46 +291,51 @@ function InlineUnitDetailRows({
   }, [unitGroup.rows, page]);
 
   return (
-    <div className="w-full bg-slate-50/70 p-2 sm:p-3 border-y border-slate-200">
+    <div className="w-full bg-slate-50/70 p-1.5 sm:p-2 border-y border-slate-200">
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
         <table className="w-full text-xs text-left border-collapse">
           {subtab === 'penerimaan' ? (
             <>
-              <thead className="bg-[#1f73a5] text-white font-bold text-[11px] border-b border-[#185c84] uppercase tracking-wider">
+              <thead className="bg-[#1f73a5] text-white font-bold text-[10px] border-b border-[#185c84] uppercase tracking-wider">
                 <tr>
-                  <th className="py-2 px-3 text-center w-10">#</th>
-                  <th className="py-2 px-3 min-w-[280px]">Keterangan &amp; Rincian Penerimaan</th>
-                  <th className="py-2 px-3 w-40 text-center">Volume &amp; Tarif</th>
-                  <th className="py-2 px-3 w-36 text-center">Sumber Dana</th>
-                  <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Penerimaan</th>
+                  <th className="py-1.5 px-2.5 text-center w-10">#</th>
+                  <th className="py-1.5 px-2.5 min-w-[280px]">Keterangan &amp; Rincian Penerimaan</th>
+                  <th className="py-1.5 px-2.5 w-48 text-center">Volume &amp; Tarif</th>
+                  <th className="py-1.5 px-2.5 w-44 text-center">Sumber Dana &amp; Status</th>
+                  <th className="py-1.5 px-2.5 min-w-[160px] text-right pr-4">Pagu Penerimaan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {paginatedRows.map((row, idx) => {
                   const num = (page - 1) * rowsPerPage + idx + 1;
                   const pagu = Number(row.renterima_pagu) || 0;
                   const tarif = Number(row.renterima_tarif) || 0;
                   const vol = Number(row.renterima_volume) || 0;
                   return (
-                    <tr key={row.renterima_id || idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
-                      <td className="py-2.5 px-3 align-top space-y-1">
-                        <div className="font-bold text-slate-900 text-xs leading-snug">{row.keterangan || row.nama_akun_penerimaan || '-'}</div>
-                        <span className="text-[10px] text-slate-400 font-mono">TA {row.tahun || '-'}</span>
+                    <tr key={row.renterima_id || idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-1.5 px-2.5 text-center text-slate-400 font-mono text-[11px] align-middle">{num}</td>
+                      <td className="py-1.5 px-2.5 align-middle">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-slate-900 text-xs">{row.keterangan || row.nama_akun_penerimaan || '-'}</span>
+                          {row.tahun && <span className="text-[10px] text-slate-400 font-mono">({row.tahun})</span>}
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 align-top text-center space-y-0.5">
-                        <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded font-mono text-xs font-bold border border-emerald-100">
-                          {vol.toLocaleString('id-ID')} Vol
-                        </span>
-                        <div className="text-[10px] text-slate-500 font-mono">@ Rp {formatRp(tarif)}</div>
+                      <td className="py-1.5 px-2.5 align-middle text-center">
+                        <div className="flex items-center justify-center gap-1.5 font-mono text-xs">
+                          <span className="font-bold text-slate-800">{vol.toLocaleString('id-ID')} Vol</span>
+                          <span className="text-slate-400 text-[10px]">@</span>
+                          <span className="text-slate-600 font-medium">Rp {formatRp(tarif)}</span>
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 align-top text-center space-y-1">
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                          {row.status || 'Aktif'}
-                        </Badge>
-                        <div className="text-[10px] text-slate-500 font-medium">{row.sumber_dana || 'Dana Masyarakat'}</div>
+                      <td className="py-1.5 px-2.5 align-middle text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className="text-[10px] text-slate-600 font-medium">{row.sumber_dana || 'Dana Masyarakat'}</span>
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] px-1.5 py-0 font-bold">
+                            {row.status || 'Aktif'}
+                          </Badge>
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 align-top text-right pr-4">
+                      <td className="py-1.5 px-2.5 align-middle text-right pr-4">
                         <span className="font-black font-mono text-emerald-950 text-xs">Rp {formatRp(pagu)}</span>
                       </td>
                     </tr>
@@ -340,42 +345,44 @@ function InlineUnitDetailRows({
             </>
           ) : (
             <>
-              <thead className="bg-[#1f73a5] text-white font-bold text-[11px] border-b border-[#185c84] uppercase tracking-wider">
+              <thead className="bg-[#1f73a5] text-white font-bold text-[10px] border-b border-[#185c84] uppercase tracking-wider">
                 <tr>
-                  <th className="py-2 px-3 text-center w-10">#</th>
-                  <th className="py-2 px-3 min-w-[260px]">Kegiatan &amp; Lingkup</th>
-                  <th className="py-2 px-3 min-w-[280px]">Uraian Belanja</th>
-                  <th className="py-2 px-3 w-36 text-center">Prioritas &amp; TA</th>
-                  <th className="py-2 px-3 min-w-[160px] text-right pr-4">Pagu Anggaran</th>
+                  <th className="py-1.5 px-2.5 text-center w-10">#</th>
+                  <th className="py-1.5 px-2.5 min-w-[260px]">Kegiatan &amp; Lingkup</th>
+                  <th className="py-1.5 px-2.5 min-w-[280px]">Uraian Belanja</th>
+                  <th className="py-1.5 px-2.5 w-40 text-center">Prioritas &amp; TA</th>
+                  <th className="py-1.5 px-2.5 min-w-[160px] text-right pr-4">Pagu Anggaran</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {paginatedRows.map((row, idx) => {
                   const num = (page - 1) * rowsPerPage + idx + 1;
                   const ang = Number(row.anggaran) || 0;
                   return (
-                    <tr key={row.id || idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px] align-top">{num}</td>
-                      <td className="py-2.5 px-3 align-top space-y-1">
-                        <div className="font-bold text-slate-900 text-xs leading-snug">{row.kegiatan || '-'}</div>
-                        {row.lingkup_kegiatan && (
-                          <div className="text-[10px] text-indigo-700 font-medium">
-                            <span className="font-bold text-indigo-900">Lingkup:</span> {row.lingkup_kegiatan}
-                          </div>
-                        )}
+                    <tr key={row.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-1.5 px-2.5 text-center text-slate-400 font-mono text-[11px] align-middle">{num}</td>
+                      <td className="py-1.5 px-2.5 align-middle">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-semibold text-slate-900 text-xs">{row.kegiatan || '-'}</span>
+                          {row.lingkup_kegiatan && (
+                            <span className="text-[10px] text-indigo-700 font-medium">[{row.lingkup_kegiatan}]</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 align-top">
-                        <div className="font-medium text-slate-800 text-xs leading-relaxed">{row.uraian_belanja || '-'}</div>
+                      <td className="py-1.5 px-2.5 align-middle">
+                        <div className="font-medium text-slate-800 text-xs leading-tight">{row.uraian_belanja || '-'}</div>
                       </td>
-                      <td className="py-2.5 px-3 align-top text-center space-y-1">
-                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold font-mono">
-                          TA {row.tahun_anggaran || '-'}
-                        </span>
-                        {row.prioritas && (
-                          <div className="text-[10px] text-slate-500 font-medium">Prioritas: {row.prioritas}</div>
-                        )}
+                      <td className="py-1.5 px-2.5 align-middle text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className="inline-block px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-bold font-mono">
+                            TA {row.tahun_anggaran || '-'}
+                          </span>
+                          {row.prioritas && (
+                            <span className="text-[10px] text-slate-500 font-medium">[{row.prioritas}]</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-2.5 px-3 align-top text-right pr-4">
+                      <td className="py-1.5 px-2.5 align-middle text-right pr-4">
                         <span className="font-black font-mono text-slate-950 text-xs">Rp {formatRp(ang)}</span>
                       </td>
                     </tr>
@@ -921,30 +928,30 @@ function UnitDetailHierarchyTable({
   }
 
   return (
-    <div className="w-full bg-white rounded-xl border border-indigo-200/90 shadow-sm overflow-hidden my-1 text-left">
+    <div className="w-full bg-white rounded-xl border border-indigo-200/90 shadow-sm overflow-hidden my-0.5 text-left">
       {/* Sub-header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-indigo-900">
-        <div className="flex items-center gap-2">
-          <Building2 size={15} className="text-indigo-300 shrink-0" />
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 border-b border-indigo-900">
+        <div className="flex items-center gap-1.5">
+          <Building2 size={14} className="text-indigo-300 shrink-0" />
           <span className="font-bold text-xs uppercase tracking-wide">
             Rincian Pos Anggaran &amp; Akun: <span className="text-amber-300 normal-case font-black">{unitData.unit}</span>
           </span>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-800/80 text-indigo-100 border border-indigo-700">
+          <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-indigo-800/80 text-indigo-100 border border-indigo-700">
             {totalAllRows.toLocaleString('id-ID')} Total Data
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-[11px]">
+        <div className="flex items-center gap-1.5 text-[10px]">
           <button
             type="button"
             onClick={expandAllSections}
-            className="px-2.5 py-1 rounded-lg bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 text-[10px] font-bold transition-colors cursor-pointer border border-indigo-700 shadow-2xs"
+            className="px-2 py-0.5 rounded-md bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 text-[10px] font-bold transition-colors cursor-pointer border border-indigo-700 shadow-2xs"
           >
             + Buka Semua Pos
           </button>
           <button
             type="button"
             onClick={collapseAllSections}
-            className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-[10px] font-bold transition-colors cursor-pointer border border-slate-700 shadow-2xs"
+            className="px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-slate-300 text-[10px] font-bold transition-colors cursor-pointer border border-slate-700 shadow-2xs"
           >
             - Tutup Semua Pos
           </button>
@@ -988,42 +995,42 @@ function UnitDetailHierarchyTable({
                     onClick={() => hasData && toggleSection(sec.id)}
                     className={`${sec.theme.bg} hover:brightness-95 border-b border-slate-200 transition-colors select-none ${hasData ? 'cursor-pointer' : 'opacity-60'}`}
                   >
-                    <td className="px-3 py-2 text-center align-middle">
+                    <td className="px-2 py-1.5 text-center align-middle">
                       {hasData ? (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); toggleSection(sec.id); }}
-                          className="w-5 h-5 rounded flex items-center justify-center bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition-all shadow-2xs mx-auto cursor-pointer border border-slate-300"
+                          className="w-4 h-4 rounded flex items-center justify-center bg-white hover:bg-slate-100 text-slate-800 text-[10px] font-bold transition-all shadow-2xs mx-auto cursor-pointer border border-slate-300"
                           title={isSecOpen ? `Tutup ${sec.title}` : `Buka ${sec.title}`}
                         >
-                          {isSecOpen ? <Minus size={11} /> : <Plus size={11} />}
+                          {isSecOpen ? <Minus size={9} /> : <Plus size={9} />}
                         </button>
                       ) : (
                         <span className="text-slate-400 font-mono text-[10px]">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-2">
-                      <div className="flex flex-wrap items-center gap-1.5 font-black text-slate-900 text-xs">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${sec.theme.badgeBg} ${sec.theme.badgeText}`}>
+                    <td className="px-3 py-1.5 align-middle">
+                      <div className="flex items-center gap-1.5 flex-wrap font-black text-slate-900 text-xs">
+                        <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold ${sec.theme.badgeBg} ${sec.theme.badgeText}`}>
                           {sec.headerNumber}
                         </span>
                         <span>{sec.title}</span>
                         {hasData && (
                           <>
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700">
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-200/80 text-slate-700">
                               {sec.akunList.length} Akun
                             </span>
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
                               {sec.rows.length.toLocaleString('id-ID')} Rincian (Rp {formatRp(sec.totalPagu)})
                             </span>
                           </>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2 text-center font-mono text-slate-600 text-xs font-semibold">
+                    <td className="px-3 py-1.5 text-center font-mono text-slate-600 text-xs font-semibold align-middle">
                       {sec.rows.length.toLocaleString('id-ID')} Usulan
                     </td>
-                    <td className="px-4 py-2 text-right font-mono font-black text-slate-950 text-xs pr-4">
+                    <td className="px-3 py-1.5 text-right font-mono font-black text-slate-950 text-xs pr-4 align-middle">
                       Rp {formatRp(sec.totalPagu)}
                     </td>
                   </tr>
@@ -1039,7 +1046,7 @@ function UnitDetailHierarchyTable({
                           onClick={() => toggleAkun(akunKey)}
                           className="bg-white hover:bg-indigo-50/40 border-b border-slate-100 cursor-pointer transition-colors text-slate-800 select-none"
                         >
-                          <td className="px-3 py-2 text-center align-middle pl-6">
+                          <td className="px-2 py-1.5 text-center align-middle pl-5">
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); toggleAkun(akunKey); }}
@@ -1049,22 +1056,22 @@ function UnitDetailHierarchyTable({
                               {isAkunOpen ? <Minus size={9} /> : <Plus size={9} />}
                             </button>
                           </td>
-                          <td className="px-4 py-2 pl-8">
-                            <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-800 text-xs">
+                          <td className="px-3 py-1.5 pl-6 align-middle">
+                            <div className="flex items-center gap-1.5 flex-wrap font-bold text-slate-800 text-xs">
                               <Tag size={12} className="text-indigo-600 shrink-0" />
                               <span>{akun.namaAkun}</span>
-                              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                 {akun.rows.length} Transaksi
                               </span>
-                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <span className="text-[10px] font-mono font-black px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                                 Total: Rp {formatRp(akun.totalPagu)}
                               </span>
                             </div>
                           </td>
-                          <td className="px-4 py-2 text-center font-mono text-slate-500 text-xs">
+                          <td className="px-3 py-1.5 text-center font-mono text-slate-500 text-xs align-middle">
                             {akun.rows.length.toLocaleString('id-ID')} Transaksi
                           </td>
-                          <td className="px-4 py-2 text-right font-mono font-bold text-slate-900 text-xs pr-4">
+                          <td className="px-3 py-1.5 text-right font-mono font-bold text-slate-900 text-xs pr-4 align-middle">
                             Rp {formatRp(akun.totalPagu)}
                           </td>
                         </tr>
@@ -4863,7 +4870,7 @@ export default function RkaLaporanPage() {
                                   {/* INLINE HIERARCHICAL TABLE PER UNIT (UPU) */}
                                   {isUnitExpanded && (
                                     <TableRow className="bg-slate-50/70 border-b-2 border-indigo-200">
-                                      <TableCell colSpan={12} className="p-2 sm:p-4">
+                                      <TableCell colSpan={12} className="p-1 sm:p-2">
                                         <UnitDetailHierarchyTable
                                           unitData={item}
                                           rekapFormat="upu"
@@ -4992,7 +4999,7 @@ export default function RkaLaporanPage() {
                                   {/* INLINE HIERARCHICAL TABLE PER UNIT (PUSDI) */}
                                   {isUnitExpanded && (
                                     <TableRow className="bg-slate-50/70 border-b-2 border-indigo-200">
-                                      <TableCell colSpan={11} className="p-2 sm:p-4">
+                                      <TableCell colSpan={11} className="p-1 sm:p-2">
                                         <UnitDetailHierarchyTable
                                           unitData={item}
                                           rekapFormat="pusdi"
@@ -5131,7 +5138,7 @@ export default function RkaLaporanPage() {
                                 {/* INLINE HIERARCHICAL TABLE PER UNIT (FAKULTAS) */}
                                 {isUnitExpanded && (
                                   <TableRow className="bg-slate-50/70 border-b-2 border-indigo-200">
-                                    <TableCell colSpan={13} className="p-2 sm:p-4">
+                                    <TableCell colSpan={13} className="p-1 sm:p-2">
                                       <UnitDetailHierarchyTable
                                         unitData={item}
                                         rekapFormat="fakultas"
