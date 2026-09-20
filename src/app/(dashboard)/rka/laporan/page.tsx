@@ -625,12 +625,14 @@ function UnitDetailHierarchyTable({
   unitData,
   rekapFormat,
   formatRp,
-  modeLaporan
+  modeLaporan,
+  expandAllTrigger
 }: {
   unitData: any;
   rekapFormat: 'fakultas' | 'pusdi' | 'upu';
   formatRp: (val: number) => string;
   modeLaporan: string;
+  expandAllTrigger?: { expanded: boolean; id: number };
 }) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [openAkuns, setOpenAkuns] = useState<Set<string>>(new Set());
@@ -871,8 +873,29 @@ function UnitDetailHierarchyTable({
     });
   };
 
+  // Sinkronisasi buka/tutup semua dari tombol # di header tabel utama
+  useEffect(() => {
+    if (!expandAllTrigger || expandAllTrigger.id === 0) return;
+    if (expandAllTrigger.expanded) {
+      setOpenSections(new Set(sections.map(s => s.id)));
+      const allAkuns = new Set<string>();
+      sections.forEach(s => {
+        s.akunList.forEach(a => allAkuns.add(`${s.id}___${a.namaAkun}`));
+      });
+      setOpenAkuns(allAkuns);
+    } else {
+      setOpenSections(new Set());
+      setOpenAkuns(new Set());
+    }
+  }, [expandAllTrigger?.id, expandAllTrigger?.expanded, sections]);
+
   const expandAllSections = () => {
     setOpenSections(new Set(sections.map(s => s.id)));
+    const allAkuns = new Set<string>();
+    sections.forEach(s => {
+      s.akunList.forEach(a => allAkuns.add(`${s.id}___${a.namaAkun}`));
+    });
+    setOpenAkuns(allAkuns);
   };
 
   const collapseAllSections = () => {
@@ -1731,6 +1754,7 @@ export default function RkaLaporanPage() {
 
   // State collapse untuk baris Rekap Group Unit Kerja (Default Tertutup / Collapsed Kosong)
   const [expandedRekapUnits, setExpandedRekapUnits] = useState<Set<string>>(new Set());
+  const [rekapExpandAllTrigger, setRekapExpandAllTrigger] = useState<{ expanded: boolean; id: number }>({ expanded: false, id: 0 });
 
   const toggleRekapUnit = (unitName: string) => {
     setExpandedRekapUnits(prev => {
@@ -1747,10 +1771,12 @@ export default function RkaLaporanPage() {
       g.units.forEach(u => allUnits.add(u.unit));
     });
     setExpandedRekapUnits(allUnits);
+    setRekapExpandAllTrigger({ expanded: true, id: Date.now() });
   };
 
   const collapseAllRekapUnits = () => {
     setExpandedRekapUnits(new Set());
+    setRekapExpandAllTrigger({ expanded: false, id: Date.now() });
   };
 
   const togglePptPenerimaan = (key: string) => {
@@ -2745,19 +2771,19 @@ export default function RkaLaporanPage() {
 
       const numCols = isUpu ? 11 : isPusdi ? 10 : 12;
 
-      // Lebar kolom tabel: Kolom berisikan nominal angka diseragamkan lebarnya secara presisi
+      // Lebar kolom tabel: Kolom berisikan nominal angka diseragamkan lebarnya secara presisi (Total A4 Landscape = 15398 dxa)
       const colWidths: number[] = isUpu
-        ? [550, 3650, 1244, 1244, 1244, 1244, 1244, 1244, 1244, 1244, 1246]
+        ? [500, 3200, 1150, 1200, 1150, 1400, 1300, 1350, 1350, 1350, 1448]
         : isPusdi
-        ? [550, 3650, 1400, 1400, 1400, 1400, 1400, 1400, 1400, 1398]
-        : [550, 3400, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1145, 1143];
+        ? [500, 3200, 1300, 1200, 1400, 1400, 1400, 1400, 1750, 1848]
+        : [450, 3050, 1080, 1400, 1080, 1050, 1200, 1200, 1250, 1150, 1250, 1268];
 
       // Header Fill Color and Cell Borders (Light Blue #9DC3E6 dengan border hitam solid)
       const headerFill = '9DC3E6';
       const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
       const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
-      const headerCellMargins = { top: 35, bottom: 35, left: 30, right: 30 };
-      const headerSpacing = { before: 0, after: 0, line: 200 };
+      const headerCellMargins = { top: 40, bottom: 40, left: 30, right: 30 };
+      const headerSpacing = { before: 0, after: 0, line: 220 };
       const dataCellMargins = { top: 75, bottom: 75, left: 60, right: 60 };
       const dataSpacing = { before: 15, after: 15 };
 
@@ -2768,7 +2794,7 @@ export default function RkaLaporanPage() {
         width,
         align = AlignmentType.CENTER,
         bold = true,
-        size = 13
+        size = 15
       }: {
         text: string;
         rowSpan?: number;
@@ -2785,7 +2811,7 @@ export default function RkaLaporanPage() {
           width: width ? { size: width, type: WidthType.DXA } : undefined,
           margins: headerCellMargins,
           children: lines.map(line => new Paragraph({
-            children: [new TextRun({ text: line, bold, size, color: '000000' })],
+            children: [new TextRun({ text: line, bold, size, color: '000000', font: 'Arial' })],
             alignment: align,
             spacing: headerSpacing
           })),
@@ -2799,35 +2825,35 @@ export default function RkaLaporanPage() {
       let headerRowsList: DocxTableRow[] = [];
 
       if (!isUpu && !isPusdi) {
-        // === FORMAT FAKULTAS (Persis seperti gambar lampiran user: 2 baris kompak, nomor di judul) ===
+        // === FORMAT FAKULTAS (2 baris kompak, font lebih besar, kolom Non Pendidikan diperlebar, rumus angka lengkap 1-10) ===
         // Baris 1: Header Utama (No & Unit Kerja rowSpan 2, Penerimaan colSpan 3, Kolom lain rowSpan 2)
         const fHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 340, rule: HeightRule.ATLEAST },
+          height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 13 }),
-            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 13 }),
-            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, width: colWidths[2] + colWidths[3] + colWidths[4], size: 13 }),
-            makeHeaderCell({ text: 'Luncuran\n(4)', rowSpan: 2, width: colWidths[5], size: 13 }),
-            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan', rowSpan: 2, width: colWidths[6], size: 13 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional', rowSpan: 2, width: colWidths[7], size: 13 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja\nModal)', rowSpan: 2, width: colWidths[8], size: 13 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran', rowSpan: 2, width: colWidths[9], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit\nOperasional', rowSpan: 2, width: colWidths[10], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit\nAnggaran', rowSpan: 2, width: colWidths[11], size: 13 }),
+            makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, width: colWidths[2] + colWidths[3] + colWidths[4], size: 15 }),
+            makeHeaderCell({ text: 'Luncuran\n(4)', rowSpan: 2, width: colWidths[5], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(5)=(3+4)', rowSpan: 2, width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(6)', rowSpan: 2, width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(7)', rowSpan: 2, width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(8)=(6+7)', rowSpan: 2, width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Ops\n(9)=(3-6)', rowSpan: 2, width: colWidths[10], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(10)=(5-8)', rowSpan: 2, width: colWidths[11], size: 14 }),
           ]
         });
 
-        // Baris 2: Sub-kolom Penerimaan (Pendidikan (1), Non Pendidikan (2), Jumlah (3)=(1-2))
+        // Baris 2: Sub-kolom Penerimaan (Pendidikan (1), Non Pendidikan (2) kolom lebar, Jumlah (3)=(1-2))
         const fHeaderRow2 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 240, rule: HeightRule.ATLEAST },
+          height: { value: 260, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'Pendidikan\n(1)', width: colWidths[2], size: 12 }),
-            makeHeaderCell({ text: 'Non Pendidikan\n(2)', width: colWidths[3], size: 12 }),
-            makeHeaderCell({ text: 'Jumlah\n(3)=(1-2)', width: colWidths[4], size: 12 }),
+            makeHeaderCell({ text: 'Pendidikan\n(1)', width: colWidths[2], size: 15 }),
+            makeHeaderCell({ text: 'Non Pendidikan\n(2)', width: colWidths[3], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1-2)', width: colWidths[4], size: 15 }),
           ]
         });
 
@@ -2837,18 +2863,18 @@ export default function RkaLaporanPage() {
         const pHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 340, rule: HeightRule.ATLEAST },
+          height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 13 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 13 }),
-            makeHeaderCell({ text: 'Penerimaan\n(1)', width: colWidths[2], size: 13 }),
-            makeHeaderCell({ text: 'Luncuran\n(2)', width: colWidths[3], size: 13 }),
-            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan\n(3)=(1+2)', width: colWidths[4], size: 13 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 13 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 13 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(1-4)', width: colWidths[8], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 13 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan\n(1)', width: colWidths[2], size: 15 }),
+            makeHeaderCell({ text: 'Luncuran\n(2)', width: colWidths[3], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(3)=(1+2)', width: colWidths[4], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(1-4)', width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 14 }),
           ]
         });
 
@@ -2858,19 +2884,19 @@ export default function RkaLaporanPage() {
         const uHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 340, rule: HeightRule.ATLEAST },
+          height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 13 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 13 }),
-            makeHeaderCell({ text: 'Subsidi\n(1)', width: colWidths[2], size: 13 }),
-            makeHeaderCell({ text: 'Penerimaan\n(2)', width: colWidths[3], size: 13 }),
-            makeHeaderCell({ text: 'Luncuran\n(3)', width: colWidths[4], size: 13 }),
-            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan\n(4)=(1+2+3)', width: colWidths[5], size: 13 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(5)', width: colWidths[6], size: 13 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 13 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 13 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(3-6)', width: colWidths[10], size: 13 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
+            makeHeaderCell({ text: 'Subsidi\n(1)', width: colWidths[2], size: 15 }),
+            makeHeaderCell({ text: 'Penerimaan\n(2)', width: colWidths[3], size: 15 }),
+            makeHeaderCell({ text: 'Luncuran\n(3)', width: colWidths[4], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(4)=(1+2+3)', width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(5)', width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(3-6)', width: colWidths[10], size: 14 }),
           ]
         });
 
@@ -4812,6 +4838,7 @@ export default function RkaLaporanPage() {
                                           rekapFormat="upu"
                                           formatRp={formatRp}
                                           modeLaporan={modeLaporan}
+                                          expandAllTrigger={rekapExpandAllTrigger}
                                         />
                                       </TableCell>
                                     </TableRow>
@@ -4940,6 +4967,7 @@ export default function RkaLaporanPage() {
                                           rekapFormat="pusdi"
                                           formatRp={formatRp}
                                           modeLaporan={modeLaporan}
+                                          expandAllTrigger={rekapExpandAllTrigger}
                                         />
                                       </TableCell>
                                     </TableRow>
@@ -5078,6 +5106,7 @@ export default function RkaLaporanPage() {
                                         rekapFormat="fakultas"
                                         formatRp={formatRp}
                                         modeLaporan={modeLaporan}
+                                        expandAllTrigger={rekapExpandAllTrigger}
                                       />
                                     </TableCell>
                                   </TableRow>
