@@ -959,15 +959,20 @@ function UnitDetailHierarchyTable({
                       )}
                     </td>
                     <td className="px-4 py-2">
-                      <div className="flex items-center gap-2 font-black text-slate-900 text-xs">
+                      <div className="flex flex-wrap items-center gap-1.5 font-black text-slate-900 text-xs">
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${sec.theme.badgeBg} ${sec.theme.badgeText}`}>
                           {sec.headerNumber}
                         </span>
                         <span>{sec.title}</span>
                         {hasData && (
-                          <span className="text-[10px] font-mono font-medium px-2 py-0.2 rounded-full bg-slate-200/80 text-slate-700">
-                            {sec.akunList.length} Akun
-                          </span>
+                          <>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700">
+                              {sec.akunList.length} Akun
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {sec.rows.length.toLocaleString('id-ID')} Rincian (Rp {formatRp(sec.totalPagu)})
+                            </span>
+                          </>
                         )}
                       </div>
                     </td>
@@ -1001,11 +1006,14 @@ function UnitDetailHierarchyTable({
                             </button>
                           </td>
                           <td className="px-4 py-2 pl-8">
-                            <div className="flex items-center gap-2 font-bold text-slate-800 text-xs">
+                            <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-800 text-xs">
                               <Tag size={12} className="text-indigo-600 shrink-0" />
                               <span>{akun.namaAkun}</span>
-                              <span className="text-[10px] font-normal px-2 py-0.2 rounded bg-slate-100 text-slate-600 font-mono border border-slate-200">
+                              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                                 {akun.rows.length} Transaksi
+                              </span>
+                              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                Total: Rp {formatRp(akun.totalPagu)}
                               </span>
                             </div>
                           </td>
@@ -2207,6 +2215,11 @@ export default function RkaLaporanPage() {
     return acc;
   }, [displayedRekapGroups]);
 
+  const isAllRekapUnitsExpanded = useMemo(() => {
+    if (displayedRekapTotals.totalUnits === 0) return false;
+    return displayedRekapGroups.length > 0 && displayedRekapGroups.every(g => g.units.every(u => expandedRekapUnits.has(u.unit)));
+  }, [displayedRekapGroups, displayedRekapTotals.totalUnits, expandedRekapUnits]);
+
   const formatRp = (num: number) => {
     return new Intl.NumberFormat('id-ID').format(Math.round(num));
   };
@@ -2743,8 +2756,8 @@ export default function RkaLaporanPage() {
       const headerFill = '9DC3E6';
       const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
       const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
-      const headerCellMargins = { top: 60, bottom: 60, left: 50, right: 50 };
-      const headerSpacing = { before: 10, after: 10 };
+      const headerCellMargins = { top: 35, bottom: 35, left: 30, right: 30 };
+      const headerSpacing = { before: 0, after: 0, line: 200 };
       const dataCellMargins = { top: 75, bottom: 75, left: 60, right: 60 };
       const dataSpacing = { before: 15, after: 15 };
 
@@ -2755,7 +2768,7 @@ export default function RkaLaporanPage() {
         width,
         align = AlignmentType.CENTER,
         bold = true,
-        size = 14
+        size = 13
       }: {
         text: string;
         rowSpan?: number;
@@ -2765,18 +2778,17 @@ export default function RkaLaporanPage() {
         bold?: boolean;
         size?: number;
       }) => {
+        const lines = text.split('\n');
         return new DocxTableCell({
           rowSpan,
           columnSpan,
           width: width ? { size: width, type: WidthType.DXA } : undefined,
           margins: headerCellMargins,
-          children: [
-            new Paragraph({
-              children: [new TextRun({ text, bold, size, color: '000000' })],
-              alignment: align,
-              spacing: headerSpacing
-            })
-          ],
+          children: lines.map(line => new Paragraph({
+            children: [new TextRun({ text: line, bold, size, color: '000000' })],
+            alignment: align,
+            spacing: headerSpacing
+          })),
           shading: { fill: headerFill, type: ShadingType.CLEAR },
           verticalAlign: VerticalAlign.CENTER,
           borders: cellBorders,
@@ -2787,140 +2799,82 @@ export default function RkaLaporanPage() {
       let headerRowsList: DocxTableRow[] = [];
 
       if (!isUpu && !isPusdi) {
-        // === FORMAT FAKULTAS (Persis seperti gambar lampiran user) ===
+        // === FORMAT FAKULTAS (Persis seperti gambar lampiran user: 2 baris kompak, nomor di judul) ===
         // Baris 1: Header Utama (No & Unit Kerja rowSpan 2, Penerimaan colSpan 3, Kolom lain rowSpan 2)
         const fHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 280, rule: HeightRule.ATLEAST },
+          height: { value: 340, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 14 }),
-            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 14 }),
-            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, width: colWidths[2] + colWidths[3] + colWidths[4], size: 14 }),
-            makeHeaderCell({ text: 'Luncuran', rowSpan: 2, width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', rowSpan: 2, width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', rowSpan: 2, width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', rowSpan: 2, width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', rowSpan: 2, width: colWidths[9], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', rowSpan: 2, width: colWidths[10], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', rowSpan: 2, width: colWidths[11], size: 14 }),
+            makeHeaderCell({ text: 'No', rowSpan: 2, width: colWidths[0], size: 13 }),
+            makeHeaderCell({ text: 'Unit Kerja', rowSpan: 2, width: colWidths[1], size: 13 }),
+            makeHeaderCell({ text: 'Penerimaan', columnSpan: 3, width: colWidths[2] + colWidths[3] + colWidths[4], size: 13 }),
+            makeHeaderCell({ text: 'Luncuran\n(4)', rowSpan: 2, width: colWidths[5], size: 13 }),
+            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan', rowSpan: 2, width: colWidths[6], size: 13 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional', rowSpan: 2, width: colWidths[7], size: 13 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja\nModal)', rowSpan: 2, width: colWidths[8], size: 13 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran', rowSpan: 2, width: colWidths[9], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit\nOperasional', rowSpan: 2, width: colWidths[10], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit\nAnggaran', rowSpan: 2, width: colWidths[11], size: 13 }),
           ]
         });
 
-        // Baris 2: Sub-kolom Penerimaan (Pendidikan, Non Pendidikan, Jumlah)
+        // Baris 2: Sub-kolom Penerimaan (Pendidikan (1), Non Pendidikan (2), Jumlah (3)=(1-2))
         const fHeaderRow2 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 250, rule: HeightRule.ATLEAST },
+          height: { value: 240, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'Pendidikan', width: colWidths[2], size: 13 }),
-            makeHeaderCell({ text: 'Non Pendidikan', width: colWidths[3], size: 13 }),
-            makeHeaderCell({ text: 'Jumlah', width: colWidths[4], size: 13 }),
+            makeHeaderCell({ text: 'Pendidikan\n(1)', width: colWidths[2], size: 12 }),
+            makeHeaderCell({ text: 'Non Pendidikan\n(2)', width: colWidths[3], size: 12 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1-2)', width: colWidths[4], size: 12 }),
           ]
         });
 
-        // Baris 3: Nomor Kolom & Formula (1, 2, 3 (1+2), 4, 5 (3+4), 6, 7, 8 (6+7), 9 (3-6), 10 (3+4-8))
-        const fHeaderRow3 = new DocxTableRow({
-          tableHeader: true,
-          cantSplit: true,
-          height: { value: 230, rule: HeightRule.ATLEAST },
-          children: [
-            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
-            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
-            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
-            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
-            makeHeaderCell({ text: '3 (1+2)', width: colWidths[4], size: 12 }),
-            makeHeaderCell({ text: '4', width: colWidths[5], size: 12 }),
-            makeHeaderCell({ text: '5 (3+4)', width: colWidths[6], size: 12 }),
-            makeHeaderCell({ text: '6', width: colWidths[7], size: 12 }),
-            makeHeaderCell({ text: '7', width: colWidths[8], size: 12 }),
-            makeHeaderCell({ text: '8 (6+7)', width: colWidths[9], size: 12 }),
-            makeHeaderCell({ text: '9 (3-6)', width: colWidths[10], size: 12 }),
-            makeHeaderCell({ text: '10 (3+4-8)', width: colWidths[11], size: 12 }),
-          ]
-        });
-
-        headerRowsList = [fHeaderRow1, fHeaderRow2, fHeaderRow3];
+        headerRowsList = [fHeaderRow1, fHeaderRow2];
       } else if (isPusdi) {
-        // === FORMAT PUSDI (9 Kolom Data, Mengikuti Desain Dasar) ===
+        // === FORMAT PUSDI (10 Kolom Data, 1 Baris Kompak) ===
         const pHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 280, rule: HeightRule.ATLEAST },
+          height: { value: 340, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
-            makeHeaderCell({ text: 'Penerimaan', width: colWidths[2], size: 14 }),
-            makeHeaderCell({ text: 'Luncuran', width: colWidths[3], size: 14 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', width: colWidths[4], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 13 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 13 }),
+            makeHeaderCell({ text: 'Penerimaan\n(1)', width: colWidths[2], size: 13 }),
+            makeHeaderCell({ text: 'Luncuran\n(2)', width: colWidths[3], size: 13 }),
+            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan\n(3)=(1+2)', width: colWidths[4], size: 13 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 13 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 13 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(1-4)', width: colWidths[8], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 13 }),
           ]
         });
 
-        const pHeaderRow2 = new DocxTableRow({
-          tableHeader: true,
-          cantSplit: true,
-          height: { value: 230, rule: HeightRule.ATLEAST },
-          children: [
-            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
-            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
-            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
-            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
-            makeHeaderCell({ text: '3 (1+2)', width: colWidths[4], size: 12 }),
-            makeHeaderCell({ text: '4', width: colWidths[5], size: 12 }),
-            makeHeaderCell({ text: '5', width: colWidths[6], size: 12 }),
-            makeHeaderCell({ text: '6 (4+5)', width: colWidths[7], size: 12 }),
-            makeHeaderCell({ text: '7 (1-4)', width: colWidths[8], size: 12 }),
-            makeHeaderCell({ text: '8 (3-6)', width: colWidths[9], size: 12 }),
-          ]
-        });
-
-        headerRowsList = [pHeaderRow1, pHeaderRow2];
+        headerRowsList = [pHeaderRow1];
       } else {
-        // === FORMAT UPU (10 Kolom Data, Mengikuti Desain Dasar) ===
+        // === FORMAT UPU (11 Kolom Data, 1 Baris Kompak) ===
         const uHeaderRow1 = new DocxTableRow({
           tableHeader: true,
           cantSplit: true,
-          height: { value: 280, rule: HeightRule.ATLEAST },
+          height: { value: 340, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 14 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 14 }),
-            makeHeaderCell({ text: 'Subsidi', width: colWidths[2], size: 14 }),
-            makeHeaderCell({ text: 'Penerimaan', width: colWidths[3], size: 14 }),
-            makeHeaderCell({ text: 'Luncuran', width: colWidths[4], size: 14 }),
-            makeHeaderCell({ text: 'Jumlah Sumber Pembiayaan', width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran Operasional', width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Investasi (Belanja Modal)', width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Total Pengeluaran', width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Operasional', width: colWidths[9], size: 14 }),
-            makeHeaderCell({ text: 'Surplus / Defisit Anggaran', width: colWidths[10], size: 14 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 13 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 13 }),
+            makeHeaderCell({ text: 'Subsidi\n(1)', width: colWidths[2], size: 13 }),
+            makeHeaderCell({ text: 'Penerimaan\n(2)', width: colWidths[3], size: 13 }),
+            makeHeaderCell({ text: 'Luncuran\n(3)', width: colWidths[4], size: 13 }),
+            makeHeaderCell({ text: 'Jumlah\nSumber\nPembiayaan\n(4)=(1+2+3)', width: colWidths[5], size: 13 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(5)', width: colWidths[6], size: 13 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 13 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 13 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(3-6)', width: colWidths[10], size: 13 }),
           ]
         });
 
-        const uHeaderRow2 = new DocxTableRow({
-          tableHeader: true,
-          cantSplit: true,
-          height: { value: 230, rule: HeightRule.ATLEAST },
-          children: [
-            makeHeaderCell({ text: '', width: colWidths[0], size: 12 }),
-            makeHeaderCell({ text: '', width: colWidths[1], size: 12 }),
-            makeHeaderCell({ text: '1', width: colWidths[2], size: 12 }),
-            makeHeaderCell({ text: '2', width: colWidths[3], size: 12 }),
-            makeHeaderCell({ text: '3', width: colWidths[4], size: 12 }),
-            makeHeaderCell({ text: '4 (1+2+3)', width: colWidths[5], size: 12 }),
-            makeHeaderCell({ text: '5', width: colWidths[6], size: 12 }),
-            makeHeaderCell({ text: '6', width: colWidths[7], size: 12 }),
-            makeHeaderCell({ text: '7 (5+6)', width: colWidths[8], size: 12 }),
-            makeHeaderCell({ text: '8 (1+2-5)', width: colWidths[9], size: 12 }),
-            makeHeaderCell({ text: '9 (3-6)', width: colWidths[10], size: 12 }),
-          ]
-        });
-
-        headerRowsList = [uHeaderRow1, uHeaderRow2];
+        headerRowsList = [uHeaderRow1];
       }
 
       const displayGroups = rekapGroupFilter === 'ALL' 
@@ -4545,7 +4499,21 @@ export default function RkaLaporanPage() {
                   {rekapFormat === 'upu' ? (
                     /* Header Format UPU (10 Kolom Utama: 0 Unit Kerja, 1 Subsidi, 2 Penerimaan, 3 Luncuran, 4 Jml Sumber Pembiayaan, 5 Pengeluaran Ops, 6 Investasi Modal, 7 Total Pengeluaran, 8 Surplus/Defisit Ops, 9 Surplus/Defisit Anggaran) */
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={isAllRekapUnitsExpanded ? collapseAllRekapUnits : expandAllRekapUnits}
+                          className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                            isAllRekapUnitsExpanded
+                              ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                              : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                          title={isAllRekapUnitsExpanded ? "Tutup Semua Rincian Unit Kerja" : "Buka Semua Rincian Unit Kerja"}
+                        >
+                          {isAllRekapUnitsExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                          <span>#</span>
+                        </button>
+                      </TableHead>
                       <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[240px]">
                         0. Unit Kerja
                       </TableHead>
@@ -4581,7 +4549,21 @@ export default function RkaLaporanPage() {
                   ) : rekapFormat === 'pusdi' ? (
                     /* Header Format PUSDI (9 Kolom Utama: 0 Unit Kerja, 1 Penerimaan, 2 Luncuran, 3 Jml Sumber Pembiayaan, 4 Pengeluaran Ops, 5 Investasi Modal, 6 Total Pengeluaran, 7 Surplus/Defisit Ops, 8 Surplus/Defisit Anggaran) */
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={isAllRekapUnitsExpanded ? collapseAllRekapUnits : expandAllRekapUnits}
+                          className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                            isAllRekapUnitsExpanded
+                              ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                              : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                          title={isAllRekapUnitsExpanded ? "Tutup Semua Rincian Unit Kerja" : "Buka Semua Rincian Unit Kerja"}
+                        >
+                          {isAllRekapUnitsExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                          <span>#</span>
+                        </button>
+                      </TableHead>
                       <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[240px]">
                         0. Unit Kerja
                       </TableHead>
@@ -4614,7 +4596,21 @@ export default function RkaLaporanPage() {
                   ) : (
                     /* Header Format Fakultas (11 Kolom Standar: 0 Unit, 1 Pendidikan, 2 Non Pendidikan, 3 Jml Penerimaan, 4 Luncuran, 5 Jml Pembiayaan, 6 Ops, 7 Modal, 8 Total Pengeluaran, 9 S/D Ops, 10 S/D Anggaran) */
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-10 text-center text-gray-500 text-xs uppercase font-bold">#</TableHead>
+                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={isAllRekapUnitsExpanded ? collapseAllRekapUnits : expandAllRekapUnits}
+                          className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                            isAllRekapUnitsExpanded
+                              ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                              : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                          title={isAllRekapUnitsExpanded ? "Tutup Semua Rincian Unit Kerja" : "Buka Semua Rincian Unit Kerja"}
+                        >
+                          {isAllRekapUnitsExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                          <span>#</span>
+                        </button>
+                      </TableHead>
                       <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[230px]">
                         0. Unit Kerja
                       </TableHead>
