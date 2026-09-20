@@ -119,6 +119,12 @@ export async function POST(request: Request) {
           renterima_tarif: parseFloat(String(r.renterimaTarif ?? r.renterima_tarif ?? 0).replace(/,/g, '.')) || 0,
           renterima_jumlah: parseFloat(String(r.renterimaJumlah ?? r.renterima_jumlah ?? 0).replace(/,/g, '.')) || 0,
           renterima_pagu: parseFloat(String(r.renterimaPagu ?? r.renterima_pagu ?? 0).replace(/,/g, '.')) || 0,
+          prop_alokasi_prosentase_unit: (() => {
+            const raw = r.propAlokasiProsentaseUnit ?? r.prop_alokasi_prosentase_unit ?? r.propAlokasi;
+            if (raw === undefined || raw === null || raw === '') return 100;
+            const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
+            return isNaN(parsed) ? 100 : parsed;
+          })(),
           status: String(r.status || 'Sedang Diproses').trim(),
           keterangan: String(r.keterangan || '').trim(),
           sumber_dana: String(r.sumber_dana || r.sumberDana || 'Dana Masyarakat Tidak Mengikat').trim(),
@@ -132,7 +138,15 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < formatted.length; i += chunkSize) {
         const chunk = formatted.slice(i, i + chunkSize);
-        const { error } = await supabaseAdmin.from('rkat_penerimaan').insert(chunk);
+        let { error } = await supabaseAdmin.from('rkat_penerimaan').insert(chunk);
+
+        // Fallback jika kolom prop_alokasi_prosentase_unit belum ada di database Supabase
+        if (error && (error.message?.includes('prop_alokasi_prosentase_unit') || error.details?.includes('prop_alokasi_prosentase_unit'))) {
+          const fallbackChunk = chunk.map(({ prop_alokasi_prosentase_unit, ...rest }: any) => rest);
+          const retryRes = await supabaseAdmin.from('rkat_penerimaan').insert(fallbackChunk);
+          error = retryRes.error;
+        }
+
         if (error) {
           if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
             return NextResponse.json({
@@ -150,7 +164,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Kasus Single Insert
-    const newRecord = {
+    const newRecord: any = {
       renterima_id: body.renterimaId ? parseInt(String(body.renterimaId).replace(/\D/g, '')) || null : body.renterima_id || null,
       unit_kerja: String(body.unit_kerja || body.unit || '').trim(),
       nama_akun_penerimaan: String(body.nama_akun_penerimaan || body.akun || '').trim(),
@@ -160,16 +174,33 @@ export async function POST(request: Request) {
       renterima_tarif: parseFloat(String(body.renterimaTarif ?? body.renterima_tarif ?? 0)) || 0,
       renterima_jumlah: parseFloat(String(body.renterimaJumlah ?? body.renterima_jumlah ?? 0)) || 0,
       renterima_pagu: parseFloat(String(body.renterimaPagu ?? body.renterima_pagu ?? 0)) || 0,
+      prop_alokasi_prosentase_unit: (() => {
+        const raw = body.propAlokasiProsentaseUnit ?? body.prop_alokasi_prosentase_unit ?? body.propAlokasi;
+        if (raw === undefined || raw === null || raw === '') return 100;
+        const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
+        return isNaN(parsed) ? 100 : parsed;
+      })(),
       status: String(body.status || 'Sedang Diproses').trim(),
       keterangan: String(body.keterangan || '').trim(),
       sumber_dana: String(body.sumber_dana || 'Dana Masyarakat Tidak Mengikat').trim(),
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('rkat_penerimaan')
       .insert([newRecord])
       .select();
+
+    // Fallback jika kolom prop_alokasi_prosentase_unit belum ada
+    if (error && (error.message?.includes('prop_alokasi_prosentase_unit') || error.details?.includes('prop_alokasi_prosentase_unit'))) {
+      const { prop_alokasi_prosentase_unit, ...fallbackRecord } = newRecord;
+      const retryRes = await supabaseAdmin
+        .from('rkat_penerimaan')
+        .insert([fallbackRecord])
+        .select();
+      data = retryRes.data;
+      error = retryRes.error;
+    }
 
     if (error) {
       if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
@@ -221,6 +252,10 @@ export async function PUT(request: Request) {
     }
     if (body.renterimaPagu !== undefined || body.renterima_pagu !== undefined) {
       payload.renterima_pagu = parseFloat(String(body.renterimaPagu ?? body.renterima_pagu)) || 0;
+    }
+    if (body.propAlokasiProsentaseUnit !== undefined || body.prop_alokasi_prosentase_unit !== undefined) {
+      const parsed = parseFloat(String(body.propAlokasiProsentaseUnit ?? body.prop_alokasi_prosentase_unit).replace(/,/g, '.').replace(/%/g, ''));
+      payload.prop_alokasi_prosentase_unit = isNaN(parsed) ? 100 : parsed;
     }
     if (body.status !== undefined) payload.status = body.status;
     if (body.keterangan !== undefined) payload.keterangan = body.keterangan;

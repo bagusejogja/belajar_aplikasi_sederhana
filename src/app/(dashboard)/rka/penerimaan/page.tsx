@@ -349,7 +349,9 @@ export default function RkaPenerimaanPage() {
       c.includes('namaakun') || 
       c.includes('akun') ||
       c.includes('pagu') ||
-      c.includes('volume')
+      c.includes('volume') ||
+      c.includes('propalokasi') ||
+      c.includes('alokasi')
     );
 
     let headerMap: Record<string, number> = {};
@@ -366,6 +368,7 @@ export default function RkaPenerimaanPage() {
         else if (col.includes('tarif')) headerMap['renterimaTarif'] = idx;
         else if (col.includes('jumlah') || col === 'total') headerMap['renterimaJumlah'] = idx;
         else if (col.includes('pagu')) headerMap['renterimaPagu'] = idx;
+        else if (col.includes('propalokasi') || col.includes('prosentase') || col.includes('alokasi')) headerMap['propAlokasiProsentaseUnit'] = idx;
         else if (col === 'status') headerMap['status'] = idx;
         else if (col.includes('keterangan') || col === 'ket') headerMap['keterangan'] = idx;
         else if (col.includes('sumberdana') || col === 'sumber') headerMap['sumber_dana'] = idx;
@@ -418,6 +421,7 @@ export default function RkaPenerimaanPage() {
         const tarifVal = parseFloat(getCol('renterimaTarif', '0').replace(/,/g, '.')) || 0;
         const jmlVal = parseFloat(getCol('renterimaJumlah', '0').replace(/,/g, '.')) || (volVal * tarifVal);
         const paguVal = parseFloat(getCol('renterimaPagu', '0').replace(/,/g, '.')) || jmlVal;
+        const propAlokasiVal = parseFloat(getCol('propAlokasiProsentaseUnit', '100').replace(/,/g, '.').replace(/%/g, '')) || 100;
 
         parsed.push({
           renterimaId: getCol('renterimaId', ''),
@@ -429,6 +433,7 @@ export default function RkaPenerimaanPage() {
           renterimaTarif: tarifVal,
           renterimaJumlah: jmlVal,
           renterimaPagu: paguVal,
+          propAlokasiProsentaseUnit: propAlokasiVal,
           status: getCol('status', 'Sedang Diproses'),
           keterangan: getCol('keterangan', ''),
           sumber_dana: getCol('sumber_dana', 'Dana Masyarakat Tidak Mengikat')
@@ -458,6 +463,7 @@ export default function RkaPenerimaanPage() {
             renterimaTarif: tarif,
             renterimaJumlah: jml,
             renterimaPagu: pagu,
+            propAlokasiProsentaseUnit: 100,
             status: cols[10] || 'Sedang Diproses',
             keterangan: cols[11] || '',
             sumber_dana: cols[12] || 'Dana Masyarakat Tidak Mengikat'
@@ -479,6 +485,7 @@ export default function RkaPenerimaanPage() {
             renterimaTarif: tarif,
             renterimaJumlah: jml,
             renterimaPagu: pagu,
+            propAlokasiProsentaseUnit: 100,
             status: cols[9] || 'Sedang Diproses',
             keterangan: cols[10] || '',
             sumber_dana: cols[11] || 'Dana Masyarakat Tidak Mengikat'
@@ -495,6 +502,7 @@ export default function RkaPenerimaanPage() {
             renterimaTarif: parseFloat((cols[4] || '0').replace(/,/g, '.')) || 0,
             renterimaJumlah: parseFloat((cols[5] || '0').replace(/,/g, '.')) || 0,
             renterimaPagu: parseFloat((cols[6] || '0').replace(/,/g, '.')) || 0,
+            propAlokasiProsentaseUnit: 100,
             status: cols[7] || 'Sedang Diproses',
             keterangan: cols[8] || '',
             sumber_dana: cols[9] || 'Dana Masyarakat Tidak Mengikat'
@@ -508,7 +516,7 @@ export default function RkaPenerimaanPage() {
 
   // Isi contoh TSV sesuai format spreadsheet pengguna
   const handleFillSampleTSV = () => {
-    const sample = `renterimaId\tunit_kerja\takun\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tstatus\tketerangan\tsumber_dana\n116893\t10000010 Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t41101.04.03.01\tPenerimaan UKT S1 | UKT Pendidikan Unggul\t2027\t1\t240\t24700000.00\t5928000000.00\t5928000000.00\tDisetujui\tPRODI PD - S1 KEDOKTERAN - tahun anggaran 2027 - angkatan 2023\tDana Masyarakat Tidak Mengikat`;
+    const sample = `renterimaId\tunit_kerja\takun\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tpropAlokasiProsentaseUnit\tstatus\tketerangan\tsumber_dana\n116893\t10000010 Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t41101.04.03.01\tPenerimaan UKT S1 | UKT Pendidikan Unggul\t2027\t1\t240\t24700000.00\t5928000000.00\t5928000000.00\t70\tDisetujui\tPRODI PD - S1 KEDOKTERAN - tahun anggaran 2027 - angkatan 2023\tDana Masyarakat Tidak Mengikat`;
     setPasteText(sample);
   };
 
@@ -1014,6 +1022,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                         <th className="px-3 py-2 text-right">Vol</th>
                         <th className="px-3 py-2 text-right">Tarif</th>
                         <th className="px-3 py-2 text-right">Pagu</th>
+                        <th className="px-3 py-2 text-right">% Alokasi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
@@ -1025,6 +1034,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                           <td className="px-3 py-1.5 text-right text-gray-600">{row.renterimaVolume}</td>
                           <td className="px-3 py-1.5 text-right text-gray-600">Rp {formatRp(row.renterimaTarif)}</td>
                           <td className="px-3 py-1.5 text-right font-bold text-emerald-700">Rp {formatRp(row.renterimaPagu)}</td>
+                          <td className="px-3 py-1.5 text-right font-bold text-blue-700">{row.propAlokasiProsentaseUnit !== undefined ? `${row.propAlokasiProsentaseUnit}%` : '100%'}</td>
                         </tr>
                       ))}
                     </tbody>

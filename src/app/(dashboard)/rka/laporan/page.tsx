@@ -636,7 +636,7 @@ function UnitDetailHierarchyTable({
   expandAllTrigger
 }: {
   unitData: any;
-  rekapFormat: 'fakultas' | 'pusdi' | 'upu' | 'kptu';
+  rekapFormat: 'fakultas' | 'fakultas_alokasi' | 'pusdi' | 'upu' | 'kptu';
   formatRp: (val: number) => string;
   modeLaporan: string;
   expandAllTrigger?: { expanded: boolean; id: number };
@@ -849,20 +849,22 @@ function UnitDetailHierarchyTable({
       ];
     }
 
-    // Format Default: Fakultas (11 Kolom Standar)
+    // Format Default: Fakultas (11 Kolom Standar) & Fakultas Alokasi
     const penPendRows = penRows.filter(r => isPendidikanPenerimaan(r));
     const penNonPendRows = penRows.filter(r => !isLuncuranPenerimaan(r) && !isPendidikanPenerimaan(r));
     const luncRows = penRows.filter(r => isLuncuranPenerimaan(r));
     const opsRows = belRows.filter(r => !isModalBelanja(r));
     const modRows = belRows.filter(r => isModalBelanja(r));
 
+    const isAlokasi = rekapFormat === 'fakultas_alokasi';
+
     return [
       {
         id: 'fak_pendidikan',
         headerNumber: '1',
-        title: 'Pen. Pendidikan',
+        title: isAlokasi ? 'Pen. Pendidikan (Alokasi)' : 'Pen. Pendidikan',
         type: 'penerimaan' as const,
-        totalPagu: unitData.pendidikan || penPendRows.reduce((a, c) => a + (Number(c.renterima_pagu) || 0), 0),
+        totalPagu: (isAlokasi ? (unitData.pendidikanAlokasi ?? unitData.pendidikan) : unitData.pendidikan) || penPendRows.reduce((a, c) => a + (Number(c.renterima_pagu) || 0), 0),
         rows: penPendRows,
         akunList: groupRowsByAkun(penPendRows, 'penerimaan'),
         theme: { bg: 'bg-emerald-50/70', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-900' }
@@ -870,9 +872,9 @@ function UnitDetailHierarchyTable({
       {
         id: 'fak_non_pendidikan',
         headerNumber: '2',
-        title: 'Pen. Non Pendidikan',
+        title: isAlokasi ? 'Pen. Non Pendidikan (Alokasi)' : 'Pen. Non Pendidikan',
         type: 'penerimaan' as const,
-        totalPagu: unitData.nonPendidikan || penNonPendRows.reduce((a, c) => a + (Number(c.renterima_pagu) || 0), 0),
+        totalPagu: (isAlokasi ? (unitData.nonPendidikanAlokasi ?? unitData.nonPendidikan) : unitData.nonPendidikan) || penNonPendRows.reduce((a, c) => a + (Number(c.renterima_pagu) || 0), 0),
         rows: penNonPendRows,
         akunList: groupRowsByAkun(penNonPendRows, 'penerimaan'),
         theme: { bg: 'bg-emerald-50/50', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-800' }
@@ -1177,7 +1179,7 @@ export default function RkaLaporanPage() {
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
   const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
   const [rekapGroupFilter, setRekapGroupFilter] = useState<string>('Fakultas');
-  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi' | 'upu' | 'kptu'>('fakultas');
+  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'fakultas_alokasi' | 'pusdi' | 'upu' | 'kptu'>('fakultas');
   const [paguAwalList, setPaguAwalList] = useState<any[]>([]);
 
   // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
@@ -2009,15 +2011,21 @@ export default function RkaLaporanPage() {
       groupOrg: string;
       // 11 Kolom Standar RKAT:
       pendidikan: number;              // (1) Penerimaan Pendidikan (Akun 41*)
+      pendidikanAlokasi: number;       // (1) Penerimaan Pendidikan x % Alokasi
       nonPendidikan: number;           // (2) Penerimaan Non Pendidikan (Akun 42*)
+      nonPendidikanAlokasi: number;    // (2) Penerimaan Non Pendidikan x % Alokasi
       jumlahPenerimaan: number;        // (3) = (1) + (2)
+      jumlahPenerimaanAlokasi: number; // (3) = (1) + (2) Alokasi
       luncuran: number;                // (4) Surplus Anggaran Tahun Sebelumnya (Akun 40101*)
       sumberPembiayaan: number;        // (5) = (3) + (4)
+      sumberPembiayaanAlokasi: number; // (5) = (3) + (4) Alokasi
       operasional: number;             // (6) Pengeluaran Operasional (Belanja operasional non-modal)
       modal: number;                   // (7) Investasi (Belanja Modal) (Akun 55* / Modal)
       totalPengeluaran: number;        // (8) = (6) + (7)
       surplusDefisitOperasional: number; // (9) = (3) - (6)
+      surplusDefisitOperasionalAlokasi: number; // (9) = (3) - (6) Alokasi
       surplusDefisitAnggaran: number;    // (10) = (5) - (8) = (3) + (4) - (8)
+      surplusDefisitAnggaranAlokasi: number; // (10) = (5) - (8) Alokasi
       
       // 8 Kolom Khusus Format KPTU & Format UPU:
       pagu: number;                        // (1) Pagu Awal dari tbl gov_pagu_anggaran
@@ -2053,15 +2061,21 @@ export default function RkaLaporanPage() {
           unit: uTrim,
           groupOrg: getUnitGroupOrg(uTrim),
           pendidikan: 0,
+          pendidikanAlokasi: 0,
           nonPendidikan: 0,
+          nonPendidikanAlokasi: 0,
           jumlahPenerimaan: 0,
+          jumlahPenerimaanAlokasi: 0,
           luncuran: 0,
           sumberPembiayaan: 0,
+          sumberPembiayaanAlokasi: 0,
           operasional: 0,
           modal: 0,
           totalPengeluaran: 0,
           surplusDefisitOperasional: 0,
+          surplusDefisitOperasionalAlokasi: 0,
           surplusDefisitAnggaran: 0,
+          surplusDefisitAnggaranAlokasi: 0,
           pagu: 0,
           subsidi: 0,
           sumberPembiayaanUpu: 0,
@@ -2114,13 +2128,38 @@ export default function RkaLaporanPage() {
       // (1) Penerimaan Pendidikan: Akun 41* atau label mengandung 'pendidikan'
       const isPendidikan = !isLuncuran && (akun.startsWith('41') || fp.includes('pendidikan') || ket.includes('pendidikan'));
 
+      // Prop Alokasi Prosentase Unit (Dari kolom data row atau master gov_units)
+      const rowProp = row.prop_alokasi_prosentase_unit ?? row.propAlokasiProsentaseUnit;
+      let multiplier = 1.0;
+      if (rowProp !== undefined && rowProp !== null && rowProp !== '') {
+        const n = typeof rowProp === 'number' ? rowProp : parseFloat(String(rowProp).replace(/,/g, '.').replace(/%/g, ''));
+        if (!isNaN(n)) {
+          multiplier = n > 1.0 ? n / 100.0 : (n < 0 ? 0 : n);
+        }
+      } else {
+        const matchedGu = govUnitsList.find(g => 
+          (g.kode_unit && g.kode_unit !== '--' && u.startsWith(g.kode_unit)) ||
+          (g.nama_unit && (u.toLowerCase().includes(g.nama_unit.toLowerCase()) || g.nama_unit.toLowerCase().includes(u.toLowerCase())))
+        );
+        if (matchedGu?.prop_alokasi_prosentase_unit !== undefined && matchedGu?.prop_alokasi_prosentase_unit !== null && matchedGu?.prop_alokasi_prosentase_unit !== '') {
+          const n = typeof matchedGu.prop_alokasi_prosentase_unit === 'number'
+            ? matchedGu.prop_alokasi_prosentase_unit
+            : parseFloat(String(matchedGu.prop_alokasi_prosentase_unit).replace(/,/g, '.').replace(/%/g, ''));
+          if (!isNaN(n)) {
+            multiplier = n > 1.0 ? n / 100.0 : (n < 0 ? 0 : n);
+          }
+        }
+      }
+
       if (isLuncuran) {
         item.luncuran += pagu;
       } else if (isPendidikan) {
         item.pendidikan += pagu;
+        item.pendidikanAlokasi += (pagu * multiplier);
       } else {
         // (2) Penerimaan Non Pendidikan: Akun 42* dan lainnya
         item.nonPendidikan += pagu;
+        item.nonPendidikanAlokasi += (pagu * multiplier);
       }
 
       item.penerimaanCount += 1;
@@ -2192,6 +2231,12 @@ export default function RkaLaporanPage() {
       u.totalPengeluaran = u.operasional + u.modal;                      // (8) = (6) + (7)
       u.surplusDefisitOperasional = u.jumlahPenerimaan - u.operasional;  // (9) = (3) - (6)
       u.surplusDefisitAnggaran = u.sumberPembiayaan - u.totalPengeluaran; // (10) = (5) - (8) = (3) + (4) - (8)
+
+      // Kalkulasi Posisi Aritmetika Format Fakultas Alokasi:
+      u.jumlahPenerimaanAlokasi = u.pendidikanAlokasi + u.nonPendidikanAlokasi;
+      u.sumberPembiayaanAlokasi = u.jumlahPenerimaanAlokasi + u.luncuran;
+      u.surplusDefisitOperasionalAlokasi = u.jumlahPenerimaanAlokasi - u.operasional;
+      u.surplusDefisitAnggaranAlokasi = u.sumberPembiayaanAlokasi - u.totalPengeluaran;
       
       // Kalkulasi Kolom Khusus KPTU & Subsidi UPU (dari tbl gov_pagu_anggaran Pagu Awal):
       const uTrim = u.unit;
@@ -2228,15 +2273,21 @@ export default function RkaLaporanPage() {
       groupOrg: string;
       units: typeof unitRekapData;
       totalPendidikan: number;
+      totalPendidikanAlokasi: number;
       totalNonPendidikan: number;
+      totalNonPendidikanAlokasi: number;
       totalJumlahPenerimaan: number;
+      totalJumlahPenerimaanAlokasi: number;
       totalLuncuran: number;
       totalSumberPembiayaan: number;
+      totalSumberPembiayaanAlokasi: number;
       totalOperasional: number;
       totalModal: number;
       totalPengeluaran: number;
       totalSurplusDefisitOperasional: number;
+      totalSurplusDefisitOperasionalAlokasi: number;
       totalSurplusDefisitAnggaran: number;
+      totalSurplusDefisitAnggaranAlokasi: number;
       totalPagu: number;
       totalSubsidi: number;
       totalSumberPembiayaanUpu: number;
@@ -2258,15 +2309,21 @@ export default function RkaLaporanPage() {
           groupOrg: g,
           units: [],
           totalPendidikan: 0,
+          totalPendidikanAlokasi: 0,
           totalNonPendidikan: 0,
+          totalNonPendidikanAlokasi: 0,
           totalJumlahPenerimaan: 0,
+          totalJumlahPenerimaanAlokasi: 0,
           totalLuncuran: 0,
           totalSumberPembiayaan: 0,
+          totalSumberPembiayaanAlokasi: 0,
           totalOperasional: 0,
           totalModal: 0,
           totalPengeluaran: 0,
           totalSurplusDefisitOperasional: 0,
+          totalSurplusDefisitOperasionalAlokasi: 0,
           totalSurplusDefisitAnggaran: 0,
+          totalSurplusDefisitAnggaranAlokasi: 0,
           totalPagu: 0,
           totalSubsidi: 0,
           totalSumberPembiayaanUpu: 0,
@@ -2283,15 +2340,21 @@ export default function RkaLaporanPage() {
       }
       groups[g].units.push(item);
       groups[g].totalPendidikan += item.pendidikan;
+      groups[g].totalPendidikanAlokasi += item.pendidikanAlokasi;
       groups[g].totalNonPendidikan += item.nonPendidikan;
+      groups[g].totalNonPendidikanAlokasi += item.nonPendidikanAlokasi;
       groups[g].totalJumlahPenerimaan += item.jumlahPenerimaan;
+      groups[g].totalJumlahPenerimaanAlokasi += item.jumlahPenerimaanAlokasi;
       groups[g].totalLuncuran += item.luncuran;
       groups[g].totalSumberPembiayaan += item.sumberPembiayaan;
+      groups[g].totalSumberPembiayaanAlokasi += item.sumberPembiayaanAlokasi;
       groups[g].totalOperasional += item.operasional;
       groups[g].totalModal += item.modal;
       groups[g].totalPengeluaran += item.totalPengeluaran;
       groups[g].totalSurplusDefisitOperasional += item.surplusDefisitOperasional;
+      groups[g].totalSurplusDefisitOperasionalAlokasi += item.surplusDefisitOperasionalAlokasi;
       groups[g].totalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
+      groups[g].totalSurplusDefisitAnggaranAlokasi += item.surplusDefisitAnggaranAlokasi;
       groups[g].totalPagu += item.pagu || 0;
       groups[g].totalSubsidi += item.subsidi || item.pagu || 0;
       groups[g].totalSumberPembiayaanUpu += item.sumberPembiayaanUpu || 0;
@@ -2319,15 +2382,21 @@ export default function RkaLaporanPage() {
 
   const unitRekapTotals = useMemo(() => {
     let grandTotalPendidikan = 0;
+    let grandTotalPendidikanAlokasi = 0;
     let grandTotalNonPendidikan = 0;
+    let grandTotalNonPendidikanAlokasi = 0;
     let grandTotalJumlahPenerimaan = 0;
+    let grandTotalJumlahPenerimaanAlokasi = 0;
     let grandTotalLuncuran = 0;
     let grandTotalSumberPembiayaan = 0;
+    let grandTotalSumberPembiayaanAlokasi = 0;
     let totalOperasional = 0;
     let totalModal = 0;
     let grandTotalPengeluaran = 0;
     let grandTotalSurplusDefisitOperasional = 0;
+    let grandTotalSurplusDefisitOperasionalAlokasi = 0;
     let grandTotalSurplusDefisitAnggaran = 0;
+    let grandTotalSurplusDefisitAnggaranAlokasi = 0;
     let grandTotalPagu = 0;
     let grandTotalSubsidi = 0;
     let grandTotalKerjasama = 0;
@@ -2338,15 +2407,21 @@ export default function RkaLaporanPage() {
 
     unitRekapData.forEach(item => {
       grandTotalPendidikan += item.pendidikan;
+      grandTotalPendidikanAlokasi += item.pendidikanAlokasi;
       grandTotalNonPendidikan += item.nonPendidikan;
+      grandTotalNonPendidikanAlokasi += item.nonPendidikanAlokasi;
       grandTotalJumlahPenerimaan += item.jumlahPenerimaan;
+      grandTotalJumlahPenerimaanAlokasi += item.jumlahPenerimaanAlokasi;
       grandTotalLuncuran += item.luncuran;
       grandTotalSumberPembiayaan += item.sumberPembiayaan;
+      grandTotalSumberPembiayaanAlokasi += item.sumberPembiayaanAlokasi;
       totalOperasional += item.operasional;
       totalModal += item.modal;
       grandTotalPengeluaran += item.totalPengeluaran;
       grandTotalSurplusDefisitOperasional += item.surplusDefisitOperasional;
+      grandTotalSurplusDefisitOperasionalAlokasi += item.surplusDefisitOperasionalAlokasi;
       grandTotalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
+      grandTotalSurplusDefisitAnggaranAlokasi += item.surplusDefisitAnggaranAlokasi;
       grandTotalPagu += item.pagu || 0;
       grandTotalSubsidi += item.subsidi || item.pagu || 0;
       grandTotalKerjasama += item.kerjasama || 0;
@@ -2358,15 +2433,21 @@ export default function RkaLaporanPage() {
 
     return { 
       grandTotalPendidikan,
+      grandTotalPendidikanAlokasi,
       grandTotalNonPendidikan,
+      grandTotalNonPendidikanAlokasi,
       grandTotalJumlahPenerimaan,
+      grandTotalJumlahPenerimaanAlokasi,
       grandTotalLuncuran,
       grandTotalSumberPembiayaan,
+      grandTotalSumberPembiayaanAlokasi,
       totalOperasional,
       totalModal,
       grandTotalPengeluaran,
       grandTotalSurplusDefisitOperasional,
+      grandTotalSurplusDefisitOperasionalAlokasi,
       grandTotalSurplusDefisitAnggaran,
+      grandTotalSurplusDefisitAnggaranAlokasi,
       grandTotalPagu,
       grandTotalSubsidi,
       grandTotalKerjasama,
@@ -2390,15 +2471,21 @@ export default function RkaLaporanPage() {
   const displayedRekapTotals = useMemo(() => {
     const acc = {
       pendidikan: 0,
+      pendidikanAlokasi: 0,
       nonPendidikan: 0,
+      nonPendidikanAlokasi: 0,
       jumlahPenerimaan: 0,
+      jumlahPenerimaanAlokasi: 0,
       luncuran: 0,
       sumberPembiayaan: 0,
+      sumberPembiayaanAlokasi: 0,
       operasional: 0,
       modal: 0,
       totalPengeluaran: 0,
       surplusDefisitOperasional: 0,
+      surplusDefisitOperasionalAlokasi: 0,
       surplusDefisitAnggaran: 0,
+      surplusDefisitAnggaranAlokasi: 0,
       pagu: 0,
       subsidi: 0,
       sumberPembiayaanUpu: 0,
@@ -2413,15 +2500,21 @@ export default function RkaLaporanPage() {
     };
     displayedRekapGroups.forEach(g => {
       acc.pendidikan += g.totalPendidikan;
+      acc.pendidikanAlokasi += g.totalPendidikanAlokasi;
       acc.nonPendidikan += g.totalNonPendidikan;
+      acc.nonPendidikanAlokasi += g.totalNonPendidikanAlokasi;
       acc.jumlahPenerimaan += g.totalJumlahPenerimaan;
+      acc.jumlahPenerimaanAlokasi += g.totalJumlahPenerimaanAlokasi;
       acc.luncuran += g.totalLuncuran;
       acc.sumberPembiayaan += g.totalSumberPembiayaan;
+      acc.sumberPembiayaanAlokasi += g.totalSumberPembiayaanAlokasi;
       acc.operasional += g.totalOperasional;
       acc.modal += g.totalModal;
       acc.totalPengeluaran += g.totalPengeluaran;
       acc.surplusDefisitOperasional += g.totalSurplusDefisitOperasional;
+      acc.surplusDefisitOperasionalAlokasi += g.totalSurplusDefisitOperasionalAlokasi;
       acc.surplusDefisitAnggaran += g.totalSurplusDefisitAnggaran;
+      acc.surplusDefisitAnggaranAlokasi += g.totalSurplusDefisitAnggaranAlokasi;
       acc.pagu += g.totalPagu;
       acc.subsidi += g.totalSubsidi || g.totalPagu;
       acc.sumberPembiayaanUpu += g.totalSumberPembiayaanUpu;
@@ -2466,7 +2559,8 @@ export default function RkaLaporanPage() {
       const isPusdi = rekapFormat === 'pusdi';
       const isUpu = rekapFormat === 'upu';
       const isKptu = rekapFormat === 'kptu';
-      const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
+      const isFakultasAlokasi = rekapFormat === 'fakultas_alokasi';
+      const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : isFakultasAlokasi ? 'Rekap_Fakultas_Alokasi' : 'Rekap_Fakultas';
       const ws = wb.addWorksheet(sheetName, {
         views: [{ showGridLines: true }]
       });
@@ -2481,6 +2575,8 @@ export default function RkaLaporanPage() {
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
         : isPusdi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
+        : isFakultasAlokasi
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (ALOKASI) (11 KOLOM) TA ${tahunFilter}`
         : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
       const subTitleRow = ws.addRow([subTitleText]);
       subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
@@ -2535,6 +2631,22 @@ export default function RkaLaporanPage() {
             '6. TOTAL PENGELUARAN (4+5) (RP)',
             '7. SURPLUS / (DEFISIT) OPS (1-4) (RP)',
             '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+          ]
+        : isFakultasAlokasi
+        ? [
+            'NO',
+            'GROUP',
+            '0. UNIT KERJA',
+            '1. PENERIMAAN PENDIDIKAN (ALOKASI) (RP)',
+            '2. PENERIMAAN NON PENDIDIKAN (ALOKASI) (RP)',
+            '3. JUMLAH PENERIMAAN (1+2) (RP)',
+            '4. LUNCURAN / SURPLUS TA LALU (RP)',
+            '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
+            '6. PENGELUARAN OPERASIONAL (RP)',
+            '7. INVESTASI (BELANJA MODAL) (RP)',
+            '8. TOTAL PENGELUARAN (6+7) (RP)',
+            '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)',
+            '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
           ]
         : [
             'NO',
@@ -2668,6 +2780,22 @@ export default function RkaLaporanPage() {
                 u.surplusDefisitOperasional,
                 u.surplusDefisitAnggaran
               ]
+            : isFakultasAlokasi
+            ? [
+                rowNum++,
+                group.groupOrg,
+                u.unit,
+                u.pendidikanAlokasi,
+                u.nonPendidikanAlokasi,
+                u.jumlahPenerimaanAlokasi,
+                u.luncuran,
+                u.sumberPembiayaanAlokasi,
+                u.operasional,
+                u.modal,
+                u.totalPengeluaran,
+                u.surplusDefisitOperasionalAlokasi,
+                u.surplusDefisitAnggaranAlokasi
+              ]
             : [
                 rowNum++,
                 group.groupOrg,
@@ -2779,6 +2907,22 @@ export default function RkaLaporanPage() {
               group.totalSurplusDefisitOperasional,
               group.totalSurplusDefisitAnggaran
             ]
+          : isFakultasAlokasi
+          ? [
+              '',
+              `SUBTOTAL ${group.groupOrg}`,
+              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+              group.totalPendidikanAlokasi,
+              group.totalNonPendidikanAlokasi,
+              group.totalJumlahPenerimaanAlokasi,
+              group.totalLuncuran,
+              group.totalSumberPembiayaanAlokasi,
+              group.totalOperasional,
+              group.totalModal,
+              group.totalPengeluaran,
+              group.totalSurplusDefisitOperasionalAlokasi,
+              group.totalSurplusDefisitAnggaranAlokasi
+            ]
           : [
               '',
               `SUBTOTAL ${group.groupOrg}`,
@@ -2864,6 +3008,22 @@ export default function RkaLaporanPage() {
             displayedRekapTotals.totalPengeluaran,
             displayedRekapTotals.surplusDefisitOperasional,
             displayedRekapTotals.surplusDefisitAnggaran
+          ]
+        : isFakultasAlokasi
+        ? [
+            '',
+            'TOTAL KESELURUHAN',
+            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
+            displayedRekapTotals.pendidikanAlokasi,
+            displayedRekapTotals.nonPendidikanAlokasi,
+            displayedRekapTotals.jumlahPenerimaanAlokasi,
+            displayedRekapTotals.luncuran,
+            displayedRekapTotals.sumberPembiayaanAlokasi,
+            displayedRekapTotals.operasional,
+            displayedRekapTotals.modal,
+            displayedRekapTotals.totalPengeluaran,
+            displayedRekapTotals.surplusDefisitOperasionalAlokasi,
+            displayedRekapTotals.surplusDefisitAnggaranAlokasi
           ]
         : [
             '',
@@ -2978,11 +3138,13 @@ export default function RkaLaporanPage() {
         ? `Rekap_Proposal_RKAT_UPU_${tahunFilter}.xlsx`
         : isPusdi
         ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}.xlsx`
+        : isFakultasAlokasi
+        ? `Rekap_Proposal_RKAT_Fakultas_Alokasi_${tahunFilter}.xlsx`
         : `Rekap_Proposal_RKAT_Fakultas_${tahunFilter}.xlsx`;
       a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
-      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom';
+      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : isFakultasAlokasi ? 'Format Fakultas (Alokasi) 11 Kolom' : 'Format Fakultas 11 Kolom';
       toast.success(`File Excel (${formatTag}) berhasil diexport!`);
     } catch (err: any) {
       console.error('Export Excel error:', err);
@@ -2998,14 +3160,17 @@ export default function RkaLaporanPage() {
       const isKptu = rekapFormat === 'kptu';
       const isUpu = rekapFormat === 'upu';
       const isPusdi = rekapFormat === 'pusdi';
+      const isFakultasAlokasi = rekapFormat === 'fakultas_alokasi';
 
-      const formatLabel = isKptu ? 'KPTU' : isUpu ? 'UPU' : isPusdi ? 'PUSDI' : 'Fakultas';
+      const formatLabel = isKptu ? 'KPTU' : isUpu ? 'UPU' : isPusdi ? 'PUSDI' : isFakultasAlokasi ? 'Fakultas_Alokasi' : 'Fakultas';
       const formatSubtitle = isKptu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KANTOR PUSAT / KPTU (9 KOLOM) TA ${tahunFilter}`
         : isUpu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
         : isPusdi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
+        : isFakultasAlokasi
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (ALOKASI) (11 KOLOM) TA ${tahunFilter}`
         : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
 
       // Kolom Word (Kolom Group dihilangkan sesuai permintaan user agar muat rapi 1 halaman lebar)
@@ -3048,6 +3213,21 @@ export default function RkaLaporanPage() {
             '6. TOTAL PENGELUARAN (4+5)',
             '7. SURPLUS/(DEFISIT) OPS (1-4)',
             '8. S/D ANGGARAN (3-6)'
+          ]
+        : isFakultasAlokasi
+        ? [
+            'NO',
+            '0. UNIT KERJA',
+            '1. PEN. PENDIDIKAN (ALOKASI)',
+            '2. PEN. NON PENDIDIKAN (ALOKASI)',
+            '3. JML PENERIMAAN (1+2)',
+            '4. LUNCURAN',
+            '5. JML PEMBIAYAAN (3+4)',
+            '6. PENGELUARAN OPS',
+            '7. INVESTASI (MODAL)',
+            '8. TOTAL PENGELUARAN (6+7)',
+            '9. SURPLUS/(DEFISIT) OPS (3-6)',
+            '10. S/D ANGGARAN'
           ]
         : [
             'NO',
@@ -3148,8 +3328,8 @@ export default function RkaLaporanPage() {
           cantSplit: true,
           height: { value: 260, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'Pendidikan\n(1)', width: colWidths[2], size: 15 }),
-            makeHeaderCell({ text: 'Non Pendidikan\n(2)', width: colWidths[3], size: 15 }),
+            makeHeaderCell({ text: isFakultasAlokasi ? 'Pendidikan (Alokasi)\n(1)' : 'Pendidikan\n(1)', width: colWidths[2], size: 15 }),
+            makeHeaderCell({ text: isFakultasAlokasi ? 'Non Pendidikan (Alokasi)\n(2)' : 'Non Pendidikan\n(2)', width: colWidths[3], size: 15 }),
             makeHeaderCell({ text: 'Jumlah\n(3)=(1-2)', width: colWidths[4], size: 15 }),
           ]
         });
@@ -3274,6 +3454,21 @@ export default function RkaLaporanPage() {
                 { text: `${u.surplusDefisitOperasional < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitOperasional))}`, align: AlignmentType.RIGHT, bold: false },
                 { text: `${u.surplusDefisitAnggaran < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitAnggaran))}`, align: AlignmentType.RIGHT, bold: true }
               ]
+            : isFakultasAlokasi
+            ? [
+                { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
+                { text: u.unit, align: AlignmentType.LEFT, bold: true },
+                { text: formatRp(u.pendidikanAlokasi), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.nonPendidikanAlokasi), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.jumlahPenerimaanAlokasi), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.luncuran), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.sumberPembiayaanAlokasi), align: AlignmentType.RIGHT, bold: true },
+                { text: formatRp(u.operasional), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.modal), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.totalPengeluaran), align: AlignmentType.RIGHT, bold: true },
+                { text: `${(u.surplusDefisitOperasionalAlokasi || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitOperasionalAlokasi || 0))}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `${(u.surplusDefisitAnggaranAlokasi || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitAnggaranAlokasi || 0))}`, align: AlignmentType.RIGHT, bold: true }
+              ]
             : [
                 { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
                 { text: u.unit, align: AlignmentType.LEFT, bold: true },
@@ -3342,6 +3537,19 @@ export default function RkaLaporanPage() {
             formatRp(displayedRekapTotals.totalPengeluaran),
             `${displayedRekapTotals.surplusDefisitOperasional < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}`,
             `${displayedRekapTotals.surplusDefisitAnggaran < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}`
+          ]
+        : isFakultasAlokasi
+        ? [
+            formatRp(displayedRekapTotals.pendidikanAlokasi),
+            formatRp(displayedRekapTotals.nonPendidikanAlokasi),
+            formatRp(displayedRekapTotals.jumlahPenerimaanAlokasi),
+            formatRp(displayedRekapTotals.luncuran),
+            formatRp(displayedRekapTotals.sumberPembiayaanAlokasi),
+            formatRp(displayedRekapTotals.operasional),
+            formatRp(displayedRekapTotals.modal),
+            formatRp(displayedRekapTotals.totalPengeluaran),
+            `${(displayedRekapTotals.surplusDefisitOperasionalAlokasi || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasionalAlokasi || 0))}`,
+            `${(displayedRekapTotals.surplusDefisitAnggaranAlokasi || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaranAlokasi || 0))}`
           ]
         : [
             formatRp(displayedRekapTotals.pendidikan),
@@ -4746,6 +4954,8 @@ export default function RkaLaporanPage() {
                       ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format UPU)'
                       : rekapFormat === 'pusdi'
                       ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format PUSDI)'
+                      : rekapFormat === 'fakultas_alokasi'
+                      ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas - Alokasi Unit)'
                       : 'Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas)'}
                   </span>
                 </CardTitle>
@@ -4756,6 +4966,8 @@ export default function RkaLaporanPage() {
                     ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran (4-7)'
                     : rekapFormat === 'pusdi'
                     ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
+                    : rekapFormat === 'fakultas_alokasi'
+                    ? '11 Kolom Standar Fakultas (Dikalikan % Alokasi Unit): 0. Unit Kerja, 1. Pen. Pendidikan (Alokasi), 2. Pen. Non Pendidikan (Alokasi), 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'
                     : '11 Kolom Standar Fakultas: 0. Unit Kerja, 1. Pen. Pendidikan, 2. Pen. Non Pendidikan, 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'}
                 </CardDescription>
               </div>
@@ -4770,13 +4982,28 @@ export default function RkaLaporanPage() {
                       setRekapFormat('fakultas');
                     }}
                     className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                      rekapGroupFilter.toLowerCase() === 'fakultas'
+                      rekapGroupFilter.toLowerCase() === 'fakultas' && rekapFormat === 'fakultas'
                         ? 'bg-white text-indigo-700 shadow-2xs font-black'
                         : 'text-slate-600 hover:text-indigo-600'
                     }`}
                   >
                     <span>🏛️</span>
                     <span>Khusus Fakultas</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapGroupFilter('Fakultas');
+                      setRekapFormat('fakultas_alokasi');
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                      rekapFormat === 'fakultas_alokasi'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-indigo-600'
+                    }`}
+                  >
+                    <span>🏛️</span>
+                    <span>Khusus Fakultas (Alokasi)</span>
                   </button>
                   <button
                     type="button"
@@ -5063,10 +5290,10 @@ export default function RkaLaporanPage() {
                         0. Unit Kerja
                       </TableHead>
                       <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[140px]">
-                        1. Pen. Pendidikan
+                        {rekapFormat === 'fakultas_alokasi' ? '1. Pen. Pendidikan (Alokasi)' : '1. Pen. Pendidikan'}
                       </TableHead>
                       <TableHead className="text-right text-emerald-700 text-xs uppercase font-bold min-w-[140px]">
-                        2. Pen. Non Pendidikan
+                        {rekapFormat === 'fakultas_alokasi' ? '2. Pen. Non Pendidikan (Alokasi)' : '2. Pen. Non Pendidikan'}
                       </TableHead>
                       <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
                         3. Jml Penerimaan (1+2)
@@ -5570,17 +5797,17 @@ export default function RkaLaporanPage() {
 
                                   {/* 1. Penerimaan Pendidikan */}
                                   <TableCell className="text-right align-middle font-mono text-gray-800 py-2.5">
-                                    Rp {formatRp(item.pendidikan)}
+                                    Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? item.pendidikanAlokasi : item.pendidikan)}
                                   </TableCell>
 
                                   {/* 2. Penerimaan Non Pendidikan */}
                                   <TableCell className="text-right align-middle font-mono text-gray-800 py-2.5">
-                                    Rp {formatRp(item.nonPendidikan)}
+                                    Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? item.nonPendidikanAlokasi : item.nonPendidikan)}
                                   </TableCell>
 
                                   {/* 3. Jumlah Penerimaan (1+2) */}
                                   <TableCell className="text-right align-middle font-mono font-bold text-emerald-900 bg-emerald-50/30 py-2.5">
-                                    Rp {formatRp(item.jumlahPenerimaan)}
+                                    Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? item.jumlahPenerimaanAlokasi : item.jumlahPenerimaan)}
                                   </TableCell>
 
                                   {/* 4. Luncuran */}
@@ -5590,7 +5817,7 @@ export default function RkaLaporanPage() {
 
                                   {/* 5. Jml Sumber Pembiayaan (3+4) */}
                                   <TableCell className="text-right align-middle font-mono font-black text-teal-950 bg-teal-50/40 py-2.5">
-                                    Rp {formatRp(item.sumberPembiayaan)}
+                                    Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? item.sumberPembiayaanAlokasi : item.sumberPembiayaan)}
                                   </TableCell>
 
                                   {/* 6. Pengeluaran Operasional */}
@@ -5610,24 +5837,34 @@ export default function RkaLaporanPage() {
 
                                   {/* 9. Surplus / (Defisit) Operasional (3-6) */}
                                   <TableCell className="text-right align-middle font-mono font-bold py-2.5">
-                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
-                                      item.surplusDefisitOperasional >= 0 
-                                        ? 'bg-emerald-50 text-emerald-700' 
-                                        : 'bg-rose-50 text-rose-700'
-                                    }`}>
-                                      {item.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitOperasional))}
-                                    </span>
+                                    {(() => {
+                                      const sdo = rekapFormat === 'fakultas_alokasi' ? item.surplusDefisitOperasionalAlokasi : item.surplusDefisitOperasional;
+                                      return (
+                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                                          sdo >= 0 
+                                            ? 'bg-emerald-50 text-emerald-700' 
+                                            : 'bg-rose-50 text-rose-700'
+                                        }`}>
+                                          {sdo < 0 && '- '}Rp {formatRp(Math.abs(sdo))}
+                                        </span>
+                                      );
+                                    })()}
                                   </TableCell>
 
                                   {/* 10. Surplus / (Defisit) Anggaran (5-8) */}
                                   <TableCell className="text-right align-middle font-mono font-black bg-slate-50/80 py-2.5">
-                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${
-                                      item.surplusDefisitAnggaran >= 0 
-                                        ? 'bg-emerald-100/80 text-emerald-800 font-black' 
-                                        : 'bg-rose-100/80 text-rose-800 font-black'
-                                    }`}>
-                                      {item.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitAnggaran))}
-                                    </span>
+                                    {(() => {
+                                      const sda = rekapFormat === 'fakultas_alokasi' ? item.surplusDefisitAnggaranAlokasi : item.surplusDefisitAnggaran;
+                                      return (
+                                        <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${
+                                          sda >= 0 
+                                            ? 'bg-emerald-100/80 text-emerald-800 font-black' 
+                                            : 'bg-rose-100/80 text-rose-800 font-black'
+                                        }`}>
+                                          {sda < 0 && '- '}Rp {formatRp(Math.abs(sda))}
+                                        </span>
+                                      );
+                                    })()}
                                   </TableCell>
 
                                   {/* Aksi */}
@@ -5782,19 +6019,19 @@ export default function RkaLaporanPage() {
                                 SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-900">
-                                Rp {formatRp(group.totalPendidikan)}
+                                Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? group.totalPendidikanAlokasi : group.totalPendidikan)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-800">
-                                Rp {formatRp(group.totalNonPendidikan)}
+                                Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? group.totalNonPendidikanAlokasi : group.totalNonPendidikan)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
-                                Rp {formatRp(group.totalJumlahPenerimaan)}
+                                Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? group.totalJumlahPenerimaanAlokasi : group.totalJumlahPenerimaan)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-bold font-mono text-teal-800">
                                 Rp {formatRp(group.totalLuncuran)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-black font-mono text-teal-950 bg-teal-100/50">
-                                Rp {formatRp(group.totalSumberPembiayaan)}
+                                Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? group.totalSumberPembiayaanAlokasi : group.totalSumberPembiayaan)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
                                 Rp {formatRp(group.totalOperasional)}
@@ -5806,14 +6043,20 @@ export default function RkaLaporanPage() {
                                 Rp {formatRp(group.totalPengeluaran)}
                               </TableCell>
                               <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
-                                group.totalSurplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                                (rekapFormat === 'fakultas_alokasi' ? group.totalSurplusDefisitOperasionalAlokasi : group.totalSurplusDefisitOperasional) >= 0 ? 'text-emerald-700' : 'text-rose-700'
                               }`}>
-                                {group.totalSurplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasional))}
+                                {(() => {
+                                  const val = rekapFormat === 'fakultas_alokasi' ? group.totalSurplusDefisitOperasionalAlokasi : group.totalSurplusDefisitOperasional;
+                                  return `${val < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(val))}`;
+                                })()}
                               </TableCell>
                               <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
-                                group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                                (rekapFormat === 'fakultas_alokasi' ? group.totalSurplusDefisitAnggaranAlokasi : group.totalSurplusDefisitAnggaran) >= 0 ? 'text-emerald-800' : 'text-rose-800'
                               }`}>
-                                {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
+                                {(() => {
+                                  const val = rekapFormat === 'fakultas_alokasi' ? group.totalSurplusDefisitAnggaranAlokasi : group.totalSurplusDefisitAnggaran;
+                                  return `${val < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(val))}`;
+                                })()}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
                             </TableRow>
@@ -5952,19 +6195,19 @@ export default function RkaLaporanPage() {
                         TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
                       </td>
                       <td className="p-3 text-right font-bold font-mono text-emerald-900">
-                        Rp {formatRp(displayedRekapTotals.pendidikan)}
+                        Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.pendidikanAlokasi : displayedRekapTotals.pendidikan)}
                       </td>
                       <td className="p-3 text-right font-bold font-mono text-emerald-800">
-                        Rp {formatRp(displayedRekapTotals.nonPendidikan)}
+                        Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.nonPendidikanAlokasi : displayedRekapTotals.nonPendidikan)}
                       </td>
                       <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
-                        Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
+                        Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.jumlahPenerimaanAlokasi : displayedRekapTotals.jumlahPenerimaan)}
                       </td>
                       <td className="p-3 text-right font-bold font-mono text-teal-800">
                         Rp {formatRp(displayedRekapTotals.luncuran)}
                       </td>
                       <td className="p-3 text-right font-black font-mono text-teal-950 bg-teal-100/70">
-                        Rp {formatRp(displayedRekapTotals.sumberPembiayaan)}
+                        Rp {formatRp(rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.sumberPembiayaanAlokasi : displayedRekapTotals.sumberPembiayaan)}
                       </td>
                       <td className="p-3 text-right font-bold font-mono text-slate-900">
                         Rp {formatRp(displayedRekapTotals.operasional)}
@@ -5976,14 +6219,20 @@ export default function RkaLaporanPage() {
                         Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
                       </td>
                       <td className={`p-3 text-right font-bold font-mono ${
-                        displayedRekapTotals.surplusDefisitOperasional >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                        (rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.surplusDefisitOperasionalAlokasi : displayedRekapTotals.surplusDefisitOperasional) >= 0 ? 'text-emerald-700' : 'text-rose-700'
                       }`}>
-                        {displayedRekapTotals.surplusDefisitOperasional < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasional))}
+                        {(() => {
+                          const val = rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.surplusDefisitOperasionalAlokasi : displayedRekapTotals.surplusDefisitOperasional;
+                          return `${val < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(val))}`;
+                        })()}
                       </td>
                       <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
-                        displayedRekapTotals.surplusDefisitAnggaran >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                        (rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.surplusDefisitAnggaranAlokasi : displayedRekapTotals.surplusDefisitAnggaran) >= 0 ? 'text-emerald-800' : 'text-rose-800'
                       }`}>
-                        {displayedRekapTotals.surplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaran))}
+                        {(() => {
+                          const val = rekapFormat === 'fakultas_alokasi' ? displayedRekapTotals.surplusDefisitAnggaranAlokasi : displayedRekapTotals.surplusDefisitAnggaran;
+                          return `${val < 0 ? '- ' : ''}Rp ${formatRp(Math.abs(val))}`;
+                        })()}
                       </td>
                       <td className="p-3 text-center text-gray-400 font-bold">
                         -

@@ -12,10 +12,19 @@ export async function GET(request: Request) {
 
     if (getUnits) {
       // Ambil daftar seluruh unit kerja dari rkat_pengeluaran, rkat_penerimaan, dan master gov_units
-      const [{ data: rkatUnits }, { data: rkatPenerimaanUnits }, { data: govUnits }] = await Promise.all([
+      let govUnits: any[] = [];
+      try {
+        const res = await supabaseAdmin.from('gov_units').select('id, kode_unit, nama_unit, group_org, prop_alokasi_prosentase_unit').order('kode_unit', { ascending: true });
+        if (res.error) throw res.error;
+        govUnits = res.data || [];
+      } catch (err) {
+        const resFallback = await supabaseAdmin.from('gov_units').select('id, kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true });
+        govUnits = resFallback.data || [];
+      }
+
+      const [{ data: rkatUnits }, { data: rkatPenerimaanUnits }] = await Promise.all([
         supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
-        supabaseAdmin.from('rkat_penerimaan').select('unit_kerja').limit(100000),
-        supabaseAdmin.from('gov_units').select('id, kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true })
+        supabaseAdmin.from('rkat_penerimaan').select('unit_kerja').limit(100000)
       ]);
 
       const formattedGovUnits = (govUnits || []).map((g: any) => {
