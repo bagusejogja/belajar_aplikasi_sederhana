@@ -3162,16 +3162,16 @@ export default function RkaLaporanPage() {
           cantSplit: true,
           height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
-            makeHeaderCell({ text: 'Penerimaan\n(1)', width: colWidths[2], size: 15 }),
-            makeHeaderCell({ text: 'Luncuran\n(2)', width: colWidths[3], size: 15 }),
-            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(3)=(1+2)', width: colWidths[4], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(1-4)', width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 18 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 18 }),
+            makeHeaderCell({ text: 'Penerimaan\n(1)', width: colWidths[2], size: 18 }),
+            makeHeaderCell({ text: 'Luncuran\n(2)', width: colWidths[3], size: 18 }),
+            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(3)=(1+2)', width: colWidths[4], size: 18 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 18 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 18 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(1-4)', width: colWidths[8], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 18 }),
           ]
         });
 
@@ -3183,16 +3183,16 @@ export default function RkaLaporanPage() {
           cantSplit: true,
           height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
-            makeHeaderCell({ text: 'Pagu\n(1)', width: colWidths[2], size: 15 }),
-            makeHeaderCell({ text: 'Kerjasama\n(2)', width: colWidths[3], size: 15 }),
-            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2+3)', width: colWidths[4], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(3-5)', width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 14 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 18 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 18 }),
+            makeHeaderCell({ text: 'Pagu\n(1)', width: colWidths[2], size: 18 }),
+            makeHeaderCell({ text: 'Kerjasama\n(2)', width: colWidths[3], size: 18 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2+3)', width: colWidths[4], size: 18 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 18 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 18 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(3-5)', width: colWidths[8], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 18 }),
           ]
         });
 
@@ -3204,17 +3204,17 @@ export default function RkaLaporanPage() {
           cantSplit: true,
           height: { value: 420, rule: HeightRule.ATLEAST },
           children: [
-            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
-            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
-            makeHeaderCell({ text: 'Subsidi\n(1)', width: colWidths[2], size: 15 }),
-            makeHeaderCell({ text: 'Penerimaan\n(2)', width: colWidths[3], size: 15 }),
-            makeHeaderCell({ text: 'Luncuran\n(3)', width: colWidths[4], size: 15 }),
-            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(4)=(1+2+3)', width: colWidths[5], size: 14 }),
-            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(5)', width: colWidths[6], size: 14 }),
-            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 14 }),
-            makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(4-7)', width: colWidths[10], size: 14 }),
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 18 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 18 }),
+            makeHeaderCell({ text: 'Subsidi\n(1)', width: colWidths[2], size: 18 }),
+            makeHeaderCell({ text: 'Penerimaan\n(2)', width: colWidths[3], size: 18 }),
+            makeHeaderCell({ text: 'Luncuran\n(3)', width: colWidths[4], size: 18 }),
+            makeHeaderCell({ text: 'Jumlah Sumber\nPembiayaan\n(4)=(1+2+3)', width: colWidths[5], size: 18 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(5)', width: colWidths[6], size: 18 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 18 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(4-7)', width: colWidths[10], size: 18 }),
           ]
         });
 
@@ -3227,6 +3227,9 @@ export default function RkaLaporanPage() {
 
       const tableRows: DocxTableRow[] = [...headerRowsList];
       let rowNum = 1;
+
+      const isFakultas = !isUpu && !isPusdi && !isKptu;
+      const tableDataFontSize = isFakultas ? 14 : 18; // Font 9 (18 half-points) untuk selain fakultas, font 7 (14 half-points) untuk fakultas
 
       displayGroups.forEach(group => {
         // Unit data rows (langsung list unit tanpa banner grup dan subtotal grup)
@@ -3293,7 +3296,7 @@ export default function RkaLaporanPage() {
               width: { size: colWidths[cIdx], type: WidthType.DXA },
               margins: dataCellMargins,
               children: [new Paragraph({
-                children: [new TextRun({ text: c.text, bold: c.bold, size: 16, font: 'Times New Roman' })],
+                children: [new TextRun({ text: c.text, bold: c.bold, size: tableDataFontSize, font: 'Times New Roman' })],
                 alignment: c.align,
                 spacing: dataSpacing
               })],
@@ -3362,7 +3365,7 @@ export default function RkaLaporanPage() {
             width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
             margins: dataCellMargins,
             children: [new Paragraph({
-              children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 16, font: 'Times New Roman' })],
+              children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: tableDataFontSize, font: 'Times New Roman' })],
               alignment: AlignmentType.RIGHT,
               spacing: dataSpacing
             })],
@@ -3374,7 +3377,7 @@ export default function RkaLaporanPage() {
             width: { size: colWidths[gIdx + 2], type: WidthType.DXA },
             margins: dataCellMargins,
             children: [new Paragraph({
-              children: [new TextRun({ text: val, bold: true, size: 16, font: 'Times New Roman' })],
+              children: [new TextRun({ text: val, bold: true, size: tableDataFontSize, font: 'Times New Roman' })],
               alignment: AlignmentType.RIGHT,
               spacing: dataSpacing
             })],
