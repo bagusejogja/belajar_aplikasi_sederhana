@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       const [{ data: rkatUnits }, { data: rkatPenerimaanUnits }, { data: govUnits }] = await Promise.all([
         supabaseAdmin.from('rkat_pengeluaran').select('unit').limit(100000),
         supabaseAdmin.from('rkat_penerimaan').select('unit_kerja').limit(100000),
-        supabaseAdmin.from('gov_units').select('kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true })
+        supabaseAdmin.from('gov_units').select('id, kode_unit, nama_unit, group_org').order('kode_unit', { ascending: true })
       ]);
 
       const formattedGovUnits = (govUnits || []).map((g: any) => {

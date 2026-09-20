@@ -636,7 +636,7 @@ function UnitDetailHierarchyTable({
   expandAllTrigger
 }: {
   unitData: any;
-  rekapFormat: 'fakultas' | 'pusdi' | 'upu';
+  rekapFormat: 'fakultas' | 'pusdi' | 'upu' | 'kptu';
   formatRp: (val: number) => string;
   modeLaporan: string;
   expandAllTrigger?: { expanded: boolean; id: number };
@@ -790,6 +790,54 @@ function UnitDetailHierarchyTable({
         },
         {
           id: 'pusdi_modal',
+          headerNumber: '5',
+          title: 'Investasi (Belanja Modal)',
+          type: 'belanja' as const,
+          totalPagu: unitData.modal || modRows.reduce((a, c) => a + (Number(c.anggaran) || 0), 0),
+          rows: modRows,
+          akunList: groupRowsByAkun(modRows, 'belanja'),
+          theme: { bg: 'bg-amber-50/70', badgeBg: 'bg-amber-100', badgeText: 'text-amber-900' }
+        }
+      ];
+    }
+
+    if (rekapFormat === 'kptu') {
+      const opsRows = belRows.filter(r => !isModalBelanja(r));
+      const modRows = belRows.filter(r => isModalBelanja(r));
+
+      return [
+        {
+          id: 'kptu_pagu',
+          headerNumber: '1',
+          title: 'Pagu (Pagu Awal)',
+          type: 'penerimaan' as const,
+          totalPagu: unitData.pagu || 0,
+          rows: [],
+          akunList: [],
+          theme: { bg: 'bg-blue-50/70', badgeBg: 'bg-blue-100', badgeText: 'text-blue-900' }
+        },
+        {
+          id: 'kptu_kerjasama',
+          headerNumber: '2',
+          title: 'Kerjasama (Penerimaan)',
+          type: 'penerimaan' as const,
+          totalPagu: unitData.kerjasama || unitData.jumlahPenerimaan || penRows.reduce((a, c) => a + (Number(c.renterima_pagu) || 0), 0),
+          rows: penRows,
+          akunList: groupRowsByAkun(penRows, 'penerimaan'),
+          theme: { bg: 'bg-emerald-50/70', badgeBg: 'bg-emerald-100', badgeText: 'text-emerald-900' }
+        },
+        {
+          id: 'kptu_ops',
+          headerNumber: '4',
+          title: 'Pengeluaran Operasional',
+          type: 'belanja' as const,
+          totalPagu: unitData.operasional || opsRows.reduce((a, c) => a + (Number(c.anggaran) || 0), 0),
+          rows: opsRows,
+          akunList: groupRowsByAkun(opsRows, 'belanja'),
+          theme: { bg: 'bg-slate-100/70', badgeBg: 'bg-slate-200', badgeText: 'text-slate-900' }
+        },
+        {
+          id: 'kptu_modal',
           headerNumber: '5',
           title: 'Investasi (Belanja Modal)',
           type: 'belanja' as const,
@@ -1129,7 +1177,8 @@ export default function RkaLaporanPage() {
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
   const [summaryStyle, setSummaryStyle] = useState<'ppt' | 'standard'>('ppt');
   const [rekapGroupFilter, setRekapGroupFilter] = useState<string>('Fakultas');
-  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi' | 'upu'>('fakultas');
+  const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'pusdi' | 'upu' | 'kptu'>('fakultas');
+  const [paguAwalList, setPaguAwalList] = useState<any[]>([]);
 
   // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
@@ -1190,13 +1239,18 @@ export default function RkaLaporanPage() {
       let urlPenerimaan = `/api/rka/penerimaan?tahun=${tahunFilter}`;
       if (unitFilter !== 'ALL') urlPenerimaan += `&unit=${encodeURIComponent(unitFilter)}`;
 
-      const [resPeng, resPen] = await Promise.all([
+      // 3. Query Pagu Awal dari gov_pagu_anggaran
+      let urlPagu = `/api/rka/pagu?tahun=${tahunFilter}`;
+
+      const [resPeng, resPen, resPagu] = await Promise.all([
         fetch(urlPengeluaran),
-        fetch(urlPenerimaan)
+        fetch(urlPenerimaan),
+        fetch(urlPagu)
       ]);
-      const [jsonPeng, jsonPen] = await Promise.all([
+      const [jsonPeng, jsonPen, jsonPagu] = await Promise.all([
         resPeng.json(),
-        resPen.json()
+        resPen.json(),
+        resPagu.json()
       ]);
 
       if (jsonPeng.success) {
@@ -1207,6 +1261,10 @@ export default function RkaLaporanPage() {
 
       if (jsonPen.success) {
         setPenerimaanList(jsonPen.data || []);
+      }
+
+      if (jsonPagu.success) {
+        setPaguAwalList(jsonPagu.data || []);
       }
     } catch (e: any) {
       toast.error('Error: ' + e.message);
@@ -1961,6 +2019,13 @@ export default function RkaLaporanPage() {
       surplusDefisitOperasional: number; // (9) = (3) - (6)
       surplusDefisitAnggaran: number;    // (10) = (5) - (8) = (3) + (4) - (8)
       
+      // 8 Kolom Khusus Format KPTU:
+      pagu: number;                        // (1) Pagu Awal dari tbl gov_pagu_anggaran
+      kerjasama: number;                   // (2) Kerjasama (Penerimaan)
+      jumlahKptu: number;                  // (3) = (1) + (2)
+      surplusDefisitOperasionalKptu: number; // (7) = (3) - (4)
+      surplusDefisitAnggaranKptu: number;    // (8) = (3) - (6)
+
       // Backward compatibility fields
       penerimaan: number;
       surplusDefisit: number;
@@ -1993,6 +2058,11 @@ export default function RkaLaporanPage() {
           totalPengeluaran: 0,
           surplusDefisitOperasional: 0,
           surplusDefisitAnggaran: 0,
+          pagu: 0,
+          kerjasama: 0,
+          jumlahKptu: 0,
+          surplusDefisitOperasionalKptu: 0,
+          surplusDefisitAnggaranKptu: 0,
           penerimaan: 0,
           surplusDefisit: 0,
           count: 0,
@@ -2101,7 +2171,13 @@ export default function RkaLaporanPage() {
       }
     });
 
-    // 3. Kalkulasi Posisi Aritmetika Standar Fakultas
+    // Pastikan seluruh unit KPTU dari master gov_units terdaftar di unitMap
+    govUnitsList.filter(g => g.group_org === 'KPTU').forEach(gu => {
+      const formattedName = gu.kode_unit && gu.kode_unit !== '--' ? `${gu.kode_unit} ${gu.nama_unit}` : gu.nama_unit;
+      getOrCreateUnit(formattedName);
+    });
+
+    // 3. Kalkulasi Posisi Aritmetika Standar Fakultas & KPTU
     Object.values(unitMap).forEach(u => {
       u.jumlahPenerimaan = u.pendidikan + u.nonPendidikan;              // (3) = (1) + (2)
       u.sumberPembiayaan = u.jumlahPenerimaan + u.luncuran;              // (5) = (3) + (4)
@@ -2109,6 +2185,22 @@ export default function RkaLaporanPage() {
       u.surplusDefisitOperasional = u.jumlahPenerimaan - u.operasional;  // (9) = (3) - (6)
       u.surplusDefisitAnggaran = u.sumberPembiayaan - u.totalPengeluaran; // (10) = (5) - (8) = (3) + (4) - (8)
       
+      // Kalkulasi Kolom Khusus KPTU:
+      const uTrim = u.unit;
+      const matchedGovUnit = govUnitsList.find(g => 
+        (g.kode_unit && g.kode_unit !== '--' && uTrim.startsWith(g.kode_unit)) ||
+        (g.nama_unit && (uTrim.toLowerCase().includes(g.nama_unit.toLowerCase()) || g.nama_unit.toLowerCase().includes(uTrim.toLowerCase())))
+      );
+      const unitPaguAwal = matchedGovUnit 
+        ? paguAwalList.filter(p => p.unit_id === matchedGovUnit.id).reduce((sum, c) => sum + (Number(c.nominal) || 0), 0)
+        : 0;
+
+      u.pagu = unitPaguAwal;                                             // (1) Pagu dari tbl gov_pagu_anggaran (Pagu Awal)
+      u.kerjasama = u.jumlahPenerimaan;                                  // (2) Kerjasama (berisi sama saat ini di web kolom "Penerimaan")
+      u.jumlahKptu = u.pagu + u.kerjasama;                               // (3) Jumlah (1+2+3)
+      u.surplusDefisitOperasionalKptu = u.jumlahKptu - u.operasional;    // (7) Surplus/Defisit Operasional (3-5)
+      u.surplusDefisitAnggaranKptu = u.jumlahKptu - u.totalPengeluaran;  // (8) Surplus/Defisit Anggaran (3-6)
+
       // Backward compatibility fields
       u.penerimaan = u.sumberPembiayaan;
       u.surplusDefisit = u.surplusDefisitAnggaran;
@@ -2116,7 +2208,7 @@ export default function RkaLaporanPage() {
 
     // Diurutkan A-Z berdasarkan KODE & NAMA UNIT KERJA
     return Object.values(unitMap).sort((a, b) => a.unit.localeCompare(b.unit, 'id', { numeric: true, sensitivity: 'base' }));
-  }, [penerimaanList, dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList]);
+  }, [penerimaanList, dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList, paguAwalList]);
 
   // Data Rekapitulasi Dikelompokkan per Group Org dari master gov_units
   const groupedByOrg = useMemo(() => {
@@ -2133,6 +2225,11 @@ export default function RkaLaporanPage() {
       totalPengeluaran: number;
       totalSurplusDefisitOperasional: number;
       totalSurplusDefisitAnggaran: number;
+      totalPagu: number;
+      totalKerjasama: number;
+      totalJumlahKptu: number;
+      totalSurplusDefisitOperasionalKptu: number;
+      totalSurplusDefisitAnggaranKptu: number;
       totalPenerimaan: number;
       totalSurplusDefisit: number;
       totalCount: number;
@@ -2154,6 +2251,11 @@ export default function RkaLaporanPage() {
           totalPengeluaran: 0,
           totalSurplusDefisitOperasional: 0,
           totalSurplusDefisitAnggaran: 0,
+          totalPagu: 0,
+          totalKerjasama: 0,
+          totalJumlahKptu: 0,
+          totalSurplusDefisitOperasionalKptu: 0,
+          totalSurplusDefisitAnggaranKptu: 0,
           totalPenerimaan: 0,
           totalSurplusDefisit: 0,
           totalCount: 0
@@ -2170,6 +2272,11 @@ export default function RkaLaporanPage() {
       groups[g].totalPengeluaran += item.totalPengeluaran;
       groups[g].totalSurplusDefisitOperasional += item.surplusDefisitOperasional;
       groups[g].totalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
+      groups[g].totalPagu += item.pagu || 0;
+      groups[g].totalKerjasama += item.kerjasama || 0;
+      groups[g].totalJumlahKptu += item.jumlahKptu || 0;
+      groups[g].totalSurplusDefisitOperasionalKptu += item.surplusDefisitOperasionalKptu || 0;
+      groups[g].totalSurplusDefisitAnggaranKptu += item.surplusDefisitAnggaranKptu || 0;
       groups[g].totalPenerimaan += item.sumberPembiayaan;
       groups[g].totalSurplusDefisit += item.surplusDefisitAnggaran;
       groups[g].totalCount += item.count;
@@ -2197,6 +2304,11 @@ export default function RkaLaporanPage() {
     let grandTotalPengeluaran = 0;
     let grandTotalSurplusDefisitOperasional = 0;
     let grandTotalSurplusDefisitAnggaran = 0;
+    let grandTotalPagu = 0;
+    let grandTotalKerjasama = 0;
+    let grandTotalJumlahKptu = 0;
+    let grandTotalSurplusDefisitOperasionalKptu = 0;
+    let grandTotalSurplusDefisitAnggaranKptu = 0;
     let totalItems = 0;
 
     unitRekapData.forEach(item => {
@@ -2210,6 +2322,11 @@ export default function RkaLaporanPage() {
       grandTotalPengeluaran += item.totalPengeluaran;
       grandTotalSurplusDefisitOperasional += item.surplusDefisitOperasional;
       grandTotalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
+      grandTotalPagu += item.pagu || 0;
+      grandTotalKerjasama += item.kerjasama || 0;
+      grandTotalJumlahKptu += item.jumlahKptu || 0;
+      grandTotalSurplusDefisitOperasionalKptu += item.surplusDefisitOperasionalKptu || 0;
+      grandTotalSurplusDefisitAnggaranKptu += item.surplusDefisitAnggaranKptu || 0;
       totalItems += item.count;
     });
 
@@ -2224,6 +2341,11 @@ export default function RkaLaporanPage() {
       grandTotalPengeluaran,
       grandTotalSurplusDefisitOperasional,
       grandTotalSurplusDefisitAnggaran,
+      grandTotalPagu,
+      grandTotalKerjasama,
+      grandTotalJumlahKptu,
+      grandTotalSurplusDefisitOperasionalKptu,
+      grandTotalSurplusDefisitAnggaranKptu,
       // Backward compatibility fields
       grandTotalPenerimaan: grandTotalSumberPembiayaan,
       grandTotalSurplusDefisit: grandTotalSurplusDefisitAnggaran,
@@ -2249,6 +2371,11 @@ export default function RkaLaporanPage() {
       totalPengeluaran: 0,
       surplusDefisitOperasional: 0,
       surplusDefisitAnggaran: 0,
+      pagu: 0,
+      kerjasama: 0,
+      jumlahKptu: 0,
+      surplusDefisitOperasionalKptu: 0,
+      surplusDefisitAnggaranKptu: 0,
       totalUnits: 0,
       totalItems: 0
     };
@@ -2263,6 +2390,11 @@ export default function RkaLaporanPage() {
       acc.totalPengeluaran += g.totalPengeluaran;
       acc.surplusDefisitOperasional += g.totalSurplusDefisitOperasional;
       acc.surplusDefisitAnggaran += g.totalSurplusDefisitAnggaran;
+      acc.pagu += g.totalPagu;
+      acc.kerjasama += g.totalKerjasama;
+      acc.jumlahKptu += g.totalJumlahKptu;
+      acc.surplusDefisitOperasionalKptu += g.totalSurplusDefisitOperasionalKptu;
+      acc.surplusDefisitAnggaranKptu += g.totalSurplusDefisitAnggaranKptu;
       acc.totalUnits += g.units.length;
       acc.totalItems += g.totalCount;
     });
@@ -2297,7 +2429,8 @@ export default function RkaLaporanPage() {
 
       const isPusdi = rekapFormat === 'pusdi';
       const isUpu = rekapFormat === 'upu';
-      const sheetName = isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
+      const isKptu = rekapFormat === 'kptu';
+      const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : 'Rekap_Fakultas';
       const ws = wb.addWorksheet(sheetName, {
         views: [{ showGridLines: true }]
       });
@@ -2306,7 +2439,9 @@ export default function RkaLaporanPage() {
       const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
       titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
       
-      const subTitleText = isUpu
+      const subTitleText = isKptu
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KANTOR PUSAT / KPTU (9 KOLOM) TA ${tahunFilter}`
+        : isUpu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
         : isPusdi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
@@ -2322,7 +2457,21 @@ export default function RkaLaporanPage() {
       ws.addRow([]); // Blank spacer
 
       // 2. Table Headers
-      const headers = isUpu
+      const headers = isKptu
+        ? [
+            'NO',
+            'GROUP',
+            '0. UNIT KERJA',
+            '1. PAGU (RP)',
+            '2. KERJASAMA (RP)',
+            '3. JUMLAH (1+2+3) (RP)',
+            '4. PENGELUARAN OPERASIONAL (RP)',
+            '5. INVESTASI (BELANJA MODAL) (RP)',
+            '6. TOTAL PENGELUARAN (4+5) (RP)',
+            '7. SURPLUS / (DEFISIT) OPS (3-5) (RP)',
+            '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+          ]
+        : isUpu
         ? [
             'NO',
             'GROUP',
@@ -2386,7 +2535,9 @@ export default function RkaLaporanPage() {
       });
 
       // Column number indicators row
-      const colIndicators = isUpu
+      const colIndicators = isKptu
+        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
+        : isUpu
         ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
         : isPusdi
         ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
@@ -2438,7 +2589,21 @@ export default function RkaLaporanPage() {
 
         // Unit rows
         group.units.forEach(u => {
-          const rowValues = isUpu
+          const rowValues = isKptu
+            ? [
+                rowNum++,
+                group.groupOrg,
+                u.unit,
+                u.pagu || 0,
+                u.kerjasama || 0,
+                u.jumlahKptu || 0,
+                u.operasional,
+                u.modal,
+                u.totalPengeluaran,
+                u.surplusDefisitOperasionalKptu || 0,
+                u.surplusDefisitAnggaranKptu || 0
+              ]
+            : isUpu
             ? [
                 rowNum++,
                 group.groupOrg,
@@ -2505,7 +2670,13 @@ export default function RkaLaporanPage() {
               // Numerical columns
               cell.alignment = { horizontal: 'right', vertical: 'middle' };
               cell.numFmt = '#,##0';
-              if (isUpu) {
+              if (isKptu) {
+                if (colIndex === 4 || colIndex === 5 || colIndex === 6) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
+                } else if (colIndex === 9) {
+                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
+                }
+              } else if (isUpu) {
                 if (colIndex === 5 || colIndex === 7) {
                   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
                 } else if (colIndex === 10) {
@@ -2529,7 +2700,21 @@ export default function RkaLaporanPage() {
         });
 
         // Group Subtotal row
-        const subtotalValues = isUpu
+        const subtotalValues = isKptu
+          ? [
+              '',
+              `SUBTOTAL ${group.groupOrg}`,
+              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+              group.totalPagu || 0,
+              group.totalKerjasama || 0,
+              group.totalJumlahKptu || 0,
+              group.totalOperasional,
+              group.totalModal,
+              group.totalPengeluaran,
+              group.totalSurplusDefisitOperasionalKptu || 0,
+              group.totalSurplusDefisitAnggaranKptu || 0
+            ]
+          : isUpu
           ? [
               '',
               `SUBTOTAL ${group.groupOrg}`,
@@ -2601,7 +2786,21 @@ export default function RkaLaporanPage() {
       });
 
       // Grand Total Row
-      const grandTotalValues = isUpu
+      const grandTotalValues = isKptu
+        ? [
+            '',
+            'TOTAL KESELURUHAN',
+            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
+            displayedRekapTotals.pagu || 0,
+            displayedRekapTotals.kerjasama || 0,
+            displayedRekapTotals.jumlahKptu || 0,
+            displayedRekapTotals.operasional,
+            displayedRekapTotals.modal,
+            displayedRekapTotals.totalPengeluaran,
+            displayedRekapTotals.surplusDefisitOperasionalKptu || 0,
+            displayedRekapTotals.surplusDefisitAnggaranKptu || 0
+          ]
+        : isUpu
         ? [
             '',
             'TOTAL KESELURUHAN',
@@ -2670,7 +2869,21 @@ export default function RkaLaporanPage() {
       });
 
       // Column widths
-      if (isUpu) {
+      if (isKptu) {
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 18 }, // GROUP
+          { width: 45 }, // 0. UNIT KERJA
+          { width: 22 }, // 1. PAGU
+          { width: 22 }, // 2. KERJASAMA
+          { width: 25 }, // 3. JUMLAH (1+2+3)
+          { width: 25 }, // 4. PENGELUARAN OPERASIONAL
+          { width: 24 }, // 5. INVESTASI (MODAL)
+          { width: 27 }, // 6. TOTAL PENGELUARAN
+          { width: 28 }, // 7. SURPLUS/DEFISIT OPS
+          { width: 28 }  // 8. SURPLUS/DEFISIT ANGGARAN
+        ];
+      } else if (isUpu) {
         ws.columns = [
           { width: 6 },  // NO
           { width: 18 }, // GROUP
@@ -2723,7 +2936,9 @@ export default function RkaLaporanPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const fileName = isUpu
+      const fileName = isKptu
+        ? `Rekap_Proposal_RKAT_KPTU_${tahunFilter}.xlsx`
+        : isUpu
         ? `Rekap_Proposal_RKAT_UPU_${tahunFilter}.xlsx`
         : isPusdi
         ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}.xlsx`
@@ -2731,7 +2946,7 @@ export default function RkaLaporanPage() {
       a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
-      const formatTag = isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom';
+      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : 'Format Fakultas 11 Kolom';
       toast.success(`File Excel (${formatTag}) berhasil diexport!`);
     } catch (err: any) {
       console.error('Export Excel error:', err);
@@ -2744,18 +2959,34 @@ export default function RkaLaporanPage() {
     if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
 
     try {
+      const isKptu = rekapFormat === 'kptu';
       const isUpu = rekapFormat === 'upu';
       const isPusdi = rekapFormat === 'pusdi';
 
-      const formatLabel = isUpu ? 'UPU' : isPusdi ? 'PUSDI' : 'Fakultas';
-      const formatSubtitle = isUpu
+      const formatLabel = isKptu ? 'KPTU' : isUpu ? 'UPU' : isPusdi ? 'PUSDI' : 'Fakultas';
+      const formatSubtitle = isKptu
+        ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KANTOR PUSAT / KPTU (9 KOLOM) TA ${tahunFilter}`
+        : isUpu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
         : isPusdi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
         : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
 
       // Kolom Word (Kolom Group dihilangkan sesuai permintaan user agar muat rapi 1 halaman lebar)
-      const headers = isUpu
+      const headers = isKptu
+        ? [
+            'NO',
+            '0. UNIT KERJA',
+            '1. PAGU',
+            '2. KERJASAMA',
+            '3. JUMLAH (1+2+3)',
+            '4. PENGELUARAN OPS',
+            '5. INVESTASI (MODAL)',
+            '6. TOTAL PENGELUARAN (4+5)',
+            '7. SURPLUS/(DEFISIT) OPS (3-5)',
+            '8. S/D ANGGARAN (3-6)'
+          ]
+        : isUpu
         ? [
             'NO',
             '0. UNIT KERJA',
@@ -2797,10 +3028,12 @@ export default function RkaLaporanPage() {
             '10. S/D ANGGARAN'
           ];
 
-      const numCols = isUpu ? 11 : isPusdi ? 10 : 12;
+      const numCols = isKptu ? 10 : isUpu ? 11 : isPusdi ? 10 : 12;
 
       // Lebar kolom tabel: Kolom berisikan nominal angka diseragamkan lebarnya secara presisi (Total A4 Landscape = 15398 dxa)
-      const colWidths: number[] = isUpu
+      const colWidths: number[] = isKptu
+        ? [500, 3200, 1300, 1300, 1400, 1400, 1400, 1400, 1700, 1798]
+        : isUpu
         ? [500, 3200, 1150, 1200, 1150, 1400, 1300, 1350, 1350, 1350, 1448]
         : isPusdi
         ? [500, 3200, 1300, 1200, 1400, 1400, 1400, 1400, 1750, 1848]
@@ -2852,7 +3085,7 @@ export default function RkaLaporanPage() {
       // Table Header Rows
       let headerRowsList: DocxTableRow[] = [];
 
-      if (!isUpu && !isPusdi) {
+      if (!isUpu && !isPusdi && !isKptu) {
         // === FORMAT FAKULTAS (2 baris kompak, font lebih besar, kolom Non Pendidikan diperlebar, rumus angka lengkap 1-10) ===
         // Baris 1: Header Utama (No & Unit Kerja rowSpan 2, Penerimaan colSpan 3, Kolom lain rowSpan 2)
         const fHeaderRow1 = new DocxTableRow({
@@ -2907,6 +3140,27 @@ export default function RkaLaporanPage() {
         });
 
         headerRowsList = [pHeaderRow1];
+      } else if (isKptu) {
+        // === FORMAT KPTU (9 Kolom Data, 1 Baris Kompak) ===
+        const kHeaderRow1 = new DocxTableRow({
+          tableHeader: true,
+          cantSplit: true,
+          height: { value: 420, rule: HeightRule.ATLEAST },
+          children: [
+            makeHeaderCell({ text: 'No', width: colWidths[0], size: 15 }),
+            makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 15 }),
+            makeHeaderCell({ text: 'Pagu\n(1)', width: colWidths[2], size: 15 }),
+            makeHeaderCell({ text: 'Kerjasama\n(2)', width: colWidths[3], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2+3)', width: colWidths[4], size: 14 }),
+            makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 14 }),
+            makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 14 }),
+            makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(3-5)', width: colWidths[8], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 14 }),
+          ]
+        });
+
+        headerRowsList = [kHeaderRow1];
       } else {
         // === FORMAT UPU (11 Kolom Data, 1 Baris Kompak) ===
         const uHeaderRow1 = new DocxTableRow({
@@ -2941,7 +3195,20 @@ export default function RkaLaporanPage() {
       displayGroups.forEach(group => {
         // Unit data rows (langsung list unit tanpa banner grup dan subtotal grup)
         group.units.forEach(u => {
-          const cellsData = isUpu
+          const cellsData = isKptu
+            ? [
+                { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
+                { text: u.unit, align: AlignmentType.LEFT, bold: true },
+                { text: formatRp(u.pagu || 0), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.kerjasama || 0), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.jumlahKptu || 0), align: AlignmentType.RIGHT, bold: true },
+                { text: formatRp(u.operasional), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.modal), align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.totalPengeluaran), align: AlignmentType.RIGHT, bold: true },
+                { text: `${(u.surplusDefisitOperasionalKptu || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitOperasionalKptu || 0))}`, align: AlignmentType.RIGHT, bold: false },
+                { text: `${(u.surplusDefisitAnggaranKptu || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(u.surplusDefisitAnggaranKptu || 0))}`, align: AlignmentType.RIGHT, bold: true }
+              ]
+            : isUpu
             ? [
                 { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
                 { text: u.unit, align: AlignmentType.LEFT, bold: true },
@@ -3003,7 +3270,18 @@ export default function RkaLaporanPage() {
       });
 
       // Grand Total row
-      const grandTotalCells = isUpu
+      const grandTotalCells = isKptu
+        ? [
+            formatRp(displayedRekapTotals.pagu || 0),
+            formatRp(displayedRekapTotals.kerjasama || 0),
+            formatRp(displayedRekapTotals.jumlahKptu || 0),
+            formatRp(displayedRekapTotals.operasional),
+            formatRp(displayedRekapTotals.modal),
+            formatRp(displayedRekapTotals.totalPengeluaran),
+            `${(displayedRekapTotals.surplusDefisitOperasionalKptu || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasionalKptu || 0))}`,
+            `${(displayedRekapTotals.surplusDefisitAnggaranKptu || 0) < 0 ? '- ' : ''}${formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaranKptu || 0))}`
+          ]
+        : isUpu
         ? [
             `0`,
             formatRp(displayedRekapTotals.jumlahPenerimaan),
@@ -4423,7 +4701,9 @@ export default function RkaLaporanPage() {
                 <CardTitle className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-2">
                   <Building2 size={18} className="text-indigo-600" />
                   <span>
-                    {rekapFormat === 'upu'
+                    {rekapFormat === 'kptu'
+                      ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format KPTU)'
+                      : rekapFormat === 'upu'
                       ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format UPU)'
                       : rekapFormat === 'pusdi'
                       ? 'Rekapitulasi Usulan RKAT per Unit Kerja (Format PUSDI)'
@@ -4431,7 +4711,9 @@ export default function RkaLaporanPage() {
                   </span>
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  {rekapFormat === 'upu'
+                  {rekapFormat === 'kptu'
+                    ? '9 Kolom Standar KPTU: 0. Unit kerja, 1. Pagu, 2. Kerjasama, 3. Jumlah (1+2+3), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus / Defisit Operasional (3-5), 8. Surplus / Defisit Anggaran (3-6)'
+                    : rekapFormat === 'upu'
                     ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran (4-7)'
                     : rekapFormat === 'pusdi'
                     ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
@@ -4487,11 +4769,27 @@ export default function RkaLaporanPage() {
                     <span>🏢</span>
                     <span>Khusus UPU</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRekapGroupFilter('KPTU');
+                      setRekapFormat('kptu');
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                      rekapGroupFilter.toLowerCase() === 'kptu' || rekapFormat === 'kptu'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-indigo-600'
+                    }`}
+                  >
+                    <span>🏛️</span>
+                    <span>Khusus KPTU</span>
+                  </button>
                   {groupedByOrg.filter(g => 
                     g.groupOrg.toLowerCase() !== 'fakultas' && 
                     g.groupOrg.toLowerCase() !== 'pusat studi' &&
                     !g.groupOrg.toLowerCase().includes('penunjang') &&
-                    !g.groupOrg.toLowerCase().includes('upu')
+                    !g.groupOrg.toLowerCase().includes('upu') &&
+                    g.groupOrg.toLowerCase() !== 'kptu'
                   ).map((g) => (
                     <button
                       key={g.groupOrg}
@@ -4514,7 +4812,7 @@ export default function RkaLaporanPage() {
                   size="sm"
                   onClick={handleExportExcelUnitRekap}
                   className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 shadow-2xs cursor-pointer flex items-center justify-center"
-                  title={`Export Excel (${rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})`}
+                  title={`Export Excel (${rekapFormat === 'kptu' ? '9 Kolom KPTU' : rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})`}
                 >
                   <Download size={14} className="text-emerald-600" />
                 </Button>
@@ -4558,9 +4856,56 @@ export default function RkaLaporanPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
-              <Table className={rekapFormat === 'pusdi' ? 'min-w-[1350px]' : rekapFormat === 'upu' ? 'min-w-[1450px]' : 'min-w-[1550px]'}>
+              <Table className={rekapFormat === 'kptu' ? 'min-w-[1350px]' : rekapFormat === 'pusdi' ? 'min-w-[1350px]' : rekapFormat === 'upu' ? 'min-w-[1450px]' : 'min-w-[1550px]'}>
                 <TableHeader className="bg-gray-100/90 border-b border-gray-200 text-gray-600 font-black uppercase text-[10px] tracking-wider">
-                  {rekapFormat === 'upu' ? (
+                  {rekapFormat === 'kptu' ? (
+                    /* Header Format KPTU (9 Kolom Utama: 0. Unit kerja, 1. Pagu, 2. Kerjasama, 3. Jumlah (1+2+3), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus / Defisit Operasional (3-5), 8. Surplus / Defisit Anggaran (3-6)) */
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
+                        <button
+                          type="button"
+                          onClick={isAllRekapUnitsExpanded ? collapseAllRekapUnits : expandAllRekapUnits}
+                          className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                            isAllRekapUnitsExpanded
+                              ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                              : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                          }`}
+                          title={isAllRekapUnitsExpanded ? "Tutup Semua Rincian Unit Kerja" : "Buka Semua Rincian Unit Kerja"}
+                        >
+                          {isAllRekapUnitsExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                          <span>#</span>
+                        </button>
+                      </TableHead>
+                      <TableHead className="text-gray-700 text-xs uppercase font-bold min-w-[240px]">
+                        0. Unit kerja
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[140px]">
+                        1. Pagu
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-700 text-xs uppercase font-bold min-w-[140px]">
+                        2. Kerjasama
+                      </TableHead>
+                      <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
+                        3. Jumlah (1+2+3)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
+                        4. Pengeluaran Operasional
+                      </TableHead>
+                      <TableHead className="text-right text-amber-800 text-xs uppercase font-bold min-w-[140px]">
+                        5. Investasi (Belanja Modal)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[150px] bg-indigo-50/60">
+                        6. Total Pengeluaran (4+5)
+                      </TableHead>
+                      <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
+                        7. Surplus / Defisit Operasional (3-5)
+                      </TableHead>
+                      <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
+                        8. Surplus / Defisit Anggaran (3-6)
+                      </TableHead>
+                      <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
+                    </TableRow>
+                  ) : rekapFormat === 'upu' ? (
                     /* Header Format UPU (10 Kolom Utama: 0 Unit Kerja, 1 Subsidi, 2 Penerimaan, 3 Luncuran, 4 Jml Sumber Pembiayaan, 5 Pengeluaran Ops, 6 Investasi Modal, 7 Total Pengeluaran, 8 Surplus/Defisit Ops, 9 Surplus/Defisit Anggaran) */
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
@@ -4715,7 +5060,7 @@ export default function RkaLaporanPage() {
                 <TableBody>
                   {displayedRekapGroups.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="text-center py-12 text-gray-400 font-medium">
+                      <TableCell colSpan={rekapFormat === 'kptu' ? 11 : rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="text-center py-12 text-gray-400 font-medium">
                         Tidak ada data unit kerja yang sesuai kriteria filter.
                       </TableCell>
                     </TableRow>
@@ -4725,7 +5070,7 @@ export default function RkaLaporanPage() {
                         <React.Fragment key={group.groupOrg}>
                           {/* Header Group Organisasi dari Master gov_units */}
                           <TableRow className="bg-indigo-50/80 border-t-2 border-b border-indigo-200 hover:bg-indigo-50/90">
-                            <TableCell colSpan={rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="px-4 py-2.5">
+                            <TableCell colSpan={rekapFormat === 'kptu' ? 11 : rekapFormat === 'upu' ? 12 : rekapFormat === 'pusdi' ? 11 : 13} className="px-4 py-2.5">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 font-black text-xs text-indigo-950 uppercase tracking-wide">
                                   <Building2 size={15} className="text-indigo-600" />
@@ -4735,12 +5080,16 @@ export default function RkaLaporanPage() {
                                   </span>
                                 </div>
                                 <div className="text-[11px] font-bold font-mono text-indigo-900 flex flex-wrap items-center gap-3">
-                                  <span className="text-teal-800 font-black">Pembiayaan: Rp {formatRp(group.totalSumberPembiayaan)}</span>
+                                  <span className="text-teal-800 font-black">
+                                    {rekapFormat === 'kptu' 
+                                      ? `Jumlah (1+2+3): Rp ${formatRp(group.totalJumlahKptu || 0)}` 
+                                      : `Pembiayaan: Rp ${formatRp(group.totalSumberPembiayaan)}`}
+                                  </span>
                                   <span>•</span>
                                   <span className="text-indigo-950 font-black">Pengeluaran: Rp {formatRp(group.totalPengeluaran)}</span>
                                   <span>•</span>
-                                  <span className={group.totalSurplusDefisitAnggaran >= 0 ? 'text-emerald-700 font-black' : 'text-rose-700 font-black'}>
-                                    S/D Anggaran: {group.totalSurplusDefisitAnggaran < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaran))}
+                                  <span className={(rekapFormat === 'kptu' ? (group.totalSurplusDefisitAnggaranKptu || 0) : group.totalSurplusDefisitAnggaran) >= 0 ? 'text-emerald-700 font-black' : 'text-rose-700 font-black'}>
+                                    S/D Anggaran: {(rekapFormat === 'kptu' ? (group.totalSurplusDefisitAnggaranKptu || 0) : group.totalSurplusDefisitAnggaran) < 0 && '- '}Rp {formatRp(Math.abs(rekapFormat === 'kptu' ? (group.totalSurplusDefisitAnggaranKptu || 0) : group.totalSurplusDefisitAnggaran))}
                                   </span>
                                 </div>
                               </div>
@@ -4750,6 +5099,132 @@ export default function RkaLaporanPage() {
                           {/* Baris per Unit Kerja dalam Group */}
                           {group.units.map((item, uIdx) => {
                             const isUnitExpanded = expandedRekapUnits.has(item.unit);
+
+                            if (rekapFormat === 'kptu') {
+                              return (
+                                <React.Fragment key={item.unit || uIdx}>
+                                  <TableRow 
+                                    onClick={() => toggleRekapUnit(item.unit)}
+                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer select-none ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
+                                  >
+                                    <TableCell className="text-center font-mono font-bold text-gray-400 align-middle py-2 px-1" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleRekapUnit(item.unit)}
+                                          className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold transition-all shadow-2xs cursor-pointer ${
+                                            isUnitExpanded
+                                              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                              : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                          }`}
+                                        >
+                                          {isUnitExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                                        </button>
+                                        <span>{uIdx + 1}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="align-middle py-2.5">
+                                      <div className="font-bold text-gray-900 text-xs flex items-start gap-1.5">
+                                        <span className="text-indigo-600 font-bold shrink-0 mt-0.5">•</span>
+                                        <div>
+                                          <span>{item.unit}</span>
+                                          <div className="text-[10px] text-gray-400 font-mono font-medium flex items-center gap-1.5">
+                                            <span>{item.count.toLocaleString('id-ID')} usulan</span>
+                                            <span>•</span>
+                                            <span className="text-emerald-700 font-semibold">{item.penerimaanCount.toLocaleString('id-ID')} penerimaan</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+
+                                    {/* 1. Pagu */}
+                                    <TableCell className="text-right align-middle font-mono text-emerald-800 py-2.5">
+                                      Rp {formatRp(item.pagu || 0)}
+                                    </TableCell>
+
+                                    {/* 2. Kerjasama */}
+                                    <TableCell className="text-right align-middle font-mono text-emerald-700 py-2.5">
+                                      Rp {formatRp(item.kerjasama || 0)}
+                                    </TableCell>
+
+                                    {/* 3. Jumlah (1+2+3) */}
+                                    <TableCell className="text-right align-middle font-mono font-black text-emerald-950 bg-emerald-50/40 py-2.5">
+                                      Rp {formatRp(item.jumlahKptu || 0)}
+                                    </TableCell>
+
+                                    {/* 4. Pengeluaran Operasional */}
+                                    <TableCell className="text-right align-middle font-mono text-slate-800 py-2.5">
+                                      Rp {formatRp(item.operasional)}
+                                    </TableCell>
+
+                                    {/* 5. Investasi (Belanja Modal) */}
+                                    <TableCell className="text-right align-middle font-mono text-amber-900 py-2.5">
+                                      Rp {formatRp(item.modal)}
+                                    </TableCell>
+
+                                    {/* 6. Total Pengeluaran (4+5) */}
+                                    <TableCell className="text-right align-middle font-mono font-black text-indigo-950 bg-indigo-50/30 py-2.5">
+                                      Rp {formatRp(item.totalPengeluaran)}
+                                    </TableCell>
+
+                                    {/* 7. Surplus / Defisit Operasional (3-5) */}
+                                    <TableCell className="text-right align-middle font-mono font-bold py-2.5">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
+                                        (item.surplusDefisitOperasionalKptu || 0) >= 0 
+                                          ? 'bg-emerald-50 text-emerald-700' 
+                                          : 'bg-rose-50 text-rose-700'
+                                      }`}>
+                                        {(item.surplusDefisitOperasionalKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitOperasionalKptu || 0))}
+                                      </span>
+                                    </TableCell>
+
+                                    {/* 8. Surplus / Defisit Anggaran (3-6) */}
+                                    <TableCell className="text-right align-middle font-mono font-black bg-slate-50/80 py-2.5">
+                                      <span className={`inline-block px-2 py-0.5 rounded text-[11px] ${
+                                        (item.surplusDefisitAnggaranKptu || 0) >= 0 
+                                          ? 'bg-emerald-100/80 text-emerald-800 font-black' 
+                                          : 'bg-rose-100/80 text-rose-800 font-black'
+                                      }`}>
+                                        {(item.surplusDefisitAnggaranKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(item.surplusDefisitAnggaranKptu || 0))}
+                                      </span>
+                                    </TableCell>
+
+                                    {/* Aksi */}
+                                    <TableCell className="text-center align-middle py-2.5" onClick={(e) => e.stopPropagation()}>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => toggleRekapUnit(item.unit)}
+                                        className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
+                                          isUnitExpanded 
+                                            ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' 
+                                            : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
+                                        }`}
+                                        title={isUnitExpanded ? `Tutup rincian ${item.unit}` : `Buka rincian ${item.unit}`}
+                                      >
+                                        {isUnitExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                        <span className="text-[10px] hidden sm:inline">{isUnitExpanded ? 'Tutup' : 'Rincian'}</span>
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+
+                                  {/* INLINE HIERARCHICAL TABLE PER UNIT (KPTU) */}
+                                  {isUnitExpanded && (
+                                    <TableRow className="bg-slate-50/70 border-b-2 border-indigo-200">
+                                      <TableCell colSpan={11} className="p-1 sm:p-2">
+                                        <UnitDetailHierarchyTable
+                                          unitData={item}
+                                          rekapFormat="kptu"
+                                          formatRp={formatRp}
+                                          modeLaporan={modeLaporan}
+                                          expandAllTrigger={rekapExpandAllTrigger}
+                                        />
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </React.Fragment>
+                              );
+                            }
 
                             if (rekapFormat === 'upu') {
                               return (
@@ -5154,7 +5629,42 @@ export default function RkaLaporanPage() {
                           })}
 
                           {/* Subtotal Baris per Group Org */}
-                          {rekapFormat === 'upu' ? (
+                          {rekapFormat === 'kptu' ? (
+                            <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
+                              <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
+                                SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-800">
+                                Rp {formatRp(group.totalPagu || 0)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-700">
+                                Rp {formatRp(group.totalKerjasama || 0)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
+                                Rp {formatRp(group.totalJumlahKptu || 0)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-slate-900">
+                                Rp {formatRp(group.totalOperasional)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-amber-900">
+                                Rp {formatRp(group.totalModal)}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-right font-black font-mono text-indigo-950 bg-indigo-100/50">
+                                Rp {formatRp(group.totalPengeluaran)}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-bold font-mono ${
+                                (group.totalSurplusDefisitOperasionalKptu || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                              }`}>
+                                {(group.totalSurplusDefisitOperasionalKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitOperasionalKptu || 0))}
+                              </TableCell>
+                              <TableCell className={`px-3 py-2 text-right font-black font-mono bg-slate-200/60 ${
+                                (group.totalSurplusDefisitAnggaranKptu || 0) >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                              }`}>
+                                {(group.totalSurplusDefisitAnggaranKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(group.totalSurplusDefisitAnggaranKptu || 0))}
+                              </TableCell>
+                              <TableCell className="px-3 py-2 text-center text-gray-300">-</TableCell>
+                            </TableRow>
+                          ) : rekapFormat === 'upu' ? (
                             <TableRow className="bg-slate-100/90 font-bold border-b-2 border-slate-300 text-slate-900 text-xs">
                               <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
                                 SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
@@ -5276,7 +5786,46 @@ export default function RkaLaporanPage() {
                 </TableBody>
 
                 {/* Footer Total Keseluruhan */}
-                {rekapFormat === 'upu' ? (
+                {rekapFormat === 'kptu' ? (
+                  <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
+                    <tr>
+                      <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
+                        TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-emerald-800">
+                        Rp {formatRp(displayedRekapTotals.pagu || 0)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-emerald-700">
+                        Rp {formatRp(displayedRekapTotals.kerjasama || 0)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
+                        Rp {formatRp(displayedRekapTotals.jumlahKptu || 0)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-slate-900">
+                        Rp {formatRp(displayedRekapTotals.operasional)}
+                      </td>
+                      <td className="p-3 text-right font-bold font-mono text-amber-900">
+                        Rp {formatRp(displayedRekapTotals.modal)}
+                      </td>
+                      <td className="p-3 text-right font-black font-mono text-indigo-950 bg-indigo-100/70">
+                        Rp {formatRp(displayedRekapTotals.totalPengeluaran)}
+                      </td>
+                      <td className={`p-3 text-right font-bold font-mono ${
+                        (displayedRekapTotals.surplusDefisitOperasionalKptu || 0) >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                      }`}>
+                        {(displayedRekapTotals.surplusDefisitOperasionalKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitOperasionalKptu || 0))}
+                      </td>
+                      <td className={`p-3 text-right font-black font-mono bg-slate-300/80 ${
+                        (displayedRekapTotals.surplusDefisitAnggaranKptu || 0) >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                      }`}>
+                        {(displayedRekapTotals.surplusDefisitAnggaranKptu || 0) < 0 && '- '}Rp {formatRp(Math.abs(displayedRekapTotals.surplusDefisitAnggaranKptu || 0))}
+                      </td>
+                      <td className="p-3 text-center text-gray-400 font-bold">
+                        -
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : rekapFormat === 'upu' ? (
                   <tfoot className="bg-slate-200/90 font-bold border-t-2 border-slate-400 text-slate-900 text-xs">
                     <tr>
                       <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
