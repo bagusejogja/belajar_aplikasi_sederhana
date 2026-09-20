@@ -903,6 +903,13 @@ function UnitDetailHierarchyTable({
     setOpenAkuns(new Set());
   };
 
+  const isAllUnderUnitOpen = useMemo(() => {
+    if (sections.length === 0) return false;
+    const sectionsWithData = sections.filter(s => s.rows.length > 0);
+    if (sectionsWithData.length === 0) return false;
+    return sectionsWithData.every(s => openSections.has(s.id));
+  }, [sections, openSections]);
+
   const totalAllRows = (unitData.penerimaanRows?.length || 0) + (unitData.belanjaRows?.length || 0);
 
   if (totalAllRows === 0) {
@@ -949,7 +956,21 @@ function UnitDetailHierarchyTable({
         <table className="w-full text-xs text-left border-collapse">
           <thead>
             <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wide">
-              <th className="w-12 px-3 py-2.5 text-center">#</th>
+              <th className="w-12 px-1.5 py-1.5 text-center align-middle">
+                <button
+                  type="button"
+                  onClick={isAllUnderUnitOpen ? collapseAllSections : expandAllSections}
+                  className={`px-1.5 py-0.5 mx-auto rounded flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                    isAllUnderUnitOpen
+                      ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                      : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}
+                  title={isAllUnderUnitOpen ? "Tutup Semua Pos & Akun di Unit Ini" : "Buka Semua Pos & Akun di Unit Ini"}
+                >
+                  {isAllUnderUnitOpen ? <Minus size={10} /> : <Plus size={10} />}
+                  <span>#</span>
+                </button>
+              </th>
               <th className="px-4 py-2.5">Kelompok Pos Header / Nama Rekening Akun</th>
               <th className="px-4 py-2.5 text-center w-36">Jumlah Data</th>
               <th className="px-4 py-2.5 text-right w-48 pr-4">Total Pagu</th>
@@ -2811,7 +2832,7 @@ export default function RkaLaporanPage() {
           width: width ? { size: width, type: WidthType.DXA } : undefined,
           margins: headerCellMargins,
           children: lines.map(line => new Paragraph({
-            children: [new TextRun({ text: line, bold, size, color: '000000', font: 'Arial' })],
+            children: [new TextRun({ text: line, bold, size, color: '000000', font: 'Times New Roman' })],
             alignment: align,
             spacing: headerSpacing
           })),
@@ -2962,7 +2983,7 @@ export default function RkaLaporanPage() {
               width: { size: colWidths[cIdx], type: WidthType.DXA },
               margins: dataCellMargins,
               children: [new Paragraph({
-                children: [new TextRun({ text: c.text, bold: c.bold, size: 14 })],
+                children: [new TextRun({ text: c.text, bold: c.bold, size: 14, font: 'Times New Roman' })],
                 alignment: c.align,
                 spacing: dataSpacing
               })],
@@ -3020,7 +3041,7 @@ export default function RkaLaporanPage() {
             width: { size: colWidths[0] + colWidths[1], type: WidthType.DXA },
             margins: dataCellMargins,
             children: [new Paragraph({
-              children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14 })],
+              children: [new TextRun({ text: `TOTAL KESELURUHAN (${displayedRekapTotals.totalUnits} UNIT)`, bold: true, size: 14, font: 'Times New Roman' })],
               alignment: AlignmentType.RIGHT,
               spacing: dataSpacing
             })],
@@ -3032,7 +3053,7 @@ export default function RkaLaporanPage() {
             width: { size: colWidths[gIdx + 2], type: WidthType.DXA },
             margins: dataCellMargins,
             children: [new Paragraph({
-              children: [new TextRun({ text: val, bold: true, size: 14 })],
+              children: [new TextRun({ text: val, bold: true, size: 14, font: 'Times New Roman' })],
               alignment: AlignmentType.RIGHT,
               spacing: dataSpacing
             })],
@@ -3059,6 +3080,15 @@ export default function RkaLaporanPage() {
       });
 
       const doc = new Document({
+        styles: {
+          default: {
+            document: {
+              run: {
+                font: 'Times New Roman',
+              },
+            },
+          },
+        },
         sections: [{
           properties: {
             page: {
@@ -3075,12 +3105,12 @@ export default function RkaLaporanPage() {
           },
           children: [
             new Paragraph({
-              children: [new TextRun({ text: 'UNIVERSITAS GADJAH MADA', bold: true, size: 26, color: '0F172A' })],
+              children: [new TextRun({ text: 'UNIVERSITAS GADJAH MADA', bold: true, size: 26, color: '0F172A', font: 'Times New Roman' })],
               alignment: AlignmentType.CENTER,
               spacing: { after: 80 },
             }),
             new Paragraph({
-              children: [new TextRun({ text: formatSubtitle, bold: true, size: 20, color: '334155' })],
+              children: [new TextRun({ text: formatSubtitle, bold: true, size: 20, color: '334155', font: 'Times New Roman' })],
               alignment: AlignmentType.CENTER,
               spacing: { after: 80 },
             }),
@@ -3090,7 +3120,8 @@ export default function RkaLaporanPage() {
                   text: `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}  |  Filter: ${rekapGroupFilter === 'ALL' ? 'Semua Group Unit Kerja' : rekapGroupFilter}`, 
                   italics: true, 
                   size: 16, 
-                  color: '64748B' 
+                  color: '64748B',
+                  font: 'Times New Roman'
                 })
               ],
               alignment: AlignmentType.CENTER,
