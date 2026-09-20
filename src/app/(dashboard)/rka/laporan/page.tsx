@@ -703,7 +703,7 @@ function UnitDetailHierarchyTable({
           headerNumber: '1',
           title: 'Subsidi',
           type: 'penerimaan' as const,
-          totalPagu: 0,
+          totalPagu: unitData.subsidi ?? unitData.pagu ?? 0,
           rows: [],
           akunList: [],
           theme: { bg: 'bg-slate-50/80', badgeBg: 'bg-slate-200', badgeText: 'text-slate-700' }
@@ -2019,8 +2019,9 @@ export default function RkaLaporanPage() {
       surplusDefisitOperasional: number; // (9) = (3) - (6)
       surplusDefisitAnggaran: number;    // (10) = (5) - (8) = (3) + (4) - (8)
       
-      // 8 Kolom Khusus Format KPTU:
+      // 8 Kolom Khusus Format KPTU & Subsidi UPU:
       pagu: number;                        // (1) Pagu Awal dari tbl gov_pagu_anggaran
+      subsidi: number;                     // (1) Subsidi UPU dari tbl gov_pagu_anggaran
       kerjasama: number;                   // (2) Kerjasama (Penerimaan)
       jumlahKptu: number;                  // (3) = (1) + (2)
       surplusDefisitOperasionalKptu: number; // (7) = (3) - (4)
@@ -2059,6 +2060,7 @@ export default function RkaLaporanPage() {
           surplusDefisitOperasional: 0,
           surplusDefisitAnggaran: 0,
           pagu: 0,
+          subsidi: 0,
           kerjasama: 0,
           jumlahKptu: 0,
           surplusDefisitOperasionalKptu: 0,
@@ -2171,13 +2173,13 @@ export default function RkaLaporanPage() {
       }
     });
 
-    // Pastikan seluruh unit KPTU dari master gov_units terdaftar di unitMap
-    govUnitsList.filter(g => g.group_org === 'KPTU').forEach(gu => {
+    // Pastikan seluruh unit KPTU dan UPU dari master gov_units terdaftar di unitMap
+    govUnitsList.filter(g => g.group_org === 'KPTU' || g.group_org === 'Unit Penunjang Universitas - UPU' || g.group_org === 'Unit Penunjang').forEach(gu => {
       const formattedName = gu.kode_unit && gu.kode_unit !== '--' ? `${gu.kode_unit} ${gu.nama_unit}` : gu.nama_unit;
       getOrCreateUnit(formattedName);
     });
 
-    // 3. Kalkulasi Posisi Aritmetika Standar Fakultas & KPTU
+    // 3. Kalkulasi Posisi Aritmetika Standar Fakultas & KPTU & UPU
     Object.values(unitMap).forEach(u => {
       u.jumlahPenerimaan = u.pendidikan + u.nonPendidikan;              // (3) = (1) + (2)
       u.sumberPembiayaan = u.jumlahPenerimaan + u.luncuran;              // (5) = (3) + (4)
@@ -2185,7 +2187,7 @@ export default function RkaLaporanPage() {
       u.surplusDefisitOperasional = u.jumlahPenerimaan - u.operasional;  // (9) = (3) - (6)
       u.surplusDefisitAnggaran = u.sumberPembiayaan - u.totalPengeluaran; // (10) = (5) - (8) = (3) + (4) - (8)
       
-      // Kalkulasi Kolom Khusus KPTU:
+      // Kalkulasi Kolom Khusus KPTU & Subsidi UPU (dari tbl gov_pagu_anggaran Pagu Awal):
       const uTrim = u.unit;
       const matchedGovUnit = govUnitsList.find(g => 
         (g.kode_unit && g.kode_unit !== '--' && uTrim.startsWith(g.kode_unit)) ||
@@ -2195,7 +2197,8 @@ export default function RkaLaporanPage() {
         ? paguAwalList.filter(p => p.unit_id === matchedGovUnit.id).reduce((sum, c) => sum + (Number(c.nominal) || 0), 0)
         : 0;
 
-      u.pagu = unitPaguAwal;                                             // (1) Pagu dari tbl gov_pagu_anggaran (Pagu Awal)
+      u.pagu = unitPaguAwal;                                             // (1) Pagu KPTU dari tbl gov_pagu_anggaran (Pagu Awal)
+      u.subsidi = unitPaguAwal;                                          // (1) Subsidi UPU dari rumus pagu KPTU (Pagu Awal gov_pagu_anggaran)
       u.kerjasama = u.jumlahPenerimaan;                                  // (2) Kerjasama (berisi sama saat ini di web kolom "Penerimaan")
       u.jumlahKptu = u.pagu + u.kerjasama;                               // (3) Jumlah (1+2+3)
       u.surplusDefisitOperasionalKptu = u.jumlahKptu - u.operasional;    // (7) Surplus/Defisit Operasional (3-5)
@@ -2226,6 +2229,7 @@ export default function RkaLaporanPage() {
       totalSurplusDefisitOperasional: number;
       totalSurplusDefisitAnggaran: number;
       totalPagu: number;
+      totalSubsidi: number;
       totalKerjasama: number;
       totalJumlahKptu: number;
       totalSurplusDefisitOperasionalKptu: number;
@@ -2252,6 +2256,7 @@ export default function RkaLaporanPage() {
           totalSurplusDefisitOperasional: 0,
           totalSurplusDefisitAnggaran: 0,
           totalPagu: 0,
+          totalSubsidi: 0,
           totalKerjasama: 0,
           totalJumlahKptu: 0,
           totalSurplusDefisitOperasionalKptu: 0,
@@ -2273,6 +2278,7 @@ export default function RkaLaporanPage() {
       groups[g].totalSurplusDefisitOperasional += item.surplusDefisitOperasional;
       groups[g].totalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
       groups[g].totalPagu += item.pagu || 0;
+      groups[g].totalSubsidi += item.subsidi || item.pagu || 0;
       groups[g].totalKerjasama += item.kerjasama || 0;
       groups[g].totalJumlahKptu += item.jumlahKptu || 0;
       groups[g].totalSurplusDefisitOperasionalKptu += item.surplusDefisitOperasionalKptu || 0;
@@ -2305,6 +2311,7 @@ export default function RkaLaporanPage() {
     let grandTotalSurplusDefisitOperasional = 0;
     let grandTotalSurplusDefisitAnggaran = 0;
     let grandTotalPagu = 0;
+    let grandTotalSubsidi = 0;
     let grandTotalKerjasama = 0;
     let grandTotalJumlahKptu = 0;
     let grandTotalSurplusDefisitOperasionalKptu = 0;
@@ -2323,6 +2330,7 @@ export default function RkaLaporanPage() {
       grandTotalSurplusDefisitOperasional += item.surplusDefisitOperasional;
       grandTotalSurplusDefisitAnggaran += item.surplusDefisitAnggaran;
       grandTotalPagu += item.pagu || 0;
+      grandTotalSubsidi += item.subsidi || item.pagu || 0;
       grandTotalKerjasama += item.kerjasama || 0;
       grandTotalJumlahKptu += item.jumlahKptu || 0;
       grandTotalSurplusDefisitOperasionalKptu += item.surplusDefisitOperasionalKptu || 0;
@@ -2342,6 +2350,7 @@ export default function RkaLaporanPage() {
       grandTotalSurplusDefisitOperasional,
       grandTotalSurplusDefisitAnggaran,
       grandTotalPagu,
+      grandTotalSubsidi,
       grandTotalKerjasama,
       grandTotalJumlahKptu,
       grandTotalSurplusDefisitOperasionalKptu,
@@ -2349,7 +2358,8 @@ export default function RkaLaporanPage() {
       // Backward compatibility fields
       grandTotalPenerimaan: grandTotalSumberPembiayaan,
       grandTotalSurplusDefisit: grandTotalSurplusDefisitAnggaran,
-      totalItems 
+      grandTotalBelanja: grandTotalPengeluaran,
+      grandTotalItems: totalItems 
     };
   }, [unitRekapData]);
 
@@ -2372,6 +2382,7 @@ export default function RkaLaporanPage() {
       surplusDefisitOperasional: 0,
       surplusDefisitAnggaran: 0,
       pagu: 0,
+      subsidi: 0,
       kerjasama: 0,
       jumlahKptu: 0,
       surplusDefisitOperasionalKptu: 0,
@@ -2391,6 +2402,7 @@ export default function RkaLaporanPage() {
       acc.surplusDefisitOperasional += g.totalSurplusDefisitOperasional;
       acc.surplusDefisitAnggaran += g.totalSurplusDefisitAnggaran;
       acc.pagu += g.totalPagu;
+      acc.subsidi += g.totalSubsidi || g.totalPagu;
       acc.kerjasama += g.totalKerjasama;
       acc.jumlahKptu += g.totalJumlahKptu;
       acc.surplusDefisitOperasionalKptu += g.totalSurplusDefisitOperasionalKptu;
@@ -2608,7 +2620,7 @@ export default function RkaLaporanPage() {
                 rowNum++,
                 group.groupOrg,
                 u.unit,
-                0, // 1. Subsidi dikosongi dahulu
+                u.subsidi ?? u.pagu ?? 0,
                 u.jumlahPenerimaan,
                 u.luncuran,
                 u.sumberPembiayaan,
@@ -2719,7 +2731,7 @@ export default function RkaLaporanPage() {
               '',
               `SUBTOTAL ${group.groupOrg}`,
               `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              0,
+              group.totalSubsidi || group.totalPagu || 0,
               group.totalJumlahPenerimaan,
               group.totalLuncuran,
               group.totalSumberPembiayaan,
@@ -2805,7 +2817,7 @@ export default function RkaLaporanPage() {
             '',
             'TOTAL KESELURUHAN',
             `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            0,
+            displayedRekapTotals.subsidi || displayedRekapTotals.pagu || 0,
             displayedRekapTotals.jumlahPenerimaan,
             displayedRekapTotals.luncuran,
             displayedRekapTotals.sumberPembiayaan,
@@ -3212,7 +3224,7 @@ export default function RkaLaporanPage() {
             ? [
                 { text: String(rowNum++), align: AlignmentType.CENTER, bold: false },
                 { text: u.unit, align: AlignmentType.LEFT, bold: true },
-                { text: '0', align: AlignmentType.RIGHT, bold: false },
+                { text: formatRp(u.subsidi ?? u.pagu ?? 0), align: AlignmentType.RIGHT, bold: false },
                 { text: formatRp(u.jumlahPenerimaan), align: AlignmentType.RIGHT, bold: false },
                 { text: formatRp(u.luncuran), align: AlignmentType.RIGHT, bold: false },
                 { text: formatRp(u.sumberPembiayaan), align: AlignmentType.RIGHT, bold: true },
@@ -3283,7 +3295,7 @@ export default function RkaLaporanPage() {
           ]
         : isUpu
         ? [
-            `0`,
+            formatRp(displayedRekapTotals.subsidi || displayedRekapTotals.pagu || 0),
             formatRp(displayedRekapTotals.jumlahPenerimaan),
             formatRp(displayedRekapTotals.luncuran),
             formatRp(displayedRekapTotals.sumberPembiayaan),
@@ -5266,9 +5278,9 @@ export default function RkaLaporanPage() {
                                       </div>
                                     </TableCell>
 
-                                    {/* 1. Subsidi (Dikosongi dahulu: Rp 0) */}
-                                    <TableCell className="text-right align-middle font-mono text-gray-400 py-2.5">
-                                      Rp 0
+                                    {/* 1. Subsidi (Dari tbl gov_pagu_anggaran Pagu Awal) */}
+                                    <TableCell className="text-right align-middle font-mono text-emerald-800 py-2.5">
+                                      Rp {formatRp(item.subsidi ?? item.pagu ?? 0)}
                                     </TableCell>
 
                                     {/* 2. Penerimaan */}
@@ -5669,8 +5681,8 @@ export default function RkaLaporanPage() {
                               <TableCell colSpan={2} className="px-3 py-2 text-[11px] font-black uppercase text-right tracking-wider">
                                 SUBTOTAL {group.groupOrg.toUpperCase()} ({group.units.length} UNIT)
                               </TableCell>
-                              <TableCell className="px-3 py-2 text-right font-mono text-gray-400">
-                                Rp 0
+                              <TableCell className="px-3 py-2 text-right font-bold font-mono text-emerald-800">
+                                Rp {formatRp(group.totalSubsidi || group.totalPagu || 0)}
                               </TableCell>
                               <TableCell className="px-3 py-2 text-right font-black font-mono text-emerald-950 bg-emerald-100/50">
                                 Rp {formatRp(group.totalJumlahPenerimaan)}
@@ -5831,8 +5843,8 @@ export default function RkaLaporanPage() {
                       <td colSpan={2} className="p-3 text-xs font-black uppercase tracking-wider text-slate-900">
                         TOTAL {rekapGroupFilter === 'ALL' ? 'KESELURUHAN' : rekapGroupFilter.toUpperCase()} ({displayedRekapTotals.totalUnits} UNIT KERJA)
                       </td>
-                      <td className="p-3 text-right font-mono text-gray-400">
-                        Rp 0
+                      <td className="p-3 text-right font-bold font-mono text-emerald-800">
+                        Rp {formatRp(displayedRekapTotals.subsidi || displayedRekapTotals.pagu || 0)}
                       </td>
                       <td className="p-3 text-right font-black font-mono text-emerald-950 bg-emerald-100/70">
                         Rp {formatRp(displayedRekapTotals.jumlahPenerimaan)}
