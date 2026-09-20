@@ -2924,7 +2924,7 @@ export default function RkaLaporanPage() {
             makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(6)', width: colWidths[7], size: 14 }),
             makeHeaderCell({ text: 'Total\nPengeluaran\n(7)=(5+6)', width: colWidths[8], size: 14 }),
             makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(8)=(1+2-5)', width: colWidths[9], size: 14 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(3-6)', width: colWidths[10], size: 14 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(9)=(4-7)', width: colWidths[10], size: 14 }),
           ]
         });
 
@@ -4432,7 +4432,7 @@ export default function RkaLaporanPage() {
                 </CardTitle>
                 <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
                   {rekapFormat === 'upu'
-                    ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran'
+                    ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran (4-7)'
                     : rekapFormat === 'pusdi'
                     ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
                     : '11 Kolom Standar Fakultas: 0. Unit Kerja, 1. Pen. Pendidikan, 2. Pen. Non Pendidikan, 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'}
@@ -4606,7 +4606,7 @@ export default function RkaLaporanPage() {
                         8. Surplus/(Defisit) Ops (1+2-5)
                       </TableHead>
                       <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
-                        9. Surplus/(Defisit) Anggaran
+                        9. Surplus/(Defisit) Anggaran (4-7)
                       </TableHead>
                       <TableHead className="text-center text-gray-500 text-xs uppercase font-bold w-14">Aksi</TableHead>
                     </TableRow>
