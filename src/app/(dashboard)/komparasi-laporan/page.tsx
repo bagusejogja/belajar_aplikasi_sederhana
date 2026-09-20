@@ -20,6 +20,7 @@ export default function KomparasiLaporanPage() {
   
   const [allYears, setAllYears] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<any[]>([]);
+  const [hasVersiColumn, setHasVersiColumn] = useState<boolean>(true);
   
   // Modals
   const [isAkunModalOpen, setIsAkunModalOpen] = useState(false);
@@ -50,6 +51,9 @@ export default function KomparasiLaporanPage() {
     
     setAkunMaster(akunData || []);
     setDataNilai(nilaiData || []);
+
+    const hasVersi = !!(nilaiData && nilaiData.length > 0 && 'versi' in nilaiData[0]);
+    setHasVersiColumn(hasVersi);
     
     const uniqueYears = Array.from(new Set((nilaiData || []).map(d => `${d.tahun}___${d.versi || 'Final'}`))).sort().reverse();
     setAllYears(uniqueYears);
@@ -88,18 +92,40 @@ export default function KomparasiLaporanPage() {
 
   const handleNilaiSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
+    const payloadWithVersi = {
       akun_id: nilaiForm.akun_id,
       tahun: nilaiForm.tahun,
       versi: nilaiForm.versi || 'Final',
       anggaran: nilaiForm.anggaran,
       realisasi: nilaiForm.realisasi
     };
-    if (nilaiForm.id) await supabase.from('app_laporan_statis').update(payload).eq('id', nilaiForm.id);
-    else await supabase.from('app_laporan_statis').insert([payload]);
-    
-    setIsNilaiModalOpen(false);
-    fetchData();
+
+    try {
+      if (nilaiForm.id) {
+        const { error } = await supabase.from('app_laporan_statis').update(payloadWithVersi).eq('id', nilaiForm.id);
+        if (error && (error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
+          const { versi, ...fallbackPayload } = payloadWithVersi;
+          const { error: errFallback } = await supabase.from('app_laporan_statis').update(fallbackPayload).eq('id', nilaiForm.id);
+          if (errFallback) throw errFallback;
+        } else if (error) {
+          throw error;
+        }
+      } else {
+        const { error } = await supabase.from('app_laporan_statis').insert([payloadWithVersi]);
+        if (error && (error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
+          const { versi, ...fallbackPayload } = payloadWithVersi;
+          const { error: errFallback } = await supabase.from('app_laporan_statis').insert([fallbackPayload]);
+          if (errFallback) throw errFallback;
+        } else if (error) {
+          throw error;
+        }
+      }
+      
+      setIsNilaiModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      alert("Gagal menyimpan data nilai: " + err.message);
+    }
   };
 
   const downloadFile = (blob: Blob, filename: string) => {
@@ -299,9 +325,27 @@ export default function KomparasiLaporanPage() {
       });
 
       if (upserts.length > 0) {
+        let isFallback = false;
+        // Coba upsert dengan 'versi' jika kolom versi sudah ada di Supabase
         const { error } = await supabase.from('app_laporan_statis').upsert(upserts, { onConflict: 'akun_id, tahun, versi' });
-        if (error) throw error;
-        alert(`✅ Berhasil import ${upserts.length} data untuk tahun ${bulkTahun}!`);
+        
+        if (error && (error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
+          // Fallback otomatis jika database Supabase belum memiliki kolom 'versi':
+          // Upsert per (akun_id, tahun) tanpa field 'versi'
+          const fallbackUpserts = upserts.map(({ versi, ...rest }) => rest);
+          const { error: fallbackError } = await supabase.from('app_laporan_statis').upsert(fallbackUpserts, { onConflict: 'akun_id, tahun' });
+          if (fallbackError) throw fallbackError;
+          isFallback = true;
+        } else if (error) {
+          throw error;
+        }
+
+        if (isFallback) {
+          alert(`✅ Berhasil import ${upserts.length} data untuk tahun ${bulkTahun}!\n\nCatatan: Kolom 'versi' belum aktif di database Supabase sehingga data disimpan ke versi default tahun ${bulkTahun}.\n\nJika ingin mengaktifkan pembedaan versi (misal: Final vs Revisi), silakan salin dan jalankan script SQL migrasi di Supabase SQL Editor.`);
+        } else {
+          alert(`✅ Berhasil import ${upserts.length} data untuk tahun ${bulkTahun} (Versi: ${bulkVersi || 'Final'})!`);
+        }
+
         setIsBulkModalOpen(false);
         fetchData();
       } else {
@@ -590,6 +634,33 @@ export default function KomparasiLaporanPage() {
           </button>
         </div>
       </div>
+
+      {/* BANNER NOTIFIKASI MIGRASI KOLOM VERSI JIKA BELUM ADA */}
+      {!hasVersiColumn && (
+        <div className="bg-amber-50/90 border border-amber-200/80 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-start gap-3">
+            <span className="text-xl shrink-0 mt-0.5">💡</span>
+            <div>
+              <p className="font-black text-amber-900">Fitur Multi-Versi Belum Diaktifkan di Database Supabase</p>
+              <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                Aplikasi saat ini tetap dapat meng-import dan menyimpan data secara normal (berdasarkan Tahun). Jika Anda ingin membedakan versi per tahun (misal: <em>Murni</em> vs <em>Revisi</em> vs <em>Final</em>), silakan salin dan jalankan script SQL migrasi di Supabase SQL Editor.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const sql = `-- ====================================================================\n-- SCRIPT MIGRASI DATABASE SUPABASE: KOMPARASI LAPORAN ADD VERSI COLUMN\n-- ====================================================================\nALTER TABLE public.app_laporan_statis ADD COLUMN IF NOT EXISTS versi VARCHAR(50) DEFAULT 'Final';\nUPDATE public.app_laporan_statis SET versi = 'Final' WHERE versi IS NULL;\nDO $$\nBEGIN\n    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'app_laporan_statis_akun_id_tahun_key') THEN\n        ALTER TABLE public.app_laporan_statis DROP CONSTRAINT app_laporan_statis_akun_id_tahun_key;\n    END IF;\nEND $$;\nALTER TABLE public.app_laporan_statis DROP CONSTRAINT IF EXISTS app_laporan_statis_akun_tahun_versi_key;\nALTER TABLE public.app_laporan_statis ADD CONSTRAINT app_laporan_statis_akun_tahun_versi_key UNIQUE (akun_id, tahun, versi);\nNOTIFY pgrst, 'reload schema';`;
+              navigator.clipboard.writeText(sql);
+              alert("📋 Script SQL migrasi berhasil disalin ke clipboard!\n\nLangkah selanjutnya:\n1. Buka Supabase Dashboard > SQL Editor\n2. Tempel (paste) dan klik 'Run'\n3. Refresh halaman ini.");
+            }}
+            className="px-3.5 py-2 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold text-xs shrink-0 shadow-2xs cursor-pointer transition-colors flex items-center gap-1.5"
+          >
+            <span>📋</span>
+            <span>Salin SQL Migrasi</span>
+          </button>
+        </div>
+      )}
 
       {/* FILTER MULTI SELECT BAR */}
       <div className="bg-white p-3 px-4 rounded-2xl shadow-xs border border-gray-200/80 flex flex-col md:flex-row items-start md:items-center gap-3 z-10 relative">
