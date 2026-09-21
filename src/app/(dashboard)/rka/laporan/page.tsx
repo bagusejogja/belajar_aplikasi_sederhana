@@ -659,10 +659,12 @@ function UnitDetailHierarchyTable({
 
     const isPendidikanPenerimaan = (r: any) => {
       if (isLuncuranPenerimaan(r)) return false;
-      const akun = (r.nama_akun_penerimaan || '').trim();
-      const fp = (r.format_proposal || '').toLowerCase();
-      const ket = (r.keterangan || '').toLowerCase();
-      return akun.startsWith('41') || fp.includes('pendidikan') || ket.includes('pendidikan');
+      const rawAkun = String(r.nama_akun_penerimaan || r.akun || r.kode_akun || '').trim();
+      return (
+        rawAkun.startsWith('411') ||
+        (r.akun && String(r.akun).trim().startsWith('411')) ||
+        (r.kode_akun && String(r.kode_akun).trim().startsWith('411'))
+      );
     };
 
     // Helper filter belanja
@@ -2125,8 +2127,13 @@ export default function RkaLaporanPage() {
       // (4) Luncuran: Akun 40101* atau label mengandung 'surplus' atau 'luncuran'
       const isLuncuran = akun.startsWith('40101') || fp.includes('surplus') || fp.includes('luncuran') || ket.includes('surplus anggaran tahun sebelumnya');
 
-      // (1) Penerimaan Pendidikan: Akun 41* atau label mengandung 'pendidikan'
-      const isPendidikan = !isLuncuran && (akun.startsWith('41') || fp.includes('pendidikan') || ket.includes('pendidikan'));
+      // (1) Penerimaan Pendidikan: HANYA kode akun 411*** (selain itu masuk ke 2. Pen. Non Pendidikan)
+      const rawAkun = String(row.nama_akun_penerimaan || row.akun || row.kode_akun || '').trim();
+      const isPendidikan = !isLuncuran && (
+        rawAkun.startsWith('411') ||
+        (row.akun && String(row.akun).trim().startsWith('411')) ||
+        (row.kode_akun && String(row.kode_akun).trim().startsWith('411'))
+      );
 
       // Prop Alokasi Prosentase Unit (Dari kolom data row rkat_penerimaan)
       const rowProp = row.prop_alokasi_prosentase_unit ?? row.propAlokasiProsentaseUnit;
