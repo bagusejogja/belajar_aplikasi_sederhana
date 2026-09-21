@@ -47,24 +47,86 @@ export interface PptTemplateConfig {
   penerimaanLainnyaLabel: string;
   pengeluaranTitle: string;
   pengeluaranSections: PptTemplateSection[];
-  pengeluaranItems?: PptTemplateItem[]; // backward compat
+  pengeluaranItems?: PptTemplateItem[];
   pengeluaranLainnyaLabel: string;
 }
 
+// Model Hierarki Baris Slide Format Proposal PPT (Sesuai Komparasi Laporan & Screenshot Pengguna)
+interface PptSlideRow {
+  id: string;
+  keterangan: string;
+  level: number; // 0, 1, 2, 3
+  is_sum: boolean;
+  is_bold: boolean;
+  matchKeys?: string[];
+  type: 'penerimaan' | 'pengeluaran' | 'summary';
+}
+
+// Susunan Standar Slide Presentasi / PPT Proposal RKAT (37 Baris Persis Sesuai Master Akun & Screenshot)
+const DEFAULT_PPT_TREE: PptSlideRow[] = [
+  // PENERIMAAN (Level 0)
+  { id: 'h_pen', keterangan: 'PENERIMAAN', level: 0, is_sum: false, is_bold: true, type: 'penerimaan' },
+  
+  // 1. Dana Pemerintah
+  { id: 'pen_pem', keterangan: 'Jumlah Penerimaan Dana Pemerintah', level: 1, is_sum: true, is_bold: true, type: 'penerimaan' },
+  { id: 'pen_gaji', keterangan: 'Penerimaan Gaji dan Tunjangan PNS', level: 2, is_sum: false, is_bold: true, matchKeys: ['gaji', 'tunjangan pns', 'pns'], type: 'penerimaan' },
+  { id: 'pen_bp_ptnbh', keterangan: 'Bantuan Pendanaan PTN Badan Hukum', level: 2, is_sum: false, is_bold: true, matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', '42103'], type: 'penerimaan' },
+  { id: 'pen_pem_lain', keterangan: 'Penerimaan Pemerintah lainnya', level: 2, is_sum: true, is_bold: true, type: 'penerimaan' },
+  { id: 'pen_penelitian', keterangan: 'Penelitian', level: 3, is_sum: false, is_bold: false, matchKeys: ['penelitian'], type: 'penerimaan' },
+  { id: 'pen_beasiswa', keterangan: 'Beasiswa dan Kontrak Kerjasama Pemerintah', level: 3, is_sum: false, is_bold: false, matchKeys: ['beasiswa', 'kontrak kerjasama'], type: 'penerimaan' },
+  { id: 'pen_jica', keterangan: 'HIBAH GDG LOAN JICA', level: 3, is_sum: false, is_bold: false, matchKeys: ['jica', 'gdg loan'], type: 'penerimaan' },
+  { id: 'pen_dapt', keterangan: 'Penerimaan DAPT', level: 3, is_sum: false, is_bold: false, matchKeys: ['dapt'], type: 'penerimaan' },
+  { id: 'pen_iku', keterangan: 'Insentif Capaian IKU', level: 3, is_sum: false, is_bold: false, matchKeys: ['iku', 'insentif iku'], type: 'penerimaan' },
+  { id: 'pen_stp', keterangan: 'HIBAH SCIENCE TECHNO PARK -ADB', level: 3, is_sum: false, is_bold: false, matchKeys: ['science techno park', 'adb', 'stp'], type: 'penerimaan' },
+  { id: 'pen_puapt', keterangan: 'HIBAH PUAPT', level: 3, is_sum: false, is_bold: false, matchKeys: ['puapt'], type: 'penerimaan' },
+  { id: 'pen_equity', keterangan: 'EQUITY', level: 3, is_sum: false, is_bold: false, matchKeys: ['equity'], type: 'penerimaan' },
+  { id: 'pen_revitalisasi', keterangan: 'Pendamping Program Revitalisasi PTN 2024', level: 3, is_sum: false, is_bold: false, matchKeys: ['revitalisasi ptn', 'revitalisasi'], type: 'penerimaan' },
+
+  // 2. Dana Masyarakat
+  { id: 'pen_masyarakat', keterangan: 'Jumlah Penerimaan Dana Masyarakat', level: 1, is_sum: true, is_bold: true, type: 'penerimaan' },
+  { id: 'pen_pendidikan', keterangan: 'Penerimaan Pendidikan', level: 2, is_sum: true, is_bold: true, type: 'penerimaan' },
+  { id: 'pen_pend_utama', keterangan: 'Penerimaan Pendidikan Utama', level: 3, is_sum: false, is_bold: false, matchKeys: ['pendidikan utama', 's1', 's2', 's3', 'vokasi', 'ukt', 'sarjana', 'magister', 'doktor'], type: 'penerimaan' },
+  { id: 'pen_pend_lain', keterangan: 'Penerimaan Pendidikan Lainnya', level: 3, is_sum: false, is_bold: false, matchKeys: ['pendidikan lainnya', 'seleksi', 'registrasi', 'admisi'], type: 'penerimaan' },
+  { id: 'pen_non_pend', keterangan: 'Penerimaan Non Pendidikan', level: 2, is_sum: true, is_bold: true, type: 'penerimaan' },
+  { id: 'pen_hibah_donasi', keterangan: 'Penerimaan Hibah dan Donasi', level: 3, is_sum: false, is_bold: false, matchKeys: ['hibah', 'donasi'], type: 'penerimaan' },
+  { id: 'pen_jasa_univ', keterangan: 'Penerimaan Jasa Universitas', level: 3, is_sum: false, is_bold: false, matchKeys: ['jasa universitas', 'jasa'], type: 'penerimaan' },
+  { id: 'pen_aset', keterangan: 'Penerimaan Pemanfaatan Aset', level: 3, is_sum: false, is_bold: false, matchKeys: ['aset', 'sewa'], type: 'penerimaan' },
+  { id: 'pen_kerjasama', keterangan: 'Penerimaan Kerjasama', level: 3, is_sum: false, is_bold: false, matchKeys: ['kerjasama'], type: 'penerimaan' },
+  { id: 'pen_upu', keterangan: 'Penerimaan dari UPU', level: 3, is_sum: false, is_bold: false, matchKeys: ['upu'], type: 'penerimaan' },
+
+  // Total Penerimaan
+  { id: 'tot_pen', keterangan: 'JUMLAH PENERIMAAN', level: 0, is_sum: true, is_bold: true, type: 'summary' },
+
+  // PENGELUARAN (Level 0)
+  { id: 'h_peng', keterangan: 'PENGELUARAN', level: 0, is_sum: false, is_bold: true, type: 'pengeluaran' },
+  { id: 'peng_pegawai', keterangan: 'Belanja Pegawai', level: 1, is_sum: false, is_bold: true, matchKeys: ['pegawai', 'gaji', 'honor', 'remun', 'tunjangan'], type: 'pengeluaran' },
+  { id: 'peng_barang_jasa', keterangan: 'Belanja Barang & Jasa', level: 1, is_sum: false, is_bold: true, matchKeys: ['barang', 'jasa', 'konsumsi', 'atk'], type: 'pengeluaran' },
+  { id: 'peng_pemeliharaan', keterangan: 'Belanja Perbaikan dan Pemeliharaan', level: 1, is_sum: false, is_bold: true, matchKeys: ['pemeliharaan', 'perbaikan', 'gedung', 'peralatan'], type: 'pengeluaran' },
+  { id: 'peng_perjalanan', keterangan: 'Belanja Perjalanan', level: 1, is_sum: false, is_bold: true, matchKeys: ['perjalanan', 'dinas'], type: 'pengeluaran' },
+  { id: 'peng_modal', keterangan: 'Belanja Modal', level: 1, is_sum: false, is_bold: true, matchKeys: ['modal', 'investasi', 'aset tetap'], type: 'pengeluaran' },
+  { id: 'peng_stp', keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, matchKeys: ['techno', 'adb', 'stp'], type: 'pengeluaran' },
+  { id: 'peng_puapt', keterangan: 'Belanja PUAPT', level: 1, is_sum: false, is_bold: false, matchKeys: ['puapt'], type: 'pengeluaran' },
+  { id: 'peng_revitalisasi', keterangan: 'Belanja Pendamping Program Revitalisasi PTN 2024', level: 1, is_sum: false, is_bold: false, matchKeys: ['revitalisasi'], type: 'pengeluaran' },
+  { id: 'peng_equity', keterangan: 'Belanja EQUITY', level: 1, is_sum: false, is_bold: false, matchKeys: ['equity'], type: 'pengeluaran' },
+
+  // Total Pengeluaran
+  { id: 'tot_peng', keterangan: 'JUMLAH PENGELUARAN', level: 0, is_sum: true, is_bold: true, type: 'summary' },
+
+  // Surplus Defisit
+  { id: 'surplus_defisit', keterangan: 'SURPLUS/(DEFISIT) ANGGARAN', level: 0, is_sum: true, is_bold: true, type: 'summary' },
+];
+
 // Helper pencocokan kata kunci template PPT yang akurat:
-// Mencegah kata 'jasa' mencocokkan 'kerjasama' (karena substring 'jasa' terdapat di dalam kata 'kerJASAma')
-function isPptKeyMatch(label: string, matchKeys: string[]): boolean {
+function isPptKeyMatch(label: string, matchKeys?: string[]): boolean {
   if (!label || !matchKeys || matchKeys.length === 0) return false;
   const kLower = label.toLowerCase().trim();
   return matchKeys.some(rawMk => {
     const mk = rawMk.toLowerCase().trim();
     if (!mk) return false;
-    // Khusus kata kunci 'jasa': jangan pernah mencocokkan kata 'kerjasama'
     if (mk === 'jasa') {
       const regex = /(?:^|[^a-zA-Z0-9])jasa(?:[^a-zA-Z0-9]|$)/i;
       return regex.test(kLower);
     }
-    // Untuk kata tunggal tanpa spasi, gunakan pembatas kata agar tidak mencaplok kata lain
     if (!mk.includes(' ')) {
       const escaped = mk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i');
@@ -1240,8 +1302,25 @@ export default function RkaLaporanPage() {
     return DEFAULT_PPT_TEMPLATE;
   });
 
+  // Template Susunan Baris Slide Hierarkis (Format Proposal RKAT 3-Tingkat Sesuai Master Akun & Screenshot)
+  const [pptTreeTemplate, setPptTreeTemplate] = useState<PptSlideRow[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('ppt_slide_tree_template_v4');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_PPT_TREE;
+  });
+
   // Modal Atur Susunan Template Slide State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [tempTreeTemplate, setTempTreeTemplate] = useState<PptSlideRow[]>(DEFAULT_PPT_TREE);
+  const [editingRowModal, setEditingRowModal] = useState<PptSlideRow | null>(null);
+  const [expandedTreeRows, setExpandedTreeRows] = useState<Set<string>>(new Set());
   const [tempTemplate, setTempTemplate] = useState<PptTemplateConfig>(DEFAULT_PPT_TEMPLATE);
   const [activeTemplateTab, setActiveTemplateTab] = useState<'penerimaan' | 'pengeluaran'>('penerimaan');
 
@@ -1772,6 +1851,169 @@ export default function RkaLaporanPage() {
       surplusDefisit
     };
   }, [penerimaanList, dataList, unitFilter, kategoriFilter, search, pptTemplate]);
+
+  // Struktur Hierarki Baris Slide Format Proposal PPT (Dihitung Bottom-Up Sesuai Komparasi Laporan & Screenshot)
+  const computedTreeData = useMemo(() => {
+    // 1. First Pass: Hitung nilai dan data matching untuk setiap leaf node (is_sum === false)
+    const rows = pptTreeTemplate.map(item => {
+      let matchingRows: any[] = [];
+      let pagu = 0;
+
+      if (!item.is_sum && item.matchKeys && item.matchKeys.length > 0) {
+        if (item.type === 'penerimaan') {
+          matchingRows = penerimaanList.filter(row => {
+            if (unitFilter !== 'ALL' && unitFilter !== '*' && (row.unit_kerja || row.unit || '') !== unitFilter) return false;
+            if (tahunFilter !== 'ALL' && String(row.tahun_anggaran || row.tahun || '') !== tahunFilter) return false;
+            
+            const text = `${row.nama_akun_penerimaan || ''} ${row.uraian_penerimaan || ''} ${row.keterangan || ''} ${row.sumber_dana || ''} ${row.format_proposal || ''} ${row.kelompok_penerimaan || ''} ${row.akun || ''}`;
+            return isPptKeyMatch(text, item.matchKeys);
+          });
+          pagu = matchingRows.reduce((acc, r) => acc + (Number(r.renterima_pagu || r.anggaran || r.pagu) || 0), 0);
+        } else if (item.type === 'pengeluaran') {
+          matchingRows = dataList.filter(row => {
+            if (unitFilter !== 'ALL' && unitFilter !== '*' && (row.unit || row.unit_kerja || '') !== unitFilter) return false;
+            if (tahunFilter !== 'ALL' && String(row.tahun_anggaran || row.tahun || '') !== tahunFilter) return false;
+            if (kategoriFilter !== 'ALL' && row.kategori_belanja !== kategoriFilter) return false;
+            
+            const classification = getRowClassification(row, 'proposal rkat') || '';
+            const text = `${row.uraian_belanja || ''} ${row.kegiatan || ''} ${row.program || ''} ${row.lingkup_kegiatan || ''} ${row.akun_detail || ''} ${row.kategori_belanja || ''} ${classification}`;
+            return isPptKeyMatch(text, item.matchKeys);
+          });
+          pagu = matchingRows.reduce((acc, r) => acc + (Number(r.anggaran) || 0), 0);
+        }
+      }
+
+      return {
+        ...item,
+        pagu,
+        count: matchingRows.length,
+        matchingRows,
+        proporsi: ''
+      };
+    });
+
+    // 2. Second Pass: Bottom-Up Summing untuk Level 2 dan Level 1
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const item = rows[i];
+      if (item.is_sum && item.level > 0) {
+        let subPagu = 0;
+        let subCount = 0;
+        const subMatching: any[] = [];
+
+        for (let j = i + 1; j < rows.length; j++) {
+          const next = rows[j];
+          if (next.level <= item.level) break; // Keluar dari blok anak
+          // Hanya jumlahkan anak langsungnya (level === item.level + 1)
+          if (next.level === item.level + 1) {
+            subPagu += next.pagu;
+            subCount += next.count;
+            subMatching.push(...next.matchingRows);
+          }
+        }
+        item.pagu = subPagu;
+        item.count = subCount;
+        item.matchingRows = subMatching;
+      }
+    }
+
+    // 3. Third Pass: Hitung Total Penerimaan & Pengeluaran (Level 0)
+    let totalPenerimaan = 0;
+    let totalPengeluaran = 0;
+
+    rows.forEach(r => {
+      if (r.level === 1 && r.type === 'penerimaan') {
+        totalPenerimaan += r.pagu;
+      } else if (r.level === 1 && r.type === 'pengeluaran') {
+        totalPengeluaran += r.pagu;
+      }
+    });
+
+    // Pasang ke baris total (Level 0)
+    rows.forEach(r => {
+      if (r.id === 'tot_pen' || r.keterangan === 'JUMLAH PENERIMAAN') {
+        r.pagu = totalPenerimaan;
+        r.count = rows.filter(x => x.type === 'penerimaan' && !x.is_sum && x.level > 0).reduce((a, b) => a + b.count, 0);
+      } else if (r.id === 'tot_peng' || r.keterangan === 'JUMLAH PENGELUARAN') {
+        r.pagu = totalPengeluaran;
+        r.count = rows.filter(x => x.type === 'pengeluaran' && !x.is_sum && x.level > 0).reduce((a, b) => a + b.count, 0);
+      } else if (r.id === 'surplus_defisit' || r.keterangan?.includes('SURPLUS/(DEFISIT)')) {
+        r.pagu = totalPenerimaan - totalPengeluaran;
+      }
+    });
+
+    // 4. Fourth Pass: Hitung % Proporsi
+    rows.forEach(r => {
+      if (r.id === 'tot_pen' || r.id === 'tot_peng') {
+        r.proporsi = '100%';
+      } else if (r.id === 'surplus_defisit' || r.level === 0) {
+        r.proporsi = '-';
+      } else if (r.type === 'penerimaan') {
+        r.proporsi = totalPenerimaan > 0 ? ((r.pagu / totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+      } else if (r.type === 'pengeluaran') {
+        r.proporsi = totalPengeluaran > 0 ? ((r.pagu / totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+      } else {
+        r.proporsi = '-';
+      }
+    });
+
+    return {
+      rows,
+      totalPenerimaan,
+      totalPengeluaran,
+      surplusDefisit: totalPenerimaan - totalPengeluaran
+    };
+  }, [pptTreeTemplate, penerimaanList, dataList, unitFilter, tahunFilter, kategoriFilter]);
+
+  const toggleExpandTreeRow = (id: string) => {
+    setExpandedTreeRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveRowEdit = () => {
+    if (!editingRowModal) return;
+    setPptTreeTemplate(prev => {
+      const next = prev.map(r => r.id === editingRowModal.id ? editingRowModal : r);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(next));
+      }
+      return next;
+    });
+    toast.success(`Baris "${editingRowModal.keterangan}" berhasil diperbarui.`);
+    setEditingRowModal(null);
+  };
+
+  const handleDeleteRow = (id: string, keterangan: string) => {
+    if (confirm(`Hapus baris "${keterangan}" dari susunan slide?`)) {
+      setPptTreeTemplate(prev => {
+        const next = prev.filter(r => r.id !== id);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(next));
+        }
+        return next;
+      });
+      toast.success(`Baris "${keterangan}" telah dihapus.`);
+    }
+  };
+
+  const handleSaveAllTreeModal = () => {
+    setPptTreeTemplate(tempTreeTemplate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(tempTreeTemplate));
+    }
+    setIsTemplateModalOpen(false);
+    toast.success('Susunan slide berhasil disimpan!');
+  };
+
+  const handleResetToDefaultTree = () => {
+    if (confirm('Kembalikan susunan slide ke format standar PPT awal (37 baris)?')) {
+      setTempTreeTemplate(JSON.parse(JSON.stringify(DEFAULT_PPT_TREE)));
+      toast('Template dikembalikan ke standar awal. Klik "Simpan Perubahan" untuk menerapkan.', { icon: 'ℹ️' });
+    }
+  };
 
   // Kelompokkan data Belanja per Kategori Laporan yang dipilih (Bagian Bawah)
   const groupedData = useMemo(() => {
@@ -3814,7 +4056,7 @@ export default function RkaLaporanPage() {
     }
   };
 
-  // Export Excel Khusus Struktur Format PPT Proposal RKAT
+  // Export Excel Khusus Struktur Format PPT Proposal RKAT (Hierarki 3 Tingkat)
   const handleExportExcelPptFormat = () => {
     const aoa: any[][] = [];
     aoa.push(['UNIVERSITAS GADJAH MADA']);
@@ -3824,69 +4066,18 @@ export default function RkaLaporanPage() {
 
     aoa.push(['URAIAN PROPOSAL RKAT', 'JUMLAH BARIS', 'PAGU USULAN (RP)', '% PROPORSI']);
 
-    // PENERIMAAN
-    aoa.push([pptProposalData.penerimaan.title || 'JUMLAH PENERIMAAN DANA MASYARAKAT', '', '', '']);
-    
-    pptProposalData.penerimaan.sections.forEach(sec => {
-      const secPct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`  ${sec.title}`, sec.count, sec.subtotal, secPct]);
-      sec.items.forEach(it => {
-        const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-        if (it.is_sum && it.subItems && it.subItems.length > 0) {
-          aoa.push([`    ${it.label} (Sub Total)`, it.count, it.totalPagu, pct]);
-          it.subItems.forEach((sub: any) => {
-            const subPct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((sub.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-            aoa.push([`      ${sub.label}`, sub.count, sub.totalPagu, subPct]);
-          });
-        } else {
-          aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
-        }
-      });
+    computedTreeData.rows.forEach(r => {
+      const indent = '  '.repeat(r.level) + (r.level > 1 ? '↳ ' : '');
+      const label = indent + r.keterangan;
+      const countStr = r.count > 0 ? r.count : '';
+      const paguVal = (r.level === 0 && !r.is_sum && r.keterangan !== 'JUMLAH PENERIMAAN' && r.keterangan !== 'JUMLAH PENGELUARAN' && !r.keterangan.includes('SURPLUS')) ? '' : r.pagu;
+      const propStr = r.proporsi || '';
+      aoa.push([label, countStr, paguVal, propStr]);
     });
-
-    if (pptProposalData.penerimaan.lainnya.totalPagu > 0) {
-      const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`  ${pptProposalData.penerimaan.lainnya.label}`, pptProposalData.penerimaan.lainnya.count, pptProposalData.penerimaan.lainnya.totalPagu, pct]);
-    }
-
-    aoa.push(['JUMLAH PENERIMAAN', '', pptProposalData.penerimaan.totalPenerimaan, '100%']);
-    aoa.push([]);
-
-    // PENGELUARAN
-    aoa.push([pptProposalData.pengeluaran.title || 'PENGELUARAN', '', '', '']);
-    (pptProposalData.pengeluaran.sections || []).forEach(sec => {
-      const secPct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((sec.subtotal / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`  ${sec.title}`, sec.count, sec.subtotal, secPct]);
-      sec.items.forEach(it => {
-        const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((it.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
-        if (it.is_sum && it.subItems && it.subItems.length > 0) {
-          aoa.push([`    ${it.label} (Sub Total)`, it.count, it.totalAnggaran, pct]);
-          it.subItems.forEach((sub: any) => {
-            const subPct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((sub.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
-            aoa.push([`      ${sub.label}`, sub.count, sub.totalAnggaran, subPct]);
-          });
-        } else {
-          aoa.push([`    ${it.label}`, it.count, it.totalAnggaran, pct]);
-        }
-      });
-    });
-    if (pptProposalData.pengeluaran.lainnya.totalAnggaran > 0) {
-      const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`  ${pptProposalData.pengeluaran.lainnya.label}`, pptProposalData.pengeluaran.lainnya.count, pptProposalData.pengeluaran.lainnya.totalAnggaran, pct]);
-    }
-    aoa.push(['JUMLAH PENGELUARAN', '', pptProposalData.pengeluaran.totalPengeluaran, '100%']);
-    aoa.push([]);
-
-    aoa.push([
-      `SURPLUS / (DEFISIT) ANGGARAN: ${pptProposalData.surplusDefisit >= 0 ? 'SURPLUS' : 'DEFISIT'}`,
-      '',
-      pptProposalData.surplusDefisit,
-      ''
-    ]);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [
-      { wch: 50 },
+      { wch: 55 },
       { wch: 16 },
       { wch: 28 },
       { wch: 16 }

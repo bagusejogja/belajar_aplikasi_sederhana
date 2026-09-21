@@ -85,12 +85,12 @@ function UnitAutocompleteFilter({
   };
 
   return (
-    <div className="relative w-full sm:w-64">
+    <div className="relative w-full">
       <div 
         onClick={() => setIsOpen(true)}
-        className="w-full h-8 px-2.5 py-1 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer flex items-center justify-between transition-all"
+        className="w-full h-9 px-3 py-1.5 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-pointer flex items-center justify-between transition-all shadow-2xs"
       >
-        <span className="truncate font-semibold text-gray-700">
+        <span className="truncate font-bold text-gray-800">
           {isAll ? 'Semua Unit Kerja' : selectedUnit}
         </span>
         <ChevronDown size={14} className={`text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
