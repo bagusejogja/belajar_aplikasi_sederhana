@@ -10,12 +10,5 @@ ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_unit NUMERIC(10,4) DEFAULT 100;
 ALTER TABLE public.rkat_penerimaan 
 ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_universitas NUMERIC(10,4) DEFAULT 0;
 
--- 2. Tambah kolom prop_alokasi_prosentase_unit & prop_alokasi_prosentase_universitas ke tabel gov_units
-ALTER TABLE public.gov_units 
-ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_unit NUMERIC(10,4) DEFAULT 100;
-
-ALTER TABLE public.gov_units 
-ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_universitas NUMERIC(10,4) DEFAULT 0;
-
--- 3. Reload schema cache PostgREST agar API Supabase langsung mengenali kolom baru
+-- 2. Reload schema cache PostgREST agar API Supabase langsung mengenali kolom baru
 NOTIFY pgrst, 'reload schema';

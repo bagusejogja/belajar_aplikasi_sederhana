@@ -2128,26 +2128,13 @@ export default function RkaLaporanPage() {
       // (1) Penerimaan Pendidikan: Akun 41* atau label mengandung 'pendidikan'
       const isPendidikan = !isLuncuran && (akun.startsWith('41') || fp.includes('pendidikan') || ket.includes('pendidikan'));
 
-      // Prop Alokasi Prosentase Unit (Dari kolom data row atau master gov_units)
+      // Prop Alokasi Prosentase Unit (Dari kolom data row rkat_penerimaan)
       const rowProp = row.prop_alokasi_prosentase_unit ?? row.propAlokasiProsentaseUnit;
       let multiplier = 1.0;
       if (rowProp !== undefined && rowProp !== null && rowProp !== '') {
         const n = typeof rowProp === 'number' ? rowProp : parseFloat(String(rowProp).replace(/,/g, '.').replace(/%/g, ''));
         if (!isNaN(n)) {
           multiplier = n > 1.0 ? n / 100.0 : (n < 0 ? 0 : n);
-        }
-      } else {
-        const matchedGu = govUnitsList.find(g => 
-          (g.kode_unit && g.kode_unit !== '--' && u.startsWith(g.kode_unit)) ||
-          (g.nama_unit && (u.toLowerCase().includes(g.nama_unit.toLowerCase()) || g.nama_unit.toLowerCase().includes(u.toLowerCase())))
-        );
-        if (matchedGu?.prop_alokasi_prosentase_unit !== undefined && matchedGu?.prop_alokasi_prosentase_unit !== null && matchedGu?.prop_alokasi_prosentase_unit !== '') {
-          const n = typeof matchedGu.prop_alokasi_prosentase_unit === 'number'
-            ? matchedGu.prop_alokasi_prosentase_unit
-            : parseFloat(String(matchedGu.prop_alokasi_prosentase_unit).replace(/,/g, '.').replace(/%/g, ''));
-          if (!isNaN(n)) {
-            multiplier = n > 1.0 ? n / 100.0 : (n < 0 ? 0 : n);
-          }
         }
       }
 
