@@ -4,11 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, 
-  Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw
+  Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check
 } from 'lucide-react';
 import Select from 'react-select';
 import ExcelJS from 'exceljs';
-import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, TextRun, AlignmentType } from 'docx';
+import { 
+  Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, BorderStyle, 
+  TextRun, AlignmentType, PageOrientation, VerticalAlign, HeightRule 
+} from 'docx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
@@ -27,6 +30,21 @@ export default function KomparasiLaporanPage() {
   const [isNilaiModalOpen, setIsNilaiModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isNarasiModalOpen, setIsNarasiModalOpen] = useState(false);
+  const [isWordModalOpen, setIsWordModalOpen] = useState(false);
+
+  // Word Export Config State
+  const [wordDocTitle, setWordDocTitle] = useState('Profil Ringkas Usulan RKAT 2027');
+  const [wordOrientation, setWordOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [wordShowRupiah, setWordShowRupiah] = useState(true);
+  const [wordShowProporsi, setWordShowProporsi] = useState(true);
+  const [wordShowGrowth, setWordShowGrowth] = useState(true);
+  const [wordLevelFilter, setWordLevelFilter] = useState<'all' | 'summary'>('all');
+  const [wordColumns, setWordColumns] = useState<Array<{
+    key: string;
+    label: string;
+    dataType: 'realisasi' | 'anggaran';
+    enabled: boolean;
+  }>>([]);
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
@@ -462,113 +480,319 @@ export default function KomparasiLaporanPage() {
     downloadFile(new Blob([buffer]), `Komparasi_Laporan_${new Date().getTime()}.xlsx`);
   };
 
-  // --- WORD EXPORT (DOCX) ---
-  const exportToWord = async () => {
-    const childrenDocs: any[] = [];
+  // --- WORD EXPORT (DOCX) SESUAI FORMAT PROFIL RINGKAS RKAT ---
+  const openWordExportModal = () => {
+    const yearsToUse = selectedYearVals.length > 0 ? selectedYearVals : (allYears.slice(0, 3).reverse());
+    const sorted = [...yearsToUse].sort((a, b) => {
+      const yA = parseInt(a.split('___')[0]) || 0;
+      const yB = parseInt(b.split('___')[0]) || 0;
+      return yA - yB;
+    });
 
-    selectedYearVals.forEach((y, idx) => {
-      const tableRows: TableRow[] = [];
-      
-      tableRows.push(new TableRow({
+    const maxYear = sorted.length > 0 ? Math.max(...sorted.map(s => parseInt(s.split('___')[0]) || 0)) : new Date().getFullYear();
+    setWordDocTitle(`Profil Ringkas Usulan RKAT ${maxYear}`);
+
+    const cols = sorted.map(yStr => {
+      const yearNum = parseInt(yStr.split('___')[0]) || 0;
+      const isTargetYear = yearNum === maxYear;
+      return {
+        key: yStr,
+        label: isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`,
+        dataType: (isTargetYear ? 'anggaran' : 'realisasi') as 'realisasi' | 'anggaran',
+        enabled: true
+      };
+    });
+
+    setWordColumns(cols);
+    setIsWordModalOpen(true);
+  };
+
+  const executeExportWord = async () => {
+    const activeCols = wordColumns.filter(c => c.enabled);
+    if (activeCols.length === 0) {
+      alert('Pilih minimal 1 kolom tahun untuk diekspor ke Word');
+      return;
+    }
+
+    const activeSubCols: Array<{ id: 'rupiah' | 'proporsi' | 'growth'; label: string }> = [];
+    if (wordShowRupiah) activeSubCols.push({ id: 'rupiah', label: 'Rupiah' });
+    if (wordShowProporsi) activeSubCols.push({ id: 'proporsi', label: '% Total' });
+    if (wordShowGrowth) activeSubCols.push({ id: 'growth', label: '%' });
+
+    if (activeSubCols.length === 0) {
+      alert('Pilih minimal 1 sub-kolom (Rupiah, % Total, atau %) untuk ditampilkan');
+      return;
+    }
+
+    const isLandscape = wordOrientation === 'landscape';
+    const totalPageWidthDxa = isLandscape ? 14400 : 10500;
+    const col1Width = isLandscape ? 3800 : 3000;
+    const totalDataCols = activeCols.length * activeSubCols.length;
+    const dataColWidth = Math.max(750, Math.floor((totalPageWidthDxa - col1Width) / totalDataCols));
+
+    const borderSingle = { style: BorderStyle.SINGLE, size: 4, color: '1F4E79' };
+    const cellBorders = { top: borderSingle, bottom: borderSingle, left: borderSingle, right: borderSingle };
+    const headerFill = '2E75B6'; // Classic Microsoft Word Blue
+
+    const tableRows: TableRow[] = [];
+
+    // Header Baris 1:
+    // Kolom 1: "Rencana Kerja dan Anggaran" (rowSpan 2)
+    // Kolom 2..n: Tiap Tahun (columnSpan = activeSubCols.length)
+    const headerRow1Cells: TableCell[] = [
+      new TableCell({
         children: [
-          new TableCell({ children: [new Paragraph({ text: "Keterangan", alignment: AlignmentType.CENTER })], rowSpan: 2, shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Rencana (Rp)", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Realisasi (Rp)", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } }),
-          new TableCell({ children: [new Paragraph({ text: "Selisih", alignment: AlignmentType.CENTER })], columnSpan: 2, shading: { fill: '0F766E' } })
-        ]
-      }));
-      
-      tableRows.push(new TableRow({
-        children: [
-          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
-          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
-          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
-          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
-          new TableCell({ children: [new Paragraph({ text: "Rp", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } }),
-          new TableCell({ children: [new Paragraph({ text: "%", alignment: AlignmentType.CENTER })], shading: { fill: 'E2E8F0' } })
-        ]
-      }));
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "Rencana Kerja dan Anggaran",
+                bold: true,
+                color: "FFFFFF",
+                font: "Times New Roman",
+                size: 18
+              })
+            ],
+            alignment: AlignmentType.CENTER
+          })
+        ],
+        rowSpan: 2,
+        width: { size: col1Width, type: WidthType.DXA },
+        shading: { fill: headerFill },
+        verticalAlign: VerticalAlign.CENTER,
+        borders: cellBorders
+      })
+    ];
 
-      flattenedRows.forEach(akun => {
-        const d = matrix[akun.id][y];
-        const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
-        let selisih = d.realisasi - d.anggaran;
-        let persen = d.anggaran !== 0 ? ((selisih / d.anggaran) * 100).toFixed(2) + '%' : '-';
-        
-        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
-        if (isZeroOverride) {
-            selisih = 0;
-            persen = '0,00%';
-        }
-        
-        let propAnggaran = 0;
-        let propRealisasi = 0;
-        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
-        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
-        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
-        
-        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
-            let denomAng = 0;
-            let denomReal = 0;
-            if (myIdx <= jpRowIdx && jpRow) {
-                denomAng = matrix[jpRow.id][y].anggaran;
-                denomReal = matrix[jpRow.id][y].realisasi;
-            } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
-                denomAng = matrix[jpengRow.id][y].anggaran;
-                denomReal = matrix[jpengRow.id][y].realisasi;
-            }
-            if (denomAng !== 0) propAnggaran = (d.anggaran / denomAng) * 100;
-            if (denomReal !== 0) propRealisasi = (d.realisasi / denomReal) * 100;
-        }
-
-        let displayLabel = akun.keterangan;
-        if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
-        
-        tableRows.push(new TableRow({
+    activeCols.forEach(col => {
+      headerRow1Cells.push(
+        new TableCell({
           children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: displayLabel, bold: isBold })], indent: { left: akun.level * 150 } })] }),
-            new TableCell({ children: [new Paragraph({ text: d.anggaran !== 0 ? fmt(d.anggaran) : '-', alignment: AlignmentType.RIGHT })] }),
-            new TableCell({ children: [new Paragraph({ text: isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.anggaran !== 0 ? `${Math.abs(propAnggaran).toFixed(2).replace('.',',')}%` : '-'), alignment: AlignmentType.CENTER })] }),
-            new TableCell({ children: [new Paragraph({ text: d.realisasi !== 0 ? fmt(d.realisasi) : '-', alignment: AlignmentType.RIGHT })] }),
-            new TableCell({ children: [new Paragraph({ text: isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : (d.realisasi !== 0 ? `${Math.abs(propRealisasi).toFixed(2).replace('.',',')}%` : '-'), alignment: AlignmentType.CENTER })] }),
-            new TableCell({ children: [new Paragraph({ text: (d.anggaran!==0 || d.realisasi!==0) ? fmt(selisih) : '-', alignment: AlignmentType.RIGHT })] }),
-            new TableCell({ children: [new Paragraph({ text: persen, alignment: AlignmentType.CENTER })] })
-          ]
-        }));
-      });
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: col.label.toUpperCase(),
+                  bold: true,
+                  color: "FFFFFF",
+                  font: "Times New Roman",
+                  size: 18
+                })
+              ],
+              alignment: AlignmentType.CENTER
+            })
+          ],
+          columnSpan: activeSubCols.length,
+          width: { size: dataColWidth * activeSubCols.length, type: WidthType.DXA },
+          shading: { fill: headerFill },
+          verticalAlign: VerticalAlign.CENTER,
+          borders: cellBorders
+        })
+      );
+    });
 
-      const docTable = new Table({
-        rows: tableRows,
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: {
-          top: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          bottom: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          left: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          right: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
-          insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "E2E8F0" },
+    tableRows.push(new TableRow({
+      cantSplit: true,
+      height: { value: 380, rule: HeightRule.ATLEAST },
+      children: headerRow1Cells
+    }));
+
+    // Header Baris 2 (Sub-Kolom):
+    const headerRow2Cells: TableCell[] = [];
+    activeCols.forEach(() => {
+      activeSubCols.forEach(sc => {
+        headerRow2Cells.push(
+          new TableCell({
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: sc.label,
+                    bold: true,
+                    color: "FFFFFF",
+                    font: "Times New Roman",
+                    size: 18
+                  })
+                ],
+                alignment: AlignmentType.CENTER
+              })
+            ],
+            width: { size: dataColWidth, type: WidthType.DXA },
+            shading: { fill: headerFill },
+            verticalAlign: VerticalAlign.CENTER,
+            borders: cellBorders
+          })
+        );
+      });
+    });
+
+    tableRows.push(new TableRow({
+      cantSplit: true,
+      height: { value: 320, rule: HeightRule.ATLEAST },
+      children: headerRow2Cells
+    }));
+
+    // Filter Baris Akun
+    const rowsToExport = wordLevelFilter === 'summary'
+      ? flattenedRows.filter(r => r.level <= 1 || r.is_sum || r.is_bold || r.kode_sistem?.includes('SURPLUS') || r.kode_sistem?.includes('JML_'))
+      : flattenedRows;
+
+    const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+    const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+
+    // Baris-baris Data
+    rowsToExport.forEach(akun => {
+      const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
+      const isCustom = akun.kode_sistem?.includes('SURPLUS') || false;
+      const rowShading = (akun.is_sum || isCustom || akun.level === 0) ? 'F2F6FA' : undefined;
+
+      let displayLabel = akun.keterangan;
+      if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
+
+      const isZeroOverride = [
+        'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA',
+        'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA',
+        'SURPLUS/(DEFISIT) ANGGARAN',
+        'PENAMBAHAN DANA ABADI'
+      ].includes(akun.keterangan);
+
+      const rowCells: TableCell[] = [
+        new TableCell({
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: displayLabel,
+                  bold: isBold,
+                  font: "Times New Roman",
+                  size: 18
+                })
+              ],
+              alignment: AlignmentType.LEFT,
+              indent: { left: akun.level * 160 }
+            })
+          ],
+          width: { size: col1Width, type: WidthType.DXA },
+          shading: rowShading ? { fill: rowShading } : undefined,
+          verticalAlign: VerticalAlign.CENTER,
+          borders: cellBorders
+        })
+      ];
+
+      const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+
+      activeCols.forEach((col, cIdx) => {
+        const d = matrix[akun.id]?.[col.key] || { anggaran: 0, realisasi: 0 };
+        const val = col.dataType === 'anggaran' ? d.anggaran : d.realisasi;
+
+        // % Total (Proporsi Pos terhadap Total Penerimaan / Pengeluaran)
+        let prop: number | null = null;
+        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+          let denom = 0;
+          if (myIdx <= jpRowIdx && jpRow) {
+            denom = col.dataType === 'anggaran' ? matrix[jpRow.id]?.[col.key]?.anggaran : matrix[jpRow.id]?.[col.key]?.realisasi;
+          } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
+            denom = col.dataType === 'anggaran' ? matrix[jpengRow.id]?.[col.key]?.anggaran : matrix[jpengRow.id]?.[col.key]?.realisasi;
+          }
+          if (denom && denom !== 0) {
+            prop = (val / denom) * 100;
+          }
         }
+
+        // % Growth (Pertumbuhan vs Kolom Sebelumnya)
+        let growth: number | null = null;
+        if (cIdx > 0 && !isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
+          const prevCol = activeCols[cIdx - 1];
+          const prevD = matrix[akun.id]?.[prevCol.key] || { anggaran: 0, realisasi: 0 };
+          const prevVal = prevCol.dataType === 'anggaran' ? prevD.anggaran : prevD.realisasi;
+          if (prevVal && prevVal !== 0) {
+            growth = ((val - prevVal) / Math.abs(prevVal)) * 100;
+          }
+        }
+
+        activeSubCols.forEach(sc => {
+          let cellText = '-';
+          if (sc.id === 'rupiah') {
+            cellText = val !== 0 ? fmt(val) : (isZeroOverride ? '0' : '-');
+          } else if (sc.id === 'proporsi') {
+            cellText = prop !== null ? `${Math.abs(prop).toFixed(2).replace('.', ',')}%` : '-';
+          } else if (sc.id === 'growth') {
+            cellText = growth !== null ? `${growth.toFixed(2).replace('.', ',')}%` : '-';
+          }
+
+          rowCells.push(
+            new TableCell({
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: cellText,
+                      bold: isBold,
+                      font: "Times New Roman",
+                      size: 18
+                    })
+                  ],
+                  alignment: sc.id === 'rupiah' ? AlignmentType.RIGHT : AlignmentType.CENTER
+                })
+              ],
+              width: { size: dataColWidth, type: WidthType.DXA },
+              shading: rowShading ? { fill: rowShading } : undefined,
+              verticalAlign: VerticalAlign.CENTER,
+              borders: cellBorders
+            })
+          );
+        });
       });
 
-      childrenDocs.push(new Paragraph({
-        children: [new TextRun({ text: `Komparasi Laporan Tahun ${y}`, bold: true, size: 32 })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 400 },
-        pageBreakBefore: idx > 0
+      tableRows.push(new TableRow({
+        cantSplit: true,
+        height: { value: 290, rule: HeightRule.ATLEAST },
+        children: rowCells
       }));
-      
-      childrenDocs.push(docTable);
+    });
+
+    const docTable = new Table({
+      rows: tableRows,
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: cellBorders
     });
 
     const doc = new Document({
       sections: [{
-        properties: {},
-        children: childrenDocs,
+        properties: {
+          page: {
+            size: {
+              orientation: isLandscape ? PageOrientation.LANDSCAPE : PageOrientation.PORTRAIT
+            },
+            margin: {
+              top: 720,
+              bottom: 720,
+              left: 720,
+              right: 720
+            }
+          }
+        },
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: wordDocTitle || "Profil Ringkas Usulan RKAT",
+                bold: true,
+                font: "Times New Roman",
+                size: 28, // 14pt
+                color: "000000"
+              })
+            ],
+            alignment: AlignmentType.LEFT,
+            spacing: { before: 100, after: 250 }
+          }),
+          docTable
+        ]
       }]
     });
 
     const buffer = await Packer.toBlob(doc);
-    downloadFile(buffer, `Komparasi_Laporan_Tahunan_${new Date().getTime()}.docx`);
+    const cleanFileName = (wordDocTitle || 'Profil_Ringkas_Usulan_RKAT').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+    downloadFile(buffer, `${cleanFileName}.docx`);
+    setIsWordModalOpen(false);
   };
 
   return (
@@ -618,8 +842,9 @@ export default function KomparasiLaporanPage() {
           </button>
 
           <button 
-            onClick={exportToWord} 
+            onClick={openWordExportModal} 
             className="h-9 px-3 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs"
+            title="Pengaturan & Ekspor Dokumen Word (Profil Ringkas RKAT)"
           >
             <FileText size={13} />
             <span>Word</span>
@@ -1126,6 +1351,248 @@ export default function KomparasiLaporanPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PENGATURAN EKSPOR WORD (PROFIL RINGKAS USULAN RKAT) */}
+      {isWordModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col border border-gray-200 max-h-[90vh]">
+            {/* Header Modal */}
+            <div className="bg-gradient-to-r from-sky-700 to-blue-800 p-4 px-5 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white/10 backdrop-blur-xs">
+                  <FileText size={18} className="text-sky-200" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight">Pengaturan Ekspor Word (Profil Ringkas RKAT)</h2>
+                  <p className="text-[11px] text-sky-100/90 font-medium">Sesuaikan judul, kolom tahun, dan indikator yang akan ditampilkan di dokumen Word.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsWordModalOpen(false)} 
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content Form */}
+            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+              {/* 1. Judul Dokumen */}
+              <div className="space-y-1.5 bg-sky-50/40 p-3.5 rounded-xl border border-sky-100">
+                <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                  Judul Tabel di Word:
+                </label>
+                <input 
+                  type="text" 
+                  value={wordDocTitle} 
+                  onChange={e => setWordDocTitle(e.target.value)} 
+                  placeholder="Contoh: Profil Ringkas Usulan RKAT 2027"
+                  className="w-full h-9 px-3.5 bg-white border border-gray-300 rounded-xl font-bold text-xs text-gray-900 focus:ring-2 focus:ring-sky-600 focus:outline-none shadow-2xs"
+                />
+                <p className="text-[10px] text-gray-500 font-medium">
+                  Judul ini akan tercetak tebal (bold) di bagian paling atas tabel dokumen Word.
+                </p>
+              </div>
+
+              {/* 2. Pilihan Kolom Tahun & Versi */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📅 Pilihan Kolom Tahun & Tipe Data:</span>
+                    <span className="text-[10px] text-sky-700 font-semibold bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md font-mono">
+                      {wordColumns.filter(c => c.enabled).length} Kolom Aktif
+                    </span>
+                  </label>
+                  {allYears.length > wordColumns.length && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const remaining = allYears.filter(y => !wordColumns.some(wc => wc.key === y));
+                        if (remaining.length > 0) {
+                          const next = remaining[0];
+                          const yNum = parseInt(next.split('___')[0]) || 0;
+                          setWordColumns([...wordColumns, {
+                            key: next,
+                            label: `REALISASI ${yNum}`,
+                            dataType: 'realisasi',
+                            enabled: true
+                          }]);
+                        }
+                      }}
+                      className="text-[11px] text-sky-700 hover:text-sky-900 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={13} /> Tambah Tahun Lain
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2 bg-gray-50/80 p-3 rounded-xl border border-gray-200">
+                  {wordColumns.map((col, idx) => (
+                    <div 
+                      key={col.key} 
+                      className={`p-2.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${col.enabled ? 'bg-white border-sky-200 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60'}`}
+                    >
+                      <label className="flex items-center gap-2.5 cursor-pointer shrink-0">
+                        <input 
+                          type="checkbox" 
+                          checked={col.enabled} 
+                          onChange={e => {
+                            const updated = [...wordColumns];
+                            updated[idx].enabled = e.target.checked;
+                            setWordColumns(updated);
+                          }}
+                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
+                        />
+                        <span className="font-mono text-[11px] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                          {col.key.replace('___', ' ')}
+                        </span>
+                      </label>
+
+                      <div className="flex items-center gap-2 flex-1 justify-end">
+                        <div className="flex items-center gap-1 flex-1 max-w-[200px]">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Label:</span>
+                          <input 
+                            type="text"
+                            value={col.label}
+                            onChange={e => {
+                              const updated = [...wordColumns];
+                              updated[idx].label = e.target.value;
+                              setWordColumns(updated);
+                            }}
+                            className="h-8 px-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900 w-full focus:outline-none focus:ring-1 focus:ring-sky-500"
+                            placeholder="Label Header"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-[10px] text-gray-400 font-bold uppercase">Nilai:</span>
+                          <select 
+                            value={col.dataType}
+                            onChange={e => {
+                              const updated = [...wordColumns];
+                              updated[idx].dataType = e.target.value as 'realisasi' | 'anggaran';
+                              setWordColumns(updated);
+                            }}
+                            className="h-8 px-2 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                          >
+                            <option value="realisasi">Realisasi</option>
+                            <option value="anggaran">RKAT (Anggaran)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Sub-Kolom yang Ditampilkan */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                  📊 Sub-Kolom yang Ditampilkan (per Tahun):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${wordShowRupiah ? 'bg-sky-50/60 border-sky-300 text-sky-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={wordShowRupiah} 
+                      onChange={e => setWordShowRupiah(e.target.checked)} 
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
+                    />
+                    <div>
+                      <div className="text-xs">Nominal (Rupiah)</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Angka pagu / realisasi</div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${wordShowProporsi ? 'bg-sky-50/60 border-sky-300 text-sky-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={wordShowProporsi} 
+                      onChange={e => setWordShowProporsi(e.target.checked)} 
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
+                    />
+                    <div>
+                      <div className="text-xs">% Total</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Proporsi thd total pos</div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${wordShowGrowth ? 'bg-sky-50/60 border-sky-300 text-sky-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={wordShowGrowth} 
+                      onChange={e => setWordShowGrowth(e.target.checked)} 
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
+                    />
+                    <div>
+                      <div className="text-xs">% Pertumbuhan</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Perubahan vs thn lalu</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 4. Opsi Tampilan Tambahan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Cakupan Baris Akun:
+                  </label>
+                  <select 
+                    value={wordLevelFilter} 
+                    onChange={e => setWordLevelFilter(e.target.value as 'all' | 'summary')}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                  >
+                    <option value="all">Semua Akun (Lengkap hingga Detail)</option>
+                    <option value="summary">Hanya Ringkasan (Akun Utama & Total)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Orientasi Kertas:
+                  </label>
+                  <select 
+                    value={wordOrientation} 
+                    onChange={e => setWordOrientation(e.target.value as 'landscape' | 'portrait')}
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                  >
+                    <option value="landscape">Landscape (Direkomendasikan untuk 3+ Tahun)</option>
+                    <option value="portrait">Portrait</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Pratinjau Struktur Kolom */}
+              <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl flex items-center justify-between text-[11px] text-blue-900 font-medium">
+                <span>Struktur Header: 1 Kolom Akun + {wordColumns.filter(c => c.enabled).length} Tahun × {[wordShowRupiah, wordShowProporsi, wordShowGrowth].filter(Boolean).length} Sub-kolom</span>
+                <span className="font-bold font-mono text-blue-800 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                  = {1 + (wordColumns.filter(c => c.enabled).length * [wordShowRupiah, wordShowProporsi, wordShowGrowth].filter(Boolean).length)} Kolom Word
+                </span>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 px-5 bg-gray-50 border-t border-gray-200 flex justify-end items-center gap-2.5 shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setIsWordModalOpen(false)} 
+                className="h-9 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={executeExportWord} 
+                className="h-9 px-5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Download size={14} />
+                <span>Download Dokumen Word (.docx)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
