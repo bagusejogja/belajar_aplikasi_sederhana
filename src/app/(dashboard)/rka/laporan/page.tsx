@@ -26,10 +26,13 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
+// Definisi Struktur Template Slide / PPT Proposal RKAT (3 Jenjang: 1. Subtotal Kelompok, 2. Pos / Subtotal Anaknya, 3. Rincian Data)
 export interface PptTemplateItem {
   id: string;
   label: string;
-  matchKeys: string[];
+  matchKeys?: string[];
+  is_sum?: boolean;
+  subItems?: PptTemplateItem[];
 }
 
 export interface PptTemplateSection {
@@ -43,7 +46,8 @@ export interface PptTemplateConfig {
   penerimaanSections: PptTemplateSection[];
   penerimaanLainnyaLabel: string;
   pengeluaranTitle: string;
-  pengeluaranItems: PptTemplateItem[];
+  pengeluaranSections: PptTemplateSection[];
+  pengeluaranItems?: PptTemplateItem[]; // backward compat
   pengeluaranLainnyaLabel: string;
 }
 
@@ -75,37 +79,55 @@ const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
   penerimaanSections: [
     {
       id: 'pendidikan',
-      title: 'Penerimaan Pendidikan',
+      title: 'I. Penerimaan Pendidikan',
       items: [
-        { id: 'pend_utama', label: 'Penerimaan Pendidikan Utama', matchKeys: ['pendidikan utama'] },
-        { id: 'pend_lainnya', label: 'Penerimaan Pendidikan Lainnya', matchKeys: ['pendidikan lainnya'] },
+        { id: 'pend_utama', label: 'Penerimaan Pendidikan Utama', matchKeys: ['pendidikan utama'], is_sum: false, subItems: [] },
+        { id: 'pend_lainnya', label: 'Penerimaan Pendidikan Lainnya', matchKeys: ['pendidikan lainnya'], is_sum: false, subItems: [] },
       ]
     },
     {
       id: 'non_pendidikan',
-      title: 'Penerimaan Non Pendidikan',
+      title: 'II. Penerimaan Non Pendidikan',
       items: [
-        { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'] },
-        { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'] },
-        { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'] },
-        { id: 'beasiswa_pemerintah', label: 'Beasiswa dan Kontrak Kerjasama Pemerintah', matchKeys: ['beasiswa'] },
-        { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'] },
-        { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'] },
+        { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'], is_sum: false, subItems: [] },
+        { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'], is_sum: false, subItems: [] },
+        { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'], is_sum: false, subItems: [] },
+        { id: 'beasiswa_pemerintah', label: 'Beasiswa dan Kontrak Kerjasama Pemerintah', matchKeys: ['beasiswa'], is_sum: false, subItems: [] },
+        { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'], is_sum: false, subItems: [] },
+        { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'], is_sum: false, subItems: [] },
       ]
     }
   ],
   penerimaanLainnyaLabel: 'Penerimaan Lainnya / Surplus TA Lalu',
   pengeluaranTitle: 'PENGELUARAN',
-  pengeluaranItems: [
-    { id: 'pegawai', label: 'Belanja Pegawai', matchKeys: ['pegawai'] },
-    { id: 'barang_jasa', label: 'Belanja Barang & Jasa', matchKeys: ['barang'] },
-    { id: 'pemeliharaan', label: 'Belanja Perbaikan dan Pemeliharaan', matchKeys: ['pemeliharaan', 'perbaikan'] },
-    { id: 'perjalanan', label: 'Belanja Perjalanan', matchKeys: ['perjalanan'] },
-    { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal'] },
-    { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'] },
-    { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK -ADB', matchKeys: ['techno', 'adb'] },
-    { id: 'puapt', label: 'Belanja PUAPT', matchKeys: ['puapt'] },
-    { id: 'equity', label: 'EQUITY', matchKeys: ['equity'] },
+  pengeluaranSections: [
+    {
+      id: 'belanja_operasional',
+      title: 'I. Belanja Operasional',
+      items: [
+        { id: 'pegawai', label: 'Belanja Pegawai', matchKeys: ['pegawai'], is_sum: false, subItems: [] },
+        { id: 'barang_jasa', label: 'Belanja Barang & Jasa', matchKeys: ['barang'], is_sum: false, subItems: [] },
+        { id: 'pemeliharaan', label: 'Belanja Perbaikan dan Pemeliharaan', matchKeys: ['pemeliharaan', 'perbaikan'], is_sum: false, subItems: [] },
+        { id: 'perjalanan', label: 'Belanja Perjalanan', matchKeys: ['perjalanan'], is_sum: false, subItems: [] },
+      ]
+    },
+    {
+      id: 'belanja_modal_investasi',
+      title: 'II. Belanja Modal / Investasi',
+      items: [
+        { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal'], is_sum: false, subItems: [] },
+        { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'], is_sum: false, subItems: [] },
+      ]
+    },
+    {
+      id: 'program_khusus',
+      title: 'III. Program Strategis & Khusus',
+      items: [
+        { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK - ADB', matchKeys: ['techno', 'adb'], is_sum: false, subItems: [] },
+        { id: 'puapt', label: 'Belanja PUAPT', matchKeys: ['puapt'], is_sum: false, subItems: [] },
+        { id: 'equity', label: 'EQUITY', matchKeys: ['equity'], is_sum: false, subItems: [] },
+      ]
+    }
   ],
   pengeluaranLainnyaLabel: 'Belanja Lainnya / Penunjang'
 };
@@ -1184,16 +1206,31 @@ export default function RkaLaporanPage() {
   const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'fakultas_alokasi' | 'pusdi' | 'upu' | 'kptu'>('fakultas');
   const [paguAwalList, setPaguAwalList] = useState<any[]>([]);
 
-  // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal)
+  // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal, mendukung 3 jenjang)
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('rka_ppt_template_config');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed && parsed.penerimaanSections && parsed.pengeluaranItems) {
-            if (!parsed.pengeluaranItems.some((i: any) => i.id === 'antar_unit')) {
-              parsed.pengeluaranItems.splice(5, 0, { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'] });
+          if (parsed && parsed.penerimaanSections) {
+            // Migrasi format lama: jika belum punya pengeluaranSections, bangun dari pengeluaranItems atau default
+            if (!parsed.pengeluaranSections || parsed.pengeluaranSections.length === 0) {
+              if (parsed.pengeluaranItems && parsed.pengeluaranItems.length > 0) {
+                parsed.pengeluaranSections = [
+                  {
+                    id: 'sec_belanja_migrated',
+                    title: 'I. Belanja Pengeluaran',
+                    items: parsed.pengeluaranItems.map((item: any) => ({
+                      ...item,
+                      is_sum: item.is_sum ?? false,
+                      subItems: item.subItems ?? []
+                    }))
+                  }
+                ];
+              } else {
+                parsed.pengeluaranSections = DEFAULT_PPT_TEMPLATE.pengeluaranSections;
+              }
             }
             return parsed;
           }
@@ -1496,17 +1533,52 @@ export default function RkaLaporanPage() {
         let itemTotal = 0;
         let itemCount = 0;
         let itemRows: any[] = [];
-        
-        Object.keys(pMap).forEach(k => {
-          if (usedPKeys.has(k)) return;
-          const isMatch = isPptKeyMatch(k, item.matchKeys || []);
-          if (isMatch) {
-            itemTotal += pMap[k].totalPagu;
-            itemCount += pMap[k].count;
-            itemRows.push(...pMap[k].rows);
-            usedPKeys.add(k);
-          }
-        });
+        let computedSubItems: any[] = [];
+
+        const isSumMode = Boolean(item.is_sum || (item.subItems && item.subItems.length > 0));
+
+        if (isSumMode && item.subItems && item.subItems.length > 0) {
+          computedSubItems = item.subItems.map(sub => {
+            let subTotal = 0;
+            let subCount = 0;
+            let subRows: any[] = [];
+
+            Object.keys(pMap).forEach(k => {
+              if (usedPKeys.has(k)) return;
+              const isMatch = isPptKeyMatch(k, sub.matchKeys || []);
+              if (isMatch) {
+                subTotal += pMap[k].totalPagu;
+                subCount += pMap[k].count;
+                subRows.push(...pMap[k].rows);
+                usedPKeys.add(k);
+              }
+            });
+
+            itemTotal += subTotal;
+            itemCount += subCount;
+            itemRows.push(...subRows);
+
+            return {
+              id: sub.id,
+              label: sub.label,
+              matchKeys: sub.matchKeys,
+              totalPagu: subTotal,
+              count: subCount,
+              rows: subRows
+            };
+          });
+        } else {
+          Object.keys(pMap).forEach(k => {
+            if (usedPKeys.has(k)) return;
+            const isMatch = isPptKeyMatch(k, item.matchKeys || []);
+            if (isMatch) {
+              itemTotal += pMap[k].totalPagu;
+              itemCount += pMap[k].count;
+              itemRows.push(...pMap[k].rows);
+              usedPKeys.add(k);
+            }
+          });
+        }
         
         secSubtotal += itemTotal;
         secCount += itemCount;
@@ -1514,6 +1586,8 @@ export default function RkaLaporanPage() {
           id: item.id,
           label: item.label,
           matchKeys: item.matchKeys,
+          is_sum: isSumMode,
+          subItems: computedSubItems,
           totalPagu: itemTotal,
           count: itemCount,
           rows: itemRows
@@ -1566,27 +1640,92 @@ export default function RkaLaporanPage() {
     });
 
     const usedBKeys = new Set<string>();
-    const computedPengeluaranItems = (pptTemplate.pengeluaranItems || []).map(item => {
-      let itemTotal = 0;
-      let itemCount = 0;
-      let itemRows: any[] = [];
-      Object.keys(bMap).forEach(k => {
-        if (usedBKeys.has(k)) return;
-        const isMatch = isPptKeyMatch(k, item.matchKeys || []);
-        if (isMatch) {
-          itemTotal += bMap[k].totalAnggaran;
-          itemCount += bMap[k].count;
-          itemRows.push(...bMap[k].rows);
-          usedBKeys.add(k);
+
+    const effectivePengeluaranSections = (pptTemplate.pengeluaranSections && pptTemplate.pengeluaranSections.length > 0)
+      ? pptTemplate.pengeluaranSections
+      : [
+          {
+            id: 'sec_pengeluaran_default',
+            title: 'I. Belanja Pengeluaran',
+            items: pptTemplate.pengeluaranItems || []
+          }
+        ];
+
+    const computedPengeluaranSections = effectivePengeluaranSections.map(sec => {
+      let secSubtotal = 0;
+      let secCount = 0;
+      const secItems = (sec.items || []).map(item => {
+        let itemTotal = 0;
+        let itemCount = 0;
+        let itemRows: any[] = [];
+        let computedSubItems: any[] = [];
+
+        const isSumMode = Boolean(item.is_sum || (item.subItems && item.subItems.length > 0));
+
+        if (isSumMode && item.subItems && item.subItems.length > 0) {
+          computedSubItems = item.subItems.map(sub => {
+            let subTotal = 0;
+            let subCount = 0;
+            let subRows: any[] = [];
+
+            Object.keys(bMap).forEach(k => {
+              if (usedBKeys.has(k)) return;
+              const isMatch = isPptKeyMatch(k, sub.matchKeys || []);
+              if (isMatch) {
+                subTotal += bMap[k].totalAnggaran;
+                subCount += bMap[k].count;
+                subRows.push(...bMap[k].rows);
+                usedBKeys.add(k);
+              }
+            });
+
+            itemTotal += subTotal;
+            itemCount += subCount;
+            itemRows.push(...subRows);
+
+            return {
+              id: sub.id,
+              label: sub.label,
+              matchKeys: sub.matchKeys,
+              totalAnggaran: subTotal,
+              count: subCount,
+              rows: subRows
+            };
+          });
+        } else {
+          Object.keys(bMap).forEach(k => {
+            if (usedBKeys.has(k)) return;
+            const isMatch = isPptKeyMatch(k, item.matchKeys || []);
+            if (isMatch) {
+              itemTotal += bMap[k].totalAnggaran;
+              itemCount += bMap[k].count;
+              itemRows.push(...bMap[k].rows);
+              usedBKeys.add(k);
+            }
+          });
         }
+
+        secSubtotal += itemTotal;
+        secCount += itemCount;
+
+        return {
+          id: item.id,
+          label: item.label,
+          matchKeys: item.matchKeys,
+          is_sum: isSumMode,
+          subItems: computedSubItems,
+          totalAnggaran: itemTotal,
+          count: itemCount,
+          rows: itemRows
+        };
       });
+
       return {
-        id: item.id,
-        label: item.label,
-        matchKeys: item.matchKeys,
-        totalAnggaran: itemTotal,
-        count: itemCount,
-        rows: itemRows
+        id: sec.id,
+        title: sec.title,
+        subtotal: secSubtotal,
+        count: secCount,
+        items: secItems
       };
     });
 
@@ -1602,8 +1741,9 @@ export default function RkaLaporanPage() {
       }
     });
 
-    const totalPengeluaran = computedPengeluaranItems.reduce((acc, it) => acc + it.totalAnggaran, 0) + bLainnyaTotal;
+    const totalPengeluaran = computedPengeluaranSections.reduce((acc, s) => acc + s.subtotal, 0) + bLainnyaTotal;
     const surplusDefisit = totalPenerimaan - totalPengeluaran;
+    const allPengeluaranItems = computedPengeluaranSections.flatMap(s => s.items);
 
     return {
       penerimaan: {
@@ -1619,7 +1759,8 @@ export default function RkaLaporanPage() {
       },
       pengeluaran: {
         title: pptTemplate.pengeluaranTitle || 'PENGELUARAN',
-        items: computedPengeluaranItems,
+        sections: computedPengeluaranSections,
+        items: allPengeluaranItems,
         lainnya: {
           label: pptTemplate.pengeluaranLainnyaLabel || 'Belanja Lainnya / Penunjang',
           totalAnggaran: bLainnyaTotal,
@@ -3691,7 +3832,15 @@ export default function RkaLaporanPage() {
       aoa.push([`  ${sec.title}`, sec.count, sec.subtotal, secPct]);
       sec.items.forEach(it => {
         const pct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((it.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
-        aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+        if (it.is_sum && it.subItems && it.subItems.length > 0) {
+          aoa.push([`    ${it.label} (Sub Total)`, it.count, it.totalPagu, pct]);
+          it.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.penerimaan.totalPenerimaan > 0 ? ((sub.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' : '0%';
+            aoa.push([`      ${sub.label}`, sub.count, sub.totalPagu, subPct]);
+          });
+        } else {
+          aoa.push([`    ${it.label}`, it.count, it.totalPagu, pct]);
+        }
       });
     });
 
@@ -3705,9 +3854,21 @@ export default function RkaLaporanPage() {
 
     // PENGELUARAN
     aoa.push([pptProposalData.pengeluaran.title || 'PENGELUARAN', '', '', '']);
-    pptProposalData.pengeluaran.items.forEach(it => {
-      const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((it.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
-      aoa.push([`  ${it.label}`, it.count, it.totalAnggaran, pct]);
+    (pptProposalData.pengeluaran.sections || []).forEach(sec => {
+      const secPct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((sec.subtotal / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+      aoa.push([`  ${sec.title}`, sec.count, sec.subtotal, secPct]);
+      sec.items.forEach(it => {
+        const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((it.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+        if (it.is_sum && it.subItems && it.subItems.length > 0) {
+          aoa.push([`    ${it.label} (Sub Total)`, it.count, it.totalAnggaran, pct]);
+          it.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((sub.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
+            aoa.push([`      ${sub.label}`, sub.count, sub.totalAnggaran, subPct]);
+          });
+        } else {
+          aoa.push([`    ${it.label}`, it.count, it.totalAnggaran, pct]);
+        }
+      });
     });
     if (pptProposalData.pengeluaran.lainnya.totalAnggaran > 0) {
       const pct = pptProposalData.pengeluaran.totalPengeluaran > 0 ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%' : '0%';
@@ -4282,42 +4443,141 @@ export default function RkaLaporanPage() {
                         </TableCell>
                       </TableRow>
 
-                      {/* Kelompok-Kelompok Penerimaan Dinamis */}
+                      {/* Kelompok-Kelompok Penerimaan Dinamis (Jenjang 1) */}
                       {pptProposalData.penerimaan.sections.map((sec) => (
                         <React.Fragment key={sec.id}>
-                          {/* Sub-Header Kelompok */}
-                          <TableRow className="bg-slate-50/80 font-bold border-b border-slate-100">
-                            <TableCell className="py-2 pl-8 font-bold text-xs text-slate-900">
-                              {sec.title}
+                          {/* Jenjang 1: Sub-Header Kelompok (Sub Total) */}
+                          <TableRow className="bg-slate-100/90 font-black border-y border-slate-200">
+                            <TableCell className="py-2.5 pl-8 font-black text-xs text-slate-900 flex items-center gap-2">
+                              <span>{sec.title}</span>
+                              <Badge variant="outline" className="text-[9px] bg-slate-50 text-slate-600 border-slate-300 font-bold px-1.5 py-0">
+                                Sub Total
+                              </Badge>
                             </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-700">
+                            <TableCell className="py-2.5 text-center text-xs font-mono font-bold text-slate-700">
                               {sec.count.toLocaleString('id-ID')} Akun
                             </TableCell>
-                            <TableCell className="py-2 text-right font-black font-mono text-xs text-slate-900 pr-4">
+                            <TableCell className="py-2.5 text-right font-black font-mono text-xs text-slate-950 pr-4">
                               Rp {formatRp(sec.subtotal)}
                             </TableCell>
-                            <TableCell className="py-2 text-center text-xs font-mono font-bold text-slate-600">
+                            <TableCell className="py-2.5 text-center text-xs font-mono font-bold text-slate-700">
                               {pptProposalData.penerimaan.totalPenerimaan > 0 
                                 ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
                                 : '0%'}
                             </TableCell>
-                            <TableCell className="py-2 text-center text-gray-300">-</TableCell>
+                            <TableCell className="py-2.5 text-center text-gray-400">-</TableCell>
                           </TableRow>
 
-                          {/* Rincian Pos-Pos dalam Kelompok (Bisa di-Expand Langsung) */}
+                          {/* Jenjang 2: Pos-Pos dalam Kelompok */}
                           {sec.items.map((item, idx) => {
                             const itemKey = item.id || item.label || `sec_item_${idx}`;
                             const isExpanded = expandedPptPenerimaanSet.has(itemKey);
                             const pct = pptProposalData.penerimaan.totalPenerimaan > 0
                               ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
                               : '0';
+
+                            // Kasus 2A: Pos adalah Sub Total dari Anaknya (is_sum true dengan subItems)
+                            if (item.is_sum && item.subItems && item.subItems.length > 0) {
+                              return (
+                                <React.Fragment key={itemKey}>
+                                  {/* Baris Jenjang 2: Sub Total Pos Induk */}
+                                  <TableRow className="border-b border-slate-200 bg-slate-50/60 font-bold">
+                                    <TableCell className="py-2 pl-12 text-xs font-bold text-slate-900 flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                      <span>{item.label}</span>
+                                      <Badge variant="outline" className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-200 font-bold px-1.5 py-0">
+                                        Sub Total Pos ({item.subItems.length} Sub)
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-xs font-mono text-slate-600 font-semibold">
+                                      {item.count.toLocaleString('id-ID')} Akun
+                                    </TableCell>
+                                    <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-900 pr-4">
+                                      Rp {formatRp(item.totalPagu)}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-xs font-mono font-semibold text-slate-600">
+                                      {pct}%
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-gray-300">-</TableCell>
+                                  </TableRow>
+
+                                  {/* Baris-baris Anak dari Jenjang 2 -> Membuka Jenjang 3 (Data) */}
+                                  {item.subItems.map((sub: any, sIdx: number) => {
+                                    const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+                                    const isSubExpanded = expandedPptPenerimaanSet.has(subKey);
+                                    const subPct = pptProposalData.penerimaan.totalPenerimaan > 0
+                                      ? ((sub.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1)
+                                      : '0';
+                                    return (
+                                      <React.Fragment key={subKey}>
+                                        <TableRow
+                                          onClick={() => togglePptPenerimaan(subKey)}
+                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isSubExpanded ? 'bg-blue-50/50' : ''}`}
+                                        >
+                                          <TableCell className="py-2 pl-18 text-xs font-medium text-slate-700 flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => { e.stopPropagation(); togglePptPenerimaan(subKey); }}
+                                              className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                            >
+                                              {isSubExpanded ? <Minus size={10} /> : <Plus size={10} />}
+                                            </button>
+                                            <span className="text-slate-800 font-medium">{sub.label}</span>
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                            {sub.count.toLocaleString('id-ID')} Akun
+                                          </TableCell>
+                                          <TableCell className="py-2 text-right font-mono font-semibold text-xs text-slate-800 pr-4">
+                                            Rp {formatRp(sub.totalPagu)}
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                            {subPct}%
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => togglePptPenerimaan(subKey)}
+                                              className={`h-7 px-2 rounded-lg border text-xs font-bold gap-1 transition-all shadow-2xs cursor-pointer ${
+                                                isSubExpanded 
+                                                  ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                                                  : 'border-slate-200 hover:bg-blue-50 text-slate-700 hover:text-blue-700'
+                                              }`}
+                                              title={isSubExpanded ? `Tutup rincian ${sub.label}` : `Buka rincian ${sub.label}`}
+                                            >
+                                              {isSubExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                              <span className="text-[10px] hidden sm:inline">{isSubExpanded ? 'Tutup' : 'Rincian'}</span>
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+
+                                        {/* Jenjang 3: Inline Hierarchical Table Rincian Data Penerimaan */}
+                                        {isSubExpanded && (
+                                          <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                            <TableCell colSpan={5} className="p-2 sm:p-4">
+                                              <HierarchicalInlineTable
+                                                rows={sub.rows}
+                                                type="penerimaan"
+                                                formatRp={formatRp}
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            }
+
+                            // Kasus 2B: Pos Berdiri Sendiri (Jumlah Jenjang Itu Sendiri) -> Langsung Membuka Jenjang 3 (Data)
                             return (
                               <React.Fragment key={itemKey}>
                                 <TableRow 
                                   onClick={() => togglePptPenerimaan(itemKey)}
                                   className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-blue-50/50' : ''}`}
                                 >
-                                  <TableCell className="py-2 pl-14 text-xs font-medium text-slate-700 flex items-center gap-2">
+                                  <TableCell className="py-2 pl-12 text-xs font-medium text-slate-700 flex items-center gap-2">
                                     <button 
                                       type="button" 
                                       onClick={(e) => { e.stopPropagation(); togglePptPenerimaan(itemKey); }}
@@ -4354,7 +4614,7 @@ export default function RkaLaporanPage() {
                                   </TableCell>
                                 </TableRow>
 
-                                {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
+                                {/* Jenjang 3: INLINE HIERARCHICAL TABLE DATA */}
                                 {isExpanded && (
                                   <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
                                     <TableCell colSpan={5} className="p-2 sm:p-4">
@@ -4463,71 +4723,194 @@ export default function RkaLaporanPage() {
                         </TableCell>
                       </TableRow>
 
-                      {/* Baris Rincian Belanja Sesuai Konfigurasi Template (Bisa di-Expand Langsung) */}
-                      {pptProposalData.pengeluaran.items.map((item, idx) => {
-                        const itemKey = item.id || item.label || `b_item_${idx}`;
-                        const isExpanded = expandedPptPengeluaranSet.has(itemKey);
-                        const pct = pptProposalData.pengeluaran.totalPengeluaran > 0
-                          ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
-                          : '0';
-                        return (
-                          <React.Fragment key={itemKey}>
-                            <TableRow 
-                              onClick={() => togglePptPengeluaran(itemKey)}
-                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-indigo-50/50' : ''}`}
-                            >
-                              <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
-                                <button 
-                                  type="button" 
-                                  onClick={(e) => { e.stopPropagation(); togglePptPengeluaran(itemKey); }}
-                                  className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
-                                >
-                                  {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
-                                </button>
-                                <span>{item.label}</span>
-                              </TableCell>
-                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                                {item.count.toLocaleString('id-ID')} Baris
-                              </TableCell>
-                              <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
-                                Rp {formatRp(item.totalAnggaran)}
-                              </TableCell>
-                              <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
-                                {pct}%
-                              </TableCell>
-                              <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => togglePptPengeluaran(itemKey)}
-                                  className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
-                                    isExpanded 
-                                      ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700' 
-                                      : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
-                                  }`}
-                                  title={isExpanded ? `Tutup rincian ${item.label}` : `Buka rincian ${item.label}`}
-                                >
-                                  {isExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
-                                  <span className="text-[10px] hidden sm:inline">{isExpanded ? 'Tutup' : 'Rincian'}</span>
-                                </Button>
-                              </TableCell>
-                            </TableRow>
+                      {/* Kelompok-Kelompok Pengeluaran Dinamis (Jenjang 1) */}
+                      {(pptProposalData.pengeluaran.sections || []).map((sec) => (
+                        <React.Fragment key={sec.id}>
+                          {/* Jenjang 1: Sub-Header Kelompok (Sub Total) */}
+                          <TableRow className="bg-slate-100/90 font-black border-y border-slate-200">
+                            <TableCell className="py-2.5 pl-8 font-black text-xs text-slate-900 flex items-center gap-2">
+                              <span>{sec.title}</span>
+                              <Badge variant="outline" className="text-[9px] bg-slate-50 text-slate-600 border-slate-300 font-bold px-1.5 py-0">
+                                Sub Total
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-2.5 text-center text-xs font-mono font-bold text-slate-700">
+                              {sec.count.toLocaleString('id-ID')} Baris
+                            </TableCell>
+                            <TableCell className="py-2.5 text-right font-black font-mono text-xs text-slate-950 pr-4">
+                              Rp {formatRp(sec.subtotal)}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-center text-xs font-mono font-bold text-slate-700">
+                              {pptProposalData.pengeluaran.totalPengeluaran > 0
+                                ? ((sec.subtotal / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+                                : '0%'}
+                            </TableCell>
+                            <TableCell className="py-2.5 text-center text-gray-400">-</TableCell>
+                          </TableRow>
 
-                            {/* INLINE HIERARCHICAL TABLE COLLAPSE */}
-                            {isExpanded && (
-                              <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
-                                <TableCell colSpan={5} className="p-2 sm:p-4">
-                                  <HierarchicalInlineTable
-                                    rows={item.rows}
-                                    type="belanja"
-                                    formatRp={formatRp}
-                                  />
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
+                          {/* Jenjang 2: Pos-Pos Belanja dalam Kelompok */}
+                          {sec.items.map((item, idx) => {
+                            const itemKey = item.id || item.label || `sec_b_${idx}`;
+                            const isExpanded = expandedPptPengeluaranSet.has(itemKey);
+                            const pct = pptProposalData.pengeluaran.totalPengeluaran > 0
+                              ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
+                              : '0';
+
+                            // Kasus 2A: Pos adalah Sub Total dari Anaknya
+                            if (item.is_sum && item.subItems && item.subItems.length > 0) {
+                              return (
+                                <React.Fragment key={itemKey}>
+                                  {/* Baris Jenjang 2: Sub Total Pos Induk */}
+                                  <TableRow className="border-b border-slate-200 bg-slate-50/60 font-bold">
+                                    <TableCell className="py-2 pl-12 text-xs font-bold text-slate-900 flex items-center gap-2">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                      <span>{item.label}</span>
+                                      <Badge variant="outline" className="text-[9px] bg-indigo-50 text-indigo-700 border-indigo-200 font-bold px-1.5 py-0">
+                                        Sub Total Pos ({item.subItems.length} Sub)
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-xs font-mono text-slate-600 font-semibold">
+                                      {item.count.toLocaleString('id-ID')} Baris
+                                    </TableCell>
+                                    <TableCell className="py-2 text-right font-mono font-bold text-xs text-slate-950 pr-4">
+                                      Rp {formatRp(item.totalAnggaran)}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-xs font-mono font-semibold text-slate-600">
+                                      {pct}%
+                                    </TableCell>
+                                    <TableCell className="py-2 text-center text-gray-300">-</TableCell>
+                                  </TableRow>
+
+                                  {/* Baris-baris Anak dari Jenjang 2 -> Membuka Jenjang 3 (Data) */}
+                                  {item.subItems.map((sub: any, sIdx: number) => {
+                                    const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+                                    const isSubExpanded = expandedPptPengeluaranSet.has(subKey);
+                                    const subPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+                                      ? ((sub.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1)
+                                      : '0';
+                                    return (
+                                      <React.Fragment key={subKey}>
+                                        <TableRow
+                                          onClick={() => togglePptPengeluaran(subKey)}
+                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isSubExpanded ? 'bg-indigo-50/50' : ''}`}
+                                        >
+                                          <TableCell className="py-2 pl-18 text-xs font-medium text-slate-700 flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => { e.stopPropagation(); togglePptPengeluaran(subKey); }}
+                                              className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                            >
+                                              {isSubExpanded ? <Minus size={10} /> : <Plus size={10} />}
+                                            </button>
+                                            <span className="text-slate-800 font-medium">{sub.label}</span>
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                            {sub.count.toLocaleString('id-ID')} Baris
+                                          </TableCell>
+                                          <TableCell className="py-2 text-right font-mono font-semibold text-xs text-slate-800 pr-4">
+                                            Rp {formatRp(sub.totalAnggaran)}
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                            {subPct}%
+                                          </TableCell>
+                                          <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => togglePptPengeluaran(subKey)}
+                                              className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
+                                                isSubExpanded
+                                                  ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                                  : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
+                                              }`}
+                                              title={isSubExpanded ? `Tutup rincian ${sub.label}` : `Buka rincian ${sub.label}`}
+                                            >
+                                              {isSubExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                              <span className="text-[10px] hidden sm:inline">{isSubExpanded ? 'Tutup' : 'Rincian'}</span>
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+
+                                        {/* Jenjang 3: INLINE HIERARCHICAL TABLE DATA */}
+                                        {isSubExpanded && (
+                                          <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                            <TableCell colSpan={5} className="p-2 sm:p-4">
+                                              <HierarchicalInlineTable
+                                                rows={sub.rows}
+                                                type="belanja"
+                                                formatRp={formatRp}
+                                              />
+                                            </TableCell>
+                                          </TableRow>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            }
+
+                            // Kasus 2B: Pos Berdiri Sendiri (Jumlah Jenjang Itu Sendiri)
+                            return (
+                              <React.Fragment key={itemKey}>
+                                <TableRow
+                                  onClick={() => togglePptPengeluaran(itemKey)}
+                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-indigo-50/50' : ''}`}
+                                >
+                                  <TableCell className="py-2 pl-12 text-xs font-bold text-slate-800 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); togglePptPengeluaran(itemKey); }}
+                                      className="w-4 h-4 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0 cursor-pointer shadow-2xs"
+                                    >
+                                      {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
+                                    </button>
+                                    <span>{item.label}</span>
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                    {item.count.toLocaleString('id-ID')} Baris
+                                  </TableCell>
+                                  <TableCell className="py-2 text-right font-mono font-black text-xs text-slate-950 pr-4">
+                                    Rp {formatRp(item.totalAnggaran)}
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
+                                    {pct}%
+                                  </TableCell>
+                                  <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => togglePptPengeluaran(itemKey)}
+                                      className={`h-7 px-2 text-xs font-bold rounded-lg border gap-1 transition-all shadow-2xs cursor-pointer ${
+                                        isExpanded
+                                          ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                                          : 'border-slate-200 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700'
+                                      }`}
+                                      title={isExpanded ? `Tutup rincian ${item.label}` : `Buka rincian ${item.label}`}
+                                    >
+                                      {isExpanded ? <EyeOff size={13} /> : <Eye size={13} />}
+                                      <span className="text-[10px] hidden sm:inline">{isExpanded ? 'Tutup' : 'Rincian'}</span>
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* Jenjang 3: INLINE HIERARCHICAL TABLE DATA */}
+                                {isExpanded && (
+                                  <TableRow className="bg-slate-50/70 border-b border-slate-200 p-0">
+                                    <TableCell colSpan={5} className="p-2 sm:p-4">
+                                      <HierarchicalInlineTable
+                                        rows={item.rows}
+                                        type="belanja"
+                                        formatRp={formatRp}
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
 
                       {/* Belanja Lainnya jika ada */}
                       {pptProposalData.pengeluaran.lainnya.totalAnggaran > 0 && (() => {
@@ -6354,7 +6737,7 @@ export default function RkaLaporanPage() {
               >
                 <span>📥 Bagian Penerimaan</span>
                 <Badge variant="outline" className="text-[10px] bg-white border-slate-200">
-                  {tempTemplate.penerimaanSections?.reduce((acc, s) => acc + (s.items?.length || 0), 0) || 0} Pos
+                  {tempTemplate.penerimaanSections?.length || 0} Kelompok
                 </Badge>
               </button>
               <button
@@ -6368,377 +6751,528 @@ export default function RkaLaporanPage() {
               >
                 <span>📤 Bagian Pengeluaran / Belanja</span>
                 <Badge variant="outline" className="text-[10px] bg-white border-slate-200">
-                  {tempTemplate.pengeluaranItems?.length || 0} Pos
+                  {(tempTemplate.pengeluaranSections || []).length} Kelompok
                 </Badge>
               </button>
             </div>
 
             {/* Modal Body */}
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
-              {activeTemplateTab === 'penerimaan' ? (
-                /* TAB 1: PENERIMAAN */
-                <div className="space-y-5">
-                  {/* Judul Utama Penerimaan */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Judul Header Penerimaan:
-                    </label>
-                    <Input
-                      type="text"
-                      value={tempTemplate.penerimaanTitle}
-                      onChange={(e) => setTempTemplate({ ...tempTemplate, penerimaanTitle: e.target.value })}
-                      className="h-9 text-xs font-bold bg-white"
-                      placeholder="Contoh: Jumlah Penerimaan Dana Masyarakat"
-                    />
-                  </div>
+              {/* Header Title Editor */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Judul Header {activeTemplateTab === 'penerimaan' ? 'Penerimaan' : 'Pengeluaran'}:
+                </label>
+                <Input
+                  type="text"
+                  value={activeTemplateTab === 'penerimaan' ? tempTemplate.penerimaanTitle : tempTemplate.pengeluaranTitle}
+                  onChange={(e) => {
+                    if (activeTemplateTab === 'penerimaan') {
+                      setTempTemplate({ ...tempTemplate, penerimaanTitle: e.target.value });
+                    } else {
+                      setTempTemplate({ ...tempTemplate, pengeluaranTitle: e.target.value });
+                    }
+                  }}
+                  className="h-9 text-xs font-bold bg-white"
+                  placeholder={activeTemplateTab === 'penerimaan' ? "Contoh: Jumlah Penerimaan Dana Masyarakat" : "Contoh: PENGELUARAN"}
+                />
+              </div>
 
-                  {/* Kelompok-Kelompok Penerimaan */}
-                  <div className="space-y-4">
-                    {tempTemplate.penerimaanSections.map((sec, secIdx) => (
-                      <div key={sec.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-3">
-                        <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-                          <div className="flex-1">
-                            <span className="text-[10px] font-extrabold uppercase text-indigo-600 tracking-wider block">
-                              Kelompok {secIdx + 1}
-                            </span>
-                            <Input
-                              type="text"
-                              value={sec.title}
-                              onChange={(e) => {
-                                const copy = { ...tempTemplate };
-                                copy.penerimaanSections[secIdx].title = e.target.value;
-                                setTempTemplate(copy);
-                              }}
-                              className="h-8 text-xs font-black bg-white mt-1"
-                              placeholder="Nama Kelompok (contoh: Penerimaan Pendidikan)"
-                            />
-                          </div>
-                          <div className="flex items-center gap-1 self-end mb-0.5">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={secIdx === 0}
-                              onClick={() => {
-                                const copy = { ...tempTemplate };
-                                const temp = copy.penerimaanSections[secIdx - 1];
-                                copy.penerimaanSections[secIdx - 1] = copy.penerimaanSections[secIdx];
-                                copy.penerimaanSections[secIdx] = temp;
-                                setTempTemplate(copy);
-                              }}
-                              className="h-7 w-7 p-0 rounded-lg"
-                              title="Pindahkan Kelompok ke Atas"
-                            >
-                              <ArrowUp size={12} />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={secIdx === tempTemplate.penerimaanSections.length - 1}
-                              onClick={() => {
-                                const copy = { ...tempTemplate };
-                                const temp = copy.penerimaanSections[secIdx + 1];
-                                copy.penerimaanSections[secIdx + 1] = copy.penerimaanSections[secIdx];
-                                copy.penerimaanSections[secIdx] = temp;
-                                setTempTemplate(copy);
-                              }}
-                              className="h-7 w-7 p-0 rounded-lg"
-                              title="Pindahkan Kelompok ke Bawah"
-                            >
-                              <ArrowDown size={12} />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const copy = { ...tempTemplate };
-                                copy.penerimaanSections.splice(secIdx, 1);
-                                setTempTemplate(copy);
-                              }}
-                              className="h-7 w-7 p-0 rounded-lg text-rose-600 hover:bg-rose-50"
-                              title="Hapus Kelompok"
-                            >
-                              <Trash2 size={12} />
-                            </Button>
-                          </div>
+              {/* Kelompok-Kelompok 3-Jenjang (Sections) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Susunan Struktur Berjenjang 3 Tingkat ({activeTemplateTab === 'penerimaan' ? 'Penerimaan' : 'Belanja'}):
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Jenjang 1: Kelompok (Sub Total) ➔ Jenjang 2: Pos ➔ Jenjang 3: Data Rincian
+                  </span>
+                </div>
+
+                {((activeTemplateTab === 'penerimaan' ? tempTemplate.penerimaanSections : tempTemplate.pengeluaranSections) || []).map((sec, secIdx, arr) => (
+                  <div key={sec.id || `sec_${secIdx}`} className="p-4 rounded-2xl border-2 border-indigo-100 bg-slate-50/70 space-y-3 shadow-xs">
+                    {/* Jenjang 1: Sub Total Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3 bg-white p-3 rounded-xl border">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className="bg-indigo-600 text-white font-bold text-[10px] px-2 py-0.5">
+                            Jenjang 1 (Sub Total)
+                          </Badge>
+                          <span className="text-xs font-bold text-slate-700">Kelompok {secIdx + 1}</span>
                         </div>
-
-                        {/* List of Items inside Section */}
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                            Daftar Baris Pos Penerimaan:
-                          </span>
-                          {sec.items.map((item, itemIdx) => (
-                            <div key={item.id} className="p-2.5 bg-white rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <div>
-                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
-                                    Label Tampilan di Slide:
-                                  </label>
-                                  <Input
-                                    type="text"
-                                    value={item.label}
-                                    onChange={(e) => {
-                                      const copy = { ...tempTemplate };
-                                      copy.penerimaanSections[secIdx].items[itemIdx].label = e.target.value;
-                                      setTempTemplate(copy);
-                                    }}
-                                    className="h-7 text-xs font-semibold"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
-                                    Kata Kunci Klasifikasi:
-                                  </label>
-                                  <Input
-                                    type="text"
-                                    value={item.matchKeys.join(', ')}
-                                    onChange={(e) => {
-                                      const copy = { ...tempTemplate };
-                                      copy.penerimaanSections[secIdx].items[itemIdx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
-                                      setTempTemplate(copy);
-                                    }}
-                                    placeholder="pisah dengan koma, misal: pendidikan utama"
-                                    className="h-7 text-xs font-mono"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 self-end sm:self-center">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={itemIdx === 0}
-                                  onClick={() => {
-                                    const copy = { ...tempTemplate };
-                                    const items = copy.penerimaanSections[secIdx].items;
-                                    const temp = items[itemIdx - 1];
-                                    items[itemIdx - 1] = items[itemIdx];
-                                    items[itemIdx] = temp;
-                                    setTempTemplate(copy);
-                                  }}
-                                  className="h-6 w-6 p-0 rounded-md"
-                                >
-                                  <ArrowUp size={11} />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={itemIdx === sec.items.length - 1}
-                                  onClick={() => {
-                                    const copy = { ...tempTemplate };
-                                    const items = copy.penerimaanSections[secIdx].items;
-                                    const temp = items[itemIdx + 1];
-                                    items[itemIdx + 1] = items[itemIdx];
-                                    items[itemIdx] = temp;
-                                    setTempTemplate(copy);
-                                  }}
-                                  className="h-6 w-6 p-0 rounded-md"
-                                >
-                                  <ArrowDown size={11} />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    const copy = { ...tempTemplate };
-                                    copy.penerimaanSections[secIdx].items.splice(itemIdx, 1);
-                                    setTempTemplate(copy);
-                                  }}
-                                  className="h-6 w-6 p-0 rounded-md text-rose-500 hover:text-rose-700"
-                                >
-                                  <Trash2 size={11} />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const copy = { ...tempTemplate };
-                              copy.penerimaanSections[secIdx].items.push({
-                                id: 'item_' + Date.now(),
-                                label: 'Pos Penerimaan Baru',
-                                matchKeys: ['kata kunci']
-                              });
-                              setTempTemplate(copy);
-                            }}
-                            className="h-7 text-xs font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-indigo-50 w-full gap-1"
-                          >
-                            <Plus size={12} />
-                            <span>Tambah Pos di {sec.title || 'Kelompok Ini'}</span>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        const copy = { ...tempTemplate };
-                        copy.penerimaanSections.push({
-                          id: 'sec_' + Date.now(),
-                          title: 'Kelompok Penerimaan Baru',
-                          items: [
-                            {
-                              id: 'item_' + Date.now(),
-                              label: 'Pos Baru',
-                              matchKeys: ['kata kunci']
+                        <Input
+                          type="text"
+                          value={sec.title}
+                          onChange={(e) => {
+                            const copy = JSON.parse(JSON.stringify(tempTemplate));
+                            const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                            targetSections[secIdx].title = e.target.value;
+                            if (activeTemplateTab === 'pengeluaran') {
+                              copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
                             }
-                          ]
-                        });
-                        setTempTemplate(copy);
-                      }}
-                      className="h-8 text-xs font-bold text-indigo-800 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/50 w-full gap-1.5"
-                    >
-                      <Plus size={13} />
-                      <span>Tambah Kelompok Penerimaan Baru</span>
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                /* TAB 2: PENGELUARAN / BELANJA */
-                <div className="space-y-5">
-                  {/* Judul Utama Pengeluaran */}
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Judul Header Pengeluaran:
-                    </label>
-                    <Input
-                      type="text"
-                      value={tempTemplate.pengeluaranTitle}
-                      onChange={(e) => setTempTemplate({ ...tempTemplate, pengeluaranTitle: e.target.value })}
-                      className="h-9 text-xs font-bold bg-white"
-                      placeholder="Contoh: PENGELUARAN"
-                    />
-                  </div>
+                            setTempTemplate(copy);
+                          }}
+                          className="h-8 text-xs font-black bg-white"
+                          placeholder="Nama Kelompok (contoh: I. Belanja Operasional)"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={secIdx === 0}
+                          onClick={() => {
+                            const copy = JSON.parse(JSON.stringify(tempTemplate));
+                            const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                            const temp = targetSections[secIdx - 1];
+                            targetSections[secIdx - 1] = targetSections[secIdx];
+                            targetSections[secIdx] = temp;
+                            if (activeTemplateTab === 'pengeluaran') {
+                              copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                            }
+                            setTempTemplate(copy);
+                          }}
+                          className="h-7 w-7 p-0 rounded-lg"
+                          title="Pindahkan Kelompok ke Atas"
+                        >
+                          <ArrowUp size={12} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={secIdx === arr.length - 1}
+                          onClick={() => {
+                            const copy = JSON.parse(JSON.stringify(tempTemplate));
+                            const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                            const temp = targetSections[secIdx + 1];
+                            targetSections[secIdx + 1] = targetSections[secIdx];
+                            targetSections[secIdx] = temp;
+                            if (activeTemplateTab === 'pengeluaran') {
+                              copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                            }
+                            setTempTemplate(copy);
+                          }}
+                          className="h-7 w-7 p-0 rounded-lg"
+                          title="Pindahkan Kelompok ke Bawah"
+                        >
+                          <ArrowDown size={12} />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const copy = JSON.parse(JSON.stringify(tempTemplate));
+                            const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                            targetSections.splice(secIdx, 1);
+                            if (activeTemplateTab === 'pengeluaran') {
+                              copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                            }
+                            setTempTemplate(copy);
+                          }}
+                          className="h-7 w-7 p-0 rounded-lg text-rose-600 hover:bg-rose-50 border-rose-200"
+                          title="Hapus Kelompok"
+                        >
+                          <Trash2 size={12} />
+                        </Button>
+                      </div>
+                    </div>
 
-                  {/* List of Pengeluaran Items */}
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      Urutan Pos Belanja Pengeluaran:
-                    </span>
-                    {tempTemplate.pengeluaranItems.map((item, idx) => (
-                      <div key={item.id} className="p-3 bg-white rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-                        <div className="flex items-center gap-2 flex-1">
-                          <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
-                                Label Tampilan di Slide:
-                              </label>
-                              <Input
-                                type="text"
-                                value={item.label}
-                                onChange={(e) => {
-                                  const copy = { ...tempTemplate };
-                                  copy.pengeluaranItems[idx].label = e.target.value;
-                                  setTempTemplate(copy);
-                                }}
-                                className="h-7 text-xs font-semibold"
-                              />
+                    {/* Jenjang 2: List of Items inside Section */}
+                    <div className="space-y-3 pl-2 sm:pl-4 border-l-2 border-indigo-200 ml-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+                          Daftar Pos (Jenjang 2) di {sec.title || 'Kelompok Ini'}:
+                        </span>
+                      </div>
+
+                      {(sec.items || []).map((item, itemIdx, itemArr) => (
+                        <div key={item.id || `it_${itemIdx}`} className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-2">
+                              {/* Label Pos */}
+                              <div className="sm:col-span-6">
+                                <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
+                                  Label Pos Tampilan di Slide:
+                                </label>
+                                <Input
+                                  type="text"
+                                  value={item.label}
+                                  onChange={(e) => {
+                                    const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                    const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                    targetSections[secIdx].items[itemIdx].label = e.target.value;
+                                    if (activeTemplateTab === 'pengeluaran') {
+                                      copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                    }
+                                    setTempTemplate(copy);
+                                  }}
+                                  className="h-7 text-xs font-bold"
+                                  placeholder="Nama Pos"
+                                />
+                              </div>
+
+                              {/* Tipe Pos (Jumlah Sendiri vs Sub Total Anaknya) */}
+                              <div className="sm:col-span-6">
+                                <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
+                                  Tipe Pos Jenjang 2:
+                                </label>
+                                <div className="flex items-center gap-1.5 h-7">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                      const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                      const cur = targetSections[secIdx].items[itemIdx];
+                                      cur.is_sum = false;
+                                      if (activeTemplateTab === 'pengeluaran') {
+                                        copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                      }
+                                      setTempTemplate(copy);
+                                    }}
+                                    className={`px-2 py-1 rounded text-[11px] font-bold border transition-all cursor-pointer ${
+                                      !item.is_sum
+                                        ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-2xs'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
+                                    }`}
+                                  >
+                                    🔘 Jumlah Pos Sendiri
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                      const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                      const cur = targetSections[secIdx].items[itemIdx];
+                                      cur.is_sum = true;
+                                      if (!cur.subItems || cur.subItems.length === 0) {
+                                        cur.subItems = [
+                                          {
+                                            id: 'sub_' + Date.now(),
+                                            label: cur.label + ' - Sub 1',
+                                            matchKeys: cur.matchKeys && cur.matchKeys.length > 0 ? [...cur.matchKeys] : ['kata kunci']
+                                          }
+                                        ];
+                                      }
+                                      if (activeTemplateTab === 'pengeluaran') {
+                                        copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                      }
+                                      setTempTemplate(copy);
+                                    }}
+                                    className={`px-2 py-1 rounded text-[11px] font-bold border transition-all cursor-pointer ${
+                                      item.is_sum
+                                        ? 'bg-indigo-50 border-indigo-400 text-indigo-700 shadow-2xs'
+                                        : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
+                                    }`}
+                                  >
+                                    📁 Sub Total Anaknya ({item.subItems?.length || 0})
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
-                                Kata Kunci Klasifikasi:
-                              </label>
-                              <Input
-                                type="text"
-                                value={item.matchKeys.join(', ')}
-                                onChange={(e) => {
-                                  const copy = { ...tempTemplate };
-                                  copy.pengeluaranItems[idx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+
+                            {/* Control Up / Down / Delete Item */}
+                            <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={itemIdx === 0}
+                                onClick={() => {
+                                  const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                  const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                  const items = targetSections[secIdx].items;
+                                  const temp = items[itemIdx - 1];
+                                  items[itemIdx - 1] = items[itemIdx];
+                                  items[itemIdx] = temp;
+                                  if (activeTemplateTab === 'pengeluaran') {
+                                    copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                  }
                                   setTempTemplate(copy);
                                 }}
-                                placeholder="misal: pegawai, atau: techno, adb"
-                                className="h-7 text-xs font-mono"
-                              />
+                                className="h-6 w-6 p-0 rounded-md"
+                              >
+                                <ArrowUp size={11} />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={itemIdx === itemArr.length - 1}
+                                onClick={() => {
+                                  const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                  const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                  const items = targetSections[secIdx].items;
+                                  const temp = items[itemIdx + 1];
+                                  items[itemIdx + 1] = items[itemIdx];
+                                  items[itemIdx] = temp;
+                                  if (activeTemplateTab === 'pengeluaran') {
+                                    copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                  }
+                                  setTempTemplate(copy);
+                                }}
+                                className="h-6 w-6 p-0 rounded-md"
+                              >
+                                <ArrowDown size={11} />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                  const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                  targetSections[secIdx].items.splice(itemIdx, 1);
+                                  if (activeTemplateTab === 'pengeluaran') {
+                                    copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                  }
+                                  setTempTemplate(copy);
+                                }}
+                                className="h-6 w-6 p-0 rounded-md text-rose-500 hover:text-rose-700 hover:bg-rose-50"
+                              >
+                                <Trash2 size={11} />
+                              </Button>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1 self-end sm:self-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={idx === 0}
-                            onClick={() => {
-                              const copy = { ...tempTemplate };
-                              const temp = copy.pengeluaranItems[idx - 1];
-                              copy.pengeluaranItems[idx - 1] = copy.pengeluaranItems[idx];
-                              copy.pengeluaranItems[idx] = temp;
-                              setTempTemplate(copy);
-                            }}
-                            className="h-7 w-7 p-0 rounded-lg"
-                            title="Naikkan Urutan"
-                          >
-                            <ArrowUp size={12} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={idx === tempTemplate.pengeluaranItems.length - 1}
-                            onClick={() => {
-                              const copy = { ...tempTemplate };
-                              const temp = copy.pengeluaranItems[idx + 1];
-                              copy.pengeluaranItems[idx + 1] = copy.pengeluaranItems[idx];
-                              copy.pengeluaranItems[idx] = temp;
-                              setTempTemplate(copy);
-                            }}
-                            className="h-7 w-7 p-0 rounded-lg"
-                            title="Turunkan Urutan"
-                          >
-                            <ArrowDown size={12} />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const copy = { ...tempTemplate };
-                              copy.pengeluaranItems.splice(idx, 1);
-                              setTempTemplate(copy);
-                            }}
-                            className="h-7 w-7 p-0 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                            title="Hapus Pos"
-                          >
-                            <Trash2 size={12} />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        const copy = { ...tempTemplate };
-                        copy.pengeluaranItems.push({
-                          id: 'b_' + Date.now(),
-                          label: 'Pos Belanja Baru',
-                          matchKeys: ['kata kunci']
-                        });
-                        setTempTemplate(copy);
-                      }}
-                      className="h-8 text-xs font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-indigo-50 w-full gap-1.5"
-                    >
-                      <Plus size={13} />
-                      <span>Tambah Pos Belanja Pengeluaran Baru</span>
-                    </Button>
+                          {/* Body item: Jika Jumlah Pos Sendiri */}
+                          {!item.is_sum ? (
+                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                              <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                                Kata Kunci Klasifikasi Transaksi:
+                              </label>
+                              <Input
+                                type="text"
+                                value={(item.matchKeys || []).join(', ')}
+                                onChange={(e) => {
+                                  const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                  const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                  targetSections[secIdx].items[itemIdx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                                  if (activeTemplateTab === 'pengeluaran') {
+                                    copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                  }
+                                  setTempTemplate(copy);
+                                }}
+                                placeholder="pisah koma, misal: pegawai, gaji atau: beasiswa"
+                                className="h-7 text-xs font-mono bg-white"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                💡 Data transaksi dengan kata kunci ini akan langsung mengisi baris pos ini dan dapat dilihat rincian datanya (Jenjang 3).
+                              </p>
+                            </div>
+                          ) : (
+                            /* Body item: Jika Sub Total Anaknya -> Render List of Sub-Items */
+                            <div className="p-3 bg-indigo-50/40 rounded-xl border border-dashed border-indigo-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider flex items-center gap-1.5">
+                                  <span>Daftar Sub-Pos Anak:</span>
+                                  <Badge className="bg-indigo-600 text-white text-[9px] px-1.5 py-0">
+                                    {(item.subItems || []).length} Anak
+                                  </Badge>
+                                </span>
+                              </div>
+
+                              {(item.subItems || []).map((sub, sIdx, subArr) => (
+                                <div key={sub.id || `sub_${sIdx}`} className="p-2 bg-white rounded-lg border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                        Nama Sub-Pos Anak:
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        value={sub.label}
+                                        onChange={(e) => {
+                                          const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                          const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                          targetSections[secIdx].items[itemIdx].subItems[sIdx].label = e.target.value;
+                                          if (activeTemplateTab === 'pengeluaran') {
+                                            copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                          }
+                                          setTempTemplate(copy);
+                                        }}
+                                        className="h-6 text-xs font-medium"
+                                        placeholder="Nama Sub-Pos"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">
+                                        Kata Kunci Klasifikasi:
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        value={(sub.matchKeys || []).join(', ')}
+                                        onChange={(e) => {
+                                          const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                          const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                          targetSections[secIdx].items[itemIdx].subItems[sIdx].matchKeys = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                                          if (activeTemplateTab === 'pengeluaran') {
+                                            copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                          }
+                                          setTempTemplate(copy);
+                                        }}
+                                        placeholder="pisah koma, misal: s1, sarjana"
+                                        className="h-6 text-xs font-mono"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={sIdx === 0}
+                                      onClick={() => {
+                                        const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                        const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                        const subs = targetSections[secIdx].items[itemIdx].subItems;
+                                        const temp = subs[sIdx - 1];
+                                        subs[sIdx - 1] = subs[sIdx];
+                                        subs[sIdx] = temp;
+                                        if (activeTemplateTab === 'pengeluaran') {
+                                          copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                        }
+                                        setTempTemplate(copy);
+                                      }}
+                                      className="h-5 w-5 p-0 rounded"
+                                    >
+                                      <ArrowUp size={10} />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={sIdx === subArr.length - 1}
+                                      onClick={() => {
+                                        const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                        const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                        const subs = targetSections[secIdx].items[itemIdx].subItems;
+                                        const temp = subs[sIdx + 1];
+                                        subs[sIdx + 1] = subs[sIdx];
+                                        subs[sIdx] = temp;
+                                        if (activeTemplateTab === 'pengeluaran') {
+                                          copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                        }
+                                        setTempTemplate(copy);
+                                      }}
+                                      className="h-5 w-5 p-0 rounded"
+                                    >
+                                      <ArrowDown size={10} />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                        const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                        targetSections[secIdx].items[itemIdx].subItems.splice(sIdx, 1);
+                                        if (activeTemplateTab === 'pengeluaran') {
+                                          copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                        }
+                                        setTempTemplate(copy);
+                                      }}
+                                      className="h-5 w-5 p-0 rounded text-rose-500 hover:text-rose-700"
+                                    >
+                                      <Trash2 size={10} />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const copy = JSON.parse(JSON.stringify(tempTemplate));
+                                  const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                                  const cur = targetSections[secIdx].items[itemIdx];
+                                  if (!cur.subItems) cur.subItems = [];
+                                  cur.subItems.push({
+                                    id: 'sub_' + Date.now(),
+                                    label: 'Sub Pos Baru',
+                                    matchKeys: ['kata kunci']
+                                  });
+                                  if (activeTemplateTab === 'pengeluaran') {
+                                    copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                                  }
+                                  setTempTemplate(copy);
+                                }}
+                                className="h-6 text-[11px] font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-white w-full gap-1"
+                              >
+                                <Plus size={11} />
+                                <span>Tambah Sub-Pos Anak di {item.label || 'Pos Ini'}</span>
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Tombol Tambah Pos di Kelompok Ini */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const copy = JSON.parse(JSON.stringify(tempTemplate));
+                          const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                          if (!targetSections[secIdx].items) targetSections[secIdx].items = [];
+                          targetSections[secIdx].items.push({
+                            id: 'item_' + Date.now(),
+                            label: 'Pos Baru',
+                            matchKeys: ['kata kunci'],
+                            is_sum: false,
+                            subItems: []
+                          });
+                          if (activeTemplateTab === 'pengeluaran') {
+                            copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                          }
+                          setTempTemplate(copy);
+                        }}
+                        className="h-7 text-xs font-bold text-indigo-700 border-dashed border-indigo-300 hover:bg-indigo-50 w-full gap-1"
+                      >
+                        <Plus size={12} />
+                        <span>Tambah Pos (Jenjang 2) di {sec.title || 'Kelompok Ini'}</span>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                ))}
+
+                {/* Tombol Tambah Kelompok Baru */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const copy = JSON.parse(JSON.stringify(tempTemplate));
+                    const targetSections = activeTemplateTab === 'penerimaan' ? copy.penerimaanSections : copy.pengeluaranSections;
+                    targetSections.push({
+                      id: 'sec_' + Date.now(),
+                      title: activeTemplateTab === 'penerimaan' ? 'Kelompok Penerimaan Baru' : 'Kelompok Pengeluaran Baru',
+                      items: [
+                        {
+                          id: 'item_' + Date.now(),
+                          label: 'Pos Baru',
+                          matchKeys: ['kata kunci'],
+                          is_sum: false,
+                          subItems: []
+                        }
+                      ]
+                    });
+                    if (activeTemplateTab === 'pengeluaran') {
+                      copy.pengeluaranItems = copy.pengeluaranSections.flatMap((s: any) => s.items || []);
+                    }
+                    setTempTemplate(copy);
+                  }}
+                  className="h-8 text-xs font-bold text-indigo-800 border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/60 w-full gap-1.5"
+                >
+                  <Plus size={13} />
+                  <span>Tambah Kelompok Baru (Jenjang 1)</span>
+                </Button>
+              </div>
             </div>
 
             {/* Modal Footer */}

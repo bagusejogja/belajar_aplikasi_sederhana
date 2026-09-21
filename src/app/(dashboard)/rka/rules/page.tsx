@@ -6,7 +6,7 @@ import {
   RefreshCw, CheckCircle2, ShieldCheck, Database, Layers,
   Building2, ArrowRight, ArrowLeft, Loader2, Sparkles, X, Save,
   FolderTree, BookOpen, AlertCircle, FileSpreadsheet, Check,
-  Copy, Wallet
+  Copy, Wallet, ChevronDown
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
-// Autocomplete Filter Unit Kerja Component (Persis seperti di tambah-pagu dengan Navigasi Keyboard ↑ ↓ + Enter)
+// Autocomplete Filter Unit Kerja Component (Seragam persis dengan /rka/laporan)
 function UnitAutocompleteFilter({ 
   units, 
   selectedUnit, 
@@ -49,17 +49,19 @@ function UnitAutocompleteFilter({
   const isAll = selectedUnit === 'ALL' || selectedUnit === '*' || !selectedUnit;
 
   const allOptions = useMemo(() => {
-    return ['*', ...filteredUnits];
+    return ['ALL', ...filteredUnits];
   }, [filteredUnits]);
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [query, isOpen]);
+    if (!isOpen) {
+      setQuery('');
+      setHighlightedIndex(0);
+    }
+  }, [isOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
         setIsOpen(true);
       }
       return;
@@ -67,85 +69,105 @@ function UnitAutocompleteFilter({
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex(prev => (prev < allOptions.length - 1 ? prev + 1 : 0));
+      setHighlightedIndex(prev => (prev + 1) % allOptions.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlightedIndex(prev => (prev > 0 ? prev - 1 : allOptions.length - 1));
+      setHighlightedIndex(prev => (prev - 1 + allOptions.length) % allOptions.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (allOptions.length > 0 && allOptions[highlightedIndex]) {
+      if (allOptions[highlightedIndex]) {
         onSelect(allOptions[highlightedIndex]);
         setIsOpen(false);
-        setQuery('');
       }
     } else if (e.key === 'Escape') {
-      e.preventDefault();
       setIsOpen(false);
     }
   };
 
   return (
-    <div className="relative inline-block text-left w-full" onKeyDown={handleKeyDown}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-9 px-3.5 rounded-xl bg-gray-50 hover:bg-white border border-gray-200 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+    <div className="relative w-full sm:w-64">
+      <div 
+        onClick={() => setIsOpen(true)}
+        className="w-full h-8 px-2.5 py-1 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer flex items-center justify-between transition-all"
       >
-        <span className="truncate font-bold">
-          {isAll ? `🏢 Semua Unit Kerja (${units.length})` : `🏢 ${selectedUnit}`}
+        <span className="truncate font-semibold text-gray-700">
+          {isAll ? 'Semua Unit Kerja' : selectedUnit}
         </span>
-        <span className="text-[10px] opacity-60">▼</span>
-      </button>
+        <ChevronDown size={14} className={`text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-1 w-full min-w-[280px] rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150">
-            <input
-              type="text"
-              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoFocus
-              className="w-full px-3 py-2 mb-2 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-            />
-            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+            <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-1.5">
+              <Search size={14} className="text-gray-400 ml-1 shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                value={query}
+                onChange={e => {
+                  setQuery(e.target.value);
+                  setHighlightedIndex(0);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Ketik cari nama unit..."
+                className="w-full bg-transparent border-none text-xs font-semibold focus:outline-hidden text-gray-800 placeholder:text-gray-400"
+              />
+              {query && (
+                <button 
+                  onClick={() => setQuery('')}
+                  className="p-1 hover:bg-gray-200 rounded-md text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-y-auto divide-y divide-gray-50 max-h-60 text-xs">
               <div
                 onClick={() => {
-                  onSelect('*');
+                  onSelect('ALL');
                   setIsOpen(false);
-                  setQuery('');
                 }}
-                className={`px-3 py-2 rounded-xl cursor-pointer font-bold transition-colors flex items-center justify-between ${
-                  highlightedIndex === 0 ? 'bg-indigo-600 text-white font-bold' : isAll ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
-                }`}
+                onMouseEnter={() => setHighlightedIndex(0)}
+                className={`p-2.5 font-bold cursor-pointer transition-colors flex items-center justify-between ${
+                  isAll ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                } ${highlightedIndex === 0 ? 'bg-blue-50/70 text-blue-800' : ''}`}
               >
-                <span>🏢 Semua Unit Kerja ({units.length})</span>
-                {isAll && <span className={highlightedIndex === 0 ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                <span>🏢 Semua Unit Kerja</span>
+                {isAll && <Check size={14} className="text-blue-600" />}
               </div>
-              {filteredUnits.map((u, idx) => {
-                const itemIdx = idx + 1;
-                const isHighlighted = highlightedIndex === itemIdx;
-                const isSelected = selectedUnit === u;
+
+              {filteredUnits.map((unit, idx) => {
+                const optIndex = idx + 1;
+                const isSelected = selectedUnit === unit;
+                const isHighlighted = highlightedIndex === optIndex;
                 return (
                   <div
-                    key={u}
+                    key={unit}
                     onClick={() => {
-                      onSelect(u);
+                      onSelect(unit);
                       setIsOpen(false);
-                      setQuery('');
                     }}
-                    className={`px-3 py-2 rounded-xl cursor-pointer font-medium transition-colors flex items-center justify-between ${
-                      isHighlighted ? 'bg-indigo-600 text-white font-bold' : isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-800'
-                    }`}
+                    onMouseEnter={() => setHighlightedIndex(optIndex)}
+                    className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
+                      isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
+                    } ${isHighlighted ? 'bg-blue-50/70 text-blue-800 font-semibold' : ''}`}
                   >
-                    <span className="truncate">{u}</span>
-                    {isSelected && <span className={isHighlighted ? 'text-white font-bold' : 'text-indigo-600 font-bold'}>✓</span>}
+                    <span className="truncate">{unit}</span>
+                    {isSelected && <Check size={14} className="text-blue-600 shrink-0" />}
                   </div>
                 );
               })}
+
               {filteredUnits.length === 0 && (
-                <div className="p-3 text-slate-400 text-center italic">Unit kerja tidak ditemukan</div>
+                <div className="p-4 text-gray-400 text-center italic">
+                  Unit tidak ditemukan
+                </div>
               )}
             </div>
           </div>
@@ -1225,7 +1247,7 @@ export default function RkaRulesPage() {
               {/* Filter Unit Kerja Form Input */}
               <div className="sm:col-span-5">
                 <label className="font-bold text-gray-700 block mb-1">
-                  Filter Unit Kerja / Fakultas
+                  Fakultas / Unit Kerja
                 </label>
                 <UnitFormInput
                   units={units}
@@ -1614,7 +1636,7 @@ export default function RkaRulesPage() {
                 </div>
 
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">Filter Unit Kerja</label>
+                  <label className="font-bold text-gray-700 block mb-1">Fakultas / Unit Kerja</label>
                   <UnitFormInput
                     units={units}
                     value={editingRule.unit}
