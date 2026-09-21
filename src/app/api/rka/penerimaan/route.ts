@@ -125,6 +125,12 @@ export async function POST(request: Request) {
             const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
             return isNaN(parsed) ? 100 : parsed;
           })(),
+          prop_alokasi_prosentase_universitas: (() => {
+            const raw = r.propAlokasiProsentaseUniversitas ?? r.prop_alokasi_prosentase_universitas ?? r.propUniversitas;
+            if (raw === undefined || raw === null || raw === '') return 0;
+            const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
+            return isNaN(parsed) ? 0 : parsed;
+          })(),
           status: String(r.status || 'Sedang Diproses').trim(),
           keterangan: String(r.keterangan || '').trim(),
           sumber_dana: String(r.sumber_dana || r.sumberDana || 'Dana Masyarakat Tidak Mengikat').trim(),
@@ -140,9 +146,9 @@ export async function POST(request: Request) {
         const chunk = formatted.slice(i, i + chunkSize);
         let { error } = await supabaseAdmin.from('rkat_penerimaan').insert(chunk);
 
-        // Fallback jika kolom prop_alokasi_prosentase_unit belum ada di database Supabase
-        if (error && (error.message?.includes('prop_alokasi_prosentase_unit') || error.details?.includes('prop_alokasi_prosentase_unit'))) {
-          const fallbackChunk = chunk.map(({ prop_alokasi_prosentase_unit, ...rest }: any) => rest);
+        // Fallback jika kolom prop_alokasi_prosentase_unit atau prop_alokasi_prosentase_universitas belum ada di database Supabase
+        if (error && (error.message?.includes('prop_alokasi_prosentase') || error.details?.includes('prop_alokasi_prosentase'))) {
+          const fallbackChunk = chunk.map(({ prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, ...rest }: any) => rest);
           const retryRes = await supabaseAdmin.from('rkat_penerimaan').insert(fallbackChunk);
           error = retryRes.error;
         }
@@ -180,6 +186,12 @@ export async function POST(request: Request) {
         const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
         return isNaN(parsed) ? 100 : parsed;
       })(),
+      prop_alokasi_prosentase_universitas: (() => {
+        const raw = body.propAlokasiProsentaseUniversitas ?? body.prop_alokasi_prosentase_universitas ?? body.propUniversitas;
+        if (raw === undefined || raw === null || raw === '') return 0;
+        const parsed = parseFloat(String(raw).replace(/,/g, '.').replace(/%/g, ''));
+        return isNaN(parsed) ? 0 : parsed;
+      })(),
       status: String(body.status || 'Sedang Diproses').trim(),
       keterangan: String(body.keterangan || '').trim(),
       sumber_dana: String(body.sumber_dana || 'Dana Masyarakat Tidak Mengikat').trim(),
@@ -191,9 +203,9 @@ export async function POST(request: Request) {
       .insert([newRecord])
       .select();
 
-    // Fallback jika kolom prop_alokasi_prosentase_unit belum ada
-    if (error && (error.message?.includes('prop_alokasi_prosentase_unit') || error.details?.includes('prop_alokasi_prosentase_unit'))) {
-      const { prop_alokasi_prosentase_unit, ...fallbackRecord } = newRecord;
+    // Fallback jika kolom prop_alokasi_prosentase_unit / universitas belum ada
+    if (error && (error.message?.includes('prop_alokasi_prosentase') || error.details?.includes('prop_alokasi_prosentase'))) {
+      const { prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, ...fallbackRecord } = newRecord;
       const retryRes = await supabaseAdmin
         .from('rkat_penerimaan')
         .insert([fallbackRecord])
@@ -256,6 +268,10 @@ export async function PUT(request: Request) {
     if (body.propAlokasiProsentaseUnit !== undefined || body.prop_alokasi_prosentase_unit !== undefined) {
       const parsed = parseFloat(String(body.propAlokasiProsentaseUnit ?? body.prop_alokasi_prosentase_unit).replace(/,/g, '.').replace(/%/g, ''));
       payload.prop_alokasi_prosentase_unit = isNaN(parsed) ? 100 : parsed;
+    }
+    if (body.propAlokasiProsentaseUniversitas !== undefined || body.prop_alokasi_prosentase_universitas !== undefined) {
+      const parsed = parseFloat(String(body.propAlokasiProsentaseUniversitas ?? body.prop_alokasi_prosentase_universitas).replace(/,/g, '.').replace(/%/g, ''));
+      payload.prop_alokasi_prosentase_universitas = isNaN(parsed) ? 0 : parsed;
     }
     if (body.status !== undefined) payload.status = body.status;
     if (body.keterangan !== undefined) payload.keterangan = body.keterangan;

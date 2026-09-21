@@ -180,6 +180,7 @@ export default function RkaPenerimaanPage() {
     renterimaJumlah: 0,
     renterimaPagu: 0,
     prop_alokasi_prosentase_unit: 100,
+    prop_alokasi_prosentase_universitas: 0,
     status: 'Sedang Diproses',
     keterangan: '',
     sumber_dana: 'Dana Masyarakat Tidak Mengikat'
@@ -369,6 +370,7 @@ export default function RkaPenerimaanPage() {
         else if (col.includes('tarif')) headerMap['renterimaTarif'] = idx;
         else if (col.includes('jumlah') || col === 'total') headerMap['renterimaJumlah'] = idx;
         else if (col.includes('pagu')) headerMap['renterimaPagu'] = idx;
+        else if (col.includes('universitas') || col.includes('univ')) headerMap['propAlokasiProsentaseUniversitas'] = idx;
         else if (col.includes('propalokasi') || col.includes('prosentase') || col.includes('alokasi')) headerMap['propAlokasiProsentaseUnit'] = idx;
         else if (col === 'status') headerMap['status'] = idx;
         else if (col.includes('keterangan') || col === 'ket') headerMap['keterangan'] = idx;
@@ -423,6 +425,7 @@ export default function RkaPenerimaanPage() {
         const jmlVal = parseFloat(getCol('renterimaJumlah', '0').replace(/,/g, '.')) || (volVal * tarifVal);
         const paguVal = parseFloat(getCol('renterimaPagu', '0').replace(/,/g, '.')) || jmlVal;
         const propAlokasiVal = parseFloat(getCol('propAlokasiProsentaseUnit', '100').replace(/,/g, '.').replace(/%/g, '')) || 100;
+        const propUniversitasVal = parseFloat(getCol('propAlokasiProsentaseUniversitas', '0').replace(/,/g, '.').replace(/%/g, '')) || 0;
 
         parsed.push({
           renterimaId: getCol('renterimaId', ''),
@@ -435,6 +438,7 @@ export default function RkaPenerimaanPage() {
           renterimaJumlah: jmlVal,
           renterimaPagu: paguVal,
           propAlokasiProsentaseUnit: propAlokasiVal,
+          propAlokasiProsentaseUniversitas: propUniversitasVal,
           status: getCol('status', 'Sedang Diproses'),
           keterangan: getCol('keterangan', ''),
           sumber_dana: getCol('sumber_dana', 'Dana Masyarakat Tidak Mengikat')
@@ -465,6 +469,7 @@ export default function RkaPenerimaanPage() {
             renterimaJumlah: jml,
             renterimaPagu: pagu,
             propAlokasiProsentaseUnit: 100,
+            propAlokasiProsentaseUniversitas: 0,
             status: cols[10] || 'Sedang Diproses',
             keterangan: cols[11] || '',
             sumber_dana: cols[12] || 'Dana Masyarakat Tidak Mengikat'
@@ -487,6 +492,7 @@ export default function RkaPenerimaanPage() {
             renterimaJumlah: jml,
             renterimaPagu: pagu,
             propAlokasiProsentaseUnit: 100,
+            propAlokasiProsentaseUniversitas: 0,
             status: cols[9] || 'Sedang Diproses',
             keterangan: cols[10] || '',
             sumber_dana: cols[11] || 'Dana Masyarakat Tidak Mengikat'
@@ -504,6 +510,7 @@ export default function RkaPenerimaanPage() {
             renterimaJumlah: parseFloat((cols[5] || '0').replace(/,/g, '.')) || 0,
             renterimaPagu: parseFloat((cols[6] || '0').replace(/,/g, '.')) || 0,
             propAlokasiProsentaseUnit: 100,
+            propAlokasiProsentaseUniversitas: 0,
             status: cols[7] || 'Sedang Diproses',
             keterangan: cols[8] || '',
             sumber_dana: cols[9] || 'Dana Masyarakat Tidak Mengikat'
@@ -517,7 +524,7 @@ export default function RkaPenerimaanPage() {
 
   // Isi contoh TSV sesuai format spreadsheet pengguna
   const handleFillSampleTSV = () => {
-    const sample = `renterimaId\tunit_kerja\takun\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tpropAlokasiProsentaseUnit\tstatus\tketerangan\tsumber_dana\n116893\t10000010 Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t41101.04.03.01\tPenerimaan UKT S1 | UKT Pendidikan Unggul\t2027\t1\t240\t24700000.00\t5928000000.00\t5928000000.00\t70\tDisetujui\tPRODI PD - S1 KEDOKTERAN - tahun anggaran 2027 - angkatan 2023\tDana Masyarakat Tidak Mengikat`;
+    const sample = `renterimaId\tunit_kerja\takun\tnama_akun_penerimaan\ttahun\trenterimaIsAktif\trenterimaVolume\trenterimaTarif\trenterimaJumlah\trenterimaPagu\tpropAlokasiProsentaseUnit\tpropAlokasiProsentaseUniversitas\tstatus\tketerangan\tsumber_dana\n116893\t10000010 Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t41101.04.03.01\tPenerimaan UKT S1 | UKT Pendidikan Unggul\t2027\t1\t240\t24700000.00\t5928000000.00\t5928000000.00\t70\t30\tDisetujui\tPRODI PD - S1 KEDOKTERAN - tahun anggaran 2027 - angkatan 2023\tDana Masyarakat Tidak Mengikat`;
     setPasteText(sample);
   };
 
@@ -1023,7 +1030,8 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                         <th className="px-3 py-2 text-right">Vol</th>
                         <th className="px-3 py-2 text-right">Tarif</th>
                         <th className="px-3 py-2 text-right">Pagu</th>
-                        <th className="px-3 py-2 text-right">% Alokasi</th>
+                        <th className="px-3 py-2 text-right">% Unit</th>
+                        <th className="px-3 py-2 text-right">% Univ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
@@ -1036,6 +1044,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                           <td className="px-3 py-1.5 text-right text-gray-600">Rp {formatRp(row.renterimaTarif)}</td>
                           <td className="px-3 py-1.5 text-right font-bold text-emerald-700">Rp {formatRp(row.renterimaPagu)}</td>
                           <td className="px-3 py-1.5 text-right font-bold text-blue-700">{row.propAlokasiProsentaseUnit !== undefined ? `${row.propAlokasiProsentaseUnit}%` : '100%'}</td>
+                          <td className="px-3 py-1.5 text-right font-bold text-purple-700">{row.propAlokasiProsentaseUniversitas !== undefined ? `${row.propAlokasiProsentaseUniversitas}%` : '0%'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1230,7 +1239,10 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                             TA {row.tahun || 2027} • ID: {row.renterima_id || row.id}
                           </span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Proporsi Alokasi Prosentase Unit">
-                            Alokasi: {row.prop_alokasi_prosentase_unit ?? 100}%
+                            Unit: {row.prop_alokasi_prosentase_unit ?? 100}%
+                          </span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-200" title="Proporsi Alokasi Prosentase Universitas">
+                            Univ: {row.prop_alokasi_prosentase_universitas ?? 0}%
                           </span>
                         </div>
 
@@ -1495,7 +1507,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Status</label>
                   <select
@@ -1508,7 +1520,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">% Alokasi Unit</label>
+                  <label className="font-bold text-gray-700 block mb-1">% Unit</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -1516,6 +1528,17 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                     onChange={e => setNewRow({ ...newRow, prop_alokasi_prosentase_unit: parseFloat(e.target.value) || 0 })}
                     className="text-xs h-8"
                     placeholder="100"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">% Univ</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newRow.prop_alokasi_prosentase_universitas ?? 0}
+                    onChange={e => setNewRow({ ...newRow, prop_alokasi_prosentase_universitas: parseFloat(e.target.value) || 0 })}
+                    className="text-xs h-8"
+                    placeholder="0"
                   />
                 </div>
                 <div>
@@ -1621,7 +1644,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Status</label>
                   <select
@@ -1635,7 +1658,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-gray-700 block mb-1">% Alokasi Unit</label>
+                  <label className="font-bold text-gray-700 block mb-1">% Unit</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -1643,6 +1666,17 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                     onChange={e => setEditingRow({ ...editingRow, prop_alokasi_prosentase_unit: parseFloat(e.target.value) || 0 })}
                     className="text-xs h-8"
                     placeholder="100"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">% Univ</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingRow.prop_alokasi_prosentase_universitas ?? 0}
+                    onChange={e => setEditingRow({ ...editingRow, prop_alokasi_prosentase_universitas: parseFloat(e.target.value) || 0 })}
+                    className="text-xs h-8"
+                    placeholder="0"
                   />
                 </div>
                 <div>

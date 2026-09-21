@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.rkat_penerimaan (
     renterima_jumlah NUMERIC(18,2) DEFAULT 0,
     renterima_pagu NUMERIC(18,2) DEFAULT 0,
     prop_alokasi_prosentase_unit NUMERIC(10,4) DEFAULT 100,
+    prop_alokasi_prosentase_universitas NUMERIC(10,4) DEFAULT 0,
     status TEXT DEFAULT 'Sedang Diproses',
     keterangan TEXT,
     sumber_dana TEXT DEFAULT 'Dana Masyarakat Tidak Mengikat',
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.rkat_penerimaan (
 
 -- Tambah kolom klasifikasi dan alokasi jika tabel sudah pernah dibuat sebelumnya
 ALTER TABLE public.rkat_penerimaan ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_unit NUMERIC(10,4) DEFAULT 100;
+ALTER TABLE public.rkat_penerimaan ADD COLUMN IF NOT EXISTS prop_alokasi_prosentase_universitas NUMERIC(10,4) DEFAULT 0;
 ALTER TABLE public.rkat_penerimaan ADD COLUMN IF NOT EXISTS kelompok_penerimaan TEXT;
 ALTER TABLE public.rkat_penerimaan ADD COLUMN IF NOT EXISTS format_proposal TEXT;
 ALTER TABLE public.rkat_penerimaan ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '{}'::jsonb;
