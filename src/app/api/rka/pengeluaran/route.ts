@@ -112,6 +112,84 @@ export async function GET(request: Request) {
   }
 }
 
+// Helper Upsert Pintar Berbasis db_id: Update jika db_id sudah ada di database, Insert jika baru
+async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
+  let dbIdMissing = initialDbIdMissing;
+
+  if (dbIdMissing) {
+    const stripped = chunk.map(({ db_id, ...rest }: any) => rest);
+    const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
+    if (error) throw error;
+    return { inserted: chunk.length, updated: 0, dbIdMissing: true };
+  }
+
+  // 1. Kumpulkan semua db_id unik yang valid dari chunk ini
+  const chunkDbIds = Array.from(new Set(chunk.map((r: any) => r.db_id).filter(Boolean)));
+  let existingDbIds = new Set<string>();
+
+  if (chunkDbIds.length > 0) {
+    const { data: existingRows, error: findErr } = await supabaseAdmin
+      .from('rkat_pengeluaran')
+      .select('db_id')
+      .in('db_id', chunkDbIds);
+
+    if (findErr) {
+      if (findErr.message?.includes('db_id')) {
+        dbIdMissing = true;
+        const stripped = chunk.map(({ db_id, ...rest }: any) => rest);
+        const { error: insErr } = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
+        if (insErr) throw insErr;
+        return { inserted: chunk.length, updated: 0, dbIdMissing: true };
+      }
+      throw findErr;
+    }
+
+    if (existingRows) {
+      existingRows.forEach((r: any) => {
+        if (r.db_id) existingDbIds.add(String(r.db_id));
+      });
+    }
+  }
+
+  // 2. Pilah data: yang sudah ada di DB di-UPDATE, yang belum ada di-INSERT
+  const toUpdate = chunk.filter((r: any) => r.db_id && existingDbIds.has(String(r.db_id)));
+  const toInsert = chunk.filter((r: any) => !r.db_id || !existingDbIds.has(String(r.db_id)));
+
+  // A. Eksekusi INSERT untuk baris baru
+  if (toInsert.length > 0) {
+    let { error: insErr } = await supabaseAdmin.from('rkat_pengeluaran').insert(toInsert);
+    if (insErr) {
+      if (insErr.message?.includes('db_id')) {
+        dbIdMissing = true;
+        const stripped = toInsert.map(({ db_id, ...rest }: any) => rest);
+        const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
+        if (retryRes.error) throw retryRes.error;
+        return { inserted: toInsert.length, updated: 0, dbIdMissing: true };
+      }
+      throw insErr;
+    }
+  }
+
+  // B. Eksekusi UPDATE untuk baris yang sudah ada (berdasarkan db_id) secara parallel
+  if (toUpdate.length > 0) {
+    const concurrency = 25;
+    for (let j = 0; j < toUpdate.length; j += concurrency) {
+      const batch = toUpdate.slice(j, j + concurrency);
+      await Promise.all(
+        batch.map((row: any) => {
+          const { db_id, ...updatePayload } = row;
+          return supabaseAdmin
+            .from('rkat_pengeluaran')
+            .update({ ...updatePayload, updated_at: new Date().toISOString() })
+            .eq('db_id', db_id);
+        })
+      );
+    }
+  }
+
+  return { inserted: toInsert.length, updated: toUpdate.length, dbIdMissing: false };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -149,30 +227,6 @@ export async function POST(request: Request) {
 
         // Split berdasarkan tab delimiter
         const cols = line.split('\t').map((c: string) => c.trim().replace(/^"|"$/g, ''));
-
-        // Format kolom baku sesuai urutan pengguna:
-        // 0: Tahun_Anggaran
-        // 1: Unit
-        // 2: Tujuan
-        // 3: Sasaran
-        // 4: Program
-        // 5: IndikatorProgram
-        // 6: target
-        // 7: cascading_kinerja_target_satuan
-        // 8: Kelompok_Indikator_Program
-        // 9: cascading_kinerja_iku
-        // 10: Kegiatan
-        // 11: Lingkup_Kegiatan
-        // 12: sumberdanaNama
-        // 13: Prioritas
-        // 14: AkunUtama
-        // 15: SubAkun
-        // 16: AkunDetail
-        // 17: Uraian_belanja
-        // 18: Anggaran
-        // 19: Realisasi
-        // 20: rncnpengeluaranIsAprove
-        // [Kolom Paling Belakang]: db_id
 
         const parseCleanNum = (val: any) => {
           if (!val || val === '\\N' || val === '-') return 0;
@@ -232,33 +286,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Tidak ada baris data valid untuk disimpan' }, { status: 400 });
       }
 
-      // Chunk insertion jika data banyak (> 200 baris) dengan fallback otomatis jika db_id belum dimigrasi di Postgres
+      // Chunk processing (200 baris per batch): Upsert pintar berbasis db_id
       const chunkSize = 200;
       let insertedCount = 0;
+      let updatedCount = 0;
       let dbIdMissingInDb = false;
 
       for (let i = 0; i < rowsToInsert.length; i += chunkSize) {
-        let chunk = rowsToInsert.slice(i, i + chunkSize);
-        if (dbIdMissingInDb) {
-          chunk = chunk.map(({ db_id, ...rest }) => rest);
-        }
-
-        const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
-        if (error) {
-          if (error.message.includes('db_id')) {
-            dbIdMissingInDb = true;
-            // Retry batch tanpa db_id agar penyimpanan tetap berhasil
-            const strippedChunk = chunk.map(({ db_id, ...rest }: any) => rest);
-            const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(strippedChunk);
-            if (retryRes.error) throw retryRes.error;
-          } else {
-            throw error;
-          }
-        }
-        insertedCount += chunk.length;
+        const chunk = rowsToInsert.slice(i, i + chunkSize);
+        const res = await processUpsertChunk(chunk, dbIdMissingInDb);
+        insertedCount += res.inserted;
+        updatedCount += res.updated;
+        if (res.dbIdMissing) dbIdMissingInDb = true;
       }
 
-      return NextResponse.json({ success: true, count: insertedCount, dbIdMissingInDb });
+      return NextResponse.json({
+        success: true,
+        count: insertedCount + updatedCount,
+        insertedCount,
+        updatedCount,
+        dbIdMissingInDb
+      });
     }
 
     // 2. Direct Array Bulk Insertion: { bulk: true, rows: [...] }
@@ -270,32 +318,46 @@ export async function POST(request: Request) {
 
       const chunkSize = 200;
       let insertedCount = 0;
+      let updatedCount = 0;
       let dbIdMissingInDb = false;
 
       for (let i = 0; i < rows.length; i += chunkSize) {
-        let chunk = rows.slice(i, i + chunkSize);
-        if (dbIdMissingInDb) {
-          chunk = chunk.map(({ db_id, ...rest }: any) => rest);
-        }
-
-        const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
-        if (error) {
-          if (error.message.includes('db_id')) {
-            dbIdMissingInDb = true;
-            const strippedChunk = chunk.map(({ db_id, ...rest }: any) => rest);
-            const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(strippedChunk);
-            if (retryRes.error) throw retryRes.error;
-          } else {
-            throw error;
-          }
-        }
-        insertedCount += chunk.length;
+        const chunk = rows.slice(i, i + chunkSize);
+        const res = await processUpsertChunk(chunk, dbIdMissingInDb);
+        insertedCount += res.inserted;
+        updatedCount += res.updated;
+        if (res.dbIdMissing) dbIdMissingInDb = true;
       }
 
-      return NextResponse.json({ success: true, count: insertedCount, dbIdMissingInDb });
+      return NextResponse.json({
+        success: true,
+        count: insertedCount + updatedCount,
+        insertedCount,
+        updatedCount,
+        dbIdMissingInDb
+      });
     }
 
-    // 3. Single Insertion
+    // 3. Single Insertion / Upsert
+    if (body.db_id) {
+      const { data: existing } = await supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select('id')
+        .eq('db_id', body.db_id)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        const { db_id, ...updatePayload } = body;
+        const { data: updated, error: updErr } = await supabaseAdmin
+          .from('rkat_pengeluaran')
+          .update({ ...updatePayload, updated_at: new Date().toISOString() })
+          .eq('db_id', body.db_id)
+          .select();
+        if (updErr) throw updErr;
+        return NextResponse.json({ success: true, data: updated, updated: true });
+      }
+    }
+
     let { data, error } = await supabaseAdmin
       .from('rkat_pengeluaran')
       .insert([body])
@@ -313,7 +375,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, inserted: true });
   } catch (error: any) {
     console.error('Error inserting rkat_pengeluaran:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

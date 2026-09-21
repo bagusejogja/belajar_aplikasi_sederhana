@@ -533,6 +533,7 @@ export default function RkaPengeluaranPage() {
     });
 
     let totalInserted = 0;
+    let totalUpdated = 0;
 
     try {
       for (let b = 0; b < totalBatches; b++) {
@@ -567,7 +568,8 @@ export default function RkaPengeluaranPage() {
           throw new Error(`Batch ${currentBatchNum}/${totalBatches} gagal: ${json.error}`);
         }
 
-        totalInserted += json.count || batchLines.length;
+        totalInserted += json.insertedCount ?? (json.count || batchLines.length);
+        totalUpdated += json.updatedCount ?? 0;
 
         const currentProcessed = end;
         const percent = Math.round((currentProcessed / totalLines) * 100);
@@ -581,7 +583,15 @@ export default function RkaPengeluaranPage() {
         });
       }
 
-      toast.success(`🎉 Berhasil mengimpor total ${totalInserted.toLocaleString('id-ID')} baris data RKAT Pengeluaran!`, { duration: 5000 });
+      const totalCount = totalInserted + totalUpdated;
+      if (totalUpdated > 0) {
+        toast.success(
+          `🎉 Berhasil memproses total ${totalCount.toLocaleString('id-ID')} baris (${totalInserted.toLocaleString('id-ID')} baru ditambahkan, ${totalUpdated.toLocaleString('id-ID')} data lama diperbarui)!`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.success(`🎉 Berhasil mengimpor total ${totalCount.toLocaleString('id-ID')} baris data baru RKAT Pengeluaran!`, { duration: 5000 });
+      }
       setPasteText('');
       setPasteModalOpen(false);
       setShowInlinePasteZone(false);
@@ -942,8 +952,9 @@ export default function RkaPengeluaranPage() {
                   Tahun_Anggaran [Tab] Unit [Tab] Tujuan [Tab] Sasaran [Tab] Program ... [Tab] Kegiatan [Tab] Lingkup [Tab] AkunDetail [Tab] Uraian_belanja [Tab] Anggaran [Tab] Realisasi [Tab] isApprove [Tab] db_id
                 </code>
               </div>
-              <p className="text-[10px] text-gray-500">
-                • Header baris pertama dari Excel akan otomatis dideteksi dan dilewati. Field <strong className="text-indigo-700 font-mono">db_id</strong> di kolom paling belakang otomatis tersimpan ke database. Format angka titik/koma otomatis dibersihkan.
+              <p className="text-[10px] text-gray-500 flex flex-col gap-0.5">
+                <span>• Header baris pertama dari Excel otomatis dideteksi dan dilewati. Format angka titik/koma otomatis dinormalisasi.</span>
+                <span className="text-emerald-700 font-semibold">• <strong>Mode Cerdas Aktif:</strong> Jika <code className="font-mono font-bold bg-emerald-100/70 px-1 py-0.5 rounded text-emerald-900">db_id</code> sudah pernah ada di database, data baris tersebut akan di-<strong>UPDATE</strong> otomatis (tidak ganda). Jika belum ada, otomatis di-<strong>INSERT</strong> sebagai baris baru.</span>
               </p>
             </div>
 
