@@ -179,6 +179,7 @@ export default function RkaPenerimaanPage() {
     renterimaTarif: 0,
     renterimaJumlah: 0,
     renterimaPagu: 0,
+    prop_alokasi_prosentase_unit: 100,
     status: 'Sedang Diproses',
     keterangan: '',
     sumber_dana: 'Dana Masyarakat Tidak Mengikat'
@@ -1228,6 +1229,9 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                           <span className="text-[10px] font-mono text-gray-400">
                             TA {row.tahun || 2027} • ID: {row.renterima_id || row.id}
                           </span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200" title="Proporsi Alokasi Prosentase Unit">
+                            Alokasi: {row.prop_alokasi_prosentase_unit ?? 100}%
+                          </span>
                         </div>
 
                         {/* 1b. Klasifikasi Rule Penerimaan Badges */}
@@ -1491,7 +1495,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Status</label>
                   <select
@@ -1502,6 +1506,17 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                     <option value="Sedang Diproses">Sedang Diproses</option>
                     <option value="Disetujui">Disetujui</option>
                   </select>
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">% Alokasi Unit</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newRow.prop_alokasi_prosentase_unit ?? 100}
+                    onChange={e => setNewRow({ ...newRow, prop_alokasi_prosentase_unit: parseFloat(e.target.value) || 0 })}
+                    className="text-xs h-8"
+                    placeholder="100"
+                  />
                 </div>
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Sumber Dana</label>
@@ -1606,7 +1621,7 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Status</label>
                   <select
@@ -1618,6 +1633,17 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                     <option value="Disetujui">Disetujui</option>
                     <option value="Selesai">Selesai</option>
                   </select>
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">% Alokasi Unit</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editingRow.prop_alokasi_prosentase_unit ?? 100}
+                    onChange={e => setEditingRow({ ...editingRow, prop_alokasi_prosentase_unit: parseFloat(e.target.value) || 0 })}
+                    className="text-xs h-8"
+                    placeholder="100"
+                  />
                 </div>
                 <div>
                   <label className="font-bold text-gray-700 block mb-1">Sumber Dana</label>
