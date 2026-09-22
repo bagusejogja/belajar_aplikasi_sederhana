@@ -151,6 +151,7 @@ const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
       id: 'non_pendidikan',
       title: 'II. Penerimaan Non Pendidikan',
       items: [
+        { id: 'bp_ptnbh', label: 'Bantuan Pendanaan PTN Badan Hukum', matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], is_sum: false, subItems: [] },
         { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'], is_sum: false, subItems: [] },
         { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'], is_sum: false, subItems: [] },
         { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'], is_sum: false, subItems: [] },
@@ -1293,6 +1294,10 @@ export default function RkaLaporanPage() {
               } else {
                 parsed.pengeluaranSections = DEFAULT_PPT_TEMPLATE.pengeluaranSections;
               }
+            }
+            const nonPendSec = parsed.penerimaanSections?.find((s: any) => s.id === 'non_pendidikan');
+            if (nonPendSec && !nonPendSec.items?.some((it: any) => it.id === 'bp_ptnbh')) {
+              nonPendSec.items.unshift({ id: 'bp_ptnbh', label: 'Bantuan Pendanaan PTN Badan Hukum', matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], is_sum: false, subItems: [] });
             }
             return parsed;
           }

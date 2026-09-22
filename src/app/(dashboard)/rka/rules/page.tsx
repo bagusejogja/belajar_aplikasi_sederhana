@@ -28,7 +28,7 @@ const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
-// Autocomplete Filter Unit Kerja Component (Seragam persis dengan /rka/laporan)
+// Autocomplete Filter Unit Kerja Component (Seragam persis dengan /rka/laporan & screenshot)
 function UnitAutocompleteFilter({ 
   units, 
   selectedUnit, 
@@ -88,12 +88,13 @@ function UnitAutocompleteFilter({
     <div className="relative w-full">
       <div 
         onClick={() => setIsOpen(true)}
-        className="w-full h-9 px-3 py-1.5 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-pointer flex items-center justify-between transition-all shadow-2xs"
+        className="w-full h-9 px-3.5 py-1.5 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-pointer flex items-center justify-between transition-all shadow-2xs"
       >
-        <span className="truncate font-bold text-gray-800">
-          {isAll ? 'Semua Unit Kerja' : selectedUnit}
+        <span className="truncate font-bold text-gray-800 flex items-center gap-1.5">
+          <span>🏢</span>
+          <span>{isAll ? `Semua Unit Kerja (${units.length})` : selectedUnit}</span>
         </span>
-        <ChevronDown size={14} className={`text-gray-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <span className="text-[10px] text-gray-500 shrink-0 ml-1">▼</span>
       </div>
 
       {isOpen && (
@@ -114,7 +115,7 @@ function UnitAutocompleteFilter({
                   setHighlightedIndex(0);
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="Ketik cari nama unit..."
+                placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
                 className="w-full bg-transparent border-none text-xs font-semibold focus:outline-hidden text-gray-800 placeholder:text-gray-400"
               />
               {query && (
@@ -135,11 +136,11 @@ function UnitAutocompleteFilter({
                 }}
                 onMouseEnter={() => setHighlightedIndex(0)}
                 className={`p-2.5 font-bold cursor-pointer transition-colors flex items-center justify-between ${
-                  isAll ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-                } ${highlightedIndex === 0 ? 'bg-blue-50/70 text-blue-800' : ''}`}
+                  isAll ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
+                } ${highlightedIndex === 0 && !isAll ? 'bg-indigo-50 text-indigo-800' : ''}`}
               >
-                <span>🏢 Semua Unit Kerja</span>
-                {isAll && <Check size={14} className="text-blue-600" />}
+                <span>🏢 Semua Unit Kerja ({units.length})</span>
+                {isAll && <Check size={14} className="text-white" />}
               </div>
 
               {filteredUnits.map((unit, idx) => {
@@ -155,11 +156,11 @@ function UnitAutocompleteFilter({
                     }}
                     onMouseEnter={() => setHighlightedIndex(optIndex)}
                     className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
-                      isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
-                    } ${isHighlighted ? 'bg-blue-50/70 text-blue-800 font-semibold' : ''}`}
+                      isSelected ? 'bg-indigo-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-50'
+                    } ${isHighlighted && !isSelected ? 'bg-indigo-50 text-indigo-800 font-semibold' : ''}`}
                   >
                     <span className="truncate">{unit}</span>
-                    {isSelected && <Check size={14} className="text-blue-600 shrink-0" />}
+                    {isSelected && <Check size={14} className="text-white shrink-0" />}
                   </div>
                 );
               })}
@@ -177,12 +178,12 @@ function UnitAutocompleteFilter({
   );
 }
 
-// Input Unit Kerja pada Form Tambah/Edit Aturan (Bisa pilih unit dari daftar atau ketik beberapa unit dipisahkan koma)
+// Input Unit Kerja pada Form Tambah/Edit Aturan (Anak panah di dalam box unit, terintegrasi rapi)
 function UnitFormInput({ 
   units, 
   value, 
   onChange, 
-  placeholder = "Ketik beberapa unit atau pilih..." 
+  placeholder = "Ketik beberapa unit atau pilih dari dropdown..." 
 }: { 
   units: string[]; 
   value: string; 
@@ -198,66 +199,77 @@ function UnitFormInput({
 
   return (
     <div className="relative w-full">
-      <div className="flex gap-1">
-        <Input 
+      <div className="relative w-full">
+        <input 
+          type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="bg-white border-gray-300 text-gray-900 text-xs font-semibold h-9 rounded-xl focus:ring-2 focus:ring-indigo-600"
+          className="w-full h-9 bg-white border border-gray-300 text-gray-900 text-xs font-semibold rounded-xl pl-3 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-600 shadow-2xs"
         />
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="px-2.5 h-9 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-300 text-xs font-bold text-gray-600 transition-colors cursor-pointer shrink-0"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 cursor-pointer p-1"
           title="Pilih unit dari daftar"
         >
-          ▼
+          <span className="text-[10px]">▼</span>
         </button>
       </div>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 mt-1 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-2xl bg-white border border-slate-200 shadow-2xl z-50 p-2 text-xs animate-in fade-in zoom-in-95 duration-150 max-w-md">
             <input
               type="text"
-              placeholder="Cari nama atau kode unit..."
+              placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
               className="w-full px-2.5 py-1.5 mb-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 font-medium"
             />
-            <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
+            <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar divide-y divide-gray-50">
               <div
                 onClick={() => {
                   onChange('*');
                   setIsOpen(false);
                   setQuery('');
                 }}
-                className="px-2.5 py-1.5 rounded-lg cursor-pointer font-bold transition-colors hover:bg-indigo-50 text-indigo-700"
+                className={`px-2.5 py-2 rounded-lg cursor-pointer font-bold transition-colors flex items-center justify-between ${
+                  value === '*' ? 'bg-indigo-600 text-white' : 'hover:bg-indigo-50 text-indigo-700'
+                }`}
               >
-                🏢 * (Semua Unit Kerja)
+                <span>🏢 Semua Unit Kerja (*)</span>
+                {value === '*' && <Check size={14} className="text-white shrink-0" />}
               </div>
-              {filtered.map(u => (
-                <div
-                  key={u}
-                  onClick={() => {
-                    if (value && value !== '*' && !value.includes(u)) {
-                      onChange(`${value}, ${u}`);
-                    } else {
-                      onChange(u);
-                    }
-                    setIsOpen(false);
-                    setQuery('');
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-slate-100 text-slate-800 transition-colors flex items-center justify-between"
-                >
-                  <span className="truncate">{u}</span>
-                  <span className="text-[10px] text-indigo-600 font-bold shrink-0 ml-2">+ Pilih</span>
-                </div>
-              ))}
+              {filtered.map(u => {
+                const isSelected = value === u || value.split(',').map(s => s.trim()).includes(u);
+                return (
+                  <div
+                    key={u}
+                    onClick={() => {
+                      if (value && value !== '*' && !value.includes(u)) {
+                        onChange(`${value}, ${u}`);
+                      } else {
+                        onChange(u);
+                      }
+                      setIsOpen(false);
+                      setQuery('');
+                    }}
+                    className={`px-2.5 py-2 rounded-lg cursor-pointer transition-colors flex items-center justify-between ${
+                      isSelected ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <span className="truncate">{u}</span>
+                    {isSelected && <Check size={14} className="text-white shrink-0" />}
+                  </div>
+                );
+              })}
               {filtered.length === 0 && (
-                <div className="p-3 text-slate-400 text-center italic">Unit tidak ditemukan</div>
+                <div className="p-3 text-center text-gray-400 italic">
+                  Unit tidak ditemukan
+                </div>
               )}
             </div>
           </div>
@@ -1253,10 +1265,10 @@ export default function RkaRulesPage() {
                   units={units}
                   value={unit}
                   onChange={setUnit}
-                  placeholder="Ketik unit/kode atau pilih dari tombol ▼..."
+                  placeholder="Ketik unit/kode atau pilih dari dropdown..."
                 />
                 <p className="text-[10px] text-gray-400 mt-1">
-                  💡 Bisa pilih dari tombol ▼ atau ketik beberapa unit dipisahkan koma (,) atau (*)
+                  💡 Bisa pilih dari dropdown atau ketik beberapa unit dipisahkan koma (,) atau (*)
                 </p>
               </div>
 
@@ -1641,10 +1653,10 @@ export default function RkaRulesPage() {
                     units={units}
                     value={editingRule.unit}
                     onChange={val => setEditingRule({ ...editingRule, unit: val })}
-                    placeholder="Ketik unit/kode atau pilih dari tombol ▼..."
+                    placeholder="Ketik unit/kode atau pilih dari dropdown..."
                   />
                   <p className="text-[10px] text-gray-400 mt-1">
-                    💡 Bisa pilih dari tombol ▼ atau ketik beberapa unit dipisahkan koma (,)
+                    💡 Bisa pilih dari dropdown atau ketik beberapa unit dipisahkan koma (,)
                   </p>
                 </div>
               </div>

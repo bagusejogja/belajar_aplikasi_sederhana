@@ -86,14 +86,20 @@ export async function POST(request: Request) {
         const aVal = cols[2] || '*';
         const kVal = cols[3] || '';
         const rawTarget = (cols[4] || '').toLowerCase();
-        const targetField = cols[4] ? cols[4].trim().toLowerCase() : (modul === 'penerimaan' ? 'format_proposal' : 'laporan_kementerian');
+        
+        // Auto deteksi modul berdasarkan awalan akun: 4* -> penerimaan, 5* -> pengeluaran
+        let rowModul = modul;
+        if (aVal && aVal.startsWith('4')) rowModul = 'penerimaan';
+        else if (aVal && aVal.startsWith('5')) rowModul = 'pengeluaran';
+
+        const targetField = cols[4] ? cols[4].trim().toLowerCase() : (rowModul === 'penerimaan' ? 'format_proposal' : 'laporan_kementerian');
         const nilaiVal = cols[5] || '';
         const ket = cols[6] || '';
 
         if (kVal && nilaiVal) {
           rulesToInsert.push({
             priority: pVal,
-            modul,
+            modul: rowModul,
             unit: uVal,
             akun: aVal,
             kata_kunci: kVal,
@@ -115,7 +121,13 @@ export async function POST(request: Request) {
 
     // 2. Single Rule Insertion
     const { priority, unit, akun, kata_kunci, target_field, nilai_klasifikasi, keterangan } = body;
-    const modul = body.modul || 'pengeluaran';
+    let modul = body.modul || 'pengeluaran';
+    if (akun && String(akun).trim().startsWith('4')) {
+      modul = 'penerimaan';
+    } else if (akun && String(akun).trim().startsWith('5')) {
+      modul = 'pengeluaran';
+    }
+
     if (!kata_kunci || !nilai_klasifikasi) {
       return NextResponse.json({ success: false, error: 'Kata kunci dan Nilai Klasifikasi wajib diisi' }, { status: 400 });
     }
@@ -128,7 +140,7 @@ export async function POST(request: Request) {
         unit: unit || '*',
         akun: akun || '*',
         kata_kunci,
-        target_field: target_field || (modul === 'penerimaan' ? 'format_proposal' : 'laporan_kementerian'),
+        target_field: target_field || (modul === 'penerimaan' ? 'format_proposal' : 'proposal rkat'),
         nilai_klasifikasi,
         keterangan: keterangan || ''
       }])
@@ -252,30 +264,15 @@ export async function PUT(request: Request) {
     }
 
     // 5. Jalankan Rule Engine (Direct DB Execution - Super Cepat 50x)
-    const { ruleId, targetYear, cleanSync = true, modul = 'pengeluaran' } = body;
+    const { ruleId, targetYear, cleanSync = true, modul = 'all' } = body;
 
-    // Ambil rules yang akan dijalankan: Urutkan priority DESCENDING agar aturan umum dieksekusi duluan, dan aturan spesifik (priority #1) dieksekusi terakhir sehingga MENIMPA / MENANG atas aturan umum.
-    let rulesQuery = supabaseAdmin.from('rka_rules').select('*').order('priority', { ascending: false }).order('id', { ascending: true });
-    if (modul === 'penerimaan') {
-      rulesQuery = rulesQuery.eq('modul', 'penerimaan');
-    } else {
-      rulesQuery = rulesQuery.or('modul.eq.pengeluaran,modul.is.null');
-    }
+    async function executePenerimaanRules() {
+      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').eq('modul', 'penerimaan').order('priority', { ascending: false }).order('id', { ascending: true });
+      if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
+      const { data: rulesList, error: rulesErr } = await rulesQuery;
+      if (rulesErr) throw rulesErr;
 
-    if (ruleId) {
-      rulesQuery = rulesQuery.eq('id', ruleId);
-    }
-    const { data: rulesList, error: rulesErr } = await rulesQuery;
-    if (rulesErr) throw rulesErr;
-
-    if (!rulesList || rulesList.length === 0) {
-      return NextResponse.json({ success: false, error: `Tidak ada aturan untuk modul ${modul}. Silakan buat aturan klasifikasi terlebih dahulu.` }, { status: 400 });
-    }
-
-    let totalUpdated = 0;
-
-    // A. EKSEKUSI KHUSUS MODUL PENERIMAAN
-    if (modul === 'penerimaan') {
+      let totalUpdated = 0;
       if (cleanSync) {
         let resetQ = supabaseAdmin
           .from('rkat_penerimaan')
@@ -292,7 +289,7 @@ export async function PUT(request: Request) {
         await resetQ;
       }
 
-      for (const rule of rulesList) {
+      for (const rule of (rulesList || [])) {
         const tf = (rule.target_field || 'format_proposal').toLowerCase().trim();
         const nilai = (rule.nilai_klasifikasi || '').trim();
         if (!nilai) continue;
@@ -353,125 +350,141 @@ export async function PUT(request: Request) {
         }
       }
 
+      return { totalUpdated, rulesApplied: (rulesList || []).length };
+    }
+
+    async function executePengeluaranRules() {
+      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').or('modul.eq.pengeluaran,modul.is.null').order('priority', { ascending: false }).order('id', { ascending: true });
+      if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
+      const { data: rulesList, error: rulesErr } = await rulesQuery;
+      if (rulesErr) throw rulesErr;
+
+      let totalUpdated = 0;
+      const { data: maxRow } = await supabaseAdmin.from('rkat_pengeluaran').select('id').order('id', { ascending: false }).limit(1);
+      const maxTableId = maxRow?.[0]?.id || 30000;
+      const CHUNK_SIZE = 2000;
+
+      if (cleanSync) {
+        for (let s = 1; s <= maxTableId + 1000; s += CHUNK_SIZE) {
+          let resetQ = supabaseAdmin
+            .from('rkat_pengeluaran')
+            .update({
+              laporan_kementerian: null,
+              laporan_webometrics: null,
+              identifikasi_lain: null,
+              tags: {}
+            })
+            .gte('id', s)
+            .lt('id', s + CHUNK_SIZE);
+
+          if (targetYear && targetYear !== 'ALL') {
+            resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
+          }
+
+          await resetQ;
+        }
+      }
+
+      for (const rule of (rulesList || [])) {
+        const tf = (rule.target_field || 'laporan_kementerian').toLowerCase().trim();
+        const nilai = (rule.nilai_klasifikasi || '').trim();
+        if (!nilai) continue;
+
+        let updatePayload: any = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (tf === 'laporan_webometrics') {
+          updatePayload.laporan_webometrics = nilai;
+        } else if (tf === 'laporan_kementerian') {
+          updatePayload.laporan_kementerian = nilai;
+        } else {
+          updatePayload.identifikasi_lain = nilai;
+          updatePayload.tags = { [tf]: nilai };
+        }
+
+        for (let startId = 1; startId <= maxTableId + 1000; startId += CHUNK_SIZE) {
+          const endId = startId + CHUNK_SIZE;
+          let chunkQ = supabaseAdmin
+            .from('rkat_pengeluaran')
+            .update(updatePayload, { count: 'exact' })
+            .gte('id', startId)
+            .lt('id', endId);
+
+          if (targetYear && targetYear !== 'ALL') {
+            chunkQ = chunkQ.eq('tahun_anggaran', parseInt(targetYear));
+          }
+
+          if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
+            const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
+            if (units.length === 1) {
+              chunkQ = chunkQ.ilike('unit', `%${units[0]}%`);
+            } else if (units.length > 1) {
+              const unitConds = units.map((u: string) => `unit.ilike.%${u}%`).join(',');
+              chunkQ = chunkQ.or(unitConds);
+            }
+          }
+
+          if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
+            const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
+            if (akuns.length === 1) {
+              chunkQ = chunkQ.ilike('akun_detail', `${akuns[0]}%`);
+            } else if (akuns.length > 1) {
+              const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
+              chunkQ = chunkQ.or(akunConds);
+            }
+          }
+
+          if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
+            const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
+            if (kws.length === 1) {
+              const kw = kws[0];
+              chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
+            } else if (kws.length > 1) {
+              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
+              chunkQ = chunkQ.or(orConds);
+            }
+          }
+
+          const { count, error } = await chunkQ;
+          if (error) {
+            console.error(`Error updating rule ID ${rule.id} chunk [${startId}-${endId}]:`, error);
+          } else if (count) {
+            totalUpdated += count;
+          }
+        }
+      }
+
+      return { totalUpdated, rulesApplied: (rulesList || []).length };
+    }
+
+    if (modul === 'penerimaan') {
+      const result = await executePenerimaanRules();
       return NextResponse.json({
         success: true,
-        message: `Rule Engine Penerimaan sukses dijalankan! Sebanyak ${totalUpdated} baris data penerimaan berhasil dipetakan sesuai aturan aktif.`,
-        updatedCount: totalUpdated,
-        rulesApplied: rulesList.length
+        message: `Rule Engine Penerimaan sukses dijalankan! Sebanyak ${result.totalUpdated} baris data penerimaan berhasil dipetakan sesuai aturan aktif.`,
+        updatedCount: result.totalUpdated,
+        rulesApplied: result.rulesApplied
+      });
+    } else if (modul === 'pengeluaran') {
+      const result = await executePengeluaranRules();
+      return NextResponse.json({
+        success: true,
+        message: `Rule Engine Pengeluaran sukses dijalankan! Seluruh data lama telah dibersihkan, dan ${result.totalUpdated} baris data belanja berhasil dipetakan.`,
+        updatedCount: result.totalUpdated,
+        rulesApplied: result.rulesApplied
+      });
+    } else {
+      const resPen = await executePenerimaanRules();
+      const resPeng = await executePengeluaranRules();
+      return NextResponse.json({
+        success: true,
+        message: `Rule Engine sukses dijalankan! Sebanyak ${resPeng.totalUpdated} data belanja dan ${resPen.totalUpdated} data penerimaan berhasil disinkronisasi & dipetakan.`,
+        penerimaanUpdated: resPen.totalUpdated,
+        pengeluaranUpdated: resPeng.totalUpdated,
+        updatedCount: resPen.totalUpdated + resPeng.totalUpdated
       });
     }
-
-    // B. EKSEKUSI KHUSUS MODUL PENGELUARAN
-    // Cari rentang ID tertinggi pada rkat_pengeluaran untuk chunking presisi (mencegah Statement Timeout PostgreSQL 8 detik)
-    const { data: maxRow } = await supabaseAdmin.from('rkat_pengeluaran').select('id').order('id', { ascending: false }).limit(1);
-    const maxTableId = maxRow?.[0]?.id || 30000;
-    const CHUNK_SIZE = 2000;
-
-    if (cleanSync) {
-      for (let s = 1; s <= maxTableId + 1000; s += CHUNK_SIZE) {
-        let resetQ = supabaseAdmin
-          .from('rkat_pengeluaran')
-          .update({
-            laporan_kementerian: null,
-            laporan_webometrics: null,
-            identifikasi_lain: null,
-            tags: {}
-          })
-          .gte('id', s)
-          .lt('id', s + CHUNK_SIZE);
-
-        if (targetYear && targetYear !== 'ALL') {
-          resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
-        }
-
-        await resetQ;
-      }
-    }
-
-    // 2. Eksekusi Setiap Aturan Langsung pada Database Supabase (dengan ID Range Chunking agar tidak timeout)
-    totalUpdated = 0;
-
-    for (const rule of rulesList) {
-      const tf = (rule.target_field || 'laporan_kementerian').toLowerCase().trim();
-      const nilai = (rule.nilai_klasifikasi || '').trim();
-      if (!nilai) continue;
-
-      let updatePayload: any = {
-        updated_at: new Date().toISOString()
-      };
-
-      if (tf === 'laporan_webometrics') {
-        updatePayload.laporan_webometrics = nilai;
-      } else if (tf === 'laporan_kementerian') {
-        updatePayload.laporan_kementerian = nilai;
-      } else {
-        // Format kustom (misal 'proposal rkat', 'laporan_iku', 'laporan_sdgs')
-        updatePayload.identifikasi_lain = nilai;
-        updatePayload.tags = { [tf]: nilai };
-      }
-
-      // Jalankan per potongan ID agar query dijamin < 1 detik dan aman dari batas timeout Supabase 8 detik
-      for (let startId = 1; startId <= maxTableId + 1000; startId += CHUNK_SIZE) {
-        const endId = startId + CHUNK_SIZE;
-        let chunkQ = supabaseAdmin
-          .from('rkat_pengeluaran')
-          .update(updatePayload, { count: 'exact' })
-          .gte('id', startId)
-          .lt('id', endId);
-
-        if (targetYear && targetYear !== 'ALL') {
-          chunkQ = chunkQ.eq('tahun_anggaran', parseInt(targetYear));
-        }
-
-        // Filter Unit (Mendukung satu atau beberapa unit dipisahkan koma atau |)
-        if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
-          const units = rule.unit.split(/[,|]/).map((u: string) => u.replace(/\*/g, '').trim()).filter(Boolean);
-          if (units.length === 1) {
-            chunkQ = chunkQ.ilike('unit', `%${units[0]}%`);
-          } else if (units.length > 1) {
-            const unitConds = units.map((u: string) => `unit.ilike.%${u}%`).join(',');
-            chunkQ = chunkQ.or(unitConds);
-          }
-        }
-
-        // Filter Akun (Mendukung satu atau beberapa kode akun dipisahkan koma atau |)
-        if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
-          const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
-          if (akuns.length === 1) {
-            chunkQ = chunkQ.ilike('akun_detail', `${akuns[0]}%`);
-          } else if (akuns.length > 1) {
-            const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
-            chunkQ = chunkQ.or(akunConds);
-          }
-        }
-
-        // Filter Kata Kunci Belanja (Mendukung satu atau beberapa kata kunci dipisahkan koma atau |)
-        if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
-          const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
-          if (kws.length === 1) {
-            const kw = kws[0];
-            chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
-          } else if (kws.length > 1) {
-            const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
-            chunkQ = chunkQ.or(orConds);
-          }
-        }
-
-        const { count, error } = await chunkQ;
-        if (error) {
-          console.error(`Error updating rule ID ${rule.id} chunk [${startId}-${endId}]:`, error);
-        } else if (count) {
-          totalUpdated += count;
-        }
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Rule Engine sukses dijalankan secara instan! Seluruh data lama yang tidak memiliki aturan telah dibersihkan, dan ${totalUpdated} baris data berhasil dipetakan sesuai aturan aktif saat ini.`,
-      updatedCount: totalUpdated,
-      rulesApplied: rulesList.length
-    });
   } catch (error: any) {
     console.error('Error in rka_rules PUT handler:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
