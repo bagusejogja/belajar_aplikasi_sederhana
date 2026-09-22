@@ -28,7 +28,7 @@ const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
-// Autocomplete Filter Unit Kerja Component (Seragam persis dengan /rka/laporan & screenshot)
+// Autocomplete Filter Unit Kerja Component (Input Langsung di Box tanpa klik dua kali)
 function UnitAutocompleteFilter({ 
   units, 
   selectedUnit, 
@@ -42,22 +42,30 @@ function UnitAutocompleteFilter({
   const [query, setQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
+  const isAll = selectedUnit === 'ALL' || selectedUnit === '*' || !selectedUnit;
+
+  // Filter unit berdasarkan query pencarian
   const filteredUnits = useMemo(() => {
+    if (!query.trim()) return units;
     return units.filter(u => u.toLowerCase().includes(query.toLowerCase()));
   }, [units, query]);
-
-  const isAll = selectedUnit === 'ALL' || selectedUnit === '*' || !selectedUnit;
 
   const allOptions = useMemo(() => {
     return ['ALL', ...filteredUnits];
   }, [filteredUnits]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setQuery('');
-      setHighlightedIndex(0);
-    }
-  }, [isOpen]);
+  // Saat dropdown dibuka, defaultkan query kosong agar semua unit muncul
+  const handleFocus = () => {
+    setIsOpen(true);
+    setQuery('');
+    setHighlightedIndex(0);
+  };
+
+  const handleSelectOption = (unit: string) => {
+    onSelect(unit);
+    setIsOpen(false);
+    setQuery('');
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) {
@@ -76,8 +84,7 @@ function UnitAutocompleteFilter({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (allOptions[highlightedIndex]) {
-        onSelect(allOptions[highlightedIndex]);
-        setIsOpen(false);
+        handleSelectOption(allOptions[highlightedIndex]);
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
@@ -86,15 +93,44 @@ function UnitAutocompleteFilter({
 
   return (
     <div className="relative w-full">
-      <div 
-        onClick={() => setIsOpen(true)}
-        className="w-full h-9 px-3.5 py-1.5 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/20 cursor-pointer flex items-center justify-between transition-all shadow-2xs"
-      >
-        <span className="truncate font-bold text-gray-800 flex items-center gap-1.5">
-          <span>🏢</span>
-          <span>{isAll ? `Semua Unit Kerja (${units.length})` : selectedUnit}</span>
-        </span>
-        <span className="text-[10px] text-gray-500 shrink-0 ml-1">▼</span>
+      <div className="relative w-full flex items-center">
+        <span className="absolute left-3 text-xs text-gray-500 pointer-events-none z-10">🏢</span>
+        <input
+          type="text"
+          value={isOpen ? query : (isAll ? `Semua Unit Kerja (${units.length})` : selectedUnit)}
+          onChange={e => {
+            setQuery(e.target.value);
+            setHighlightedIndex(0);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
+          placeholder="Ketik nama Fakultas / Unit Kerja..."
+          className="w-full h-9 pl-8 pr-12 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-gray-800 font-bold transition-all shadow-2xs cursor-text placeholder:font-normal placeholder:text-gray-400"
+        />
+        <div className="absolute right-2.5 flex items-center gap-1">
+          {(!isAll || query) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect('ALL');
+                setQuery('');
+              }}
+              title="Reset ke Semua Unit"
+              className="p-1 hover:bg-gray-100 rounded-md text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOpen(prev => !prev)}
+            className="p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          >
+            <ChevronDown size={13} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {isOpen && (
@@ -103,37 +139,15 @@ function UnitAutocompleteFilter({
             className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)} 
           />
-          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
-            <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-1.5">
-              <Search size={14} className="text-gray-400 ml-1 shrink-0" />
-              <input
-                type="text"
-                autoFocus
-                value={query}
-                onChange={e => {
-                  setQuery(e.target.value);
-                  setHighlightedIndex(0);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Cari unit (Navigasi ↑ ↓ + Enter)..."
-                className="w-full bg-transparent border-none text-xs font-semibold focus:outline-hidden text-gray-800 placeholder:text-gray-400"
-              />
-              {query && (
-                <button 
-                  onClick={() => setQuery('')}
-                  className="p-1 hover:bg-gray-200 rounded-md text-gray-400 hover:text-gray-600"
-                >
-                  <X size={12} />
-                </button>
-              )}
+          <div className="absolute left-0 top-full mt-1.5 w-full min-w-[280px] max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+            <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+              <span>Pilih Unit Kerja ({filteredUnits.length} hasil)</span>
+              <span className="text-[10px] text-gray-400 font-mono">↑↓ Enter</span>
             </div>
 
             <div className="overflow-y-auto divide-y divide-gray-50 max-h-60 text-xs">
               <div
-                onClick={() => {
-                  onSelect('ALL');
-                  setIsOpen(false);
-                }}
+                onClick={() => handleSelectOption('ALL')}
                 onMouseEnter={() => setHighlightedIndex(0)}
                 className={`p-2.5 font-bold cursor-pointer transition-colors flex items-center justify-between ${
                   isAll ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
@@ -143,32 +157,29 @@ function UnitAutocompleteFilter({
                 {isAll && <Check size={14} className="text-white" />}
               </div>
 
-              {filteredUnits.map((unit, idx) => {
-                const optIndex = idx + 1;
-                const isSelected = selectedUnit === unit;
-                const isHighlighted = highlightedIndex === optIndex;
-                return (
-                  <div
-                    key={unit}
-                    onClick={() => {
-                      onSelect(unit);
-                      setIsOpen(false);
-                    }}
-                    onMouseEnter={() => setHighlightedIndex(optIndex)}
-                    className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
-                      isSelected ? 'bg-indigo-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-50'
-                    } ${isHighlighted && !isSelected ? 'bg-indigo-50 text-indigo-800 font-semibold' : ''}`}
-                  >
-                    <span className="truncate">{unit}</span>
-                    {isSelected && <Check size={14} className="text-white shrink-0" />}
-                  </div>
-                );
-              })}
-
-              {filteredUnits.length === 0 && (
-                <div className="p-4 text-gray-400 text-center italic">
-                  Unit tidak ditemukan
+              {filteredUnits.length === 0 ? (
+                <div className="p-4 text-center text-xs text-gray-400 italic">
+                  Unit &quot;{query}&quot; tidak ditemukan.
                 </div>
+              ) : (
+                filteredUnits.map((unit, idx) => {
+                  const optIndex = idx + 1;
+                  const isSelected = selectedUnit === unit;
+                  const isHighlighted = highlightedIndex === optIndex;
+                  return (
+                    <div
+                      key={unit}
+                      onClick={() => handleSelectOption(unit)}
+                      onMouseEnter={() => setHighlightedIndex(optIndex)}
+                      className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
+                        isSelected ? 'bg-indigo-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-50'
+                      } ${isHighlighted && !isSelected ? 'bg-indigo-50 text-indigo-800 font-semibold' : ''}`}
+                    >
+                      <span className="truncate">{unit}</span>
+                      {isSelected && <Check size={14} className="text-white shrink-0" />}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
