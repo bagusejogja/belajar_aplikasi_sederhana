@@ -28,7 +28,7 @@ const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
 ];
 
-// Autocomplete Filter Unit Kerja Component (Input Langsung di Box tanpa klik dua kali)
+// Autocomplete Filter Unit Kerja Component (Input Langsung di Box tanpa klik dua kali - Seragam dengan /rka/laporan)
 function UnitAutocompleteFilter({ 
   units, 
   selectedUnit, 
@@ -92,12 +92,11 @@ function UnitAutocompleteFilter({
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full sm:w-64">
       <div className="relative w-full flex items-center">
-        <span className="absolute left-3 text-xs text-gray-500 pointer-events-none z-10">🏢</span>
         <input
           type="text"
-          value={isOpen ? query : (isAll ? `Semua Unit Kerja (${units.length})` : selectedUnit)}
+          value={isOpen ? query : (isAll ? 'Semua Unit Kerja' : selectedUnit)}
           onChange={e => {
             setQuery(e.target.value);
             setHighlightedIndex(0);
@@ -105,10 +104,10 @@ function UnitAutocompleteFilter({
           }}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
-          placeholder="Ketik nama Fakultas / Unit Kerja..."
-          className="w-full h-9 pl-8 pr-12 text-xs rounded-xl border border-gray-300 bg-white hover:border-indigo-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-gray-800 font-bold transition-all shadow-2xs cursor-text placeholder:font-normal placeholder:text-gray-400"
+          placeholder="Ketik cari nama unit..."
+          className="w-full h-8 pl-3 pr-10 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800 font-semibold transition-all shadow-2xs cursor-text placeholder:font-normal placeholder:text-gray-400"
         />
-        <div className="absolute right-2.5 flex items-center gap-1">
+        <div className="absolute right-2 flex items-center gap-0.5">
           {(!isAll || query) && (
             <button
               type="button"
@@ -139,7 +138,7 @@ function UnitAutocompleteFilter({
             className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)} 
           />
-          <div className="absolute left-0 top-full mt-1.5 w-full min-w-[280px] max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-h-72 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
             <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center justify-between text-[11px] text-gray-500 font-medium">
               <span>Pilih Unit Kerja ({filteredUnits.length} hasil)</span>
               <span className="text-[10px] text-gray-400 font-mono">↑↓ Enter</span>
@@ -150,11 +149,11 @@ function UnitAutocompleteFilter({
                 onClick={() => handleSelectOption('ALL')}
                 onMouseEnter={() => setHighlightedIndex(0)}
                 className={`p-2.5 font-bold cursor-pointer transition-colors flex items-center justify-between ${
-                  isAll ? 'bg-indigo-600 text-white' : 'text-gray-700 hover:bg-gray-50'
-                } ${highlightedIndex === 0 && !isAll ? 'bg-indigo-50 text-indigo-800' : ''}`}
+                  isAll ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                } ${highlightedIndex === 0 ? 'bg-blue-50/70 text-blue-800' : ''}`}
               >
-                <span>🏢 Semua Unit Kerja ({units.length})</span>
-                {isAll && <Check size={14} className="text-white" />}
+                <span>🏢 Semua Unit Kerja</span>
+                {isAll && <Check size={14} className="text-blue-600" />}
               </div>
 
               {filteredUnits.length === 0 ? (
@@ -172,11 +171,11 @@ function UnitAutocompleteFilter({
                       onClick={() => handleSelectOption(unit)}
                       onMouseEnter={() => setHighlightedIndex(optIndex)}
                       className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between ${
-                        isSelected ? 'bg-indigo-600 text-white font-bold' : 'text-gray-700 hover:bg-gray-50'
-                      } ${isHighlighted && !isSelected ? 'bg-indigo-50 text-indigo-800 font-semibold' : ''}`}
+                        isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
+                      } ${isHighlighted ? 'bg-blue-50/70 text-blue-800' : ''}`}
                     >
                       <span className="truncate">{unit}</span>
-                      {isSelected && <Check size={14} className="text-white shrink-0" />}
+                      {isSelected && <Check size={14} className="text-blue-600 shrink-0 ml-1" />}
                     </div>
                   );
                 })
@@ -1342,43 +1341,57 @@ export default function RkaRulesPage() {
             </Badge>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            
-            {/* Filter Unit Kerja (Seragam dengan tambah-pagu) */}
-            <div className="w-56 sm:w-72">
-              <UnitAutocompleteFilter
-                units={units}
-                selectedUnit={filterUnit}
-                onSelect={setFilterUnit}
-              />
+          <div className="flex flex-wrap items-end gap-2.5">
+            {/* Filter Fakultas / Unit Kerja (Seragam dengan /rka/laporan) */}
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Fakultas / Unit Kerja
+              </label>
+              <div className="w-56 sm:w-72">
+                <UnitAutocompleteFilter
+                  units={units}
+                  selectedUnit={filterUnit}
+                  onSelect={setFilterUnit}
+                />
+              </div>
             </div>
 
             {/* Filter Target Format Laporan */}
-            <select
-              value={filterTarget}
-              onChange={e => setFilterTarget(e.target.value)}
-              className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
-            >
-              <option value="ALL">Semua Format Laporan ({rules.length})</option>
-              {allTargetOptions.map(t => {
-                const count = rules.filter(r => (r.target_field || '').toLowerCase() === t.toLowerCase()).length;
-                const pretty = t.replace(/^(laporan_|target_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                return (
-                  <option key={t} value={t}>📊 {pretty} ({count})</option>
-                );
-              })}
-            </select>
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Target Format
+              </label>
+              <select
+                value={filterTarget}
+                onChange={e => setFilterTarget(e.target.value)}
+                className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-8 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="ALL">Semua Format Laporan ({rules.length})</option>
+                {allTargetOptions.map(t => {
+                  const count = rules.filter(r => (r.target_field || '').toLowerCase() === t.toLowerCase()).length;
+                  const pretty = t.replace(/^(laporan_|target_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                  return (
+                    <option key={t} value={t}>📊 {pretty} ({count})</option>
+                  );
+                })}
+              </select>
+            </div>
 
             {/* Search Box */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-              <input
-                type="text"
-                placeholder="Cari kata kunci, label, akun..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-9 outline-none focus:ring-2 focus:ring-indigo-600 font-medium focus:bg-white transition-all w-52 sm:w-60"
-              />
+            <div className="flex flex-col">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                Pencarian
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Cari kata kunci, label, akun..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-8 outline-none focus:ring-2 focus:ring-blue-500 font-medium focus:bg-white transition-all w-52 sm:w-60"
+                />
+              </div>
             </div>
           </div>
         </div>

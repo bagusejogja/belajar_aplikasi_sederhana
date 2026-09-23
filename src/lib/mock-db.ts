@@ -54,7 +54,6 @@ export const menuList: MenuItem[] = [
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Copas Zone Pagu', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Laporan Komparasi', path: '/komparasi-laporan', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
 
   // --- REVIEW ANGGARAN ---
   { title: 'Review Detail Anggaran', path: '/review', icon: 'CheckSquare', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
@@ -110,7 +109,6 @@ export const menuList: MenuItem[] = [
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Catatan & Tugas Kerja', path: '/catatan-tugas', icon: 'ListTodo', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
   { title: 'Arsip Berjenjang', path: '/arsip-kegiatan', icon: 'FolderTree', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
-  { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },
 
   // --- MOCKUP ---
   { title: 'Approval RKAT', path: '/mockup/approval-rkat', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Mockup' },
@@ -120,6 +118,7 @@ export const menuList: MenuItem[] = [
   { title: 'RKA Pengeluaran', path: '/rka/pengeluaran', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'RKA' },
   { title: 'Klasifikasi & Rules RKA', path: '/rka/rules', icon: 'Wand2', roles: ['ADMIN', 'MANAGER'], group: 'RKA' },
   { title: 'Rekap Laporan RKA', path: '/rka/laporan', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'RKA' },
+  { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'RKA' },
 ];
 
 

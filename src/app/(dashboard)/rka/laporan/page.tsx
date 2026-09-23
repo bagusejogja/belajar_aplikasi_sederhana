@@ -51,6 +51,8 @@ export interface PptTemplateConfig {
   pengeluaranLainnyaLabel: string;
 }
 
+import { isPptKeyMatch } from '@/lib/rka-ppt-mapping';
+
 // Model Hierarki Baris Slide Format Proposal PPT (Sesuai Komparasi Laporan & Screenshot Pengguna)
 interface PptSlideRow {
   id: string;
@@ -62,7 +64,7 @@ interface PptSlideRow {
   type: 'penerimaan' | 'pengeluaran' | 'summary';
 }
 
-// Susunan Standar Slide Presentasi / PPT Proposal RKAT (37 Baris Persis Sesuai Master Akun & Screenshot)
+// Susunan Standar Slide Presentasi / PPT Proposal RKAT (Diselaraskan 1:1 dengan Master Akun Komparasi Laporan)
 const DEFAULT_PPT_TREE: PptSlideRow[] = [
   // PENERIMAAN (Level 0)
   { id: 'h_pen', keterangan: 'PENERIMAAN', level: 0, is_sum: false, is_bold: true, type: 'penerimaan' },
@@ -70,17 +72,17 @@ const DEFAULT_PPT_TREE: PptSlideRow[] = [
   // 1. Dana Pemerintah
   { id: 'pen_pem', keterangan: 'Jumlah Penerimaan Dana Pemerintah', level: 1, is_sum: true, is_bold: true, type: 'penerimaan' },
   { id: 'pen_gaji', keterangan: 'Penerimaan Gaji dan Tunjangan PNS', level: 2, is_sum: false, is_bold: true, matchKeys: ['gaji', 'tunjangan pns', 'pns'], type: 'penerimaan' },
-  { id: 'pen_bp_ptnbh', keterangan: 'Bantuan Pendanaan PTN Badan Hukum', level: 2, is_sum: false, is_bold: true, matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', '42103'], type: 'penerimaan' },
+  { id: 'pen_bp_ptnbh', keterangan: 'Bantuan Pendanaan PTN Badan Hukum', level: 2, is_sum: false, is_bold: true, matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], type: 'penerimaan' },
   { id: 'pen_pem_lain', keterangan: 'Penerimaan Pemerintah lainnya', level: 2, is_sum: true, is_bold: true, type: 'penerimaan' },
   { id: 'pen_penelitian', keterangan: 'Penelitian', level: 3, is_sum: false, is_bold: false, matchKeys: ['penelitian'], type: 'penerimaan' },
   { id: 'pen_beasiswa', keterangan: 'Beasiswa dan Kontrak Kerjasama Pemerintah', level: 3, is_sum: false, is_bold: false, matchKeys: ['beasiswa', 'kontrak kerjasama'], type: 'penerimaan' },
-  { id: 'pen_jica', keterangan: 'HIBAH GDG LOAN JICA', level: 3, is_sum: false, is_bold: false, matchKeys: ['jica', 'gdg loan'], type: 'penerimaan' },
+  { id: 'pen_jica', keterangan: 'HIBAH GDG LOAN JICA', level: 3, is_sum: false, is_bold: false, matchKeys: ['jica', 'loan jica'], type: 'penerimaan' },
   { id: 'pen_dapt', keterangan: 'Penerimaan DAPT', level: 3, is_sum: false, is_bold: false, matchKeys: ['dapt'], type: 'penerimaan' },
-  { id: 'pen_iku', keterangan: 'Insentif Capaian IKU', level: 3, is_sum: false, is_bold: false, matchKeys: ['iku', 'insentif iku'], type: 'penerimaan' },
-  { id: 'pen_stp', keterangan: 'HIBAH SCIENCE TECHNO PARK -ADB', level: 3, is_sum: false, is_bold: false, matchKeys: ['science techno park', 'adb', 'stp'], type: 'penerimaan' },
+  { id: 'pen_iku', keterangan: 'Insentif Capaian IKU', level: 3, is_sum: false, is_bold: false, matchKeys: ['iku', 'insentif iku', 'capaian iku'], type: 'penerimaan' },
+  { id: 'pen_stp', keterangan: 'HIBAH SCIENCE TECHNO PARK -ADB', level: 3, is_sum: false, is_bold: false, matchKeys: ['science techno park', 'techno park', 'stp', 'prime step', 'adb'], type: 'penerimaan' },
   { id: 'pen_puapt', keterangan: 'HIBAH PUAPT', level: 3, is_sum: false, is_bold: false, matchKeys: ['puapt'], type: 'penerimaan' },
   { id: 'pen_equity', keterangan: 'EQUITY', level: 3, is_sum: false, is_bold: false, matchKeys: ['equity'], type: 'penerimaan' },
-  { id: 'pen_revitalisasi', keterangan: 'Pendamping Program Revitalisasi PTN 2024', level: 3, is_sum: false, is_bold: false, matchKeys: ['revitalisasi ptn', 'revitalisasi'], type: 'penerimaan' },
+  { id: 'pen_revitalisasi', keterangan: 'Pendamping Program Revitalisasi PTN 2024', level: 3, is_sum: false, is_bold: false, matchKeys: ['revitalisasi'], type: 'penerimaan' },
 
   // 2. Dana Masyarakat
   { id: 'pen_masyarakat', keterangan: 'Jumlah Penerimaan Dana Masyarakat', level: 1, is_sum: true, is_bold: true, type: 'penerimaan' },
@@ -88,11 +90,13 @@ const DEFAULT_PPT_TREE: PptSlideRow[] = [
   { id: 'pen_pend_utama', keterangan: 'Penerimaan Pendidikan Utama', level: 3, is_sum: false, is_bold: false, matchKeys: ['pendidikan utama', 's1', 's2', 's3', 'vokasi', 'ukt', 'sarjana', 'magister', 'doktor'], type: 'penerimaan' },
   { id: 'pen_pend_lain', keterangan: 'Penerimaan Pendidikan Lainnya', level: 3, is_sum: false, is_bold: false, matchKeys: ['pendidikan lainnya', 'seleksi', 'registrasi', 'admisi'], type: 'penerimaan' },
   { id: 'pen_non_pend', keterangan: 'Penerimaan Non Pendidikan', level: 2, is_sum: true, is_bold: true, type: 'penerimaan' },
-  { id: 'pen_hibah_donasi', keterangan: 'Penerimaan Hibah dan Donasi', level: 3, is_sum: false, is_bold: false, matchKeys: ['hibah', 'donasi'], type: 'penerimaan' },
+  { id: 'pen_hibah_donasi', keterangan: 'Penerimaan Hibah dan Donasi', level: 3, is_sum: false, is_bold: false, matchKeys: ['hibah dan donasi', 'donasi'], type: 'penerimaan' },
   { id: 'pen_jasa_univ', keterangan: 'Penerimaan Jasa Universitas', level: 3, is_sum: false, is_bold: false, matchKeys: ['jasa universitas', 'jasa'], type: 'penerimaan' },
   { id: 'pen_aset', keterangan: 'Penerimaan Pemanfaatan Aset', level: 3, is_sum: false, is_bold: false, matchKeys: ['aset', 'sewa'], type: 'penerimaan' },
   { id: 'pen_kerjasama', keterangan: 'Penerimaan Kerjasama', level: 3, is_sum: false, is_bold: false, matchKeys: ['kerjasama'], type: 'penerimaan' },
   { id: 'pen_upu', keterangan: 'Penerimaan dari UPU', level: 3, is_sum: false, is_bold: false, matchKeys: ['upu'], type: 'penerimaan' },
+  { id: 'pen_pinjaman', keterangan: 'Pinjaman Dalam Negeri', level: 3, is_sum: false, is_bold: false, matchKeys: ['pinjaman'], type: 'penerimaan' },
+  { id: 'pen_cadangan', keterangan: 'cadangana ', level: 3, is_sum: false, is_bold: false, matchKeys: ['cadangan'], type: 'penerimaan' },
 
   // Total Penerimaan
   { id: 'tot_pen', keterangan: 'JUMLAH PENERIMAAN', level: 0, is_sum: true, is_bold: true, type: 'summary' },
@@ -116,48 +120,68 @@ const DEFAULT_PPT_TREE: PptSlideRow[] = [
   { id: 'surplus_defisit', keterangan: 'SURPLUS/(DEFISIT) ANGGARAN', level: 0, is_sum: true, is_bold: true, type: 'summary' },
 ];
 
-// Helper pencocokan kata kunci template PPT yang akurat:
-function isPptKeyMatch(label: string, matchKeys?: string[]): boolean {
-  if (!label || !matchKeys || matchKeys.length === 0) return false;
-  const kLower = label.toLowerCase().trim();
-  return matchKeys.some(rawMk => {
-    const mk = rawMk.toLowerCase().trim();
-    if (!mk) return false;
-    if (mk === 'jasa') {
-      const regex = /(?:^|[^a-zA-Z0-9])jasa(?:[^a-zA-Z0-9]|$)/i;
-      return regex.test(kLower);
-    }
-    if (!mk.includes(' ')) {
-      const escaped = mk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i');
-      return regex.test(kLower);
-    }
-    return kLower.includes(mk);
-  });
-}
-
 const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
-  penerimaanTitle: 'Jumlah Penerimaan Dana Masyarakat',
+  penerimaanTitle: 'PENERIMAAN',
   penerimaanSections: [
     {
-      id: 'pendidikan',
-      title: 'I. Penerimaan Pendidikan',
+      id: 'dana_pemerintah',
+      title: 'Jumlah Penerimaan Dana Pemerintah',
       items: [
-        { id: 'pend_utama', label: 'Penerimaan Pendidikan Utama', matchKeys: ['pendidikan utama'], is_sum: false, subItems: [] },
-        { id: 'pend_lainnya', label: 'Penerimaan Pendidikan Lainnya', matchKeys: ['pendidikan lainnya'], is_sum: false, subItems: [] },
+        { 
+          id: 'gaji_pns', 
+          label: 'Penerimaan Gaji dan Tunjangan PNS', 
+          matchKeys: ['gaji', 'tunjangan pns', 'pns'], 
+          is_sum: false, 
+          subItems: [] 
+        },
+        { 
+          id: 'bp_ptnbh', 
+          label: 'Bantuan Pendanaan PTN Badan Hukum', 
+          matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], 
+          is_sum: false, 
+          subItems: [] 
+        },
+        { 
+          id: 'pem_lainnya', 
+          label: 'Penerimaan Pemerintah lainnya', 
+          is_sum: true, 
+          matchKeys: [], 
+          subItems: [
+            { id: 'penelitian', label: 'Penelitian', matchKeys: ['penelitian'], is_sum: false, subItems: [] },
+            { id: 'beasiswa_pemerintah', label: 'Beasiswa dan Kontrak Kerjasama Pemerintah', matchKeys: ['beasiswa', 'kontrak kerjasama'], is_sum: false, subItems: [] },
+            { id: 'stp', label: 'HIBAH SCIENCE TECHNO PARK -ADB', matchKeys: ['science techno park', 'techno park', 'stp', 'prime step', 'adb'], is_sum: false, subItems: [] },
+            { id: 'equity', label: 'EQUITY', matchKeys: ['equity'], is_sum: false, subItems: [] }
+          ] 
+        }
       ]
     },
     {
-      id: 'non_pendidikan',
-      title: 'II. Penerimaan Non Pendidikan',
+      id: 'dana_masyarakat',
+      title: 'Jumlah Penerimaan Dana Masyarakat',
       items: [
-        { id: 'bp_ptnbh', label: 'Bantuan Pendanaan PTN Badan Hukum', matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], is_sum: false, subItems: [] },
-        { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah'], is_sum: false, subItems: [] },
-        { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'], is_sum: false, subItems: [] },
-        { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset'], is_sum: false, subItems: [] },
-        { id: 'beasiswa_pemerintah', label: 'Beasiswa dan Kontrak Kerjasama Pemerintah', matchKeys: ['beasiswa'], is_sum: false, subItems: [] },
-        { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'], is_sum: false, subItems: [] },
-        { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'], is_sum: false, subItems: [] },
+        {
+          id: 'pendidikan',
+          label: 'Penerimaan Pendidikan',
+          is_sum: true,
+          matchKeys: [],
+          subItems: [
+            { id: 'pend_utama', label: 'Penerimaan Pendidikan Utama', matchKeys: ['pendidikan utama', 's1', 's2', 's3', 'vokasi', 'ukt', 'sarjana', 'magister', 'doktor'], is_sum: false, subItems: [] },
+            { id: 'pend_lainnya', label: 'Penerimaan Pendidikan Lainnya', matchKeys: ['pendidikan lainnya', 'seleksi', 'registrasi', 'admisi'], is_sum: false, subItems: [] }
+          ]
+        },
+        {
+          id: 'non_pendidikan',
+          label: 'Penerimaan Non Pendidikan',
+          is_sum: true,
+          matchKeys: [],
+          subItems: [
+            { id: 'hibah', label: 'Penerimaan Hibah dan Donasi', matchKeys: ['hibah dan donasi', 'donasi'], is_sum: false, subItems: [] },
+            { id: 'jasa', label: 'Penerimaan Jasa Universitas', matchKeys: ['jasa universitas', 'jasa'], is_sum: false, subItems: [] },
+            { id: 'aset', label: 'Penerimaan Pemanfaatan Aset', matchKeys: ['aset', 'sewa'], is_sum: false, subItems: [] },
+            { id: 'kerjasama', label: 'Penerimaan Kerjasama', matchKeys: ['kerjasama'], is_sum: false, subItems: [] },
+            { id: 'upu', label: 'Penerimaan dari UPU', matchKeys: ['upu'], is_sum: false, subItems: [] }
+          ]
+        }
       ]
     }
   ],
@@ -635,7 +659,7 @@ function HierarchicalInlineTable({
                 {/* LEVEL 1: NAMA_AKUN */}
                 <tr 
                   onClick={() => toggleAkun(akun.namaAkun)}
-                  className="bg-[#eef5fa] hover:bg-[#e2edf5] border-b border-slate-200 cursor-pointer transition-colors font-bold text-slate-900 select-none"
+                  className="bg-[#eef5fa] hover:bg-[#e2edf5] border-b border-slate-200 cursor-pointer transition-colors font-bold text-slate-900"
                 >
                   <td className="px-3 py-2.5 text-center align-middle">
                     <button 
@@ -672,7 +696,7 @@ function HierarchicalInlineTable({
                     <React.Fragment key={unitKey + uIdx}>
                       <tr 
                         onClick={() => toggleUnit(unitKey)}
-                        className="bg-white hover:bg-slate-50/80 border-b border-slate-100 cursor-pointer transition-colors text-slate-800 select-none"
+                        className="bg-white hover:bg-slate-50/80 border-b border-slate-100 cursor-pointer transition-colors text-slate-800"
                       >
                         <td className="px-3 py-2 text-center align-middle pl-6">
                           <button 
@@ -1142,7 +1166,7 @@ function UnitDetailHierarchyTable({
                   {/* LEVEL 1: POS HEADER (1. Pen. Pendidikan, 2. Pen. Non Pendidikan, dst.) */}
                   <tr
                     onClick={() => hasData && toggleSection(sec.id)}
-                    className={`${sec.theme.bg} hover:brightness-95 border-b border-slate-200 transition-colors select-none ${hasData ? 'cursor-pointer' : 'opacity-60'}`}
+                    className={`${sec.theme.bg} hover:brightness-95 border-b border-slate-200 transition-colors ${hasData ? 'cursor-pointer' : 'opacity-60'}`}
                   >
                     <td className="px-2 py-1.5 text-center align-middle">
                       {hasData ? (
@@ -1193,7 +1217,7 @@ function UnitDetailHierarchyTable({
                       <React.Fragment key={akunKey}>
                         <tr
                           onClick={() => toggleAkun(akunKey)}
-                          className="bg-white hover:bg-indigo-50/40 border-b border-slate-100 cursor-pointer transition-colors text-slate-800 select-none"
+                          className="bg-white hover:bg-indigo-50/40 border-b border-slate-100 cursor-pointer transition-colors text-slate-800"
                         >
                           <td className="px-2 py-1.5 text-center align-middle pl-5">
                             <button
@@ -1285,33 +1309,16 @@ export default function RkaLaporanPage() {
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('rka_ppt_template_config');
+        const saved = localStorage.getItem('rka_ppt_template_config_v7');
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.penerimaanSections) {
-            // Migrasi format lama: jika belum punya pengeluaranSections, bangun dari pengeluaranItems atau default
-            if (!parsed.pengeluaranSections || parsed.pengeluaranSections.length === 0) {
-              if (parsed.pengeluaranItems && parsed.pengeluaranItems.length > 0) {
-                parsed.pengeluaranSections = [
-                  {
-                    id: 'sec_belanja_migrated',
-                    title: 'I. Belanja Pengeluaran',
-                    items: parsed.pengeluaranItems.map((item: any) => ({
-                      ...item,
-                      is_sum: item.is_sum ?? false,
-                      subItems: item.subItems ?? []
-                    }))
-                  }
-                ];
-              } else {
-                parsed.pengeluaranSections = DEFAULT_PPT_TEMPLATE.pengeluaranSections;
-              }
+            const hasDanaPemerintah = parsed.penerimaanSections.some(
+              (s: any) => s.id === 'dana_pemerintah' || s.title?.toLowerCase().includes('dana pemerintah')
+            );
+            if (hasDanaPemerintah) {
+              return parsed;
             }
-            const nonPendSec = parsed.penerimaanSections?.find((s: any) => s.id === 'non_pendidikan');
-            if (nonPendSec && !nonPendSec.items?.some((it: any) => it.id === 'bp_ptnbh')) {
-              nonPendSec.items.unshift({ id: 'bp_ptnbh', label: 'Bantuan Pendanaan PTN Badan Hukum', matchKeys: ['bantuan pendanaan', 'ptn badan hukum', 'bp ptn bh', 'ptnbh', 'bpptnbh', '42103'], is_sum: false, subItems: [] });
-            }
-            return parsed;
           }
         }
       } catch (e) {}
@@ -1323,7 +1330,7 @@ export default function RkaLaporanPage() {
   const [pptTreeTemplate, setPptTreeTemplate] = useState<PptSlideRow[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const saved = localStorage.getItem('ppt_slide_tree_template_v4');
+        const saved = localStorage.getItem('ppt_slide_tree_template_v5');
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -1641,7 +1648,7 @@ export default function RkaLaporanPage() {
 
             Object.keys(pMap).forEach(k => {
               if (usedPKeys.has(k)) return;
-              const isMatch = isPptKeyMatch(k, sub.matchKeys || []);
+              const isMatch = (k.toLowerCase().trim() === sub.label.toLowerCase().trim()) || isPptKeyMatch(k, sub.matchKeys || []);
               if (isMatch) {
                 subTotal += pMap[k].totalPagu;
                 subCount += pMap[k].count;
@@ -1666,7 +1673,7 @@ export default function RkaLaporanPage() {
         } else {
           Object.keys(pMap).forEach(k => {
             if (usedPKeys.has(k)) return;
-            const isMatch = isPptKeyMatch(k, item.matchKeys || []);
+            const isMatch = (k.toLowerCase().trim() === item.label.toLowerCase().trim()) || isPptKeyMatch(k, item.matchKeys || []);
             if (isMatch) {
               itemTotal += pMap[k].totalPagu;
               itemCount += pMap[k].count;
@@ -1766,7 +1773,7 @@ export default function RkaLaporanPage() {
 
             Object.keys(bMap).forEach(k => {
               if (usedBKeys.has(k)) return;
-              const isMatch = isPptKeyMatch(k, sub.matchKeys || []);
+              const isMatch = (k.toLowerCase().trim() === sub.label.toLowerCase().trim()) || isPptKeyMatch(k, sub.matchKeys || []);
               if (isMatch) {
                 subTotal += bMap[k].totalAnggaran;
                 subCount += bMap[k].count;
@@ -1791,7 +1798,7 @@ export default function RkaLaporanPage() {
         } else {
           Object.keys(bMap).forEach(k => {
             if (usedBKeys.has(k)) return;
-            const isMatch = isPptKeyMatch(k, item.matchKeys || []);
+            const isMatch = (k.toLowerCase().trim() === item.label.toLowerCase().trim()) || isPptKeyMatch(k, item.matchKeys || []);
             if (isMatch) {
               itemTotal += bMap[k].totalAnggaran;
               itemCount += bMap[k].count;
@@ -1882,7 +1889,12 @@ export default function RkaLaporanPage() {
             if (unitFilter !== 'ALL' && unitFilter !== '*' && (row.unit_kerja || row.unit || '') !== unitFilter) return false;
             if (tahunFilter !== 'ALL' && String(row.tahun_anggaran || row.tahun || '') !== tahunFilter) return false;
             
-            const text = `${row.nama_akun_penerimaan || ''} ${row.uraian_penerimaan || ''} ${row.keterangan || ''} ${row.sumber_dana || ''} ${row.format_proposal || ''} ${row.kelompok_penerimaan || ''} ${row.akun || ''}`;
+            const classification = (row.format_proposal || row.kelompok_penerimaan || '').trim();
+            if (classification) {
+              if (item.keterangan && classification.toLowerCase() === item.keterangan.toLowerCase().trim()) return true;
+              return isPptKeyMatch(classification, item.matchKeys);
+            }
+            const text = `${row.nama_akun_penerimaan || ''} ${row.uraian_penerimaan || ''} ${row.keterangan || ''} ${row.sumber_dana || ''} ${row.akun || ''}`;
             return isPptKeyMatch(text, item.matchKeys);
           });
           pagu = matchingRows.reduce((acc, r) => acc + (Number(r.renterima_pagu || r.anggaran || r.pagu) || 0), 0);
@@ -1893,7 +1905,11 @@ export default function RkaLaporanPage() {
             if (kategoriFilter !== 'ALL' && row.kategori_belanja !== kategoriFilter) return false;
             
             const classification = getRowClassification(row, 'proposal rkat') || '';
-            const text = `${row.uraian_belanja || ''} ${row.kegiatan || ''} ${row.program || ''} ${row.lingkup_kegiatan || ''} ${row.akun_detail || ''} ${row.kategori_belanja || ''} ${classification}`;
+            if (classification) {
+              if (item.keterangan && classification.toLowerCase() === item.keterangan.toLowerCase().trim()) return true;
+              return isPptKeyMatch(classification, item.matchKeys);
+            }
+            const text = `${row.uraian_belanja || ''} ${row.kegiatan || ''} ${row.program || ''} ${row.lingkup_kegiatan || ''} ${row.akun_detail || ''} ${row.kategori_belanja || ''}`;
             return isPptKeyMatch(text, item.matchKeys);
           });
           pagu = matchingRows.reduce((acc, r) => acc + (Number(r.anggaran) || 0), 0);
@@ -1995,7 +2011,7 @@ export default function RkaLaporanPage() {
     setPptTreeTemplate(prev => {
       const next = prev.map(r => r.id === editingRowModal.id ? editingRowModal : r);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(next));
+        localStorage.setItem('ppt_slide_tree_template_v5', JSON.stringify(next));
       }
       return next;
     });
@@ -2008,7 +2024,7 @@ export default function RkaLaporanPage() {
       setPptTreeTemplate(prev => {
         const next = prev.filter(r => r.id !== id);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(next));
+          localStorage.setItem('ppt_slide_tree_template_v5', JSON.stringify(next));
         }
         return next;
       });
@@ -2019,7 +2035,7 @@ export default function RkaLaporanPage() {
   const handleSaveAllTreeModal = () => {
     setPptTreeTemplate(tempTreeTemplate);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ppt_slide_tree_template_v4', JSON.stringify(tempTreeTemplate));
+      localStorage.setItem('ppt_slide_tree_template_v5', JSON.stringify(tempTreeTemplate));
     }
     setIsTemplateModalOpen(false);
     toast.success('Susunan slide berhasil disimpan!');
@@ -2612,9 +2628,11 @@ export default function RkaLaporanPage() {
       }
     });
 
-    // Pastikan seluruh unit KPTU dan UPU dari master gov_units terdaftar di unitMap
+    // Pastikan seluruh unit KPTU dan UPU dari master gov_units terdaftar di unitMap jika sesuai filter
     govUnitsList.filter(g => g.group_org === 'KPTU' || g.group_org === 'Unit Penunjang Universitas - UPU' || g.group_org === 'Unit Penunjang').forEach(gu => {
       const formattedName = gu.kode_unit && gu.kode_unit !== '--' ? `${gu.kode_unit} ${gu.nama_unit}` : gu.nama_unit;
+      if (unitFilter !== 'ALL' && formattedName !== unitFilter) return;
+      if (search && !formattedName.toLowerCase().includes(search.toLowerCase())) return;
       getOrCreateUnit(formattedName);
     });
 
@@ -2954,6 +2972,7 @@ export default function RkaLaporanPage() {
       const isUpu = rekapFormat === 'upu';
       const isKptu = rekapFormat === 'kptu';
       const isFakultasAlokasi = rekapFormat === 'fakultas_alokasi';
+      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : isFakultasAlokasi ? 'Format Fakultas (Alokasi) 11 Kolom' : 'Format Fakultas 11 Kolom';
       const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : isFakultasAlokasi ? 'Rekap_Fakultas_Alokasi' : 'Rekap_Fakultas';
       const ws = wb.addWorksheet(sheetName, {
         views: [{ showGridLines: true }]
@@ -2975,9 +2994,16 @@ export default function RkaLaporanPage() {
       const subTitleRow = ws.addRow([subTitleText]);
       subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
 
-      const infoRow = ws.addRow([
-        `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}  |  Filter: ${rekapGroupFilter === 'ALL' ? 'Semua Group Unit Kerja' : rekapGroupFilter}`
-      ]);
+      const filterParts: string[] = [
+        `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        `Tahun: ${tahunFilter === 'ALL' ? 'Semua Tahun' : `TA ${tahunFilter}`}`,
+        `Format: ${formatTag}`,
+        `Group: ${rekapGroupFilter === 'ALL' ? 'Semua Group' : rekapGroupFilter}`
+      ];
+      if (unitFilter !== 'ALL') filterParts.push(`Unit: ${unitFilter}`);
+      if (search) filterParts.push(`Pencarian: "${search}"`);
+
+      const infoRow = ws.addRow([filterParts.join('  |  ')]);
       infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
 
       ws.addRow([]); // Blank spacer
@@ -3103,10 +3129,15 @@ export default function RkaLaporanPage() {
         };
       });
 
-      // Filter group jika rekapGroupFilter aktif
-      const displayGroups = rekapGroupFilter === 'ALL' 
+      // Filter group jika rekapGroupFilter aktif dan abaikan group yang tidak memiliki unit kerja sesuai filter
+      const displayGroups = (rekapGroupFilter === 'ALL' 
         ? groupedByOrg 
-        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase());
+        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase())
+      ).filter(g => g.units.length > 0);
+
+      if (displayGroups.length === 0) {
+        return toast.error('Tidak ada data unit kerja yang sesuai filter untuk diexport');
+      }
 
       const numCols = headers.length;
       let rowNum = 1;
@@ -3526,19 +3557,20 @@ export default function RkaLaporanPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
+      const unitSuffix = unitFilter !== 'ALL' ? `_${unitFilter.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 20)}` : '';
+      const groupSuffix = rekapGroupFilter !== 'ALL' ? `_${rekapGroupFilter.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 20)}` : '';
       const fileName = isKptu
-        ? `Rekap_Proposal_RKAT_KPTU_${tahunFilter}.xlsx`
+        ? `Rekap_Proposal_RKAT_KPTU_${tahunFilter}${groupSuffix}${unitSuffix}.xlsx`
         : isUpu
-        ? `Rekap_Proposal_RKAT_UPU_${tahunFilter}.xlsx`
+        ? `Rekap_Proposal_RKAT_UPU_${tahunFilter}${groupSuffix}${unitSuffix}.xlsx`
         : isPusdi
-        ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}.xlsx`
+        ? `Rekap_Proposal_RKAT_PUSDI_${tahunFilter}${groupSuffix}${unitSuffix}.xlsx`
         : isFakultasAlokasi
-        ? `Rekap_Proposal_RKAT_Fakultas_Alokasi_${tahunFilter}.xlsx`
-        : `Rekap_Proposal_RKAT_Fakultas_${tahunFilter}.xlsx`;
+        ? `Rekap_Proposal_RKAT_Fakultas_Alokasi_${tahunFilter}${groupSuffix}${unitSuffix}.xlsx`
+        : `Rekap_Proposal_RKAT_Fakultas_${tahunFilter}${groupSuffix}${unitSuffix}.xlsx`;
       a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
-      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : isFakultasAlokasi ? 'Format Fakultas (Alokasi) 11 Kolom' : 'Format Fakultas 11 Kolom';
       toast.success(`File Excel (${formatTag}) berhasil diexport!`);
     } catch (err: any) {
       console.error('Export Excel error:', err);
@@ -4081,16 +4113,82 @@ export default function RkaLaporanPage() {
     aoa.push([`Standar Presentasi Eksekutif / Slide PPT  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`]);
     aoa.push([]);
 
-    aoa.push(['URAIAN PROPOSAL RKAT', 'JUMLAH BARIS', 'PAGU USULAN (RP)', '% PROPORSI']);
+    aoa.push(['URAIAN PROPOSAL RKAT', 'JUMLAH DATA', 'PAGU USULAN (RP)', '% PROPORSI']);
 
-    computedTreeData.rows.forEach(r => {
-      const indent = '  '.repeat(r.level) + (r.level > 1 ? '↳ ' : '');
-      const label = indent + r.keterangan;
-      const countStr = r.count > 0 ? r.count : '';
-      const paguVal = (r.level === 0 && !r.is_sum && r.keterangan !== 'JUMLAH PENERIMAAN' && r.keterangan !== 'JUMLAH PENGELUARAN' && !r.keterangan.includes('SURPLUS')) ? '' : r.pagu;
-      const propStr = r.proporsi || '';
-      aoa.push([label, countStr, paguVal, propStr]);
+    // 1. Bagian Penerimaan
+    aoa.push([pptProposalData.penerimaan.title, '', '', '']);
+    (pptProposalData.penerimaan.sections || []).forEach(sec => {
+      const secPct = pptProposalData.penerimaan.totalPenerimaan > 0 
+        ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+        : '0%';
+      aoa.push([sec.title + ' (Sub Total)', sec.count > 0 ? `${sec.count} Akun` : '', sec.subtotal, secPct]);
+      
+      sec.items.forEach(item => {
+        const itemPct = pptProposalData.penerimaan.totalPenerimaan > 0
+          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+          : '0%';
+        if (item.is_sum && item.subItems && item.subItems.length > 0) {
+          aoa.push(['   ' + item.label + ' (Sub Total Pos)', item.count > 0 ? `${item.count} Akun` : '', item.totalPagu, itemPct]);
+          item.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.penerimaan.totalPenerimaan > 0
+              ? ((sub.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+              : '0%';
+            aoa.push(['      ↳ ' + sub.label, sub.count > 0 ? `${sub.count} Akun` : '', sub.totalPagu, subPct]);
+          });
+        } else {
+          aoa.push(['   ' + item.label, item.count > 0 ? `${item.count} Akun` : '', item.totalPagu, itemPct]);
+        }
+      });
     });
+
+    if (pptProposalData.penerimaan.lainnya.totalPagu > 0) {
+      const lPct = pptProposalData.penerimaan.totalPenerimaan > 0
+        ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+        : '0%';
+      aoa.push(['   ' + pptProposalData.penerimaan.lainnya.label, `${pptProposalData.penerimaan.lainnya.count} Akun`, pptProposalData.penerimaan.lainnya.totalPagu, lPct]);
+    }
+
+    aoa.push(['JUMLAH PENERIMAAN', '', pptProposalData.penerimaan.totalPenerimaan, '100%']);
+    aoa.push([]);
+
+    // 2. Bagian Pengeluaran
+    aoa.push([pptProposalData.pengeluaran.title, '', '', '']);
+    (pptProposalData.pengeluaran.sections || []).forEach(sec => {
+      const secPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+        ? ((sec.subtotal / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+        : '0%';
+      aoa.push([sec.title + ' (Sub Total)', sec.count > 0 ? `${sec.count} Baris` : '', sec.subtotal, secPct]);
+
+      sec.items.forEach(item => {
+        const itemPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+          ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+          : '0%';
+        if (item.is_sum && item.subItems && item.subItems.length > 0) {
+          aoa.push(['   ' + item.label + ' (Sub Total Pos)', item.count > 0 ? `${item.count} Baris` : '', item.totalAnggaran, itemPct]);
+          item.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+              ? ((sub.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+              : '0%';
+            aoa.push(['      ↳ ' + sub.label, sub.count > 0 ? `${sub.count} Baris` : '', sub.totalAnggaran, subPct]);
+          });
+        } else {
+          aoa.push(['   ' + item.label, item.count > 0 ? `${item.count} Baris` : '', item.totalAnggaran, itemPct]);
+        }
+      });
+    });
+
+    if (pptProposalData.pengeluaran.lainnya.totalAnggaran > 0) {
+      const lPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+        ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+        : '0%';
+      aoa.push(['   ' + pptProposalData.pengeluaran.lainnya.label, `${pptProposalData.pengeluaran.lainnya.count} Baris`, pptProposalData.pengeluaran.lainnya.totalAnggaran, lPct]);
+    }
+
+    aoa.push(['JUMLAH PENGELUARAN', '', pptProposalData.pengeluaran.totalPengeluaran, '100%']);
+    aoa.push([]);
+
+    // 3. Surplus / Defisit
+    aoa.push([pptProposalData.surplusDefisit >= 0 ? 'SURPLUS ANGGARAN' : 'DEFISIT ANGGARAN', '', pptProposalData.surplusDefisit, '']);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [
@@ -4114,10 +4212,378 @@ export default function RkaLaporanPage() {
     toast.success('File Excel Format Slide PPT Proposal RKAT berhasil diexport!');
   };
 
+  // Export Excel Khusus Tab Tabel Rincian Data (Menggunakan ExcelJS: Desain Elegan, Berwarna, Zebra Row, Format Angka Currency, Double Border Total)
+  const handleExportExcelDetail = async () => {
+    const hasBelanja = allDetailRows.length > 0;
+    const hasPenerimaan = allDetailPenerimaanRows.length > 0;
+
+    if (!hasBelanja && !hasPenerimaan) {
+      return toast.error('Tidak ada data rincian untuk diexport');
+    }
+
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Universitas Gadjah Mada';
+      wb.lastModifiedBy = 'RKAT Online';
+      wb.created = new Date();
+
+      const filterParts: string[] = [
+        `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        `Tahun: ${tahunFilter === 'ALL' ? 'Semua Tahun' : `TA ${tahunFilter}`}`,
+        `Unit: ${unitFilter === 'ALL' ? 'Semua Unit Kerja' : unitFilter}`
+      ];
+      if (kategoriFilter !== 'ALL') filterParts.push(`Group Belanja: ${kategoriFilter}`);
+      if (search) filterParts.push(`Pencarian: "${search}"`);
+      const filterSummary = filterParts.join('  |  ');
+
+      // Helper styling banner
+      const applyBanner = (ws: ExcelJS.Worksheet, title: string, countText: string) => {
+        const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+        titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+
+        const subTitleRow = ws.addRow([title]);
+        subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
+
+        const infoRow = ws.addRow([`${filterSummary}  |  Total: ${countText}`]);
+        infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+
+        ws.addRow([]); // Blank spacer
+      };
+
+      const styleHeaderRow = (headerRow: ExcelJS.Row, bgArgb: string) => {
+        headerRow.height = 28;
+        headerRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: bgArgb }
+          };
+          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          };
+        });
+      };
+
+      // 1. Sheet Rincian Belanja
+      const createBelanjaSheet = () => {
+        const ws = wb.addWorksheet('Rincian_Belanja', { views: [{ showGridLines: true }] });
+        applyBanner(
+          ws,
+          `RINCIAN DATA USULAN BELANJA RKA - FORMAT ${activeTabObj?.label || 'PROPOSAL RKAT'}`,
+          `${allDetailRows.length.toLocaleString('id-ID')} Baris Data`
+        );
+
+        const headers = [
+          'NO',
+          'UNIT KERJA',
+          'KODE / NAMA AKUN',
+          'KLASIFIKASI / GROUP FORMAT',
+          'PROGRAM',
+          'KEGIATAN',
+          'LINGKUP KEGIATAN',
+          'URAIAN BELANJA',
+          'PRIORITAS',
+          'TAHUN',
+          'PAGU ANGGARAN (RP)'
+        ];
+
+        const headerRow = ws.addRow(headers);
+        styleHeaderRow(headerRow, 'FF1E293B'); // Dark Slate Navy
+
+        let totalPaguBelanja = 0;
+        allDetailRows.forEach((r, idx) => {
+          const pagu = Number(r.anggaran) || 0;
+          totalPaguBelanja += pagu;
+          const classification = getRowClassification(r, modeLaporan) || '-';
+          const namaAkun = (r.akun_detail || r.nama_akun || r.akun || '-').trim();
+
+          const dataRow = ws.addRow([
+            idx + 1,
+            r.unit || '-',
+            namaAkun,
+            classification,
+            r.program || '-',
+            r.kegiatan || '-',
+            r.lingkup_kegiatan || '-',
+            r.uraian_belanja || '-',
+            r.prioritas || '-',
+            r.tahun_anggaran || tahunFilter || '-',
+            pagu
+          ]);
+
+          dataRow.height = 20;
+          const isZebra = idx % 2 === 1;
+          dataRow.eachCell((cell, colIndex) => {
+            cell.font = { name: 'Calibri', size: 9.5 };
+            if (isZebra) {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF8FAFC' }
+              };
+            }
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+            };
+
+            if (colIndex === 1) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else if (colIndex === 2) {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+            } else if (colIndex === 9 || colIndex === 10) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else if (colIndex === 11) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' };
+              cell.numFmt = '#,##0';
+              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+            } else {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            }
+          });
+        });
+
+        // Total Row Belanja
+        const totalRow = ws.addRow([
+          '',
+          'TOTAL KESELURUHAN BELANJA',
+          '',
+          '',
+          '',
+          '',
+          '',
+          `TOTAL (${allDetailRows.length.toLocaleString('id-ID')} BARIS DATA)`,
+          '',
+          '',
+          totalPaguBelanja
+        ]);
+        totalRow.height = 26;
+        totalRow.eachCell((cell, colIndex) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE2E8F0' }
+          };
+          cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+          cell.border = {
+            top: { style: 'medium', color: { argb: 'FF64748B' } },
+            bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+          };
+          if (colIndex === 11) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            cell.numFmt = '#,##0';
+          } else {
+            cell.alignment = { horizontal: colIndex === 8 ? 'right' : 'left', vertical: 'middle' };
+          }
+        });
+
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 35 }, // UNIT KERJA
+          { width: 30 }, // KODE / NAMA AKUN
+          { width: 28 }, // KLASIFIKASI / GROUP FORMAT
+          { width: 25 }, // PROGRAM
+          { width: 30 }, // KEGIATAN
+          { width: 25 }, // LINGKUP KEGIATAN
+          { width: 45 }, // URAIAN BELANJA
+          { width: 14 }, // PRIORITAS
+          { width: 10 }, // TAHUN
+          { width: 24 }  // PAGU ANGGARAN (RP)
+        ];
+      };
+
+      // 2. Sheet Rincian Penerimaan
+      const createPenerimaanSheet = () => {
+        const ws = wb.addWorksheet('Rincian_Penerimaan', { views: [{ showGridLines: true }] });
+        applyBanner(
+          ws,
+          'RINCIAN DATA USULAN PENERIMAAN / PENDAPATAN RKA',
+          `${allDetailPenerimaanRows.length.toLocaleString('id-ID')} Baris Data`
+        );
+
+        const headers = [
+          'NO',
+          'UNIT KERJA',
+          'KODE / NAMA AKUN',
+          'KELOMPOK PENERIMAAN',
+          'KETERANGAN / RINCIAN',
+          'VOLUME',
+          'TARIF (RP)',
+          'SUMBER DANA',
+          '% ALOKASI UNIT',
+          'STATUS',
+          'TAHUN',
+          'PAGU PENERIMAAN (RP)'
+        ];
+
+        const headerRow = ws.addRow(headers);
+        styleHeaderRow(headerRow, 'FF065F46'); // Deep Emerald Green
+
+        let totalPaguPenerimaan = 0;
+        allDetailPenerimaanRows.forEach((r, idx) => {
+          const pagu = Number(r.renterima_pagu) || 0;
+          const tarif = Number(r.renterima_tarif) || 0;
+          const vol = Number(r.renterima_volume) || 0;
+          totalPaguPenerimaan += pagu;
+
+          const rowProp = r.prop_alokasi_prosentase_unit ?? r.propAlokasiProsentaseUnit;
+          let propStr = '-';
+          if (rowProp !== undefined && rowProp !== null && rowProp !== '') {
+            propStr = String(rowProp).includes('%') ? String(rowProp) : `${rowProp}%`;
+          }
+
+          const dataRow = ws.addRow([
+            idx + 1,
+            r.unit_kerja || '-',
+            r.nama_akun_penerimaan || r.akun || '-',
+            r.kelompok_penerimaan || r.format_proposal || '-',
+            r.keterangan || '-',
+            vol,
+            tarif,
+            r.sumber_dana || 'Dana Masyarakat',
+            propStr,
+            r.status || 'Aktif',
+            r.tahun || tahunFilter || '-',
+            pagu
+          ]);
+
+          dataRow.height = 20;
+          const isZebra = idx % 2 === 1;
+          dataRow.eachCell((cell, colIndex) => {
+            cell.font = { name: 'Calibri', size: 9.5 };
+            if (isZebra) {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFF0FDF4' }
+              };
+            }
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+            };
+
+            if (colIndex === 1) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else if (colIndex === 2) {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF065F46' } };
+            } else if (colIndex === 6 || colIndex === 7) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' };
+              cell.numFmt = '#,##0';
+            } else if (colIndex === 9 || colIndex === 10 || colIndex === 11) {
+              cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            } else if (colIndex === 12) {
+              cell.alignment = { horizontal: 'right', vertical: 'middle' };
+              cell.numFmt = '#,##0';
+              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF065F46' } };
+            } else {
+              cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            }
+          });
+        });
+
+        // Total Row Penerimaan
+        const totalRow = ws.addRow([
+          '',
+          'TOTAL KESELURUHAN PENERIMAAN',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          `TOTAL (${allDetailPenerimaanRows.length.toLocaleString('id-ID')} BARIS DATA)`,
+          '',
+          '',
+          totalPaguPenerimaan
+        ]);
+        totalRow.height = 26;
+        totalRow.eachCell((cell, colIndex) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFD1FAE5' }
+          };
+          cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF065F46' } };
+          cell.border = {
+            top: { style: 'medium', color: { argb: 'FF059669' } },
+            bottom: { style: 'double', color: { argb: 'FF065F46' } },
+            left: { style: 'thin', color: { argb: 'FFA7F3D0' } },
+            right: { style: 'thin', color: { argb: 'FFA7F3D0' } }
+          };
+          if (colIndex === 12) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            cell.numFmt = '#,##0';
+          } else {
+            cell.alignment = { horizontal: colIndex === 9 ? 'right' : 'left', vertical: 'middle' };
+          }
+        });
+
+        ws.columns = [
+          { width: 6 },  // NO
+          { width: 35 }, // UNIT KERJA
+          { width: 30 }, // KODE / NAMA AKUN
+          { width: 28 }, // KELOMPOK PENERIMAAN
+          { width: 40 }, // KETERANGAN / RINCIAN
+          { width: 14 }, // VOLUME
+          { width: 18 }, // TARIF
+          { width: 22 }, // SUMBER DANA
+          { width: 16 }, // % ALOKASI
+          { width: 12 }, // STATUS
+          { width: 10 }, // TAHUN
+          { width: 24 }  // PAGU PENERIMAAN (RP)
+        ];
+      };
+
+      // Buat sheets dengan urutan sesuai subtab yang aktif
+      if (activeDetailSubtab === 'penerimaan') {
+        if (hasPenerimaan) createPenerimaanSheet();
+        if (hasBelanja) createBelanjaSheet();
+      } else {
+        if (hasBelanja) createBelanjaSheet();
+        if (hasPenerimaan) createPenerimaanSheet();
+      }
+
+      // Download file
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const subtabTag = activeDetailSubtab === 'penerimaan' ? 'Penerimaan' : 'Belanja';
+      const unitTag = unitFilter !== 'ALL' ? `_${unitFilter.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 20)}` : '';
+      const catTag = kategoriFilter !== 'ALL' ? `_${kategoriFilter.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 20)}` : '';
+      a.download = `Rincian_Data_RKA_${subtabTag}_TA${tahunFilter}${unitTag}${catTag}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      const countExported = activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows.length : allDetailRows.length;
+      toast.success(`File Excel Rincian Data (${countExported.toLocaleString('id-ID')} baris) berhasil diexport!`);
+    } catch (err: any) {
+      console.error('Export Excel detail error:', err);
+      toast.error('Gagal export Excel rincian data: ' + err.message);
+    }
+  };
+
   // Export Excel (Switchable based on active view)
   const handleExportExcel = () => {
     if (activeViewTab === 'rekap_unit') {
       return handleExportExcelUnitRekap();
+    }
+    if (activeViewTab === 'detail') {
+      return handleExportExcelDetail();
     }
     if (modeLaporan === 'proposal rkat' && summaryStyle === 'ppt') {
       return handleExportExcelPptFormat();
@@ -4720,7 +5186,7 @@ export default function RkaLaporanPage() {
                                       <React.Fragment key={subKey}>
                                         <TableRow
                                           onClick={() => togglePptPenerimaan(subKey)}
-                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isSubExpanded ? 'bg-blue-50/50' : ''}`}
+                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isSubExpanded ? 'bg-blue-50/50' : ''}`}
                                         >
                                           <TableCell className="py-2 pl-18 text-xs font-medium text-slate-700 flex items-center gap-2">
                                             <button
@@ -4783,7 +5249,7 @@ export default function RkaLaporanPage() {
                               <React.Fragment key={itemKey}>
                                 <TableRow 
                                   onClick={() => togglePptPenerimaan(itemKey)}
-                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-blue-50/50' : ''}`}
+                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50/50' : ''}`}
                                 >
                                   <TableCell className="py-2 pl-12 text-xs font-medium text-slate-700 flex items-center gap-2">
                                     <button 
@@ -4847,7 +5313,7 @@ export default function RkaLaporanPage() {
                           <React.Fragment>
                             <TableRow 
                               onClick={() => togglePptPenerimaan('p_lainnya')}
-                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isLainnyaOpen ? 'bg-blue-50/50' : ''}`}
+                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isLainnyaOpen ? 'bg-blue-50/50' : ''}`}
                             >
                               <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
                                 <button 
@@ -5000,7 +5466,7 @@ export default function RkaLaporanPage() {
                                       <React.Fragment key={subKey}>
                                         <TableRow
                                           onClick={() => togglePptPengeluaran(subKey)}
-                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isSubExpanded ? 'bg-indigo-50/50' : ''}`}
+                                          className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isSubExpanded ? 'bg-indigo-50/50' : ''}`}
                                         >
                                           <TableCell className="py-2 pl-18 text-xs font-medium text-slate-700 flex items-center gap-2">
                                             <button
@@ -5063,7 +5529,7 @@ export default function RkaLaporanPage() {
                               <React.Fragment key={itemKey}>
                                 <TableRow
                                   onClick={() => togglePptPengeluaran(itemKey)}
-                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isExpanded ? 'bg-indigo-50/50' : ''}`}
+                                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-indigo-50/50' : ''}`}
                                 >
                                   <TableCell className="py-2 pl-12 text-xs font-bold text-slate-800 flex items-center gap-2">
                                     <button
@@ -5127,7 +5593,7 @@ export default function RkaLaporanPage() {
                           <React.Fragment>
                             <TableRow 
                               onClick={() => togglePptPengeluaran('b_lainnya')}
-                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer select-none ${isBLainnyaOpen ? 'bg-indigo-50/50' : ''}`}
+                              className={`border-b border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer ${isBLainnyaOpen ? 'bg-indigo-50/50' : ''}`}
                             >
                               <TableCell className="py-2 pl-8 text-xs font-bold text-slate-800 flex items-center gap-2">
                                 <button 
@@ -5281,7 +5747,7 @@ export default function RkaLaporanPage() {
                               <React.Fragment key={group.label || gIdx}>
                                 <TableRow 
                                   onClick={() => toggleStdPenerimaan(group.label)}
-                                  className={`border-b border-gray-100 hover:bg-emerald-50/40 transition-colors cursor-pointer select-none ${isGroupOpen ? 'bg-emerald-50/50' : ''}`}
+                                  className={`border-b border-gray-100 hover:bg-emerald-50/40 transition-colors cursor-pointer ${isGroupOpen ? 'bg-emerald-50/50' : ''}`}
                                 >
                                   <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
                                     <button 
@@ -5423,7 +5889,7 @@ export default function RkaLaporanPage() {
                             <React.Fragment key={group.label || gIdx}>
                               <TableRow 
                                 onClick={() => toggleStdBelanja(group.label)}
-                                className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors cursor-pointer select-none ${isGroupOpen ? 'bg-indigo-50/50' : ''}`}
+                                className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors cursor-pointer ${isGroupOpen ? 'bg-indigo-50/50' : ''}`}
                               >
                                 <TableCell className="text-center font-mono font-bold text-gray-400 text-xs">
                                   <button 
@@ -5956,7 +6422,7 @@ export default function RkaLaporanPage() {
                                 <React.Fragment key={item.unit || uIdx}>
                                   <TableRow 
                                     onClick={() => toggleRekapUnit(item.unit)}
-                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer select-none ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
+                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
                                   >
                                     <TableCell className="text-center font-mono font-bold text-gray-400 align-middle py-2 px-1" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1.5">
@@ -6082,7 +6548,7 @@ export default function RkaLaporanPage() {
                                 <React.Fragment key={item.unit || uIdx}>
                                   <TableRow 
                                     onClick={() => toggleRekapUnit(item.unit)}
-                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer select-none ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
+                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
                                   >
                                     <TableCell className="text-center font-mono font-bold text-gray-400 align-middle py-2 px-1" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1.5">
@@ -6216,7 +6682,7 @@ export default function RkaLaporanPage() {
                                 <React.Fragment key={item.unit || uIdx}>
                                   <TableRow 
                                     onClick={() => toggleRekapUnit(item.unit)}
-                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer select-none ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
+                                    className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
                                   >
                                     <TableCell className="text-center font-mono font-bold text-gray-400 align-middle py-2 px-1" onClick={(e) => e.stopPropagation()}>
                                       <div className="flex items-center justify-center gap-1.5">
@@ -6345,7 +6811,7 @@ export default function RkaLaporanPage() {
                               <React.Fragment key={item.unit || uIdx}>
                                 <TableRow 
                                   onClick={() => toggleRekapUnit(item.unit)}
-                                  className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer select-none ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
+                                  className={`border-b border-gray-100 hover:bg-indigo-50/40 transition-colors text-xs cursor-pointer ${isUnitExpanded ? 'bg-indigo-50/50 font-medium' : ''}`}
                                 >
                                   <TableCell className="text-center font-mono font-bold text-gray-400 align-middle py-2 px-1" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex items-center justify-center gap-1.5">
@@ -6888,6 +7354,17 @@ export default function RkaLaporanPage() {
                   </button>
                 </div>
 
+                {/* Export Excel Button khusus Tab Rincian */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcelDetail}
+                  className="h-8 rounded-lg border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer ml-auto"
+                  title="Export Seluruh Rincian Data ke Excel"
+                >
+                  <Download size={13} className="text-emerald-600" />
+                  <span>Export Excel Rincian ({activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows.length.toLocaleString('id-ID') : allDetailRows.length.toLocaleString('id-ID')})</span>
+                </Button>
               </div>
             </CardHeader>
 
@@ -7515,7 +7992,7 @@ export default function RkaLaporanPage() {
                   onClick={() => {
                     setPptTemplate(tempTemplate);
                     try {
-                      localStorage.setItem('rka_ppt_template_config', JSON.stringify(tempTemplate));
+                      localStorage.setItem('rka_ppt_template_config_v7', JSON.stringify(tempTemplate));
                     } catch (e) {}
                     setIsTemplateModalOpen(false);
                     toast.success('Susunan template slide berhasil disimpan dan diterapkan!');
