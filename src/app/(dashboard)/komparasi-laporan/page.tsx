@@ -119,15 +119,14 @@ export default function KomparasiLaporanPage() {
     dataType: 'realisasi' | 'anggaran';
     enabled: boolean;
   }>>([]);
-  const [wordExcludeBelanjaModal, setWordExcludeBelanjaModal] = useState<boolean>(false);
   const [addYearWordSelect, setAddYearWordSelect] = useState<string>('');
 
-  // Belanja Modal Simulation Toggle (Khusus Kolom Anggaran)
-  const [excludeBelanjaModalAnggaran, setExcludeBelanjaModalAnggaran] = useState<boolean>(false);
+  // Cell Notes / Catatan per akun, tahun, versi
+  const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
-  const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), versi: 'Final', anggaran: 0, realisasi: 0 });
+  const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), versi: 'Final', anggaran: 0, realisasi: 0, catatan: '' });
   const [selectedAkunName, setSelectedAkunName] = useState('');
 
   // Bulk & Narasi State
@@ -255,6 +254,18 @@ export default function KomparasiLaporanPage() {
       setSelectedYears(uniqueYears.slice(0, 3).map(y => ({ value: y, label: y.replace('___', ' - ') })));
       if (!narasiTahun) setNarasiTahun(uniqueYears[0]);
     }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const savedNotes = localStorage.getItem('komparasi_notes_map');
+        if (savedNotes) {
+          setNotesMap(JSON.parse(savedNotes));
+        }
+      } catch (err) {
+        console.error("Gagal membaca catatan dari storage:", err);
+      }
+    }
+
     setLoading(false);
   };
 
@@ -408,6 +419,23 @@ export default function KomparasiLaporanPage() {
       anggaran: nilaiForm.anggaran,
       realisasi: nilaiForm.realisasi
     };
+
+    // Simpan Catatan / Note ke notesMap & localStorage
+    const noteKey = `${nilaiForm.akun_id}_${nilaiForm.tahun}_${nilaiForm.versi || 'Final'}`;
+    const nextNotes = { ...notesMap };
+    if (nilaiForm.catatan && nilaiForm.catatan.trim()) {
+      nextNotes[noteKey] = nilaiForm.catatan.trim();
+    } else {
+      delete nextNotes[noteKey];
+    }
+    setNotesMap(nextNotes);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('komparasi_notes_map', JSON.stringify(nextNotes));
+      } catch (err) {
+        console.error("Gagal menyimpan catatan ke storage:", err);
+      }
+    }
 
     try {
       if (nilaiForm.id) {
@@ -672,11 +700,6 @@ export default function KomparasiLaporanPage() {
   if (modalRow) {
     yearsToCompute.forEach(y => {
       originalModalAnggaranMatrix[y] = matrix[modalRow.id]?.[y]?.anggaran || 0;
-      if (excludeBelanjaModalAnggaran) {
-        if (matrix[modalRow.id] && matrix[modalRow.id][y]) {
-          matrix[modalRow.id][y].anggaran = 0;
-        }
-      }
     });
   }
 
@@ -1029,7 +1052,6 @@ export default function KomparasiLaporanPage() {
     });
 
     setWordColumns(cols);
-    setWordExcludeBelanjaModal(excludeBelanjaModalAnggaran);
     if (!addYearWordSelect && allYears.length > 0) {
       setAddYearWordSelect(allYears[0]);
     }
@@ -1399,16 +1421,7 @@ export default function KomparasiLaporanPage() {
                 font: "Times New Roman",
                 size: 28, // 14pt
                 color: "000000"
-              }),
-              ...(wordExcludeBelanjaModal ? [
-                new TextRun({
-                  text: "\n(Simulasi Anggaran Tanpa Belanja Modal)",
-                  italics: true,
-                  font: "Times New Roman",
-                  size: 20, // 10pt
-                  color: "7030A0"
-                })
-              ] : [])
+              })
             ],
             alignment: AlignmentType.LEFT,
             spacing: { before: 100, after: 200 }
@@ -1613,93 +1626,7 @@ export default function KomparasiLaporanPage() {
           </button>
         </div>
 
-        {/* TOGGLE SWITCH: SIMULASI ANGGARAN TANPA BELANJA MODAL */}
-        <div className="flex items-center shrink-0">
-          <button
-            type="button"
-            onClick={() => setExcludeBelanjaModalAnggaran(prev => !prev)}
-            className={`h-9 px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 shadow-2xs cursor-pointer ${
-              excludeBelanjaModalAnggaran 
-                ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-amber-100 ring-2 ring-amber-300' 
-                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
-            }`}
-            title="Klik untuk melihat simulasi anggaran dan surplus/defisit jika tanpa belanja modal (Realisasi tetap asli)"
-          >
-            {excludeBelanjaModalAnggaran ? (
-              <CheckSquare size={15} className="text-white shrink-0" />
-            ) : (
-              <Square size={15} className="text-slate-400 shrink-0" />
-            )}
-            <span>Tanpa Belanja Modal (Anggaran)</span>
-            {excludeBelanjaModalAnggaran ? (
-              <span className="text-[10px] bg-amber-700/60 px-1.5 py-0.5 rounded text-white font-mono font-bold">
-                Aktif
-              </span>
-            ) : (
-              <span className="text-[10px] text-slate-400 font-normal">
-                (Normal)
-              </span>
-            )}
-          </button>
-        </div>
       </div>
-
-      {/* BANNER PENJELASAN MODE FORMAT AKTIF */}
-      {selectedYearVals.length > 0 && (
-        <div className={`border rounded-2xl p-2.5 px-4 flex items-center justify-between gap-3 text-xs shadow-2xs transition-all ${
-          formatMode === 'harmonisasi' 
-            ? 'bg-teal-50/70 border-teal-200/90 text-teal-950'
-            : 'bg-indigo-50/70 border-indigo-200/90 text-indigo-950'
-        }`}>
-          <div className="flex items-center gap-2.5">
-            <span className="text-base shrink-0">
-              {formatMode === 'harmonisasi' ? '🔄' : '📜'}
-            </span>
-            <div className="text-[11px] leading-relaxed">
-              {formatMode === 'harmonisasi' ? (
-                <>
-                  <strong className="text-teal-900 font-bold">Mode Harmonisasi Aktif:</strong> Format laporan dan ringkasan surplus diselaraskan dengan struktur <strong>Profil RKAT Terbaru (2027)</strong> agar perbandingan multi-tahun bersifat konsisten (<em>apple-to-apple</em>).
-                </>
-              ) : (
-                <>
-                  <strong className="text-indigo-900 font-bold">Mode Format Asli Aktif:</strong> Menampilkan format dan formula surplus resmi sesuai tahun berjalan ({selectedYearVals.some(y => (parseInt(y.split('___')[0]) || 0) < 2027) ? 'Format Klasik untuk < 2027' : 'Format Profil 2027'}).
-                </>
-              )}
-            </div>
-          </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFormatMode(prev => prev === 'harmonisasi' ? 'asli' : 'harmonisasi')}
-              className="text-[10px] font-bold text-gray-500 hover:text-gray-900 underline underline-offset-2 cursor-pointer"
-            >
-              Ganti ke {formatMode === 'harmonisasi' ? 'Format Asli' : 'Mode Harmonisasi'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* BANNER NOTIFIKASI SIMULASI TANPA BELANJA MODAL */}
-      {excludeBelanjaModalAnggaran && (
-        <div className="bg-amber-50 border border-amber-300/80 rounded-2xl p-3 px-4 flex items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in duration-200">
-          <div className="flex items-center gap-2.5">
-            <span className="text-lg">⚙️</span>
-            <div>
-              <p className="font-black text-amber-950">Mode Simulasi Aktif: Pagu Belanja Modal Dinolkan pada Kolom Anggaran</p>
-              <p className="text-[11px] text-amber-800">
-                Nilai Belanja Modal dinolkan khusus untuk kolom <strong>Rencana / Anggaran</strong> sehingga Anda dapat melihat surplus/defisit operasional murni. Kolom <strong>Realisasi</strong> tetap menampilkan data aktual.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setExcludeBelanjaModalAnggaran(false)}
-            className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 font-bold text-amber-900 text-xs shrink-0 cursor-pointer shadow-2xs"
-          >
-            Tampilkan Normal
-          </button>
-        </div>
-      )}
 
       {/* CHART VISUALISASI */}
       {selectedYearVals.length > 0 && !loading && (
@@ -1913,21 +1840,7 @@ export default function KomparasiLaporanPage() {
                         return (
                           <React.Fragment key={`${akun.id}-${y}`}>
                             <td className={`py-2 px-2.5 text-right font-mono text-xs border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.anggaran !== 0 ? 'text-gray-900' : 'text-gray-300'}`}>
-                              {isModalRow && excludeBelanjaModalAnggaran ? (
-                                <div className="flex flex-col items-end leading-tight">
-                                  <span className="text-amber-700 font-bold">0</span>
-                                  {originalModalAnggaranMatrix[y] > 0 && (
-                                    <span className="text-[9px] text-gray-400 line-through">
-                                      Rp {fmt(originalModalAnggaranMatrix[y])}
-                                    </span>
-                                  )}
-                                  <span className="text-[8px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-bold uppercase mt-0.5">
-                                    Dikecualikan
-                                  </span>
-                                </div>
-                              ) : (
-                                d.anggaran !== 0 ? fmt(d.anggaran) : '-'
-                              )}
+                              {d.anggaran !== 0 ? fmt(d.anggaran) : '-'}
                             </td>
                             <td className="py-2 px-2 border-r border-gray-100 text-center text-emerald-600 font-medium">
                               {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-emerald-50 px-1 py-0.5 rounded text-emerald-700 font-mono font-bold">{Math.abs(propAnggaran).toFixed(1).replace('.',',')}%</span>}
@@ -1945,24 +1858,55 @@ export default function KomparasiLaporanPage() {
                               {isZeroOverride ? '0,00%' : (d.anggaran > 0 ? `${persen.toFixed(1).replace('.',',')}%` : '-')}
                             </td>
                             <td className="py-2 px-1 border-r border-gray-200 text-center">
-                              {isModalRow && excludeBelanjaModalAnggaran ? (
-                                <span className="text-[9px] text-amber-600 font-semibold italic">Dikecualikan</span>
-                              ) : akun.is_sum || isCustom || [37, 39, 45, 47, 49].includes(akun.urutan) ? (
+                              {akun.is_sum || isCustom || [37, 39, 45, 47, 49].includes(akun.urutan) ? (
                                 <span className="text-[9px] text-gray-300 font-semibold italic">Auto</span>
                               ) : (
-                                d.id ? (
-                                  <button onClick={() => {
-                                    setNilaiForm({ id: d.id, akun_id: akun.id, tahun: parseInt(y.split('___')[0]), versi: y.split('___')[1] || 'Final', anggaran: d.anggaran, realisasi: d.realisasi });
-                                    setSelectedAkunName(akun.keterangan);
-                                    setIsNilaiModalOpen(true);
-                                  }} className="p-1 text-teal-600 hover:bg-teal-50 rounded" title="Edit Nilai"><Edit2 size={12}/></button>
-                                ) : (
-                                  <button onClick={() => {
-                                      setNilaiForm({ id: null, akun_id: akun.id, tahun: parseInt(y.split('___')[0]), versi: y.split('___')[1] || 'Final', anggaran: 0, realisasi: 0 });
+                                <div className="flex items-center justify-center gap-0.5">
+                                  {d.id ? (
+                                    <button onClick={() => {
+                                      const yNum = parseInt(y.split('___')[0]);
+                                      const yVersi = y.split('___')[1] || 'Final';
+                                      const noteKey = `${akun.id}_${yNum}_${yVersi}`;
+                                      setNilaiForm({ id: d.id, akun_id: akun.id, tahun: yNum, versi: yVersi, anggaran: d.anggaran, realisasi: d.realisasi, catatan: notesMap[noteKey] || '' });
                                       setSelectedAkunName(akun.keterangan);
                                       setIsNilaiModalOpen(true);
-                                  }} className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded" title="Isi Nilai"><Plus size={12}/></button>
-                                )
+                                    }} className="p-1 text-teal-600 hover:bg-teal-50 rounded cursor-pointer" title="Edit Nilai"><Edit2 size={12}/></button>
+                                  ) : (
+                                    <button onClick={() => {
+                                      const yNum = parseInt(y.split('___')[0]);
+                                      const yVersi = y.split('___')[1] || 'Final';
+                                      const noteKey = `${akun.id}_${yNum}_${yVersi}`;
+                                      setNilaiForm({ id: null, akun_id: akun.id, tahun: yNum, versi: yVersi, anggaran: 0, realisasi: 0, catatan: notesMap[noteKey] || '' });
+                                      setSelectedAkunName(akun.keterangan);
+                                      setIsNilaiModalOpen(true);
+                                    }} className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded cursor-pointer" title="Isi Nilai"><Plus size={12}/></button>
+                                  )}
+                                  {notesMap[`${akun.id}_${parseInt(y.split('___')[0])}_${y.split('___')[1] || 'Final'}`] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const yNum = parseInt(y.split('___')[0]);
+                                        const yVersi = y.split('___')[1] || 'Final';
+                                        const noteKey = `${akun.id}_${yNum}_${yVersi}`;
+                                        setNilaiForm({
+                                          id: d.id || null,
+                                          akun_id: akun.id,
+                                          tahun: yNum,
+                                          versi: yVersi,
+                                          anggaran: d.anggaran || 0,
+                                          realisasi: d.realisasi || 0,
+                                          catatan: notesMap[noteKey] || ''
+                                        });
+                                        setSelectedAkunName(akun.keterangan);
+                                        setIsNilaiModalOpen(true);
+                                      }}
+                                      className="p-0.5 px-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 rounded text-[10px] font-mono cursor-pointer flex items-center gap-0.5 shadow-2xs"
+                                      title={`Catatan: ${notesMap[`${akun.id}_${parseInt(y.split('___')[0])}_${y.split('___')[1] || 'Final'}`]}`}
+                                    >
+                                      <span>📝</span>
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           </React.Fragment>
@@ -2504,15 +2448,30 @@ export default function KomparasiLaporanPage() {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Anggaran</label>
-                <input required type="number" value={nilaiForm.anggaran} onChange={e => setNilaiForm({...nilaiForm, anggaran: parseFloat(e.target.value)})} className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs font-bold outline-none" />
+                <input required type="number" value={nilaiForm.anggaran} onChange={e => setNilaiForm({...nilaiForm, anggaran: parseFloat(e.target.value) || 0})} className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs font-bold outline-none" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Realisasi</label>
-                <input required type="number" value={nilaiForm.realisasi} onChange={e => setNilaiForm({...nilaiForm, realisasi: parseFloat(e.target.value)})} className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs font-bold outline-none" />
+                <input required type="number" value={nilaiForm.realisasi} onChange={e => setNilaiForm({...nilaiForm, realisasi: parseFloat(e.target.value) || 0})} className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs font-bold outline-none" />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Catatan / Note (Opsional)
+                  </label>
+                  <span className="text-[10px] text-gray-400 italic">Bisa diisi / dikosongkan</span>
+                </div>
+                <textarea
+                  rows={2}
+                  value={nilaiForm.catatan || ''}
+                  onChange={e => setNilaiForm({ ...nilaiForm, catatan: e.target.value })}
+                  placeholder="Catatan tambahan untuk nilai tahun ini (misal: penyesuaian luncuran, SK rektor, dll)..."
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl font-sans text-xs text-gray-800 outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white resize-none"
+                />
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                <button type="button" onClick={() => setIsNilaiModalOpen(false)} className="h-9 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold">Batal</button>
-                <button type="submit" className="h-9 px-5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold flex items-center gap-1.5">
+                <button type="button" onClick={() => setIsNilaiModalOpen(false)} className="h-9 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold cursor-pointer">Batal</button>
+                <button type="submit" className="h-9 px-5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold flex items-center gap-1.5 cursor-pointer">
                   <Save size={14} /> Simpan Nilai
                 </button>
               </div>
@@ -2785,34 +2744,6 @@ export default function KomparasiLaporanPage() {
                 </div>
               </div>
 
-              {/* SIMULASI TANPA BELANJA MODAL CHECKBOX */}
-              <div className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 ${wordExcludeBelanjaModal ? 'bg-amber-50/80 border-amber-300 shadow-2xs' : 'bg-gray-50 border-gray-200'}`}>
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input 
-                    type="checkbox"
-                    checked={wordExcludeBelanjaModal}
-                    onChange={e => {
-                      const checked = e.target.checked;
-                      setWordExcludeBelanjaModal(checked);
-                      setExcludeBelanjaModalAnggaran(checked);
-                    }}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 mt-0.5 cursor-pointer"
-                  />
-                  <div>
-                    <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
-                      <span>Kecualikan Belanja Modal pada Kolom Anggaran (Simulasi)</span>
-                      {wordExcludeBelanjaModal && (
-                        <span className="text-[9px] bg-amber-200 text-amber-900 font-extrabold px-1.5 py-0.2 rounded uppercase">
-                          Aktif
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">
-                      Pagu Belanja Modal akan dinolkan pada kolom <strong>RKAT / Anggaran</strong> sehingga surplus/defisit di Word dihitung murni operasional. Kolom <strong>Realisasi</strong> tetap utuh.
-                    </p>
-                  </div>
-                </label>
-              </div>
 
               {/* 3. Sub-Kolom yang Ditampilkan */}
               <div className="space-y-2">
@@ -2992,13 +2923,31 @@ export default function KomparasiLaporanPage() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                     Target Versi Komparasi:
                   </label>
-                  <input
-                    type="text"
-                    value={rkaTargetVersi}
-                    onChange={e => setRkaTargetVersi(e.target.value)}
-                    placeholder="Contoh: Final"
-                    className="h-9 w-32 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={['Final', '1', 'Revisi 1', 'Revisi 2', 'Murni', 'Draft', ...allYears.map(y => y.split('___')[1]).filter(Boolean)].includes(rkaTargetVersi) ? rkaTargetVersi : 'custom'}
+                      onChange={e => {
+                        if (e.target.value !== 'custom') {
+                          setRkaTargetVersi(e.target.value);
+                        }
+                      }}
+                      className="h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                      title="Pilih versi cepat atau ketik sendiri di samping"
+                    >
+                      {Array.from(new Set(['Final', '1', 'Revisi 1', 'Revisi 2', 'Murni', 'Draft', ...allYears.map(y => y.split('___')[1]).filter(Boolean)])).map(v => (
+                        <option key={v} value={v}>Versi: {v}</option>
+                      ))}
+                      <option value="custom">✏️ Ketik Manual...</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={rkaTargetVersi}
+                      onChange={e => setRkaTargetVersi(e.target.value)}
+                      placeholder="Contoh: Final"
+                      className="h-9 w-28 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                      title="Ketik manual nama versi target jika ingin custom"
+                    />
+                  </div>
                 </div>
 
                 <button
