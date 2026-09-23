@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, 
-  Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check
+  Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check,
+  ArrowUpDown, ChevronUp, ChevronDown, ListOrdered, Layers
 } from 'lucide-react';
 import Select from 'react-select';
 import ExcelJS from 'exceljs';
@@ -16,6 +17,61 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
+// Peta Urutan & Hierarki Historis Asli (Khusus Format Asli tahun-tahun sebelumnya, misal 2024, 2025, 2026)
+// Terkunci permanen agar saat pengguna mengatur urutan untuk tahun berjalan / komparasi, format asli masa lalu tidak berubah.
+const HISTORICAL_BASELINE_MAP: Record<number, { urutan: number; parent_id: number | null; level: number }> = {
+  1: { urutan: 1, parent_id: null, level: 0 },
+  2: { urutan: 2, parent_id: 1, level: 1 },
+  3: { urutan: 3, parent_id: 2, level: 2 },
+  4: { urutan: 4, parent_id: 2, level: 2 },
+  5: { urutan: 5, parent_id: 2, level: 2 },
+  6: { urutan: 6, parent_id: 5, level: 3 },
+  7: { urutan: 7, parent_id: 5, level: 3 },
+  8: { urutan: 8, parent_id: 5, level: 3 },
+  9: { urutan: 9, parent_id: 5, level: 3 },
+  10: { urutan: 10, parent_id: 5, level: 3 },
+  11: { urutan: 11, parent_id: 5, level: 3 },
+  12: { urutan: 12, parent_id: 5, level: 3 },
+  13: { urutan: 13, parent_id: 5, level: 3 },
+  14: { urutan: 14, parent_id: 5, level: 3 },
+  15: { urutan: 15, parent_id: 1, level: 1 },
+  16: { urutan: 16, parent_id: 15, level: 2 },
+  17: { urutan: 17, parent_id: 16, level: 3 },
+  18: { urutan: 18, parent_id: 16, level: 3 },
+  19: { urutan: 19, parent_id: 15, level: 2 },
+  20: { urutan: 20, parent_id: 19, level: 3 },
+  21: { urutan: 21, parent_id: 19, level: 3 },
+  22: { urutan: 22, parent_id: 19, level: 3 },
+  23: { urutan: 23, parent_id: 19, level: 3 },
+  24: { urutan: 24, parent_id: 19, level: 3 },
+  25: { urutan: 25, parent_id: 1, level: 0 },
+  26: { urutan: 26, parent_id: null, level: 0 },
+  27: { urutan: 27, parent_id: 26, level: 1 },
+  28: { urutan: 28, parent_id: 26, level: 1 },
+  29: { urutan: 29, parent_id: 26, level: 1 },
+  30: { urutan: 30, parent_id: 26, level: 1 },
+  31: { urutan: 31, parent_id: 26, level: 1 }, // Belanja Modal posisi historis di dalam Pengeluaran
+  32: { urutan: 32, parent_id: 26, level: 1 },
+  33: { urutan: 33, parent_id: 26, level: 1 },
+  34: { urutan: 34, parent_id: 26, level: 1 },
+  35: { urutan: 35, parent_id: 26, level: 1 },
+  36: { urutan: 36, parent_id: null, level: 0 },
+  37: { urutan: 37, parent_id: null, level: 0 },
+  38: { urutan: 38, parent_id: null, level: 0 },
+  39: { urutan: 39, parent_id: null, level: 0 },
+  40: { urutan: 40, parent_id: null, level: 0 },
+  41: { urutan: 41, parent_id: null, level: 0 },
+  42: { urutan: 42, parent_id: 19, level: 3 },
+  43: { urutan: 43, parent_id: 19, level: 3 },
+  44: { urutan: 44, parent_id: null, level: 0 },
+  45: { urutan: 45, parent_id: null, level: 0 },
+  46: { urutan: 46, parent_id: null, level: 0 },
+  47: { urutan: 47, parent_id: null, level: 0 },
+  48: { urutan: 48, parent_id: null, level: 0 },
+  49: { urutan: 49, parent_id: null, level: 0 },
+  50: { urutan: 50, parent_id: null, level: 0 },
+};
+
 export default function KomparasiLaporanPage() {
   const [akunMaster, setAkunMaster] = useState<any[]>([]);
   const [dataNilai, setDataNilai] = useState<any[]>([]);
@@ -24,6 +80,18 @@ export default function KomparasiLaporanPage() {
   const [allYears, setAllYears] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<any[]>([]);
   const [hasVersiColumn, setHasVersiColumn] = useState<boolean>(true);
+
+  // Format Mode: 'harmonisasi' (Profil 2027 untuk komparasi multi-tahun) vs 'asli' (struktur format berjalan tahun terpilih)
+  const [formatMode, setFormatMode] = useState<'harmonisasi' | 'asli'>('harmonisasi');
+
+  // Smart Auto-Switch: 1 tahun terpilih -> otomatis Format Asli; >= 2 tahun -> otomatis Harmonisasi
+  useEffect(() => {
+    if (selectedYears.length === 1) {
+      setFormatMode('asli');
+    } else if (selectedYears.length > 1) {
+      setFormatMode('harmonisasi');
+    }
+  }, [selectedYears.length]);
   
   // Modals
   const [isAkunModalOpen, setIsAkunModalOpen] = useState(false);
@@ -31,6 +99,12 @@ export default function KomparasiLaporanPage() {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isNarasiModalOpen, setIsNarasiModalOpen] = useState(false);
   const [isWordModalOpen, setIsWordModalOpen] = useState(false);
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+
+  // Reorder State
+  const [reorderList, setReorderList] = useState<any[]>([]);
+  const [isSavingReorder, setIsSavingReorder] = useState(false);
+  const [reorderSearchFilter, setReorderSearchFilter] = useState('');
 
   // Word Export Config State
   const [wordDocTitle, setWordDocTitle] = useState('Profil Ringkas Usulan RKAT 2027');
@@ -45,6 +119,11 @@ export default function KomparasiLaporanPage() {
     dataType: 'realisasi' | 'anggaran';
     enabled: boolean;
   }>>([]);
+  const [wordExcludeBelanjaModal, setWordExcludeBelanjaModal] = useState<boolean>(false);
+  const [addYearWordSelect, setAddYearWordSelect] = useState<string>('');
+
+  // Belanja Modal Simulation Toggle (Khusus Kolom Anggaran)
+  const [excludeBelanjaModalAnggaran, setExcludeBelanjaModalAnggaran] = useState<boolean>(false);
   
   // Forms
   const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
@@ -204,6 +283,122 @@ export default function KomparasiLaporanPage() {
     }
   };
 
+  // Reorder Row-Level Handlers (Naik/Turun Baris Sejajar / Sibling)
+  const handleMoveUpRow = async (akun: any) => {
+    const siblings = akunMaster
+      .filter(a => (a.parent_id || null) === (akun.parent_id || null))
+      .sort((a, b) => a.urutan - b.urutan);
+    const curIdx = siblings.findIndex(a => a.id === akun.id);
+    if (curIdx > 0) {
+      const prevSibling = siblings[curIdx - 1];
+      let newUrutan = prevSibling.urutan;
+      let newPrevUrutan = akun.urutan;
+      if (newUrutan === newPrevUrutan) {
+        newUrutan = newPrevUrutan - 1;
+      }
+      await Promise.all([
+        supabase.from('app_laporan_akun').update({ urutan: newUrutan }).eq('id', akun.id),
+        supabase.from('app_laporan_akun').update({ urutan: newPrevUrutan }).eq('id', prevSibling.id)
+      ]);
+      fetchData();
+    }
+  };
+
+  const handleMoveDownRow = async (akun: any) => {
+    const siblings = akunMaster
+      .filter(a => (a.parent_id || null) === (akun.parent_id || null))
+      .sort((a, b) => a.urutan - b.urutan);
+    const curIdx = siblings.findIndex(a => a.id === akun.id);
+    if (curIdx < siblings.length - 1) {
+      const nextSibling = siblings[curIdx + 1];
+      let newUrutan = nextSibling.urutan;
+      let newNextUrutan = akun.urutan;
+      if (newUrutan === newNextUrutan) {
+        newUrutan = newNextUrutan + 1;
+      }
+      await Promise.all([
+        supabase.from('app_laporan_akun').update({ urutan: newUrutan }).eq('id', akun.id),
+        supabase.from('app_laporan_akun').update({ urutan: newNextUrutan }).eq('id', nextSibling.id)
+      ]);
+      fetchData();
+    }
+  };
+
+  // Reorder Modal Handlers
+  const openReorderModal = () => {
+    const sorted = [...akunMaster].sort((a, b) => a.urutan - b.urutan);
+    setReorderList(sorted.map(r => ({ ...r })));
+    setReorderSearchFilter('');
+    setIsReorderModalOpen(true);
+  };
+
+  const moveReorderItem = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= reorderList.length) return;
+    
+    const updated = [...reorderList];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    
+    // Otomatis sinkronkan nomor urutan sesuai posisi baris di layar
+    updated.forEach((item, i) => {
+      item.urutan = i + 1;
+    });
+    
+    setReorderList(updated);
+  };
+
+  const handleReorderUrutanChange = (id: number, val: number) => {
+    setReorderList(prev => prev.map(item => item.id === id ? { ...item, urutan: val } : item));
+  };
+
+  const handleReorderFieldChange = (id: number, field: string, val: any) => {
+    setReorderList(prev => prev.map(item => item.id === id ? { ...item, [field]: val } : item));
+  };
+
+  const handleSortByUrutan = () => {
+    const updated = [...reorderList].sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+    setReorderList(updated);
+  };
+
+  const handleAutoRenumber = () => {
+    const sorted = [...reorderList].sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
+    const updated = sorted.map((item, idx) => ({
+      ...item,
+      urutan: idx + 1
+    }));
+    setReorderList(updated);
+  };
+
+  const handleSaveReorder = async () => {
+    setIsSavingReorder(true);
+    try {
+      const updates = reorderList.map((item, idx) => {
+        const finalUrutan = Number.isFinite(item.urutan) ? item.urutan : idx + 1;
+        return supabase
+          .from('app_laporan_akun')
+          .update({
+            urutan: finalUrutan,
+            keterangan: item.keterangan,
+            level: Number(item.level) || 0,
+            parent_id: item.parent_id ? Number(item.parent_id) : null,
+            is_bold: !!item.is_bold,
+            is_sum: !!item.is_sum
+          })
+          .eq('id', item.id);
+      });
+      await Promise.all(updates);
+      setIsReorderModalOpen(false);
+      await fetchData();
+      alert('✅ Urutan posisi, nama akun, jenjang, dan level berhasil disimpan ke database!');
+    } catch (err: any) {
+      alert('Gagal menyimpan urutan akun: ' + err.message);
+    } finally {
+      setIsSavingReorder(false);
+    }
+  };
+
   const handleNilaiSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const payloadWithVersi = {
@@ -254,11 +449,31 @@ export default function KomparasiLaporanPage() {
   // --- PEMROSESAN MATRIX & HIERARKI ---
   const selectedYearVals = selectedYears.map(y => y.value).sort(); 
 
-  // Build Tree dari app_laporan_akun
+  // Cek apakah sedang menampilkan Format Asli untuk tahun-tahun sebelumnya (< 2027)
+  const isHistoricalMode = formatMode === 'asli' && selectedYearVals.length > 0 && selectedYearVals.every(y => {
+    const yr = parseInt(y.split('___')[0]) || 0;
+    return yr < 2027;
+  });
+
+  // Terapkan baseline urutan & hierarki historis jika dalam mode Format Asli tahun sebelumnya
+  const activeAkunMaster = React.useMemo(() => {
+    if (isHistoricalMode) {
+      return akunMaster.map(acc => {
+        const hist = HISTORICAL_BASELINE_MAP[acc.id];
+        if (hist) {
+          return { ...acc, urutan: hist.urutan, parent_id: hist.parent_id, level: hist.level };
+        }
+        return acc;
+      });
+    }
+    return akunMaster;
+  }, [akunMaster, isHistoricalMode]);
+
+  // Build Tree dari activeAkunMaster
   const roots: any[] = [];
   const childrenMap = new Map<number, any[]>();
   
-  akunMaster.forEach(akun => {
+  activeAkunMaster.forEach(akun => {
     if (akun.parent_id) {
       if (!childrenMap.has(akun.parent_id)) childrenMap.set(akun.parent_id, []);
       childrenMap.get(akun.parent_id)!.push(akun);
@@ -270,21 +485,171 @@ export default function KomparasiLaporanPage() {
   roots.sort((a, b) => a.urutan - b.urutan);
   childrenMap.forEach(arr => arr.sort((a, b) => a.urutan - b.urutan));
 
-  const flattenedRows: any[] = [];
-  const flatten = (nodes: any[]) => {
-    nodes.forEach(node => {
-      flattenedRows.push(node);
-      if (childrenMap.has(node.id)) {
-        flatten(childrenMap.get(node.id)!);
+  // Urutan baris laporan mengikuti nomor urutan resmi (urutan) di database atau baseline historis
+  const flattenedRows = React.useMemo(() => {
+    return [...activeAkunMaster].sort((a, b) => a.urutan - b.urutan);
+  }, [activeAkunMaster]);
+
+  // Helper Penjelasan Rumus Penjumlahan Baris
+  const getRowFormulaInfo = (akun: any, rowList: any[]) => {
+    const getPos = (id: number) => {
+      const found = rowList.find(r => r.id === id);
+      return found ? `#${found.urutan}` : '';
+    };
+
+    if (akun.kode_sistem === 'JML_PEN' || akun.id === 25) {
+      const p1 = getPos(2);
+      const p2 = getPos(15);
+      return {
+        short: `${p1} + ${p2}`,
+        full: `Penjumlahan Dana Pemerintah (${p1}) + Dana Masyarakat (${p2})`
+      };
+    }
+    if (akun.kode_sistem === 'PEN_PEM' || akun.id === 2) {
+      const p1 = getPos(3);
+      const p2 = getPos(4);
+      const p3 = getPos(5);
+      return {
+        short: `${p1} + ${p2} + ${p3}`,
+        full: `Penjumlahan Gaji PNS (${p1}) + BPPTN-BH (${p2}) + Penerimaan Pemerintah lainnya (${p3})`
+      };
+    }
+    if (akun.id === 5) {
+      return {
+        short: `#6 s/d #14`,
+        full: `Penjumlahan: Penelitian (#6), Beasiswa (#7), Hibah JICA (#8), DAPT (#9), IKU (#10), STP (#11), PUAPT (#12), EQUITY (#13), Revitalisasi (#14)`
+      };
+    }
+    if (akun.kode_sistem === 'PEN_MAS' || akun.id === 15) {
+      const p1 = getPos(16);
+      const p2 = getPos(19);
+      return {
+        short: `${p1} + ${p2}`,
+        full: `Penjumlahan Penerimaan Pendidikan (${p1}) + Non Pendidikan (${p2})`
+      };
+    }
+    if (akun.kode_sistem === 'PEN_PEND' || akun.id === 16) {
+      const p1 = getPos(17);
+      const p2 = getPos(18);
+      return {
+        short: `${p1} + ${p2}`,
+        full: `Penjumlahan Penerimaan Pendidikan Utama (${p1}) + Pendidikan Lainnya (${p2})`
+      };
+    }
+    if (akun.kode_sistem === 'PEN_NONPEND' || akun.id === 19) {
+      return {
+        short: `#20 s/d #24, #42, #43`,
+        full: `Penjumlahan: Hibah/Donasi (#20), Jasa Univ (#21), Pemanfaatan Aset (#22), Kerjasama (#23), UPU (#24), Pinjaman (#42), Cadangan (#43)`
+      };
+    }
+    if (akun.kode_sistem === 'JML_PENG' || akun.id === 36) {
+      return {
+        short: `Subtotal Belanja`,
+        full: `Penjumlahan seluruh pos rincian belanja operasional level 1 di atasnya`
+      };
+    }
+    if (akun.kode_sistem === 'SURPLUS_1' || akun.id === 37 || akun.id === 45) {
+      const pPen = getPos(25);
+      const pPeng = getPos(36);
+      return {
+        short: `${pPen} - ${pPeng}`,
+        full: `Selisih JUMLAH PENERIMAAN (${pPen}) dikurangi JUMLAH PENGELUARAN (${pPeng})`
+      };
+    }
+    if (akun.kode_sistem === 'SURPLUS_2' || akun.id === 39) {
+      const pS1 = getPos(37);
+      const pSisa = getPos(38);
+      return {
+        short: `${pS1} + ${pSisa}`,
+        full: `SURPLUS ANGGARAN SEBELUMNYA (${pS1}) + SISA LEBIH (${pSisa})`
+      };
+    }
+    if (akun.id === 47) {
+      const p45 = getPos(45);
+      const p46 = getPos(46);
+      const pModal = getPos(31);
+      return {
+        short: `${p45} + ${p46} - ${pModal}`,
+        full: `SURPLUS OPERASIONAL (${p45}) + RENCANA LUNCURAN (${p46}) - BELANJA MODAL (${pModal})`
+      };
+    }
+    if (akun.id === 49) {
+      const p47 = getPos(47);
+      const p48 = getPos(48);
+      return {
+        short: `${p47} + ${p48}`,
+        full: `SURPLUS SETELAH LUNCURAN (${p47}) + SISA LEBIH SEBELUMNYA (${p48})`
+      };
+    }
+
+    if (akun.is_sum) {
+      const children = rowList.filter(r => r.parent_id === akun.id);
+      if (children.length > 0) {
+        const childNums = children.map(c => `#${c.urutan}`).join(' + ');
+        return {
+          short: childNums,
+          full: `Penjumlahan sub-akun: ${children.map(c => `${c.keterangan} (#${c.urutan})`).join(', ')}`
+        };
+      }
+      return {
+        short: `Penjumlahan Sub-Akun`,
+        full: `Penjumlahan otomatis sub-akun di bawahnya`
+      };
+    }
+
+    return null;
+  };
+
+  const displayedRows = React.useMemo(() => {
+    return flattenedRows.filter(akun => {
+      // Selalu sembunyikan baris dummy separator (id 44)
+      if (akun.id === 44 || akun.keterangan?.toLowerCase().includes('start profil') || akun.kode_sistem === 'DUMMY_2027') {
+        return false;
+      }
+
+      // Baris-baris khusus profil lama (Surplus dkk)
+      const isOldFormatRow = [37, 38, 39, 40].includes(akun.id) || ['SURPLUS_1', 'SISA_LEBIH', 'SURPLUS_2', 'DANA_ABADI'].includes(akun.kode_sistem || '');
+      
+      // Baris-baris khusus profil baru 2027 (Surplus, Luncuran, dkk)
+      // Perhatikan: Belanja Modal (id 31) TIDAK TERMASUK di sini, jadi dia selalu tampil!
+      const isNewFormatRow = [45, 51, 46, 47, 48, 49, 50].includes(akun.id) || ['SD_opr'].includes(akun.kode_sistem || '');
+
+      if (formatMode === 'harmonisasi') {
+        // Mode Harmonisasi: selaraskan format ke Profil 2027 (baris baru), sembunyikan baris lama
+        if (isOldFormatRow) {
+          return false;
+        }
+        return true;
+      } else {
+        // Mode Format Asli:
+        // Cek apakah seluruh tahun yang dipilih adalah >= 2027
+        const isAll2027Plus = selectedYearVals.length > 0 && selectedYearVals.every(y => {
+          const yr = parseInt(y.split('___')[0]) || 0;
+          return yr >= 2027;
+        });
+
+        if (isAll2027Plus) {
+          // Tahun 2027+: sembunyikan baris lama, tampilkan baris baru
+          if (isOldFormatRow) {
+            return false;
+          }
+          return true;
+        } else {
+          // Tahun < 2027 (misal 2024 atau 2025): tampilkan baris lama, sembunyikan baris baru
+          if (isNewFormatRow) {
+            return false;
+          }
+          return true;
+        }
       }
     });
-  };
-  flatten(roots);
+  }, [flattenedRows, formatMode, selectedYearVals]);
 
+  const yearsToCompute = Array.from(new Set([...selectedYearVals, ...allYears]));
   const matrix: Record<number, Record<string, any>> = {};
   flattenedRows.forEach(akun => {
     matrix[akun.id] = {};
-    selectedYearVals.forEach(y => {
+    yearsToCompute.forEach(y => {
       matrix[akun.id][y] = { id: null, anggaran: 0, realisasi: 0 };
     });
   });
@@ -300,6 +665,21 @@ export default function KomparasiLaporanPage() {
     }
   });
 
+  // Belanja Modal: ID 31 / PENG_MODAL
+  const modalRow = flattenedRows.find(r => r.kode_sistem === 'PENG_MODAL' || r.keterangan?.trim().toLowerCase() === 'belanja modal');
+  const originalModalAnggaranMatrix: Record<string, number> = {};
+
+  if (modalRow) {
+    yearsToCompute.forEach(y => {
+      originalModalAnggaranMatrix[y] = matrix[modalRow.id]?.[y]?.anggaran || 0;
+      if (excludeBelanjaModalAnggaran) {
+        if (matrix[modalRow.id] && matrix[modalRow.id][y]) {
+          matrix[modalRow.id][y].anggaran = 0;
+        }
+      }
+    });
+  }
+
   // Kalkulasi Otomatis (Bottom-Up)
   const computeSums = (nodes: any[]) => {
     nodes.forEach(node => {
@@ -308,7 +688,7 @@ export default function KomparasiLaporanPage() {
       }
       
       if (node.is_sum) {
-        selectedYearVals.forEach(y => {
+        yearsToCompute.forEach(y => {
           let sumAnggaran = 0;
           let sumRealisasi = 0;
           
@@ -339,16 +719,16 @@ export default function KomparasiLaporanPage() {
   const sisaRow = flattenedRows.find(r => r.kode_sistem === 'SISA_LEBIH' || r.urutan === 38);
 
   // Profil 2027 Custom Totals:
-  // 1. urutan 45 (SURPLUS/(DEFISIT) ANGGARAN) rumus sama urutan 37
-  // 2. urutan 47 = urutan 46 + urutan 45
-  // 3. urutan 49 = urutan 47 + urutan 48
-  const row45 = flattenedRows.find(r => r.urutan === 45);
-  const row46 = flattenedRows.find(r => r.urutan === 46);
-  const row47 = flattenedRows.find(r => r.urutan === 47);
-  const row48 = flattenedRows.find(r => r.urutan === 48);
-  const row49 = flattenedRows.find(r => r.urutan === 49);
+  // 1. id 45 & 51 (SURPLUS/(DEFISIT) ANGGARAN) rumus sama id 37
+  // 2. id 47 = id 45 (Surplus Operasional) + id 46 (Rencana Luncuran) + Belanja Modal (id 31)
+  // 3. id 49 = id 47 + id 48
+  const row45 = flattenedRows.find(r => r.id === 45 || r.id === 51);
+  const row46 = flattenedRows.find(r => r.id === 46);
+  const row47 = flattenedRows.find(r => r.id === 47);
+  const row48 = flattenedRows.find(r => r.id === 48);
+  const row49 = flattenedRows.find(r => r.id === 49);
 
-  selectedYearVals.forEach(y => {
+  yearsToCompute.forEach(y => {
     if (jpRow && jpPemerintah && jpMasyarakat) {
       matrix[jpRow.id][y].anggaran = matrix[jpPemerintah.id][y].anggaran + matrix[jpMasyarakat.id][y].anggaran;
       matrix[jpRow.id][y].realisasi = matrix[jpPemerintah.id][y].realisasi + matrix[jpMasyarakat.id][y].realisasi;
@@ -385,10 +765,12 @@ export default function KomparasiLaporanPage() {
       matrix[row45.id][y].realisasi = matrix[jpRow.id][y].realisasi - matrix[jpengRow.id][y].realisasi;
     }
 
-    // 2. urutan 47 = urutan 46 + urutan 45
+    // 2. id 47 = id 45 (Surplus Operasional) + id 46 (Rencana Luncuran) - modalRow (Belanja Modal)
     if (row47 && row46 && row45) {
-      matrix[row47.id][y].anggaran = (matrix[row46.id]?.[y]?.anggaran || 0) + (matrix[row45.id]?.[y]?.anggaran || 0);
-      matrix[row47.id][y].realisasi = (matrix[row46.id]?.[y]?.realisasi || 0) + (matrix[row45.id]?.[y]?.realisasi || 0);
+      const valModalAng = modalRow ? (matrix[modalRow.id]?.[y]?.anggaran || 0) : 0;
+      const valModalReal = modalRow ? (matrix[modalRow.id]?.[y]?.realisasi || 0) : 0;
+      matrix[row47.id][y].anggaran = (matrix[row45.id]?.[y]?.anggaran || 0) + (matrix[row46.id]?.[y]?.anggaran || 0) - valModalAng;
+      matrix[row47.id][y].realisasi = (matrix[row45.id]?.[y]?.realisasi || 0) + (matrix[row46.id]?.[y]?.realisasi || 0) - valModalReal;
     }
 
     // 3. urutan 49 = urutan 47 + urutan 48
@@ -413,8 +795,8 @@ export default function KomparasiLaporanPage() {
     ws.getRow(1).font = { bold: true };
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
 
-    flattenedRows.forEach(akun => {
-      const isAuto = akun.is_sum || akun.kode_sistem?.includes('SURPLUS') || [37, 39, 45, 47, 49].includes(akun.urutan);
+    displayedRows.forEach(akun => {
+      const isAuto = akun.is_sum || akun.kode_sistem?.includes('SURPLUS') || [37, 39, 45, 47, 49, 51].includes(akun.id);
       const row = ws.addRow({
         id: akun.id,
         ket: `${'   '.repeat(akun.level)}${akun.keterangan}${isAuto ? ' [OTOMATIS - JANGAN DIISI]' : ''}`,
@@ -509,7 +891,15 @@ export default function KomparasiLaporanPage() {
     const header1 = ['Keterangan'];
     const header2 = [''];
     selectedYearVals.forEach(y => {
-      header1.push(`TAHUN ${y.split('___').join(' - ')}`, '', '', '', '', '');
+      const parts = y.split('___');
+      const yearNum = parseInt(parts[0]) || 0;
+      const maxYear = selectedYearVals.length > 0 ? Math.max(...selectedYearVals.map(s => parseInt(s.split('___')[0]) || 0)) : 0;
+      const isTargetYear = yearNum === maxYear && selectedYearVals.length > 1;
+      const title = selectedYearVals.length > 1
+        ? (isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`)
+        : `TAHUN ${y.split('___').join(' - ')}`;
+
+      header1.push(title, '', '', '', '', '');
       header2.push('Rencana (Rp)', '%', 'Realisasi (Rp)', '%', 'Selisih (Rp)', '%');
     });
 
@@ -532,7 +922,7 @@ export default function KomparasiLaporanPage() {
       });
     });
 
-    flattenedRows.forEach(akun => {
+    displayedRows.forEach(akun => {
       const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
       let displayLabel = akun.keterangan;
       if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
@@ -552,9 +942,9 @@ export default function KomparasiLaporanPage() {
 
         let propAnggaran = 0;
         let propRealisasi = 0;
-        const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
-        const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
-        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+        const jpRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+        const jpEngRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+        const myIdx = displayedRows.findIndex(x => x.id === akun.id);
         
         if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
             let denomAng = 0;
@@ -595,6 +985,14 @@ export default function KomparasiLaporanPage() {
       });
     });
 
+    if (formatMode === 'harmonisasi' && selectedYearVals.length > 1) {
+      ws.addRow([]);
+      const noteRow = ws.addRow([
+        '* Catatan: Data tahun sebelumnya telah diselaraskan dengan struktur format RKAT terbaru guna memastikan konsistensi perbandingan antar-tahun.'
+      ]);
+      noteRow.font = { italic: true, size: 9, color: { argb: 'FF555555' } };
+    }
+
     ws.getColumn(1).width = 50;
     for (let i = 2; i <= (selectedYearVals.length * 6) + 1; i++) {
        ws.getColumn(i).width = 18;
@@ -617,17 +1015,24 @@ export default function KomparasiLaporanPage() {
     setWordDocTitle(`Profil Ringkas Usulan RKAT ${maxYear}`);
 
     const cols = sorted.map(yStr => {
-      const yearNum = parseInt(yStr.split('___')[0]) || 0;
+      const parts = yStr.split('___');
+      const yearNum = parseInt(parts[0]) || 0;
+      const versi = parts[1] || 'Final';
       const isTargetYear = yearNum === maxYear;
+      const defaultLabel = isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`;
       return {
         key: yStr,
-        label: isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`,
+        label: defaultLabel,
         dataType: (isTargetYear ? 'anggaran' : 'realisasi') as 'realisasi' | 'anggaran',
         enabled: true
       };
     });
 
     setWordColumns(cols);
+    setWordExcludeBelanjaModal(excludeBelanjaModalAnggaran);
+    if (!addYearWordSelect && allYears.length > 0) {
+      setAddYearWordSelect(allYears[0]);
+    }
     setIsWordModalOpen(true);
   };
 
@@ -766,8 +1171,8 @@ export default function KomparasiLaporanPage() {
     // 1. Filter level (summary / all)
     // 2. Baris dengan semua nilai data 0 tidak ditampilkan di Word
     const baseRows = wordLevelFilter === 'summary'
-      ? flattenedRows.filter(r => r.level <= 1 || r.is_sum || r.is_bold || r.kode_sistem?.includes('SURPLUS') || r.kode_sistem?.includes('JML_'))
-      : flattenedRows;
+      ? displayedRows.filter(r => r.level <= 1 || r.is_sum || r.is_bold || r.kode_sistem?.includes('SURPLUS') || r.kode_sistem?.includes('JML_') || [45, 46, 47, 48, 49, 50].includes(r.urutan))
+      : displayedRows;
 
     const rowsToExport = baseRows.filter(akun => {
       const norm = akun.keterangan?.trim().toUpperCase();
@@ -787,8 +1192,8 @@ export default function KomparasiLaporanPage() {
       return hasAnyData;
     });
 
-    const jpRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
-    const jpEngRowIdx = flattenedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
+    const jpRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
+    const jpEngRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
 
     // Baris-baris Data
     rowsToExport.forEach(akun => {
@@ -994,12 +1399,35 @@ export default function KomparasiLaporanPage() {
                 font: "Times New Roman",
                 size: 28, // 14pt
                 color: "000000"
-              })
+              }),
+              ...(wordExcludeBelanjaModal ? [
+                new TextRun({
+                  text: "\n(Simulasi Anggaran Tanpa Belanja Modal)",
+                  italics: true,
+                  font: "Times New Roman",
+                  size: 20, // 10pt
+                  color: "7030A0"
+                })
+              ] : [])
             ],
             alignment: AlignmentType.LEFT,
-            spacing: { before: 100, after: 250 }
+            spacing: { before: 100, after: 200 }
           }),
-          docTable
+          docTable,
+          ...(formatMode === 'harmonisasi' && activeCols.length > 1 ? [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "* Catatan: Data tahun sebelumnya telah diselaraskan dengan struktur format RKAT terbaru guna memastikan konsistensi perbandingan antar-tahun.",
+                  italics: true,
+                  font: "Times New Roman",
+                  size: 18, // 9pt
+                  color: "555555"
+                })
+              ],
+              spacing: { before: 140, after: 80 }
+            })
+          ] : [])
         ]
       }]
     });
@@ -1075,6 +1503,15 @@ export default function KomparasiLaporanPage() {
           </button>
 
           <button 
+            onClick={openReorderModal}
+            className="h-9 px-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            title="Kelola & Rapikan Urutan Posisi Seluruh Baris Akun Laporan"
+          >
+            <ArrowUpDown size={13} className="text-amber-700" />
+            <span>Atur Urutan</span>
+          </button>
+
+          <button 
             onClick={() => { setAkunForm({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: akunMaster.length + 1, level: 0, is_sum: false, is_bold: false }); setIsAkunModalOpen(true); }}
             className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
           >
@@ -1112,27 +1549,157 @@ export default function KomparasiLaporanPage() {
       )}
 
       {/* FILTER MULTI SELECT BAR */}
-      <div className="bg-white p-3 px-4 rounded-2xl shadow-xs border border-gray-200/80 flex flex-col md:flex-row items-start md:items-center gap-3 z-10 relative">
-        <div className="flex items-center gap-1.5 font-bold text-gray-700 uppercase tracking-wider text-[11px] shrink-0">
-          <Filter size={14} className="text-teal-600" /> Sandingkan Tahun:
+      <div className="bg-white p-3 px-4 rounded-2xl shadow-xs border border-gray-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 z-10 relative">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-1">
+          <div className="flex items-center gap-1.5 font-bold text-gray-700 uppercase tracking-wider text-[11px] shrink-0">
+            <Filter size={14} className="text-teal-600" /> Sandingkan Tahun:
+          </div>
+          <div className="w-full flex-1">
+            <Select
+              isMulti
+              options={allYears.map(y => ({ value: y, label: y.replace('___', ' - ') }))}
+              value={selectedYears}
+              onChange={(val: any) => setSelectedYears(val || [])}
+              placeholder="Pilih tahun anggaran untuk dibandingkan..."
+              className="text-xs font-semibold"
+              styles={{
+                control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
+                multiValue: (base) => ({ ...base, backgroundColor: '#0f766e', borderRadius: '0.375rem', padding: '0 2px' }),
+                multiValueLabel: (base) => ({ ...base, color: 'white', fontWeight: 'bold', fontSize: '11px', padding: '0 4px' }),
+                multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#115e59', color: 'white' } })
+              }}
+            />
+          </div>
         </div>
-        <div className="w-full flex-1">
-          <Select
-            isMulti
-            options={allYears.map(y => ({ value: y, label: y }))}
-            value={selectedYears}
-            onChange={(val: any) => setSelectedYears(val || [])}
-            placeholder="Pilih tahun anggaran untuk dibandingkan..."
-            className="text-xs font-semibold"
-            styles={{
-              control: (base) => ({ ...base, minHeight: '36px', height: '36px', borderRadius: '0.75rem', borderColor: '#e5e7eb', backgroundColor: '#f9fafb' }),
-              multiValue: (base) => ({ ...base, backgroundColor: '#0f766e', borderRadius: '0.375rem', padding: '0 2px' }),
-              multiValueLabel: (base) => ({ ...base, color: 'white', fontWeight: 'bold', fontSize: '11px', padding: '0 4px' }),
-              multiValueRemove: (base) => ({ ...base, color: 'white', ':hover': { backgroundColor: '#115e59', color: 'white' } })
-            }}
-          />
+
+        {/* FORMAT MODE TOGGLE: HARMONISASI VS ASLI */}
+        <div className="flex items-center gap-1.5 shrink-0 bg-gray-100 p-1 rounded-xl border border-gray-200">
+          <button
+            type="button"
+            onClick={() => setFormatMode('harmonisasi')}
+            className={`h-7 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              formatMode === 'harmonisasi'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+            }`}
+            title="Harmonisasikan semua tahun ke struktur format RKAT terbaru (Profil 2027) untuk perbandingan setara (apple-to-apple)"
+          >
+            <Layers size={13} className={formatMode === 'harmonisasi' ? 'text-teal-200' : 'text-gray-500'} />
+            <span>Harmonisasi (2027)</span>
+            {selectedYears.length > 1 && formatMode === 'harmonisasi' && (
+              <span className="text-[9px] bg-teal-800/80 text-teal-100 px-1 py-0.2 rounded font-mono font-semibold">
+                Auto
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFormatMode('asli')}
+            className={`h-7 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              formatMode === 'asli'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+            }`}
+            title="Tampilkan struktur pos dan formula surplus sesuai ketentuan format resmi pada tahun berjalan"
+          >
+            <FileText size={13} className={formatMode === 'asli' ? 'text-indigo-200' : 'text-gray-500'} />
+            <span>Format Asli</span>
+            {selectedYears.length === 1 && formatMode === 'asli' && (
+              <span className="text-[9px] bg-indigo-800/80 text-indigo-100 px-1 py-0.2 rounded font-mono font-semibold">
+                Auto
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* TOGGLE SWITCH: SIMULASI ANGGARAN TANPA BELANJA MODAL */}
+        <div className="flex items-center shrink-0">
+          <button
+            type="button"
+            onClick={() => setExcludeBelanjaModalAnggaran(prev => !prev)}
+            className={`h-9 px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 shadow-2xs cursor-pointer ${
+              excludeBelanjaModalAnggaran 
+                ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-amber-100 ring-2 ring-amber-300' 
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
+            }`}
+            title="Klik untuk melihat simulasi anggaran dan surplus/defisit jika tanpa belanja modal (Realisasi tetap asli)"
+          >
+            {excludeBelanjaModalAnggaran ? (
+              <CheckSquare size={15} className="text-white shrink-0" />
+            ) : (
+              <Square size={15} className="text-slate-400 shrink-0" />
+            )}
+            <span>Tanpa Belanja Modal (Anggaran)</span>
+            {excludeBelanjaModalAnggaran ? (
+              <span className="text-[10px] bg-amber-700/60 px-1.5 py-0.5 rounded text-white font-mono font-bold">
+                Aktif
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 font-normal">
+                (Normal)
+              </span>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* BANNER PENJELASAN MODE FORMAT AKTIF */}
+      {selectedYearVals.length > 0 && (
+        <div className={`border rounded-2xl p-2.5 px-4 flex items-center justify-between gap-3 text-xs shadow-2xs transition-all ${
+          formatMode === 'harmonisasi' 
+            ? 'bg-teal-50/70 border-teal-200/90 text-teal-950'
+            : 'bg-indigo-50/70 border-indigo-200/90 text-indigo-950'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <span className="text-base shrink-0">
+              {formatMode === 'harmonisasi' ? '🔄' : '📜'}
+            </span>
+            <div className="text-[11px] leading-relaxed">
+              {formatMode === 'harmonisasi' ? (
+                <>
+                  <strong className="text-teal-900 font-bold">Mode Harmonisasi Aktif:</strong> Format laporan dan ringkasan surplus diselaraskan dengan struktur <strong>Profil RKAT Terbaru (2027)</strong> agar perbandingan multi-tahun bersifat konsisten (<em>apple-to-apple</em>).
+                </>
+              ) : (
+                <>
+                  <strong className="text-indigo-900 font-bold">Mode Format Asli Aktif:</strong> Menampilkan format dan formula surplus resmi sesuai tahun berjalan ({selectedYearVals.some(y => (parseInt(y.split('___')[0]) || 0) < 2027) ? 'Format Klasik untuk < 2027' : 'Format Profil 2027'}).
+                </>
+              )}
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFormatMode(prev => prev === 'harmonisasi' ? 'asli' : 'harmonisasi')}
+              className="text-[10px] font-bold text-gray-500 hover:text-gray-900 underline underline-offset-2 cursor-pointer"
+            >
+              Ganti ke {formatMode === 'harmonisasi' ? 'Format Asli' : 'Mode Harmonisasi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER NOTIFIKASI SIMULASI TANPA BELANJA MODAL */}
+      {excludeBelanjaModalAnggaran && (
+        <div className="bg-amber-50 border border-amber-300/80 rounded-2xl p-3 px-4 flex items-center justify-between gap-3 text-xs shadow-2xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">⚙️</span>
+            <div>
+              <p className="font-black text-amber-950">Mode Simulasi Aktif: Pagu Belanja Modal Dinolkan pada Kolom Anggaran</p>
+              <p className="text-[11px] text-amber-800">
+                Nilai Belanja Modal dinolkan khusus untuk kolom <strong>Rencana / Anggaran</strong> sehingga Anda dapat melihat surplus/defisit operasional murni. Kolom <strong>Realisasi</strong> tetap menampilkan data aktual.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExcludeBelanjaModalAnggaran(false)}
+            className="px-3 py-1.5 rounded-xl bg-white border border-amber-300 hover:bg-amber-100 font-bold text-amber-900 text-xs shrink-0 cursor-pointer shadow-2xs"
+          >
+            Tampilkan Normal
+          </button>
+        </div>
+      )}
 
       {/* CHART VISUALISASI */}
       {selectedYearVals.length > 0 && !loading && (
@@ -1199,18 +1766,35 @@ export default function KomparasiLaporanPage() {
         ) : selectedYearVals.length === 0 ? (
           <div className="text-center py-20 text-gray-400 font-semibold italic text-xs">Silakan pilih minimal 1 tahun di filter atas untuk menampilkan tabel.</div>
         ) : (
-          <div className="overflow-x-auto pb-2">
+          <>
+            <div className="overflow-x-auto pb-2">
             <table className="w-full text-left border-collapse min-w-[1000px] text-xs">
               <thead>
                 <tr className="bg-gray-900 text-white uppercase tracking-wider text-[11px]">
                   <th rowSpan={2} className="py-3 px-4 border-r border-gray-800 min-w-[320px] sticky left-0 bg-gray-900 z-20 font-black shadow-xs">
                     Keterangan
                   </th>
-                  {selectedYearVals.map(y => (
-                    <th key={`head-${y}`} colSpan={7} className="py-2.5 px-3 text-center border-r border-gray-800 border-b border-gray-800 bg-gray-800 font-black">
-                      TAHUN {y.split('___').join(' - ')}
-                    </th>
-                  ))}
+                  {selectedYearVals.map(y => {
+                    const parts = y.split('___');
+                    const yearNum = parseInt(parts[0]) || 0;
+                    const versi = parts[1] || 'Final';
+                    const maxYear = selectedYearVals.length > 0 ? Math.max(...selectedYearVals.map(s => parseInt(s.split('___')[0]) || 0)) : 0;
+                    const isTargetYear = yearNum === maxYear && selectedYearVals.length > 1;
+                    const title = selectedYearVals.length > 1
+                      ? (isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`)
+                      : `TAHUN ${yearNum} - ${versi}`;
+
+                    return (
+                      <th key={`head-${y}`} colSpan={7} className="py-2.5 px-3 text-center border-r border-gray-800 border-b border-gray-800 bg-gray-800 font-black">
+                        <span>{title}</span>
+                        {selectedYearVals.length > 1 && (
+                          <span className="block text-[9px] font-normal text-gray-400 font-mono tracking-normal mt-0.5">
+                            Versi: {versi}
+                          </span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
                 <tr className="bg-gray-800 text-white uppercase tracking-tighter text-[10px] font-bold">
                   {selectedYearVals.map(y => (
@@ -1227,9 +1811,10 @@ export default function KomparasiLaporanPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {flattenedRows.map((akun, idx) => {
+                {displayedRows.map((akun, idx) => {
                   const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
-                  const isCustom = akun.kode_sistem?.includes('SURPLUS') || [37, 39, 45, 47, 49].includes(akun.urutan);
+                  const isCustom = akun.kode_sistem?.includes('SURPLUS') || [37, 39, 45, 47, 49].includes(akun.id);
+                  const formulaInfo = getRowFormulaInfo(akun, displayedRows);
                   
                   let displayLabel = akun.keterangan;
                   if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
@@ -1239,15 +1824,56 @@ export default function KomparasiLaporanPage() {
                       <td 
                         className={`py-2 px-3 sticky left-0 bg-white group-hover:bg-teal-50/30 border-r border-gray-200 z-10 flex items-center justify-between ${(akun.is_sum || isCustom) ? '!bg-gray-50/80' : ''}`}
                       >
-                        <div className="flex items-center gap-1.5" style={{ paddingLeft: `${akun.level * 1.5}rem` }}>
+                        <div className="flex items-center gap-1.5 flex-wrap" style={{ paddingLeft: `${akun.level * 1.5}rem` }}>
                           {akun.level > 0 && <CornerDownRight size={12} className="text-gray-300 shrink-0" />}
                           <span className={`${isBold ? 'font-black text-gray-900 text-xs' : 'font-medium text-gray-700 text-xs'}`}>
                             {displayLabel}
                           </span>
+                          {formulaInfo && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 text-[9px] text-teal-800 bg-teal-50/90 border border-teal-200/80 px-1.5 py-0.2 rounded-md font-mono font-medium shadow-2xs shrink-0 cursor-help"
+                              title={formulaInfo.full}
+                            >
+                              <span className="font-bold text-teal-700">∑</span> {formulaInfo.short}
+                            </span>
+                          )}
                         </div>
-                        <div className="opacity-0 group-hover:opacity-100 flex gap-0.5 bg-white p-0.5 rounded-lg shadow-2xs border border-gray-200">
-                           <button onClick={() => { setAkunForm({...akun}); setIsAkunModalOpen(true); }} className="p-1 text-gray-400 hover:text-teal-600 rounded"><Edit2 size={11}/></button>
-                           <button onClick={() => handleAkunDelete(akun.id)} className="p-1 text-gray-400 hover:text-rose-600 rounded"><Trash2 size={11}/></button>
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 bg-white p-0.5 rounded-lg shadow-2xs border border-gray-200 shrink-0 ml-2">
+                           <span className="text-[9px] font-mono font-bold text-gray-400 px-1 border-r border-gray-100" title={`Nomor Urut: ${akun.urutan}`}>
+                             #{akun.urutan}
+                           </span>
+                           <button 
+                             type="button"
+                             onClick={() => handleMoveUpRow(akun)} 
+                             className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                             title="Pindah Urutan ke Atas (▲)"
+                           >
+                             <ChevronUp size={11}/>
+                           </button>
+                           <button 
+                             type="button"
+                             onClick={() => handleMoveDownRow(akun)} 
+                             className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
+                             title="Pindah Urutan ke Bawah (▼)"
+                           >
+                             <ChevronDown size={11}/>
+                           </button>
+                           <button 
+                             type="button"
+                             onClick={() => { setAkunForm({...akun}); setIsAkunModalOpen(true); }} 
+                             className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                             title="Edit Akun & Urutan"
+                           >
+                             <Edit2 size={11}/>
+                           </button>
+                           <button 
+                             type="button"
+                             onClick={() => handleAkunDelete(akun.id)} 
+                             className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                             title="Hapus Akun"
+                           >
+                             <Trash2 size={11}/>
+                           </button>
                         </div>
                       </td>
                       
@@ -1256,7 +1882,7 @@ export default function KomparasiLaporanPage() {
                         let selisih = d.realisasi - d.anggaran;
                         let persen = d.anggaran > 0 ? (selisih / d.anggaran * 100) : 0; 
                         
-                        const isZeroOverride = ['SURPLUS_1', 'SISA_LEBIH', 'SURPLUS_2', 'DANA_ABADI'].includes(akun.kode_sistem || '') || [37, 38, 39, 40, 44, 45, 46, 47, 48, 49, 50].includes(akun.urutan);
+                        const isZeroOverride = ['SURPLUS_1', 'SISA_LEBIH', 'SURPLUS_2', 'DANA_ABADI'].includes(akun.kode_sistem || '') || [37, 38, 39, 40, 44, 45, 46, 47, 48, 49, 50].includes(akun.id);
                         if (isZeroOverride) {
                            selisih = 0;
                            persen = 0;
@@ -1264,9 +1890,9 @@ export default function KomparasiLaporanPage() {
 
                         let propAnggaran = 0;
                         let propRealisasi = 0;
-                        const jpRowIdx = flattenedRows.findIndex(x => x.kode_sistem === 'JML_PEN');
-                        const jpEngRowIdx = flattenedRows.findIndex(x => x.kode_sistem === 'JML_PENG');
-                        const myIdx = flattenedRows.findIndex(x => x.id === akun.id);
+                        const jpRowIdx = displayedRows.findIndex(x => x.kode_sistem === 'JML_PEN');
+                        const jpEngRowIdx = displayedRows.findIndex(x => x.kode_sistem === 'JML_PENG');
+                        const myIdx = displayedRows.findIndex(x => x.id === akun.id);
                         
                         if (!isZeroOverride && !akun.kode_sistem?.includes('SURPLUS')) {
                             let denomAng = 0;
@@ -1282,10 +1908,26 @@ export default function KomparasiLaporanPage() {
                             if (denomReal !== 0) propRealisasi = (d.realisasi / denomReal) * 100;
                         }
 
+                        const isModalRow = akun.kode_sistem === 'PENG_MODAL' || akun.keterangan?.trim().toLowerCase() === 'belanja modal';
+
                         return (
                           <React.Fragment key={`${akun.id}-${y}`}>
                             <td className={`py-2 px-2.5 text-right font-mono text-xs border-r border-gray-100 ${isBold ? 'font-bold' : ''} ${d.anggaran !== 0 ? 'text-gray-900' : 'text-gray-300'}`}>
-                              {d.anggaran !== 0 ? fmt(d.anggaran) : '-'}
+                              {isModalRow && excludeBelanjaModalAnggaran ? (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span className="text-amber-700 font-bold">0</span>
+                                  {originalModalAnggaranMatrix[y] > 0 && (
+                                    <span className="text-[9px] text-gray-400 line-through">
+                                      Rp {fmt(originalModalAnggaranMatrix[y])}
+                                    </span>
+                                  )}
+                                  <span className="text-[8px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-bold uppercase mt-0.5">
+                                    Dikecualikan
+                                  </span>
+                                </div>
+                              ) : (
+                                d.anggaran !== 0 ? fmt(d.anggaran) : '-'
+                              )}
                             </td>
                             <td className="py-2 px-2 border-r border-gray-100 text-center text-emerald-600 font-medium">
                               {isZeroOverride || akun.kode_sistem?.includes('SURPLUS') ? '-' : <span className="text-[10px] bg-emerald-50 px-1 py-0.5 rounded text-emerald-700 font-mono font-bold">{Math.abs(propAnggaran).toFixed(1).replace('.',',')}%</span>}
@@ -1303,7 +1945,9 @@ export default function KomparasiLaporanPage() {
                               {isZeroOverride ? '0,00%' : (d.anggaran > 0 ? `${persen.toFixed(1).replace('.',',')}%` : '-')}
                             </td>
                             <td className="py-2 px-1 border-r border-gray-200 text-center">
-                              {akun.is_sum || isCustom || [37, 39, 45, 47, 49].includes(akun.urutan) ? (
+                              {isModalRow && excludeBelanjaModalAnggaran ? (
+                                <span className="text-[9px] text-amber-600 font-semibold italic">Dikecualikan</span>
+                              ) : akun.is_sum || isCustom || [37, 39, 45, 47, 49].includes(akun.urutan) ? (
                                 <span className="text-[9px] text-gray-300 font-semibold italic">Auto</span>
                               ) : (
                                 d.id ? (
@@ -1330,6 +1974,24 @@ export default function KomparasiLaporanPage() {
               </tbody>
             </table>
           </div>
+          {/* FOOTNOTE KETERANGAN MODE FORMAT */}
+          <div className="bg-gray-50/80 border-t border-gray-100 p-2.5 px-4 text-[11px] text-gray-500 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+              {formatMode === 'harmonisasi' ? (
+                <span>
+                  <strong className="text-gray-700 font-semibold">* Mode Harmonisasi:</strong> Data tahun-tahun sebelumnya telah diselaraskan dengan struktur format RKAT terbaru guna memastikan konsistensi perbandingan antar-tahun.
+                </span>
+              ) : (
+                <span>
+                  <strong className="text-gray-700 font-semibold">* Format Asli:</strong> Menampilkan susunan akun dan formula surplus resmi sesuai tahun anggaran berjalan.
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] text-gray-400 font-mono">
+              {displayedRows.length} baris akun ditampilkan
+            </span>
+          </div>
+          </>
         )}
       </div>
 
@@ -1547,6 +2209,286 @@ export default function KomparasiLaporanPage() {
         </div>
       )}
 
+      {/* MODAL: ATUR POSISI & URUTAN AKUN */}
+      {isReorderModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh] border border-gray-200">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 p-4 px-6 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <ArrowUpDown size={20} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight uppercase">Atur Posisi &amp; Urutan Akun</h2>
+                  <p className="text-[11px] text-amber-100 font-medium">
+                    Geser posisi akun dengan tombol panah naik/turun atau ketik nomor urutan baru, lalu simpan.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsReorderModalOpen(false)} 
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Info Banner: Khusus Komparasi & Tahun Berjalan */}
+            <div className="bg-amber-50 border-b border-amber-200/80 px-6 py-2.5 text-xs text-amber-950 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded font-black text-[9px] uppercase tracking-wider">
+                  Info Penting
+                </span>
+                <span className="text-[11px] leading-relaxed">
+                  Pengaturan posisi &amp; urutan ini <strong>hanya berlaku untuk Laporan Komparasi (Harmonisasi) &amp; Tahun Berjalan</strong>. Format asli tahun-tahun sebelumnya (2024–2026) akan tetap terkunci sesuai format historis aslinya agar data masa lalu tidak berantakan.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Toolbar: Search & Auto-Renumber */}
+            <div className="p-3.5 px-6 bg-amber-50/50 border-b border-amber-200/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0 text-xs">
+              <div className="flex items-center gap-2 flex-1 max-w-md">
+                <input
+                  type="text"
+                  value={reorderSearchFilter}
+                  onChange={e => setReorderSearchFilter(e.target.value)}
+                  placeholder="Cari nama akun atau kode sistem..."
+                  className="w-full h-8 px-3 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-2xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={handleSortByUrutan}
+                  className="h-8 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Urutkan baris sesuai angka di kolom Nomor Urutan"
+                >
+                  <ArrowUpDown size={13} className="text-amber-700" />
+                  <span>Urutkan Sesuai Nomor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoRenumber}
+                  className="h-8 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 font-bold text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Otomatis beri nomor urutan 1, 2, 3... berurutan dari atas ke bawah untuk menghilangkan nomor duplikat"
+                >
+                  <ListOrdered size={13} className="text-amber-700" />
+                  <span>Rapikan Nomor Urut (1..N)</span>
+                </button>
+                <span className="text-[11px] font-mono font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-md border border-amber-200">
+                  {reorderList.length} Akun
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Body: Table of Accounts */}
+            <div className="overflow-y-auto flex-1 p-4 px-6 text-xs">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-100 text-gray-700 uppercase tracking-wider text-[10px] font-bold border-b border-gray-200">
+                    <th className="py-2.5 px-2 w-12 text-center">Posisi</th>
+                    <th className="py-2.5 px-3 min-w-[240px]">Nama Akun</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Induk Baris (Parent / Jenjang)</th>
+                    <th className="py-2.5 px-2.5 w-36 text-center">Level &amp; Format</th>
+                    <th className="py-2.5 px-2 w-20 text-center">Pindah</th>
+                    <th className="py-2.5 px-2 w-20 text-center">Nomor Urut</th>
+                    <th className="py-2.5 px-2 w-12 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {reorderList.map((item, idx) => {
+                    const isMatchSearch = !reorderSearchFilter.trim() || 
+                      item.keterangan?.toLowerCase().includes(reorderSearchFilter.toLowerCase()) ||
+                      (item.kode_sistem && item.kode_sistem.toLowerCase().includes(reorderSearchFilter.toLowerCase()));
+
+                    if (!isMatchSearch) return null;
+
+                    return (
+                      <tr 
+                        key={item.id} 
+                        className={`hover:bg-amber-50/40 transition-colors ${item.level === 0 ? 'bg-gray-50/80 font-bold' : ''}`}
+                      >
+                        <td className="py-2 px-2 text-center font-mono font-bold text-gray-400 text-[11px]">
+                          {idx + 1}
+                        </td>
+
+                        {/* 1. NAMA AKUN & KODE SISTEM */}
+                        <td className="py-2 px-3">
+                          <div className="flex flex-col gap-1" style={{ paddingLeft: `${Math.min(item.level || 0, 3) * 0.75}rem` }}>
+                            <div className="flex items-center gap-1.5">
+                              {(item.level || 0) > 0 && <CornerDownRight size={11} className="text-gray-400 shrink-0" />}
+                              <input
+                                type="text"
+                                value={item.keterangan || ''}
+                                onChange={e => handleReorderFieldChange(item.id, 'keterangan', e.target.value)}
+                                className={`w-full px-2 py-1 bg-white border border-gray-200 rounded-md text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none ${item.is_bold ? 'font-black text-gray-900' : 'font-medium text-gray-800'}`}
+                                placeholder="Nama Keterangan Akun..."
+                              />
+                            </div>
+                            {item.kode_sistem && (
+                              <span className="text-[9px] font-mono text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded self-start">
+                                Kode: {item.kode_sistem}
+                              </span>
+                            )}
+                            {(() => {
+                              const fInfo = getRowFormulaInfo(item, reorderList);
+                              if (!fInfo) return null;
+                              return (
+                                <span className="text-[9px] font-mono text-amber-900 bg-amber-100/90 border border-amber-300/70 px-1.5 py-0.5 rounded self-start cursor-help" title={fInfo.full}>
+                                  ∑ {fInfo.short}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </td>
+
+                        {/* 2. INDUK BARIS (PARENT / JENJANG) */}
+                        <td className="py-2 px-3">
+                          <select
+                            value={item.parent_id || ''}
+                            onChange={e => handleReorderFieldChange(item.id, 'parent_id', e.target.value ? Number(e.target.value) : null)}
+                            className="w-full h-7 px-2 bg-white border border-gray-200 rounded-md text-[11px] font-medium text-gray-700 focus:ring-1 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                          >
+                            <option value="">-- Tidak ada (Root Utama) --</option>
+                            {reorderList.filter(a => a.id !== item.id).map(a => (
+                              <option key={a.id} value={a.id}>
+                                {a.level > 0 ? '— '.repeat(a.level) : ''}{a.keterangan}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* 3. LEVEL & FORMAT (LEVEL / TIPE) */}
+                        <td className="py-2 px-2.5">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <select
+                              value={item.level ?? 0}
+                              onChange={e => handleReorderFieldChange(item.id, 'level', Number(e.target.value))}
+                              className="h-6 px-1.5 bg-white border border-gray-200 rounded text-[10px] font-bold text-gray-700 cursor-pointer"
+                            >
+                              <option value={0}>Level 0 (Utama)</option>
+                              <option value={1}>Level 1 (Sub-Pos)</option>
+                              <option value={2}>Level 2 (Rincian)</option>
+                              <option value={3}>Level 3 (Detail)</option>
+                            </select>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              <label className="flex items-center gap-1 cursor-pointer font-semibold text-gray-600">
+                                <input
+                                  type="checkbox"
+                                  checked={!!item.is_bold}
+                                  onChange={e => handleReorderFieldChange(item.id, 'is_bold', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded text-amber-600"
+                                />
+                                <span>Tebal</span>
+                              </label>
+                              <label className="flex items-center gap-1 cursor-pointer font-semibold text-gray-600">
+                                <input
+                                  type="checkbox"
+                                  checked={!!item.is_sum}
+                                  onChange={e => handleReorderFieldChange(item.id, 'is_sum', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded text-amber-600"
+                                />
+                                <span>Auto-Sum</span>
+                              </label>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 4. PINDAH POSISI */}
+                        <td className="py-2 px-2 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => moveReorderItem(idx, 'up')}
+                              className="w-7 h-7 rounded-lg border border-gray-200 bg-white hover:bg-amber-100 hover:text-amber-900 flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-2xs"
+                              title="Pindah ke Atas"
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === reorderList.length - 1}
+                              onClick={() => moveReorderItem(idx, 'down')}
+                              className="w-7 h-7 rounded-lg border border-gray-200 bg-white hover:bg-amber-100 hover:text-amber-900 flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer shadow-2xs"
+                              title="Pindah ke Bawah"
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* 5. NOMOR URUTAN */}
+                        <td className="py-2 px-2 text-center">
+                          <input
+                            type="number"
+                            value={item.urutan}
+                            onChange={e => handleReorderUrutanChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-16 h-7 text-center font-mono font-bold text-xs bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500 shadow-2xs"
+                          />
+                        </td>
+
+                        {/* 6. AKSI EDIT DETAIL */}
+                        <td className="py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAkunForm({ ...item });
+                              setIsAkunModalOpen(true);
+                            }}
+                            className="w-7 h-7 rounded-lg border border-gray-200 bg-white hover:bg-teal-50 hover:text-teal-700 text-gray-500 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
+                            title="Edit Detail Akun Lengkap"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 px-6 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="text-[11px] text-gray-500 font-medium">
+                💡 <span className="font-semibold">Tips:</span> Anda bisa menggeser baris dengan panah ▲/▼ atau klik <strong>Rapikan Nomor Urut (1..N)</strong> untuk penomoran otomatis yang rapi dan tanpa nomor kembar.
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsReorderModalOpen(false)}
+                  className="h-9 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingReorder}
+                  onClick={handleSaveReorder}
+                  className="h-9 px-5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingReorder ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={13} />
+                      <span>Simpan Urutan ke Database</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: INPUT NILAI */}
       {isNilaiModalOpen && (
         <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
@@ -1604,112 +2546,272 @@ export default function KomparasiLaporanPage() {
 
             {/* Content Form */}
             <div className="p-5 overflow-y-auto space-y-5 text-xs">
-              {/* 1. Judul Dokumen */}
-              <div className="space-y-1.5 bg-sky-50/40 p-3.5 rounded-xl border border-sky-100">
-                <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
-                  Judul Tabel di Word:
-                </label>
+              {/* 1. Judul Dokumen & Preset */}
+              <div className="space-y-2 bg-sky-50/40 p-3.5 rounded-xl border border-sky-100">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                    Judul Tabel di Word:
+                  </label>
+                  <span className="text-[10px] text-sky-800 font-semibold">Bisa dipilih atau diketik bebas</span>
+                </div>
                 <input 
                   type="text" 
                   value={wordDocTitle} 
                   onChange={e => setWordDocTitle(e.target.value)} 
-                  placeholder="Contoh: Profil Ringkas Usulan RKAT 2027"
+                  placeholder="Contoh: 2025 Final atau Profil Ringkas RKAT 2025 Final"
                   className="w-full h-9 px-3.5 bg-white border border-gray-300 rounded-xl font-bold text-xs text-gray-900 focus:ring-2 focus:ring-sky-600 focus:outline-none shadow-2xs"
                 />
-                <p className="text-[10px] text-gray-500 font-medium">
-                  Judul ini akan tercetak tebal (bold) di bagian paling atas tabel dokumen Word.
-                </p>
+                
+                {/* Quick Presets for Document Title */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase shrink-0">Preset Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={() => setWordDocTitle('2025 Final')}
+                    className="px-2 py-0.5 rounded-md bg-white border border-sky-300 hover:bg-sky-100 text-sky-800 font-bold text-[10px] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    2025 Final
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWordDocTitle('Profil Ringkas RKAT 2025 Final')}
+                    className="px-2 py-0.5 rounded-md bg-white border border-sky-300 hover:bg-sky-100 text-sky-800 font-bold text-[10px] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Profil Ringkas RKAT 2025 Final
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWordDocTitle('Profil Ringkas Usulan RKAT 2027')}
+                    className="px-2 py-0.5 rounded-md bg-white border border-sky-300 hover:bg-sky-100 text-sky-800 font-bold text-[10px] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Profil Ringkas Usulan RKAT 2027
+                  </button>
+                  {allYears.filter(y => !['2025___Final'].includes(y)).slice(0, 3).map(y => {
+                    const label = y.replace('___', ' ');
+                    return (
+                      <button
+                        key={`preset-${y}`}
+                        type="button"
+                        onClick={() => setWordDocTitle(label)}
+                        className="px-2 py-0.5 rounded-md bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 font-medium text-[10px] transition-colors cursor-pointer"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 2. Pilihan Kolom Tahun & Versi */}
               <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="text-[11px] font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                     <span>📅 Pilihan Kolom Tahun & Tipe Data:</span>
                     <span className="text-[10px] text-sky-700 font-semibold bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md font-mono">
                       {wordColumns.filter(c => c.enabled).length} Kolom Aktif
                     </span>
                   </label>
-                  {allYears.length > wordColumns.length && (
+                  
+                  {/* Selector to Add Any Column */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={addYearWordSelect || (allYears[0] || '')}
+                      onChange={e => setAddYearWordSelect(e.target.value)}
+                      className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-[11px] font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                    >
+                      {allYears.map(y => (
+                        <option key={`add-${y}`} value={y}>{y.replace('___', ' ')}</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => {
-                        const remaining = allYears.filter(y => !wordColumns.some(wc => wc.key === y));
-                        if (remaining.length > 0) {
-                          const next = remaining[0];
-                          const yNum = parseInt(next.split('___')[0]) || 0;
-                          setWordColumns([...wordColumns, {
-                            key: next,
-                            label: `REALISASI ${yNum}`,
-                            dataType: 'realisasi',
+                        const targetKey = addYearWordSelect || allYears[0];
+                        if (targetKey) {
+                          const parts = targetKey.split('___');
+                          const yNum = parseInt(parts[0]) || 0;
+                          const versi = parts[1] || 'Final';
+                          const maxYear = wordColumns.length > 0 ? Math.max(...wordColumns.map(c => parseInt(c.key.split('___')[0]) || 0)) : new Date().getFullYear();
+                          const isTarget = yNum >= maxYear;
+                          setWordColumns(prev => [...prev, {
+                            key: targetKey,
+                            label: isTarget ? `RKAT ${yNum}` : `REALISASI ${yNum}`,
+                            dataType: isTarget ? 'anggaran' : 'realisasi',
                             enabled: true
                           }]);
                         }
                       }}
-                      className="text-[11px] text-sky-700 hover:text-sky-900 font-bold flex items-center gap-1 cursor-pointer"
+                      className="h-7 px-2.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                     >
-                      <Plus size={13} /> Tambah Tahun Lain
+                      <Plus size={13} /> Tambah Kolom
                     </button>
-                  )}
+                  </div>
                 </div>
 
                 <div className="space-y-2 bg-gray-50/80 p-3 rounded-xl border border-gray-200">
-                  {wordColumns.map((col, idx) => (
-                    <div 
-                      key={col.key} 
-                      className={`p-2.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${col.enabled ? 'bg-white border-sky-200 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60'}`}
-                    >
-                      <label className="flex items-center gap-2.5 cursor-pointer shrink-0">
-                        <input 
-                          type="checkbox" 
-                          checked={col.enabled} 
-                          onChange={e => {
-                            const updated = [...wordColumns];
-                            updated[idx].enabled = e.target.checked;
-                            setWordColumns(updated);
-                          }}
-                          className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
-                        />
-                        <span className="font-mono text-[11px] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
-                          {col.key.replace('___', ' ')}
-                        </span>
-                      </label>
+                  {wordColumns.map((col, idx) => {
+                    const parts = col.key.split('___');
+                    const yNum = parseInt(parts[0]) || 0;
+                    const versi = parts[1] || 'Final';
 
-                      <div className="flex items-center gap-2 flex-1 justify-end">
-                        <div className="flex items-center gap-1 flex-1 max-w-[200px]">
-                          <span className="text-[10px] text-gray-400 font-bold uppercase">Label:</span>
+                    return (
+                      <div 
+                        key={`${col.key}-${idx}`} 
+                        className={`p-2.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${col.enabled ? 'bg-white border-sky-200 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60'}`}
+                      >
+                        <div className="flex items-center gap-2 shrink-0">
                           <input 
-                            type="text"
-                            value={col.label}
+                            type="checkbox" 
+                            checked={col.enabled} 
                             onChange={e => {
                               const updated = [...wordColumns];
-                              updated[idx].label = e.target.value;
+                              updated[idx].enabled = e.target.checked;
                               setWordColumns(updated);
                             }}
-                            className="h-8 px-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900 w-full focus:outline-none focus:ring-1 focus:ring-sky-500"
-                            placeholder="Label Header"
+                            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
                           />
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="text-[10px] text-gray-400 font-bold uppercase">Nilai:</span>
-                          <select 
-                            value={col.dataType}
+                          
+                          {/* Dropdown to change year/version */}
+                          <select
+                            value={col.key}
                             onChange={e => {
+                              const newKey = e.target.value;
+                              const p = newKey.split('___');
+                              const yn = parseInt(p[0]) || 0;
+                              const ver = p[1] || 'Final';
                               const updated = [...wordColumns];
-                              updated[idx].dataType = e.target.value as 'realisasi' | 'anggaran';
+                              updated[idx].key = newKey;
+                              updated[idx].label = `${yn} ${ver}`;
                               setWordColumns(updated);
                             }}
-                            className="h-8 px-2 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                            className="h-7 px-1.5 bg-gray-100 hover:bg-white border border-gray-300 rounded-md text-[11px] font-bold text-gray-800 focus:outline-none cursor-pointer"
                           >
-                            <option value="realisasi">Realisasi</option>
-                            <option value="anggaran">RKAT (Anggaran)</option>
+                            {allYears.map(y => (
+                              <option key={`opt-${idx}-${y}`} value={y}>{y.replace('___', ' ')}</option>
+                            ))}
                           </select>
                         </div>
+
+                        <div className="flex items-center gap-2 flex-1 justify-end flex-wrap sm:flex-nowrap">
+                          {/* Label input and quick presets */}
+                          <div className="flex flex-col gap-1 flex-1 min-w-[200px] max-w-[260px]">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase shrink-0">Label:</span>
+                              <input 
+                                type="text"
+                                value={col.label}
+                                onChange={e => {
+                                  const updated = [...wordColumns];
+                                  updated[idx].label = e.target.value;
+                                  setWordColumns(updated);
+                                }}
+                                className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900 w-full focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                placeholder="Label Header"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1 pl-8">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...wordColumns];
+                                  updated[idx].label = `${yNum} ${versi}`;
+                                  setWordColumns(updated);
+                                }}
+                                className="text-[9px] bg-gray-100 hover:bg-sky-100 hover:text-sky-800 text-gray-600 px-1 py-0.2 rounded border border-gray-200 cursor-pointer"
+                              >
+                                {yNum} {versi}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...wordColumns];
+                                  updated[idx].label = `RKAT ${yNum}`;
+                                  setWordColumns(updated);
+                                }}
+                                className="text-[9px] bg-gray-100 hover:bg-sky-100 hover:text-sky-800 text-gray-600 px-1 py-0.2 rounded border border-gray-200 cursor-pointer"
+                              >
+                                RKAT {yNum}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = [...wordColumns];
+                                  updated[idx].label = `REALISASI ${yNum}`;
+                                  setWordColumns(updated);
+                                }}
+                                className="text-[9px] bg-gray-100 hover:bg-sky-100 hover:text-sky-800 text-gray-600 px-1 py-0.2 rounded border border-gray-200 cursor-pointer"
+                              >
+                                REALISASI {yNum}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Data type select */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase">Nilai:</span>
+                            <select 
+                              value={col.dataType}
+                              onChange={e => {
+                                const updated = [...wordColumns];
+                                updated[idx].dataType = e.target.value as 'realisasi' | 'anggaran';
+                                setWordColumns(updated);
+                              }}
+                              className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-[11px] font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                            >
+                              <option value="realisasi">Realisasi</option>
+                              <option value="anggaran">RKAT (Anggaran)</option>
+                            </select>
+                          </div>
+
+                          {/* Delete Column Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (wordColumns.length <= 1) {
+                                alert('Minimal harus menyisakan 1 kolom.');
+                                return;
+                              }
+                              setWordColumns(wordColumns.filter((_, i) => i !== idx));
+                            }}
+                            title="Hapus Kolom"
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+
+              {/* SIMULASI TANPA BELANJA MODAL CHECKBOX */}
+              <div className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 ${wordExcludeBelanjaModal ? 'bg-amber-50/80 border-amber-300 shadow-2xs' : 'bg-gray-50 border-gray-200'}`}>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={wordExcludeBelanjaModal}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setWordExcludeBelanjaModal(checked);
+                      setExcludeBelanjaModalAnggaran(checked);
+                    }}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 mt-0.5 cursor-pointer"
+                  />
+                  <div>
+                    <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                      <span>Kecualikan Belanja Modal pada Kolom Anggaran (Simulasi)</span>
+                      {wordExcludeBelanjaModal && (
+                        <span className="text-[9px] bg-amber-200 text-amber-900 font-extrabold px-1.5 py-0.2 rounded uppercase">
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-600 mt-0.5 leading-snug">
+                      Pagu Belanja Modal akan dinolkan pada kolom <strong>RKAT / Anggaran</strong> sehingga surplus/defisit di Word dihitung murni operasional. Kolom <strong>Realisasi</strong> tetap utuh.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {/* 3. Sub-Kolom yang Ditampilkan */}

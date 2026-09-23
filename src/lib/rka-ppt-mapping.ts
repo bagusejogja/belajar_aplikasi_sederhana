@@ -51,7 +51,7 @@ export const MASTER_PPT_ACCOUNTS: MasterAkunMapping[] = [
   { keterangan: 'Belanja Barang & Jasa', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['barang'], kode_sistem: 'PENG_BRG' },
   { keterangan: 'Belanja Perbaikan dan Pemeliharaan', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['pemeliharaan', 'perbaikan'], kode_sistem: 'PENG_PEMEL' },
   { keterangan: 'Belanja Perjalanan', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['perjalanan'], kode_sistem: 'PENG_PERJ' },
-  { keterangan: 'Belanja Modal', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['modal', 'antar unit', 'transfer'], kode_sistem: 'PENG_MODAL' },
+  { keterangan: 'Belanja Modal', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['modal'], kode_sistem: 'PENG_MODAL' },
   { keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['techno', 'adb', 'stp'], kode_sistem: 'PENG_STP' },
   { keterangan: 'Belanja PUAPT', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['puapt'] },
   { keterangan: 'Belanja Pendamping Program Revitalisasi PTN 2024', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['revitalisasi'] },
@@ -184,6 +184,16 @@ export function calculateRkaHierarchy({
       let count = 0;
       Object.keys(bMap).forEach(k => {
         if (usedBKeys.has(k)) return;
+        
+        // Pengecualian khusus: untuk "Belanja Modal", "belanja transfer antar unit" tidak ditarik
+        const isBelanjaModal = row.kode_sistem === 'PENG_MODAL' || row.keterangan?.trim().toLowerCase() === 'belanja modal';
+        if (isBelanjaModal) {
+          const kLower = k.toLowerCase().trim();
+          if (kLower.includes('antar unit') || kLower.includes('transfer')) {
+            return;
+          }
+        }
+
         if (isPptKeyMatch(k, row.matchKeys)) {
           totalAnggaran += bMap[k].totalAnggaran;
           count += bMap[k].count;
