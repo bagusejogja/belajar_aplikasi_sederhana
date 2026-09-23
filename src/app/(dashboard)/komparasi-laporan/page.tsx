@@ -17,6 +17,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
+const generateKodeSistem = (str: string) => {
+  if (!str) return '';
+  return str
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50);
+};
+
 // Peta Urutan & Hierarki Historis Asli (Khusus Format Asli tahun-tahun sebelumnya, misal 2024, 2025, 2026)
 // Terkunci permanen agar saat pengguna mengatur urutan untuk tahun berjalan / komparasi, format asli masa lalu tidak berubah.
 const HISTORICAL_BASELINE_MAP: Record<number, { urutan: number; parent_id: number | null; level: number }> = {
@@ -125,7 +136,7 @@ export default function KomparasiLaporanPage() {
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
   
   // Forms
-  const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false });
+  const [akunForm, setAkunForm] = useState({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: 0, level: 0, is_sum: false, is_bold: false, formula: '' });
   const [nilaiForm, setNilaiForm] = useState({ id: null as any, akun_id: null as any, tahun: new Date().getFullYear(), versi: 'Final', anggaran: 0, realisasi: 0, catatan: '' });
   const [selectedAkunName, setSelectedAkunName] = useState('');
 
@@ -255,16 +266,27 @@ export default function KomparasiLaporanPage() {
       if (!narasiTahun) setNarasiTahun(uniqueYears[0]);
     }
 
+    const initialNotes: Record<string, string> = {};
     if (typeof window !== 'undefined') {
       try {
         const savedNotes = localStorage.getItem('komparasi_notes_map');
         if (savedNotes) {
-          setNotesMap(JSON.parse(savedNotes));
+          Object.assign(initialNotes, JSON.parse(savedNotes));
         }
       } catch (err) {
         console.error("Gagal membaca catatan dari storage:", err);
       }
     }
+    // Gabungkan dengan catatan dari DB (jika kolom catatan sudah dimigrasi)
+    if (nilaiData && Array.isArray(nilaiData)) {
+      nilaiData.forEach((d: any) => {
+        if (d.catatan && typeof d.catatan === 'string' && d.catatan.trim()) {
+          const key = `${d.akun_id}_${d.tahun}_${d.versi || 'Final'}`;
+          initialNotes[key] = d.catatan.trim();
+        }
+      });
+    }
+    setNotesMap(initialNotes);
 
     setLoading(false);
   };
@@ -273,12 +295,35 @@ export default function KomparasiLaporanPage() {
   const handleAkunSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      let finalKode = akunForm.kode_sistem?.trim();
+      if (!finalKode && akunForm.keterangan) {
+        finalKode = generateKodeSistem(akunForm.keterangan);
+      }
+      const payloadWithFormula: any = {
+        ...akunForm,
+        kode_sistem: finalKode || null,
+        formula: akunForm.formula?.trim() || null
+      };
+
       if (akunForm.id) {
-        await supabase.from('app_laporan_akun').update(akunForm).eq('id', akunForm.id);
+        const { error } = await supabase.from('app_laporan_akun').update(payloadWithFormula).eq('id', akunForm.id);
+        if (error && (error.message?.toLowerCase().includes('formula') || error.message?.toLowerCase().includes('schema cache'))) {
+          const { formula, ...fallbackPayload } = payloadWithFormula;
+          const { error: errFallback } = await supabase.from('app_laporan_akun').update(fallbackPayload).eq('id', akunForm.id);
+          if (errFallback) throw errFallback;
+        } else if (error) {
+          throw error;
+        }
       } else {
-        const { id, ...payload } = akunForm;
+        const { id, ...payload } = payloadWithFormula;
         const { error } = await supabase.from('app_laporan_akun').insert([payload]);
-        if (error) throw error;
+        if (error && (error.message?.toLowerCase().includes('formula') || error.message?.toLowerCase().includes('schema cache'))) {
+          const { formula, ...fallbackPayload } = payload;
+          const { error: errFallback } = await supabase.from('app_laporan_akun').insert([fallbackPayload]);
+          if (errFallback) throw errFallback;
+        } else if (error) {
+          throw error;
+        }
       }
       setIsAkunModalOpen(false);
       fetchData();
@@ -412,15 +457,16 @@ export default function KomparasiLaporanPage() {
 
   const handleNilaiSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payloadWithVersi = {
+    const payloadWithVersiAndCatatan: any = {
       akun_id: nilaiForm.akun_id,
       tahun: nilaiForm.tahun,
       versi: nilaiForm.versi || 'Final',
       anggaran: nilaiForm.anggaran,
-      realisasi: nilaiForm.realisasi
+      realisasi: nilaiForm.realisasi,
+      catatan: nilaiForm.catatan && nilaiForm.catatan.trim() ? nilaiForm.catatan.trim() : null
     };
 
-    // Simpan Catatan / Note ke notesMap & localStorage
+    // Simpan Catatan / Note ke notesMap & localStorage sebagai cache instan
     const noteKey = `${nilaiForm.akun_id}_${nilaiForm.tahun}_${nilaiForm.versi || 'Final'}`;
     const nextNotes = { ...notesMap };
     if (nilaiForm.catatan && nilaiForm.catatan.trim()) {
@@ -439,18 +485,34 @@ export default function KomparasiLaporanPage() {
 
     try {
       if (nilaiForm.id) {
-        const { error } = await supabase.from('app_laporan_statis').update(payloadWithVersi).eq('id', nilaiForm.id);
-        if (error && (error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
-          const { versi, ...fallbackPayload } = payloadWithVersi;
+        const { error } = await supabase.from('app_laporan_statis').update(payloadWithVersiAndCatatan).eq('id', nilaiForm.id);
+        if (error && (error.message?.toLowerCase().includes('catatan') || error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
+          const fallbackPayload: any = {
+            akun_id: nilaiForm.akun_id,
+            tahun: nilaiForm.tahun,
+            anggaran: nilaiForm.anggaran,
+            realisasi: nilaiForm.realisasi
+          };
+          if (!error.message?.toLowerCase().includes('versi')) {
+            fallbackPayload.versi = nilaiForm.versi || 'Final';
+          }
           const { error: errFallback } = await supabase.from('app_laporan_statis').update(fallbackPayload).eq('id', nilaiForm.id);
           if (errFallback) throw errFallback;
         } else if (error) {
           throw error;
         }
       } else {
-        const { error } = await supabase.from('app_laporan_statis').insert([payloadWithVersi]);
-        if (error && (error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
-          const { versi, ...fallbackPayload } = payloadWithVersi;
+        const { error } = await supabase.from('app_laporan_statis').insert([payloadWithVersiAndCatatan]);
+        if (error && (error.message?.toLowerCase().includes('catatan') || error.message?.toLowerCase().includes('versi') || error.message?.toLowerCase().includes('schema cache'))) {
+          const fallbackPayload: any = {
+            akun_id: nilaiForm.akun_id,
+            tahun: nilaiForm.tahun,
+            anggaran: nilaiForm.anggaran,
+            realisasi: nilaiForm.realisasi
+          };
+          if (!error.message?.toLowerCase().includes('versi')) {
+            fallbackPayload.versi = nilaiForm.versi || 'Final';
+          }
           const { error: errFallback } = await supabase.from('app_laporan_statis').insert([fallbackPayload]);
           if (errFallback) throw errFallback;
         } else if (error) {
@@ -520,6 +582,14 @@ export default function KomparasiLaporanPage() {
 
   // Helper Penjelasan Rumus Penjumlahan Baris
   const getRowFormulaInfo = (akun: any, rowList: any[]) => {
+    // 1. Prioritaskan formula custom dari database jika ada
+    if (akun.formula && typeof akun.formula === 'string' && akun.formula.trim()) {
+      return {
+        short: akun.formula.trim(),
+        full: `Formula Dinamis: ${akun.formula.trim()}`
+      };
+    }
+
     const getPos = (id: number) => {
       const found = rowList.find(r => r.id === id);
       return found ? `#${found.urutan}` : '';
@@ -801,6 +871,37 @@ export default function KomparasiLaporanPage() {
       matrix[row49.id][y].anggaran = (matrix[row47.id]?.[y]?.anggaran || 0) + (matrix[row48.id]?.[y]?.anggaran || 0);
       matrix[row49.id][y].realisasi = (matrix[row47.id]?.[y]?.realisasi || 0) + (matrix[row48.id]?.[y]?.realisasi || 0);
     }
+
+    // 4. Custom Formula Dinamis dari app_laporan_akun.formula
+    // Jika akun memiliki formula teks (misal: "#44 + #45 - #46" atau "#25 - #36"),
+    // hitung otomatis berdasarkan nomor urutan atau ID pos.
+    flattenedRows.forEach(akun => {
+      if (akun.formula && typeof akun.formula === 'string' && akun.formula.trim()) {
+        try {
+          const rawFormula = akun.formula.trim();
+          const calcExpr = (type: 'anggaran' | 'realisasi') => {
+            const expr = rawFormula.replace(/#(\d+)/g, (_: string, numStr: string) => {
+              const num = parseInt(numStr);
+              const target = flattenedRows.find(r => r.urutan === num || r.id === num);
+              if (target && matrix[target.id] && matrix[target.id][y]) {
+                return String(matrix[target.id][y][type] || 0);
+              }
+              return '0';
+            });
+            if (/^[0-9+\-*/().\s]+$/.test(expr)) {
+              // eslint-disable-next-line no-eval
+              return Function(`'use strict'; return (${expr})`)() || 0;
+            }
+            return matrix[akun.id][y][type];
+          };
+
+          matrix[akun.id][y].anggaran = calcExpr('anggaran');
+          matrix[akun.id][y].realisasi = calcExpr('realisasi');
+        } catch (e) {
+          console.error('Error dynamic formula calculation:', e);
+        }
+      }
+    });
   });
 
   // --- BULK TEMPLATE & IMPORT ---
@@ -1525,7 +1626,7 @@ export default function KomparasiLaporanPage() {
           </button>
 
           <button 
-            onClick={() => { setAkunForm({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: akunMaster.length + 1, level: 0, is_sum: false, is_bold: false }); setIsAkunModalOpen(true); }}
+            onClick={() => { setAkunForm({ id: null as any, keterangan: '', kode_sistem: '', parent_id: null as any, urutan: akunMaster.length + 1, level: 0, is_sum: false, is_bold: false, formula: '' }); setIsAkunModalOpen(true); }}
             className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
           >
             <Settings size={13} />
@@ -1787,7 +1888,7 @@ export default function KomparasiLaporanPage() {
                            </button>
                            <button 
                              type="button"
-                             onClick={() => { setAkunForm({...akun}); setIsAkunModalOpen(true); }} 
+                             onClick={() => { setAkunForm({ ...akun, formula: akun.formula || '' }); setIsAkunModalOpen(true); }}
                              className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
                              title="Edit Akun & Urutan"
                            >
@@ -2117,11 +2218,69 @@ export default function KomparasiLaporanPage() {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Keterangan Akun *</label>
-                <input required type="text" value={akunForm.keterangan} onChange={e => setAkunForm({...akunForm, keterangan: e.target.value})} className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none" />
+                <input
+                  required
+                  type="text"
+                  value={akunForm.keterangan}
+                  onChange={e => {
+                    const newKet = e.target.value;
+                    const prevAuto = generateKodeSistem(akunForm.keterangan);
+                    const shouldSync = !akunForm.kode_sistem || akunForm.kode_sistem === prevAuto;
+                    setAkunForm({
+                      ...akunForm,
+                      keterangan: newKet,
+                      kode_sistem: shouldSync ? generateKodeSistem(newKet) : akunForm.kode_sistem
+                    });
+                  }}
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-bold outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Kode Sistem Internal (Opsional)</label>
-                <input type="text" value={akunForm.kode_sistem} onChange={e => setAkunForm({...akunForm, kode_sistem: e.target.value})} placeholder="Contoh: JML_PEN" className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs outline-none" />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Kode Sistem Internal (Opsional)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (akunForm.keterangan) {
+                        setAkunForm({ ...akunForm, kode_sistem: generateKodeSistem(akunForm.keterangan) });
+                      }
+                    }}
+                    className="text-[10px] text-teal-700 hover:text-teal-900 font-bold flex items-center gap-1 cursor-pointer bg-teal-50 hover:bg-teal-100 px-2 py-0.5 rounded-lg border border-teal-200 transition-colors"
+                    title="Generate otomatis kode sistem dari nama pos"
+                  >
+                    ⚡ Auto-Generate Kode
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={akunForm.kode_sistem}
+                  onChange={e => setAkunForm({ ...akunForm, kode_sistem: e.target.value })}
+                  placeholder="Contoh: PENERIMAAN_SPP"
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl font-mono text-xs outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                />
+                <span className="text-[10px] text-gray-400 mt-0.5 block">
+                  Digunakan untuk identifikasi unik dan jembatan mapping saat Tarik Usulan RKAT PPT.
+                </span>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-bold text-teal-700 uppercase tracking-widest">
+                    Formula Custom / Rumus Perhitungan (Opsional)
+                  </label>
+                  <span className="text-[10px] text-gray-400 italic">Format: #urutan</span>
+                </div>
+                <input
+                  type="text"
+                  value={akunForm.formula || ''}
+                  onChange={e => setAkunForm({ ...akunForm, formula: e.target.value })}
+                  placeholder="Contoh: #44 + #45 - #46 atau #25 - #36"
+                  className="w-full h-9 px-3 bg-gray-50 border border-teal-200 rounded-xl font-mono text-xs font-bold text-teal-900 outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                />
+                <p className="text-[10px] text-gray-500 mt-1 leading-snug">
+                  Gunakan tanda pagar dan nomor urutan pos (misal <code>#44 + #45 - #46</code> atau <code>#25 - #36</code>). Nilai Anggaran &amp; Realisasi akan otomatis dihitung berdasarkan rumus ini.
+                </p>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
@@ -2379,7 +2538,7 @@ export default function KomparasiLaporanPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              setAkunForm({ ...item });
+                              setAkunForm({ ...item, formula: item.formula || '' });
                               setIsAkunModalOpen(true);
                             }}
                             className="w-7 h-7 rounded-lg border border-gray-200 bg-white hover:bg-teal-50 hover:text-teal-700 text-gray-500 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
@@ -2914,7 +3073,11 @@ export default function KomparasiLaporanPage() {
                   <input
                     type="number"
                     value={rkaTargetYear}
-                    onChange={e => setRkaTargetYear(parseInt(e.target.value) || new Date().getFullYear())}
+                    onChange={e => {
+                      const newYr = parseInt(e.target.value) || new Date().getFullYear();
+                      setRkaTargetYear(newYr);
+                      fetchRkaPreview(rkaSourceYear, newYr, rkaTargetVersi);
+                    }}
                     className="h-9 w-28 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
                   />
                 </div>
@@ -2927,8 +3090,10 @@ export default function KomparasiLaporanPage() {
                     <select
                       value={['Final', '1', 'Revisi 1', 'Revisi 2', 'Murni', 'Draft', ...allYears.map(y => y.split('___')[1]).filter(Boolean)].includes(rkaTargetVersi) ? rkaTargetVersi : 'custom'}
                       onChange={e => {
-                        if (e.target.value !== 'custom') {
-                          setRkaTargetVersi(e.target.value);
+                        const val = e.target.value;
+                        if (val !== 'custom') {
+                          setRkaTargetVersi(val);
+                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, val);
                         }
                       }}
                       className="h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
@@ -2943,9 +3108,16 @@ export default function KomparasiLaporanPage() {
                       type="text"
                       value={rkaTargetVersi}
                       onChange={e => setRkaTargetVersi(e.target.value)}
+                      onBlur={() => fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi);
+                        }
+                      }}
                       placeholder="Contoh: Final"
                       className="h-9 w-28 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-                      title="Ketik manual nama versi target jika ingin custom"
+                      title="Ketik manual nama versi target jika ingin custom, lalu tekan Enter"
                     />
                   </div>
                 </div>
@@ -2963,11 +3135,17 @@ export default function KomparasiLaporanPage() {
 
               {/* Data count status badge */}
               {rkaPreviewData && (
-                <div className="flex items-center gap-2 text-xs bg-blue-50/80 border border-blue-200 text-blue-900 px-3 py-1.5 rounded-xl font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                  <span>
-                    Dianalisis: <strong>{fmt(rkaPreviewData.counts.penerimaan)}</strong> Penerimaan &amp; <strong>{fmt(rkaPreviewData.counts.pengeluaran)}</strong> Pengeluaran
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-blue-50/80 border border-blue-200 text-blue-900 px-3.5 py-2 rounded-xl font-medium w-full">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span>
+                      Dianalisis: <strong>{fmt(rkaPreviewData.counts.penerimaan)}</strong> Penerimaan &amp; <strong>{fmt(rkaPreviewData.counts.pengeluaran)}</strong> Pengeluaran
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] bg-white border border-blue-200/90 text-blue-950 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                    <span>Target Banding:</span>
+                    <strong className="text-blue-700">Tahun {rkaTargetYear} (Versi: {rkaTargetVersi})</strong>
+                  </div>
                 </div>
               )}
             </div>
@@ -3064,8 +3242,8 @@ export default function KomparasiLaporanPage() {
                             <th className="py-2.5 px-3 w-10 text-center">No</th>
                             <th className="py-2.5 px-3">Uraian Akun Master (Komparasi)</th>
                             <th className="py-2.5 px-3 w-16 text-center">Level</th>
-                            <th className="py-2.5 px-3 text-right">Saat Ini (Rp)</th>
-                            <th className="py-2.5 px-3 text-right text-blue-900 bg-blue-50/50">Usulan RKA Baru (Rp)</th>
+                            <th className="py-2.5 px-3 text-right">Eksisting ({rkaTargetYear} - {rkaTargetVersi})</th>
+                            <th className="py-2.5 px-3 text-right text-blue-900 bg-blue-50/50">Usulan RKA ({rkaSourceYear})</th>
                             <th className="py-2.5 px-3 text-right">Selisih</th>
                             <th className="py-2.5 px-3 w-28 text-center">Status</th>
                           </tr>
