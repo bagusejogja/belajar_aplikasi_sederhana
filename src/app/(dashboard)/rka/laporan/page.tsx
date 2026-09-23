@@ -613,6 +613,27 @@ function HierarchicalInlineTable({
     return result.sort((a, b) => a.namaAkun.localeCompare(b.namaAkun, 'id', { numeric: true, sensitivity: 'base' }));
   }, [rows, type]);
 
+  const isAllOpen = useMemo(() => {
+    return groupedAkunList.length > 0 && openAkunSet.size === groupedAkunList.length;
+  }, [groupedAkunList, openAkunSet]);
+
+  const expandAll = () => {
+    const allAkun = new Set(groupedAkunList.map(a => a.namaAkun));
+    const allUnits = new Set<string>();
+    groupedAkunList.forEach(a => {
+      a.units.forEach(u => {
+        allUnits.add(`${a.namaAkun}___${u.unit}`);
+      });
+    });
+    setOpenAkunSet(allAkun);
+    setOpenUnitSet(allUnits);
+  };
+
+  const collapseAll = () => {
+    setOpenAkunSet(new Set());
+    setOpenUnitSet(new Set());
+  };
+
   const toggleAkun = (namaAkun: string) => {
     setOpenAkunSet(prev => {
       const next = new Set(prev);
@@ -644,7 +665,21 @@ function HierarchicalInlineTable({
       <table className="w-full text-xs text-left border-collapse">
         <thead>
           <tr className="bg-slate-200/90 text-slate-800 font-bold border-b border-slate-300 text-[11px] uppercase tracking-wide">
-            <th className="w-12 px-3 py-2.5 text-center">#</th>
+            <th className="w-12 text-center text-slate-700 text-xs uppercase font-bold py-1 px-1">
+              <button
+                type="button"
+                onClick={isAllOpen ? collapseAll : expandAll}
+                className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                  isAllOpen
+                    ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                    : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                }`}
+                title={isAllOpen ? "Tutup Semua Rincian Akun & Unit" : "Buka Semua Rincian Akun & Unit"}
+              >
+                {isAllOpen ? <Minus size={11} /> : <Plus size={11} />}
+                <span>#</span>
+              </button>
+            </th>
             <th className="px-4 py-2.5">Akun (Anak 1) / Unit Kerja (Anak 2) / Detail Transaksi (Anak 3)</th>
             <th className="px-4 py-2.5 text-center w-36">Jumlah Data</th>
             <th className="px-4 py-2.5 text-right w-44 pr-4">Pagu Anggaran</th>
@@ -2947,6 +2982,95 @@ export default function RkaLaporanPage() {
     return displayedRekapGroups.length > 0 && displayedRekapGroups.every(g => g.units.every(u => expandedRekapUnits.has(u.unit)));
   }, [displayedRekapGroups, displayedRekapTotals.totalUnits, expandedRekapUnits]);
 
+  // State & handler Buka / Tutup Semua untuk Tab Ringkasan Usulan
+  const isAllSummaryExpanded = useMemo(() => {
+    if (summaryStyle === 'ppt') {
+      let totalItemCount = 0;
+      let expandedCount = 0;
+      pptProposalData.penerimaan.sections.forEach(sec => {
+        sec.items.forEach((item, idx) => {
+          const itemKey = item.id || item.label || `sec_item_${idx}`;
+          totalItemCount++;
+          if (expandedPptPenerimaanSet.has(itemKey)) expandedCount++;
+          if (item.subItems) {
+            item.subItems.forEach((sub: any, sIdx: number) => {
+              const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+              totalItemCount++;
+              if (expandedPptPenerimaanSet.has(subKey)) expandedCount++;
+            });
+          }
+        });
+      });
+      pptProposalData.pengeluaran.sections.forEach(sec => {
+        sec.items.forEach((item, idx) => {
+          const itemKey = item.id || item.label || `sec_item_${idx}`;
+          totalItemCount++;
+          if (expandedPptPengeluaranSet.has(itemKey)) expandedCount++;
+          if (item.subItems) {
+            item.subItems.forEach((sub: any, sIdx: number) => {
+              const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+              totalItemCount++;
+              if (expandedPptPengeluaranSet.has(subKey)) expandedCount++;
+            });
+          }
+        });
+      });
+      return totalItemCount > 0 && expandedCount === totalItemCount;
+    } else {
+      const totalStd = groupedPenerimaan.length + groupedData.length;
+      const openedStd = expandedStdPenerimaanSet.size + expandedStdBelanjaSet.size;
+      return totalStd > 0 && openedStd === totalStd;
+    }
+  }, [summaryStyle, pptProposalData, expandedPptPenerimaanSet, expandedPptPengeluaranSet, groupedPenerimaan, groupedData, expandedStdPenerimaanSet, expandedStdBelanjaSet]);
+
+  const expandAllSummary = () => {
+    const pKeys = new Set<string>();
+    pptProposalData.penerimaan.sections.forEach(sec => {
+      sec.items.forEach((item, idx) => {
+        const itemKey = item.id || item.label || `sec_item_${idx}`;
+        pKeys.add(itemKey);
+        if (item.subItems) {
+          item.subItems.forEach((sub: any, sIdx: number) => {
+            const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+            pKeys.add(subKey);
+          });
+        }
+      });
+    });
+    if (pptProposalData.penerimaan.lainnya?.rows && pptProposalData.penerimaan.lainnya.rows.length > 0) {
+      pKeys.add('p_lainnya');
+    }
+
+    const bKeys = new Set<string>();
+    pptProposalData.pengeluaran.sections.forEach(sec => {
+      sec.items.forEach((item, idx) => {
+        const itemKey = item.id || item.label || `sec_item_${idx}`;
+        bKeys.add(itemKey);
+        if (item.subItems) {
+          item.subItems.forEach((sub: any, sIdx: number) => {
+            const subKey = sub.id || `${itemKey}_sub_${sIdx}`;
+            bKeys.add(subKey);
+          });
+        }
+      });
+    });
+    if (pptProposalData.pengeluaran.lainnya?.rows && pptProposalData.pengeluaran.lainnya.rows.length > 0) {
+      bKeys.add('b_lainnya');
+    }
+
+    setExpandedPptPenerimaanSet(pKeys);
+    setExpandedPptPengeluaranSet(bKeys);
+    setExpandedStdPenerimaanSet(new Set(groupedPenerimaan.map((g: any) => g.label)));
+    setExpandedStdBelanjaSet(new Set(groupedData.map((g: any) => g.label)));
+  };
+
+  const collapseAllSummary = () => {
+    setExpandedPptPenerimaanSet(new Set());
+    setExpandedPptPengeluaranSet(new Set());
+    setExpandedStdPenerimaanSet(new Set());
+    setExpandedStdBelanjaSet(new Set());
+  };
+
   const formatRp = (num: number) => {
     return new Intl.NumberFormat('id-ID').format(Math.round(num));
   };
@@ -4847,7 +4971,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <FileSpreadsheet size={14} className="text-indigo-600" />
-                <span>📊 Ringkasan Usulan</span>
+                <span>Ringkasan Usulan</span>
               </button>
               <button
                 type="button"
@@ -4859,7 +4983,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <Building2 size={14} className="text-indigo-600" />
-                <span>🏛️ Rekap Group Unit Kerja</span>
+                <span>Rekap Group Unit Kerja</span>
               </button>
               <button
                 type="button"
@@ -4871,7 +4995,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <BookOpen size={14} className="text-indigo-600" />
-                <span>📋 Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
+                <span>Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
               </button>
             </div>
 
@@ -5076,24 +5200,49 @@ export default function RkaLaporanPage() {
                       <Settings2 size={13} className="text-indigo-600" />
                       <span>Atur Susunan Slide</span>
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleExportExcelPptFormat}
-                      className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <Download size={13} className="text-blue-600" />
-                      <span>Export Format PPT</span>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-slate-100 border-b-2 border-slate-300 text-slate-800 font-black uppercase text-[10px] tracking-wider">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="text-slate-900 text-xs uppercase font-black min-w-[340px] pl-4">
-                          Uraian / Format Proposal RKAT
-                        </TableHead>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={isAllSummaryExpanded ? collapseAllSummary : expandAllSummary}
+                        className="h-8 rounded-xl border-slate-200 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                        title={isAllSummaryExpanded ? "Tutup Semua Rincian Pos RKAT" : "Buka Semua Rincian Pos RKAT"}
+                      >
+                        {isAllSummaryExpanded ? <Minus size={13} className="text-slate-500" /> : <Plus size={13} className="text-indigo-600" />}
+                        <span className="hidden sm:inline">{isAllSummaryExpanded ? 'Tutup Semua Pos' : 'Buka Semua Pos'}</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportExcelPptFormat}
+                        className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Download size={13} className="text-blue-600" />
+                        <span>Export Format PPT</span>
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader className="bg-slate-100 border-b-2 border-slate-300 text-slate-800 font-black uppercase text-[10px] tracking-wider">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="text-slate-900 text-xs uppercase font-black min-w-[340px] pl-4">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={isAllSummaryExpanded ? collapseAllSummary : expandAllSummary}
+                                className={`px-1.5 py-1 rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                                  isAllSummaryExpanded
+                                    ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                                    : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                                }`}
+                                title={isAllSummaryExpanded ? "Tutup Semua Rincian Pos RKAT" : "Buka Semua Rincian Pos RKAT"}
+                              >
+                                {isAllSummaryExpanded ? <Minus size={11} /> : <Plus size={11} />}
+                                <span>#</span>
+                              </button>
+                              <span>Uraian / Format Proposal RKAT</span>
+                            </div>
+                          </TableHead>
                         <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-32">
                           Jumlah Data
                         </TableHead>
@@ -5721,7 +5870,27 @@ export default function RkaLaporanPage() {
                     <Table>
                       <TableHeader className="bg-emerald-50/40 border-b border-emerald-100 text-emerald-800 font-black uppercase text-[10px] tracking-wider">
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-12 text-center text-emerald-800 text-xs uppercase font-bold">#</TableHead>
+                          <TableHead className="w-12 text-center text-emerald-800 text-xs uppercase font-bold py-1 px-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (expandedStdPenerimaanSet.size === groupedPenerimaan.length && groupedPenerimaan.length > 0) {
+                                  setExpandedStdPenerimaanSet(new Set());
+                                } else {
+                                  setExpandedStdPenerimaanSet(new Set(groupedPenerimaan.map(g => g.label)));
+                                }
+                              }}
+                              className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                                expandedStdPenerimaanSet.size === groupedPenerimaan.length && groupedPenerimaan.length > 0
+                                  ? 'bg-emerald-700 text-white border-emerald-800 hover:bg-emerald-800'
+                                  : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300'
+                              }`}
+                              title={expandedStdPenerimaanSet.size === groupedPenerimaan.length ? "Tutup Semua Kelompok Penerimaan" : "Buka Semua Kelompok Penerimaan"}
+                            >
+                              {expandedStdPenerimaanSet.size === groupedPenerimaan.length && groupedPenerimaan.length > 0 ? <Minus size={11} /> : <Plus size={11} />}
+                              <span>#</span>
+                            </button>
+                          </TableHead>
                           <TableHead className="text-emerald-800 text-xs uppercase font-bold min-w-[280px]">Format / Kelompok Penerimaan</TableHead>
                           <TableHead className="text-center text-emerald-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
                           <TableHead className="text-right text-emerald-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Penerimaan</TableHead>
@@ -5870,7 +6039,27 @@ export default function RkaLaporanPage() {
                     <Table>
                       <TableHeader className="bg-indigo-50/40 border-b border-indigo-100 text-indigo-800 font-black uppercase text-[10px] tracking-wider">
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-12 text-center text-indigo-800 text-xs uppercase font-bold">#</TableHead>
+                          <TableHead className="w-12 text-center text-indigo-800 text-xs uppercase font-bold py-1 px-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (expandedStdBelanjaSet.size === groupedData.length && groupedData.length > 0) {
+                                  setExpandedStdBelanjaSet(new Set());
+                                } else {
+                                  setExpandedStdBelanjaSet(new Set(groupedData.map((g: any) => g.label)));
+                                }
+                              }}
+                              className={`px-1.5 py-1 mx-auto rounded-md flex items-center justify-center gap-1 font-black text-[11px] transition-all shadow-2xs cursor-pointer border ${
+                                expandedStdBelanjaSet.size === groupedData.length && groupedData.length > 0
+                                  ? 'bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700'
+                                  : 'bg-white hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}
+                              title={expandedStdBelanjaSet.size === groupedData.length ? "Tutup Semua Kelompok Belanja" : "Buka Semua Kelompok Belanja"}
+                            >
+                              {expandedStdBelanjaSet.size === groupedData.length && groupedData.length > 0 ? <Minus size={11} /> : <Plus size={11} />}
+                              <span>#</span>
+                            </button>
+                          </TableHead>
                           <TableHead className="text-indigo-800 text-xs uppercase font-bold min-w-[280px]">Group Belanja</TableHead>
                           <TableHead className="text-center text-indigo-800 text-xs uppercase font-bold w-36">Jumlah Baris</TableHead>
                           <TableHead className="text-right text-indigo-800 text-xs uppercase font-bold min-w-[180px]">Total Pagu Anggaran</TableHead>
