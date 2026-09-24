@@ -89,7 +89,7 @@ export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 4 Kolom Rata & Rapi, Lanjut Baris Baru jika lebih dari 4 dengan ukuran seragam */}
+      {/* Navigation Grid: 4 Kolom Rata & Rapi, Format 2 Baris (Judul di Atas, Badge di Bawah) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -100,25 +100,39 @@ export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
               key={tab.id}
               href={tab.path}
               title={tab.title}
-              className={`group flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border h-full min-h-[44px] ${
+              className={`group flex flex-col justify-between gap-2 p-3 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border h-full ${
                 isActive
                   ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
-                  : 'bg-slate-50/90 hover:bg-blue-50/70 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 hover:shadow-2xs active:scale-[0.99]'
+                  : 'bg-white hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 hover:shadow-2xs active:scale-[0.99]'
               }`}
             >
-              <div className="flex items-center gap-2 min-w-0 pr-1">
-                <Icon size={15} className={`shrink-0 ${isActive ? 'text-white' : 'text-blue-600 group-hover:scale-110 transition-transform'}`} />
+              {/* Baris 1: Ikon + Judul Menu */}
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                  isActive 
+                    ? 'bg-white/20 text-white' 
+                    : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors'
+                }`}>
+                  <Icon size={16} />
+                </div>
                 <span className="line-clamp-2 font-bold tracking-tight text-[12px] leading-snug">
                   {tab.title}
                 </span>
               </div>
-              <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
-                isActive 
-                  ? 'bg-white/20 text-white' 
-                  : 'bg-slate-200/80 text-slate-600'
-              }`}>
-                {tab.badge}
-              </span>
+
+              {/* Baris 2: Badge Kategori di Bawah */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/80 mt-1">
+                <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
+                  isActive 
+                    ? 'bg-white/25 text-white' 
+                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-100/70 group-hover:text-blue-700'
+                }`}>
+                  {tab.badge}
+                </span>
+                <span className={`text-[10px] font-semibold ${isActive ? 'text-blue-100' : 'text-slate-400 group-hover:text-blue-600'}`}>
+                  {isActive ? '● Aktif' : 'Buka →'}
+                </span>
+              </div>
             </Link>
           );
         })}
