@@ -197,12 +197,16 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
               
               // Tarik Menu Path yang diizinkan untuk Role tersebut dari app_role_menus
               const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
-              if (menuData && menuData.length > 0) {
-                 setAllowedPaths(menuData.map(m => m.path));
-              } else if (roleData.role.toLowerCase() === 'admin' || roleData.role.toLowerCase() === 'administrator') {
-                 // Fallback jika belum di-set, Admin punya akses semua
-                 setAllowedPaths(menuList.map(m => m.path));
-              }
+              const roleLower = roleData.role.toLowerCase();
+              const dbPaths = (menuData || []).map(m => m.path);
+              const rolePresetPaths = (roleLower === 'admin' || roleLower === 'administrator')
+                 ? menuList.map(m => m.path)
+                 : menuList.filter(item => {
+                      const rolesLower = (item.roles || []).map(r => r.toLowerCase());
+                      return rolesLower.includes(roleLower) || rolesLower.includes('all');
+                   }).map(item => item.path);
+              const finalAllowed = Array.from(new Set([...dbPaths, ...rolePresetPaths]));
+              setAllowedPaths(finalAllowed);
            }
         }
      };
@@ -414,7 +418,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                     <div className="space-y-1.5 pt-0.5">
                       {favoriteItems.map(item => {
                         const Icon = iconMap[item.icon] || LayoutDashboard;
-                        const isActive = pathname === item.path;
+                        const isActive = pathname === item.path || (item.path !== '/' && item.path !== '/dashboard' && pathname.startsWith(item.path + '/'));
 
                         return (
                           <div key={`fav-${item.path}`} className="relative group/item flex justify-center items-center">
@@ -546,7 +550,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                           <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pt-1">
                             {visibleItems.map(subItem => {
                               const SubIcon = iconMap[subItem.icon] || LayoutDashboard;
-                              const isSubActive = pathname === subItem.path;
+                              const isSubActive = pathname === subItem.path || (subItem.path !== '/' && subItem.path !== '/dashboard' && pathname.startsWith(subItem.path + '/'));
                               const isSubFav = favoritePaths.includes(subItem.path);
                               return (
                                 <div key={subItem.path} className="flex items-center justify-between group/sub">

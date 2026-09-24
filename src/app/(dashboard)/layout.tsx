@@ -3,9 +3,10 @@
 import Sidebar from '@/components/Sidebar';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Search, Bell, HelpCircle, Menu, Loader2, ShieldAlert } from 'lucide-react';
+import { Search, Bell, HelpCircle, Menu, Loader2, ShieldAlert, ArrowLeft, Home } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
+import { menuList } from '@/lib/mock-db';
 
 export default function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default function DashboardLayout({
   const lastLoggedPath = useRef<string>('');
 
   const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [userRole, setUserRole] = useState<string>('');
 
   useEffect(() => {
      const savedCollapsed = localStorage.getItem('sidebar_collapsed');
@@ -38,6 +40,9 @@ export default function DashboardLayout({
 
   useEffect(() => {
      const checkAuth = async () => {
+        setIsUnauthorized(false);
+        setIsAuthChecking(true);
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
            router.push('/login');
@@ -48,6 +53,7 @@ export default function DashboardLayout({
         // Fetch role data
         const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
         const currentRole = roleData?.role || 'Viewer';
+        setUserRole(currentRole);
         
         if (typeof window !== 'undefined') {
            sessionStorage.setItem('user_role', currentRole);
@@ -66,32 +72,45 @@ export default function DashboardLayout({
            });
         }
 
-        // Jika sedang di root '/' atau '/dashboard', biarkan lewat
+        // 1. Jika sedang di root '/' atau '/dashboard', selalu biarkan lewat
         if (pathname === '/' || pathname === '/dashboard') {
+           setIsUnauthorized(false);
            setIsAuthChecking(false);
            return;
         }
 
-        if (roleData) {
-           if (roleData.role.toLowerCase() === 'admin') {
-              setIsAuthChecking(false); // Admin selalu lolos
-              return;
-           }
+        // 2. Admin & Administrator selalu lolos ke semua halaman
+        const roleLower = currentRole.toLowerCase();
+        if (roleLower === 'admin' || roleLower === 'administrator') {
+           setIsUnauthorized(false);
+           setIsAuthChecking(false);
+           return;
+        }
 
-           const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
-           if (menuData) {
-              const allowedPaths = menuData.map((m: any) => m.path);
-              // Cek apakah pathname saat ini ada di daftar yang diizinkan
-              const isAllowed = allowedPaths.some((p: string) => pathname.startsWith(p));
-              
-              if (!isAllowed) {
-                 setIsUnauthorized(true);
-              }
-           } else {
-              setIsUnauthorized(true); // Jika tidak ada menu di-mapping, blokir
-           }
+        // 3. Cek allowed paths dari database app_role_menus
+        const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', currentRole);
+        const dbAllowedPaths = (menuData || []).map((m: any) => m.path);
+
+        // 4. Fallback ke menuList (di mock-db.ts) agar tidak salah blokir menu baru
+        const fallbackAllowedPaths = menuList
+           .filter(item => {
+              const itemRoles = (item.roles || []).map(r => r.toLowerCase());
+              return itemRoles.includes(roleLower) || itemRoles.includes('all');
+           })
+           .map(item => item.path);
+
+        const combinedAllowedPaths = Array.from(new Set([...dbAllowedPaths, ...fallbackAllowedPaths]));
+
+        // Cek apakah pathname saat ini diizinkan
+        const isAllowed = combinedAllowedPaths.some((p: string) => {
+           if (!p) return false;
+           return pathname === p || pathname.startsWith(p + '/');
+        });
+
+        if (!isAllowed) {
+           setIsUnauthorized(true);
         } else {
-           setIsUnauthorized(true); // User tidak punya role
+           setIsUnauthorized(false);
         }
         
         setIsAuthChecking(false);
@@ -148,16 +167,45 @@ export default function DashboardLayout({
 
   if (isUnauthorized) {
      return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-           <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-red-100 max-w-md">
-              <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                 <ShieldAlert size={40} className="text-red-600" />
+        <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50/80 p-6 text-center">
+           <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl border border-red-100 max-w-lg space-y-4">
+              <div className="bg-red-50 text-red-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto border border-red-100">
+                 <ShieldAlert size={36} />
               </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-2">Akses Ditolak!</h2>
-              <p className="text-gray-500 font-medium mb-8">Maaf, peran Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi Administrator jika ini adalah sebuah kesalahan.</p>
-              <button onClick={() => router.push('/')} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-200">
-                 KEMBALI KE DASHBOARD
-              </button>
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Akses Ditolak!</h2>
+                <div className="mt-1 flex items-center justify-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                    Peran Akun: {userRole || 'Staff/Unit'}
+                  </span>
+                </div>
+              </div>
+              <p className="text-gray-500 text-xs md:text-sm font-medium leading-relaxed">
+                Maaf, peran Anda tidak memiliki izin untuk mengakses halaman <code className="bg-gray-100 text-red-600 px-1.5 py-0.5 rounded font-mono font-bold text-xs">{pathname}</code>. Silakan hubungi Administrator jika ini adalah sebuah kesalahan.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-3">
+                 <button 
+                   onClick={() => {
+                     setIsUnauthorized(false);
+                     router.back();
+                   }} 
+                   className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                 >
+                    <ArrowLeft size={14} />
+                    <span>Halaman Sebelumnya</span>
+                 </button>
+                 <button 
+                   onClick={() => {
+                     setIsUnauthorized(false);
+                     router.push('/');
+                   }} 
+                   className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                 >
+                    <Home size={14} />
+                    <span>Dashboard Utama</span>
+                 </button>
+              </div>
            </div>
         </div>
      );
