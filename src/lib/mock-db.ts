@@ -65,10 +65,10 @@ export const menuList: MenuItem[] = [
 
   // --- PERSURATAN ---
   { title: 'Dokumen', path: '/dokumen', icon: 'FileText', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
-  { title: 'Editor HTML Surat', path: '/surat/editor-html', icon: 'FileCode', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
+  { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
   { title: 'AI Convert Surat', path: '/surat/convert-ai', icon: 'Wand2', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
-  { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'FileEdit', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
-  { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Persuratan' },
+  { title: 'Editor HTML Surat', path: '/surat/editor-html', icon: 'FileCode', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
+  { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
   
   // --- MASTER & PENGATURAN ---
   { title: 'Monitoring Aktivitas User', path: '/monitoring-user', icon: 'Activity', roles: ['ADMIN', 'MANAGER'], group: 'Master' },
@@ -76,26 +76,20 @@ export const menuList: MenuItem[] = [
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
+  { title: 'Master Unit Kerja', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN'], group: 'Master' },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Unit Kerja (DB)', path: '/units', icon: 'Building2', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Unit', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN ---
-  { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
-  { title: 'Komparasi Tambah Pagu', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
-  { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'FileText', roles: ['ADMIN', 'STAFF'], group: 'Anggaran' },
   { title: 'Tambah Pagu', path: '/tambah-pagu', icon: 'Layout', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
+  { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
+  { title: 'Komparasi Tambah Pagu', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Analisis Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
+  { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-
-  // --- REVIEW ANGGARAN ---
-  { title: 'Review Admin', path: '/admin', icon: 'ShieldCheck', roles: ['ADMIN'], group: 'Anggaran' },
-  { title: 'Usulan Unit Kerja', path: '/unit-kerja', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-  { title: 'Master Aturan AI', path: '/admin/rules', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
 
   // --- INPUT FORM ---
   { title: 'Form Tolakan Verif', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },

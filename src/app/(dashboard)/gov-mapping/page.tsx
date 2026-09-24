@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import MasterUnitTabs from '@/components/MasterUnitTabs';
 
 export default function GovMappingPage() {
   const [mappings, setMappings] = useState<any[]>([]);
@@ -125,6 +126,9 @@ export default function GovMappingPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* UNIFIED MASTER UNIT TABS */}
+      <MasterUnitTabs activeTab="gov-mapping" />
+
       {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 import { getTambahPagu } from '@/app/actions/tambah-pagu';
 import * as XLSX from 'xlsx';
 import { 
@@ -318,6 +319,9 @@ export default function KomparasiTambahPaguPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* COHESIVE TAMBAH PAGU TABS */}
+      <TambahPaguTabs activeTab="komparasi" />
+
       {/* ROW 1: SLIM & UNIFIED TOP TOOLBAR & ACTIONS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

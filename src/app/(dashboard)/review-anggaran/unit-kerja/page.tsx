@@ -21,6 +21,7 @@ import {
   ArrowLeft, ShieldCheck, Database, Layers, Search, RefreshCw 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ReviewAnggaranTabs from '@/components/ReviewAnggaranTabs';
 
 // Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -805,6 +806,9 @@ export default function UnitKerjaDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* ROLE-AWARE UNIFIED TABS */}
+      <ReviewAnggaranTabs activeTab="unit-kerja" />
+
       {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 import Select from 'react-select';
 import { 
   Save, ArrowLeft, FileText, Calendar, 
@@ -670,6 +671,9 @@ const handleAutoExtractTanggapanAI = async () => {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* COHESIVE TAMBAH PAGU TABS */}
+      <TambahPaguTabs activeTab="tambah" />
+
       {/* SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

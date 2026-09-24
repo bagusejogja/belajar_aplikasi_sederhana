@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 import OCRPanel from './components/OCRPanel';
 import DataForm from './components/DataForm';
 import DataPendukung from './components/DataPendukung';
@@ -429,6 +430,9 @@ export default function AnalisisPaguPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* COHESIVE TAMBAH PAGU TABS */}
+      <TambahPaguTabs activeTab="analisis" />
+
       {/* SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         {/* Title & Active Document Badge */}

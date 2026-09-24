@@ -9,6 +9,7 @@ import {
 import Select from 'react-select';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import MasterUnitTabs from '@/components/MasterUnitTabs';
 
 // Tipe Data untuk gov_units
 interface GovUnit {
@@ -213,6 +214,9 @@ export default function GovUnitsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
+      {/* UNIFIED MASTER UNIT TABS */}
+      <MasterUnitTabs activeTab="gov-units" />
+
       {/* SLIM & UNIFIED HEADER TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
         <div className="flex items-center gap-3">

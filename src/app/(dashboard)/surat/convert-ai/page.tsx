@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { convertSuratToTextWithAI } from '@/app/actions/ai-scan';
 import toast from 'react-hot-toast';
+import PersuratanTabs from '@/components/PersuratanTabs';
 
 type DynamicFormatKey = 'standar' | 'menindaklanjuti' | 'berdasarkan' | 'sehubungan' | 'memo_singkat' | 'lengkap' | 'kustom';
 
@@ -329,6 +330,9 @@ Sehubungan dengan pelaksanaan program pengabdian masyarakat terpadu di wilayah 3
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* COHESIVE PERSURATAN TABS */}
+      <PersuratanTabs activeTab="convert-ai" />
+
       {/* Toast Notification when image is pasted */}
       {pasteNotice && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2.5 animate-in slide-in-from-top-4 font-bold text-xs">

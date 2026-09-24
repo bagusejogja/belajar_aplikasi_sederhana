@@ -22,6 +22,8 @@ import {
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import ReviewAnggaranTabs from '@/components/ReviewAnggaranTabs';
+import { useUserRole } from '@/lib/useUserRole';
 
 // Autocomplete Input / Filter Unit Kerja untuk Rule Form & Filter (Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / Ketik Unit Kerja..." }: { units: string[], value: string, onChange: (val: string) => void, placeholder?: string }) {
@@ -143,6 +145,7 @@ function UnitAutocompleteInput({ units, value, onChange, placeholder = "Pilih / 
 }
 
 export default function RulesPage() {
+  const { isAdmin, isManager, role, loading: roleLoading } = useUserRole();
   const [rules, setRules] = useState<any[]>([]);
   const [unitList, setUnitList] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -409,8 +412,30 @@ export default function RulesPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+      {/* ROLE-AWARE UNIFIED TABS */}
+      <ReviewAnggaranTabs activeTab="rules" />
+
+      {!roleLoading && !isAdmin && !isManager ? (
+        <div className="bg-white rounded-2xl p-8 border border-amber-200 text-center shadow-xs space-y-3">
+          <div className="inline-flex p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
+            <ShieldCheck size={32} />
+          </div>
+          <h2 className="text-base font-black text-gray-900">Akses Terbatas: Administrator & Verifikator</h2>
+          <p className="text-xs text-gray-500 max-w-md mx-auto">
+            Halaman Master Aturan (Rule Engine) diperuntukkan bagi Administrator &amp; Verifikator Anggaran. Akun Anda saat ini memiliki hak akses <span className="font-bold uppercase text-amber-700">[{role || 'STAFF'}]</span>. Silakan gunakan Portal Usulan Unit Kerja untuk memantau usulan Anda.
+          </p>
+          <div className="pt-2">
+            <Link href="/review-anggaran/unit-kerja">
+              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs">
+                Buka Portal Usulan Unit Kerja
+              </Button>
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">
           <Link href="/review-anggaran">
             <button className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer" title="Kembali ke Landing">
@@ -935,6 +960,8 @@ Direktorat Aset\t53102 | 53103\tPerbaikan dan Pemeliharaan\t1\tWajib Ada`)}
           </div>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import toast from 'react-hot-toast';
 import ExcelJS from 'exceljs';
 import { supabase } from '@/lib/supabase';
+import ReviewAnggaranTabs from '@/components/ReviewAnggaranTabs';
 
 // --- PHP FORMULA PARSER & SERIALIZER ---
 interface PhpFormulaData {
@@ -1676,6 +1677,9 @@ export default function ReviewPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-24 font-sans text-gray-900 animate-in fade-in duration-300">
+      {/* ROLE-AWARE UNIFIED TABS */}
+      <ReviewAnggaranTabs activeTab="review" />
+
       {/* 1. SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import PersuratanTabs from '@/components/PersuratanTabs';
 import JSZip from 'jszip';
 import { logActivity } from '@/lib/activityLogger';
 
@@ -695,6 +696,9 @@ export default function SuratHtmlEditorPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* COHESIVE PERSURATAN TABS */}
+      <PersuratanTabs activeTab="editor-html" />
+
       {/* Hidden File Input for Word Upload */}
       <input
         type="file"

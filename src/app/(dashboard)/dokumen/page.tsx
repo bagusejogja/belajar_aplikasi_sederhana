@@ -42,6 +42,7 @@ import {
   Paperclip
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import PersuratanTabs from '@/components/PersuratanTabs';
 import * as XLSX from 'xlsx';
 
 interface DocumentItem {
@@ -849,6 +850,9 @@ NOTIFY pgrst, 'reload schema';`;
 
   return (
     <div className="min-h-screen bg-slate-50/60 p-4 md:p-8 space-y-6">
+      {/* COHESIVE PERSURATAN TABS */}
+      <PersuratanTabs activeTab="dokumen" />
+
       {/* HEADER SECTION (Judul: Dokumen) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>

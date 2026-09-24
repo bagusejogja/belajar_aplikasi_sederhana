@@ -5,6 +5,7 @@ import { getTambahPagu } from '@/app/actions/tambah-pagu';
 import { getMyPermissions } from '@/app/actions/surat';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { 
@@ -482,6 +483,9 @@ export default function TambahPaguPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* COHESIVE TAMBAH PAGU TABS */}
+      <TambahPaguTabs activeTab="daftar" />
+
       {/* ROW 1: SLIM & UNIFIED TOP TOOLBAR & ACTION BUTTONS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">

@@ -7,10 +7,14 @@ import {
   ArrowRight, CheckSquare, Zap, Cpu, CheckCircle2,
   Lock, TrendingUp, BarChart3, Database
 } from 'lucide-react';
+import ReviewAnggaranTabs from '@/components/ReviewAnggaranTabs';
 
 export default function ReviewAnggaranLanding() {
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* GLOBAL REVIEW TABS */}
+      <ReviewAnggaranTabs activeTab="landing" />
+
       {/* 1. SLIM HERO BANNER */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-6 md:p-8 shadow-xs border border-indigo-500/20">
         <div className="relative z-10 max-w-3xl space-y-2.5">
