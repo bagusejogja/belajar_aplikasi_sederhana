@@ -72,8 +72,8 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 3 Kolom Rata & Rapi, Format 2 Baris (Judul di Atas, Badge di Bawah) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+      {/* Navigation Grid: 3 Kolom Rata & Rapi, Efisien Tempat (Icon Kiri, Judul di Atas, Badge Tepat di Bawah Judul) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
@@ -83,37 +83,32 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
               key={tab.id}
               href={tab.path}
               title={tab.title}
-              className={`group flex flex-col justify-between gap-2 p-3 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border h-full ${
+              className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[46px] ${
                 isActive
                   ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
                   : 'bg-white hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 hover:shadow-2xs active:scale-[0.99]'
               }`}
             >
-              {/* Baris 1: Ikon + Judul Menu */}
-              <div className="flex items-start gap-2.5 min-w-0">
-                <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
-                  isActive 
-                    ? 'bg-white/20 text-white' 
-                    : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors'
-                }`}>
-                  <Icon size={16} />
-                </div>
-                <span className="line-clamp-2 font-bold tracking-tight text-[12px] leading-snug">
-                  {tab.title}
-                </span>
+              {/* Icon di Sisi Kiri */}
+              <div className={`p-1.5 rounded-lg shrink-0 ${
+                isActive 
+                  ? 'bg-white/20 text-white' 
+                  : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors'
+              }`}>
+                <Icon size={16} />
               </div>
 
-              {/* Baris 2: Badge Kategori di Bawah */}
-              <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/80 mt-1">
-                <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
+              {/* Konten Kanan: Judul Menu & Badge Tepat di Bawah Judul */}
+              <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+                <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
+                  {tab.title}
+                </span>
+                <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wider ${
                   isActive 
                     ? 'bg-white/25 text-white' 
-                    : 'bg-slate-100 text-slate-600 group-hover:bg-blue-100/70 group-hover:text-blue-700'
+                    : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100/70 group-hover:text-blue-700'
                 }`}>
                   {tab.badge}
-                </span>
-                <span className={`text-[10px] font-semibold ${isActive ? 'text-blue-100' : 'text-slate-400 group-hover:text-blue-600'}`}>
-                  {isActive ? '● Aktif' : 'Buka →'}
                 </span>
               </div>
             </Link>
