@@ -52,12 +52,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: data || [], hasDbIdColumn });
     }
 
-    // 2. Fetch seluruh baris data secara paralel dan cepat
+    // 2. Fetch seluruh baris data menggunakan ID-cursor pagination (Sangat cepat, hemat resource, bebas timeout)
     let allData: any[] = [];
     const pageSize = 1000;
+    let lastId = 0;
+    let hasMore = true;
 
-    const buildQuery = (fields = selectFields, options?: any) => {
-      let q = supabaseAdmin.from('rkat_pengeluaran').select(fields, options);
+    while (hasMore) {
+      let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
       if (tahun && tahun !== 'ALL') {
         q = q.eq('tahun_anggaran', parseInt(tahun));
       }
@@ -75,38 +77,27 @@ export async function GET(request: Request) {
           q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
         }
       }
-      return q;
-    };
 
-    // Ambil halaman pertama beserta count
-    const firstRes = await buildQuery(selectFields, { count: 'exact' })
-      .order('id', { ascending: true })
-      .range(0, pageSize - 1);
-
-    if (firstRes.error) throw firstRes.error;
-    const firstData = firstRes.data || [];
-    const totalCount = firstRes.count ?? firstData.length;
-
-    if (totalCount <= pageSize) {
-      allData = firstData;
-    } else {
-      const totalPages = Math.ceil(totalCount / pageSize);
-      const chunkPromises = [];
-      for (let p = 1; p < totalPages; p++) {
-        const from = p * pageSize;
-        const to = from + pageSize - 1;
-        chunkPromises.push(
-          buildQuery(selectFields)
-            .order('id', { ascending: true })
-            .range(from, to)
-            .then(res => {
-              if (res.error) throw res.error;
-              return res.data || [];
-            })
-        );
+      if (lastId > 0) {
+        q = q.gt('id', lastId);
       }
-      const restResults = await Promise.all(chunkPromises);
-      allData = firstData.concat(restResults.flat());
+
+      q = q.order('id', { ascending: true }).limit(pageSize);
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allData.push(...data);
+      lastId = (data[data.length - 1] as any)?.id || 0;
+
+      if (data.length < pageSize) {
+        hasMore = false;
+      }
     }
 
     return NextResponse.json({ success: true, data: allData, hasDbIdColumn });
