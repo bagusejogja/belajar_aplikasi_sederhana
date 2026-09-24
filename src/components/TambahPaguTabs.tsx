@@ -89,8 +89,8 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Pills: Responsive Wrap Layout (No horizontal scrolling!) */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Navigation Grid: 4 Kolom Rata & Rapi, Lanjut Baris Baru jika lebih dari 4 dengan ukuran seragam */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
@@ -99,15 +99,20 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
             <Link
               key={tab.id}
               href={tab.path}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer ${
+              title={tab.title}
+              className={`group flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border h-full min-h-[44px] ${
                 isActive
-                  ? 'bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-200/70 ring-1 ring-emerald-500/40 scale-[1.02]'
-                  : 'bg-slate-50/90 hover:bg-emerald-50/70 text-slate-700 hover:text-emerald-700 border border-slate-200/80 hover:border-emerald-200 hover:shadow-2xs active:scale-95'
+                  ? 'bg-gradient-to-r from-emerald-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-200/70 border-emerald-500 ring-1 ring-emerald-500/40 scale-[1.01]'
+                  : 'bg-slate-50/90 hover:bg-emerald-50/70 text-slate-700 hover:text-emerald-700 border-slate-200/90 hover:border-emerald-200 hover:shadow-2xs active:scale-[0.99]'
               }`}
             >
-              <Icon size={14} className={isActive ? 'text-white' : 'text-emerald-600'} />
-              <span className="tracking-tight">{tab.title}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
+              <div className="flex items-center gap-2 min-w-0 pr-1">
+                <Icon size={15} className={`shrink-0 ${isActive ? 'text-white' : 'text-emerald-600 group-hover:scale-110 transition-transform'}`} />
+                <span className="line-clamp-2 font-bold tracking-tight text-[12px] leading-snug">
+                  {tab.title}
+                </span>
+              </div>
+              <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-wider ${
                 isActive 
                   ? 'bg-white/20 text-white' 
                   : 'bg-slate-200/80 text-slate-600'
