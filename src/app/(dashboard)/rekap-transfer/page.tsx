@@ -117,6 +117,21 @@ export default function RekapTransferPage() {
      item.status?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, startDate, endDate]);
+
+  const totalPages = itemsPerPage === -1 ? 1 : Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const paginatedData = React.useMemo(() => {
+    if (itemsPerPage === -1) return filteredData;
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
+
   const formatRp = (angka: number) => {
      return new Intl.NumberFormat('id-ID').format(angka);
   };
@@ -366,7 +381,7 @@ export default function RekapTransferPage() {
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium">
-                   {filteredData.map((item) => (
+                   {paginatedData.map((item) => (
                       <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors">
                          <td className="py-3 px-4 whitespace-nowrap">
                             <div className="font-bold text-gray-900">{item.tanggal_transfer || item.tanggal_pengajuan || '-'}</div>
@@ -414,8 +429,85 @@ export default function RekapTransferPage() {
                    ))}
                 </tbody>
              </table>
-          )}
+           )}
         </div>
+
+        {/* PAGINATION FOOTER */}
+        {filteredData.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+            {/* Left: Info */}
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan <strong className="text-gray-900">{itemsPerPage === -1 ? 1 : (currentPage - 1) * itemsPerPage + 1}</strong> - <strong className="text-gray-900">{itemsPerPage === -1 ? filteredData.length : Math.min(currentPage * itemsPerPage, filteredData.length)}</strong> dari <strong className="text-gray-900">{filteredData.length}</strong> transaksi
+              </span>
+            </div>
+
+            {/* Center: Rows per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={-1}>Semua</option>
+              </select>
+            </div>
+
+            {/* Right: Page Navigation */}
+            {itemsPerPage !== -1 && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Pertama"
+                >
+                  «
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Sebelumnya"
+                >
+                  ‹ Prev
+                </button>
+                
+                <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                  Hal {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Selanjutnya"
+                >
+                  Next ›
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {isModalOpen && selectedData && (

@@ -46,11 +46,7 @@ export const menuList: MenuItem[] = [
   // --- DANA PEMERINTAH ---
   { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Perbandingan Anggaran', path: '/usulan-anggaran', icon: 'Scale', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Anggaran Uang Makan', path: '/anggaran-uang-makan', icon: 'FileText', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Tunjangan Guru Besar', path: '/tunjangan-guru-besar', icon: 'FileSpreadsheet', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Tunjangan Serdos', path: '/tunjangan-serdos', icon: 'CheckCircle', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Tunjangan Fungsional', path: '/tunjangan-fungsional', icon: 'FileText', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Gaji PNS', path: '/gaji-pns', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+  { title: 'Gaji & Tunjangan Pegawai', path: '/dana-pemerintah', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Copas Zone Pagu', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
