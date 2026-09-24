@@ -249,8 +249,12 @@ export default function KomparasiLaporanPage() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: akunData } = await supabase.from('app_laporan_akun').select('*').order('urutan', { ascending: true });
-    const { data: nilaiData } = await supabase.from('app_laporan_statis').select('*');
+    const [resAkun, resNilai] = await Promise.all([
+      supabase.from('app_laporan_akun').select('*').order('urutan', { ascending: true }),
+      supabase.from('app_laporan_statis').select('*')
+    ]);
+    const akunData = resAkun.data;
+    const nilaiData = resNilai.data;
     
     setAkunMaster(akunData || []);
     setDataNilai(nilaiData || []);
@@ -1799,7 +1803,7 @@ export default function KomparasiLaporanPage() {
             <table className="w-full text-left border-collapse min-w-[1000px] text-xs">
               <thead>
                 <tr className="bg-gray-900 text-white uppercase tracking-wider text-[11px]">
-                  <th rowSpan={2} className="py-3 px-4 border-r border-gray-800 min-w-[320px] sticky left-0 bg-gray-900 z-20 font-black shadow-xs">
+                  <th rowSpan={2} className="py-3 px-4 border-r border-gray-800 min-w-[380px] sm:min-w-[420px] sticky left-0 bg-gray-900 z-20 font-black shadow-xs">
                     Keterangan
                   </th>
                   {selectedYearVals.map(y => {
@@ -1850,58 +1854,38 @@ export default function KomparasiLaporanPage() {
                   return (
                     <tr key={idx} className={`hover:bg-teal-50/30 transition-colors group ${(akun.is_sum || isCustom) ? 'bg-gray-50/80' : ''}`}>
                       <td 
-                        className={`py-2 px-3 sticky left-0 bg-white group-hover:bg-teal-50/30 border-r border-gray-200 z-10 flex items-center justify-between ${(akun.is_sum || isCustom) ? '!bg-gray-50/80' : ''}`}
+                        className={`py-2 px-3 sticky left-0 bg-white group-hover:bg-teal-50/30 border-r border-gray-200 z-10 ${(akun.is_sum || isCustom) ? '!bg-gray-50/80' : ''}`}
                       >
-                        <div className="flex items-center gap-1.5 flex-wrap" style={{ paddingLeft: `${akun.level * 1.5}rem` }}>
-                          {akun.level > 0 && <CornerDownRight size={12} className="text-gray-300 shrink-0" />}
-                          <span className={`${isBold ? 'font-black text-gray-900 text-xs' : 'font-medium text-gray-700 text-xs'}`}>
-                            {displayLabel}
-                          </span>
-                          {formulaInfo && (
-                            <span 
-                              className="inline-flex items-center gap-0.5 text-[9px] text-teal-800 bg-teal-50/90 border border-teal-200/80 px-1.5 py-0.2 rounded-md font-mono font-medium shadow-2xs shrink-0 cursor-help"
-                              title={formulaInfo.full}
-                            >
-                              <span className="font-bold text-teal-700">∑</span> {formulaInfo.short}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1" style={{ paddingLeft: `${akun.level * 1.5}rem` }}>
+                            <span className="text-[10px] font-mono font-bold text-gray-400 shrink-0 min-w-[24px]">
+                              #{akun.urutan}
                             </span>
-                          )}
-                        </div>
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 bg-white p-0.5 rounded-lg shadow-2xs border border-gray-200 shrink-0 ml-2">
-                           <span className="text-[9px] font-mono font-bold text-gray-400 px-1 border-r border-gray-100" title={`Nomor Urut: ${akun.urutan}`}>
-                             #{akun.urutan}
-                           </span>
-                           <button 
-                             type="button"
-                             onClick={() => handleMoveUpRow(akun)} 
-                             className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
-                             title="Pindah Urutan ke Atas (▲)"
-                           >
-                             <ChevronUp size={11}/>
-                           </button>
-                           <button 
-                             type="button"
-                             onClick={() => handleMoveDownRow(akun)} 
-                             className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" 
-                             title="Pindah Urutan ke Bawah (▼)"
-                           >
-                             <ChevronDown size={11}/>
-                           </button>
-                           <button 
-                             type="button"
-                             onClick={() => { setAkunForm({ ...akun, formula: akun.formula || '' }); setIsAkunModalOpen(true); }}
-                             className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
-                             title="Edit Akun & Urutan"
-                           >
-                             <Edit2 size={11}/>
-                           </button>
-                           <button 
-                             type="button"
-                             onClick={() => handleAkunDelete(akun.id)} 
-                             className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                             title="Hapus Akun"
-                           >
-                             <Trash2 size={11}/>
-                           </button>
+                            {akun.level > 0 && <CornerDownRight size={12} className="text-gray-300 shrink-0" />}
+                            <span className={`${isBold ? 'font-black text-gray-900 text-xs' : 'font-medium text-gray-700 text-xs'}`}>
+                              {displayLabel}
+                            </span>
+                            {formulaInfo && (
+                              <span 
+                                className="inline-flex items-center gap-0.5 text-[9px] text-teal-800 bg-teal-50/90 border border-teal-200/80 px-1.5 py-0.2 rounded-md font-mono font-medium shadow-2xs shrink-0 cursor-help"
+                                title={formulaInfo.full}
+                              >
+                                <span className="font-bold text-teal-700">∑</span> {formulaInfo.short}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {/* Aksi Cepat Edit Pengaturan Baris */}
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
+                            <button 
+                              type="button"
+                              onClick={() => { setAkunForm({ ...akun, formula: akun.formula || '' }); setIsAkunModalOpen(true); }}
+                              className="p-1 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                              title="Edit Pengaturan Akun & Formula"
+                            >
+                              <Edit2 size={12}/>
+                            </button>
+                          </div>
                         </div>
                       </td>
                       

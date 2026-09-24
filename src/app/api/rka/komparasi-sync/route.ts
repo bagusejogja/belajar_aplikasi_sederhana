@@ -13,77 +13,56 @@ export async function GET(request: Request) {
     const versi = searchParams.get('versi') || 'Final';
     const tahun = parseInt(tahunStr);
 
-    // 1. Fetch seluruh akun master dari app_laporan_akun
-    const { data: akunList, error: akunErr } = await supabaseAdmin
-      .from('app_laporan_akun')
-      .select('*')
-      .order('urutan', { ascending: true });
-    if (akunErr) throw akunErr;
+    // 1. Fetch seluruh akun master, hitung total baris, dan ambil data statis secara paralel
+    const [akunRes, penCountRes, expCountRes, statisRes] = await Promise.all([
+      supabaseAdmin.from('app_laporan_akun').select('*').order('urutan', { ascending: true }),
+      supabaseAdmin.from('rkat_penerimaan').select('*', { count: 'exact', head: true }).eq('tahun', tahun),
+      supabaseAdmin.from('rkat_pengeluaran').select('*', { count: 'exact', head: true }).eq('tahun_anggaran', tahun),
+      supabaseAdmin.from('app_laporan_statis').select('*').eq('tahun', tahun).eq('versi', versi)
+    ]);
 
-    // 2. Fetch seluruh baris penerimaan RKA untuk tahun ini secara paralel
-    let penerimaanRows: any[] = [];
-    try {
-      const { count: penCount } = await supabaseAdmin
-        .from('rkat_penerimaan')
-        .select('*', { count: 'exact', head: true })
-        .eq('tahun', tahun);
+    if (akunRes.error) throw akunRes.error;
+    const akunList = akunRes.data || [];
+    const statisList = statisRes.data || [];
+    const penCount = penCountRes.count || 0;
+    const expCount = expCountRes.count || 0;
 
-      if (penCount && penCount > 0) {
-        const pSize = 1000;
-        const totalPPages = Math.ceil(penCount / pSize);
-        const pPromises = [];
-        for (let p = 0; p < totalPPages; p++) {
-          pPromises.push(
-            supabaseAdmin
-              .from('rkat_penerimaan')
-              .select('id, format_proposal, kelompok_penerimaan, renterima_pagu, tahun')
-              .eq('tahun', tahun)
-              .range(p * pSize, p * pSize + pSize - 1)
-              .then(res => res.data || [])
-          );
-        }
-        const pResults = await Promise.all(pPromises);
-        penerimaanRows = pResults.flat();
-      }
-    } catch (e) {
-      console.warn('Fallback penerimaan fetch error:', e);
+    // 2. Fetch seluruh data penerimaan & pengeluaran secara paralel
+    const pSize = 1000;
+    const totalPPages = penCount > 0 ? Math.ceil(penCount / pSize) : 0;
+    const pPromises = [];
+    for (let p = 0; p < totalPPages; p++) {
+      pPromises.push(
+        supabaseAdmin
+          .from('rkat_penerimaan')
+          .select('id, format_proposal, kelompok_penerimaan, renterima_pagu, tahun')
+          .eq('tahun', tahun)
+          .range(p * pSize, p * pSize + pSize - 1)
+          .then(res => res.data || [])
+      );
     }
 
-    // 3. Fetch seluruh baris pengeluaran RKA untuk tahun ini secara paralel
-    let pengeluaranRows: any[] = [];
-    try {
-      const { count: expCount } = await supabaseAdmin
-        .from('rkat_pengeluaran')
-        .select('*', { count: 'exact', head: true })
-        .eq('tahun_anggaran', tahun);
-
-      if (expCount && expCount > 0) {
-        const eSize = 1000;
-        const totalEPages = Math.ceil(expCount / eSize);
-        const ePromises = [];
-        for (let p = 0; p < totalEPages; p++) {
-          ePromises.push(
-            supabaseAdmin
-              .from('rkat_pengeluaran')
-              .select('id, identifikasi_lain, tags, anggaran, tahun_anggaran')
-              .eq('tahun_anggaran', tahun)
-              .range(p * eSize, p * eSize + eSize - 1)
-              .then(res => res.data || [])
-          );
-        }
-        const eResults = await Promise.all(ePromises);
-        pengeluaranRows = eResults.flat();
-      }
-    } catch (e) {
-      console.warn('Fallback pengeluaran fetch error:', e);
+    const eSize = 1000;
+    const totalEPages = expCount > 0 ? Math.ceil(expCount / eSize) : 0;
+    const ePromises = [];
+    for (let p = 0; p < totalEPages; p++) {
+      ePromises.push(
+        supabaseAdmin
+          .from('rkat_pengeluaran')
+          .select('id, identifikasi_lain, tags, anggaran, tahun_anggaran')
+          .eq('tahun_anggaran', tahun)
+          .range(p * eSize, p * eSize + eSize - 1)
+          .then(res => res.data || [])
+      );
     }
 
-    // 4. Fetch data nilai komparasi saat ini di app_laporan_statis untuk tahun & versi yang ditargetkan
-    const { data: statisList, error: statisErr } = await supabaseAdmin
-      .from('app_laporan_statis')
-      .select('*')
-      .eq('tahun', tahun)
-      .eq('versi', versi);
+    const [pResults, eResults] = await Promise.all([
+      Promise.all(pPromises),
+      Promise.all(ePromises)
+    ]);
+
+    const penerimaanRows: any[] = pResults.flat();
+    const pengeluaranRows: any[] = eResults.flat();
 
     const currentMap = new Map<number, { id?: number; anggaran: number; realisasi: number }>();
     (statisList || []).forEach((row: any) => {

@@ -4795,12 +4795,12 @@ export default function RkaLaporanPage() {
           </Button>
 
           <Button
-            variant="outline"
             size="sm"
             onClick={handleExportExcel}
-            className="h-9 rounded-xl border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs"
+            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
+            title="Export Excel Seluruh Data Sesuai Tab Aktif"
           >
-            <Download size={14} className="text-emerald-600" />
+            <Download size={14} className="text-white" />
             <span>Export Excel</span>
           </Button>
 
@@ -5184,40 +5184,21 @@ export default function RkaLaporanPage() {
                       Struktur hierarkis Penerimaan Dana Masyarakat &amp; Pengeluaran Belanja Usulan RKAT Universitas
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-blue-700 border-blue-300">
-                      TA {tahunFilter}
-                    </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setTempTemplate(JSON.parse(JSON.stringify(pptTemplate)));
-                        setIsTemplateModalOpen(true);
-                      }}
-                      className="h-8 rounded-xl border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                      <Settings2 size={13} className="text-indigo-600" />
-                      <span>Atur Susunan Slide</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-blue-700 border-blue-300">
+                        TA {tahunFilter}
+                      </Badge>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={isAllSummaryExpanded ? collapseAllSummary : expandAllSummary}
-                        className="h-8 rounded-xl border-slate-200 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                        title={isAllSummaryExpanded ? "Tutup Semua Rincian Pos RKAT" : "Buka Semua Rincian Pos RKAT"}
+                        onClick={() => {
+                          setTempTemplate(JSON.parse(JSON.stringify(pptTemplate)));
+                          setIsTemplateModalOpen(true);
+                        }}
+                        className="h-8 rounded-xl border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        {isAllSummaryExpanded ? <Minus size={13} className="text-slate-500" /> : <Plus size={13} className="text-indigo-600" />}
-                        <span className="hidden sm:inline">{isAllSummaryExpanded ? 'Tutup Semua Pos' : 'Buka Semua Pos'}</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExportExcelPptFormat}
-                        className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                      >
-                        <Download size={13} className="text-blue-600" />
-                        <span>Export Format PPT</span>
+                        <Settings2 size={13} className="text-indigo-600" />
+                        <span>Atur Susunan Slide</span>
                       </Button>
                     </div>
                   </CardHeader>
@@ -6312,49 +6293,17 @@ export default function RkaLaporanPage() {
                   ))}
                 </div>
 
-                {/* Export Buttons: Excel & Word Landscape (Icon Only) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportExcelUnitRekap}
-                  className="h-8 w-8 p-0 rounded-xl border-emerald-200 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100 shadow-2xs cursor-pointer flex items-center justify-center"
-                  title={`Export Excel (${rekapFormat === 'kptu' ? '9 Kolom KPTU' : rekapFormat === 'upu' ? '10 Kolom UPU' : rekapFormat === 'pusdi' ? '9 Kolom PUSDI' : '11 Kolom Fakultas'})`}
-                >
-                  <Download size={14} className="text-emerald-600" />
-                </Button>
-
+                {/* Export Word Landscape Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleExportWordUnitRekap}
-                  className="h-8 w-8 p-0 rounded-xl border-blue-200 bg-blue-50/60 text-blue-700 hover:bg-blue-100 shadow-2xs cursor-pointer flex items-center justify-center"
+                  className="h-8 px-2.5 rounded-xl border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100 shadow-2xs cursor-pointer flex items-center gap-1.5 text-xs font-bold"
                   title="Export Word (Landscape)"
                 >
-                  <FileText size={14} className="text-blue-600" />
+                  <FileText size={13} className="text-sky-600" />
+                  <span>Word</span>
                 </Button>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={expandAllRekapUnits}
-                    className="h-8 px-2 text-[11px] font-bold rounded-xl border-slate-200 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 shadow-2xs cursor-pointer gap-1"
-                    title="Buka semua rincian unit kerja"
-                  >
-                    <Plus size={12} className="text-indigo-600" />
-                    <span className="hidden lg:inline">Buka Semua Unit</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={collapseAllRekapUnits}
-                    className="h-8 px-2 text-[11px] font-bold rounded-xl border-slate-200 bg-white hover:bg-slate-100 text-slate-600 shadow-2xs cursor-pointer gap-1"
-                    title="Tutup semua rincian unit kerja"
-                  >
-                    <Minus size={12} className="text-slate-500" />
-                    <span className="hidden lg:inline">Tutup Semua</span>
-                  </Button>
-                </div>
 
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
                   {displayedRekapTotals.totalUnits} Unit
@@ -7542,18 +7491,6 @@ export default function RkaLaporanPage() {
                     💰 Rincian Penerimaan ({allDetailPenerimaanRows.length.toLocaleString('id-ID')})
                   </button>
                 </div>
-
-                {/* Export Excel Button khusus Tab Rincian */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportExcelDetail}
-                  className="h-8 rounded-lg border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer ml-auto"
-                  title="Export Seluruh Rincian Data ke Excel"
-                >
-                  <Download size={13} className="text-emerald-600" />
-                  <span>Export Excel Rincian ({activeDetailSubtab === 'penerimaan' ? allDetailPenerimaanRows.length.toLocaleString('id-ID') : allDetailRows.length.toLocaleString('id-ID')})</span>
-                </Button>
               </div>
             </CardHeader>
 

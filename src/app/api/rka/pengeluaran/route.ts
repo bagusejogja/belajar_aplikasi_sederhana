@@ -52,57 +52,61 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: data || [], hasDbIdColumn });
     }
 
-    // 2. Fetch seluruh baris data secara bertahap yang aman
+    // 2. Fetch seluruh baris data secara paralel dan cepat
     let allData: any[] = [];
-    let page = 0;
     const pageSize = 1000;
-    let hasMore = true;
 
-    while (hasMore) {
-      const from = page * pageSize;
-      const to = from + pageSize - 1;
-
-      let query = supabaseAdmin
-        .from('rkat_pengeluaran')
-        .select(selectFields)
-        .order('id', { ascending: true })
-        .range(from, to);
-
+    const buildQuery = (fields = selectFields, options?: any) => {
+      let q = supabaseAdmin.from('rkat_pengeluaran').select(fields, options);
       if (tahun && tahun !== 'ALL') {
-        query = query.eq('tahun_anggaran', parseInt(tahun));
+        q = q.eq('tahun_anggaran', parseInt(tahun));
       }
-
       if (unit && unit !== 'ALL' && unit !== '*') {
-        query = query.ilike('unit', `%${unit}%`);
+        q = q.ilike('unit', `%${unit}%`);
       }
-
       if (onlyClassified === 'true') {
         if (targetFormat === 'laporan_kementerian') {
-          query = query.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+          q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
         } else if (targetFormat === 'laporan_webometrics') {
-          query = query.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+          q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
         } else if (targetFormat && targetFormat !== 'ALL') {
-          query = query.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
+          q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
         } else {
-          query = query.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
+          q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
         }
       }
+      return q;
+    };
 
-      const { data, error } = await query;
-      if (error) throw error;
+    // Ambil halaman pertama beserta count
+    const firstRes = await buildQuery(selectFields, { count: 'exact' })
+      .order('id', { ascending: true })
+      .range(0, pageSize - 1);
 
-      if (!data || data.length === 0) {
-        hasMore = false;
-        break;
+    if (firstRes.error) throw firstRes.error;
+    const firstData = firstRes.data || [];
+    const totalCount = firstRes.count ?? firstData.length;
+
+    if (totalCount <= pageSize) {
+      allData = firstData;
+    } else {
+      const totalPages = Math.ceil(totalCount / pageSize);
+      const chunkPromises = [];
+      for (let p = 1; p < totalPages; p++) {
+        const from = p * pageSize;
+        const to = from + pageSize - 1;
+        chunkPromises.push(
+          buildQuery(selectFields)
+            .order('id', { ascending: true })
+            .range(from, to)
+            .then(res => {
+              if (res.error) throw res.error;
+              return res.data || [];
+            })
+        );
       }
-
-      allData = allData.concat(data);
-
-      if (data.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
-      }
+      const restResults = await Promise.all(chunkPromises);
+      allData = firstData.concat(restResults.flat());
     }
 
     return NextResponse.json({ success: true, data: allData, hasDbIdColumn });
