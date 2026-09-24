@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, CheckCircle2, Clock, Loader2, Search, 
   Download, Mail, ExternalLink, RefreshCw, ClipboardList,
-  Filter, Calendar, BarChart3, Database, Building2
+  Filter, Calendar, BarChart3, Database, Building2, Eye
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 
@@ -30,6 +30,7 @@ export default function MonitoringMakPage() {
   const [emailModalId, setEmailModalId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -177,6 +178,20 @@ export default function MonitoringMakPage() {
     return files;
   };
 
+  const getSafeFileUrl = (url: string, filename?: string) => {
+    if (!url) return '';
+    const gdriveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (gdriveMatch && gdriveMatch[1]) {
+      return `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w1000`;
+    }
+    // Jika URL R2, bypass blokir ISP (Indihome/Telkomsel pada domain Cloudflare R2 *.r2.dev) lewat proxy backend
+    if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+      const fn = filename ? `&filename=${encodeURIComponent(filename)}` : '';
+      return `/api/image-cors?url=${encodeURIComponent(url)}${fn}`;
+    }
+    return url;
+  };
+
   const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string, uploadTime: string) => {
     try {
       // 1. Cek jika URL adalah tautan SharePoint / Office365 / Google Drive (buka langsung di tab baru agar tidak korup)
@@ -206,20 +221,25 @@ export default function MonitoringMakPage() {
       const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
       const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
       
+      // Ambil safe URL melewati proxy backend untuk bypass blokir ISP Indihome/Telkomsel
+      const targetUrl = (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com'))
+        ? `/api/image-cors?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(newFileName)}`
+        : url;
+
       let response: Response;
       try {
-        response = await window.fetch(url);
+        response = await window.fetch(targetUrl);
         if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
       } catch {
-        // Fallback to proxy if CORS fails
-        const proxyUrl = `/api/image-cors?url=${encodeURIComponent(url)}`;
+        // Fallback to proxy if direct fetch fails
+        const proxyUrl = `/api/image-cors?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(newFileName)}`;
         response = await window.fetch(proxyUrl);
         if (!response.ok) throw new Error(`Proxy HTTP Error ${response.status}`);
       }
       
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('text/html')) {
-        window.open(url, '_blank');
+        window.open(targetUrl, '_blank');
         return;
       }
 
@@ -250,8 +270,9 @@ export default function MonitoringMakPage() {
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (err) {
-      console.error("Gagal download blob, fallback buka tab:", err);
-      window.open(url, '_blank');
+      console.error("Gagal download blob, fallback buka tab proxy:", err);
+      const fallbackUrl = getSafeFileUrl(url, originalName);
+      window.open(fallbackUrl, '_blank');
     }
   };
 
@@ -302,19 +323,48 @@ export default function MonitoringMakPage() {
       <div className="flex flex-col gap-1.5 items-start">
         {files.map((file, i) => {
           const meta = getFileMeta(file);
+          const cleanUrl = (file.url || '').split('?')[0];
+          const ext = (cleanUrl.split('.').pop() || file.name.split('.').pop() || '').toLowerCase();
+          const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].includes(ext);
+          const safeUrl = getSafeFileUrl(file.url, file.name || meta.label);
+
+          if (isImg) {
+            return (
+              <div key={i} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPreviewImage(safeUrl)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-lg border shadow-xs transition-all hover:scale-105 active:scale-95 select-none ${meta.color}`}
+                  title={`Klik untuk lihat gambar: ${file.name || meta.label}`}
+                >
+                  <span>{meta.icon}</span>
+                  <span>{meta.label}</span>
+                  <Eye size={10} className="opacity-60 shrink-0 ml-0.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadCustomName(file.url, file.name || meta.label, unitVal, uploadTime)}
+                  className="p-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 border border-gray-200 rounded-lg transition-colors shadow-2xs"
+                  title="Unduh File"
+                >
+                  <Download size={11} />
+                </button>
+              </div>
+            );
+          }
+
           return (
-            <a
+            <button
               key={i}
-              href={file.url}
-              target="_blank"
-              rel="noreferrer"
+              type="button"
+              onClick={() => handleDownloadCustomName(file.url, file.name || meta.label, unitVal, uploadTime)}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-extrabold rounded-lg border shadow-xs transition-all hover:scale-105 active:scale-95 select-none ${meta.color}`}
-              title={`Klik untuk buka: ${file.name || meta.label}`}
+              title={`Klik untuk unduh: ${file.name || meta.label}`}
             >
               <span>{meta.icon}</span>
               <span>{meta.label}</span>
-              <ExternalLink size={10} className="opacity-60 shrink-0 ml-0.5" />
-            </a>
+              <Download size={10} className="opacity-60 shrink-0 ml-0.5" />
+            </button>
           );
         })}
       </div>
@@ -821,6 +871,36 @@ export default function MonitoringMakPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Modal Preview Gambar Layar Penuh (Bypass Indihome via Proxy) */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[70] bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-150" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-6 right-6 text-white bg-white/20 hover:bg-rose-500 p-3 rounded-full transition-colors font-bold group" onClick={() => setPreviewImage(null)}>
+            ✕
+          </button>
+          <p className="absolute top-6 left-6 text-white font-bold bg-black/50 px-4 py-2 rounded-xl text-xs">
+            Klik di mana saja untuk menutup
+          </p>
+          <div className="relative max-w-full max-h-[85vh] flex justify-center w-full">
+            <img 
+              src={previewImage} 
+              alt="Preview Lampiran" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl ring-4 ring-white/10" 
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </div>
+          <a 
+            href={previewImage} 
+            target="_blank" 
+            rel="noreferrer" 
+            className="mt-6 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg flex items-center gap-2 text-xs" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink size={14} />
+            <span>Buka Resolusi Penuh</span>
+          </a>
         </div>
       )}
     </div>
