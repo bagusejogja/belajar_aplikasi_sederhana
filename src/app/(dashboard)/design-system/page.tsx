@@ -53,7 +53,13 @@ import {
   ZoomIn,
   Gauge,
   Type,
-  ArrowUpDown
+  ArrowUpDown,
+  Bell,
+  CheckCircle2,
+  ShieldAlert,
+  Rows,
+  AlignJustify,
+  Info
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -64,6 +70,11 @@ import MultiSelectFilter from '@/components/shared/MultiSelectFilter';
 import AutocompleteCombobox from '@/components/shared/AutocompleteCombobox';
 import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
 import FileUploadDropzone from '@/components/shared/FileUploadDropzone';
+import EmptyState from '@/components/shared/EmptyState';
+import SkeletonTable from '@/components/shared/SkeletonTable';
+import ConfirmModal from '@/components/shared/ConfirmModal';
+import ToastNotification, { ToastItem } from '@/components/shared/ToastNotification';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
 import { 
   PrimaryButton, 
   SecondaryButton, 
@@ -73,8 +84,40 @@ import {
 
 export default function DesignSystemPage() {
   const [activeTab, setActiveTab] = useState<
-    'forms' | 'typography' | 'cards' | 'charts' | 'tab-styles' | 'editor' | 'colors' | 'table'
+    'forms' | 'typography' | 'cards' | 'charts' | 'tab-styles' | 'editor' | 'colors' | 'table' | 'modals'
   >('forms');
+
+  // Table Density & Simulation State
+  const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
+  const [tableSimState, setTableSimState] = useState<'normal' | 'loading' | 'empty'>('normal');
+
+  // Modal State
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalVariant, setModalVariant] = useState<'danger' | 'warning' | 'primary' | 'success'>('danger');
+  const [modalTitle, setModalTitle] = useState('Konfirmasi Hapus Pengajuan');
+  const [modalDesc, setModalDesc] = useState('Apakah Anda yakin ingin menghapus data pengajuan pagu ini? Tindakan ini tidak dapat dibatalkan.');
+  const [modalLoading, setModalLoading] = useState(false);
+
+  // Toast Notification State
+  const [toasts, setToasts] = useState<ToastItem[]>([
+    { id: '1', type: 'success', title: 'Data Berhasil Disimpan', message: 'Penyesuaian usulan pagu Fakultas Biologi telah diperbarui.' }
+  ]);
+
+  const triggerToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message?: string) => {
+    const newId = Date.now().toString();
+    const newToast: ToastItem = { id: newId, type, title, message };
+    setToasts((prev) => [...prev, newToast]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== newId));
+    }, 4500);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Empty State Interactive Type
+  const [emptyStateVariant, setEmptyStateVariant] = useState<'search' | 'empty' | 'error' | 'unauthorized'>('search');
 
   // Poin 1 & 2: Autocomplete & Multi-Select State
   const [autocompleteUnit, setAutocompleteUnit] = useState<string>('3');
@@ -170,21 +213,43 @@ export default function DesignSystemPage() {
         }
       />
 
-      {/* 2. Grid 4 Kolom Proporsional (2 Baris Rapi, Nyaman & Tidak Terjepit) */}
+      {/* Floating Toast Notification Container */}
+      <ToastNotification toasts={toasts} onDismiss={removeToast} position="top-right" />
+
+      {/* Interactive Confirm Modal */}
+      <ConfirmModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        variant={modalVariant}
+        title={modalTitle}
+        description={modalDesc}
+        isLoading={modalLoading}
+        confirmText="Ya, Lanjutkan"
+        cancelText="Batal"
+        onConfirm={async () => {
+          setModalLoading(true);
+          await new Promise((res) => setTimeout(res, 800));
+          setModalLoading(false);
+          setModalOpen(false);
+          triggerToast('success', 'Aksi Berhasil Diproses', `Tindakan ${modalTitle} telah dieksekusi secara aman.`);
+        }}
+      />
+
+      {/* 2. Grid 3 Kolom Proporsional (3 Baris Rapi, Nyaman & Tidak Terjepit) */}
       <div className="bg-white/95 backdrop-blur-sm p-3.5 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} className="text-blue-600" />
             <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">
-              Katalog Komponen Baku Terpadu
+              Katalog Komponen Baku Terpadu (9 Modul Standar)
             </span>
           </div>
           <span className="text-[10px] text-gray-400 font-semibold hidden sm:inline">
-            Tampilan lega & nyaman dilihat (4 kolom x 2 baris)
+            Tampilan proporsional & responsif (3 kolom x 3 baris)
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {[
             { id: 'forms', num: '01', label: 'Filter & Form Input', desc: 'Autocomplete ↑/↓, Multi, Jam', icon: Search },
             { id: 'typography', num: '02', label: 'Ukuran & Jenis Font', desc: 'Hierarki Font, Mono Uang, Tester', icon: Type },
@@ -193,7 +258,8 @@ export default function DesignSystemPage() {
             { id: 'tab-styles', num: '05', label: 'Tab Pilihan Menu', desc: 'Pill, Underline, Capsule', icon: Layers },
             { id: 'editor', num: '06', label: 'Editor & Gambar', desc: 'Toolbar Dokumen & Ukuran Foto', icon: FileText },
             { id: 'colors', num: '07', label: 'Palet Warna Baku', desc: 'Royal Blue, Emerald, Amber', icon: Palette },
-            { id: 'table', num: '08', label: 'Tabel & Paging', desc: 'Data Table & Paging Baku', icon: TableIcon },
+            { id: 'table', num: '08', label: 'Tabel & Paging', desc: 'Density Luwes/Rapat & Shimmer', icon: TableIcon },
+            { id: 'modals', num: '09', label: 'Modal, Toast & State', desc: 'Confirm Dialog, Toast, Empty', icon: Bell },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1083,66 +1149,389 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 8: TABEL & PAGING                                                     */}
+      {/* TAB 8: TABEL & PAGING (DENSITY & SIMULASI LOADING / KOSONG)                */}
       {/* ========================================================================= */}
       {activeTab === 'table' && (
         <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
             <div>
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                Standarisasi Tabel Data & Paging Baku
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5">Teks rata kiri, angka/uang rata kanan (font mono), status rata tengah.</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Standarisasi Tabel Data, Paging & Kerapatan (Density)
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  {tableDensity === 'compact' ? 'Mode Rapat (Compact)' : 'Mode Luwes (Comfortable)'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Teks rata kiri, angka/uang rata kanan (font mono), status rata tengah. Dilengkapi pengatur kerapatan baris.
+              </p>
             </div>
-            <ExportButtons onExportExcel={() => alert('Excel')} onExportWord={() => alert('Word')} />
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Density Toggle */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
+                <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
+              </div>
+
+              {/* Simulation Mode Controls */}
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTableSimState('normal')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    tableSimState === 'normal'
+                      ? 'bg-white text-blue-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Normal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableSimState('loading')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    tableSimState === 'loading'
+                      ? 'bg-white text-blue-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Loading Shimmer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableSimState('empty')}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                    tableSimState === 'empty'
+                      ? 'bg-white text-blue-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Data Kosong
+                </button>
+              </div>
+
+              <ExportButtons onExportExcel={() => alert('Excel')} onExportWord={() => alert('Word')} />
+            </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-2xs">
-            <table className="w-full text-xs text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-12">No</th>
-                  <th className="py-3 px-3">Kode Akun</th>
-                  <th className="py-3 px-3">Uraian Akun</th>
-                  <th className="py-3 px-3">Unit Kerja</th>
-                  <th className="py-3 px-3 text-right">Pagu Usulan</th>
-                  <th className="py-3 px-3 text-right">Realisasi</th>
-                  <th className="py-3 px-3 text-center">Status</th>
-                  <th className="py-3 px-3 text-center w-24">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sampleTableData.map((row, idx) => (
-                  <tr key={row.id} className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/30">
-                    <td className="py-2.5 px-3 text-center text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-indigo-700">{row.kode}</td>
-                    <td className="py-2.5 px-3 font-semibold text-gray-800">{row.nama}</td>
-                    <td className="py-2.5 px-3 text-gray-600">{row.unit}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-gray-900">Rp {row.pagu.toLocaleString('id-ID')}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-emerald-700 font-semibold">Rp {row.realisasi.toLocaleString('id-ID')}</td>
-                    <td className="py-2.5 px-3 text-center"><StatusBadge status={row.status} /></td>
-                    <td className="py-2.5 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <TableActionButton icon={Eye} variant="primary" title="Detail" />
-                        <TableActionButton icon={Pencil} variant="warning" title="Edit" />
-                        <TableActionButton icon={Trash2} variant="danger" title="Hapus" />
-                      </div>
-                    </td>
-                  </tr>
+          {/* Conditional Rendering: Loading Skeleton vs Empty State vs Normal Table */}
+          {tableSimState === 'loading' && (
+            <div className="space-y-3">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-center justify-between">
+                <span>⚡ <strong>Simulasi Skeleton Shimmer:</strong> Pengganti animasi putaran loading konvensional agar perpindahan halaman mulus & tidak berkedip.</span>
+                <button
+                  onClick={() => setTableSimState('normal')}
+                  className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 font-bold rounded-lg border border-blue-200 text-[11px]"
+                >
+                  Kembalikan Normal
+                </button>
+              </div>
+              <SkeletonTable rows={5} columns={8} showStatCards={false} />
+            </div>
+          )}
+
+          {tableSimState === 'empty' && (
+            <div className="space-y-3">
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+                <span>🔍 <strong>Simulasi Empty State:</strong> Memberikan panduan aksi solutif saat hasil pencarian atau filter bernilai 0 rekaman.</span>
+                <button
+                  onClick={() => setTableSimState('normal')}
+                  className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 font-bold rounded-lg border border-amber-200 text-[11px]"
+                >
+                  Kembalikan Normal
+                </button>
+              </div>
+              <EmptyState
+                type="search"
+                title="Pagu Anggaran Tidak Ditemukan"
+                description="Tidak ada data belanja pagu yang sesuai dengan filter atau kata kunci pencarian yang sedang aktif."
+                actionLabel="Reset & Tampilkan Semua"
+                onAction={() => setTableSimState('normal')}
+              />
+            </div>
+          )}
+
+          {tableSimState === 'normal' && (
+            <>
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-2xs">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                      <th className={`text-center w-12 ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>No</th>
+                      <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Kode Akun</th>
+                      <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Uraian Akun</th>
+                      <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Unit Kerja</th>
+                      <th className={`text-right ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Pagu Usulan</th>
+                      <th className={`text-right ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Realisasi</th>
+                      <th className={`text-center ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Status</th>
+                      <th className={`text-center w-24 ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sampleTableData.map((row, idx) => (
+                      <tr 
+                        key={row.id} 
+                        className={`hover:bg-blue-50/40 transition-colors even:bg-slate-50/30 ${
+                          tableDensity === 'compact' ? 'text-[11px]' : 'text-xs'
+                        }`}
+                      >
+                        <td className={`text-center text-gray-400 font-mono ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          {idx + 1}
+                        </td>
+                        <td className={`font-mono font-bold text-indigo-700 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          {row.kode}
+                        </td>
+                        <td className={`font-semibold text-gray-800 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          {row.nama}
+                        </td>
+                        <td className={`text-gray-600 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          {row.unit}
+                        </td>
+                        <td className={`text-right font-mono font-bold text-gray-900 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          Rp {row.pagu.toLocaleString('id-ID')}
+                        </td>
+                        <td className={`text-right font-mono text-emerald-700 font-semibold ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          Rp {row.realisasi.toLocaleString('id-ID')}
+                        </td>
+                        <td className={`text-center ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className={`text-center ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                          <div className="flex items-center justify-center gap-1">
+                            <TableActionButton icon={Eye} variant="primary" title="Detail" />
+                            <TableActionButton icon={Pencil} variant="warning" title="Edit" />
+                            <TableActionButton icon={Trash2} variant="danger" title="Hapus" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={5}
+                totalItems={48}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(p) => setCurrentPage(p)}
+                onItemsPerPageChange={(size) => setItemsPerPage(size)}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 9: MODAL KONFIRMASI, TOAST NOTIFIKASI & EMPTY STATE                    */}
+      {/* ========================================================================= */}
+      {activeTab === 'modals' && (
+        <div className="space-y-6">
+          {/* Bagian A: Modal Dialog Konfirmasi */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  1. Modal Dialog Konfirmasi Baku (Backdrop Blur & Safe Confirm)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Mencegah kekeliruan fatal pengguna pada aksi destruktif (Hapus, Tolak, Simpan Perubahan).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(`<ConfirmModal
+  isOpen={isOpen}
+  onClose={() => setIsOpen(false)}
+  variant="danger"
+  title="Konfirmasi Hapus Usulan"
+  description="Apakah Anda yakin ingin menghapus data ini secara permanen?"
+  confirmText="Ya, Hapus Data"
+  onConfirm={async () => { await handleDelete(); }}
+/>`, 'confirm-modal-code')}
+                className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                {copiedCode === 'confirm-modal-code' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                {copiedCode === 'confirm-modal-code' ? 'Tersalin!' : 'Salin Kode'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Trigger Danger Modal */}
+              <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/40 space-y-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-rose-100 text-rose-700">
+                  Danger / Destruktif
+                </span>
+                <h4 className="text-xs font-bold text-gray-800">Hapus Data & Penolakan Usulan</h4>
+                <p className="text-[11px] text-gray-500">Ikon tempat sampah merah & tombol konfirmasi rose mencolok.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalVariant('danger');
+                    setModalTitle('Konfirmasi Hapus Usulan Pagu');
+                    setModalDesc('Apakah Anda yakin ingin menghapus usulan Belanja Modal Fakultas Biologi? Data yang dihapus tidak dapat dipulihkan.');
+                    setModalOpen(true);
+                  }}
+                  className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={13} /> Uji Modal Hapus (Danger)
+                </button>
+              </div>
+
+              {/* Trigger Warning Modal */}
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 space-y-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                  Warning / Koreksi
+                </span>
+                <h4 className="text-xs font-bold text-gray-800">Kembalikan untuk Revisi</h4>
+                <p className="text-[11px] text-gray-500">Ikon peringatan kuning amber untuk pengembalian dokumen.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalVariant('warning');
+                    setModalTitle('Kembalikan Dokumen untuk Revisi');
+                    setModalDesc('Dokumen RKA akan dikembalikan ke Unit Kerja dengan catatan revisi yang telah dilampirkan.');
+                    setModalOpen(true);
+                  }}
+                  className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <AlertCircle size={13} /> Uji Modal Revisi (Warning)
+                </button>
+              </div>
+
+              {/* Trigger Primary/Success Modal */}
+              <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2.5">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                  Primary / Approval
+                </span>
+                <h4 className="text-xs font-bold text-gray-800">Persetujuan & Penguncian Data</h4>
+                <p className="text-[11px] text-gray-500">Ikon tanda tanya biru untuk validasi akhir pengesahan anggaran.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalVariant('primary');
+                    setModalTitle('Setujui Usulan Pagu Anggaran');
+                    setModalDesc('Apakah Anda yakin ingin menyetujui seluruh mata anggaran usulan ini dan meneruskannya ke SK Rektor?');
+                    setModalOpen(true);
+                  }}
+                  className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 size={13} /> Uji Modal Setujui (Primary)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bagian B: Toast Notification System */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-blue-600" />
+                  2. Toast Notifikasi Mengambang (Floating Feedback Alerts)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Umpan balik seketika di pojok kanan atas setelah aksi API/DB (hilang otomatis setelah 4.5 detik).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(`// Trigger toast dari komponen manapun
+triggerToast('success', 'Data Berhasil Disimpan', 'Pagu telah disesuaikan.');
+triggerToast('error', 'Gagal Memproses Permintaan', 'Koneksi database timeout.');`, 'toast-code')}
+                className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                {copiedCode === 'toast-code' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                {copiedCode === 'toast-code' ? 'Tersalin!' : 'Salin Kode'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                onClick={() => triggerToast('success', 'Berhasil Disimpan!', 'Penyesuaian data pagu unit berhasil direkam ke database.')}
+                className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <CheckCircle2 size={15} className="text-emerald-600" /> Toast Sukses
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerToast('error', 'Gagal Memproses!', 'Nomor rekening atau kode akun belanja tidak terdaftar.')}
+                className="p-3 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <AlertCircle size={15} className="text-rose-600" /> Toast Gagal
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerToast('warning', 'Peringatan Anggaran!', 'Sisa saldo pagu unit telah mencapai 92% dari batas maksimal.')}
+                className="p-3 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <AlertCircle size={15} className="text-amber-600" /> Toast Peringatan
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerToast('info', 'Informasi Pemeliharaan', 'Sinkronisasi data RKAT terjadwal akan berlangsung pukul 23:00 WIB.')}
+                className="p-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                <Info size={15} className="text-blue-600" /> Toast Info
+              </button>
+            </div>
+          </div>
+
+          {/* Bagian C: Galeri Empty State Interaktif */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <Search className="w-4 h-4 text-indigo-600" />
+                  3. Empty State Baku (Tampilan Saat Data Kosong / Gagal)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  4 varian siap pakai untuk mencegah layar kosong membingungkan bagi pengguna.
+                </p>
+              </div>
+
+              {/* Varian Selector */}
+              <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+                {[
+                  { id: 'search', label: 'Filter Kosong' },
+                  { id: 'empty', label: 'Belum Ada Data' },
+                  { id: 'error', label: 'Koneksi Error' },
+                  { id: 'unauthorized', label: 'Akses Ditolak' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setEmptyStateVariant(item.id as any)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      emptyStateVariant === item.id
+                        ? 'bg-white text-blue-700 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </div>
 
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={5}
-            totalItems={48}
-            itemsPerPage={itemsPerPage}
-            onPageChange={(p) => setCurrentPage(p)}
-            onItemsPerPageChange={(size) => setItemsPerPage(size)}
-            pageSizeOptions={[10, 25, 50, 100]}
-          />
+            {/* Live Render of EmptyState */}
+            <div className="p-4 bg-slate-50/60 rounded-xl border border-slate-200/80">
+              <EmptyState
+                type={emptyStateVariant}
+                onAction={() => alert(`Aksi utama untuk tipe: ${emptyStateVariant}`)}
+                onSecondaryAction={() => alert('Aksi sekunder dipicu')}
+                secondaryLabel={emptyStateVariant === 'error' ? 'Bantuan Teknis' : undefined}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
