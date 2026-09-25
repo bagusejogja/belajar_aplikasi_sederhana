@@ -10,13 +10,13 @@ import {
   Scale, RefreshCw, CheckCircle2, AlertTriangle, 
   XCircle, Building2, FileText, Search, Sparkles, Download, 
   Zap, ChevronRight, ChevronDown, ChevronUp, Layers, ArrowUpRight, 
-  ArrowDownRight, ExternalLink, Check, Info
+  ArrowDownRight, ExternalLink, Check, Info, History, RotateCcw, ShieldCheck, TrendingUp
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function KomparasiTambahPaguPage() {
   const router = useRouter();
@@ -34,6 +34,23 @@ export default function KomparasiTambahPaguPage() {
 
   // Sync Confirmation Dialog State
   const [syncTargetUnit, setSyncTargetUnit] = useState<any | null>(null);
+  const [syncModalTab, setSyncModalTab] = useState<'preview' | 'letters' | 'history'>('preview');
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+
+  // Snapshot History Interface
+  interface UnitSyncSnapshot {
+    id: string;
+    unit_id: string;
+    unit_nama: string;
+    tahun: string;
+    timestamp: string;
+    previousRows: Array<{
+      id?: string | number;
+      jenis_anggaran: string;
+      nominal: number;
+    }>;
+  }
+  const [unitSnapshots, setUnitSnapshots] = useState<UnitSyncSnapshot[]>([]);
 
   // Raw Database Data
   const [rawTambahPagu, setRawTambahPagu] = useState<any[]>([]);
@@ -43,6 +60,17 @@ export default function KomparasiTambahPaguPage() {
 
   useEffect(() => {
     fetchAuditData();
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(`tambah_pagu_snapshots_${selectedYear}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) setUnitSnapshots(parsed);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading snapshots:', e);
+    }
   }, [selectedYear]);
 
   const fetchAuditData = async () => {
@@ -222,13 +250,12 @@ export default function KomparasiTambahPaguPage() {
     setExpandedUnits(prev => ({ ...prev, [unitId]: !prev[unitId] }));
   };
 
-  // EXECUTE SYNC AFTER CONFIRMATION
+  // EXECUTE SYNC AFTER CONFIRMATION (WITH AUTO SNAPSHOT)
   const executeSync = async () => {
     if (!syncTargetUnit) return;
 
     const unitAudit = syncTargetUnit;
     setIsSyncing(unitAudit.id);
-    setSyncTargetUnit(null);
 
     try {
       // 1. Check existing rows in gov_pagu_anggaran for inisiatif & penugasan
@@ -240,6 +267,28 @@ export default function KomparasiTambahPaguPage() {
 
       const inisiatifRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif'));
       const penugasanRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('penugasan'));
+
+      // 2. Save Safety Snapshot Before Overwrite
+      const snap: UnitSyncSnapshot = {
+        id: `snap_${unitAudit.id}_${Date.now()}`,
+        unit_id: unitAudit.id,
+        unit_nama: unitAudit.nama_unit,
+        tahun: selectedYear,
+        timestamp: new Date().toISOString(),
+        previousRows: (existingRows || []).map(r => ({
+          id: r.id,
+          jenis_anggaran: r.jenis_anggaran,
+          nominal: Number(r.nominal) || 0
+        }))
+      };
+
+      setUnitSnapshots(prev => {
+        const updated = [snap, ...prev.filter(s => s.unit_id !== unitAudit.id)].slice(0, 10);
+        try {
+          localStorage.setItem(`tambah_pagu_snapshots_${selectedYear}`, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
 
       // Update / Insert Inisiatif
       if (unitAudit.surat_inisiatif > 0) {
@@ -269,12 +318,115 @@ export default function KomparasiTambahPaguPage() {
         }
       }
 
+      setSyncTargetUnit(null);
       await fetchAuditData();
       alert(`✨ Berhasil menyinkronkan data Tambah Pagu ${unitAudit.nama_unit} ke database gov_pagu_anggaran! Status kini 🟢 MATCH!`);
     } catch (err: any) {
       alert("Gagal menyinkronkan data: " + err.message);
     } finally {
       setIsSyncing(null);
+    }
+  };
+
+  // EXECUTE ROLLBACK FOR A UNIT
+  const executeRollback = async (snap: UnitSyncSnapshot) => {
+    const timeFmt = new Date(snap.timestamp).toLocaleString('id-ID');
+    const confirmMsg = `Konfirmasi Rollback:\n\nApakah Anda yakin ingin memulihkan nilai database untuk ${snap.unit_nama} ke versi sebelum sinkronisasi pada ${timeFmt}?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      for (const row of snap.previousRows) {
+        if (row.id) {
+          await supabase.from('gov_pagu_anggaran').update({ nominal: row.nominal }).eq('id', row.id);
+        }
+      }
+
+      setUnitSnapshots(prev => {
+        const next = prev.filter(s => s.id !== snap.id);
+        try {
+          localStorage.setItem(`tambah_pagu_snapshots_${selectedYear}`, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
+
+      await fetchAuditData();
+      alert(`✅ Rollback Berhasil! Nilai database untuk ${snap.unit_nama} telah dipulihkan.`);
+    } catch (err: any) {
+      alert("Gagal memulihkan nilai: " + err.message);
+    }
+  };
+
+  // EXECUTE BULK SYNC FOR ALL KELEWAT / SELISIH UNITS
+  const executeBulkSync = async () => {
+    const unalignedUnits = auditUnitComparison.filter(u => u.audit_status === 'KELEWAT' || u.audit_status === 'SELISIH');
+    if (unalignedUnits.length === 0) {
+      alert('Semua unit kerja sudah MATCH (Sesuai). Tidak ada data yang perlu disinkronkan.');
+      return;
+    }
+
+    const confirmMsg = `Konfirmasi Sinkronisasi Massal:\n\nApakah Anda yakin ingin menyinkronkan ${unalignedUnits.length} unit kerja sekaligus ke tabel gov_pagu_anggaran untuk Tahun ${selectedYear}?\n\nSemua unit yang berstatus KELEWAT & SELISIH akan otomatis diselaraskan dengan surat persetujuan resmi.`;
+    if (!confirm(confirmMsg)) return;
+
+    setIsBulkSyncing(true);
+    try {
+      for (const unitAudit of unalignedUnits) {
+        const { data: existingRows } = await supabase
+          .from('gov_pagu_anggaran')
+          .select('*')
+          .eq('unit_id', unitAudit.id)
+          .eq('tahun_anggaran', selectedYear);
+
+        const inisiatifRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('inisiatif'));
+        const penugasanRow = (existingRows || []).find(r => (r.jenis_anggaran || '').toLowerCase().includes('penugasan'));
+
+        const snap: UnitSyncSnapshot = {
+          id: `snap_${unitAudit.id}_${Date.now()}`,
+          unit_id: unitAudit.id,
+          unit_nama: unitAudit.nama_unit,
+          tahun: selectedYear,
+          timestamp: new Date().toISOString(),
+          previousRows: (existingRows || []).map(r => ({
+            id: r.id,
+            jenis_anggaran: r.jenis_anggaran,
+            nominal: Number(r.nominal) || 0
+          }))
+        };
+
+        setUnitSnapshots(prev => [snap, ...prev.filter(s => s.unit_id !== unitAudit.id)].slice(0, 10));
+
+        if (unitAudit.surat_inisiatif > 0) {
+          if (inisiatifRow) {
+            await supabase.from('gov_pagu_anggaran').update({ nominal: unitAudit.surat_inisiatif }).eq('id', inisiatifRow.id);
+          } else {
+            await supabase.from('gov_pagu_anggaran').insert([{
+              unit_id: unitAudit.id,
+              tahun_anggaran: selectedYear,
+              jenis_anggaran: 'tambah pagu - inisiatif',
+              nominal: unitAudit.surat_inisiatif
+            }]);
+          }
+        }
+
+        if (unitAudit.surat_penugasan > 0) {
+          if (penugasanRow) {
+            await supabase.from('gov_pagu_anggaran').update({ nominal: unitAudit.surat_penugasan }).eq('id', penugasanRow.id);
+          } else {
+            await supabase.from('gov_pagu_anggaran').insert([{
+              unit_id: unitAudit.id,
+              tahun_anggaran: selectedYear,
+              jenis_anggaran: 'tambah pagu - penugasan',
+              nominal: unitAudit.surat_penugasan
+            }]);
+          }
+        }
+      }
+
+      await fetchAuditData();
+      alert(`🎉 Selesai! Berhasil menyinkronkan ${unalignedUnits.length} unit kerja ke database gov_pagu_anggaran. Seluruh status kini 🟢 MATCH!`);
+    } catch (err: any) {
+      alert("Terjadi kesalahan saat sinkronisasi massal: " + err.message);
+    } finally {
+      setIsBulkSyncing(false);
     }
   };
 
@@ -505,18 +657,41 @@ export default function KomparasiTambahPaguPage() {
 
       {/* ROW 4: TABEL AUDIT KOMPARASI PER UNIT KERJA (COLLAPSIBLE ACCORDION PER SURAT) */}
       <Card className="border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden bg-white">
-        <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
+        <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-sm font-black text-gray-900">
-              Hasil Komparasi Audit: <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">tambah_pagu</code> VS <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">gov_pagu_anggaran</code>
+            <CardTitle className="text-sm font-black text-gray-900 flex items-center gap-2">
+              <span>Hasil Komparasi Audit: <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">tambah_pagu</code> VS <code className="bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-mono font-bold text-xs">gov_pagu_anggaran</code></span>
             </CardTitle>
-            <CardDescription className="text-[11px] text-gray-500 font-medium">
-              Klik baris unit kerja untuk memperluas (expand) rincian surat usulan di dalamnya
+            <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+              Klik baris unit kerja untuk melihat rincian surat usulan vs pagu database, atau gunakan tombol ⚡ Sinkron untuk menyelaraskan nilai
             </CardDescription>
           </div>
-          <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-bold">
-            {filteredAuditUnits.length} Unit
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-bold px-2.5 py-1">
+              {filteredAuditUnits.length} Unit
+            </Badge>
+
+            {(kpiAuditSummary.kelewatCount + kpiAuditSummary.selisihCount > 0) && (
+              <Button
+                size="sm"
+                onClick={executeBulkSync}
+                disabled={isBulkSyncing}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs h-8 px-3 gap-1.5"
+              >
+                {isBulkSyncing ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin text-amber-300" />
+                    <span>Menyinkronkan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={13} className="text-amber-300 fill-amber-300" />
+                    <span>⚡ Sinkronkan Semua ({kpiAuditSummary.kelewatCount + kpiAuditSummary.selisihCount})</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -527,12 +702,14 @@ export default function KomparasiTambahPaguPage() {
                 <TableHead>Nama Unit Kerja & Group</TableHead>
                 <TableHead className="text-right text-amber-900">Surat Disetujui (tambah_pagu)</TableHead>
                 <TableHead className="text-right text-emerald-900">Tercatat DB (gov_pagu_anggaran)</TableHead>
+                <TableHead className="text-right text-slate-800">Selisih / Diff (Rp)</TableHead>
+                <TableHead className="text-center w-[150px]">Status & Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredAuditUnits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-12 text-gray-400 font-medium">
+                  <TableCell colSpan={7} className="text-center py-12 text-gray-400 font-medium">
                     Tidak ada unit kerja yang memiliki mutasi atau sesuai filter.
                   </TableCell>
                 </TableRow>
@@ -591,12 +768,80 @@ export default function KomparasiTambahPaguPage() {
                           </div>
                         </TableCell>
 
+                        {/* SELISIH / DIFF */}
+                        <TableCell className="text-right align-top pt-3 space-y-1">
+                          {u.selisih === 0 ? (
+                            <div className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                              <CheckCircle2 size={12} className="text-emerald-500" />
+                              <span>Rp 0</span>
+                            </div>
+                          ) : (
+                            <div className={`font-mono font-black ${u.selisih > 0 ? 'text-amber-700' : 'text-purple-700'}`}>
+                              {u.selisih > 0 ? `+Rp ${formatRp(u.selisih)}` : `-Rp ${formatRp(Math.abs(u.selisih))}`}
+                            </div>
+                          )}
+                          <div className="text-[10px] text-gray-400">
+                            {u.selisih === 0 ? 'Tepat Sesuai' : (u.selisih > 0 ? 'Surat > DB' : 'Surat < DB')}
+                          </div>
+                        </TableCell>
+
+                        {/* STATUS AUDIT & AKSI SINKRON */}
+                        <TableCell className="text-center align-top pt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div>
+                            {u.audit_status === 'MATCH' && (
+                              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-black px-2 py-0.5 shadow-2xs">
+                                🟢 MATCH
+                              </Badge>
+                            )}
+                            {u.audit_status === 'KELEWAT' && (
+                              <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-black px-2 py-0.5 shadow-2xs">
+                                🔴 KELEWAT
+                              </Badge>
+                            )}
+                            {u.audit_status === 'SELISIH' && (
+                              <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-black px-2 py-0.5 shadow-2xs">
+                                🟡 SELISIH
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div>
+                            {u.audit_status !== 'MATCH' ? (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSyncModalTab('preview');
+                                  setSyncTargetUnit(u);
+                                }}
+                                className="h-6 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] rounded-lg shadow-2xs transition-all transform active:scale-95 flex items-center gap-1 mx-auto"
+                              >
+                                <Zap size={11} className="text-amber-300 fill-amber-300" />
+                                <span>⚡ Sinkron</span>
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSyncModalTab('preview');
+                                  setSyncTargetUnit(u);
+                                }}
+                                className="h-6 px-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-bold text-[10px] rounded-lg mx-auto"
+                                title="Lihat Pratinjau & Surat"
+                              >
+                                <Info size={11} className="text-slate-400" />
+                                <span>Detail</span>
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+
                       </TableRow>
 
                       {/* 🔴 REQUIREMENT 3: ACCORDION CHILD ROW - DETAIL SURAT PENGAJUAN PER UNIT */}
                       {isExpanded && (
                         <TableRow className="bg-indigo-50 border-b border-indigo-100 shadow-inner">
-                          <TableCell colSpan={5} className="p-4 md:p-6">
+                          <TableCell colSpan={7} className="p-4 md:p-6">
                             <div className="space-y-6">
                               
                               {/* LEFT TABLE: Rincian Surat Usulan */}
@@ -794,84 +1039,339 @@ export default function KomparasiTambahPaguPage() {
         )}
       </Card>
 
-      {/* 🔴 REQUIREMENT 4: DIALOG SINKRONISASI DATA */}
+      {/* 🔴 REQUIREMENT 4: DIALOG SINKRONISASI DATA DENGAN 3 TAB HANDAL */}
       <Dialog open={!!syncTargetUnit} onOpenChange={(open) => !open && setSyncTargetUnit(null)}>
-        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[550px] w-full rounded-3xl p-6 shadow-2xl">
+        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[700px] w-full rounded-3xl p-6 shadow-2xl overflow-hidden">
           <DialogHeader className="border-b border-slate-100 pb-4">
-            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
-              <Zap className="text-amber-500" size={20} />
-              Konfirmasi Sinkronisasi Pagu Ke Database
-            </DialogTitle>
-            <DialogDescription className="text-slate-500 text-xs mt-1">
-              Data nominal persetujuan surat dari <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono font-bold">tambah_pagu</code> akan dimasukkan/diperbarui langsung ke tabel database <code className="bg-slate-100 text-indigo-700 px-1 py-0.5 rounded font-mono font-bold">gov_pagu_anggaran</code>.
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
+                  <Zap className="fill-amber-500 text-amber-500" size={18} />
+                </div>
+                <div>
+                  <span>Pusat Sinkronisasi & Audit Pagu Unit</span>
+                  <p className="text-[11px] font-normal text-slate-500">
+                    Sistem perbandingan, validasi surat usulan, dan snapshot pemulihan data (rollback)
+                  </p>
+                </div>
+              </DialogTitle>
+            </div>
+
+            {/* TAB SELECTOR */}
+            <div className="flex items-center gap-1.5 mt-4 p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 text-xs">
+              <button
+                type="button"
+                onClick={() => setSyncModalTab('preview')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  syncModalTab === 'preview'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <TrendingUp size={13} />
+                <span>1. Pratinjau Nilai DB</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSyncModalTab('letters')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  syncModalTab === 'letters'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <FileText size={13} />
+                <span>2. Surat Usulan ({syncTargetUnit?.letters?.length || 0})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSyncModalTab('history')}
+                className={`flex-1 py-1.5 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  syncModalTab === 'history'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <History size={13} />
+                <span>3. Riwayat & Rollback ({unitSnapshots.filter(s => s.unit_id === syncTargetUnit?.id).length})</span>
+              </button>
+            </div>
           </DialogHeader>
 
           {syncTargetUnit && (
-            <div className="space-y-4 text-xs mt-2">
-              <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-100 space-y-2">
-                <div className="font-black text-indigo-900 text-sm flex items-center gap-2">
-                  <Building2 size={16} />
-                  {syncTargetUnit.nama_unit} ({syncTargetUnit.group_org})
+            <div className="space-y-4 text-xs mt-1 max-h-[60vh] overflow-y-auto pr-1">
+              {/* UNIT BANNER */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black">
+                    <Building2 size={18} />
+                  </div>
+                  <div>
+                    <div className="font-black text-slate-900 text-sm">{syncTargetUnit.nama_unit}</div>
+                    <div className="text-[11px] text-indigo-700 font-semibold">{syncTargetUnit.group_org} • Tahun {selectedYear}</div>
+                  </div>
                 </div>
-                <div className="text-slate-600 font-medium">
-                  Tahun Anggaran: <span className="font-bold text-slate-900">{selectedYear}</span>
+                <div>
+                  {syncTargetUnit.audit_status === 'MATCH' && (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-black text-xs">
+                      🟢 MATCH (Sesuai)
+                    </Badge>
+                  )}
+                  {syncTargetUnit.audit_status === 'KELEWAT' && (
+                    <Badge className="bg-rose-100 text-rose-800 border-rose-300 font-black text-xs">
+                      🔴 KELEWAT DI DB
+                    </Badge>
+                  )}
+                  {syncTargetUnit.audit_status === 'SELISIH' && (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-black text-xs">
+                      🟡 ADA SELISIH NILAI
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="bg-slate-50 px-4 py-2 font-bold text-slate-700 text-xs border-b border-slate-200">
-                  Rincian Nominal yang Akan Disimpan ke DB:
-                </div>
-                <Table>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-bold text-slate-600">Nominal Inisiatif (Rp)</TableCell>
-                      <TableCell className="text-right font-mono font-bold text-slate-900">
-                        Rp {formatRp(syncTargetUnit.surat_inisiatif)}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-bold text-slate-600">Nominal Penugasan (Rp)</TableCell>
-                      <TableCell className="text-right font-mono font-bold text-slate-900">
-                        Rp {formatRp(syncTargetUnit.surat_penugasan)}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-emerald-50">
-                      <TableCell className="font-black text-emerald-900">TOTAL HASIL SINKRONISASI</TableCell>
-                      <TableCell className="text-right font-mono font-black text-emerald-800 text-sm">
+              {/* TAB 1: PRATINJAU NILAI */}
+              {syncModalTab === 'preview' && (
+                <div className="space-y-4">
+                  {/* Grid Perbandingan 3 Kolom */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-1">
+                      <div className="text-[10px] font-bold text-amber-800 uppercase">Persetujuan Surat Resmi</div>
+                      <div className="text-base font-black text-amber-900 font-mono">
                         Rp {formatRp(syncTargetUnit.surat_nominal_disetujui)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+                      </div>
+                      <div className="text-[10px] text-amber-700 font-medium">
+                        {syncTargetUnit.approved_surat_count} Surat Disetujui
+                      </div>
+                    </div>
 
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2 text-amber-900">
-                <Info size={16} className="shrink-0 mt-0.5 text-amber-600" />
-                <span>
-                  Proses ini akan mengubah status audit unit ini menjadi <strong>🟢 MATCH (Sesuai)</strong> secara real-time.
-                </span>
-              </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+                      <div className="text-[10px] font-bold text-slate-600 uppercase">Tercatat di Database Saat Ini</div>
+                      <div className="text-base font-black text-slate-800 font-mono">
+                        Rp {formatRp(syncTargetUnit.total_gov_tambah)}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        Inisiatif: Rp {formatRp(syncTargetUnit.gov_inisiatif)} | Penugasan: Rp {formatRp(syncTargetUnit.gov_penugasan)}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 space-y-1">
+                      <div className="text-[10px] font-bold text-emerald-800 uppercase">Target Nilai Setelah Sinkron</div>
+                      <div className="text-base font-black text-emerald-900 font-mono">
+                        Rp {formatRp(syncTargetUnit.surat_nominal_disetujui)}
+                      </div>
+                      <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={11} /> 100% Selaras (Diff Rp 0)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Breakdown Rincian Nilai */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="bg-slate-50 px-4 py-2.5 font-black text-slate-700 text-xs border-b border-slate-200 flex items-center justify-between">
+                      <span>Rincian Jenis Pagu yang Akan Disimpan ke DB</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Tabel gov_pagu_anggaran</span>
+                    </div>
+                    <Table>
+                      <TableBody>
+                        <TableRow>
+                          <TableCell className="font-bold text-slate-700 py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span>tambah pagu - inisiatif</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-slate-900 py-2.5">
+                            Rp {formatRp(syncTargetUnit.surat_inisiatif)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-bold text-slate-700 py-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                              <span>tambah pagu - penugasan</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-bold text-slate-900 py-2.5">
+                            Rp {formatRp(syncTargetUnit.surat_penugasan)}
+                          </TableCell>
+                        </TableRow>
+                        <TableRow className="bg-indigo-50/60 font-black">
+                          <TableCell className="text-indigo-900 py-2.5">TOTAL AKUMULASI TAMBAH PAGU</TableCell>
+                          <TableCell className="text-right font-mono font-black text-indigo-900 text-sm py-2.5">
+                            Rp {formatRp(syncTargetUnit.surat_nominal_disetujui)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 flex items-start gap-2.5 text-blue-900">
+                    <ShieldCheck size={18} className="shrink-0 text-blue-600 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <div className="font-bold text-xs">Perlindungan Integritas & Snapshot Otomatis</div>
+                      <div className="text-[11px] text-blue-700 leading-relaxed">
+                        Sebelum data ditimpa, sistem akan secara otomatis menyimpan cadangan nilai database saat ini ke dalam riwayat snapshot. Anda dapat melakukan rollback kapan saja jika diperlukan.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: SURAT USULAN & LEGALITAS */}
+              {syncModalTab === 'letters' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-1">
+                    <span>Daftar {syncTargetUnit.letters.length} Surat Usulan yang Disetujui:</span>
+                    <span className="text-indigo-600 font-bold">Sumber data: tabel tambah_pagu</span>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                    <Table>
+                      <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
+                        <TableRow>
+                          <TableHead className="w-8">No</TableHead>
+                          <TableHead>Surat Pengajuan & Hal</TableHead>
+                          <TableHead className="w-24">Jenis</TableHead>
+                          <TableHead className="text-right w-36">Nominal Disetujui</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {syncTargetUnit.letters.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-slate-400">
+                              Tidak ada surat usulan yang disetujui untuk unit ini pada tahun {selectedYear}.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          syncTargetUnit.letters.map((letItem: any, lIdx: number) => (
+                            <TableRow key={letItem.id || lIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                              <TableCell className="font-bold text-slate-400 text-center align-top pt-3">
+                                {lIdx + 1}
+                              </TableCell>
+                              <TableCell className="space-y-1 align-top pt-2.5">
+                                <div className="font-bold text-slate-900 font-mono text-[11px]">
+                                  📄 {letItem.no_surat_pengajuan || '-'}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  📅 {letItem.tanggal_surat_pengajuan || '-'}
+                                </div>
+                                <div className="text-slate-600 text-[11px] leading-relaxed line-clamp-2">
+                                  {letItem.hal_surat_pengajuan || '-'}
+                                </div>
+                              </TableCell>
+                              <TableCell className="align-top pt-3">
+                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[10px] font-bold">
+                                  {letItem.jenis_tambah_pagu || 'Penugasan'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-black text-emerald-700 text-xs align-top pt-3">
+                                Rp {formatRp(letItem.nominal_tanggapan || letItem.nominal_disetujui || 0)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: RIWAYAT SNAPSHOT & ROLLBACK */}
+              {syncModalTab === 'history' && (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-600 font-medium px-1">
+                    Berikut adalah catatan cadangan nilai DB sebelum sinkronisasi dilakukan untuk unit <strong>{syncTargetUnit.nama_unit}</strong>. Anda dapat mengembalikan nilai ke kondisi sebelumnya kapan saja.
+                  </div>
+
+                  {(() => {
+                    const unitSnaps = unitSnapshots.filter(s => s.unit_id === syncTargetUnit.id);
+                    if (unitSnaps.length === 0) {
+                      return (
+                        <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                          <History size={28} className="mx-auto text-slate-300" />
+                          <div className="font-bold text-slate-700 text-xs">Belum Ada Riwayat Snapshot</div>
+                          <div className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                            Snapshot cadangan akan otomatis tersimpan begitu Anda menekan tombol <strong>Proses Sinkronisasi</strong>.
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return unitSnaps.map((snapItem, sIdx) => {
+                      const totalPrev = snapItem.previousRows.reduce((a, b) => a + b.nominal, 0);
+                      return (
+                        <div key={snapItem.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-slate-100 text-slate-700 font-mono text-[10px]">
+                                #{sIdx + 1}
+                              </Badge>
+                              <span className="font-bold text-slate-900 text-xs">
+                                Snapshot Waktu: {new Date(snapItem.timestamp).toLocaleString('id-ID')}
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => executeRollback(snapItem)}
+                              className="h-7 px-2.5 border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 font-bold text-xs gap-1 rounded-xl"
+                            >
+                              <RotateCcw size={12} />
+                              <span>Rollback ke Versi Ini</span>
+                            </Button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                              <span className="text-slate-400 block text-[10px]">Total Nilai Sebelum Sinkron:</span>
+                              <span className="font-mono font-bold text-slate-800">Rp {formatRp(totalPrev)}</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                              <span className="text-slate-400 block text-[10px]">Jumlah Record DB:</span>
+                              <span className="font-bold text-slate-800">{snapItem.previousRows.length} Baris Data</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
             </div>
           )}
 
-          <div className="border-t border-slate-100 pt-4 flex gap-2 justify-end">
+          <DialogFooter className="border-t border-slate-100 pt-4 flex flex-row items-center justify-between sm:justify-between w-full">
             <Button
               variant="outline"
               onClick={() => setSyncTargetUnit(null)}
-              className="rounded-xl font-bold text-xs"
+              className="rounded-xl font-bold text-xs h-9 px-4"
             >
-              Batal
+              Tutup
             </Button>
-            <Button
-              onClick={executeSync}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md px-5"
-            >
-              <Zap size={14} className="mr-1.5 text-amber-300" />
-              Proses Sinkronisasi Sekarang
-            </Button>
-          </div>
+
+            {syncTargetUnit && syncTargetUnit.audit_status !== 'MATCH' && (
+              <Button
+                onClick={executeSync}
+                disabled={!!isSyncing}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md h-9 px-5 gap-1.5"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin text-amber-300" />
+                    <span>Menyimpan ke DB...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} className="text-amber-300 fill-amber-300" />
+                    <span>Proses Sinkronisasi Sekarang</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

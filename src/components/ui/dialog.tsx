@@ -48,4 +48,10 @@ function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLPar
   return <p className={cn("text-sm text-gray-500 font-medium", className)} {...props} />;
 }
 
-export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription };
+function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />;
+}
+
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter };
+
+
