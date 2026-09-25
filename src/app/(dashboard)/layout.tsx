@@ -7,6 +7,7 @@ import { Search, Bell, HelpCircle, Menu, Loader2, ShieldAlert, ArrowLeft, Home }
 import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
 import { menuList } from '@/lib/mock-db';
+import CommandPalette from '@/components/shared/CommandPalette';
 
 export default function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const lastLoggedPath = useRef<string>('');
@@ -37,6 +39,18 @@ export default function DashboardLayout({
         return next;
      });
   };
+
+  // Global Ctrl + K listener for Command Palette
+  useEffect(() => {
+     const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+           e.preventDefault();
+           setIsCommandPaletteOpen((prev) => !prev);
+        }
+     };
+     window.addEventListener('keydown', handleKeyDown);
+     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
      const checkAuth = async () => {
@@ -242,11 +256,31 @@ export default function DashboardLayout({
            
            {/* Kanan / Action */}
            <div className="flex items-center gap-2">
+              {/* Command Palette Trigger Button (Ctrl + K) */}
+              <button
+                type="button"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/90 hover:bg-slate-200/80 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-medium border border-slate-200/80 transition-all cursor-pointer shadow-2xs group"
+                title="Pencarian Cepat Menu & Data (Ctrl+K)"
+              >
+                <Search size={13} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
+                <span className="hidden md:inline font-semibold">Cari menu & data...</span>
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-bold bg-white text-slate-500 rounded border border-slate-200 shadow-2xs">
+                  Ctrl+K
+                </kbd>
+              </button>
+
               <button className="p-1.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all shadow-2xs" title="Notifikasi">
                  <Bell size={16} />
               </button>
            </div>
         </header>
+
+        {/* Global Command Palette Dialog */}
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+        />
 
         <main className="flex-1 p-3 md:p-5 lg:p-6 w-full">
           {children}
