@@ -131,6 +131,11 @@ export async function GET(request: Request) {
         totalPengeluaran: calcResult.totalPengeluaran,
         surplusDefisit: calcResult.surplusDefisit
       },
+      auditStats: calcResult.auditStats,
+      unmappedList: [
+        ...calcResult.unmappedPenerimaan,
+        ...calcResult.unmappedPengeluaran
+      ],
       previewRows
     });
   } catch (err: any) {
@@ -139,23 +144,29 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Terapkan / Simpan data hasil perhitungan RKA ke app_laporan_statis
+// POST: Terapkan / Simpan data hasil perhitungan RKA ke app_laporan_statis (dengan snapshot cadangan)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { tahun, versi = 'Final', updates } = body;
+    const { tahun, versi = 'Final', updates, isRollback = false, rollbackTimestamp } = body;
 
     if (!tahun || !Array.isArray(updates) || updates.length === 0) {
       return NextResponse.json({ success: false, error: 'Parameter tahun dan updates wajib diisi' }, { status: 400 });
     }
 
-    // 1. Ambil data nilai yang sudah ada saat ini untuk tahun & versi tersebut
+    // 1. Ambil data nilai yang sudah ada saat ini untuk tahun & versi tersebut sebagai cadangan snapshot
     const { data: existingRows, error: exErr } = await supabaseAdmin
       .from('app_laporan_statis')
-      .select('id, akun_id, realisasi')
+      .select('id, akun_id, anggaran, realisasi')
       .eq('tahun', tahun)
       .eq('versi', versi);
     if (exErr) throw exErr;
+
+    const previousSnapshot = (existingRows || []).map((r: any) => ({
+      akun_id: r.akun_id,
+      anggaran: Number(r.anggaran) || 0,
+      realisasi: Number(r.realisasi) || 0
+    }));
 
     const existingMap = new Map<number, { id: number; realisasi: number }>();
     (existingRows || []).forEach((row: any) => {
@@ -204,9 +215,20 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Berhasil memperbarui ${updates.length} nilai anggaran untuk tahun ${tahun} (${versi})`,
+      message: isRollback
+        ? `Rollback Berhasil! Data telah dipulihkan ke versi sebelum penarikan (${rollbackTimestamp || 'sebelumnya'}).`
+        : `Berhasil memperbarui ${updates.length} nilai anggaran untuk tahun ${tahun} (${versi})`,
       updated: toUpdate.length,
-      inserted: toInsert.length
+      inserted: toInsert.length,
+      isRollback,
+      snapshot: {
+        id: `snap_${tahun}_${versi}_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        tahun,
+        versi,
+        totalUpdated: updates.length,
+        previousSnapshot
+      }
     });
   } catch (err: any) {
     console.error('Error in POST /api/rka/komparasi-sync:', err);

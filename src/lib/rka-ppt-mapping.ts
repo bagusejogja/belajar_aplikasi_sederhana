@@ -248,11 +248,43 @@ export function calculateRkaHierarchy({
     valuesMap[r.id] = r.pagu;
   });
 
+  // 6. Kumpulkan Pos Tanpa Pemetaan (Orphan Pos Detector)
+  const unmappedPenerimaan = Object.keys(pMap)
+    .filter(k => !usedPKeys.has(k))
+    .map(k => ({
+      pos_name: k,
+      total_pagu: pMap[k].totalPagu,
+      count: pMap[k].count,
+      tipe: 'Penerimaan' as const,
+      dialihkan_ke: 'Sisa Lebih Perhitungan Tahun Sebelumnya'
+    }));
+
+  const unmappedPengeluaran = Object.keys(bMap)
+    .filter(k => !usedBKeys.has(k))
+    .map(k => ({
+      pos_name: k,
+      total_pagu: bMap[k].totalAnggaran,
+      count: bMap[k].count,
+      tipe: 'Pengeluaran' as const,
+      dialihkan_ke: 'Belum Terpetakan / Tidak Dialokasikan'
+    }));
+
   return {
     rowValues,
     valuesMap,
     totalPenerimaan: totalPenerimaanWithSurplus,
     totalPengeluaran,
-    surplusDefisit: totalPenerimaanWithSurplus - totalPengeluaran
+    surplusDefisit: totalPenerimaanWithSurplus - totalPengeluaran,
+    unmappedPenerimaan,
+    unmappedPengeluaran,
+    auditStats: {
+      totalPenerimaanRows: penerimaanRows.length,
+      totalPengeluaranRows: pengeluaranRows.length,
+      mappedPenerimaanGroups: usedPKeys.size,
+      unmappedPenerimaanGroups: unmappedPenerimaan.length,
+      mappedPengeluaranGroups: usedBKeys.size,
+      unmappedPengeluaranGroups: unmappedPengeluaran.length,
+      isFullyClean: unmappedPengeluaran.length === 0
+    }
   };
 }

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, 
   Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check,
-  ArrowUpDown, ChevronUp, ChevronDown, ListOrdered, Layers
+  ArrowUpDown, ChevronUp, ChevronDown, ListOrdered, Layers, History, RotateCcw, ShieldCheck, AlertTriangle
 } from 'lucide-react';
 import Select from 'react-select';
 import ExcelJS from 'exceljs';
@@ -157,9 +157,40 @@ export default function KomparasiLaporanPage() {
   const [rkaApplying, setRkaApplying] = useState(false);
   const [rkaSearchFilter, setRkaSearchFilter] = useState('');
   const [rkaStatusFilter, setRkaStatusFilter] = useState<'all' | 'changed' | 'same'>('all');
+  const [rkaModalTab, setRkaModalTab] = useState<'preview' | 'orphan' | 'history'>('preview');
+  const [rkaRollbackLoading, setRkaRollbackLoading] = useState(false);
+
+  // Snapshot History Interface
+  interface RkaSnapshotHistoryItem {
+    id: string;
+    timestamp: string;
+    tahun: number;
+    versi: string;
+    totalUpdated: number;
+    previousSnapshot: Array<{ akun_id: number; anggaran: number; realisasi: number }>;
+  }
+  const [rkaSnapshots, setRkaSnapshots] = useState<RkaSnapshotHistoryItem[]>([]);
+  const [lastSyncMeta, setLastSyncMeta] = useState<{ timestamp: string; tahun: number; versi: string } | null>(null);
+
   const [rkaPreviewData, setRkaPreviewData] = useState<{
     counts: { penerimaan: number; pengeluaran: number; totalAccounts: number; changedAccounts: number };
     summary: { totalPenerimaan: number; totalPengeluaran: number; surplusDefisit: number };
+    auditStats?: {
+      totalPenerimaanRows: number;
+      totalPengeluaranRows: number;
+      mappedPenerimaanGroups: number;
+      unmappedPenerimaanGroups: number;
+      mappedPengeluaranGroups: number;
+      unmappedPengeluaranGroups: number;
+      isFullyClean: boolean;
+    };
+    unmappedList?: Array<{
+      pos_name: string;
+      total_pagu: number;
+      count: number;
+      tipe: 'Penerimaan' | 'Pengeluaran';
+      dialihkan_ke: string;
+    }>;
     previewRows: Array<{
       akun_id: number;
       keterangan: string;
@@ -177,6 +208,25 @@ export default function KomparasiLaporanPage() {
 
   useEffect(() => {
     fetchData();
+    // Load local snapshots
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('rka_sync_snapshots_v1');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRkaSnapshots(parsed);
+            setLastSyncMeta({
+              timestamp: parsed[0].timestamp,
+              tahun: parsed[0].tahun,
+              versi: parsed[0].versi
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error loading rka snapshots:', e);
+    }
   }, []);
 
   const fetchRkaPreview = async (year = rkaSourceYear, targetYear = rkaTargetYear, targetVersi = rkaTargetVersi) => {
@@ -204,6 +254,7 @@ export default function KomparasiLaporanPage() {
 
   const openRkaPullModal = () => {
     setIsRkaPullModalOpen(true);
+    setRkaModalTab('preview');
     fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi);
   };
 
@@ -230,6 +281,20 @@ export default function KomparasiLaporanPage() {
       });
       const json = await res.json();
       if (json.success) {
+        if (json.snapshot) {
+          setRkaSnapshots(prev => {
+            const updated = [json.snapshot, ...prev].slice(0, 5);
+            try {
+              localStorage.setItem('rka_sync_snapshots_v1', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+          setLastSyncMeta({
+            timestamp: json.snapshot.timestamp,
+            tahun: rkaTargetYear,
+            versi: rkaTargetVersi
+          });
+        }
         alert(`✅ Berhasil! Data Usulan RKA ${rkaSourceYear} telah diterapkan ke kolom Anggaran ${rkaTargetYear} (${rkaTargetVersi}).`);
         setIsRkaPullModalOpen(false);
         const targetKey = `${rkaTargetYear}___${rkaTargetVersi}`;
@@ -244,6 +309,50 @@ export default function KomparasiLaporanPage() {
       alert('Terjadi kesalahan saat menyimpan: ' + err.message);
     } finally {
       setRkaApplying(false);
+    }
+  };
+
+  const handleRollbackSnapshot = async (snap: RkaSnapshotHistoryItem) => {
+    const timeFormatted = new Date(snap.timestamp).toLocaleString('id-ID');
+    const confirmMsg = `Konfirmasi Rollback:\n\nApakah Anda yakin ingin memulihkan nilai Anggaran Tahun ${snap.tahun} (${snap.versi}) ke versi sebelum penarikan pada ${timeFormatted}?\n\n(${snap.previousSnapshot.length} akun akan dipulihkan)`;
+    if (!confirm(confirmMsg)) return;
+
+    setRkaRollbackLoading(true);
+    try {
+      const updates = snap.previousSnapshot.map(s => ({
+        akun_id: s.akun_id,
+        anggaran: s.anggaran
+      }));
+
+      const res = await fetch('/api/rka/komparasi-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tahun: snap.tahun,
+          versi: snap.versi,
+          isRollback: true,
+          rollbackTimestamp: timeFormatted,
+          updates
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert(`✅ Rollback Berhasil! Data anggaran Tahun ${snap.tahun} (${snap.versi}) telah dipulihkan ke versi sebelum penarikan.`);
+        setRkaSnapshots(prev => {
+          const next = prev.filter(s => s.id !== snap.id);
+          try {
+            localStorage.setItem('rka_sync_snapshots_v1', JSON.stringify(next));
+          } catch (e) {}
+          return next;
+        });
+        fetchData();
+      } else {
+        alert('Gagal rollback: ' + json.error);
+      }
+    } catch (err: any) {
+      alert('Terjadi kesalahan saat rollback: ' + err.message);
+    } finally {
+      setRkaRollbackLoading(false);
     }
   };
 
@@ -1578,6 +1687,19 @@ export default function KomparasiLaporanPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
+          {lastSyncMeta && (
+            <button 
+              type="button"
+              onClick={openRkaPullModal}
+              title={`Penarikan terakhir: TA ${lastSyncMeta.tahun} (${lastSyncMeta.versi}) pada ${new Date(lastSyncMeta.timestamp).toLocaleString('id-ID')}`}
+              className="h-9 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <ShieldCheck size={13} className="text-emerald-600" />
+              <span className="hidden sm:inline">Sinkron: TA {lastSyncMeta.tahun} ({lastSyncMeta.versi})</span>
+              <span className="sm:hidden">TA {lastSyncMeta.tahun}</span>
+            </button>
+          )}
+
           <button 
             onClick={openRkaPullModal} 
             className="h-9 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:via-indigo-700 hover:to-sky-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer active:scale-95"
@@ -3185,140 +3307,369 @@ export default function KomparasiLaporanPage() {
                     </div>
                   </div>
 
-                  {/* Filter & Search Bar */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-                    <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold w-full sm:w-auto">
-                      <button
-                        onClick={() => setRkaStatusFilter('all')}
-                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'all' ? 'bg-white shadow-2xs text-slate-900 font-black' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Semua ({rkaPreviewData.previewRows.length})
-                      </button>
-                      <button
-                        onClick={() => setRkaStatusFilter('changed')}
-                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'changed' ? 'bg-white shadow-2xs text-indigo-700 font-black' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Berubah Saja ({rkaPreviewData.counts.changedAccounts})
-                      </button>
-                      <button
-                        onClick={() => setRkaStatusFilter('same')}
-                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'same' ? 'bg-white shadow-2xs text-slate-900 font-black' : 'text-slate-600 hover:text-slate-900'}`}
-                      >
-                        Nilai Tetap ({rkaPreviewData.previewRows.length - rkaPreviewData.counts.changedAccounts})
-                      </button>
-                    </div>
+                  {/* Sub-Navigation Tabs inside Modal */}
+                  <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setRkaModalTab('preview')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        rkaModalTab === 'preview'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Layers size={13} />
+                      <span>📊 Pratinjau &amp; Selisih ({rkaPreviewData.previewRows.length} Akun)</span>
+                    </button>
 
-                    <input
-                      type="text"
-                      value={rkaSearchFilter}
-                      onChange={e => setRkaSearchFilter(e.target.value)}
-                      placeholder="🔍 Cari nama akun uraian..."
-                      className="h-8 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setRkaModalTab('orphan')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        rkaModalTab === 'orphan'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : (rkaPreviewData.unmappedList && rkaPreviewData.unmappedList.length > 0)
+                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <ShieldCheck size={13} className="text-amber-500" />
+                      <span>
+                        🔍 Deteksi Pos Lepas ({rkaPreviewData.unmappedList?.length || 0} Pos)
+                      </span>
+                      {(!rkaPreviewData.unmappedList || rkaPreviewData.unmappedList.length === 0) && (
+                        <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full font-bold">100% Bersih</span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRkaModalTab('history')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        rkaModalTab === 'history'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <History size={13} />
+                      <span>⏱️ Riwayat Snapshot &amp; Rollback ({rkaSnapshots.length})</span>
+                    </button>
                   </div>
 
-                  {/* Comparison Table */}
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    <div className="max-h-[460px] overflow-y-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className="bg-slate-100 sticky top-0 z-20 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
-                          <tr>
-                            <th className="py-2.5 px-3 w-10 text-center">No</th>
-                            <th className="py-2.5 px-3">Uraian Akun Master (Komparasi)</th>
-                            <th className="py-2.5 px-3 w-16 text-center">Level</th>
-                            <th className="py-2.5 px-3 text-right">Eksisting ({rkaTargetYear} - {rkaTargetVersi})</th>
-                            <th className="py-2.5 px-3 text-right text-blue-900 bg-blue-50/50">Usulan RKA ({rkaSourceYear})</th>
-                            <th className="py-2.5 px-3 text-right">Selisih</th>
-                            <th className="py-2.5 px-3 w-28 text-center">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {rkaPreviewData.previewRows
-                            .filter(row => {
-                              if (rkaStatusFilter === 'changed' && row.selisih === 0) return false;
-                              if (rkaStatusFilter === 'same' && row.selisih !== 0) return false;
-                              if (rkaSearchFilter.trim()) {
-                                return row.keterangan.toLowerCase().includes(rkaSearchFilter.toLowerCase().trim());
-                              }
-                              return true;
-                            })
-                            .map((row, idx) => {
-                              const isHeader = row.level === 0;
-                              const isLevel1 = row.level === 1;
-                              const isChanged = row.selisih !== 0;
+                  {/* TAB 1: PREVIEW PERBANDINGAN NILAI & SELISIH */}
+                  {rkaModalTab === 'preview' && (
+                    <div className="space-y-3">
+                      {/* Filter & Search Bar */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={() => setRkaStatusFilter('all')}
+                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'all' ? 'bg-white shadow-2xs text-slate-900 font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                          >
+                            Semua ({rkaPreviewData.previewRows.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRkaStatusFilter('changed')}
+                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'changed' ? 'bg-white shadow-2xs text-indigo-700 font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                          >
+                            Berubah Saja ({rkaPreviewData.counts.changedAccounts})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRkaStatusFilter('same')}
+                            className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${rkaStatusFilter === 'same' ? 'bg-white shadow-2xs text-slate-900 font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                          >
+                            Nilai Tetap ({rkaPreviewData.previewRows.length - rkaPreviewData.counts.changedAccounts})
+                          </button>
+                        </div>
 
-                              return (
-                                <tr
-                                  key={row.akun_id}
-                                  className={`transition-colors ${
-                                    isHeader
-                                      ? 'bg-slate-900 text-white font-black'
-                                      : isLevel1
-                                      ? 'bg-slate-100/80 font-bold text-slate-900'
-                                      : isChanged
-                                      ? 'bg-indigo-50/30 hover:bg-indigo-50/60 text-slate-800'
-                                      : 'hover:bg-slate-50 text-slate-700'
-                                  }`}
-                                >
-                                  <td className={`py-2 px-3 text-center text-[10px] ${isHeader ? 'text-slate-400' : 'text-slate-400'}`}>
-                                    {idx + 1}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <div style={{ paddingLeft: `${row.level * 16}px` }} className="flex items-center gap-1.5">
-                                      {row.level > 0 && (
-                                        <span className={`text-[10px] ${isHeader ? 'text-slate-400' : 'text-slate-300'}`}>↳</span>
-                                      )}
-                                      <span className={row.is_bold || row.is_sum || isHeader ? 'font-bold' : ''}>
-                                        {row.keterangan}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-3 text-center">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                      isHeader ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
-                                    }`}>
-                                      L{row.level}
-                                    </span>
-                                  </td>
-                                  <td className={`py-2 px-3 text-right font-mono text-[11px] ${isHeader ? 'text-slate-300' : 'text-slate-600'}`}>
-                                    {row.nilai_saat_ini !== 0 ? fmt(row.nilai_saat_ini) : '-'}
-                                  </td>
-                                  <td className={`py-2 px-3 text-right font-mono text-[11px] font-bold ${
-                                    isHeader ? 'text-amber-300 bg-white/5' : 'text-blue-900 bg-blue-50/40'
-                                  }`}>
-                                    {row.nilai_usulan_rka !== 0 ? fmt(row.nilai_usulan_rka) : (isHeader ? '0' : '-')}
-                                  </td>
-                                  <td className="py-2 px-3 text-right font-mono text-[11px]">
-                                    {row.selisih > 0 ? (
-                                      <span className="text-emerald-600 font-bold">+{fmt(row.selisih)}</span>
-                                    ) : row.selisih < 0 ? (
-                                      <span className="text-rose-600 font-bold">{fmt(row.selisih)}</span>
-                                    ) : (
-                                      <span className="text-slate-400">-</span>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-3 text-center">
-                                    {isHeader ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-slate-200">
-                                        Summary
-                                      </span>
-                                    ) : isChanged ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                        {row.matchCount > 0 ? `${row.matchCount} Baris` : 'Subtotal'}
-                                      </span>
-                                    ) : (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">
-                                        Tetap
-                                      </span>
-                                    )}
-                                  </td>
+                        <input
+                          type="text"
+                          value={rkaSearchFilter}
+                          onChange={e => setRkaSearchFilter(e.target.value)}
+                          placeholder="🔍 Cari nama akun uraian..."
+                          className="h-8 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
+                        />
+                      </div>
+
+                      {/* Comparison Table */}
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                        <div className="max-h-[460px] overflow-y-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead className="bg-slate-100 sticky top-0 z-20 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[10px] shadow-2xs">
+                              <tr>
+                                <th className="py-2.5 px-3 w-10 text-center">No</th>
+                                <th className="py-2.5 px-3">Uraian Akun Master (Komparasi)</th>
+                                <th className="py-2.5 px-3 w-16 text-center">Level</th>
+                                <th className="py-2.5 px-3 text-right">Eksisting ({rkaTargetYear} - {rkaTargetVersi})</th>
+                                <th className="py-2.5 px-3 text-right text-blue-900 bg-blue-50/50">Usulan RKA ({rkaSourceYear})</th>
+                                <th className="py-2.5 px-3 text-right">Selisih</th>
+                                <th className="py-2.5 px-3 w-28 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {rkaPreviewData.previewRows
+                                .filter(row => {
+                                  if (rkaStatusFilter === 'changed' && row.selisih === 0) return false;
+                                  if (rkaStatusFilter === 'same' && row.selisih !== 0) return false;
+                                  if (rkaSearchFilter.trim()) {
+                                    return row.keterangan.toLowerCase().includes(rkaSearchFilter.toLowerCase().trim());
+                                  }
+                                  return true;
+                                })
+                                .map((row, idx) => {
+                                  const isHeader = row.level === 0;
+                                  const isLevel1 = row.level === 1;
+                                  const isChanged = row.selisih !== 0;
+
+                                  return (
+                                    <tr
+                                      key={row.akun_id}
+                                      className={`transition-colors ${
+                                        isHeader
+                                          ? 'bg-slate-900 text-white font-black'
+                                          : isLevel1
+                                          ? 'bg-slate-100/80 font-bold text-slate-900'
+                                          : isChanged
+                                          ? 'bg-indigo-50/30 hover:bg-indigo-50/60 text-slate-800'
+                                          : 'hover:bg-slate-50 text-slate-700'
+                                      }`}
+                                    >
+                                      <td className={`py-2 px-3 text-center text-[10px] ${isHeader ? 'text-slate-400' : 'text-slate-400'}`}>
+                                        {idx + 1}
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <div style={{ paddingLeft: `${row.level * 16}px` }} className="flex items-center gap-1.5">
+                                          {row.level > 0 && (
+                                            <span className={`text-[10px] ${isHeader ? 'text-slate-400' : 'text-slate-300'}`}>↳</span>
+                                          )}
+                                          <span className={row.is_bold || row.is_sum || isHeader ? 'font-bold' : ''}>
+                                            {row.keterangan}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                          isHeader ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
+                                        }`}>
+                                          L{row.level}
+                                        </span>
+                                      </td>
+                                      <td className={`py-2 px-3 text-right font-mono text-[11px] ${isHeader ? 'text-slate-300' : 'text-slate-600'}`}>
+                                        {row.nilai_saat_ini !== 0 ? fmt(row.nilai_saat_ini) : '-'}
+                                      </td>
+                                      <td className={`py-2 px-3 text-right font-mono text-[11px] font-bold ${
+                                        isHeader ? 'text-amber-300 bg-white/5' : 'text-blue-900 bg-blue-50/40'
+                                      }`}>
+                                        {row.nilai_usulan_rka !== 0 ? fmt(row.nilai_usulan_rka) : (isHeader ? '0' : '-')}
+                                      </td>
+                                      <td className="py-2 px-3 text-right font-mono text-[11px]">
+                                        {row.selisih > 0 ? (
+                                          <span className="text-emerald-600 font-bold">+{fmt(row.selisih)}</span>
+                                        ) : row.selisih < 0 ? (
+                                          <span className="text-rose-600 font-bold">{fmt(row.selisih)}</span>
+                                        ) : (
+                                          <span className="text-slate-400">-</span>
+                                        )}
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        {isHeader ? (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-slate-200">
+                                            Summary
+                                          </span>
+                                        ) : isChanged ? (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                            {row.matchCount > 0 ? `${row.matchCount} Baris` : 'Subtotal'}
+                                          </span>
+                                        ) : (
+                                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">
+                                            Tetap
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: DETEKSI POS LEPAS (ORPHAN DETECTOR & AUDIT INTEGRITAS) */}
+                  {rkaModalTab === 'orphan' && (
+                    <div className="space-y-4">
+                      {/* Audit Summary Box */}
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 bg-white rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Transaksi Dianalisis</span>
+                          <span className="text-base font-black text-slate-800 font-mono mt-0.5 block">
+                            {fmt((rkaPreviewData.counts.penerimaan || 0) + (rkaPreviewData.counts.pengeluaran || 0))} Baris
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {fmt(rkaPreviewData.counts.penerimaan)} Penerimaan | {fmt(rkaPreviewData.counts.pengeluaran)} Belanja
+                          </span>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Kelompok Pos Terpetakan</span>
+                          <span className="text-base font-black text-emerald-700 font-mono mt-0.5 block">
+                            {(rkaPreviewData.auditStats?.mappedPenerimaanGroups || 0) + (rkaPreviewData.auditStats?.mappedPengeluaranGroups || 0)} Kelompok
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-medium">100% Selaras Struktur PPT</span>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Pos Tanpa Pemetaan</span>
+                          <span className={`text-base font-black font-mono mt-0.5 block ${
+                            (rkaPreviewData.unmappedList?.length || 0) > 0 ? 'text-amber-700' : 'text-emerald-700'
+                          }`}>
+                            {rkaPreviewData.unmappedList?.length || 0} Pos
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {(rkaPreviewData.unmappedList?.length || 0) === 0 ? 'Semua Terdistribusi Sempurna' : 'Perlu Peninjauan'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Clean Status or Table */}
+                      {!rkaPreviewData.unmappedList || rkaPreviewData.unmappedList.length === 0 ? (
+                        <div className="p-6 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 text-center space-y-2">
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                            <ShieldCheck size={26} />
+                          </div>
+                          <h4 className="text-sm font-black text-emerald-900 tracking-tight">
+                            Integritas Sempurna: Nol Rupiah Tertinggal
+                          </h4>
+                          <p className="text-xs text-emerald-700 max-w-lg mx-auto">
+                            Seluruh pos usulan RKA {rkaSourceYear} telah cocok dengan kamus Bagan Akun Standar Komparasi. Tidak ada data usulan yang terselip ataupun hilang.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
+                            <AlertTriangle size={15} className="text-amber-600" />
+                            <span>Daftar Pos Usulan yang Menggunakan Alokasi Cadangan/Default:</span>
+                          </div>
+
+                          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
+                                <tr>
+                                  <th className="py-2.5 px-3">Nama Pos Usulan di Proposal RKA</th>
+                                  <th className="py-2.5 px-3 w-28 text-center">Tipe</th>
+                                  <th className="py-2.5 px-3 w-24 text-center">Jumlah Baris</th>
+                                  <th className="py-2.5 px-3 text-right">Total Anggaran (Rp)</th>
+                                  <th className="py-2.5 px-3">Penanganan Sistem</th>
                                 </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {rkaPreviewData.unmappedList.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-slate-50">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-800">
+                                      {item.pos_name}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        item.tipe === 'Penerimaan' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'
+                                      }`}>
+                                        {item.tipe}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center font-mono">
+                                      {item.count}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                      {fmt(item.total_pagu)}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
+                                        {item.dialihkan_ke}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* TAB 3: RIWAYAT SNAPSHOT & ROLLBACK */}
+                  {rkaModalTab === 'history' && (
+                    <div className="space-y-4">
+                      <div className="p-3.5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl flex items-start gap-3">
+                        <div className="p-2 bg-indigo-100 text-indigo-700 rounded-xl shrink-0">
+                          <History size={16} />
+                        </div>
+                        <div className="text-xs text-indigo-900">
+                          <span className="font-bold block">Pencadangan Otomatis (Safety Snapshot)</span>
+                          <span className="text-indigo-700">
+                            Setiap kali Anda menekan tombol &quot;Terapkan &amp; Simpan ke Komparasi&quot;, sistem secara otomatis menyimpan snapshot nilai sebelumnya. Anda dapat memulihkan (*rollback*) data kapan saja jika terjadi salah pilih tahun/versi.
+                          </span>
+                        </div>
+                      </div>
+
+                      {rkaSnapshots.length === 0 ? (
+                        <div className="p-10 rounded-2xl border border-dashed border-slate-200 text-center text-slate-400 text-xs space-y-1.5">
+                          <History size={28} className="mx-auto opacity-40" />
+                          <p className="font-bold text-slate-600">Belum Ada Riwayat Snapshot</p>
+                          <p className="text-[11px]">
+                            Snapshot akan otomatis tercatat pada penarikan data berikutnya.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {rkaSnapshots.map((snap, idx) => (
+                            <div
+                              key={snap.id || idx}
+                              className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-slate-900">
+                                    Penarikan RKA ➔ Tahun {snap.tahun} (Versi: {snap.versi})
+                                  </span>
+                                  {idx === 0 && (
+                                    <span className="px-2 py-0.2 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase">
+                                      Terbaru
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 font-medium">
+                                  <span>📅 {new Date(snap.timestamp).toLocaleString('id-ID')}</span>
+                                  <span>•</span>
+                                  <span>📦 {snap.totalUpdated} Akun Diperbarui</span>
+                                  <span>•</span>
+                                  <span>💾 {snap.previousSnapshot?.length || 0} Nilai Dicadangkan</span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRollbackSnapshot(snap)}
+                                disabled={rkaRollbackLoading}
+                                className="h-8 px-3.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 self-end sm:self-auto"
+                                title="Kembalikan nilai sebelum penarikan ini dilakukan"
+                              >
+                                {rkaRollbackLoading ? (
+                                  <Loader2 size={12} className="animate-spin" />
+                                ) : (
+                                  <RotateCcw size={12} />
+                                )}
+                                <span>Pulihkan Versi Ini (Rollback)</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : null}
             </div>
