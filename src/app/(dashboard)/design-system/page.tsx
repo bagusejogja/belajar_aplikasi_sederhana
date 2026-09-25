@@ -52,8 +52,8 @@ import {
   Paperclip,
   ZoomIn,
   Gauge,
-  Activity,
-  ChevronRight
+  Type,
+  ArrowUpDown
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -61,6 +61,7 @@ import ExportButtons from '@/components/shared/ExportButtons';
 import StatusBadge from '@/components/shared/StatusBadge';
 import StatCard from '@/components/shared/StatCard';
 import MultiSelectFilter from '@/components/shared/MultiSelectFilter';
+import AutocompleteCombobox from '@/components/shared/AutocompleteCombobox';
 import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
 import FileUploadDropzone from '@/components/shared/FileUploadDropzone';
 import { 
@@ -72,33 +73,37 @@ import {
 
 export default function DesignSystemPage() {
   const [activeTab, setActiveTab] = useState<
-    'forms' | 'cards' | 'charts' | 'tab-styles' | 'editor' | 'colors' | 'buttons' | 'table'
+    'forms' | 'typography' | 'cards' | 'charts' | 'tab-styles' | 'editor' | 'colors' | 'table'
   >('forms');
 
-  // Poin 2: Filter Single vs Multi State
-  const [singleUnit, setSingleUnit] = useState<string>('3');
-  const [selectedUnits, setSelectedUnits] = useState<string[]>(['1', '3']);
+  // Poin 1 & 2: Autocomplete & Multi-Select State
+  const [autocompleteUnit, setAutocompleteUnit] = useState<string>('3');
   const [singleStatus, setSingleStatus] = useState<string>('approved');
+  const [selectedUnits, setSelectedUnits] = useState<string[]>(['1', '3']);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['approved', 'pending']);
 
-  // Poin 3: Unified Date Range Picker State
+  // Poin 2 (Baru): Unified Date Range Picker with Time (Jam)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: '2026-09-01',
-    endDate: '2026-09-30'
+    endDate: '2026-09-30',
+    startTime: '08:00',
+    endTime: '17:00'
   });
   const [singleDate, setSingleDate] = useState<string>('2026-09-25');
   const [dateTimeVal, setDateTimeVal] = useState<string>('2026-09-25T08:30');
 
-  // Poin 4: Upload Textbox & Camera
-  const [uploadTextPath, setUploadTextPath] = useState<string>('SK_Rektor_Penetapan_Pagu_2026.pdf');
-  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
-  const [isSwitchActive, setIsSwitchActive] = useState<boolean>(true);
-  const [isCheckboxChecked, setIsCheckboxChecked] = useState<boolean>(true);
+  // Poin 3 (Baru): Typography Tester State
+  const [sampleTesterText, setSampleTesterText] = useState<string>('Universitas Gadjah Mada - Sistem Verifikasi Anggaran Terpadu');
+  const [testerSize, setTesterSize] = useState<string>('text-lg');
+  const [testerWeight, setTesterWeight] = useState<string>('font-bold');
 
-  // Poin 6: Clickable Card Selection (Colored Border Ring)
+  // Upload Textbox & Camera
+  const [uploadTextPath, setUploadTextPath] = useState<string>('SK_Rektor_Penetapan_Pagu_2026.pdf');
+
+  // Card Selection (Colored Border Ring)
   const [selectedCardId, setSelectedCardId] = useState<string>('pagu');
 
-  // Poin 7: Tab Pilihan Demo
+  // Tab Styles Demo
   const [demoPillTab, setDemoPillTab] = useState<string>('tab1');
   const [demoUnderlineTab, setDemoUnderlineTab] = useState<string>('all');
   const [demoSegmentedTab, setDemoSegmentedTab] = useState<string>('monthly');
@@ -114,13 +119,13 @@ export default function DesignSystemPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const sampleUnits = [
-    { value: '1', label: 'Majelis Wali Amanat', badge: 'KPTU' },
-    { value: '2', label: 'Dewan Guru Besar', badge: 'KPTU' },
-    { value: '3', label: 'Direktorat Keuangan', badge: 'KPTU' },
-    { value: '4', label: 'Direktorat Perencanaan', badge: 'KPTU' },
-    { value: '5', label: 'Fakultas Biologi', badge: 'Fakultas' },
-    { value: '6', label: 'Fakultas Ekonomika dan Bisnis', badge: 'Fakultas' },
-    { value: '7', label: 'Fakultas Teknik', badge: 'Fakultas' },
+    { value: '1', label: 'Majelis Wali Amanat', badge: 'KPTU', subtext: 'Kode Unit: 010101' },
+    { value: '2', label: 'Dewan Guru Besar', badge: 'KPTU', subtext: 'Kode Unit: 010201' },
+    { value: '3', label: 'Direktorat Keuangan', badge: 'KPTU', subtext: 'Kode Unit: 010802' },
+    { value: '4', label: 'Direktorat Perencanaan', badge: 'KPTU', subtext: 'Kode Unit: 010801' },
+    { value: '5', label: 'Fakultas Biologi', badge: 'Fakultas', subtext: 'Kode Unit: 02000010' },
+    { value: '6', label: 'Fakultas Ekonomika dan Bisnis', badge: 'Fakultas', subtext: 'Kode Unit: 03000010' },
+    { value: '7', label: 'Fakultas Teknik', badge: 'Fakultas', subtext: 'Kode Unit: 04000010' },
   ];
 
   const sampleStatuses = [
@@ -155,7 +160,7 @@ export default function DesignSystemPage() {
           { label: 'Master Data' },
           { label: 'Standar UI / UX' },
         ]}
-        badge={{ text: 'Design System v2.2', variant: 'purple' }}
+        badge={{ text: 'Design System v2.3', variant: 'purple' }}
         actions={
           <ExportButtons
             onExportExcel={() => alert('Simulasi: Export Excel Standard')}
@@ -165,7 +170,7 @@ export default function DesignSystemPage() {
         }
       />
 
-      {/* 2. Poin 1: Katalog Tab Dibuat Cakep & Luas (Grid 4 Kolom Proporsional, Tidak Berdesakan) */}
+      {/* 2. Grid 4 Kolom Proporsional (2 Baris Rapi, Nyaman & Tidak Terjepit) */}
       <div className="bg-white/95 backdrop-blur-sm p-3.5 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100">
           <div className="flex items-center gap-2">
@@ -175,20 +180,19 @@ export default function DesignSystemPage() {
             </span>
           </div>
           <span className="text-[10px] text-gray-400 font-semibold hidden sm:inline">
-            Tampilan lega & nyaman dilihat (4 kolom proporsional)
+            Tampilan lega & nyaman dilihat (4 kolom x 2 baris)
           </span>
         </div>
 
-        {/* Grid 4 Kolom: Lega, Rapi, & Elegan */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
           {[
-            { id: 'forms', num: '01', label: 'Filter & Form Input', desc: 'Single & Multi, Date, Upload', icon: Search },
-            { id: 'cards', num: '02', label: 'Template Card', desc: 'KPI Stat & Klik Garis Tepi', icon: Layout },
-            { id: 'charts', num: '03', label: 'Template Grafik', desc: 'Bar, Line, Donut, Gauge', icon: BarChart3 },
-            { id: 'tab-styles', num: '04', label: 'Tab Pilihan Menu', desc: 'Pill, Underline, Capsule', icon: Layers },
-            { id: 'editor', num: '05', label: 'Editor & Gambar', desc: 'Toolbar Dokumen & Ukuran Foto', icon: FileText },
-            { id: 'colors', num: '06', label: 'Palet Warna Baku', desc: 'Royal Blue, Emerald, Amber', icon: Palette },
-            { id: 'buttons', num: '07', label: 'Tombol & Ikon', desc: 'Primary, Danger, Row Actions', icon: Plus },
+            { id: 'forms', num: '01', label: 'Filter & Form Input', desc: 'Autocomplete ↑/↓, Multi, Jam', icon: Search },
+            { id: 'typography', num: '02', label: 'Ukuran & Jenis Font', desc: 'Hierarki Font, Mono Uang, Tester', icon: Type },
+            { id: 'cards', num: '03', label: 'Template Card', desc: 'KPI Stat & Klik Garis Tepi', icon: Layout },
+            { id: 'charts', num: '04', label: 'Template Grafik', desc: 'Bar, Line, Donut, Gauge', icon: BarChart3 },
+            { id: 'tab-styles', num: '05', label: 'Tab Pilihan Menu', desc: 'Pill, Underline, Capsule', icon: Layers },
+            { id: 'editor', num: '06', label: 'Editor & Gambar', desc: 'Toolbar Dokumen & Ukuran Foto', icon: FileText },
+            { id: 'colors', num: '07', label: 'Palet Warna Baku', desc: 'Royal Blue, Emerald, Amber', icon: Palette },
             { id: 'table', num: '08', label: 'Tabel & Paging', desc: 'Data Table & Paging Baku', icon: TableIcon },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -228,11 +232,81 @@ export default function DesignSystemPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 1: FILTER & FORM INPUT (POIN 2: SINGLE VS MULTI, POIN 3: RANGE, POIN 4: UPLOAD) */}
+      {/* TAB 1: FILTER & FORM INPUT (AUTOCOMPLETE ↑/↓, MULTI-SELECT, RANGE + JAM) */}
       {/* ========================================================================= */}
       {activeTab === 'forms' && (
         <div className="space-y-4">
-          {/* Poin 2: Filter Single vs Multi-Select Side-by-Side */}
+          {/* Card: Autocomplete with Keyboard Arrow Navigation (Poin 1) */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
+                  Poin 1
+                </span>
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Filter Autocomplete dengan Navigasi Panah Naik / Turun (↑ / ↓)
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Ketik untuk menyaring opsi, gunakan <strong>panah atas/bawah keyboard</strong> untuk memilih baris, dan tekan <strong>Enter</strong> untuk memilih tanpa perlu menyentuh mouse.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Autocomplete Combobox dengan Navigasi Keyboard */}
+              <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                    <ArrowUpDown size={13} className="text-blue-600" />
+                    Autocomplete Keyboard-Friendly
+                  </span>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                    ↑ / ↓ + Enter
+                  </span>
+                </div>
+
+                <AutocompleteCombobox
+                  label="Pilih Unit Kerja (Ketik & Gunakan Panah ↑/↓)"
+                  placeholder="Ketik nama unit (misal: Biologi, Keuangan)..."
+                  options={sampleUnits}
+                  value={autocompleteUnit}
+                  onChange={setAutocompleteUnit}
+                />
+
+                <span className="text-[11px] text-gray-500 font-medium block pt-1">
+                  Unit terpilih: <strong className="text-blue-700">{sampleUnits.find(u => u.value === autocompleteUnit)?.label || 'Belum dipilih'}</strong>
+                </span>
+              </div>
+
+              {/* Multi-Select Filter */}
+              <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                    Multi-Select Filter (Banyak Pilihan)
+                  </span>
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                    Centang + Tag
+                  </span>
+                </div>
+
+                <MultiSelectFilter
+                  label="Pilih Beberapa Unit (Multi-Select)"
+                  placeholder="Pilih beberapa unit kerja..."
+                  options={sampleUnits}
+                  selectedValues={selectedUnits}
+                  onChange={setSelectedUnits}
+                  maxDisplayTags={2}
+                />
+
+                <span className="text-[11px] text-gray-500 font-medium block pt-1">
+                  Terpilih ({selectedUnits.length}): <span className="font-mono text-indigo-700 font-bold">[{selectedUnits.join(', ')}]</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Rentang Tanggal + Jam (Poin 2) */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div>
               <div className="flex items-center gap-2">
@@ -240,130 +314,30 @@ export default function DesignSystemPage() {
                   Poin 2
                 </span>
                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Komparasi Filter: Single-Select vs Multi-Select
+                  Rentang Tanggal & Jam Laporan (Unified Popover dengan Jam)
                 </h2>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Keduanya disediakan berdampingan: Gunakan <strong>Single Dropdown</strong> jika pencarian memerlukan 1 pilihan pasti, atau gunakan <strong>Multi-Select Filter</strong> jika data dapat dikelompokkan ke banyak pilihan sekaligus.
-              </p>
-            </div>
-
-            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Kolom 1: Single-Select Dropdown */}
-              <div className="space-y-3 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    Pilihan Tunggal (Single-Select)
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    1 Nilai
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    Unit Kerja (Single Dropdown)
-                  </label>
-                  <select
-                    value={singleUnit}
-                    onChange={(e) => setSingleUnit(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800 cursor-pointer"
-                  >
-                    <option value="">-- Semua Unit Kerja --</option>
-                    {sampleUnits.map((u) => (
-                      <option key={u.value} value={u.value}>
-                        {u.label} ({u.badge})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                    Status Usulan (Single Dropdown)
-                  </label>
-                  <select
-                    value={singleStatus}
-                    onChange={(e) => setSingleStatus(e.target.value)}
-                    className="w-full h-9 px-3 text-xs bg-slate-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800 cursor-pointer"
-                  >
-                    <option value="">-- Semua Status --</option>
-                    {sampleStatuses.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Kolom 2: Multi-Select Filter (Poin 1) */}
-              <div className="space-y-3 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                    Pilihan Ganda (Multi-Select Filter)
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                    Banyak Nilai + Tag
-                  </span>
-                </div>
-
-                <MultiSelectFilter
-                  label="Unit Kerja (Multi-Select)"
-                  placeholder="Pilih beberapa unit..."
-                  options={sampleUnits}
-                  selectedValues={selectedUnits}
-                  onChange={setSelectedUnits}
-                  maxDisplayTags={2}
-                />
-
-                <MultiSelectFilter
-                  label="Status Usulan (Multi-Select)"
-                  placeholder="Pilih beberapa status..."
-                  options={sampleStatuses}
-                  selectedValues={selectedStatuses}
-                  onChange={setSelectedStatuses}
-                  maxDisplayTags={2}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Poin 3: Unified Date Range Picker (1x Klik Popover) */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
-                  Poin 3
-                </span>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Range Picker Terpadu (1 Tampilan Tanpa Perlu Klik 2x)
-                </h2>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Komponen <code className="text-blue-600 font-bold">&lt;DateRangePicker /&gt;</code> menampilkan kotak rentang tanggal terpadu. Saat diklik, popover langsung menyajikan tombol cepat (*Hari ini, 7 hari, Bulan ini*) serta input tanggal awal dan akhir dalam satu layar.
+                Komponen <code className="text-blue-600 font-bold">&lt;DateRangePicker showTime /&gt;</code> menyajikan tanggal awal & akhir beserta <strong>jam mulai & jam selesai</strong> dalam satu popover terpadu (1x klik).
               </p>
             </div>
 
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Unified Range Picker */}
               <div className="sm:col-span-2">
                 <DateRangePicker
-                  label="Rentang Tanggal Laporan (Unified Popover)"
+                  label="Rentang Tanggal & Jam Lengkap (1x Klik)"
                   value={dateRange}
                   onChange={setDateRange}
+                  showTime={true}
                 />
                 <span className="text-[10px] text-gray-400 mt-1 block">
-                  Aktif: {dateRange.startDate} s/d {dateRange.endDate}
+                  Aktif: {dateRange.startDate} ({dateRange.startTime}) s/d {dateRange.endDate} ({dateRange.endTime})
                 </span>
               </div>
 
-              {/* Date & Time Picker */}
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  Tanggal & Waktu (DateTime)
+                  Tanggal & Jam Tunggal
                 </label>
                 <input
                   type="datetime-local"
@@ -375,96 +349,80 @@ export default function DesignSystemPage() {
             </div>
           </div>
 
-          {/* Poin 4: Upload Textbox & Kamera + Drag & Drop */}
+          {/* Upload Textbox & Kamera */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
-                  Poin 4
-                </span>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Fasilitas Upload: Textbox File, Tombol Kamera / Browse, & Drag-Drop
-                </h2>
-              </div>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                Fasilitas Upload: Textbox File, Tombol Kamera / Browse, & Drag-Drop
+              </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Tersedia input textbox berkas dengan tombol klik pilih file dan ambil foto dari kamera perangkat, disandingkan dengan area drag-and-drop.
+                Pilih berkas lewat textbox, ambil foto fisik kuitansi via kamera HP, atau seret ke area dropzone.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Opsi 1: Textbox Upload dengan Tombol Browse & Kamera */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-                  1. Input Textbox Berkas & Tombol Ambil Foto
+                  Input Textbox Berkas & Tombol Kamera
                 </span>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    {/* Text Box File Display */}
-                    <div className="relative flex-1">
-                      <Paperclip size={14} className="absolute left-3 top-2.5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={uploadTextPath}
-                        onChange={(e) => setUploadTextPath(e.target.value)}
-                        placeholder="Pilih berkas atau tempel URL..."
-                        className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
-                      />
-                    </div>
-
-                    {/* Tombol Pilih File */}
-                    <label className="h-9 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs">
-                      <FolderTree size={14} />
-                      <span className="hidden sm:inline">Pilih File</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            setUploadTextPath(e.target.files[0].name);
-                          }
-                        }}
-                      />
-                    </label>
-
-                    {/* Tombol Kamera / Ambil Foto */}
-                    <label className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Ambil foto dari kamera">
-                      <Camera size={14} />
-                      <span className="hidden sm:inline">Foto</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            setUploadTextPath(`[Foto Kamera] ${e.target.files[0].name}`);
-                          }
-                        }}
-                      />
-                    </label>
+                <div className="flex items-center gap-1.5">
+                  <div className="relative flex-1">
+                    <Paperclip size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={uploadTextPath}
+                      onChange={(e) => setUploadTextPath(e.target.value)}
+                      placeholder="Pilih berkas atau tempel URL..."
+                      className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
+                    />
                   </div>
 
-                  {/* Thumbnail Chip Preview */}
-                  {uploadTextPath && (
-                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText size={15} className="text-blue-600 shrink-0" />
-                        <span className="truncate font-semibold text-gray-700">{uploadTextPath}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded shrink-0">
-                        Siap Diunggah
-                      </span>
-                    </div>
-                  )}
+                  <label className="h-9 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs">
+                    <FolderTree size={14} />
+                    <span className="hidden sm:inline">Pilih File</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setUploadTextPath(e.target.files[0].name);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  <label className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Ambil foto dari kamera">
+                    <Camera size={14} />
+                    <span className="hidden sm:inline">Foto</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setUploadTextPath(`[Foto Kamera] ${e.target.files[0].name}`);
+                        }
+                      }}
+                    />
+                  </label>
                 </div>
+
+                {uploadTextPath && (
+                  <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText size={15} className="text-blue-600 shrink-0" />
+                      <span className="truncate font-semibold text-gray-700">{uploadTextPath}</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded shrink-0">
+                      Siap Diunggah
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Opsi 2: Area Drag & Drop */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80">
-                <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-2">
-                  2. Area Seret Berkas (Drag & Drop)
-                </span>
                 <FileUploadDropzone
                   label=""
                   maxSizeMB={15}
@@ -477,26 +435,204 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: TEMPLATE CARD (POIN 6: CARD DIKLIK ADA GARIS TEPI WARNA)          */}
+      {/* TAB 2: UKURAN & JENIS FONT (POIN 3: TYPOGRAPHY SYSTEM & TESTER)           */}
+      {/* ========================================================================= */}
+      {activeTab === 'typography' && (
+        <div className="space-y-4">
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
+                  Poin 3
+                </span>
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Standarisasi Ukuran & Jenis Font (Typography System)
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Aturan baku ukuran huruf (*font scale*), ketebalan (*weight*), dan jenis font (*Sans vs Monospace*) agar tampilan halaman rapi, mudah dibaca, dan tidak tumpang tindih.
+              </p>
+            </div>
+
+            {/* 1. Aturan Jenis Font (Sans vs Mono) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80">
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                    1. Font Sans-Serif (Inter / System UI)
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                    font-sans
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed font-sans">
+                  Digunakan untuk semua judul halaman, label formulir, teks paragraf, tombol aksi, dan nama unit kerja. Memberikan kesan modern, bersih, dan nyaman di mata.
+                </p>
+                <div className="p-2.5 bg-slate-50 rounded-lg text-xs font-sans text-gray-700">
+                  Contoh: <strong>Direktorat Keuangan Universitas Gadjah Mada</strong>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                    2. Font Monospace (Tabular Numbers)
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">
+                    font-mono
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed font-sans">
+                  Wajib digunakan untuk <strong>nominal uang rupiah</strong>, persentase, kode akun MAK, dan tanggal/jam agar setiap angka memiliki lebar yang sama dan lurus rata kanan di tabel.
+                </p>
+                <div className="p-2.5 bg-slate-50 rounded-lg text-xs font-mono font-bold text-emerald-700 text-right">
+                  Rp 1.250.000.000 | 511111 | 2026-09-25
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Tabel Skala Ukuran Font Baku */}
+            <div className="space-y-2">
+              <span className="text-xs font-black text-gray-800 uppercase tracking-wider block">
+                Tabel Skala & Kegunaan Ukuran Font
+              </span>
+
+              <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-2xs">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Tingkat / Level</th>
+                      <th className="py-2.5 px-3">Ukuran (Pixel)</th>
+                      <th className="py-2.5 px-3">Class Tailwind</th>
+                      <th className="py-2.5 px-3">Contoh Visual</th>
+                      <th className="py-2.5 px-3">Kaidah Penggunaan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Judul Halaman (H1)</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">24 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-2xl font-black</td>
+                      <td className="py-3 px-3 font-black text-2xl text-gray-900 leading-none">Judul Utama Halaman</td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Header teratas setiap halaman</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Judul Card / Section (H2)</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">20 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-xl font-black</td>
+                      <td className="py-3 px-3 font-black text-xl text-gray-800 leading-none">Judul Modul / Card</td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Header kartu KPI, modal popover</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Sub-Judul Card (H3)</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">14 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-sm font-bold</td>
+                      <td className="py-3 px-3 font-bold text-sm text-gray-800 leading-none">Sub-Judul Bagian Fitur</td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Header tabel, filter title</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Teks Isi / Sel Tabel (Body)</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">12 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-xs font-semibold</td>
+                      <td className="py-3 px-3 text-xs font-semibold text-gray-700">Teks isi data tabel standar</td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Data baris tabel, deskripsi, form input</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Header Kolom Tabel (TH)</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">11 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-[11px] font-black uppercase</td>
+                      <td className="py-3 px-3 text-[11px] font-black uppercase tracking-wider text-gray-600">KODE AKUN</td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Header kolom tabel berjarak rapi</td>
+                    </tr>
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="py-3 px-3 font-bold text-gray-900">Micro Badge / Status</td>
+                      <td className="py-3 px-3 font-mono font-bold text-blue-600">8.5 - 9.5 px</td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-gray-500">text-[8.5px] font-black uppercase</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[8.5px] font-black uppercase tracking-wider">
+                          DISUSETUJUI
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-gray-500 text-[11px]">Badge sub-menu dan status transaksi</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 3. Live Font Tester Playground */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+              <span className="text-xs font-black text-gray-800 uppercase tracking-wider block">
+                Uji Coba Langsung Ukuran Font (Live Font Tester)
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <input
+                    type="text"
+                    value={sampleTesterText}
+                    onChange={(e) => setSampleTesterText(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium"
+                    placeholder="Ketik teks untuk diuji..."
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <select
+                    value={testerSize}
+                    onChange={(e) => setTesterSize(e.target.value)}
+                    className="h-9 px-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none font-bold text-gray-700 flex-1"
+                  >
+                    <option value="text-2xl">24px (H1)</option>
+                    <option value="text-xl">20px (H2)</option>
+                    <option value="text-lg">18px (Large)</option>
+                    <option value="text-base">16px (H3)</option>
+                    <option value="text-sm">14px (Medium)</option>
+                    <option value="text-xs">12px (Body/Tabel)</option>
+                    <option value="text-[11px]">11px (Header Tabel)</option>
+                    <option value="text-[9px]">9px (Micro Badge)</option>
+                  </select>
+
+                  <select
+                    value={testerWeight}
+                    onChange={(e) => setTesterWeight(e.target.value)}
+                    className="h-9 px-2 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none font-bold text-gray-700 flex-1"
+                  >
+                    <option value="font-black">Black (900)</option>
+                    <option value="font-bold">Bold (700)</option>
+                    <option value="font-semibold">Semibold (600)</option>
+                    <option value="font-medium">Medium (500)</option>
+                    <option value="font-normal">Regular (400)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Preview Box */}
+              <div className="p-4 bg-white rounded-xl border border-gray-200 min-h-[60px] flex items-center justify-center text-center">
+                <span className={`${testerSize} ${testerWeight} text-gray-900 transition-all`}>
+                  {sampleTesterText || 'Ketik teks di atas'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: TEMPLATE CARD (KLIK KARTU ADA GARIS TEPI MENYALA)                   */}
       {/* ========================================================================= */}
       {activeTab === 'cards' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
-                  Poin 6
-                </span>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Template Card Interaktif (Klik Kartu ➔ Garis Tepi Menyala / Ring Focus)
-                </h2>
-              </div>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                Template Card Interaktif (Klik Kartu ➔ Garis Tepi Menyala / Ring Focus)
+              </h2>
               <p className="text-xs text-gray-500 mt-1">
                 Silakan <strong>klik salah satu kartu di bawah ini</strong>: Kartu yang aktif akan mendapatkan garis tepi bergradien warna tebal (*ring outline*) dengan tanda centang aktif.
               </p>
             </div>
 
-            {/* Interactive Selectable Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
               {[
                 { id: 'pagu', title: 'Total Pagu Anggaran', val: 'Rp 48,25 M', desc: 'TA 2026', icon: Coins, color: 'blue' },
@@ -524,7 +660,6 @@ export default function DesignSystemPage() {
                         : 'border-gray-200/90 bg-white hover:border-gray-300 hover:shadow-xs'
                     }`}
                   >
-                    {/* Active Checkmark Pill in Top Right */}
                     {isSelected && (
                       <div className="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase flex items-center gap-1 shadow-2xs">
                         <Check size={10} strokeWidth={3} />
@@ -557,42 +692,27 @@ export default function DesignSystemPage() {
                 );
               })}
             </div>
-
-            {/* Notification of Active Card */}
-            <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200 flex items-center justify-between text-xs text-blue-900">
-              <span className="font-semibold">
-                Kartu aktif terpilih: <strong>{selectedCardId.toUpperCase()}</strong>
-              </span>
-              <span className="text-[11px] text-blue-700 font-medium">
-                Garis tepi otomatis menyala sesuai tema warna
-              </span>
-            </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: TEMPLATE GRAFIK (POIN 5: DITAMBAH GRAFIK LINE, GAUGE, STACKED)     */}
+      {/* TAB 4: TEMPLATE GRAFIK (BAR, LINE, DONUT, GAUGE)                          */}
       {/* ========================================================================= */}
       {activeTab === 'charts' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
-                  Poin 5
-                </span>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Koleksi Template Grafik Baku Lengkap
-                </h2>
-              </div>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                Koleksi Template Grafik Baku Lengkap
+              </h2>
               <p className="text-xs text-gray-500 mt-1">
-                Tersedia 4 format visualisasi data: Bar Komparasi, Tren Garis Bulanan, Donut Komposisi, dan Speedometer Gauge Target.
+                Bar Komparasi, Tren Garis Bulanan, Donut Komposisi, dan Speedometer Gauge Target.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* 1. Bar Chart (Komparasi Usulan per Unit) */}
+              {/* Bar Chart */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -625,7 +745,7 @@ export default function DesignSystemPage() {
                 </div>
               </div>
 
-              {/* 2. Line / Area Trend Chart (Tren Realisasi Jan - Des) */}
+              {/* Line / Area Chart */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -637,7 +757,6 @@ export default function DesignSystemPage() {
                   </span>
                 </div>
 
-                {/* SVG Area Sparkline */}
                 <div className="h-32 w-full pt-2 flex flex-col justify-end">
                   <svg className="w-full h-24 overflow-visible" viewBox="0 0 300 80">
                     <defs>
@@ -646,17 +765,8 @@ export default function DesignSystemPage() {
                         <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
-                    <path
-                      d="M0,70 Q50,60 100,45 T200,30 T300,10 L300,80 L0,80 Z"
-                      fill="url(#areaGradient)"
-                    />
-                    <path
-                      d="M0,70 Q50,60 100,45 T200,30 T300,10"
-                      fill="none"
-                      stroke="#059669"
-                      strokeWidth="3"
-                    />
-                    {/* Data Points */}
+                    <path d="M0,70 Q50,60 100,45 T200,30 T300,10 L300,80 L0,80 Z" fill="url(#areaGradient)" />
+                    <path d="M0,70 Q50,60 100,45 T200,30 T300,10" fill="none" stroke="#059669" strokeWidth="3" />
                     <circle cx="0" cy="70" r="3.5" fill="#059669" />
                     <circle cx="100" cy="45" r="3.5" fill="#059669" />
                     <circle cx="200" cy="30" r="3.5" fill="#059669" />
@@ -671,7 +781,7 @@ export default function DesignSystemPage() {
                 </div>
               </div>
 
-              {/* 3. Donut Composition Chart */}
+              {/* Donut Chart */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -679,7 +789,7 @@ export default function DesignSystemPage() {
                     <span className="text-xs font-bold text-gray-800">3. Donut: Komposisi Belanja</span>
                   </div>
                   <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded">
-                    Total: 100%
+                    Total 100%
                   </span>
                 </div>
 
@@ -688,8 +798,8 @@ export default function DesignSystemPage() {
                     <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                       <path className="text-gray-100" strokeWidth="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       <path className="text-blue-600" strokeDasharray="45, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-emerald-500" strokeDasharray="30, 100" strokeDashoffset="-45" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-purple-500" strokeDasharray="25, 100" strokeDashoffset="-75" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path className="text-emerald-500" strokeDasharray="30, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      <path className="text-purple-500" strokeDasharray="25, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                     </svg>
                     <div className="absolute text-center">
                       <span className="text-xs font-black text-gray-800">48 M</span>
@@ -704,7 +814,7 @@ export default function DesignSystemPage() {
                 </div>
               </div>
 
-              {/* 4. Target Gauge / Speedometer Chart */}
+              {/* Gauge Chart */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -737,33 +847,20 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: TAB PILIHAN MENU (POIN 7: VARIASI TAB BAKU)                       */}
+      {/* TAB 5: TAB PILIHAN MENU (3 VARIASI GAYA TAB)                              */}
       {/* ========================================================================= */}
       {activeTab === 'tab-styles' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
-                  Poin 7
-                </span>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Katalog Gaya Tab Pilihan (Tab Selection Standards)
-                </h2>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                4 pilihan gaya tab baku yang dapat dipilih sesuai kebutuhan halaman:
-              </p>
-            </div>
+            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+              Katalog Gaya Tab Pilihan (Tab Selection Standards)
+            </h2>
 
-            {/* Gaya 1: Pill Gradient (Gaya Suite yang Kita Buat) */}
+            {/* Gaya 1: Pill Gradient */}
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Gaya 1: Glow Pill Tabs (Dipakai di Sub-Menu Suite)
-                </span>
-                <span className="text-[10px] font-mono text-gray-400">Flex-wrap / Grid</span>
-              </div>
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                Gaya 1: Glow Pill Tabs (Dipakai di Sub-Menu Suite)
+              </span>
               <div className="flex flex-wrap gap-2">
                 {[
                   { id: 'tab1', label: 'Ringkasan Usulan', badge: 'Monitoring' },
@@ -790,14 +887,11 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            {/* Gaya 2: Classic Underline Tab with Badge */}
+            {/* Gaya 2: Underline Tab */}
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Gaya 2: Underline Line Tabs (Dipakai di Rincian Laporan)
-                </span>
-                <span className="text-[10px] font-mono text-gray-400">Border-b Active Line</span>
-              </div>
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                Gaya 2: Underline Line Tabs (Dipakai di Rincian Laporan)
+              </span>
               <div className="flex items-center gap-6 border-b border-gray-200">
                 {[
                   { id: 'all', label: 'Semua Transaksi', count: 124 },
@@ -825,14 +919,11 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            {/* Gaya 3: Segmented Slider Capsule */}
+            {/* Gaya 3: Segmented Capsule */}
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Gaya 3: Segmented Capsule Bar (Gaya iOS / Switch Filter)
-                </span>
-                <span className="text-[10px] font-mono text-gray-400">Kapsul Abu-Abu</span>
-              </div>
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                Gaya 3: Segmented Capsule Bar (Gaya iOS / Switch Filter)
+              </span>
               <div className="inline-flex p-1 bg-gray-200/70 rounded-xl">
                 {[
                   { id: 'daily', label: 'Harian' },
@@ -859,21 +950,15 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 5: HALAMAN EDITOR & STANDAR UKURAN GAMBAR                             */}
+      {/* TAB 6: EDITOR & STANDAR UKURAN GAMBAR                                     */}
       {/* ========================================================================= */}
       {activeTab === 'editor' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <div>
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                Template Editor Dokumen & Standar Ukuran Menampilkan Gambar
-              </h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Bilah alat (*toolbar*) standar untuk penyusunan narasi usulan serta kaidah dimensi gambar.
-              </p>
-            </div>
+            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+              Template Editor Dokumen & Standar Ukuran Menampilkan Gambar
+            </h2>
 
-            {/* Editor Workspace Mockup */}
             <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
               <div className="bg-slate-50 border-b border-gray-200 p-2 flex items-center gap-1 flex-wrap select-none">
                 <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Undo"><Undo2 size={14} /></button>
@@ -905,7 +990,6 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            {/* Image Sizes Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80">
               <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center space-y-1">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 mx-auto flex items-center justify-center font-bold text-xs">40px</div>
@@ -939,19 +1023,13 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 6: PALET WARNA BAKU                                                   */}
+      {/* TAB 7: PALET WARNA BAKU                                                   */}
       {/* ========================================================================= */}
       {activeTab === 'colors' && (
         <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-          <div>
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-              Palet Warna Baku (Color Tokens & Standar Semantik)
-            </h2>
-            <p className="text-xs text-gray-500 mt-1">
-              Aturan fungsi warna agar serasi dengan identitas Universitas Gadjah Mada:
-            </p>
-          </div>
-
+          <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+            Palet Warna Baku (Color Tokens & Standar Semantik)
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             <div className="p-3.5 rounded-xl border border-gray-200 bg-white space-y-2">
               <div className="h-10 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 flex items-center px-3 text-white font-bold text-xs justify-between">
@@ -999,40 +1077,6 @@ export default function DesignSystemPage() {
                 <span className="font-mono text-[10px]">#1E293B</span>
               </div>
               <p className="text-[11px] text-gray-500">Teks utama, garis pemisah, dan tombol batal.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 7: TOMBOL & IKON                                                      */}
-      {/* ========================================================================= */}
-      {activeTab === 'buttons' && (
-        <div className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-              Standarisasi Tombol & Ikon Baris Tabel
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50/70 rounded-xl border border-slate-200/80">
-              <div>
-                <span className="text-[11px] font-bold text-gray-600 uppercase block mb-1.5">Primary</span>
-                <PrimaryButton><Plus size={14} /> Tambah Data Baru</PrimaryButton>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-gray-600 uppercase block mb-1.5">Secondary</span>
-                <SecondaryButton><RotateCcw size={14} /> Reset Filter</SecondaryButton>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-gray-600 uppercase block mb-1.5">Danger</span>
-                <DangerButton>Hapus Terpilih</DangerButton>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-4 bg-slate-50/70 rounded-xl border border-slate-200/80 flex-wrap">
-              <div className="flex items-center gap-1.5"><TableActionButton icon={Eye} variant="primary" title="Detail" /><span className="text-xs text-gray-600">Lihat Detail</span></div>
-              <div className="flex items-center gap-1.5"><TableActionButton icon={Pencil} variant="warning" title="Edit" /><span className="text-xs text-gray-600">Ubah Data</span></div>
-              <div className="flex items-center gap-1.5"><TableActionButton icon={Trash2} variant="danger" title="Hapus" /><span className="text-xs text-gray-600">Hapus Data</span></div>
-              <div className="flex items-center gap-1.5"><TableActionButton icon={RefreshCw} variant="success" title="Sinkron" /><span className="text-xs text-gray-600">Sinkronisasi</span></div>
             </div>
           </div>
         </div>
