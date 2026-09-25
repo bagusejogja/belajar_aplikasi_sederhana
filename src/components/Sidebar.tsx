@@ -39,7 +39,8 @@ import {
   Clock,
   ListTodo,
   BarChart4,
-  Star
+  Star,
+  Palette
 } from 'lucide-react';
 import { 
   getFavoriteUserKey, 
@@ -82,7 +83,8 @@ const iconMap: Record<string, any> = {
   ListTodo,
   Calendar,
   FolderTree,
-  BarChart4
+  BarChart4,
+  Palette
 };
 
 const groupIconMap: Record<string, any> = {
