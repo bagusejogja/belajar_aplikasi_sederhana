@@ -228,28 +228,28 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50/50 overflow-hidden font-sans print:overflow-visible print:bg-white">
+    <div className="flex h-screen bg-gray-50/50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 overflow-hidden font-sans print:overflow-visible print:bg-white transition-colors duration-200">
       <div className="print:hidden">
          <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} isCollapsed={isSidebarCollapsed} setIsCollapsed={handleToggleCollapsed} />
       </div>
       
       <div className={`flex-1 flex flex-col ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} w-full h-full overflow-y-auto overflow-x-hidden transition-all duration-300 print:ml-0 print:overflow-visible print:h-auto print:block`}>
-        <header className="flex items-center justify-between px-4 py-2.5 md:px-6 lg:px-8 bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-gray-200/80 shadow-2xs print:hidden">
+        <header className="flex items-center justify-between px-4 py-2.5 md:px-6 lg:px-8 bg-white/80 dark:bg-slate-900/90 backdrop-blur-md sticky top-0 z-30 border-b border-gray-200/80 dark:border-slate-800 shadow-2xs print:hidden transition-colors">
            
            <div className="flex items-center gap-3">
               {/* Tombol Hamburger Untuk Mobile Saja */}
               <button 
                  onClick={() => setIsSidebarOpen(true)}
-                 className="lg:hidden p-1.5 -ml-1 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                 className="lg:hidden p-1.5 -ml-1 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-xl transition-all"
               >
                  <Menu size={20} />
               </button>
               
               <div className="flex flex-wrap items-center gap-2">
-                 <h1 className="text-sm md:text-base font-black text-gray-900 tracking-tight leading-none">{getPageTitle(pathname)}</h1>
-                 <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-gray-300" />
-                 <span className="text-[11px] text-gray-500 font-medium hidden sm:inline">Selamat datang</span>
-                 <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-mono font-bold border border-indigo-100 shadow-2xs">
+                 <h1 className="text-sm md:text-base font-black text-gray-900 dark:text-slate-100 tracking-tight leading-none">{getPageTitle(pathname)}</h1>
+                 <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-700" />
+                 <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium hidden sm:inline">Selamat datang</span>
+                 <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-mono font-bold border border-indigo-100 dark:border-indigo-800/80 shadow-2xs">
                    SYNC_v4.5.18.5
                  </span>
               </div>

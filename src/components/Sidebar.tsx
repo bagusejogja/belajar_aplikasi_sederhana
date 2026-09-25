@@ -255,13 +255,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
 
       {/* Sidebar Content */}
       <aside className={cn(
-        "fixed left-0 top-0 h-screen bg-white border-r border-gray-200/80 z-50 transition-all duration-300 ease-in-out flex flex-col shadow-2xl lg:shadow-none",
+        "fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-gray-200/80 dark:border-slate-800 z-50 transition-all duration-300 ease-in-out flex flex-col shadow-2xl lg:shadow-none text-slate-800 dark:text-slate-100",
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         isCollapsed ? "lg:w-20 w-64" : "w-64"
       )}>
         {/* Brand Header */}
         <div className={cn(
-          "p-5 border-b border-gray-100 flex items-center justify-between", 
+          "p-5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between", 
           isCollapsed && "lg:p-3 lg:py-4 lg:flex-col lg:gap-2.5 lg:justify-center"
         )}>
            <div className="flex items-center gap-3 overflow-hidden">
@@ -274,7 +274,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
              </div>
              {!isCollapsed && (
                <div className="animate-in fade-in duration-200">
-                  <h1 className="font-extrabold text-gray-900 leading-tight tracking-tight text-base">Apps<br/><span className="text-indigo-600 font-black">Bersama</span></h1>
+                  <h1 className="font-extrabold text-gray-900 dark:text-slate-100 leading-tight tracking-tight text-base">Apps<br/><span className="text-indigo-600 dark:text-indigo-400 font-black">Bersama</span></h1>
                </div>
              )}
            </div>
@@ -315,13 +315,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
         <nav className="flex-1 p-3 space-y-3 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {!isCollapsed && (
             <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={16} />
               <input 
                 type="text"
                 placeholder="Cari menu..."
                 value={menuSearch}
                 onChange={e => setMenuSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
+                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all text-slate-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500"
               />
             </div>
           )}
@@ -675,20 +675,20 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
         </nav>
 
         {/* Profile / Bottom Action */}
-        <div className="p-3 border-t border-gray-100 bg-gray-50/50">
-           <div className={cn("bg-white p-3 rounded-2xl flex border border-gray-100 shadow-sm relative group/profile", isCollapsed ? "flex-col items-center justify-center" : "flex-col gap-2")}>
+        <div className="p-3 border-t border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50">
+           <div className={cn("bg-white dark:bg-slate-800/80 p-3 rounded-2xl flex border border-gray-100 dark:border-slate-700/80 shadow-sm relative group/profile", isCollapsed ? "flex-col items-center justify-center" : "flex-col gap-2")}>
               <div className="flex items-center justify-between w-full">
                  <div className="flex items-center gap-2.5 overflow-hidden">
                    <div className="relative">
                      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center font-black shrink-0 uppercase text-sm shadow-md shadow-indigo-200 cursor-pointer">
                        {userEmail ? userEmail.charAt(0) : 'U'}
                      </div>
-                     <div className="w-3 h-3 bg-emerald-500 border-2 border-white rounded-full absolute -bottom-0.5 -right-0.5 shadow-sm" title="Online" />
+                     <div className="w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-800 rounded-full absolute -bottom-0.5 -right-0.5 shadow-sm" title="Online" />
                    </div>
                    {!isCollapsed && (
                      <div className="overflow-hidden">
-                        <p className="text-xs font-bold text-gray-900 truncate" title={userEmail}>{userEmail || 'Memuat...'}</p>
-                        <p className="text-[9px] text-gray-500 truncate uppercase tracking-wider font-semibold">Terkoneksi • {userRole}</p>
+                        <p className="text-xs font-bold text-gray-900 dark:text-slate-100 truncate" title={userEmail}>{userEmail || 'Memuat...'}</p>
+                        <p className="text-[9px] text-gray-500 dark:text-slate-400 truncate uppercase tracking-wider font-semibold">Terkoneksi • {userRole}</p>
                      </div>
                    )}
                  </div>
@@ -697,7 +697,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                      <button 
                        onClick={handleLogout} 
                        title="Keluar / Logout Aplikasi" 
-                       className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 border border-gray-100 hover:border-rose-100 rounded-xl transition-all shadow-2xs flex items-center justify-center cursor-pointer"
+                       className="p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-gray-100 dark:border-slate-700/60 hover:border-rose-100 dark:hover:border-rose-900/60 rounded-xl transition-all shadow-2xs flex items-center justify-center cursor-pointer"
                      >
                         <LogOut size={15} />
                      </button>
