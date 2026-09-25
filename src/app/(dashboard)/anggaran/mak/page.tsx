@@ -5,21 +5,117 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, CheckCircle2, Clock, Loader2, Search, 
   Download, Mail, ExternalLink, RefreshCw, ClipboardList,
-  Filter, Calendar, BarChart3, Database, Building2, Eye
+  Filter, Calendar, BarChart3, Database, Building2, Eye,
+  Users, UserCheck, Award, Zap, TrendingUp, ArrowRight,
+  RotateCcw, Sparkles, Check, ChevronDown, ChevronUp, AlertCircle
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+
+// Helper Format Durasi Waktu Bahasa Indonesia
+const formatDuration = (ms: number): string => {
+  if (!ms || ms <= 0) return '< 1 mnt';
+  const totalMinutes = Math.floor(ms / (1000 * 60));
+  const totalHours = Math.floor(totalMinutes / 60);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days} hr ${hours} jam`;
+  }
+  if (hours > 0) {
+    return `${hours} jam ${minutes} mnt`;
+  }
+  if (minutes > 0) {
+    return `${minutes} mnt`;
+  }
+  return '< 1 mnt';
+};
+
+// Helper Badge Durasi Selisih Masuk vs Selesai
+const getDurationBadge = (created: string, updated?: string, status?: string) => {
+  if (!created) return { label: '-', subtext: '-', className: 'text-gray-400 bg-gray-50 border-gray-200' };
+  
+  const createdDate = new Date(created).getTime();
+  const isFinished = status === 'Selesai';
+  const endDate = isFinished && updated ? new Date(updated).getTime() : Date.now();
+  const diffMs = Math.max(0, endDate - createdDate);
+  const formatted = formatDuration(diffMs);
+  const hours = diffMs / (1000 * 60 * 60);
+
+  if (isFinished) {
+    if (hours < 6) {
+      return {
+        label: `⚡ ${formatted}`,
+        subtext: 'Respon Kilat (< 6 jam)',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200 font-black'
+      };
+    } else if (hours <= 24) {
+      return {
+        label: `⏱️ ${formatted}`,
+        subtext: 'Standar Cepat (≤ 24 jam)',
+        className: 'bg-indigo-50 text-indigo-800 border-indigo-200 font-bold'
+      };
+    } else if (hours <= 72) {
+      return {
+        label: `📅 ${formatted}`,
+        subtext: '1 - 3 Hari Kerja',
+        className: 'bg-sky-50 text-sky-800 border-sky-200 font-bold'
+      };
+    } else {
+      return {
+        label: `⏳ ${formatted}`,
+        subtext: '> 3 Hari Kerja',
+        className: 'bg-amber-50 text-amber-800 border-amber-200 font-bold'
+      };
+    }
+  } else {
+    // Belum Selesai (Dalam Proses)
+    return {
+      label: `⏳ Berjalan: ${formatted}`,
+      subtext: 'Menunggu Verifikasi Selesai',
+      className: 'bg-amber-50/90 text-amber-800 border-amber-300 font-black animate-pulse'
+    };
+  }
+};
+
+// Helper Avatar Inisial & Palet PIC
+const getPicAvatarMeta = (picName: string) => {
+  const p = (picName || 'Tanpa PIC').trim();
+  const parts = p.split(' ').filter(Boolean);
+  const initials = parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}`.toUpperCase() : (p.slice(0, 2).toUpperCase() || 'PIC');
+  
+  const palette = [
+    'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'bg-amber-100 text-amber-700 border-amber-200',
+    'bg-purple-100 text-purple-700 border-purple-200',
+    'bg-rose-100 text-rose-700 border-rose-200',
+    'bg-sky-100 text-sky-700 border-sky-200',
+    'bg-teal-100 text-teal-700 border-teal-200'
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < p.length; i++) {
+    hash = p.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const color = palette[Math.abs(hash) % palette.length];
+  
+  return { initials, color };
+};
 
 export default function MonitoringMakPage() {
   const [data, setData] = useState<any[]>([]);
   const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
+  const [activeTab, setActiveTab] = useState<'pic-report' | 'table' | 'chart'>('pic-report');
   
   // Filters
   const [search, setSearch] = useState('');
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
   const [filterUnit, setFilterUnit] = useState('');
   const [filterPIC, setFilterPIC] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
   
   // Paging
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,9 +195,87 @@ export default function MonitoringMakPage() {
       const matchTahun = filterTahun === '' || String(row.tahun) === filterTahun;
       const matchUnit = filterUnit === '' || row.unit === filterUnit;
       const matchPIC = filterPIC === '' || row.pic === filterPIC;
-      return matchSearch && matchTahun && matchUnit && matchPIC;
+      const matchStatus = filterStatus === 'ALL' || (filterStatus === 'Selesai' ? row.status === 'Selesai' : row.status !== 'Selesai');
+      return matchSearch && matchTahun && matchUnit && matchPIC && matchStatus;
     });
-  }, [data, search, filterTahun, filterUnit, filterPIC]);
+  }, [data, search, filterTahun, filterUnit, filterPIC, filterStatus]);
+
+  // 🔴 REQUIREMENT 1: REPORT & REKAP KINERJA & SLA PENYELESAIAN PER PIC
+  const picSummaryData = useMemo(() => {
+    const map: Record<string, {
+      pic: string;
+      total: number;
+      selesai: number;
+      proses: number;
+      durations: number[];
+    }> = {};
+
+    filtered.forEach(row => {
+      const picName = (row.pic || 'Tanpa PIC').trim();
+      if (!map[picName]) {
+        map[picName] = { pic: picName, total: 0, selesai: 0, proses: 0, durations: [] };
+      }
+      map[picName].total += 1;
+      if (row.status === 'Selesai') {
+        map[picName].selesai += 1;
+        if (row.created_at && row.updated_at) {
+          const diff = new Date(row.updated_at).getTime() - new Date(row.created_at).getTime();
+          if (diff >= 0) map[picName].durations.push(diff);
+        }
+      } else {
+        map[picName].proses += 1;
+      }
+    });
+
+    const list = Object.values(map).map(item => {
+      const sumDurations = item.durations.reduce((a, b) => a + b, 0);
+      const avgMs = item.durations.length > 0 ? sumDurations / item.durations.length : 0;
+      const minMs = item.durations.length > 0 ? Math.min(...item.durations) : 0;
+      const maxMs = item.durations.length > 0 ? Math.max(...item.durations) : 0;
+      const completionRate = item.total > 0 ? Math.round((item.selesai / item.total) * 100) : 0;
+
+      return {
+        ...item,
+        avgMs,
+        minMs,
+        maxMs,
+        avgFormatted: avgMs > 0 ? formatDuration(avgMs) : '-',
+        minFormatted: minMs > 0 ? formatDuration(minMs) : '-',
+        maxFormatted: maxMs > 0 ? formatDuration(maxMs) : '-',
+        completionRate
+      };
+    });
+
+    return list.sort((a, b) => b.selesai - a.selesai || b.total - a.total);
+  }, [filtered]);
+
+  // Global SLA & Kinerja Summary
+  const globalSlaSummary = useMemo(() => {
+    let allDurations: number[] = [];
+    let totalSelesai = 0;
+    let totalProses = 0;
+
+    picSummaryData.forEach(p => {
+      allDurations = allDurations.concat(p.durations);
+      totalSelesai += p.selesai;
+      totalProses += p.proses;
+    });
+
+    const grandTotal = totalSelesai + totalProses;
+    const avgGlobalMs = allDurations.length > 0 ? allDurations.reduce((a, b) => a + b, 0) / allDurations.length : 0;
+    const fastestMs = allDurations.length > 0 ? Math.min(...allDurations) : 0;
+    const slowestMs = allDurations.length > 0 ? Math.max(...allDurations) : 0;
+    const mostProductive = picSummaryData.length > 0 ? picSummaryData[0] : null;
+
+    return {
+      avgGlobalFormatted: avgGlobalMs > 0 ? formatDuration(avgGlobalMs) : '-',
+      fastestFormatted: fastestMs > 0 ? formatDuration(fastestMs) : '-',
+      slowestFormatted: slowestMs > 0 ? formatDuration(slowestMs) : '-',
+      completionRate: grandTotal > 0 ? Math.round((totalSelesai / grandTotal) * 100) : 0,
+      mostProductivePic: mostProductive ? mostProductive.pic : '-',
+      mostProductiveCount: mostProductive ? mostProductive.selesai : 0
+    };
+  }, [picSummaryData]);
 
   const dashboardData = useMemo(() => {
     const unitCounts: Record<string, number> = {};
@@ -146,7 +320,7 @@ export default function MonitoringMakPage() {
   }, [filtered, currentPage, itemsPerPage]);
 
   // Reset page when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC, filterStatus, itemsPerPage]);
 
   const total = filtered.length;
   const selesai = filtered.filter(d => d.status === 'Selesai').length;
@@ -476,26 +650,282 @@ export default function MonitoringMakPage() {
       {/* Dashboard Gambaran Revisi */}
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
-          <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
-            <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}
-          </h2>
+          <div>
+            <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}
+            </h2>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              Monitoring kinerja verifikator, durasi rata-rata penyelesaian (SLA), dan sebaran revisi per unit.
+            </p>
+          </div>
+          
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button 
-              onClick={() => setActiveTab('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => setActiveTab('pic-report')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'pic-report' 
+                  ? 'bg-white text-indigo-700 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              Tabel Frekuensi
+              <UserCheck size={13} />
+              <span>Report per PIC & SLA ({picSummaryData.length})</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('table')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'table' 
+                  ? 'bg-white text-indigo-700 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Building2 size={13} />
+              <span>Frekuensi Unit</span>
             </button>
             <button 
               onClick={() => setActiveTab('chart')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'chart' 
+                  ? 'bg-white text-indigo-700 shadow-xs' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              Grafik Batang
+              <BarChart3 size={13} />
+              <span>Grafik Batang</span>
             </button>
           </div>
         </div>
 
-        {activeTab === 'table' ? (
+        {/* TAB 1: 🔴 REQUIREMENT 1 - REPORT & REKAP KINERJA & SLA PENYELESAIAN PER PIC */}
+        {activeTab === 'pic-report' && (
+          <div className="space-y-4">
+            {/* 4 KPI SUMMARY CARDS SESUAI STANDAR DESIGN SYSTEM */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Card 1: Rata-Rata SLA */}
+              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                      RATA-RATA PENYELESAIAN (SLA)
+                    </span>
+                    <div className="text-xl font-black text-indigo-900 font-mono tracking-tight">
+                      {globalSlaSummary.avgGlobalFormatted}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-indigo-100/70 text-indigo-700 border border-indigo-200">
+                    <Clock size={16} />
+                  </div>
+                </div>
+                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                  <span>Dari berkas masuk s/d selesai</span>
+                  <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-black">
+                    SLA Global
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: Tingkat Ketuntasan */}
+              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                      TINGKAT KETUNTASAN
+                    </span>
+                    <div className="text-xl font-black text-emerald-800 font-mono tracking-tight">
+                      {globalSlaSummary.completionRate}%
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-100/70 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 size={16} />
+                  </div>
+                </div>
+                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                  <span>{selesai} selesai dari {total} berkas</span>
+                  <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-black">
+                    {proses} Pending
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 3: Waktu Selesai Tercepat */}
+              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                      RESPON TERCEPAT
+                    </span>
+                    <div className="text-xl font-black text-amber-900 font-mono tracking-tight flex items-center gap-1">
+                      <Zap size={16} className="text-amber-500 fill-amber-500" />
+                      <span>{globalSlaSummary.fastestFormatted}</span>
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-amber-100/70 text-amber-700 border border-amber-200">
+                    <Sparkles size={16} />
+                  </div>
+                </div>
+                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                  <span>Waktu penanganan minimum</span>
+                  <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-black">
+                    Kilat
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 4: PIC Paling Produktif */}
+              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                      PIC TERBANYAK TUNTAS
+                    </span>
+                    <div className="text-sm font-black text-slate-900 line-clamp-1" title={globalSlaSummary.mostProductivePic}>
+                      {globalSlaSummary.mostProductivePic}
+                    </div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-purple-100/70 text-purple-700 border border-purple-200">
+                    <Award size={16} />
+                  </div>
+                </div>
+                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                  <span>Menyelesaikan pekerjaan</span>
+                  <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-black">
+                    {globalSlaSummary.mostProductiveCount} Berkas
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TABEL REKAP KINERJA & SLA PER PIC */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3 text-center w-10">No</th>
+                    <th className="px-4 py-3 min-w-[200px]">PIC Verifikator</th>
+                    <th className="px-3 py-3 text-center w-24">Total Tugas</th>
+                    <th className="px-3 py-3 text-center w-28">Dalam Proses</th>
+                    <th className="px-3 py-3 text-center w-24">Selesai</th>
+                    <th className="px-4 py-3 min-w-[160px]">Tingkat Ketuntasan</th>
+                    <th className="px-4 py-3 text-center min-w-[180px]">Rata-rata Waktu Selesai (SLA)</th>
+                    <th className="px-4 py-3 text-center min-w-[180px]">Rentang Waktu (Min - Max)</th>
+                    <th className="px-3 py-3 text-center w-24">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {picSummaryData.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center py-8 text-gray-400 font-medium">
+                        Tidak ada data PIC untuk filter yang dipilih.
+                      </td>
+                    </tr>
+                  ) : (
+                    picSummaryData.map((p, idx) => {
+                      const avatar = getPicAvatarMeta(p.pic);
+                      return (
+                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                          <td className="px-4 py-3 text-center font-bold text-gray-400">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[11px] border shrink-0 ${avatar.color}`}>
+                                {avatar.initials}
+                              </div>
+                              <div>
+                                <div className="font-bold text-gray-900 text-xs">{p.pic}</div>
+                                <div className="text-[10px] text-gray-400">Verifikator Anggaran</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="font-mono font-black text-gray-900 text-xs">
+                              {p.total}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {p.proses > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[10px]">
+                                <Clock size={10} /> {p.proses} berkas
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 font-bold text-[11px]">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-black text-[10px]">
+                              <CheckCircle2 size={10} /> {p.selesai}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px] font-bold">
+                                <span className="text-gray-500">{p.selesai}/{p.total} Tuntas</span>
+                                <span className={p.completionRate === 100 ? 'text-emerald-700 font-black' : 'text-indigo-700'}>
+                                  {p.completionRate}%
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    p.completionRate === 100 ? 'bg-emerald-500' : p.completionRate >= 80 ? 'bg-indigo-600' : 'bg-amber-500'
+                                  }`}
+                                  style={{ width: `${p.completionRate}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {p.selesai > 0 ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200 font-black text-xs font-mono">
+                                  ⏱️ {p.avgFormatted}
+                                </span>
+                                <span className="text-[9px] text-gray-400 mt-0.5">
+                                  Rata-rata data masuk s/d selesai
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic text-[11px]">Belum ada berkas selesai</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {p.selesai > 0 ? (
+                              <div className="flex items-center justify-center gap-1 text-[11px] font-mono">
+                                <span className="text-emerald-700 font-bold" title="Tercepat">⚡ {p.minFormatted}</span>
+                                <span className="text-gray-300">-</span>
+                                <span className="text-slate-600 font-medium" title="Terlama">⏳ {p.maxFormatted}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterPIC(p.pic === 'Tanpa PIC' ? '' : p.pic);
+                                const tableEl = document.getElementById('submissions-table-card');
+                                if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-gray-600 text-[10px] font-bold border border-gray-200 transition-colors flex items-center gap-1 mx-auto"
+                              title={`Tampilkan hanya berkas ${p.pic}`}
+                            >
+                              <span>Filter</span>
+                              <ArrowRight size={10} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: TABEL FREKUENSI UNIT */}
+        {activeTab === 'table' && (
           dashboardData.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-gray-100">
               <table className="w-full text-left border-collapse text-xs">
@@ -549,7 +979,10 @@ export default function MonitoringMakPage() {
               <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
             </div>
           )
-        ) : (
+        )}
+
+        {/* TAB 3: GRAFIK BATANG UNIT */}
+        {activeTab === 'chart' && (
           chartData.length > 0 ? (
             <div className="h-[280px] w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
@@ -586,23 +1019,79 @@ export default function MonitoringMakPage() {
         )}
       </div>
 
-      {/* Main Table Section */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+      {/* 🔴 REQUIREMENT 2: MAIN TABLE SECTION DENGAN SELISIH BERKAS MASUK DAN SELESAI */}
+      <div id="submissions-table-card" className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden scroll-mt-20">
         
-        {/* Filters */}
-        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-3 items-center">
+        {/* Table Card Header & Quick Status Filter */}
+        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gray-50/50">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black text-gray-900 tracking-tight">
+                Daftar Usulan Revisi Tolakan & Audit SLA
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                {filtered.length} Berkas
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              Tabel audit real-time dengan selisih waktu akurat dari berkas diterima hingga verifikasi diselesaikan.
+            </p>
+          </div>
+
+          {/* Quick Filter Pill Buttons */}
+          <div className="flex items-center gap-1.5 self-start md:self-auto bg-gray-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setFilterStatus('ALL')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${
+                filterStatus === 'ALL'
+                  ? 'bg-white text-indigo-700 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Semua ({data.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('Proses Revisi')}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                filterStatus === 'Proses Revisi'
+                  ? 'bg-white text-amber-700 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-amber-700'
+              }`}
+            >
+              <Clock size={11} className="text-amber-500" />
+              <span>Proses ({proses})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('Selesai')}
+              className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                filterStatus === 'Selesai'
+                  ? 'bg-white text-emerald-700 shadow-xs font-black'
+                  : 'text-gray-600 hover:text-emerald-700'
+              }`}
+            >
+              <CheckCircle2 size={11} className="text-emerald-500" />
+              <span>Selesai ({selesai})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filters Toolbar */}
+        <div className="p-3.5 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-2.5 items-center bg-white">
           <div className="flex-1 relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             <input 
               type="text" 
-              placeholder="Cari kata kunci..." 
+              placeholder="Cari unit kerja, nama PIC, email, atau tahun..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full h-9 pl-8 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
           
-          <div className="w-full md:w-44">
+          <div className="w-full md:w-36">
             <select 
               value={filterTahun}
               onChange={(e) => setFilterTahun(e.target.value)}
@@ -613,7 +1102,7 @@ export default function MonitoringMakPage() {
             </select>
           </div>
 
-          <div className="w-full md:w-56">
+          <div className="w-full md:w-48">
             <input 
               list="unit-options"
               placeholder="Pilih/Ketik Unit..."
@@ -636,24 +1125,49 @@ export default function MonitoringMakPage() {
               {availablePICs.map((pic, idx) => <option key={idx} value={pic}>{pic}</option>)}
             </select>
           </div>
+
+          {(search || filterUnit || filterPIC || filterStatus !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setFilterUnit('');
+                setFilterPIC('');
+                setFilterStatus('ALL');
+              }}
+              className="h-9 px-3 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 text-xs font-bold flex items-center gap-1 transition-all"
+              title="Reset Semua Filter"
+            >
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
 
         {/* Table Content */}
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <Loader2 className="animate-spin mb-4" size={32} />
-              <p className="text-sm font-bold">Memuat Data...</p>
+              <Loader2 className="animate-spin mb-4 text-indigo-600" size={32} />
+              <p className="text-sm font-bold text-gray-700">Memuat Data Revisi & Menghitung SLA...</p>
             </div>
           ) : currentData.length > 0 ? (
             <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+              <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-5 py-3 text-center w-12">NO</th>
-                  <th className="px-5 py-3 min-w-[250px]">Unit Kerja & Email</th>
-                  <th className="px-5 py-3">PIC & Status</th>
-                  <th className="px-5 py-3">Lampiran</th>
-                  <th className="px-5 py-3 text-center w-24">Aksi</th>
+                  <th className="px-4 py-3.5 text-center w-10">No</th>
+                  <th className="px-4 py-3.5 min-w-[220px]">Unit Kerja & Pengaju</th>
+                  <th className="px-4 py-3.5 min-w-[170px]">PIC Verifikator</th>
+                  <th className="px-4 py-3.5 min-w-[190px]">Waktu Berkas (Masuk & Selesai)</th>
+                  <th className="px-4 py-3.5 text-center min-w-[170px] bg-indigo-50/40 border-x border-indigo-100/60">
+                    <div className="flex items-center justify-center gap-1 text-indigo-900">
+                      <Clock size={12} className="text-indigo-600" />
+                      <span>Selisih Waktu (SLA)</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3.5 text-center w-28">Status</th>
+                  <th className="px-4 py-3.5 min-w-[130px]">Lampiran</th>
+                  <th className="px-4 py-3.5 text-center w-24">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -665,57 +1179,128 @@ export default function MonitoringMakPage() {
                       ? (() => { try { return JSON.parse(row.lampiran_catatan) } catch { return [] } })()
                       : [];
 
+                  const durationBadge = getDurationBadge(row.created_at, row.updated_at, row.status);
+                  const avatar = getPicAvatarMeta(row.pic);
+                  const cleanUnit = (row.unit || '').trim();
+                  const groupOrg = unitGroups[cleanUnit];
+
                   return (
-                    <tr key={row.id} className="transition-colors group hover:bg-indigo-50/30">
-                      <td className="px-6 py-4 border-r border-gray-50 text-center">
-                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs mx-auto">{globalIdx}</span>
+                    <tr key={row.id} className="transition-colors group hover:bg-indigo-50/20">
+                      {/* NO */}
+                      <td className="px-4 py-3.5 text-center align-top pt-4">
+                        <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs mx-auto">
+                          {globalIdx}
+                        </span>
                       </td>
                       
-                      <td className="px-6 py-4 border-r border-gray-50">
+                      {/* UNIT KERJA & EMAIL */}
+                      <td className="px-4 py-3.5 align-top pt-3.5">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-start gap-2">
-                            <span className="text-sm font-black text-gray-900 whitespace-normal leading-snug">{row.unit || '-'}</span>
+                          <div className="flex items-start gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-gray-900 leading-snug">
+                              {row.unit || '-'}
+                            </span>
                             {row.tahun && (
-                              <span className="shrink-0 px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded text-[9px] font-black uppercase tracking-wider mt-0.5">
+                              <span className="shrink-0 px-1.5 py-0.2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase">
                                 {row.tahun}
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] font-semibold text-gray-500 flex items-center gap-1 mt-1">
-                            <Mail size={10} /> {row.email || 'Tanpa Email'}
+                          
+                          {groupOrg && (
+                            <span className="text-[10px] text-indigo-700 font-semibold inline-block">
+                              Grup: <strong className="font-bold">{groupOrg}</strong>
+                            </span>
+                          )}
+
+                          <span className="text-[10px] font-medium text-gray-500 flex items-center gap-1 mt-0.5" title={row.email}>
+                            <Mail size={10} className="text-gray-400 shrink-0" />
+                            <span className="truncate max-w-[200px]">{row.email || 'Tanpa Email'}</span>
                           </span>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap bg-gray-50/30 border-r border-gray-100">
-                        <div className="flex flex-col gap-2 items-start">
-                          <span className="text-xs font-black text-indigo-700 uppercase tracking-wide">{row.pic || '-'}</span>
-                          
-                          <span className="text-[9px] text-gray-500 font-bold flex items-center gap-1" title="Tanggal Masuk">
-                            <Clock size={10} className="text-indigo-400" />
-                            {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'} WIB
-                          </span>
+                      {/* PIC VERIFIKATOR */}
+                      <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[10px] border shrink-0 ${avatar.color}`}>
+                            {avatar.initials}
+                          </div>
+                          <div>
+                            <span className="text-xs font-black text-slate-800 block">
+                              {row.pic || 'Tanpa PIC'}
+                            </span>
+                            <span className="text-[9px] text-gray-400">Verifikator</span>
+                          </div>
+                        </div>
+                      </td>
 
-                          {row.status === 'Selesai' ? (
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md font-black text-[9px] uppercase tracking-wider border border-emerald-200">
-                                <CheckCircle2 size={10} /> Selesai
+                      {/* WAKTU BERKAS (MASUK & SELESAI) */}
+                      <td className="px-4 py-3.5 align-top pt-3.5 text-xs">
+                        <div className="space-y-1.5">
+                          {/* Tanggal Masuk */}
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                            <span className="w-4 h-4 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-[9px] font-black shrink-0">
+                              📥
+                            </span>
+                            <div className="leading-tight">
+                              <span className="font-medium text-slate-600 block text-[10px]">Berkas Masuk:</span>
+                              <span className="font-bold text-slate-900 font-mono text-[11px]">
+                                {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'} WIB
                               </span>
-                              {row.updated_at && (
-                                <span className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
-                                  <Clock size={10} className="text-emerald-600" /> {new Date(row.updated_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
+                            </div>
+                          </div>
+
+                          {/* Tanggal Selesai */}
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-700">
+                            <span className="w-4 h-4 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-[9px] font-black shrink-0">
+                              ✅
+                            </span>
+                            <div className="leading-tight">
+                              <span className="font-medium text-slate-600 block text-[10px]">Waktu Selesai:</span>
+                              {row.status === 'Selesai' && row.updated_at ? (
+                                <span className="font-bold text-emerald-900 font-mono text-[11px]">
+                                  {new Date(row.updated_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})} WIB
+                                </span>
+                              ) : (
+                                <span className="text-amber-600 font-bold italic text-[10px]">
+                                  Sedang Diproses...
                                 </span>
                               )}
                             </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md font-black text-[9px] uppercase tracking-wider border border-amber-200">
-                              <Clock size={10} /> {row.status}
-                            </span>
-                          )}
+                          </div>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 border-r border-gray-50">
+                      {/* 🔴 REQUIREMENT 2: SELISIH WAKTU / DURASI SELESAI (SLA) */}
+                      <td className="px-4 py-3.5 align-top pt-3.5 text-center bg-indigo-50/20 border-x border-indigo-100/40">
+                        <div className="flex flex-col items-center gap-1">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-mono shadow-2xs ${durationBadge.className}`}>
+                            {durationBadge.label}
+                          </span>
+                          <span className="text-[9px] text-gray-400 font-medium">
+                            {durationBadge.subtext}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* STATUS BERKAS */}
+                      <td className="px-4 py-3.5 align-top pt-3.5 text-center whitespace-nowrap">
+                        {row.status === 'Selesai' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-black text-[10px] uppercase tracking-wider border border-emerald-200 shadow-2xs">
+                            <CheckCircle2 size={12} className="text-emerald-600" />
+                            <span>Selesai</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-black text-[10px] uppercase tracking-wider border border-amber-200 shadow-2xs">
+                            <Clock size={12} className="text-amber-600" />
+                            <span>Proses</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* LAMPIRAN DOKUMEN */}
+                      <td className="px-4 py-3.5 align-top pt-3.5">
                         {renderFileLinks(
                           [
                             ...(row.lampiran_excel ? [{ 
@@ -729,16 +1314,22 @@ export default function MonitoringMakPage() {
                         )}
                       </td>
 
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {/* AKSI */}
+                      <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap text-center">
                         {row.status !== 'Selesai' ? (
                           <button
+                            type="button"
                             onClick={() => setEmailModalId(row.id)}
-                            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-200 mx-auto active:scale-95"
+                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-200 mx-auto active:scale-95"
                           >
-                            <CheckCircle2 size={12} /> Proses
+                            <Zap size={11} className="text-amber-300 fill-amber-300" />
+                            <span>Proses</span>
                           </button>
                         ) : (
-                          <span className="text-gray-300 font-bold">-</span>
+                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            <Check size={12} />
+                            <span>Tuntas</span>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -749,7 +1340,8 @@ export default function MonitoringMakPage() {
           ) : (
             <div className="text-center py-20 text-gray-400">
               <Database className="mx-auto mb-4 opacity-20" size={48} />
-              <p className="text-sm font-bold">Data Kosong atau Tidak Ditemukan</p>
+              <p className="text-sm font-bold text-gray-700">Data Tidak Ditemukan</p>
+              <p className="text-xs text-gray-400 mt-1">Coba sesuaikan kata kunci atau reset filter pencarian Anda.</p>
             </div>
           )}
         </div>
