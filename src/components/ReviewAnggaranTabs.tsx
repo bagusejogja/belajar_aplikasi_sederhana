@@ -138,7 +138,7 @@ export default function ReviewAnggaranTabs({ activeTab }: { activeTab?: string }
                 <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
                   {tab.title}
                 </span>
-                <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wider ${
+                <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
                   isActive 
                     ? 'bg-white/25 text-white' 
                     : tab.adminOnly 
