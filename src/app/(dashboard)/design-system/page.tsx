@@ -59,7 +59,11 @@ import {
   ShieldAlert,
   Rows,
   AlignJustify,
-  Info
+  Info,
+  PanelRightClose,
+  FileCheck,
+  History,
+  Tag
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -75,6 +79,9 @@ import SkeletonTable from '@/components/shared/SkeletonTable';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import ToastNotification, { ToastItem } from '@/components/shared/ToastNotification';
 import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import BannerAlert from '@/components/shared/BannerAlert';
+import FormModal from '@/components/shared/FormModal';
+import DetailDrawer from '@/components/shared/DetailDrawer';
 import { 
   PrimaryButton, 
   SecondaryButton, 
@@ -97,6 +104,20 @@ export default function DesignSystemPage() {
   const [modalTitle, setModalTitle] = useState('Konfirmasi Hapus Pengajuan');
   const [modalDesc, setModalDesc] = useState('Apakah Anda yakin ingin menghapus data pengajuan pagu ini? Tindakan ini tidak dapat dibatalkan.');
   const [modalLoading, setModalLoading] = useState(false);
+
+  // Form Modal Demo State
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [formModalLoading, setFormModalLoading] = useState(false);
+  const [demoFormAccount, setDemoFormAccount] = useState('521211');
+  const [demoFormName, setDemoFormName] = useState('Belanja Bahan Operasional Laboratorium');
+  const [demoFormAmount, setDemoFormAmount] = useState('175000000');
+  const [demoFormNotes, setDemoFormNotes] = useState('Diusulkan untuk pengadaan reagen dan alat habis pakai semester ganjil');
+
+  // Detail Drawer Demo State
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Banner Alert Demo State
+  const [showWarningBanner, setShowWarningBanner] = useState(true);
 
   // Toast Notification State
   const [toasts, setToasts] = useState<ToastItem[]>([
@@ -235,6 +256,203 @@ export default function DesignSystemPage() {
         }}
       />
 
+      {/* Interactive Form Modal (Standard Input Dialog) */}
+      <FormModal
+        isOpen={formModalOpen}
+        onClose={() => setFormModalOpen(false)}
+        title="Input Usulan Pagu Anggaran Baru"
+        subtitle="Formulir entri alokasi belanja unit kerja tahun anggaran 2026"
+        icon={<FileCheck className="w-5 h-5" />}
+        size="lg"
+        isLoading={formModalLoading}
+        submitText="Simpan Usulan Pagu"
+        onSubmit={async () => {
+          setFormModalLoading(true);
+          await new Promise((res) => setTimeout(res, 900));
+          setFormModalLoading(false);
+          setFormModalOpen(false);
+          triggerToast('success', 'Usulan Pagu Berhasil Disimpan', `Kode Akun ${demoFormAccount} sebesar Rp ${Number(demoFormAmount).toLocaleString('id-ID')} telah direkam.`);
+        }}
+      >
+        <div className="space-y-3.5">
+          <BannerAlert
+            type="info"
+            variant="soft"
+            title="Ketentuan Penetapan"
+            message="Pastikan kode akun sesuai dengan Bagan Akun Standar (BAS) UGM edisi 2026."
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">
+                Unit Kerja
+              </label>
+              <input
+                type="text"
+                disabled
+                value="Majelis Wali Amanat (MWA)"
+                className="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-slate-700 text-xs font-semibold cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">
+                Kode Akun Belanja
+              </label>
+              <input
+                type="text"
+                value={demoFormAccount}
+                onChange={(e) => setDemoFormAccount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-xs font-mono font-bold text-indigo-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">
+              Uraian Akun Belanja
+            </label>
+            <input
+              type="text"
+              value={demoFormName}
+              onChange={(e) => setDemoFormName(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-xs font-semibold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">
+              Nominal Pagu Diusulkan (Rp)
+            </label>
+            <input
+              type="number"
+              value={demoFormAmount}
+              onChange={(e) => setDemoFormAmount(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 font-mono">
+              Terbaca: Rp {Number(demoFormAmount || 0).toLocaleString('id-ID')}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">
+              Catatan & Justifikasi Pengajuan
+            </label>
+            <textarea
+              rows={3}
+              value={demoFormNotes}
+              onChange={(e) => setDemoFormNotes(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 text-xs text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      </FormModal>
+
+      {/* Interactive Detail Drawer (Slide-Over Panel Samping) */}
+      <DetailDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Detail Verifikasi Usulan"
+        subtitle="ID Berkas: TR-UGM-2026-0902"
+        badge={<StatusBadge status="disetujui" />}
+        icon={<PanelRightClose className="w-5 h-5" />}
+        width="xl"
+        footerActions={
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[11px] text-gray-500 font-mono">
+              Terakhir diperbarui: 25 Sep 2026, 14:30
+            </span>
+            <div className="flex items-center gap-2">
+              <SecondaryButton onClick={() => setDrawerOpen(false)}>
+                Tutup
+              </SecondaryButton>
+              <PrimaryButton onClick={() => {
+                setDrawerOpen(false);
+                triggerToast('info', 'Cetak Lembar Verifikasi', 'Menyiapkan berkas PDF lembar verifikasi...');
+              }}>
+                Cetak Lembar Verifikasi
+              </PrimaryButton>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Banner Alert inside Drawer */}
+          <BannerAlert
+            type="success"
+            variant="accent-left"
+            title="Verifikasi Lolos Syarat"
+            message="Pengajuan telah diperiksa oleh Verifikator Keuangan dan dinyatakan memenuhi seluruh kepatuhan administrasi."
+          />
+
+          {/* KPI Ringkasan Akun */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] uppercase font-bold text-gray-400">Total Pagu Disetujui</span>
+              <p className="text-sm font-mono font-bold text-gray-900 dark:text-gray-100 mt-0.5">
+                Rp 1.250.000.000
+              </p>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] uppercase font-bold text-gray-400">Realisasi s.d. Saat Ini</span>
+              <p className="text-sm font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                Rp 850.000.000 (68%)
+              </p>
+            </div>
+          </div>
+
+          {/* Metadata Rincian */}
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-850 space-y-2.5">
+            <span className="text-[11px] font-black uppercase tracking-wider text-gray-700 dark:text-gray-200 block border-b pb-1.5 border-gray-100 dark:border-slate-700">
+              Informasi Mata Anggaran
+            </span>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <span className="text-gray-500 font-medium">Unit Pengusul:</span>
+              <span className="col-span-2 font-bold text-gray-900 dark:text-gray-100">Fakultas Biologi UGM</span>
+
+              <span className="text-gray-500 font-medium">Mata Anggaran:</span>
+              <span className="col-span-2 font-mono font-bold text-indigo-700 dark:text-indigo-400">511111 - Belanja Gaji Pokok PNS</span>
+
+              <span className="text-gray-500 font-medium">Sumber Dana:</span>
+              <span className="col-span-2 font-semibold text-gray-800 dark:text-gray-200">Dana Masyarakat (PTNBH)</span>
+
+              <span className="text-gray-500 font-medium">SK Penetapan:</span>
+              <span className="col-span-2 font-semibold text-blue-600">SK/REK/UGM/2026/0411</span>
+            </div>
+          </div>
+
+          {/* Audit Timeline / Jejak Rekam */}
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-850 space-y-3">
+            <span className="text-[11px] font-black uppercase tracking-wider text-gray-700 dark:text-gray-200 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-blue-600" /> Jejak Rekam Verifikasi (Audit Trail)
+            </span>
+            
+            <div className="relative pl-6 space-y-3 border-l-2 border-blue-200 dark:border-blue-900 ml-2">
+              <div className="relative">
+                <div className="absolute -left-[31px] top-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-white dark:ring-slate-900" />
+                <span className="text-[10px] text-gray-400 font-mono">25 Sep 2026, 14:30 WIB</span>
+                <p className="font-bold text-gray-800 dark:text-gray-100 text-xs">Persetujuan Final oleh Direktur Keuangan</p>
+                <p className="text-[11px] text-gray-500">Berkas dinyatakan lengkap dan telah ditandatangani secara digital.</p>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -left-[31px] top-0.5 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-white dark:ring-slate-900" />
+                <span className="text-[10px] text-gray-400 font-mono">24 Sep 2026, 10:15 WIB</span>
+                <p className="font-bold text-gray-800 dark:text-gray-100 text-xs">Pemeriksaan Kesesuaian oleh Staf Verifikator</p>
+                <p className="text-[11px] text-gray-500">Kesesuaian volume dan harga satuan telah sesuai standar SBU.</p>
+              </div>
+
+              <div className="relative">
+                <div className="absolute -left-[31px] top-0.5 w-3 h-3 rounded-full bg-slate-300 dark:bg-slate-600 ring-4 ring-white dark:ring-slate-900" />
+                <span className="text-[10px] text-gray-400 font-mono">22 Sep 2026, 09:00 WIB</span>
+                <p className="font-bold text-gray-800 dark:text-gray-100 text-xs">Pengajuan Usulan oleh Unit Kerja</p>
+                <p className="text-[11px] text-gray-500">Dokumen RKA diunggah melalui portal anggaran.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DetailDrawer>
+
       {/* 2. Grid 3 Kolom Proporsional (3 Baris Rapi, Nyaman & Tidak Terjepit) */}
       <div className="bg-white/95 backdrop-blur-sm p-3.5 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100">
@@ -259,7 +477,7 @@ export default function DesignSystemPage() {
             { id: 'editor', num: '06', label: 'Editor & Gambar', desc: 'Toolbar Dokumen & Ukuran Foto', icon: FileText },
             { id: 'colors', num: '07', label: 'Palet Warna Baku', desc: 'Royal Blue, Emerald, Amber', icon: Palette },
             { id: 'table', num: '08', label: 'Tabel & Paging', desc: 'Density Luwes/Rapat & Shimmer', icon: TableIcon },
-            { id: 'modals', num: '09', label: 'Modal, Toast & State', desc: 'Confirm Dialog, Toast, Empty', icon: Bell },
+            { id: 'modals', num: '09', label: 'Modal, Alert & Drawer', desc: 'Confirm, Form, Alert, Drawer', icon: Bell },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1326,17 +1544,202 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 9: MODAL KONFIRMASI, TOAST NOTIFIKASI & EMPTY STATE                    */}
+      {/* TAB 9: MODAL, ALERT & DRAWER (SISTEM DIALOG, NOTIFIKASI & PANEL SAMPING)   */}
       {/* ========================================================================= */}
       {activeTab === 'modals' && (
         <div className="space-y-6">
-          {/* Bagian A: Modal Dialog Konfirmasi */}
+          {/* 1. Banner Alert & Callout Kontekstual */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <Info className="w-4 h-4 text-blue-600" />
+                  1. Banner Alert Kontekstual (Inline Page Alerts & Callouts)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Pemberitahuan tersemat di dalam halaman atau kartu untuk instruksi, batas waktu, atau peringatan pagu.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(`<BannerAlert
+  type="warning"
+  variant="accent-left"
+  title="Batas Akhir Revisi Pagu"
+  message="Pengajuan perubahan usulan pagu anggaran tahun 2026 akan ditutup pada 30 September 2026 pukul 23:59 WIB."
+  actionText="Lihat Jadwal Revisi"
+  onAction={() => router.push('/jadwal')}
+  onClose={() => setVisible(false)}
+/>`, 'banner-alert-code')}
+                className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                {copiedCode === 'banner-alert-code' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                {copiedCode === 'banner-alert-code' ? 'Tersalin!' : 'Salin Kode'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* Info Alert */}
+              <BannerAlert
+                type="info"
+                variant="accent-left"
+                title="Sinkronisasi Data Simaster"
+                message="Data RKAT unit kerja telah tersinkronisasi otomatis dengan server pusat pada pukul 08:30 WIB."
+                actionText="Periksa Log"
+                onAction={() => alert('Membuka log sinkronisasi')}
+              />
+
+              {/* Warning Alert */}
+              {showWarningBanner ? (
+                <BannerAlert
+                  type="warning"
+                  variant="accent-left"
+                  title="Peringatan Batas Waktu Revisi"
+                  message="Masa revisi usulan pagu berakhir dalam 5 hari kerja. Pastikan seluruh berkas telah diunggah."
+                  actionText="Cek Dokumen"
+                  onAction={() => alert('Membuka daftar berkas')}
+                  onClose={() => setShowWarningBanner(false)}
+                />
+              ) : (
+                <div className="p-3 rounded-xl border border-dashed border-gray-200 flex items-center justify-between text-xs text-gray-400">
+                  <span>Banner Peringatan telah ditutup oleh pengguna.</span>
+                  <button
+                    onClick={() => setShowWarningBanner(true)}
+                    className="text-blue-600 font-bold hover:underline"
+                  >
+                    Tampilkan Lagi
+                  </button>
+                </div>
+              )}
+
+              {/* Danger Alert */}
+              <BannerAlert
+                type="danger"
+                variant="accent-left"
+                title="Pagu Anggaran Melebihi Batas Plafon"
+                message="Total usulan belanja modal Fakultas Kedokteran melebihi plafon indikatif sebesar Rp 45.000.000."
+              />
+
+              {/* Success Alert */}
+              <BannerAlert
+                type="success"
+                variant="accent-left"
+                title="Verifikasi Administrasi Lengkap"
+                message="Seluruh berkas persyaratan dan surat keputusan telah diverifikasi sah oleh Tim Verifikator."
+              />
+            </div>
+          </div>
+
+          {/* 2. Modal Form Pengisian Data (FormModal) & Panel Samping (DetailDrawer) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Kartu Uji Form Modal */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-blue-600" />
+                  2. Modal Form Input (FormModal)
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                  Size: LG / XL
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Dialog entri data / tambah usulan tanpa perlu berpindah halaman (dilengkapi header sticky, form scrollable, & tombol simpan beranimasi loading).
+              </p>
+
+              <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/30 flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold text-gray-800 block">Form Entri Pagu Unit</span>
+                  <span className="text-[11px] text-gray-500">Simulasi input nominal pagu & kode akun BAS</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormModalOpen(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Plus size={14} /> Buka Form Modal
+                </button>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleCopy(`<FormModal
+  isOpen={isOpen}
+  onClose={() => setIsOpen(false)}
+  title="Input Usulan Pagu Baru"
+  subtitle="Formulir alokasi belanja unit"
+  size="lg"
+  isLoading={isLoading}
+  onSubmit={handleSubmit}
+>
+  {/* Input fields di sini */}
+</FormModal>`, 'form-modal-code')}
+                  className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  {copiedCode === 'form-modal-code' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                  {copiedCode === 'form-modal-code' ? 'Tersalin' : 'Salin Sintaks FormModal'}
+                </button>
+              </div>
+            </div>
+
+            {/* Kartu Uji Detail Drawer (Slide-Over) */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <PanelRightClose className="w-4 h-4 text-indigo-600" />
+                  3. Panel Samping Slide-Over (DetailDrawer)
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                  Offcanvas Right
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                Panel inspeksi yang meluncur mulus dari sisi kanan layar, sangat ideal untuk membaca jejak rekam audit, catatan review, atau rincian transaksi tabel.
+              </p>
+
+              <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold text-gray-800 block">Inspeksi Berkas TR-UGM-2026</span>
+                  <span className="text-[11px] text-gray-500">Jejak audit, metadata akun & verifikator</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Eye size={14} /> Buka Panel Samping
+                </button>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleCopy(`<DetailDrawer
+  isOpen={isDrawerOpen}
+  onClose={() => setIsDrawerOpen(false)}
+  title="Detail Usulan Pagu"
+  badge={<StatusBadge status="disetujui" />}
+  width="xl"
+>
+  {/* Konten detail atau audit trail di sini */}
+</DetailDrawer>`, 'drawer-code')}
+                  className="text-[11px] font-semibold text-indigo-600 hover:underline flex items-center gap-1"
+                >
+                  {copiedCode === 'drawer-code' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                  {copiedCode === 'drawer-code' ? 'Tersalin' : 'Salin Sintaks DetailDrawer'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Modal Dialog Konfirmasi Baku (ConfirmModal) */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div>
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-rose-600" />
-                  1. Modal Dialog Konfirmasi Baku (Backdrop Blur & Safe Confirm)
+                  4. Modal Dialog Konfirmasi Baku (Backdrop Blur & Safe Confirm)
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Mencegah kekeliruan fatal pengguna pada aksi destruktif (Hapus, Tolak, Simpan Perubahan).
@@ -1426,13 +1829,13 @@ export default function DesignSystemPage() {
             </div>
           </div>
 
-          {/* Bagian B: Toast Notification System */}
+          {/* 4. Toast Notification System */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <div>
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
                   <Bell className="w-4 h-4 text-blue-600" />
-                  2. Toast Notifikasi Mengambang (Floating Feedback Alerts)
+                  5. Toast Notifikasi Mengambang (Floating Feedback Alerts)
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Umpan balik seketika di pojok kanan atas setelah aksi API/DB (hilang otomatis setelah 4.5 detik).
@@ -1485,13 +1888,13 @@ triggerToast('error', 'Gagal Memproses Permintaan', 'Koneksi database timeout.')
             </div>
           </div>
 
-          {/* Bagian C: Galeri Empty State Interaktif */}
+          {/* 5. Galeri Empty State Interaktif */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
               <div>
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
                   <Search className="w-4 h-4 text-indigo-600" />
-                  3. Empty State Baku (Tampilan Saat Data Kosong / Gagal)
+                  6. Empty State Baku (Tampilan Saat Data Kosong / Gagal)
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
                   4 varian siap pakai untuk mencegah layar kosong membingungkan bagi pengguna.
