@@ -63,7 +63,11 @@ import {
   PanelRightClose,
   FileCheck,
   History,
-  Tag
+  Tag,
+  Database,
+  Network,
+  GitBranch,
+  Link as LinkIcon
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -86,6 +90,7 @@ import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
 import VerificationStepper from '@/components/shared/VerificationStepper';
 import QuickFilterChips from '@/components/shared/QuickFilterChips';
 import ThemeToggle from '@/components/shared/ThemeToggle';
+import TreeView, { TreeNodeItem } from '@/components/shared/TreeView';
 import { 
   PrimaryButton, 
   SecondaryButton, 
@@ -218,6 +223,233 @@ export default function DesignSystemPage() {
     { id: 3, kode: '511129', nama: 'Belanja Uang Makan PNS', unit: 'Direktorat Keuangan', pagu: 340000000, realisasi: 195000000, status: 'disetujui' },
     { id: 4, kode: '521211', nama: 'Belanja Bahan Operasional', unit: 'Fakultas Kedokteran', pagu: 95000000, realisasi: 0, status: 'revisi' },
     { id: 5, kode: '532111', nama: 'Belanja Modal Peralatan Mesin', unit: 'Direktorat Perencanaan', pagu: 600000000, realisasi: 120000000, status: 'ditolak' },
+  ];
+
+  // Tree View State & Sample Data
+  const [treeTab, setTreeTab] = useState<'unit' | 'akun'>('unit');
+  const [selectedTreeNode, setSelectedTreeNode] = useState<TreeNodeItem | null>({
+    id: 'u-5',
+    label: 'Fakultas Biologi',
+    code: '02000010',
+    type: 'faculty',
+    badge: 'Fakultas',
+    amount: 12500000000,
+  });
+
+  const sampleUnitTreeData: TreeNodeItem[] = [
+    {
+      id: 'ugm-root',
+      label: 'Universitas Gadjah Mada',
+      code: 'UGM-00',
+      type: 'faculty',
+      badge: 'Pusat',
+      badgeVariant: 'blue',
+      children: [
+        {
+          id: 'kptu',
+          label: 'Kantor Pimpinan Universitas (KPTU)',
+          code: 'KPTU-01',
+          type: 'faculty',
+          badge: 'Rektorat',
+          badgeVariant: 'slate',
+          children: [
+            { id: 'u-1', label: 'Majelis Wali Amanat (MWA)', code: '010101', type: 'unit', badge: 'KPTU', amount: 1540000000 },
+            { id: 'u-2', label: 'Dewan Guru Besar (DGB)', code: '010201', type: 'unit', badge: 'KPTU', amount: 890000000 },
+            { id: 'u-3', label: 'Direktorat Keuangan', code: '010802', type: 'unit', badge: 'Direktorat', amount: 4820000000 },
+            { id: 'u-4', label: 'Direktorat Perencanaan', code: '010801', type: 'unit', badge: 'Direktorat', amount: 3250000000 },
+          ],
+        },
+        {
+          id: 'agro',
+          label: 'Klaster Agro & Hayati',
+          code: 'KLS-02',
+          type: 'faculty',
+          badge: 'Klaster',
+          badgeVariant: 'emerald',
+          children: [
+            {
+              id: 'u-5',
+              label: 'Fakultas Biologi',
+              code: '02000010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 12500000000,
+              children: [
+                { id: 'dep-bio-1', label: 'Departemen Biologi Tropika', code: '020100', type: 'department', amount: 4500000000 },
+                { id: 'lab-bio-2', label: 'Laboratorium Genetika & Bioteknologi', code: '020200', type: 'unit', amount: 2100000000 },
+              ],
+            },
+            {
+              id: 'u-6',
+              label: 'Fakultas Pertanian',
+              code: '02020010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 14200000000,
+            },
+          ],
+        },
+        {
+          id: 'saintek',
+          label: 'Klaster Sains & Teknologi',
+          code: 'KLS-04',
+          type: 'faculty',
+          badge: 'Klaster',
+          badgeVariant: 'amber',
+          children: [
+            {
+              id: 'u-7',
+              label: 'Fakultas Teknik',
+              code: '04000010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 28900000000,
+              children: [
+                { id: 'dep-te-1', label: 'Departemen Teknik Elektro & TI', code: '040100', type: 'department', amount: 8200000000 },
+                { id: 'dep-ts-2', label: 'Departemen Teknik Sipil & Lingkungan', code: '040200', type: 'department', amount: 7400000000 },
+              ],
+            },
+            {
+              id: 'u-8',
+              label: 'Fakultas MIPA',
+              code: '05000010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 16800000000,
+            },
+          ],
+        },
+        {
+          id: 'soshum',
+          label: 'Klaster Sosial Humaniora',
+          code: 'KLS-06',
+          type: 'faculty',
+          badge: 'Klaster',
+          badgeVariant: 'blue',
+          children: [
+            {
+              id: 'u-9',
+              label: 'Fakultas Ekonomika dan Bisnis',
+              code: '03000010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 22400000000,
+            },
+            {
+              id: 'u-10',
+              label: 'Fakultas Hukum',
+              code: '06000010',
+              type: 'faculty',
+              badge: 'Fakultas',
+              amount: 11900000000,
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const sampleAccountTreeData: TreeNodeItem[] = [
+    {
+      id: 'acc-5',
+      label: '5 - Belanja Negara & PTNBH',
+      code: '5',
+      type: 'account_group',
+      badge: 'Akun Utama',
+      badgeVariant: 'blue',
+      children: [
+        {
+          id: 'acc-51',
+          label: '51 - Belanja Pegawai',
+          code: '51',
+          type: 'account_subgroup',
+          badge: 'Kelompok',
+          badgeVariant: 'slate',
+          children: [
+            {
+              id: 'acc-5111',
+              label: '5111 - Gaji dan Tunjangan Pokok PNS',
+              code: '5111',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-511111', label: 'Belanja Gaji Pokok PNS', code: '511111', type: 'account_item', badge: 'Operasional', badgeVariant: 'emerald', amount: 1250000000 },
+                { id: 'acc-511119', label: 'Belanja Pembulatan Gaji PNS', code: '511119', type: 'account_item', badge: 'Operasional', badgeVariant: 'slate', amount: 45000000 },
+                { id: 'acc-511129', label: 'Belanja Uang Makan PNS', code: '511129', type: 'account_item', badge: 'Operasional', badgeVariant: 'emerald', amount: 340000000 },
+              ],
+            },
+            {
+              id: 'acc-5121',
+              label: '5121 - Belanja Pegawai Non-PNS / Tendik Kontrak',
+              code: '5121',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-512111', label: 'Belanja Honorarium Tendik Kontrak PTNBH', code: '512111', type: 'account_item', badge: 'Kontrak', badgeVariant: 'amber', amount: 620000000 },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'acc-52',
+          label: '52 - Belanja Barang dan Jasa',
+          code: '52',
+          type: 'account_subgroup',
+          badge: 'Kelompok',
+          badgeVariant: 'slate',
+          children: [
+            {
+              id: 'acc-5211',
+              label: '5211 - Belanja Barang Operasional Perkantoran',
+              code: '5211',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-521111', label: 'Belanja Keperluan Sehari-hari Perkantoran / ATK', code: '521111', type: 'account_item', badge: 'Rutin', badgeVariant: 'emerald', amount: 280000000 },
+                { id: 'acc-521115', label: 'Belanja Daya dan Jasa (Langganan Listrik & PDAM)', code: '521115', type: 'account_item', badge: 'Utilitas', badgeVariant: 'blue', amount: 890000000 },
+              ],
+            },
+            {
+              id: 'acc-5212',
+              label: '5212 - Belanja Bahan Praktikum & Penunjang Akademik',
+              code: '5212',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-521211', label: 'Belanja Bahan Praktikum & Reagen Kimia Laboratorium', code: '521211', type: 'account_item', badge: 'Akademik', badgeVariant: 'emerald', amount: 450000000 },
+                { id: 'acc-521213', label: 'Belanja Honorarium Output Narasumber Seminar', code: '521213', type: 'account_item', badge: 'Honor', badgeVariant: 'amber', amount: 175000000 },
+              ],
+            },
+            {
+              id: 'acc-5241',
+              label: '5241 - Belanja Perjalanan Dinas Jabatan',
+              code: '5241',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-524111', label: 'Belanja Perjalanan Dinas Biasa Dalam Daerah', code: '524111', type: 'account_item', badge: 'Dinas', badgeVariant: 'slate', amount: 95000000 },
+                { id: 'acc-524113', label: 'Belanja Perjalanan Dinas Luar Daerah / Konsorsium', code: '524113', type: 'account_item', badge: 'Dinas', badgeVariant: 'amber', amount: 210000000 },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'acc-53',
+          label: '53 - Belanja Modal',
+          code: '53',
+          type: 'account_subgroup',
+          badge: 'Investasi',
+          badgeVariant: 'amber',
+          children: [
+            {
+              id: 'acc-5321',
+              label: '5321 - Belanja Modal Peralatan dan Mesin',
+              code: '5321',
+              type: 'account_subgroup',
+              children: [
+                { id: 'acc-532111', label: 'Pengadaan Alat Spektrofotometer Riset Terpadu', code: '532111', type: 'account_item', badge: 'Aset', badgeVariant: 'rose', amount: 1650000000 },
+                { id: 'acc-532114', label: 'Pengadaan Server Komputasi Kinerja Tinggi (HPC)', code: '532114', type: 'account_item', badge: 'Aset TI', badgeVariant: 'blue', amount: 980000000 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   ];
 
   const handleCopy = (code: string, key: string) => {
@@ -495,7 +727,7 @@ export default function DesignSystemPage() {
           {[
             { id: 'forms', num: '01', label: 'Filter & Form Input', desc: 'Autocomplete ↑/↓, Multi, Jam', icon: Search },
             { id: 'typography', num: '02', label: 'Ukuran & Jenis Font', desc: 'Hierarki Font, Mono Uang, Tester', icon: Type },
-            { id: 'cards', num: '03', label: 'Template Card', desc: 'KPI Stat & Klik Garis Tepi', icon: Layout },
+            { id: 'cards', num: '03', label: 'Template Card & Tree', desc: 'KPI 4-Kolom & Pohon Hierarki', icon: Layout },
             { id: 'charts', num: '04', label: 'Template Grafik', desc: 'Bar, Line, Donut, Gauge', icon: BarChart3 },
             { id: 'tab-styles', num: '05', label: 'Tab Pilihan Menu', desc: 'Pill, Underline, Capsule', icon: Layers },
             { id: 'editor', num: '06', label: 'Editor & Gambar', desc: 'Toolbar Dokumen & Ukuran Foto', icon: FileText },
@@ -927,78 +1159,333 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: TEMPLATE CARD (KLIK KARTU ADA GARIS TEPI MENYALA)                   */}
+      {/* TAB 3: TEMPLATE CARD & TREE VIEW (FORMAT BAKU REVIEW-ANGGARAN & GOV-MAPPING) */}
       {/* ========================================================================= */}
       {activeTab === 'cards' && (
-        <div className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <div>
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                Template Card Interaktif (Klik Kartu ➔ Garis Tepi Menyala / Ring Focus)
-              </h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Silakan <strong>klik salah satu kartu di bawah ini</strong>: Kartu yang aktif akan mendapatkan garis tepi bergradien warna tebal (*ring outline*) dengan tanda centang aktif.
-              </p>
+        <div className="space-y-6">
+          {/* BAGIAN A: 4 MODERN KPI SUMMARY CARDS */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 text-[10px] font-black uppercase">
+                    Standar Baku
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 dark:text-slate-100 uppercase tracking-wider">
+                    4 Modern KPI Summary Cards (Standar Unit Kerja & Gov-Mapping)
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Format baku kartu ringkasan eksekutif 4-kolom seperti di modul <code>/review-anggaran/unit-kerja</code> dan <code>/gov-mapping</code> (Pemetaan PIC). Klik kartu untuk simulasi filter aktif (garis tepi menyala).
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleCopy(
+                    `<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">\n  {/* CARD 1: TOTAL */}\n  <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">\n    <div className="flex items-start justify-between">\n      <div>\n        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">TOTAL ANGGARAN USULAN</span>\n        <div className="text-xl font-black text-gray-900 font-mono tracking-tight">\n          Rp 48.250.000.000\n        </div>\n      </div>\n      <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">\n        <Layers size={18} />\n      </div>\n    </div>\n    <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">\n      <span>142 Usulan Item</span>\n      <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Semua Unit</span>\n    </div>\n  </div>\n</div>`,
+                    'kpi-card'
+                  )
+                }
+                className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                {copiedCode === 'kpi-card' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                <span>{copiedCode === 'kpi-card' ? 'Tersalin!' : 'Salin Kode Card'}</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {/* 4 Modern KPI Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { id: 'pagu', title: 'Total Pagu Anggaran', val: 'Rp 48,25 M', desc: 'TA 2026', icon: Coins, color: 'blue' },
-                { id: 'realisasi', title: 'Realisasi Belanja', val: 'Rp 31,80 M', desc: 'Serapan 65.8%', icon: TrendingUp, color: 'emerald' },
-                { id: 'sisa', title: 'Sisa Pagu Tersedia', val: 'Rp 16,45 M', desc: 'Alokasi Berjalan', icon: Layers, color: 'indigo' },
-                { id: 'review', title: 'Usulan Menunggu', val: '14 Berkas', desc: 'Perlu Verifikasi', icon: Clock, color: 'amber' },
+                {
+                  id: 'total_anggaran',
+                  title: 'TOTAL ANGGARAN USULAN',
+                  titleColor: 'text-gray-400 dark:text-slate-400',
+                  value: 'Rp 48.250.000.000',
+                  valueUnit: '',
+                  valueColor: 'text-gray-900 dark:text-slate-100',
+                  icon: Layers,
+                  iconBox: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/60',
+                  footerLeft: '142 Usulan Item',
+                  footerBadge: 'Semua Unit',
+                  footerBadgeClass: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400',
+                  footerBorder: 'border-gray-100 dark:border-slate-800',
+                  footerTextColor: 'text-gray-500 dark:text-slate-400',
+                  activeRing: 'ring-2 ring-indigo-600 border-indigo-500 dark:border-indigo-500 bg-indigo-50/15',
+                },
+                {
+                  id: 'terkunci_status',
+                  title: 'TERKUNCI STATUS (WAJIB)',
+                  titleColor: 'text-emerald-600 dark:text-emerald-400',
+                  value: 'Rp 31.800.000.000',
+                  valueUnit: '',
+                  valueColor: 'text-emerald-700 dark:text-emerald-400',
+                  icon: ShieldCheck,
+                  iconBox: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/60',
+                  footerLeft: '98 Item Terkunci',
+                  footerBadge: '65.8% Pagu',
+                  footerBadgeClass: 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300',
+                  footerBorder: 'border-emerald-100/60 dark:border-emerald-900/40',
+                  footerTextColor: 'text-emerald-700 dark:text-emerald-400',
+                  activeRing: 'ring-2 ring-emerald-600 border-emerald-500 dark:border-emerald-500 bg-emerald-50/15',
+                },
+                {
+                  id: 'pagu_bebas',
+                  title: 'PAGU BEBAS (TANPA STATUS)',
+                  titleColor: 'text-amber-600 dark:text-amber-400',
+                  value: 'Rp 16.450.000.000',
+                  valueUnit: '',
+                  valueColor: 'text-amber-700 dark:text-amber-400',
+                  icon: Database,
+                  iconBox: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800/60',
+                  footerLeft: '44 Item Bebas',
+                  footerBadge: '34.2% Pagu',
+                  footerBadgeClass: 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300',
+                  footerBorder: 'border-amber-100/60 dark:border-amber-900/40',
+                  footerTextColor: 'text-amber-700 dark:text-amber-400',
+                  activeRing: 'ring-2 ring-amber-500 border-amber-500 dark:border-amber-500 bg-amber-50/15',
+                },
+                {
+                  id: 'pemetaan_coverage',
+                  title: 'SUMBER ATURAN & PIC',
+                  titleColor: 'text-purple-600 dark:text-purple-400',
+                  value: '82 Rule',
+                  valueUnit: '| 16 AI',
+                  valueColor: 'text-purple-700 dark:text-purple-300',
+                  icon: LinkIcon,
+                  iconBox: 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-800/60',
+                  footerLeft: 'Coverage Penguncian',
+                  footerBadge: '69.0%',
+                  footerBadgeClass: 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300',
+                  footerBorder: 'border-purple-100/60 dark:border-purple-900/40',
+                  footerTextColor: 'text-purple-700 dark:text-purple-400',
+                  activeRing: 'ring-2 ring-purple-500 border-purple-500 dark:border-purple-500 bg-purple-50/15',
+                },
               ].map((card) => {
                 const Icon = card.icon;
                 const isSelected = selectedCardId === card.id;
-
-                const ringColors: Record<string, string> = {
-                  blue: 'ring-2 ring-blue-600 border-blue-500 bg-blue-50/20 shadow-md scale-[1.02]',
-                  emerald: 'ring-2 ring-emerald-600 border-emerald-500 bg-emerald-50/20 shadow-md scale-[1.02]',
-                  indigo: 'ring-2 ring-indigo-600 border-indigo-500 bg-indigo-50/20 shadow-md scale-[1.02]',
-                  amber: 'ring-2 ring-amber-500 border-amber-500 bg-amber-50/20 shadow-md scale-[1.02]',
-                };
 
                 return (
                   <div
                     key={card.id}
                     onClick={() => setSelectedCardId(card.id)}
-                    className={`p-4 md:p-5 rounded-2xl border transition-all duration-200 cursor-pointer relative select-none ${
+                    className={`bg-white dark:bg-slate-900 rounded-2xl p-4 border transition-all duration-200 cursor-pointer relative select-none flex flex-col justify-between shadow-xs ${
                       isSelected
-                        ? ringColors[card.color]
-                        : 'border-gray-200/90 bg-white hover:border-gray-300 hover:shadow-xs'
+                        ? `${card.activeRing} shadow-md scale-[1.01]`
+                        : 'border-gray-200/80 dark:border-slate-800 hover:border-gray-300 dark:hover:border-slate-700 hover:shadow-xs'
                     }`}
                   >
                     {isSelected && (
-                      <div className="absolute top-3 right-3 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase flex items-center gap-1 shadow-2xs">
-                        <Check size={10} strokeWidth={3} />
-                        <span>Terpilih</span>
+                      <div className="absolute top-2.5 right-2.5 px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase flex items-center gap-0.5 shadow-2xs">
+                        <Check size={9} strokeWidth={3} />
+                        <span>Filter Aktif</span>
                       </div>
                     )}
 
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                    <div className="flex items-start justify-between">
+                      <div className="pr-2">
+                        <span className={`text-[10px] font-black uppercase tracking-wider block mb-1 ${card.titleColor}`}>
                           {card.title}
                         </span>
-                        <div className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-mono">
-                          {card.val}
+                        <div className={`text-xl font-black font-mono tracking-tight flex items-baseline gap-1.5 ${card.valueColor}`}>
+                          {card.value}
+                          {card.valueUnit && (
+                            <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                              {card.valueUnit}
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      <div className="p-2.5 rounded-xl border bg-slate-50 border-gray-200 text-gray-700 shrink-0">
+                      <div className={`p-2 rounded-xl shrink-0 ${card.iconBox}`}>
                         <Icon size={18} />
                       </div>
                     </div>
 
-                    <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                      <span>{card.desc}</span>
-                      <span className={`text-[10px] font-bold ${isSelected ? 'text-blue-600' : 'text-gray-400'}`}>
-                        {isSelected ? '● Aktif' : 'Klik kartu'}
+                    <div className={`mt-3 text-xs font-bold flex items-center justify-between border-t pt-2 ${card.footerBorder} ${card.footerTextColor}`}>
+                      <span>{card.footerLeft}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${card.footerBadgeClass}`}>
+                        {card.footerBadge}
                       </span>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* BAGIAN B: TEMPLATE POHON HIERARKIS (TREE VIEW COMPONENT) */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase">
+                    Komponen Baru
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                    <FolderTree size={16} className="text-emerald-600 dark:text-emerald-400" />
+                    Template Struktur Pohon Hierarkis (Hierarchical Tree View)
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Komponen pohon bertingkat untuk struktur hierarki Unit Kerja UGM (Pusat ➔ Fakultas ➔ Departemen ➔ Lab) dan hierarki Bagan Akun Standar (BAS). Mendukung pencarian, expand/collapse, dan seleksi node aktif.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleCopy(
+                    `import TreeView, { TreeNodeItem } from '@/components/shared/TreeView';\n\n// Gunakan TreeView di halaman Anda:\n<TreeView\n  data={treeData}\n  selectedId={selectedId}\n  onSelect={(node) => console.log('Node terpilih:', node)}\n  defaultExpandedIds={['ugm-root', 'kptu', 'agro']}\n  searchable={true}\n  showExpandCollapseAll={true}\n/>`,
+                    'tree-view-code'
+                  )
+                }
+                className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+              >
+                {copiedCode === 'tree-view-code' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                <span>{copiedCode === 'tree-view-code' ? 'Tersalin!' : 'Salin Kode TreeView'}</span>
+              </button>
+            </div>
+
+            {/* Tree Type Selector Tabs */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTreeTab('unit');
+                  setSelectedTreeNode(sampleUnitTreeData[0]?.children?.[1]?.children?.[0] || sampleUnitTreeData[0]);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  treeTab === 'unit'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-200'
+                }`}
+              >
+                <Building2 size={14} />
+                <span>Pohon Struktur Unit Kerja UGM</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTreeTab('akun');
+                  setSelectedTreeNode(sampleAccountTreeData[0]?.children?.[0]?.children?.[0]?.children?.[0] || sampleAccountTreeData[0]);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  treeTab === 'akun'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-200'
+                }`}
+              >
+                <FolderTree size={14} />
+                <span>Pohon Bagan Akun Standar (BAS 2026)</span>
+              </button>
+            </div>
+
+            {/* 2-Column Layout: Left = TreeView, Right = Active Node Detail Inspector */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Kolom Kiri: TreeView */}
+              <div className="lg:col-span-7">
+                <TreeView
+                  data={treeTab === 'unit' ? sampleUnitTreeData : sampleAccountTreeData}
+                  selectedId={selectedTreeNode?.id}
+                  onSelect={(node) => setSelectedTreeNode(node)}
+                  defaultExpandedIds={['ugm-root', 'kptu', 'agro', 'acc-5', 'acc-51', 'acc-52']}
+                  searchable={true}
+                  showExpandCollapseAll={true}
+                />
+              </div>
+
+              {/* Kolom Kanan: Detail Node Inspector */}
+              <div className="lg:col-span-5 flex flex-col">
+                <div className="bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 flex-1 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-gray-200/80 dark:border-slate-700">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-gray-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <Tag size={13} className="text-blue-600" />
+                        Detail Node Terpilih (Inspector)
+                      </span>
+                      {selectedTreeNode?.badge && (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                          {selectedTreeNode.badge}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedTreeNode ? (
+                      <div className="space-y-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-gray-400 dark:text-slate-500 block">
+                            Nama Elemen
+                          </span>
+                          <h3 className="text-base font-black text-gray-900 dark:text-slate-100 tracking-tight">
+                            {selectedTreeNode.label}
+                          </h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase block">Kode Unik</span>
+                            <span className="font-mono font-black text-indigo-700 dark:text-indigo-400 text-xs">
+                              {selectedTreeNode.code || '-'}
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase block">Tipe Node</span>
+                            <span className="font-semibold text-gray-700 dark:text-slate-300 text-xs capitalize">
+                              {selectedTreeNode.type || 'Sub-Item'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {selectedTreeNode.amount !== undefined && (
+                          <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/50">
+                            <span className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 block mb-0.5">
+                              Estimasi Alokasi Pagu
+                            </span>
+                            <div className="text-lg font-black font-mono text-emerald-800 dark:text-emerald-300 tracking-tight">
+                              Rp {new Intl.NumberFormat('id-ID').format(selectedTreeNode.amount)}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 space-y-1.5 text-xs">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Status Cabang</span>
+                          <p className="text-gray-600 dark:text-slate-300">
+                            {selectedTreeNode.children && selectedTreeNode.children.length > 0 ? (
+                              <span>Memiliki <strong>{selectedTreeNode.children.length} sub-item/cabang</strong> di bawahnya.</span>
+                            ) : (
+                              <span>Merupakan <strong>node level akhir (terminal node)</strong> yang dapat langsung dipilih untuk penganggaran/transaksi.</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-8 text-center text-xs text-gray-400">
+                        Klik salah satu node pada pohon di samping untuk melihat rincian datanya.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-200/70 dark:border-slate-700 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500 font-mono">
+                      ID: {selectedTreeNode?.id || '-'}
+                    </span>
+                    <PrimaryButton
+                      onClick={() =>
+                        triggerToast(
+                          'success',
+                          'Node Dipilih',
+                          `${selectedTreeNode?.label} (${selectedTreeNode?.code || 'ID: ' + selectedTreeNode?.id}) terpilih untuk pemrosesan.`
+                        )
+                      }
+                    >
+                      Gunakan Node Ini
+                    </PrimaryButton>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
