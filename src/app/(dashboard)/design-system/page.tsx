@@ -82,6 +82,10 @@ import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensi
 import BannerAlert from '@/components/shared/BannerAlert';
 import FormModal from '@/components/shared/FormModal';
 import DetailDrawer from '@/components/shared/DetailDrawer';
+import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
+import VerificationStepper from '@/components/shared/VerificationStepper';
+import QuickFilterChips from '@/components/shared/QuickFilterChips';
+import ThemeToggle from '@/components/shared/ThemeToggle';
 import { 
   PrimaryButton, 
   SecondaryButton, 
@@ -118,6 +122,15 @@ export default function DesignSystemPage() {
 
   // Banner Alert Demo State
   const [showWarningBanner, setShowWarningBanner] = useState(true);
+
+  // Document Viewer Demo State
+  const [docViewerOpen, setDocViewerOpen] = useState(false);
+
+  // Quick Filter Chips State
+  const [selectedQuickChip, setSelectedQuickChip] = useState('all');
+
+  // Verification Stepper State
+  const [activeStepIdx, setActiveStepIdx] = useState(2);
 
   // Toast Notification State
   const [toasts, setToasts] = useState<ToastItem[]>([
@@ -452,6 +465,17 @@ export default function DesignSystemPage() {
           </div>
         </div>
       </DetailDrawer>
+
+      {/* Interactive Document / PDF Viewer Modal */}
+      <DocumentViewerModal
+        isOpen={docViewerOpen}
+        onClose={() => setDocViewerOpen(false)}
+        title="SK_Rektor_Penetapan_Pagu_2026.pdf"
+        fileSize="2.4 MB"
+        uploadedAt="25 Sep 2026, 14:15 WIB"
+        uploader="Direktorat Keuangan UGM"
+        status="disetujui"
+      />
 
       {/* 2. Grid 3 Kolom Proporsional (3 Baris Rapi, Nyaman & Tidak Terjepit) */}
       <div className="bg-white/95 backdrop-blur-sm p-3.5 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-2xs">
@@ -1473,6 +1497,21 @@ export default function DesignSystemPage() {
 
           {tableSimState === 'normal' && (
             <>
+              {/* Quick Filter Chips Baku */}
+              <div className="pb-1">
+                <QuickFilterChips
+                  chips={[
+                    { id: 'all', label: 'Semua Rekaman', count: 48 },
+                    { id: 'pending', label: 'Perlu Review Saya', count: 12 },
+                    { id: 'high', label: 'Pagu > 1 Milyar', count: 8 },
+                    { id: 'low-balance', label: 'Saldo Menipis (<10%)', count: 5 },
+                    { id: 'approved', label: 'Disetujui', count: 23 },
+                  ]}
+                  selectedChipId={selectedQuickChip}
+                  onSelect={setSelectedQuickChip}
+                />
+              </div>
+
               <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-2xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1933,6 +1972,109 @@ triggerToast('error', 'Gagal Memproses Permintaan', 'Koneksi database timeout.')
                 onSecondaryAction={() => alert('Aksi sekunder dipicu')}
                 secondaryLabel={emptyStateVariant === 'error' ? 'Bantuan Teknis' : undefined}
               />
+            </div>
+          </div>
+
+          {/* 7. Pratinjau Dokumen / PDF In-App (DocumentViewerModal) */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-rose-600" />
+                  7. Pratinjau Dokumen / PDF In-App (DocumentViewerModal)
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Memeriksa lampiran SK Rektor, Nota Dinas, atau bukti kwitansi langsung di browser tanpa perlu mendownload file lokal.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopy(`<DocumentViewerModal
+  isOpen={isOpen}
+  onClose={() => setIsOpen(false)}
+  title="SK_Rektor_Penetapan_Pagu_2026.pdf"
+  fileSize="2.4 MB"
+  uploader="Direktorat Keuangan UGM"
+  status="disetujui"
+/>`, 'doc-viewer-code')}
+                className="px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-1.5 transition-colors"
+              >
+                {copiedCode === 'doc-viewer-code' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                {copiedCode === 'doc-viewer-code' ? 'Tersalin!' : 'Salin Kode'}
+              </button>
+            </div>
+
+            <div className="p-4 rounded-xl border border-rose-100 bg-rose-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-rose-100 text-rose-700">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-800">
+                    SK_Rektor_Penetapan_Pagu_2026.pdf
+                  </h4>
+                  <p className="text-[11px] text-gray-500">
+                    Dilengkapi kontrol Zoom In/Out, Putar 90°, Unduh, Cetak, dan Pratinjau Resolusi Tinggi.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDocViewerOpen(true)}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <ZoomIn size={14} /> Buka Pratinjau Dokumen
+              </button>
+            </div>
+          </div>
+
+          {/* 8. Alur Tahapan Verifikasi & Persetujuan (Workflow Stepper) */}
+          <div className="space-y-2">
+            <VerificationStepper
+              currentStepIndex={activeStepIdx}
+              onStepClick={(step, idx) => {
+                setActiveStepIdx(idx);
+                triggerToast('info', `Tahap ${idx + 1}: ${step.title}`, `Status: ${step.status.toUpperCase()} • Penanggung Jawab: ${step.role}`);
+              }}
+            />
+            <div className="flex justify-end pr-2">
+              <button
+                type="button"
+                onClick={() => handleCopy(`<VerificationStepper
+  currentStepIndex={2}
+  onStepClick={(step, index) => console.log(step)}
+/>`, 'stepper-code')}
+                className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+              >
+                {copiedCode === 'stepper-code' ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                {copiedCode === 'stepper-code' ? 'Tersalin' : 'Salin Sintaks Stepper'}
+              </button>
+            </div>
+          </div>
+
+          {/* 9. Mode Gelap & Pencarian Cepat Global */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800">Mode Gelap / Terang (ThemeToggle)</span>
+                <ThemeToggle />
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Peralihan tema instan yang tersimpan di browser untuk kenyamanan mata pengguna saat lembur malam hari.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-gray-200 bg-white space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800">Pencarian Cepat (Ctrl + K)</span>
+                <kbd className="px-2 py-0.5 text-[10px] font-mono font-bold bg-slate-100 rounded border border-slate-300">
+                  Ctrl + K
+                </kbd>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                Tekan <code className="font-bold text-blue-600">Ctrl + K</code> di keyboard untuk mencari menu, unit kerja, atau unduh format Excel dalam 1 detik.
+              </p>
             </div>
           </div>
         </div>

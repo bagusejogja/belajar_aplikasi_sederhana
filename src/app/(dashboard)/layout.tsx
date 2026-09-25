@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
 import { menuList } from '@/lib/mock-db';
 import CommandPalette from '@/components/shared/CommandPalette';
+import ThemeToggle from '@/components/shared/ThemeToggle';
 
 export default function DashboardLayout({
   children,
@@ -270,7 +271,10 @@ export default function DashboardLayout({
                 </kbd>
               </button>
 
-              <button className="p-1.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-500 transition-all shadow-2xs" title="Notifikasi">
+              {/* Theme Toggle (Dark / Light Mode) */}
+              <ThemeToggle />
+
+              <button className="p-1.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-750 text-gray-500 dark:text-gray-300 transition-all shadow-2xs cursor-pointer" title="Notifikasi">
                  <Bell size={16} />
               </button>
            </div>
