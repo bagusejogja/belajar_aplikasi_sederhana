@@ -801,7 +801,7 @@ export default function MonitoringMakPage() {
                 <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="px-4 py-3 text-center w-10">No</th>
-                    <th className="px-4 py-3 min-w-[200px]">PIC Verifikator</th>
+                    <th className="px-4 py-3 min-w-[200px]">PIC</th>
                     <th className="px-3 py-3 text-center w-24">Total Tugas</th>
                     <th className="px-3 py-3 text-center w-28">Dalam Proses</th>
                     <th className="px-3 py-3 text-center w-24">Selesai</th>
@@ -1157,7 +1157,7 @@ export default function MonitoringMakPage() {
                 <tr>
                   <th className="px-4 py-3.5 text-center w-10">No</th>
                   <th className="px-4 py-3.5 min-w-[220px]">Unit Kerja & Pengaju</th>
-                  <th className="px-4 py-3.5 min-w-[170px]">PIC Verifikator</th>
+                  <th className="px-4 py-3.5 min-w-[150px]">PIC</th>
                   <th className="px-4 py-3.5 min-w-[190px]">Waktu Berkas (Masuk & Selesai)</th>
                   <th className="px-4 py-3.5 text-center min-w-[170px] bg-indigo-50/40 border-x border-indigo-100/60">
                     <div className="flex items-center justify-center gap-1 text-indigo-900">
@@ -1165,9 +1165,8 @@ export default function MonitoringMakPage() {
                       <span>Selisih Waktu (SLA)</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3.5 text-center w-28">Status</th>
                   <th className="px-4 py-3.5 min-w-[130px]">Lampiran</th>
-                  <th className="px-4 py-3.5 text-center w-24">Aksi</th>
+                  <th className="px-4 py-3.5 text-center min-w-[110px]">Status & Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -1220,7 +1219,7 @@ export default function MonitoringMakPage() {
                         </div>
                       </td>
 
-                      {/* PIC VERIFIKATOR */}
+                      {/* PIC */}
                       <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-[10px] border shrink-0 ${avatar.color}`}>
@@ -1230,12 +1229,12 @@ export default function MonitoringMakPage() {
                             <span className="text-xs font-black text-slate-800 block">
                               {row.pic || 'Tanpa PIC'}
                             </span>
-                            <span className="text-[9px] text-gray-400">Verifikator</span>
+                            <span className="text-[9px] text-gray-400">Petugas</span>
                           </div>
                         </div>
                       </td>
 
-                      {/* WAKTU BERKAS (MASUK & SELESAI) */}
+                      {/* WAKTU BERKAS (MASUK & SELESAI) - TANPA WIB */}
                       <td className="px-4 py-3.5 align-top pt-3.5 text-xs">
                         <div className="space-y-1.5">
                           {/* Tanggal Masuk */}
@@ -1246,7 +1245,7 @@ export default function MonitoringMakPage() {
                             <div className="leading-tight">
                               <span className="font-medium text-slate-600 block text-[10px]">Berkas Masuk:</span>
                               <span className="font-bold text-slate-900 font-mono text-[11px]">
-                                {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'} WIB
+                                {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'}
                               </span>
                             </div>
                           </div>
@@ -1260,7 +1259,7 @@ export default function MonitoringMakPage() {
                               <span className="font-medium text-slate-600 block text-[10px]">Waktu Selesai:</span>
                               {row.status === 'Selesai' && row.updated_at ? (
                                 <span className="font-bold text-emerald-900 font-mono text-[11px]">
-                                  {new Date(row.updated_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})} WIB
+                                  {new Date(row.updated_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
                                 </span>
                               ) : (
                                 <span className="text-amber-600 font-bold italic text-[10px]">
@@ -1272,7 +1271,7 @@ export default function MonitoringMakPage() {
                         </div>
                       </td>
 
-                      {/* 🔴 REQUIREMENT 2: SELISIH WAKTU / DURASI SELESAI (SLA) */}
+                      {/* SELISIH WAKTU / DURASI SELESAI (SLA) */}
                       <td className="px-4 py-3.5 align-top pt-3.5 text-center bg-indigo-50/20 border-x border-indigo-100/40">
                         <div className="flex flex-col items-center gap-1">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-mono shadow-2xs ${durationBadge.className}`}>
@@ -1282,21 +1281,6 @@ export default function MonitoringMakPage() {
                             {durationBadge.subtext}
                           </span>
                         </div>
-                      </td>
-
-                      {/* STATUS BERKAS */}
-                      <td className="px-4 py-3.5 align-top pt-3.5 text-center whitespace-nowrap">
-                        {row.status === 'Selesai' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-black text-[10px] uppercase tracking-wider border border-emerald-200 shadow-2xs">
-                            <CheckCircle2 size={12} className="text-emerald-600" />
-                            <span>Selesai</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-black text-[10px] uppercase tracking-wider border border-amber-200 shadow-2xs">
-                            <Clock size={12} className="text-amber-600" />
-                            <span>Proses</span>
-                          </span>
-                        )}
                       </td>
 
                       {/* LAMPIRAN DOKUMEN */}
@@ -1314,22 +1298,22 @@ export default function MonitoringMakPage() {
                         )}
                       </td>
 
-                      {/* AKSI */}
+                      {/* STATUS & AKSI (DIGABUNG: JIKA SELESAI -> TUNTAS, JIKA PROSES -> TOMBOL PROSES) */}
                       <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap text-center">
-                        {row.status !== 'Selesai' ? (
+                        {row.status === 'Selesai' ? (
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl font-black text-xs border border-emerald-200 shadow-2xs">
+                            <CheckCircle2 size={13} className="text-emerald-600" />
+                            <span>Tuntas</span>
+                          </div>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => setEmailModalId(row.id)}
-                            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-200 mx-auto active:scale-95"
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-xs shadow-indigo-200 mx-auto active:scale-95"
                           >
                             <Zap size={11} className="text-amber-300 fill-amber-300" />
                             <span>Proses</span>
                           </button>
-                        ) : (
-                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                            <Check size={12} />
-                            <span>Tuntas</span>
-                          </div>
                         )}
                       </td>
                     </tr>
