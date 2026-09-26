@@ -11,7 +11,7 @@ import {
   XCircle, Building2, FileText, Search, Sparkles, Download, 
   Zap, ChevronRight, ChevronDown, ChevronUp, Layers, ArrowUpRight, 
   ArrowDownRight, ExternalLink, Check, Info, History, RotateCcw, ShieldCheck, TrendingUp,
-  Coins, ShieldAlert
+  Coins, ShieldAlert, Settings, Trash2, Plus
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,9 +19,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-// PEMETAAN PEMBEBANAN ANGGARAN KHUSUS (Unit Pengusul -> Unit Pembebanan di DIPA/Pagu)
-// Kasus: GMC dibebankan ke Direktorat Keuangan, Masjid Kampus dibebankan ke Sekretaris Universitas
-const PEMBEBANAN_MAPPING: Record<number, { targetUnitId: number; targetUnitName: string; note: string }> = {
+// PEMETAAN PEMBEBANAN ANGGARAN DEFAULT (Unit Pengusul -> Unit Pembebanan di DIPA/Pagu)
+// Kasus default: GMC dibebankan ke Direktorat Keuangan, Masjid Kampus dibebankan ke Sekretaris Universitas
+const DEFAULT_PEMBEBANAN_MAPPING: Record<number, { targetUnitId: number; targetUnitName: string; note: string }> = {
   58: { targetUnitId: 22, targetUnitName: 'Direktorat Keuangan', note: 'Biaya kesehatan & kapitasi mahasiswa GMC dibebankan ke pagu Direktorat Keuangan' },
   52: { targetUnitId: 5, targetUnitName: 'Sekretaris Universitas', note: 'Bantuan operasional & kegiatan Ramadhan Masjid Kampus dibebankan ke pagu Sekretaris Universitas' }
 };
@@ -37,8 +37,34 @@ export default function KomparasiTambahPaguPage() {
   const [selectedAuditStatus, setSelectedAuditStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Toggle Mode Pembebanan Anggaran Khusus (GMC -> Dit Keu, Masjid -> Sekun)
+  // Dynamic Pembebanan Mapping State (bisa ditambah/diubah oleh user di modal)
+  const [pembebananMapping, setPembebananMapping] = useState<Record<number, { targetUnitId: number; targetUnitName: string; note: string }>>(DEFAULT_PEMBEBANAN_MAPPING);
   const [usePembebananMapping, setUsePembebananMapping] = useState<boolean>(true);
+  const [isPembebananModalOpen, setIsPembebananModalOpen] = useState(false);
+  const [newSourceUnitId, setNewSourceUnitId] = useState<string>('');
+  const [newTargetUnitId, setNewTargetUnitId] = useState<string>('');
+  const [newNote, setNewNote] = useState<string>('');
+
+  // Load pembebanan mapping dari localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('tambah_pagu_pembebanan_mapping');
+      if (saved) {
+        setPembebananMapping(JSON.parse(saved));
+      }
+    } catch (err) {
+      console.error("Gagal load pembebanan mapping:", err);
+    }
+  }, []);
+
+  const savePembebananMapping = (newMap: Record<number, { targetUnitId: number; targetUnitName: string; note: string }>) => {
+    setPembebananMapping(newMap);
+    try {
+      localStorage.setItem('tambah_pagu_pembebanan_mapping', JSON.stringify(newMap));
+    } catch (err) {
+      console.error("Gagal save pembebanan mapping:", err);
+    }
+  };
 
   // Accordion Expand State
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
@@ -157,7 +183,7 @@ export default function KomparasiTambahPaguPage() {
       });
 
       // 2. Jika unit ini adalah penerima titipan pembebanan (contoh: Dit Keu menerima beban GMC, Sekun menerima beban Masjid Kampus)
-      const delegatedSources = Object.entries(PEMBEBANAN_MAPPING)
+      const delegatedSources = Object.entries(pembebananMapping)
         .filter(([_, map]) => map.targetUnitId === u.id)
         .map(([srcId]) => Number(srcId));
 
@@ -167,11 +193,16 @@ export default function KomparasiTambahPaguPage() {
           const isFromSource = delegatedSources.includes(l.unit_id);
           const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
           return isFromSource && matchesYear;
-        }).map(l => ({
-          ...l,
-          is_delegated: true,
-          delegated_from: l.gov_units?.nama_unit || (l.unit_id === 58 ? 'Gama Medical Center (GMC)' : 'Masjid Kampus')
-        }));
+        }).map(l => {
+          const sourceMap = pembebananMapping[l.unit_id];
+          const sourceUnitName = l.gov_units?.nama_unit || unitList.find(un => un.id === l.unit_id)?.nama_unit || `Unit #${l.unit_id}`;
+          return {
+            ...l,
+            is_delegated: true,
+            delegated_from: sourceUnitName,
+            delegated_note: sourceMap?.note || null
+          };
+        });
       }
 
       // Gabungkan surat internal + surat titipan pembebanan
@@ -212,7 +243,7 @@ export default function KomparasiTambahPaguPage() {
       const diff = totalSuratNominalDisetujui - totalGovPaguTambah;
 
       // Status Audit
-      const isDelegatedOrigin = usePembebananMapping && PEMBEBANAN_MAPPING[u.id];
+      const isDelegatedOrigin = usePembebananMapping && pembebananMapping[u.id];
       let auditStatus: 'MATCH' | 'KELEWAT' | 'SELISIH' | 'KOSONG' | 'DIBEBANKAN' = 'KOSONG';
 
       if (isDelegatedOrigin) {
@@ -249,7 +280,7 @@ export default function KomparasiTambahPaguPage() {
 
     // 🔴 REQUIREMENT: FILTER OUT UNITS WITH 0 MUTATION
     return calculated.filter(u => u.surat_nominal_disetujui > 0 || u.total_gov_tambah > 0 || u.total_surat_count > 0);
-  }, [unitList, rawTambahPagu, rawGovPagu, selectedYear, usePembebananMapping]);
+  }, [unitList, rawTambahPagu, rawGovPagu, selectedYear, usePembebananMapping, pembebananMapping]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -822,20 +853,30 @@ export default function KomparasiTambahPaguPage() {
             />
           </div>
 
-          {/* Toggle Pembebanan Anggaran Khusus */}
-          <div>
+          {/* Toggle & Atur Pembebanan Anggaran Khusus */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setUsePembebananMapping(prev => !prev)}
-              className={`w-full h-9 px-3 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs ${
+              className={`flex-1 h-9 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs ${
                 usePembebananMapping
                   ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                   : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
               }`}
-              title="Klik untuk beralih antara mode pembebanan anggaran khusus (GMC -> Dit Keu, Masjid -> Sekun) atau mode pengusul murni"
+              title="Klik untuk beralih antara mode pembebanan anggaran khusus atau mode pengusul murni"
             >
               <ShieldAlert size={13} className={usePembebananMapping ? 'text-amber-600' : 'text-gray-400'} />
-              <span className="truncate">{usePembebananMapping ? '⚡ Beban GMC & Masjid' : 'Standar Pengusul'}</span>
+              <span className="truncate">{usePembebananMapping ? '⚡ Beban Dialihkan' : 'Standar Pengusul'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsPembebananModalOpen(true)}
+              className="h-9 px-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1 shrink-0"
+              title="Kelola & Atur Pembebanan Anggaran Antar Unit"
+            >
+              <Settings size={14} className="text-indigo-600" />
+              <span>Set ({Object.keys(pembebananMapping).length})</span>
             </button>
           </div>
         </div>
@@ -910,81 +951,106 @@ export default function KomparasiTambahPaguPage() {
 
                   return (
                     <React.Fragment key={u.id}>
-                      {/* PARENT ROW: UNIT AUDIT SUMMARY */}
-                      <TableRow 
-                        onClick={() => toggleUnitAccordion(u.id)}
-                        className={`cursor-pointer transition-colors border-b border-slate-100 text-xs ${
-                          isExpanded ? 'bg-indigo-50/50 hover:bg-indigo-50' : 'hover:bg-slate-50'
-                        }`}
-                      >
-                        <TableCell className="text-center">
-                          <button className="p-1 rounded-md text-slate-400 hover:text-slate-800">
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-center font-bold text-gray-400 align-top pt-3.5">{rowNumber}</TableCell>
-                        
-                        {/* UNIT NAME & GROUP */}
-                        <TableCell className="align-top pt-3 space-y-1">
-                          <div className="flex items-center gap-1.5 font-black text-slate-900">
-                            <Building2 size={14} className="text-indigo-600 shrink-0" />
-                            <span>{u.nama_unit}</span>
-                          </div>
-                          <span className="text-[10px] text-indigo-700 font-semibold px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md inline-block">
-                            {u.group_org}
-                          </span>
-                        </TableCell>
+                      {/* PARENT ROW: UNIT AUDIT SUMMARY WITH HIGH-CONTRAST HIGHLIGHTING */}
+                      {(() => {
+                        let rowHighlightClass = "border-b border-slate-100 transition-colors cursor-pointer text-xs";
+                        if (u.audit_status === 'SELISIH') {
+                          rowHighlightClass += isExpanded 
+                            ? " bg-amber-100/80 hover:bg-amber-100 border-l-4 border-l-amber-500 shadow-xs" 
+                            : " bg-amber-50/60 hover:bg-amber-100/70 border-l-4 border-l-amber-500";
+                        } else if (u.audit_status === 'KELEWAT') {
+                          rowHighlightClass += isExpanded 
+                            ? " bg-rose-100/80 hover:bg-rose-100 border-l-4 border-l-rose-500 shadow-xs" 
+                            : " bg-rose-50/60 hover:bg-rose-100/70 border-l-4 border-l-rose-500";
+                        } else if (u.audit_status === 'MATCH') {
+                          rowHighlightClass += isExpanded 
+                            ? " bg-emerald-50 hover:bg-emerald-100/70 border-l-4 border-l-emerald-500" 
+                            : " hover:bg-emerald-50/40 border-l-4 border-l-emerald-400/60";
+                        } else if (u.audit_status === 'DIBEBANKAN') {
+                          rowHighlightClass += isExpanded 
+                            ? " bg-sky-50 hover:bg-sky-100/70 border-l-4 border-l-sky-500" 
+                            : " hover:bg-sky-50/40 border-l-4 border-l-sky-400/60";
+                        } else {
+                          rowHighlightClass += isExpanded ? " bg-slate-100" : " hover:bg-slate-50";
+                        }
 
-                        {/* SURAT DISETUJUI NOMINAL */}
-                        <TableCell className="text-right align-top pt-3 space-y-1">
-                          <div className="font-mono font-bold text-amber-900">Rp {formatRp(u.surat_nominal_disetujui)}</div>
-                          <div className="text-[10px] text-slate-500 font-semibold">
-                            {u.approved_surat_count} Surat Disetujui
-                            {u.audit_status === 'DIBEBANKAN' && <span className="text-sky-600 block text-[9px] font-medium">(Beban ke {u.delegated_to})</span>}
-                          </div>
-                        </TableCell>
+                        return (
+                          <TableRow 
+                            onClick={() => toggleUnitAccordion(u.id)}
+                            className={rowHighlightClass}
+                          >
+                            <TableCell className="text-center">
+                              <button className="p-1 rounded-md text-slate-500 hover:text-slate-800">
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                            </TableCell>
+                            <TableCell className="text-center font-bold text-gray-400 align-top pt-3.5">{rowNumber}</TableCell>
+                            
+                            {/* UNIT NAME & GROUP */}
+                            <TableCell className="align-top pt-3 space-y-1">
+                              <div className="flex items-center gap-1.5 font-black text-slate-900">
+                                <Building2 size={14} className="text-indigo-600 shrink-0" />
+                                <span>{u.nama_unit}</span>
+                              </div>
+                              <span className="text-[10px] text-indigo-700 font-semibold px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md inline-block">
+                                {u.group_org}
+                              </span>
+                            </TableCell>
 
-                        {/* GOV PAGU NOMINAL */}
-                        <TableCell className="text-right align-top pt-3 space-y-1">
-                          <div className="flex justify-end items-center gap-2">
-                            {(u.selisih === 0 && (u.surat_nominal_disetujui > 0 || u.audit_status === 'DIBEBANKAN')) && (
-                              <CheckCircle2 size={16} className="text-emerald-500" />
-                            )}
-                            <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {u.audit_status === 'DIBEBANKAN' 
-                              ? `Dialihkan ke ${u.delegated_to}` 
-                              : `Inisiatif: Rp ${formatRp(u.gov_inisiatif)} | Penugasan: Rp ${formatRp(u.gov_penugasan)}`}
-                          </div>
-                        </TableCell>
+                            {/* SURAT DISETUJUI NOMINAL */}
+                            <TableCell className="text-right align-top pt-3 space-y-1">
+                              <div className="font-mono font-bold text-amber-900">Rp {formatRp(u.surat_nominal_disetujui)}</div>
+                              <div className="text-[10px] text-slate-500 font-semibold">
+                                {u.approved_surat_count} Surat Disetujui
+                                {u.audit_status === 'DIBEBANKAN' && <span className="text-sky-600 block text-[9px] font-medium">(Beban ke {u.delegated_to})</span>}
+                              </div>
+                            </TableCell>
 
-                        {/* SELISIH / DIFF */}
-                        <TableCell className="text-right align-top pt-3 space-y-1">
-                          {u.audit_status === 'DIBEBANKAN' ? (
-                            <div className="inline-flex items-center gap-1 font-mono font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
-                              <Info size={12} className="text-sky-600" />
-                              <span>Rp 0 (Dialihkan)</span>
-                            </div>
-                          ) : u.selisih === 0 ? (
-                            <div className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                              <CheckCircle2 size={12} className="text-emerald-500" />
-                              <span>Rp 0</span>
-                            </div>
-                          ) : (
-                            <div className={`font-mono font-black ${u.selisih > 0 ? 'text-amber-700' : 'text-purple-700'}`}>
-                              {u.selisih > 0 ? `+Rp ${formatRp(u.selisih)}` : `-Rp ${formatRp(Math.abs(u.selisih))}`}
-                            </div>
-                          )}
-                          <div className="text-[10px] text-gray-400">
-                            {u.audit_status === 'DIBEBANKAN' 
-                              ? `Beban ${u.delegated_to}` 
-                              : (u.selisih === 0 ? 'Tepat Sesuai' : (u.selisih > 0 ? 'Surat > DB' : 'Surat < DB'))}
-                          </div>
-                        </TableCell>
+                            {/* GOV PAGU NOMINAL */}
+                            <TableCell className="text-right align-top pt-3 space-y-1">
+                              <div className="flex justify-end items-center gap-2">
+                                {(u.selisih === 0 && (u.surat_nominal_disetujui > 0 || u.audit_status === 'DIBEBANKAN')) && (
+                                  <CheckCircle2 size={16} className="text-emerald-500" />
+                                )}
+                                <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                {u.audit_status === 'DIBEBANKAN' 
+                                  ? `Dialihkan ke ${u.delegated_to}` 
+                                  : `Inisiatif: Rp ${formatRp(u.gov_inisiatif)} | Penugasan: Rp ${formatRp(u.gov_penugasan)}`}
+                              </div>
+                            </TableCell>
 
-                        {/* STATUS AUDIT & AKSI SINKRON */}
-                        <TableCell className="text-center align-top pt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                            {/* SELISIH / DIFF WITH EYE-CATCHING HIGHLIGHT */}
+                            <TableCell className="text-right align-top pt-3 space-y-1">
+                              {u.audit_status === 'DIBEBANKAN' ? (
+                                <div className="inline-flex items-center gap-1 font-mono font-bold text-sky-800 bg-sky-100/90 px-2.5 py-1 rounded-lg border border-sky-300 shadow-2xs">
+                                  <Info size={12} className="text-sky-600" />
+                                  <span>Rp 0 (Dialihkan)</span>
+                                </div>
+                              ) : u.selisih === 0 ? (
+                                <div className="inline-flex items-center gap-1 font-mono font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-300 shadow-2xs">
+                                  <CheckCircle2 size={13} className="text-emerald-600" />
+                                  <span>Rp 0 (Cocok)</span>
+                                </div>
+                              ) : (
+                                <div className={`inline-block px-2.5 py-1 rounded-lg font-mono font-black shadow-2xs border ${
+                                  u.selisih > 0 
+                                    ? 'bg-amber-100 text-amber-950 border-amber-300' 
+                                    : 'bg-rose-100 text-rose-950 border-rose-300'
+                                }`}>
+                                  {u.selisih > 0 ? `+Rp ${formatRp(u.selisih)}` : `-Rp ${formatRp(Math.abs(u.selisih))}`}
+                                </div>
+                              )}
+                              <div className="text-[10px] font-semibold text-slate-500">
+                                {u.audit_status === 'DIBEBANKAN' 
+                                  ? `Beban ${u.delegated_to}` 
+                                  : (u.selisih === 0 ? 'Tepat Sesuai' : (u.selisih > 0 ? 'Surat > DB (Belum Tercatat)' : 'Surat < DB (Kelebihan)'))}
+                              </div>
+                            </TableCell>
+
+                            {/* STATUS AUDIT & AKSI SINKRON */}
+                            <TableCell className="text-center align-top pt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                           <div>
                             {u.audit_status === 'DIBEBANKAN' && (
                               <Badge className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-black px-2 py-0.5 shadow-2xs" title={u.delegated_note || ''}>
@@ -1043,8 +1109,9 @@ export default function KomparasiTambahPaguPage() {
                             )}
                           </div>
                         </TableCell>
-
                       </TableRow>
+                    );
+                  })()}
 
                       {/* 🔴 REQUIREMENT 3: ACCORDION CHILD ROW - DETAIL SURAT PENGAJUAN PER UNIT */}
                       {isExpanded && (
@@ -1087,8 +1154,16 @@ export default function KomparasiTambahPaguPage() {
                                       ) : (
                                         u.letters.map((subItem: any, subIdx: number) => {
                                           const nominalDisetujui = getSuratDisetujuiNominal(subItem);
+                                          const isFoundInDb = dbRows.some(r => Number(r.nominal) === nominalDisetujui && nominalDisetujui > 0);
+
+                                          const subRowClass = isFoundInDb
+                                            ? "bg-emerald-50/70 hover:bg-emerald-100/70 border-l-4 border-l-emerald-500 border-b border-emerald-100/80 text-xs"
+                                            : nominalDisetujui > 0
+                                              ? "bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-l-rose-500 border-b border-rose-100 text-xs"
+                                              : "hover:bg-slate-50 border-b border-slate-100 text-xs";
+
                                           return (
-                                            <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
+                                            <TableRow key={subItem.id || subIdx} className={subRowClass}>
                                               <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{subIdx + 1}</TableCell>
                                               <TableCell className="space-y-1">
                                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1112,12 +1187,26 @@ export default function KomparasiTambahPaguPage() {
                                                   )}
                                                 </div>
                                               </TableCell>
-                                              <TableCell className="text-right font-mono font-black text-emerald-700 text-xs align-top pt-3">
-                                                <div className="flex items-center justify-end gap-1.5">
-                                                  {dbRows.some(r => Number(r.nominal) === nominalDisetujui) && (
-                                                    <CheckCircle2 size={16} className="text-emerald-500" />
+                                              <TableCell className="text-right align-top pt-3 space-y-1">
+                                                <div className="font-mono font-black text-xs">
+                                                  <span className={isFoundInDb ? 'text-emerald-700' : nominalDisetujui > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-500'}>
+                                                    Rp {formatRp(nominalDisetujui)}
+                                                  </span>
+                                                </div>
+                                                <div>
+                                                  {isFoundInDb ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                      <CheckCircle2 size={11} className="text-emerald-600" />
+                                                      <span>Sudah Dicatat di DB</span>
+                                                    </span>
+                                                  ) : nominalDisetujui > 0 ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs">
+                                                      <AlertTriangle size={11} className="text-rose-600" />
+                                                      <span>Belum Masuk DB</span>
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-[10px] text-slate-400">Rp 0 / Ditolak</span>
                                                   )}
-                                                  <span>Rp {formatRp(nominalDisetujui)}</span>
                                                 </div>
                                               </TableCell>
                                             </TableRow>
@@ -1155,29 +1244,46 @@ export default function KomparasiTambahPaguPage() {
                                             </TableRow>
                                           );
                                         }
-                                        return dbRows.map((dbRow: any, dbIdx: number) => (
-                                          <TableRow key={dbRow.id || dbIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
-                                            <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{dbIdx + 1}</TableCell>
-                                            <TableCell className="space-y-1">
-                                              <div className="font-bold text-slate-900 font-mono text-[11px] capitalize">
-                                                {dbRow.jenis_anggaran || '-'}
-                                              </div>
-                                              {dbRow.keterangan && (
-                                                <div className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">
-                                                  Keterangan: {dbRow.keterangan}
+                                        return dbRows.map((dbRow: any, dbIdx: number) => {
+                                          const isMatchedInLetters = u.letters.some((l: any) => getSuratDisetujuiNominal(l) === Number(dbRow.nominal) && Number(dbRow.nominal) > 0);
+                                          const dbRowClass = isMatchedInLetters
+                                            ? "bg-emerald-50/70 hover:bg-emerald-100/70 border-l-4 border-l-emerald-500 border-b border-emerald-100/80 text-xs"
+                                            : "bg-amber-50/80 hover:bg-amber-100/80 border-l-4 border-l-amber-500 border-b border-amber-100 text-xs";
+
+                                          return (
+                                            <TableRow key={dbRow.id || dbIdx} className={dbRowClass}>
+                                              <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{dbIdx + 1}</TableCell>
+                                              <TableCell className="space-y-1">
+                                                <div className="font-bold text-slate-900 font-mono text-[11px] capitalize">
+                                                  {dbRow.jenis_anggaran || '-'}
                                                 </div>
-                                              )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono font-black text-emerald-800 text-xs align-top pt-3">
-                                              <div className="flex items-center justify-end gap-1.5">
-                                                {u.letters.some((l: any) => Number(l.nominal_tanggapan || l.nominal_disetujui || 0) === Number(dbRow.nominal)) && (
-                                                  <CheckCircle2 size={16} className="text-emerald-500" />
+                                                {dbRow.keterangan && (
+                                                  <div className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">
+                                                    Keterangan: {dbRow.keterangan}
+                                                  </div>
                                                 )}
-                                                <span>Rp {formatRp(dbRow.nominal)}</span>
-                                              </div>
-                                            </TableCell>
-                                          </TableRow>
-                                        ));
+                                              </TableCell>
+                                              <TableCell className="text-right align-top pt-3 space-y-1">
+                                                <div className="font-mono font-black text-emerald-800 text-xs">
+                                                  Rp {formatRp(dbRow.nominal)}
+                                                </div>
+                                                <div>
+                                                  {isMatchedInLetters ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                      <CheckCircle2 size={11} className="text-emerald-600" />
+                                                      <span>Sesuai Surat Usulan</span>
+                                                    </span>
+                                                  ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                                                      <AlertTriangle size={11} className="text-amber-600" />
+                                                      <span>DB Tanpa Surat Usulan</span>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        });
                                       })()}
                                     </TableBody>
                                   </Table>
@@ -1642,6 +1748,232 @@ export default function KomparasiTambahPaguPage() {
                 )}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🔴 REQUIREMENT: DIALOG KELOLA PEMBEBANAN ANGGARAN ANTAR UNIT */}
+      <Dialog open={isPembebananModalOpen} onOpenChange={setIsPembebananModalOpen}>
+        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[750px] w-full rounded-3xl p-6 shadow-2xl overflow-hidden">
+          <DialogHeader className="border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
+                <Settings size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-black text-slate-900">
+                  Pengaturan Pembebanan Anggaran Khusus
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 font-medium mt-0.5">
+                  Tentukan unit pengusul yang pagu tambahannya dibukukan / dibebankan ke DIPA unit kerja lain.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-5 text-xs max-h-[60vh] overflow-y-auto pr-1 py-1">
+            {/* Callout Informasi */}
+            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-950 flex items-start gap-2.5">
+              <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <strong>Cara Kerja:</strong> Surat usulan dari <em>Unit Pengusul</em> akan otomatis dikonsolidasikan ke <em>Unit Pembebanan</em> pada perhitungan komparasi audit. Status unit pengusul akan ditandai <code className="bg-amber-100 px-1 py-0.5 rounded font-bold">ℹ️ DIBEBANKAN</code> dengan selisih Rp 0, dan pagu DB di unit pembebanan akan terverifikasi secara akurat tanpa <em>false alarm</em>.
+              </div>
+            </div>
+
+            {/* TABEL ATURAN PEMBEBANAN AKTIF */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-indigo-600" />
+                  <span>Daftar Aturan Pembebanan Aktif ({Object.keys(pembebananMapping).length})</span>
+                </h4>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/50">
+                <Table>
+                  <TableHeader className="bg-slate-100/80 text-[10px] uppercase font-bold text-slate-500">
+                    <TableRow>
+                      <TableHead className="w-8 text-center">No</TableHead>
+                      <TableHead>Unit Pengusul (Sumber)</TableHead>
+                      <TableHead className="w-8 text-center"></TableHead>
+                      <TableHead>Unit Pembebanan (Tujuan DIPA)</TableHead>
+                      <TableHead>Catatan / Alasan</TableHead>
+                      <TableHead className="w-12 text-center">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.keys(pembebananMapping).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-6 text-slate-400">
+                          Belum ada pembebanan khusus yang disetel.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      Object.entries(pembebananMapping).map(([srcIdStr, map], idx) => {
+                        const srcId = Number(srcIdStr);
+                        const srcUnit = unitList.find(u => u.id === srcId);
+                        const srcName = srcUnit?.nama_unit || `Unit ID ${srcId}`;
+
+                        return (
+                          <TableRow key={srcId} className="hover:bg-white text-xs border-b border-slate-200/60">
+                            <TableCell className="text-center font-bold text-slate-400">{idx + 1}</TableCell>
+                            <TableCell className="font-bold text-slate-900">
+                              <span className="text-indigo-700 block font-mono text-[10px]">ID: {srcId}</span>
+                              {srcName}
+                            </TableCell>
+                            <TableCell className="text-center text-slate-400 font-bold">→</TableCell>
+                            <TableCell className="font-bold text-emerald-800">
+                              <span className="text-emerald-600 block font-mono text-[10px]">ID: {map.targetUnitId}</span>
+                              {map.targetUnitName}
+                            </TableCell>
+                            <TableCell className="text-slate-600 text-[11px] leading-relaxed">
+                              {map.note || '-'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirm(`Hapus pembebanan untuk ${srcName}?`)) {
+                                    const next = { ...pembebananMapping };
+                                    delete next[srcId];
+                                    savePembebananMapping(next);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                                title="Hapus Pembebanan"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* FORM TAMBAH PEMBEBANAN BARU */}
+            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+              <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Plus size={14} className="text-indigo-600" />
+                <span>Tambah Aturan Pembebanan Baru</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    1. Unit Pengusul (Sumber Surat):
+                  </label>
+                  <select
+                    value={newSourceUnitId}
+                    onChange={(e) => setNewSourceUnitId(e.target.value)}
+                    className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="">-- Pilih Unit Pengusul --</option>
+                    {unitList.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.nama_unit} ({u.kode_unit || `ID ${u.id}`})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    2. Unit Pembebanan (Tujuan DIPA/Pagu):
+                  </label>
+                  <select
+                    value={newTargetUnitId}
+                    onChange={(e) => setNewTargetUnitId(e.target.value)}
+                    className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="">-- Pilih Unit Pembebanan --</option>
+                    {unitList.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.nama_unit} ({u.kode_unit || `ID ${u.id}`})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  3. Catatan / Alasan Pembebanan (Opsional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Operasional kegiatan dibebankan ke DIPA Direktorat..."
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (!newSourceUnitId || !newTargetUnitId) {
+                      alert("Silakan pilih Unit Pengusul dan Unit Pembebanan terlebih dahulu.");
+                      return;
+                    }
+                    if (newSourceUnitId === newTargetUnitId) {
+                      alert("Unit Pengusul dan Unit Pembebanan tidak boleh sama.");
+                      return;
+                    }
+
+                    const srcIdNum = Number(newSourceUnitId);
+                    const targetIdNum = Number(newTargetUnitId);
+                    const targetUnit = unitList.find(u => u.id === targetIdNum);
+
+                    const next = {
+                      ...pembebananMapping,
+                      [srcIdNum]: {
+                        targetUnitId: targetIdNum,
+                        targetUnitName: targetUnit?.nama_unit || `Unit ID ${targetIdNum}`,
+                        note: newNote.trim() || 'Pembebanan dialihkan ke unit lain'
+                      }
+                    };
+
+                    savePembebananMapping(next);
+                    setNewSourceUnitId('');
+                    setNewTargetUnitId('');
+                    setNewNote('');
+                    alert("Berhasil menambahkan aturan pembebanan anggaran!");
+                  }}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs h-8 px-4 flex items-center gap-1.5"
+                >
+                  <Plus size={13} />
+                  <span>Tambahkan Aturan</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-slate-100 pt-4 flex flex-row items-center justify-between sm:justify-between w-full">
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm("Kembalikan pembebanan ke default (GMC -> Dit. Keuangan & Masjid Kampus -> Sekun)?")) {
+                  savePembebananMapping(DEFAULT_PEMBEBANAN_MAPPING);
+                }
+              }}
+              className="text-xs text-slate-500 hover:text-slate-800 underline font-medium"
+            >
+              Reset ke Default (GMC & Masjid)
+            </button>
+
+            <Button
+              type="button"
+              onClick={() => setIsPembebananModalOpen(false)}
+              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs h-9 px-5"
+            >
+              Selesai & Terapkan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
