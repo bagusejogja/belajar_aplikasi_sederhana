@@ -153,6 +153,11 @@ export default function KomparasiTambahPaguPage() {
   // Helper: Ambil nominal persetujuan surat sesuai rumus resmi di /tambah-pagu
   const getSuratDisetujuiNominal = (l: any): number => {
     const status = (l.status_pengajuan || '').toLowerCase();
+    // 🔴 REQUIREMENT: Jika status Ditolak, nominal selalu 0
+    if (status.includes('tolak')) {
+      return 0;
+    }
+
     const isApprovedAll = status.includes('semua') || status.includes('100');
     const isApprovedPartial = status.includes('sebagian');
     const isGeneralApproved = status.includes('disetujui') || status.includes('setuju');
@@ -174,8 +179,12 @@ export default function KomparasiTambahPaguPage() {
     const calculated = unitList.map(u => {
       const uName = u.nama_unit.toLowerCase();
 
-      // 1. Surat-surat usulan tambah_pagu milik unit ini
+      // 1. Surat-surat usulan tambah_pagu milik unit ini (Abaikan status Ditolak / nominal 0)
       let uLetters = rawTambahPagu.filter(l => {
+        const status = (l.status_pengajuan || '').toLowerCase();
+        // 🔴 REQUIREMENT: Surat Ditolak tidak usah ditampilkan untuk dibandingkan
+        if (status.includes('tolak')) return false;
+
         const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || '').toLowerCase();
         const matchesUnit = letterUnit === uName || l.unit_id === u.id;
         const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
@@ -190,6 +199,10 @@ export default function KomparasiTambahPaguPage() {
       let delegatedLetters: any[] = [];
       if (usePembebananMapping && delegatedSources.length > 0) {
         delegatedLetters = rawTambahPagu.filter(l => {
+          const status = (l.status_pengajuan || '').toLowerCase();
+          // 🔴 REQUIREMENT: Surat Ditolak tidak usah ditampilkan untuk dibandingkan
+          if (status.includes('tolak')) return false;
+
           const isFromSource = delegatedSources.includes(l.unit_id);
           const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
           return isFromSource && matchesYear;
@@ -205,8 +218,11 @@ export default function KomparasiTambahPaguPage() {
         });
       }
 
-      // Gabungkan surat internal + surat titipan pembebanan
-      const combinedLetters = [...uLetters, ...delegatedLetters];
+      // Gabungkan surat internal + surat titipan pembebanan (tanpa surat ditolak)
+      const combinedLetters = [...uLetters, ...delegatedLetters].filter(l => {
+        const status = (l.status_pengajuan || '').toLowerCase();
+        return !status.includes('tolak');
+      });
 
       const approvedLetters = combinedLetters.filter(l => 
         getSuratDisetujuiNominal(l) > 0 || (l.status_pengajuan || '').toLowerCase().includes('disetujui')
