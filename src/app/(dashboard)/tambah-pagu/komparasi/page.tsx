@@ -19,11 +19,34 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
+// TIPE ATURAN PEMBEBANAN ANGGARAN (DAPAT BERLAKU SEMUA SURAT ATAU SURAT TERTENTU)
+export interface PembebananConfig {
+  sourceUnitId: number;
+  sourceUnitName?: string;
+  targetUnitId: number;
+  targetUnitName: string;
+  scope: 'ALL' | 'SELECTED'; // 'ALL' = seluruh surat unit, 'SELECTED' = surat tertentu saja
+  selectedLetterIds?: number[]; // daftar ID surat yang dipindahkan
+  note: string;
+}
+
 // PEMETAAN PEMBEBANAN ANGGARAN DEFAULT (Unit Pengusul -> Unit Pembebanan di DIPA/Pagu)
 // Kasus default: GMC dibebankan ke Direktorat Keuangan, Masjid Kampus dibebankan ke Sekretaris Universitas
-const DEFAULT_PEMBEBANAN_MAPPING: Record<number, { targetUnitId: number; targetUnitName: string; note: string }> = {
-  58: { targetUnitId: 22, targetUnitName: 'Direktorat Keuangan', note: 'Biaya kesehatan & kapitasi mahasiswa GMC dibebankan ke pagu Direktorat Keuangan' },
-  52: { targetUnitId: 5, targetUnitName: 'Sekretaris Universitas', note: 'Bantuan operasional & kegiatan Ramadhan Masjid Kampus dibebankan ke pagu Sekretaris Universitas' }
+const DEFAULT_PEMBEBANAN_MAPPING: Record<number, PembebananConfig> = {
+  58: { 
+    sourceUnitId: 58, 
+    targetUnitId: 22, 
+    targetUnitName: 'Direktorat Keuangan', 
+    scope: 'ALL', 
+    note: 'Biaya kesehatan & kapitasi mahasiswa GMC dibebankan ke pagu Direktorat Keuangan' 
+  },
+  52: { 
+    sourceUnitId: 52, 
+    targetUnitId: 5, 
+    targetUnitName: 'Sekretaris Universitas', 
+    scope: 'ALL', 
+    note: 'Bantuan operasional & kegiatan Ramadhan Masjid Kampus dibebankan ke pagu Sekretaris Universitas' 
+  }
 };
 
 export default function KomparasiTambahPaguPage() {
@@ -38,11 +61,13 @@ export default function KomparasiTambahPaguPage() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Dynamic Pembebanan Mapping State (bisa ditambah/diubah oleh user di modal)
-  const [pembebananMapping, setPembebananMapping] = useState<Record<number, { targetUnitId: number; targetUnitName: string; note: string }>>(DEFAULT_PEMBEBANAN_MAPPING);
+  const [pembebananMapping, setPembebananMapping] = useState<Record<number, PembebananConfig>>(DEFAULT_PEMBEBANAN_MAPPING);
   const [usePembebananMapping, setUsePembebananMapping] = useState<boolean>(true);
   const [isPembebananModalOpen, setIsPembebananModalOpen] = useState(false);
   const [newSourceUnitId, setNewSourceUnitId] = useState<string>('');
   const [newTargetUnitId, setNewTargetUnitId] = useState<string>('');
+  const [newScope, setNewScope] = useState<'ALL' | 'SELECTED'>('ALL');
+  const [newSelectedLetterIds, setNewSelectedLetterIds] = useState<number[]>([]);
   const [newNote, setNewNote] = useState<string>('');
 
   // Load pembebanan mapping dari localStorage
@@ -57,7 +82,7 @@ export default function KomparasiTambahPaguPage() {
     }
   }, []);
 
-  const savePembebananMapping = (newMap: Record<number, { targetUnitId: number; targetUnitName: string; note: string }>) => {
+  const savePembebananMapping = (newMap: Record<number, PembebananConfig>) => {
     setPembebananMapping(newMap);
     try {
       localStorage.setItem('tambah_pagu_pembebanan_mapping', JSON.stringify(newMap));
@@ -174,12 +199,33 @@ export default function KomparasiTambahPaguPage() {
     return 0;
   };
 
+  // Surat usulan dari unit pengusul yang sedang dipilih di form modal pembebanan
+  const sourceLettersForForm = useMemo(() => {
+    if (!newSourceUnitId) return [];
+    const srcIdNum = Number(newSourceUnitId);
+    const srcUnitObj = unitList.find(u => u.id === srcIdNum);
+    const srcUnitName = (srcUnitObj?.nama_unit || '').toLowerCase();
+
+    return rawTambahPagu.filter(l => {
+      const status = (l.status_pengajuan || '').toLowerCase();
+      // Surat Ditolak tidak usah ditampilkan
+      if (status.includes('tolak')) return false;
+
+      const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || '').toLowerCase();
+      const matchesUnit = l.unit_id === srcIdNum || (srcUnitName && letterUnit === srcUnitName);
+      const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
+      return matchesUnit && matchesYear;
+    });
+  }, [newSourceUnitId, unitList, rawTambahPagu, selectedYear]);
+
   // AUDIT CALCULATION PER UNIT KERJA (EXCLUDING UNITS WITH 0 MUTATION)
   const auditUnitComparison = useMemo(() => {
     const calculated = unitList.map(u => {
       const uName = u.nama_unit.toLowerCase();
 
       // 1. Surat-surat usulan tambah_pagu milik unit ini (Abaikan status Ditolak / nominal 0)
+      const ruleFromU = usePembebananMapping ? pembebananMapping[u.id] : null;
+
       let uLetters = rawTambahPagu.filter(l => {
         const status = (l.status_pengajuan || '').toLowerCase();
         // 🔴 REQUIREMENT: Surat Ditolak tidak usah ditampilkan untuk dibandingkan
@@ -189,54 +235,79 @@ export default function KomparasiTambahPaguPage() {
         const matchesUnit = letterUnit === uName || l.unit_id === u.id;
         const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
         return matchesUnit && matchesYear;
+      }).map(l => {
+        let isTransferredOut = false;
+        let transferredTo: string | null = null;
+        let transferredNote: string | null = null;
+
+        if (ruleFromU) {
+          const isScopeAll = ruleFromU.scope === 'ALL' || !ruleFromU.scope;
+          const isSelected = ruleFromU.scope === 'SELECTED' && (ruleFromU.selectedLetterIds || []).includes(l.id);
+          if (isScopeAll || isSelected) {
+            isTransferredOut = true;
+            transferredTo = ruleFromU.targetUnitName;
+            transferredNote = ruleFromU.note;
+          }
+        }
+
+        return {
+          ...l,
+          is_transferred_out: isTransferredOut,
+          transferred_to: transferredTo,
+          transferred_note: transferredNote
+        };
       });
 
       // 2. Jika unit ini adalah penerima titipan pembebanan (contoh: Dit Keu menerima beban GMC, Sekun menerima beban Masjid Kampus)
-      const delegatedSources = Object.entries(pembebananMapping)
-        .filter(([_, map]) => map.targetUnitId === u.id)
-        .map(([srcId]) => Number(srcId));
-
       let delegatedLetters: any[] = [];
-      if (usePembebananMapping && delegatedSources.length > 0) {
-        delegatedLetters = rawTambahPagu.filter(l => {
-          const status = (l.status_pengajuan || '').toLowerCase();
-          // 🔴 REQUIREMENT: Surat Ditolak tidak usah ditampilkan untuk dibandingkan
-          if (status.includes('tolak')) return false;
+      if (usePembebananMapping) {
+        Object.entries(pembebananMapping).forEach(([srcIdStr, rule]) => {
+          if (rule.targetUnitId === u.id) {
+            const srcId = Number(srcIdStr);
+            const srcUnit = unitList.find(un => un.id === srcId);
+            const srcName = srcUnit?.nama_unit || `Unit #${srcId}`;
 
-          const isFromSource = delegatedSources.includes(l.unit_id);
-          const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
-          return isFromSource && matchesYear;
-        }).map(l => {
-          const sourceMap = pembebananMapping[l.unit_id];
-          const sourceUnitName = l.gov_units?.nama_unit || unitList.find(un => un.id === l.unit_id)?.nama_unit || `Unit #${l.unit_id}`;
-          return {
-            ...l,
-            is_delegated: true,
-            delegated_from: sourceUnitName,
-            delegated_note: sourceMap?.note || null
-          };
+            const incoming = rawTambahPagu.filter(l => {
+              const status = (l.status_pengajuan || '').toLowerCase();
+              if (status.includes('tolak')) return false;
+
+              const matchesUnit = l.unit_id === srcId;
+              const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
+              const isScopeAll = rule.scope === 'ALL' || !rule.scope;
+              const isSelected = rule.scope === 'SELECTED' && (rule.selectedLetterIds || []).includes(l.id);
+              return matchesUnit && matchesYear && (isScopeAll || isSelected);
+            }).map(l => ({
+              ...l,
+              is_delegated: true,
+              delegated_from: srcName,
+              delegated_note: rule.note || null
+            }));
+
+            delegatedLetters.push(...incoming);
+          }
         });
       }
 
       // Gabungkan surat internal + surat titipan pembebanan (tanpa surat ditolak)
-      const combinedLetters = [...uLetters, ...delegatedLetters].filter(l => {
-        const status = (l.status_pengajuan || '').toLowerCase();
-        return !status.includes('tolak');
+      const combinedLetters = [...uLetters, ...delegatedLetters];
+
+      // Surat yang benar-benar menjadi beban anggaran di unit ini
+      const approvedLettersForUnit = combinedLetters.filter(l => {
+        if (l.is_transferred_out) return false; // Jangan hitung surat yang dialihkan ke unit lain
+        return getSuratDisetujuiNominal(l) > 0 || (l.status_pengajuan || '').toLowerCase().includes('disetujui');
       });
 
-      const approvedLetters = combinedLetters.filter(l => 
-        getSuratDisetujuiNominal(l) > 0 || (l.status_pengajuan || '').toLowerCase().includes('disetujui')
-      );
+      const totalSuratNominalDiajukan = combinedLetters
+        .filter(l => !l.is_transferred_out)
+        .reduce((a, b) => a + Number(b.nominal_diajukan || 0), 0);
+      const totalSuratNominalDisetujui = approvedLettersForUnit.reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
 
-      const totalSuratNominalDiajukan = combinedLetters.reduce((a, b) => a + Number(b.nominal_diajukan || 0), 0);
-      const totalSuratNominalDisetujui = approvedLetters.reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
-
-      // Breakdown Inisiatif & Penugasan dari tambah_pagu
-      const suratInisiatif = approvedLetters
+      // Breakdown Inisiatif & Penugasan dari tambah_pagu yang dibebankan di unit ini
+      const suratInisiatif = approvedLettersForUnit
         .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
         .reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
       
-      const suratPenugasan = approvedLetters
+      const suratPenugasan = approvedLettersForUnit
         .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('penugasan') || !(l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
         .reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
 
@@ -259,10 +330,10 @@ export default function KomparasiTambahPaguPage() {
       const diff = totalSuratNominalDisetujui - totalGovPaguTambah;
 
       // Status Audit
-      const isDelegatedOrigin = usePembebananMapping && pembebananMapping[u.id];
+      const allLettersTransferred = ruleFromU && uLetters.length > 0 && uLetters.every(l => l.is_transferred_out);
       let auditStatus: 'MATCH' | 'KELEWAT' | 'SELISIH' | 'KOSONG' | 'DIBEBANKAN' = 'KOSONG';
 
-      if (isDelegatedOrigin) {
+      if (allLettersTransferred) {
         auditStatus = 'DIBEBANKAN';
       } else if (totalSuratNominalDisetujui > 0 && totalGovPaguTambah === 0) {
         auditStatus = 'KELEWAT';
@@ -278,7 +349,7 @@ export default function KomparasiTambahPaguPage() {
         nama_unit: u.nama_unit,
         group_org: u.group_org || '-',
         total_surat_count: combinedLetters.length,
-        approved_surat_count: approvedLetters.length,
+        approved_surat_count: approvedLettersForUnit.length,
         surat_nominal_diajukan: totalSuratNominalDiajukan,
         surat_nominal_disetujui: totalSuratNominalDisetujui,
         surat_inisiatif: suratInisiatif,
@@ -286,10 +357,10 @@ export default function KomparasiTambahPaguPage() {
         gov_inisiatif: govPaguInisiatif,
         gov_penugasan: govPaguPenugasan,
         total_gov_tambah: totalGovPaguTambah,
-        selisih: isDelegatedOrigin ? 0 : diff,
+        selisih: allLettersTransferred ? 0 : diff,
         audit_status: auditStatus,
-        delegated_to: isDelegatedOrigin ? isDelegatedOrigin.targetUnitName : null,
-        delegated_note: isDelegatedOrigin ? isDelegatedOrigin.note : null,
+        delegated_to: allLettersTransferred ? ruleFromU?.targetUnitName : null,
+        delegated_note: allLettersTransferred ? ruleFromU?.note : null,
         letters: combinedLetters
       };
     });
@@ -1008,9 +1079,21 @@ export default function KomparasiTambahPaguPage() {
                                 <Building2 size={14} className="text-indigo-600 shrink-0" />
                                 <span>{u.nama_unit}</span>
                               </div>
-                              <span className="text-[10px] text-indigo-700 font-semibold px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md inline-block">
-                                {u.group_org}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                                <span className="text-[10px] text-indigo-700 font-semibold px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded-md inline-block">
+                                  {u.group_org}
+                                </span>
+                                {u.letters.some((l: any) => l.is_transferred_out) && u.audit_status !== 'DIBEBANKAN' && (
+                                  <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-300 text-[9px] font-bold">
+                                    ℹ️ Sebagian Surat Dialihkan
+                                  </Badge>
+                                )}
+                                {u.letters.some((l: any) => l.is_delegated) && (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[9px] font-bold">
+                                    ⚡ Menerima Beban Unit Lain
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
 
                             {/* SURAT DISETUJUI NOMINAL */}
@@ -1019,6 +1102,9 @@ export default function KomparasiTambahPaguPage() {
                               <div className="text-[10px] text-slate-500 font-semibold">
                                 {u.approved_surat_count} Surat Disetujui
                                 {u.audit_status === 'DIBEBANKAN' && <span className="text-sky-600 block text-[9px] font-medium">(Beban ke {u.delegated_to})</span>}
+                                {u.letters.some((l: any) => l.is_transferred_out) && u.audit_status !== 'DIBEBANKAN' && (
+                                  <span className="text-sky-600 block text-[9px] font-medium">({u.letters.filter((l: any) => l.is_transferred_out).length} surat dialihkan ke unit lain)</span>
+                                )}
                               </div>
                             </TableCell>
 
@@ -1148,7 +1234,16 @@ export default function KomparasiTambahPaguPage() {
                                   <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 font-medium flex items-center gap-2.5">
                                     <Info size={16} className="text-sky-600 shrink-0" />
                                     <span>
-                                      <strong>Catatan Pembebanan Anggaran:</strong> Surat usulan unit ini dialokasikan pembebanannya ke <strong>{u.delegated_to}</strong> ({u.delegated_note}). Pagu tercatat di unit {u.delegated_to}.
+                                      <strong>Catatan Pembebanan Anggaran:</strong> Seluruh surat usulan unit ini dialokasikan pembebanannya ke <strong>{u.delegated_to}</strong> ({u.delegated_note}). Pagu tercatat di unit {u.delegated_to}.
+                                    </span>
+                                  </div>
+                                )}
+
+                                {!u.delegated_to && u.letters.some((l: any) => l.is_transferred_out) && (
+                                  <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 font-medium flex items-center gap-2.5">
+                                    <Info size={16} className="text-sky-600 shrink-0" />
+                                    <span>
+                                      <strong>Catatan Pembebanan Sebagian Surat:</strong> Sebagian surat pengajuan dari unit ini dialokasikan pembebanannya ke unit lain. Surat yang dialihkan diberi label khusus dan tidak dihitung dalam beban unit ini sehingga tidak memicu selisih.
                                     </span>
                                   </div>
                                 )}
@@ -1172,11 +1267,13 @@ export default function KomparasiTambahPaguPage() {
                                           const nominalDisetujui = getSuratDisetujuiNominal(subItem);
                                           const isFoundInDb = dbRows.some(r => Number(r.nominal) === nominalDisetujui && nominalDisetujui > 0);
 
-                                          const subRowClass = isFoundInDb
-                                            ? "bg-emerald-50/70 hover:bg-emerald-100/70 border-l-4 border-l-emerald-500 border-b border-emerald-100/80 text-xs"
-                                            : nominalDisetujui > 0
-                                              ? "bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-l-rose-500 border-b border-rose-100 text-xs"
-                                              : "hover:bg-slate-50 border-b border-slate-100 text-xs";
+                                          const subRowClass = subItem.is_transferred_out
+                                            ? "bg-sky-50/60 hover:bg-sky-100/60 border-l-4 border-l-sky-400 border-b border-sky-100/80 text-xs"
+                                            : isFoundInDb
+                                              ? "bg-emerald-50/70 hover:bg-emerald-100/70 border-l-4 border-l-emerald-500 border-b border-emerald-100/80 text-xs"
+                                              : nominalDisetujui > 0
+                                                ? "bg-rose-50/80 hover:bg-rose-100/80 border-l-4 border-l-rose-500 border-b border-rose-100 text-xs"
+                                                : "hover:bg-slate-50 border-b border-slate-100 text-xs";
 
                                           return (
                                             <TableRow key={subItem.id || subIdx} className={subRowClass}>
@@ -1186,10 +1283,25 @@ export default function KomparasiTambahPaguPage() {
                                                   <span className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</span>
                                                   {subItem.is_delegated && (
                                                     <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[9px] font-bold">
-                                                      ⚡ Beban Titipan: {subItem.delegated_from}
+                                                      ⚡ Beban: {subItem.delegated_from}
+                                                    </Badge>
+                                                  )}
+                                                  {subItem.is_transferred_out && (
+                                                    <Badge variant="outline" className="bg-sky-50 text-sky-900 border-sky-300 text-[9px] font-bold">
+                                                      ℹ️ Dibebankan ke: {subItem.transferred_to}
                                                     </Badge>
                                                   )}
                                                 </div>
+                                                {subItem.is_transferred_out && subItem.transferred_note && (
+                                                  <div className="text-[10px] text-sky-800 italic bg-sky-100/60 border border-sky-200/80 rounded px-2 py-0.5 w-fit">
+                                                    Catatan Alihan: {subItem.transferred_note}
+                                                  </div>
+                                                )}
+                                                {subItem.is_delegated && subItem.delegated_note && (
+                                                  <div className="text-[10px] text-amber-800 italic bg-amber-100/60 border border-amber-200/80 rounded px-2 py-0.5 w-fit">
+                                                    Catatan Beban: {subItem.delegated_note}
+                                                  </div>
+                                                )}
                                                 <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
                                                 <div className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-wrap">{subItem.hal_surat_pengajuan || '-'}</div>
                                                 <div className="pt-1 flex items-center gap-2">
@@ -1205,12 +1317,25 @@ export default function KomparasiTambahPaguPage() {
                                               </TableCell>
                                               <TableCell className="text-right align-top pt-3 space-y-1">
                                                 <div className="font-mono font-black text-xs">
-                                                  <span className={isFoundInDb ? 'text-emerald-700' : nominalDisetujui > 0 ? 'text-rose-700 font-extrabold' : 'text-slate-500'}>
+                                                  <span className={
+                                                    subItem.is_transferred_out 
+                                                      ? 'text-sky-700 font-bold'
+                                                      : isFoundInDb 
+                                                        ? 'text-emerald-700' 
+                                                        : nominalDisetujui > 0 
+                                                          ? 'text-rose-700 font-extrabold' 
+                                                          : 'text-slate-500'
+                                                  }>
                                                     Rp {formatRp(nominalDisetujui)}
                                                   </span>
                                                 </div>
                                                 <div>
-                                                  {isFoundInDb ? (
+                                                  {subItem.is_transferred_out ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
+                                                      <Info size={11} className="text-sky-600" />
+                                                      <span>Dibebankan ke {subItem.transferred_to}</span>
+                                                    </span>
+                                                  ) : isFoundInDb ? (
                                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                                       <CheckCircle2 size={11} className="text-emerald-600" />
                                                       <span>Sudah Dicatat di DB</span>
@@ -1789,11 +1914,16 @@ export default function KomparasiTambahPaguPage() {
 
           <div className="space-y-5 text-xs max-h-[60vh] overflow-y-auto pr-1 py-1">
             {/* Callout Informasi */}
-            <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-950 flex items-start gap-2.5">
-              <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">
-                <strong>Cara Kerja:</strong> Surat usulan dari <em>Unit Pengusul</em> akan otomatis dikonsolidasikan ke <em>Unit Pembebanan</em> pada perhitungan komparasi audit. Status unit pengusul akan ditandai <code className="bg-amber-100 px-1 py-0.5 rounded font-bold">ℹ️ DIBEBANKAN</code> dengan selisih Rp 0, dan pagu DB di unit pembebanan akan terverifikasi secara akurat tanpa <em>false alarm</em>.
+            <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl text-amber-950 space-y-1.5">
+              <div className="flex items-center gap-2 font-bold text-xs text-amber-900">
+                <Info size={16} className="text-amber-700 shrink-0" />
+                <span>Petunjuk Pembebanan Anggaran Lintas Unit:</span>
               </div>
+              <ul className="list-disc list-inside text-[11px] text-amber-800/90 space-y-0.5 leading-relaxed">
+                <li>Surat usulan yang dialihkan pembebanannya akan otomatis dihitung di <strong>Unit Pembebanan (Tujuan)</strong> dan tidak memicu selisih di <strong>Unit Pengusul (Asal)</strong>.</li>
+                <li>Jika unit pengusul memiliki beberapa pengajuan tapi hanya sebagian yang dipindah, Anda dapat memilih <strong>surat tertentu</strong> saja.</li>
+                <li>Jika ingin membatalkan/mengembalikan surat ke unit asalnya (misal GMC kembali ke GMC, Masjid ke Masjid), Anda dapat menekan tombol <strong>Hapus</strong> pada tabel atau tombol <strong>Kembalikan Semua ke Unit Asal</strong> di bawah.</li>
+              </ul>
             </div>
 
             {/* TABEL ATURAN PEMBEBANAN AKTIF */}
@@ -1821,7 +1951,7 @@ export default function KomparasiTambahPaguPage() {
                     {Object.keys(pembebananMapping).length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-6 text-slate-400">
-                          Belum ada pembebanan khusus yang disetel.
+                          Belum ada pembebanan khusus yang disetel. Seluruh surat dihitung di unit kerja masing-masing.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -1835,7 +1965,18 @@ export default function KomparasiTambahPaguPage() {
                             <TableCell className="text-center font-bold text-slate-400">{idx + 1}</TableCell>
                             <TableCell className="font-bold text-slate-900">
                               <span className="text-indigo-700 block font-mono text-[10px]">ID: {srcId}</span>
-                              {srcName}
+                              <div>{srcName}</div>
+                              <div className="mt-1">
+                                {map.scope === 'SELECTED' ? (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[9px] font-bold">
+                                    📑 {map.selectedLetterIds?.length || 0} Surat Tertentu Dipindahkan
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-sky-50 text-sky-900 border-sky-300 text-[9px] font-bold">
+                                    📁 Seluruh Surat Dipindahkan
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-center text-slate-400 font-bold">→</TableCell>
                             <TableCell className="font-bold text-emerald-800">
@@ -1849,14 +1990,14 @@ export default function KomparasiTambahPaguPage() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (confirm(`Hapus pembebanan untuk ${srcName}?`)) {
+                                  if (confirm(`Hapus pembebanan untuk ${srcName}? Surat-surat unit ini akan kembali dihitung di unit asalnya.`)) {
                                     const next = { ...pembebananMapping };
                                     delete next[srcId];
                                     savePembebananMapping(next);
                                   }
                                 }}
                                 className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
-                                title="Hapus Pembebanan"
+                                title="Hapus pembebanan ini agar surat kembali ke unit asalnya"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -1871,10 +2012,10 @@ export default function KomparasiTambahPaguPage() {
             </div>
 
             {/* FORM TAMBAH PEMBEBANAN BARU */}
-            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-3.5">
               <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <Plus size={14} className="text-indigo-600" />
-                <span>Tambah Aturan Pembebanan Baru</span>
+                <span>Tambah / Perbarui Aturan Pembebanan</span>
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1884,7 +2025,11 @@ export default function KomparasiTambahPaguPage() {
                   </label>
                   <select
                     value={newSourceUnitId}
-                    onChange={(e) => setNewSourceUnitId(e.target.value)}
+                    onChange={(e) => {
+                      setNewSourceUnitId(e.target.value);
+                      setNewScope('ALL');
+                      setNewSelectedLetterIds([]);
+                    }}
                     className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="">-- Pilih Unit Pengusul --</option>
@@ -1915,9 +2060,135 @@ export default function KomparasiTambahPaguPage() {
                 </div>
               </div>
 
+              {/* 🔴 PILIHAN SURAT YANG AKAN DIPINDAHKAN (SEMUA / TERTENTU) */}
+              {newSourceUnitId && (
+                <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                      <FileText size={13} className="text-indigo-600" />
+                      <span>3. Pilih Surat yang Dipindahkan:</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      Tersedia {sourceLettersForForm.length} surat aktif di TA {selectedYear}
+                    </span>
+                  </div>
+
+                  {sourceLettersForForm.length === 0 ? (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 leading-relaxed">
+                      Unit ini belum memiliki surat usulan di TA {selectedYear} (atau berstatus ditolak). Aturan pembebanan ini tetap dapat dibuat dan akan otomatis berlaku untuk seluruh pengajuan unit ini jika ada di kemudian hari.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-4 text-xs font-semibold">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="scopeOption"
+                            checked={newScope === 'ALL'}
+                            onChange={() => setNewScope('ALL')}
+                            className="accent-indigo-600 cursor-pointer"
+                          />
+                          <span className={newScope === 'ALL' ? 'text-indigo-950 font-bold' : 'text-slate-600'}>
+                            Pindahkan Seluruh Surat ({sourceLettersForForm.length} Surat)
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="scopeOption"
+                            checked={newScope === 'SELECTED'}
+                            onChange={() => {
+                              setNewScope('SELECTED');
+                              if (newSelectedLetterIds.length === 0) {
+                                setNewSelectedLetterIds(sourceLettersForForm.map(l => l.id));
+                              }
+                            }}
+                            className="accent-indigo-600 cursor-pointer"
+                          />
+                          <span className={newScope === 'SELECTED' ? 'text-indigo-950 font-bold' : 'text-slate-600'}>
+                            Pilih Surat Tertentu Saja ({newSelectedLetterIds.length} dipilih)
+                          </span>
+                        </label>
+                      </div>
+
+                      {newScope === 'SELECTED' && (
+                        <div className="mt-2 space-y-2 pt-2 border-t border-slate-200/80">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-600 font-medium">Centang surat yang ingin dialihkan ke unit tujuan:</span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setNewSelectedLetterIds(sourceLettersForForm.map(l => l.id))}
+                                className="text-[10px] text-indigo-600 hover:underline font-bold"
+                              >
+                                Pilih Semua
+                              </button>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                type="button"
+                                onClick={() => setNewSelectedLetterIds([])}
+                                className="text-[10px] text-slate-500 hover:underline font-bold"
+                              >
+                                Kosongkan Pilihan
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-slate-200 rounded-lg p-2 bg-white">
+                            {sourceLettersForForm.map((letItem: any) => {
+                              const isChecked = newSelectedLetterIds.includes(letItem.id);
+                              const nom = getSuratDisetujuiNominal(letItem);
+                              return (
+                                <label
+                                  key={letItem.id}
+                                  className={`flex items-start gap-2.5 p-2 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                    isChecked 
+                                      ? 'bg-indigo-50/70 border-indigo-200 text-indigo-950' 
+                                      : 'bg-slate-50/40 border-slate-100 hover:bg-slate-100/50 text-slate-700'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setNewSelectedLetterIds(prev => [...prev, letItem.id]);
+                                      } else {
+                                        setNewSelectedLetterIds(prev => prev.filter(id => id !== letItem.id));
+                                      }
+                                    }}
+                                    className="mt-0.5 accent-indigo-600 rounded cursor-pointer"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-mono font-bold text-[11px] truncate">
+                                        📄 {letItem.no_surat_pengajuan || `Surat #${letItem.id}`}
+                                      </span>
+                                      <span className="font-mono font-black text-emerald-700 shrink-0 text-[11px]">
+                                        Rp {formatRp(nom)}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                                      {letItem.hal_surat_pengajuan || '-'}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400 mt-0.5">
+                                      📅 {letItem.tanggal_surat_pengajuan || '-'} • {letItem.jenis_tambah_pagu || 'Penugasan'} • {letItem.status_pengajuan}
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                  3. Catatan / Alasan Pembebanan (Opsional):
+                  4. Catatan / Alasan Pembebanan (Opsional):
                 </label>
                 <input
                   type="text"
@@ -1942,15 +2213,25 @@ export default function KomparasiTambahPaguPage() {
                       return;
                     }
 
+                    if (newScope === 'SELECTED' && newSelectedLetterIds.length === 0) {
+                      alert("Silakan centang minimal 1 surat yang ingin dipindahkan ke unit tujuan.");
+                      return;
+                    }
+
                     const srcIdNum = Number(newSourceUnitId);
                     const targetIdNum = Number(newTargetUnitId);
+                    const srcUnit = unitList.find(u => u.id === srcIdNum);
                     const targetUnit = unitList.find(u => u.id === targetIdNum);
 
                     const next = {
                       ...pembebananMapping,
                       [srcIdNum]: {
+                        sourceUnitId: srcIdNum,
+                        sourceUnitName: srcUnit?.nama_unit,
                         targetUnitId: targetIdNum,
                         targetUnitName: targetUnit?.nama_unit || `Unit ID ${targetIdNum}`,
+                        scope: newScope,
+                        selectedLetterIds: newScope === 'SELECTED' ? newSelectedLetterIds : undefined,
                         note: newNote.trim() || 'Pembebanan dialihkan ke unit lain'
                       }
                     };
@@ -1958,35 +2239,59 @@ export default function KomparasiTambahPaguPage() {
                     savePembebananMapping(next);
                     setNewSourceUnitId('');
                     setNewTargetUnitId('');
+                    setNewScope('ALL');
+                    setNewSelectedLetterIds([]);
                     setNewNote('');
-                    alert("Berhasil menambahkan aturan pembebanan anggaran!");
+                    alert("Berhasil menyimpan aturan pembebanan anggaran!");
                   }}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs h-8 px-4 flex items-center gap-1.5"
                 >
                   <Plus size={13} />
-                  <span>Tambahkan Aturan</span>
+                  <span>Simpan Aturan</span>
                 </Button>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="border-t border-slate-100 pt-4 flex flex-row items-center justify-between sm:justify-between w-full">
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm("Kembalikan pembebanan ke default (GMC -> Dit. Keuangan & Masjid Kampus -> Sekun)?")) {
-                  savePembebananMapping(DEFAULT_PEMBEBANAN_MAPPING);
-                }
-              }}
-              className="text-xs text-slate-500 hover:text-slate-800 underline font-medium"
-            >
-              Reset ke Default (GMC & Masjid)
-            </button>
+          <DialogFooter className="border-t border-slate-100 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Kembalikan seluruh surat ke unit asal masing-masing (menghapus semua aturan pembebanan)?\n\nSetelah dikosongkan, GMC akan kembali dihitung di GMC dan Masjid Kampus kembali dihitung di Masjid Kampus.")) {
+                    savePembebananMapping({});
+                    alert("Semua aturan pembebanan telah dihapus. Seluruh surat kembali dihitung di unit asalnya masing-masing.");
+                  }
+                }}
+                className="text-xs text-rose-600 hover:text-rose-800 hover:underline font-bold flex items-center gap-1"
+                title="Hapus semua pembebanan sehingga semua surat kembali ke unit asalnya"
+              >
+                <RotateCcw size={12} />
+                <span>Kembalikan Semua ke Unit Asal (Hapus Semua Aturan)</span>
+              </button>
+
+              <span className="text-slate-300 hidden sm:inline">|</span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm("Terapkan aturan bawaan:\n- GMC dibebankan ke Direktorat Keuangan\n- Masjid Kampus dibebankan ke Sekretaris Universitas?")) {
+                    savePembebananMapping(DEFAULT_PEMBEBANAN_MAPPING);
+                    alert("Aturan bawaan diterapkan: GMC dibebankan ke Dit. Keuangan & Masjid Kampus dibebankan ke Sekretaris Universitas.");
+                  }
+                }}
+                className="text-xs text-indigo-600 hover:text-indigo-800 hover:underline font-bold flex items-center gap-1"
+                title="Terapkan pembebanan default GMC ke Ditkeu dan Masjid ke Sekun"
+              >
+                <Sparkles size={12} />
+                <span>Terapkan Default (GMC & Masjid)</span>
+              </button>
+            </div>
 
             <Button
               type="button"
               onClick={() => setIsPembebananModalOpen(false)}
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs h-9 px-5"
+              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs h-9 px-5 shrink-0"
             >
               Selesai & Terapkan
             </Button>
