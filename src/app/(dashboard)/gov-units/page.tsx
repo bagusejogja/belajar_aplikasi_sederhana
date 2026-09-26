@@ -10,6 +10,7 @@ import Select from 'react-select';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import MasterUnitTabs from '@/components/MasterUnitTabs';
+import Link from 'next/link';
 
 // Tipe Data untuk gov_units
 interface GovUnit {
@@ -25,6 +26,7 @@ interface GovUnit {
 
 export default function GovUnitsPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
+  const [masterPics, setMasterPics] = useState<{ id: number; nama: string; email: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filter states
@@ -100,13 +102,14 @@ export default function GovUnitsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-         .from('gov_units')
-         .select('*')
-         .order('kode_unit', { ascending: true });
+      const [unitsRes, picsRes] = await Promise.all([
+        supabase.from('gov_units').select('*').order('kode_unit', { ascending: true }),
+        supabase.from('gov_pics').select('id, nama, email').eq('is_active', true).order('nama', { ascending: true })
+      ]);
          
-      if (error) throw error;
-      if (data) setUnits(data as GovUnit[]);
+      if (unitsRes.error) throw unitsRes.error;
+      if (unitsRes.data) setUnits(unitsRes.data as GovUnit[]);
+      if (picsRes.data) setMasterPics(picsRes.data);
     } catch (error: any) {
       console.error('Error fetching gov units:', error);
       toast.error('Gagal memuat data: ' + error.message);
@@ -660,14 +663,40 @@ export default function GovUnitsPage() {
                         />
                      </div>
                      <div>
-                        <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1.5">Penanggung Jawab (PIC)</label>
-                        <input 
-                           type="text" 
-                           value={formData.pic} 
-                           onChange={(e) => setFormData({...formData, pic: e.target.value})} 
-                           className="w-full border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none text-xs font-medium" 
-                           placeholder="Cth: Rohman / Triyanto" 
-                        />
+                        <div className="flex items-center justify-between mb-1.5">
+                           <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">Penanggung Jawab (PIC)</label>
+                           <Link href="/gov-pics" target="_blank" className="text-[10px] text-blue-600 font-bold hover:underline flex items-center gap-0.5">
+                              + Master PIC
+                           </Link>
+                        </div>
+                        {masterPics.length > 0 ? (
+                           <select
+                              value={formData.pic}
+                              onChange={(e) => setFormData({...formData, pic: e.target.value})}
+                              className="w-full border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none text-xs font-bold text-gray-800 bg-white cursor-pointer"
+                           >
+                              <option value="">-- Pilih PIC dari Master --</option>
+                              {masterPics.map(p => (
+                                 <option key={p.id} value={p.nama}>
+                                    {p.nama} ({p.email})
+                                 </option>
+                              ))}
+                              {/* Opsi fallback jika nama PIC existing belum ada di master */}
+                              {formData.pic && !masterPics.some(p => p.nama === formData.pic) && (
+                                 <option value={formData.pic}>
+                                    {formData.pic} (Kustom / Belum terdaftar di Master)
+                                 </option>
+                              )}
+                           </select>
+                        ) : (
+                           <input 
+                              type="text" 
+                              value={formData.pic} 
+                              onChange={(e) => setFormData({...formData, pic: e.target.value})} 
+                              className="w-full border border-gray-200 rounded-xl p-2.5 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none text-xs font-medium" 
+                              placeholder="Cth: Bambang Indarto / Muslifah Iswandari" 
+                           />
+                        )}
                      </div>
                   </div>
 

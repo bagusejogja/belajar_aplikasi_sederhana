@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  Landmark, Link2, Building2 
+  Landmark, Link2, Building2, Users
 } from 'lucide-react';
 import { useUserRole } from '@/lib/useUserRole';
 
@@ -23,6 +23,13 @@ const TABS: TabConfig[] = [
     path: '/gov-units',
     icon: Landmark,
     badge: 'Organisasi & PIC',
+  },
+  {
+    id: 'gov-pics',
+    title: 'Master PIC & Email',
+    path: '/gov-pics',
+    icon: Users,
+    badge: 'PIC & Kontak',
   },
   {
     id: 'gov-mapping',
@@ -45,6 +52,7 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
   const { role } = useUserRole();
 
   const currentTab = activeTab || (
+    pathname === '/gov-pics' ? 'gov-pics' :
     pathname === '/gov-mapping' ? 'gov-mapping' :
     pathname === '/units' ? 'units' :
     pathname === '/gov-units' ? 'gov-units' : 'gov-units'
@@ -61,7 +69,7 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
           <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">
             Master Data Unit Kerja Suite
           </span>
-          <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">• Struktur Unit, PIC, & Mapping Referensi</span>
+          <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">• Struktur Unit, Master PIC, & Mapping Referensi</span>
         </div>
 
         <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium shrink-0">
@@ -72,8 +80,8 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 3 Kolom Rata & Rapi, Efisien Tempat (Icon Kiri, Judul di Atas, Badge Tepat di Bawah Judul) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      {/* Navigation Grid: 4 Kolom Rata & Rapi */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;

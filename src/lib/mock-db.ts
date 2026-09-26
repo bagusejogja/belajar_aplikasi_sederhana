@@ -77,6 +77,7 @@ export const menuList: MenuItem[] = [
   { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
   { title: 'Master Unit Kerja', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN'], group: 'Master' },
+  { title: 'Master PIC & Email', path: '/gov-pics', icon: 'Users', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN'], group: 'Master' },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
