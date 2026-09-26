@@ -52,47 +52,93 @@ export async function POST(req: NextRequest) {
 
         const catatan = submission.lampiran_catatan;
         const lampiranList = Array.isArray(catatan)
-          ? catatan.map((f: any) => `<li><a href="${f.url}">${f.name}</a></li>`).join('')
+          ? catatan.map((f: any) => `<li><a href="${f.url}" style="color: #2563eb; text-decoration: underline;">${f.name}</a></li>`).join('')
           : '';
 
+        // Hitung SLA pengerjaan
+        const createdAt = new Date(submission.created_at);
+        const finishedAt = new Date();
+        const diffMs = Math.max(0, finishedAt.getTime() - createdAt.getTime());
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const durationText = hours > 0 ? `${hours} Jam ${minutes} Menit` : `${minutes} Menit`;
+
+        // Ambil info PIC dari submission atau gov_pics
+        const picName = submission.pic || 'Verifikator Anggaran';
+
         await transporter.sendMail({
-          from: `"Tim Anggaran" <${process.env.EMAIL_USER}>`,
+          from: `"Verifikasi Anggaran UGM" <${process.env.EMAIL_USER}>`,
           to: emailTarget,
-          subject: `[Notifikasi] Pengajuan MAK Unit ${submission.unit} (Tahun ${submission.tahun}) Telah Diproses`,
+          subject: `[TUNTAS] Pengajuan Revisi MAK Unit ${submission.unit} (Tahun ${submission.tahun}) Telah Selesai`,
           html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); padding: 32px; border-radius: 16px 16px 0 0; color: white;">
-                <h1 style="margin: 0; font-size: 22px; font-weight: 900;">✅ Pengajuan MAK Telah Diproses</h1>
-                <p style="margin: 8px 0 0; opacity: 0.85;">Notifikasi dari Sistem Verifikasi Anggaran</p>
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 32px; border-radius: 16px 16px 0 0; color: white; text-align: center;">
+                <div style="font-size: 36px; margin-bottom: 8px;">🎉</div>
+                <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">Pengajuan Revisi MAK Telah Selesai</h1>
+                <p style="margin: 8px 0 0; opacity: 0.9; font-size: 13px;">Pemberitahuan Resmi Sistem Informasi Verifikasi Anggaran</p>
               </div>
-              <div style="background: white; padding: 32px; border: 1px solid #e5e7eb; border-radius: 0 0 16px 16px;">
-                <p style="font-size: 15px; color: #374151;">Pengajuan perubahan MAK dari unit Anda telah <strong>selesai diproses</strong> oleh tim Anggaran.</p>
+
+              <div style="background: white; padding: 32px; border: 1px solid #e2e8f0; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                <p style="font-size: 14px; color: #334155; line-height: 1.6; margin-top: 0;">
+                  Yth. Pengusul Anggaran <strong>${submission.unit}</strong>,
+                </p>
+                <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+                  Kami informasikan bahwa berkas usulan pergeseran / perubahan MAK Anda telah <strong>selesai diverifikasi dan diproses</strong> dengan rincian sebagai berikut:
+                </p>
                 
-                <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin: 20px 0; border-left: 4px solid #4f46e5;">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <div style="background: #f1f5f9; border-radius: 12px; padding: 18px 20px; margin: 20px 0; border-left: 4px solid #10b981;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                     <tr>
-                      <td style="padding: 6px 0; color: #6b7280; width: 40%;">Unit Kerja</td>
-                      <td style="padding: 6px 0; font-weight: bold; color: #111827;">${submission.unit}</td>
+                      <td style="padding: 7px 0; color: #64748b; width: 38%;">Unit Kerja</td>
+                      <td style="padding: 7px 0; font-weight: 700; color: #0f172a;">${submission.unit}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; color: #6b7280;">Tahun Anggaran</td>
-                      <td style="padding: 6px 0; font-weight: bold; color: #111827;">${submission.tahun}</td>
+                      <td style="padding: 7px 0; color: #64748b;">Tahun Anggaran</td>
+                      <td style="padding: 7px 0; font-weight: 700; color: #0f172a;">${submission.tahun}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; color: #6b7280;">Status</td>
-                      <td style="padding: 6px 0;"><span style="background: #d1fae5; color: #065f46; padding: 2px 10px; border-radius: 999px; font-weight: bold; font-size: 12px;">Selesai</span></td>
+                      <td style="padding: 7px 0; color: #64748b;">PIC Verifikator</td>
+                      <td style="padding: 7px 0; font-weight: 700; color: #2563eb;">👤 ${picName}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 6px 0; color: #6b7280;">Tanggal Pengajuan</td>
-                      <td style="padding: 6px 0; font-weight: bold; color: #111827;">${new Date(submission.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</td>
+                      <td style="padding: 7px 0; color: #64748b;">Waktu Berkas Masuk</td>
+                      <td style="padding: 7px 0; font-weight: 600; color: #0f172a;">${createdAt.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 7px 0; color: #64748b;">Waktu Diselesaikan</td>
+                      <td style="padding: 7px 0; font-weight: 600; color: #059669;">${finishedAt.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 7px 0; color: #64748b;">Durasi Layanan (SLA)</td>
+                      <td style="padding: 7px 0;">
+                        <span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-family: monospace;">⚡ ${durationText}</span>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 7px 0; color: #64748b;">Status Terkini</td>
+                      <td style="padding: 7px 0;">
+                        <span style="background: #d1fae5; color: #065f46; padding: 3px 10px; border-radius: 999px; font-weight: 800; font-size: 11px; text-transform: uppercase;">✓ Tuntas / Selesai</span>
+                      </td>
                     </tr>
                   </table>
                 </div>
                 
-                ${lampiranList ? `<p style="font-size: 14px; color: #374151; font-weight: bold; margin-top: 16px;">Lampiran yang diajukan:</p><ul style="margin: 0; padding-left: 20px; color: #4f46e5;">${lampiranList}</ul>` : ''}
+                ${lampiranList ? `
+                  <div style="margin-top: 18px;">
+                    <p style="font-size: 13px; color: #475569; font-weight: 700; margin-bottom: 6px;">Lampiran Berkas yang Diajukan:</p>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6;">${lampiranList}</ul>
+                  </div>
+                ` : ''}
+
+                <div style="margin-top: 24px; padding: 14px; background: #ecfdf5; border-radius: 10px; border: 1px solid #d1fae5; font-size: 12px; color: #065f46; line-height: 1.5;">
+                  💡 <strong>Catatan:</strong> Perubahan anggaran MAK sudah dapat Anda cek dan gunakan pada sistem anggaran unit Anda. Terima kasih atas kerja samanya.
+                </div>
                 
-                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-                <p style="font-size: 12px; color: #9ca3af; text-align: center;">Pesan ini dikirim otomatis oleh Sistem Verifikasi Anggaran. Jangan membalas email ini.</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+                  Email ini dikirim secara otomatis oleh <strong>Sistem Informasi Verifikasi Anggaran</strong>. Mohon tidak membalas email ini secara langsung.
+                </p>
               </div>
             </div>
           `,

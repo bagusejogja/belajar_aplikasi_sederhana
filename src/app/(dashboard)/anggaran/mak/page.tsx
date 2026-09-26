@@ -1418,15 +1418,40 @@ export default function MonitoringMakPage() {
               </div>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Email Pengaju
-              </label>
-              <div className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm font-medium border-none text-gray-600">
-                {data.find(r => r.id === emailModalId)?.email || 'Tidak ada email pengaju'}
-              </div>
-              <p className="text-xs text-gray-400 mt-2">Sistem akan otomatis mengirimkan notifikasi ke alamat ini.</p>
-            </div>
+            {(() => {
+              const selectedRow = data.find(r => r.id === emailModalId);
+              return (
+                <div className="space-y-3 mb-6">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-gray-500">
+                      <span>Unit Pengusul:</span>
+                      <strong className="text-gray-900">{selectedRow?.unit || '-'}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500">
+                      <span>PIC Verifikator:</span>
+                      <strong className="text-blue-700">{selectedRow?.pic || '-'}</strong>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500">
+                      <span>Tahun:</span>
+                      <strong className="text-gray-900">{selectedRow?.tahun || '-'}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center justify-between">
+                      <span>Email Pengusul (Penerima Notifikasi)</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">Otomatis Terkirim</span>
+                    </label>
+                    <div className="w-full px-3.5 py-2.5 bg-blue-50/60 border border-blue-200/80 rounded-xl text-xs font-mono font-bold text-blue-900 select-all">
+                      {selectedRow?.email || 'Tidak ada email terdaftar'}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
+                      Sistem akan mengubah status menjadi <strong>Tuntas</strong> dan otomatis mengirim email laporan SLA ke pengusul di atas.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="flex gap-3">
               <button
