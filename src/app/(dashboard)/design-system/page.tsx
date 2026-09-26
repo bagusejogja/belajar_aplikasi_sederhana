@@ -68,7 +68,10 @@ import {
   Network,
   GitBranch,
   Link as LinkIcon,
-  Users
+  Users,
+  Scale,
+  PlusCircle,
+  ClipboardPaste
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -1758,6 +1761,56 @@ export default function DesignSystemPage() {
                   { id: 'gov-pics', title: 'Master PIC & Email', badge: 'PIC & Kontak', icon: Users, active: true },
                   { id: 'gov-mapping', title: 'Pemetaan PIC -> Unit', badge: 'Mapping', icon: LinkIcon, active: false },
                   { id: 'units', title: 'Tabel Unit Dasar (DB)', badge: 'Ref DB', icon: Database, active: false },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-xs select-none border min-h-[46px] transition-all ${
+                        item.active
+                          ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
+                          : 'bg-white text-slate-700 border-slate-200/90'
+                      }`}
+                    >
+                      <div className={`p-1.5 rounded-lg shrink-0 ${
+                        item.active ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
+                      }`}>
+                        <Icon size={16} />
+                      </div>
+                      <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+                        <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
+                          {item.title}
+                        </span>
+                        <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                          item.active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {item.badge}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Gaya 5: Tambah Pagu & Mutasi Suite 6-Column Grid Tabs (Baru) */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+                  Gaya 5: Tambah Pagu & Mutasi Suite (6-Column Navigation Card)
+                </span>
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  Resmi: /tambah-pagu, /tambah, /komparasi, /analisis, /potret-mutasi-pagu, /copas-pagu
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {[
+                  { id: 'daftar', title: 'Daftar Usulan', badge: 'Monitoring', icon: Layout, active: true },
+                  { id: 'tambah', title: 'Input Pagu Baru', badge: 'Form Usulan', icon: PlusCircle, active: false },
+                  { id: 'komparasi', title: 'Komparasi Versi', badge: 'Audit Versi', icon: Scale, active: false },
+                  { id: 'analisis', title: 'Analisis Pagu', badge: 'Global Pagu', icon: FileSpreadsheet, active: false },
+                  { id: 'potret', title: 'Potret Mutasi', badge: 'Mutasi Pagu', icon: PieChart, active: false },
+                  { id: 'copas', title: 'Copas Pagu', badge: 'Copas Zone', icon: ClipboardPaste, active: false },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (

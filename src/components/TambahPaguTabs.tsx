@@ -20,45 +20,45 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   {
     id: 'daftar',
-    title: 'Daftar Usulan Tambah Pagu',
+    title: 'Daftar Usulan',
     path: '/tambah-pagu',
     icon: Layout,
     badge: 'Monitoring',
   },
   {
     id: 'tambah',
-    title: 'Input Usulan Baru',
+    title: 'Input Pagu Baru',
     path: '/tambah-pagu/tambah',
     icon: PlusCircle,
-    badge: 'Form',
+    badge: 'Form Usulan',
   },
   {
     id: 'komparasi',
-    title: 'Komparasi Usulan',
+    title: 'Komparasi Versi',
     path: '/tambah-pagu/komparasi',
     icon: Scale,
-    badge: 'Versi',
+    badge: 'Audit Versi',
   },
   {
     id: 'analisis',
-    title: 'Analisis Tambah Pagu',
+    title: 'Analisis Pagu',
     path: '/analisis',
     icon: FileSpreadsheet,
     badge: 'Global Pagu',
   },
   {
     id: 'potret',
-    title: 'Potret Mutasi Pagu',
+    title: 'Potret Mutasi',
     path: '/potret-mutasi-pagu',
     icon: PieChart,
-    badge: 'Mutasi',
+    badge: 'Mutasi Pagu',
   },
   {
     id: 'copas',
-    title: 'Copas Pagu Anggaran',
+    title: 'Copas Pagu',
     path: '/copas-pagu',
     icon: ClipboardPaste,
-    badge: 'Zone',
+    badge: 'Copas Zone',
   },
 ];
 
@@ -77,7 +77,7 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
 
   return (
     <div className="bg-white/95 backdrop-blur-sm p-3 px-4 md:px-5 rounded-2xl border border-gray-200/90 shadow-xs mb-4">
-      {/* Top Header Label & Role Indicator */}
+      {/* Top Header Label & Role Indicator (Design System Standard) */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 mb-2.5 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-700">
@@ -86,7 +86,9 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
           <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider">
             Tambah Pagu & Mutasi Suite
           </span>
-          <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">• Usulan, Komparasi, & Analisis</span>
+          <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
+            • Usulan, Komparasi, Analisis, & Copas Pagu
+          </span>
         </div>
 
         <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium shrink-0">
@@ -97,8 +99,8 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 6 Kolom Rata & Rapi */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+      {/* Navigation Grid: Konsisten dengan Standar Design System (min-h-[46px], Icon Kiri, Judul + Badge Tepat di Bawah) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
