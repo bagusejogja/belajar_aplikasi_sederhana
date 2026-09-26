@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   Layout, PlusCircle, Scale, FileSpreadsheet, PieChart, 
-  Coins
+  Coins, ClipboardPaste
 } from 'lucide-react';
 import { useUserRole } from '@/lib/useUserRole';
 
@@ -53,6 +53,13 @@ const TABS: TabConfig[] = [
     icon: PieChart,
     badge: 'Mutasi',
   },
+  {
+    id: 'copas',
+    title: 'Copas Pagu Anggaran',
+    path: '/copas-pagu',
+    icon: ClipboardPaste,
+    badge: 'Zone',
+  },
 ];
 
 export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
@@ -64,6 +71,7 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
     pathname === '/tambah-pagu/komparasi' ? 'komparasi' :
     pathname === '/analisis' ? 'analisis' :
     pathname === '/potret-mutasi-pagu' ? 'potret' :
+    pathname === '/copas-pagu' ? 'copas' :
     pathname.startsWith('/tambah-pagu') ? 'daftar' : 'daftar'
   );
 
@@ -89,8 +97,8 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 4 Kolom Rata & Rapi, Efisien Tempat (Icon Kiri, Judul di Atas, Badge Tepat di Bawah Judul) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+      {/* Navigation Grid: 6 Kolom Rata & Rapi */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;

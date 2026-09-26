@@ -9,6 +9,7 @@ import {
 import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 
 interface GovUnit {
   id: number;
@@ -522,6 +523,9 @@ export default function CopasPaguPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+      {/* COHESIVE TAMBAH PAGU TABS */}
+      <TambahPaguTabs activeTab="copas" />
+
       {/* SLIM & UNIFIED TOP TOOLBAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3">
@@ -972,6 +976,11 @@ export default function CopasPaguPage() {
                     <td className="py-2.5 px-4">
                       <div className="font-bold text-gray-900 text-xs">{r.gov_units?.nama_unit || `Unit ID: ${r.unit_id}`}</div>
                       <div className="flex flex-wrap items-center gap-1.5 mt-1 font-bold">
+                        {r.id_db && (
+                          <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold" title="ID DB Referensi">
+                            ID DB: #{r.id_db}
+                          </span>
+                        )}
                         <span className="bg-gray-100 text-gray-700 px-1.5 py-0.2 rounded text-[10px]">Thn {r.tahun_anggaran}</span>
                         <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded text-[10px] border border-indigo-100">{r.jenis_anggaran || '-'}</span>
                         <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded text-[10px] border border-emerald-100">{r.status_pagu || 'Bukan Pagu Awal'}</span>

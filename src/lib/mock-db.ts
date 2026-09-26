@@ -48,7 +48,6 @@ export const menuList: MenuItem[] = [
   { title: 'Perbandingan Anggaran', path: '/usulan-anggaran', icon: 'Scale', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Gaji & Tunjangan Pegawai', path: '/dana-pemerintah', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
   { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Copas Zone Pagu', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Dana Pemerintah' },
   { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
 
   // --- REVIEW ANGGARAN ---
@@ -90,6 +89,7 @@ export const menuList: MenuItem[] = [
   { title: 'Komparasi Tambah Pagu', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
   { title: 'Analisis Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Potret Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
+  { title: 'Copas Pagu Anggaran', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Anggaran' },
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
   { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
 
