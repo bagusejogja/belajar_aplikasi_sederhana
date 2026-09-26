@@ -8,6 +8,7 @@ import DataForm from './components/DataForm';
 import DataPendukung from './components/DataPendukung';
 import PdfPreview from './components/PdfPreview';
 import RiwayatList from './components/RiwayatList';
+import MasterPaguPanel from './components/MasterPaguPanel';
 import * as XLSX from 'xlsx';
 import { 
   FileText, 
@@ -25,12 +26,14 @@ import {
   BookmarkCheck,
   CheckCircle2,
   Sparkles,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Database,
+  Hash
 } from 'lucide-react';
 
 export default function AnalisisPaguPage() {
   // Step State: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'
-  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'>('riwayat');
+  const [activeStep, setActiveStep] = useState<'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'master-pagu' | 'all'>('riwayat');
   const [analisisId, setAnalisisId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetKey, setResetKey] = useState(0);
@@ -409,6 +412,8 @@ export default function AnalisisPaguPage() {
       setActiveStep('pdf');
     } else if (tab === 'riwayat') {
       setActiveStep('riwayat');
+    } else if (tab === 'master-pagu') {
+      setActiveStep('master-pagu');
     } else if (['step1', 'step2', 'step3', 'all'].includes(tab)) {
       setActiveStep(tab as any);
     } else {
@@ -445,7 +450,7 @@ export default function AnalisisPaguPage() {
               <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
                 Analisis Pagu Anggaran
               </h1>
-              {analisisId && activeStep !== 'riwayat' && (
+              {analisisId && activeStep !== 'riwayat' && activeStep !== 'master-pagu' && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-bold font-mono">
                   <BookmarkCheck size={11} /> {mainData.no_surat || analisisId}
                 </span>
@@ -471,6 +476,20 @@ export default function AnalisisPaguPage() {
           >
             <Layers size={13} />
             <span>{activeStep === 'all' ? 'Mode Wizard' : 'Mode 1 Halaman'}</span>
+          </button>
+
+          {/* Master Pagu (id_db) Button */}
+          <button 
+            onClick={() => setActiveStep('master-pagu')} 
+            className={`h-9 px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs shrink-0 ${
+              activeStep === 'master-pagu' 
+                ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-500/20' 
+                : 'bg-indigo-50/70 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+            }`}
+            title="Kelola Master Pagu Anggaran Unit & Referensi id_db"
+          >
+            <Database size={13} />
+            <span>Master Pagu (id_db)</span>
           </button>
 
           {/* Riwayat Button */}
@@ -525,8 +544,8 @@ export default function AnalisisPaguPage() {
         </div>
       </div>
 
-      {/* STEPPER WIZARD NAVIGATOR (Visible when NOT in 'riwayat' mode) */}
-      {activeStep !== 'riwayat' && (
+      {/* STEPPER WIZARD NAVIGATOR (Visible when NOT in 'riwayat' or 'master-pagu' mode) */}
+      {activeStep !== 'riwayat' && activeStep !== 'master-pagu' && (
         <div className="bg-white rounded-2xl border border-gray-200/80 p-3 shadow-xs space-y-2.5">
           {/* Steps Pills Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -951,7 +970,26 @@ export default function AnalisisPaguPage() {
           </div>
         )}
 
-        {/* RIWAYAT ANALISIS TAB */}
+        {/* MASTER PAGU (ID_DB) TAB */}
+        {activeStep === 'master-pagu' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <div className="flex items-center justify-between bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-3.5 px-4 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
+                  <Database size={18} />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">Master Data Pagu Anggaran & id_db (Tabel: gov_pagu_anggaran)</h2>
+                  <p className="text-[11px] text-indigo-200/80">Kelola rujukan basis data pagu per unit kerja, nominal anggaran, dan pemetaan referensi id_db</p>
+                </div>
+              </div>
+            </div>
+
+            <MasterPaguPanel />
+          </div>
+        )}
+
+                {/* RIWAYAT ANALISIS TAB */}
         {activeStep === 'riwayat' && (
           <div className="space-y-4 animate-in fade-in duration-300">
             <div className="flex items-center justify-between bg-gradient-to-r from-amber-900 to-slate-900 text-white p-3.5 px-4 rounded-2xl shadow-xs">

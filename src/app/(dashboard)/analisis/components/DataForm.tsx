@@ -109,7 +109,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
         const unitId = unitsData[0].id;
         const { data: inisiatifData } = await supabase
           .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
+          .select('id, id_db, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
           .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
           .eq('tahun_anggaran', '2026')
@@ -123,7 +123,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
 
         const { data: penugasanData } = await supabase
           .from('gov_pagu_anggaran')
-          .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
+          .select('id, id_db, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
           .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
           .eq('tahun_anggaran', '2026')
@@ -744,7 +744,14 @@ ${mainData.ringkasan_ai}`;
                           <td className="px-4 py-2.5 text-center font-medium text-gray-600 whitespace-nowrap">{i + 1}</td>
                           <td className="px-4 py-2.5">
                             <div className="font-bold text-gray-900 leading-relaxed">{h.keterangan || '-'}</div>
-                            <div className="text-[11px] text-gray-500 font-medium mt-1">Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</span></div>
+                            <div className="text-[11px] text-gray-500 font-medium mt-1 flex flex-wrap items-center gap-1.5">
+                              {h.id_db && (
+                                <span className="px-1.5 py-0.2 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono font-bold text-[10px]" title="ID DB Referensi">
+                                  ID DB: #{h.id_db}
+                                </span>
+                              )}
+                              <span>Tahun: {h.tahun_anggaran || '-'} &bull; Status: <strong className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</strong></span>
+                            </div>
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                             Rp {formatRp(parseNum(h.nominal || '0'))}
@@ -775,7 +782,14 @@ ${mainData.ringkasan_ai}`;
                           <td className="px-4 py-2.5 text-center font-medium text-gray-600 whitespace-nowrap">{i + 1}</td>
                           <td className="px-4 py-2.5">
                             <div className="font-bold text-gray-900 leading-relaxed">{h.keterangan || '-'}</div>
-                            <div className="text-[11px] text-gray-500 font-medium mt-1">Tahun: {h.tahun_anggaran || '-'} &bull; Status: <span className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</span></div>
+                            <div className="text-[11px] text-gray-500 font-medium mt-1 flex flex-wrap items-center gap-1.5">
+                              {h.id_db && (
+                                <span className="px-1.5 py-0.2 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-800 font-mono font-bold text-[10px]" title="ID DB Referensi">
+                                  ID DB: #{h.id_db}
+                                </span>
+                              )}
+                              <span>Tahun: {h.tahun_anggaran || '-'} &bull; Status: <strong className="text-emerald-600 font-bold">{h.status_pagu || 'Disetujui'}</strong></span>
+                            </div>
                           </td>
                           <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                             Rp {formatRp(parseNum(h.nominal || '0'))}
