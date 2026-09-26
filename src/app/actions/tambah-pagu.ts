@@ -7,8 +7,8 @@ import { revalidatePath } from 'next/cache';
 export async function getTambahPagu() {
   const { data, error } = await supabase
     .from('tambah_pagu')
-    .select('*, gov_units(nama_unit)')
-    .order('created_time', { ascending: false });
+    .select('*, gov_units(id, nama_unit, kode_unit, group_org)')
+    .order('id', { ascending: false });
     
   if (error) throw error;
   return data;

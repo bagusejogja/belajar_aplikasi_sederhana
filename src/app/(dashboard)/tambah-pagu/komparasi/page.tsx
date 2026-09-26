@@ -10,13 +10,21 @@ import {
   Scale, RefreshCw, CheckCircle2, AlertTriangle, 
   XCircle, Building2, FileText, Search, Sparkles, Download, 
   Zap, ChevronRight, ChevronDown, ChevronUp, Layers, ArrowUpRight, 
-  ArrowDownRight, ExternalLink, Check, Info, History, RotateCcw, ShieldCheck, TrendingUp
+  ArrowDownRight, ExternalLink, Check, Info, History, RotateCcw, ShieldCheck, TrendingUp,
+  Coins, ShieldAlert
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+
+// PEMETAAN PEMBEBANAN ANGGARAN KHUSUS (Unit Pengusul -> Unit Pembebanan di DIPA/Pagu)
+// Kasus: GMC dibebankan ke Direktorat Keuangan, Masjid Kampus dibebankan ke Sekretaris Universitas
+const PEMBEBANAN_MAPPING: Record<number, { targetUnitId: number; targetUnitName: string; note: string }> = {
+  58: { targetUnitId: 22, targetUnitName: 'Direktorat Keuangan', note: 'Biaya kesehatan & kapitasi mahasiswa GMC dibebankan ke pagu Direktorat Keuangan' },
+  52: { targetUnitId: 5, targetUnitName: 'Sekretaris Universitas', note: 'Bantuan operasional & kegiatan Ramadhan Masjid Kampus dibebankan ke pagu Sekretaris Universitas' }
+};
 
 export default function KomparasiTambahPaguPage() {
   const router = useRouter();
@@ -28,6 +36,9 @@ export default function KomparasiTambahPaguPage() {
   const [selectedGroupOrg, setSelectedGroupOrg] = useState('ALL');
   const [selectedAuditStatus, setSelectedAuditStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Toggle Mode Pembebanan Anggaran Khusus (GMC -> Dit Keu, Masjid -> Sekun)
+  const [usePembebananMapping, setUsePembebananMapping] = useState<boolean>(true);
 
   // Accordion Expand State
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({});
@@ -113,35 +124,74 @@ export default function KomparasiTambahPaguPage() {
     return new Intl.NumberFormat('id-ID').format(Number(clean) || 0);
   };
 
+  // Helper: Ambil nominal persetujuan surat sesuai rumus resmi di /tambah-pagu
+  const getSuratDisetujuiNominal = (l: any): number => {
+    const status = (l.status_pengajuan || '').toLowerCase();
+    const isApprovedAll = status.includes('semua') || status.includes('100');
+    const isApprovedPartial = status.includes('sebagian');
+    const isGeneralApproved = status.includes('disetujui') || status.includes('setuju');
+
+    if (isApprovedAll) {
+      return Number(l.nominal_tanggapan || l.nominal_disetujui || l.nominal_diajukan || 0);
+    }
+    if (isApprovedPartial || isGeneralApproved) {
+      return Number(l.nominal_tanggapan || l.nominal_disetujui || 0);
+    }
+    if (Number(l.nominal_tanggapan || l.nominal_disetujui || 0) > 0) {
+      return Number(l.nominal_tanggapan || l.nominal_disetujui || 0);
+    }
+    return 0;
+  };
+
   // AUDIT CALCULATION PER UNIT KERJA (EXCLUDING UNITS WITH 0 MUTATION)
   const auditUnitComparison = useMemo(() => {
     const calculated = unitList.map(u => {
       const uName = u.nama_unit.toLowerCase();
 
-      // Surat-surat usulan tambah_pagu milik unit ini yang disetujui
-      const uLetters = rawTambahPagu.filter(l => {
-        const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || l.unit_pengusul || '').toLowerCase();
+      // 1. Surat-surat usulan tambah_pagu milik unit ini
+      let uLetters = rawTambahPagu.filter(l => {
+        const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || '').toLowerCase();
         const matchesUnit = letterUnit === uName || l.unit_id === u.id;
         const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
         return matchesUnit && matchesYear;
       });
 
-      const approvedLetters = uLetters.filter(l => 
-        (l.status_pengajuan || '').toLowerCase().includes('disetujui') || 
-        Number(l.nominal_tanggapan || l.nominal_disetujui || 0) > 0
+      // 2. Jika unit ini adalah penerima titipan pembebanan (contoh: Dit Keu menerima beban GMC, Sekun menerima beban Masjid Kampus)
+      const delegatedSources = Object.entries(PEMBEBANAN_MAPPING)
+        .filter(([_, map]) => map.targetUnitId === u.id)
+        .map(([srcId]) => Number(srcId));
+
+      let delegatedLetters: any[] = [];
+      if (usePembebananMapping && delegatedSources.length > 0) {
+        delegatedLetters = rawTambahPagu.filter(l => {
+          const isFromSource = delegatedSources.includes(l.unit_id);
+          const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
+          return isFromSource && matchesYear;
+        }).map(l => ({
+          ...l,
+          is_delegated: true,
+          delegated_from: l.gov_units?.nama_unit || (l.unit_id === 58 ? 'Gama Medical Center (GMC)' : 'Masjid Kampus')
+        }));
+      }
+
+      // Gabungkan surat internal + surat titipan pembebanan
+      const combinedLetters = [...uLetters, ...delegatedLetters];
+
+      const approvedLetters = combinedLetters.filter(l => 
+        getSuratDisetujuiNominal(l) > 0 || (l.status_pengajuan || '').toLowerCase().includes('disetujui')
       );
 
-      const totalSuratNominalDiajukan = uLetters.reduce((a, b) => a + Number(b.nominal_diajukan || 0), 0);
-      const totalSuratNominalDisetujui = approvedLetters.reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+      const totalSuratNominalDiajukan = combinedLetters.reduce((a, b) => a + Number(b.nominal_diajukan || 0), 0);
+      const totalSuratNominalDisetujui = approvedLetters.reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
 
       // Breakdown Inisiatif & Penugasan dari tambah_pagu
       const suratInisiatif = approvedLetters
         .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
-        .reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+        .reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
       
       const suratPenugasan = approvedLetters
         .filter(l => (l.jenis_tambah_pagu || '').toLowerCase().includes('penugasan') || !(l.jenis_tambah_pagu || '').toLowerCase().includes('inisiatif'))
-        .reduce((a, b) => a + Number(b.nominal_tanggapan || b.nominal_disetujui || 0), 0);
+        .reduce((a, b) => a + getSuratDisetujuiNominal(b), 0);
 
       // Data dari gov_pagu_anggaran milik unit ini (hanya Tambah Pagu - Inisiatif dan Tambah Pagu - Penugasan)
       const uGovRows = rawGovPagu.filter(r => 
@@ -161,10 +211,15 @@ export default function KomparasiTambahPaguPage() {
 
       const diff = totalSuratNominalDisetujui - totalGovPaguTambah;
 
-      let auditStatus: 'MATCH' | 'KELEWAT' | 'SELISIH' | 'KOSONG' = 'KOSONG';
-      if (totalSuratNominalDisetujui > 0 && totalGovPaguTambah === 0) {
+      // Status Audit
+      const isDelegatedOrigin = usePembebananMapping && PEMBEBANAN_MAPPING[u.id];
+      let auditStatus: 'MATCH' | 'KELEWAT' | 'SELISIH' | 'KOSONG' | 'DIBEBANKAN' = 'KOSONG';
+
+      if (isDelegatedOrigin) {
+        auditStatus = 'DIBEBANKAN';
+      } else if (totalSuratNominalDisetujui > 0 && totalGovPaguTambah === 0) {
         auditStatus = 'KELEWAT';
-      } else if (diff === 0 && totalSuratNominalDisetujui > 0) {
+      } else if (diff === 0 && (totalSuratNominalDisetujui > 0 || totalGovPaguTambah > 0)) {
         auditStatus = 'MATCH';
       } else if (diff !== 0) {
         auditStatus = 'SELISIH';
@@ -175,7 +230,7 @@ export default function KomparasiTambahPaguPage() {
         kode_unit: u.kode_unit,
         nama_unit: u.nama_unit,
         group_org: u.group_org || '-',
-        total_surat_count: uLetters.length,
+        total_surat_count: combinedLetters.length,
         approved_surat_count: approvedLetters.length,
         surat_nominal_diajukan: totalSuratNominalDiajukan,
         surat_nominal_disetujui: totalSuratNominalDisetujui,
@@ -184,15 +239,17 @@ export default function KomparasiTambahPaguPage() {
         gov_inisiatif: govPaguInisiatif,
         gov_penugasan: govPaguPenugasan,
         total_gov_tambah: totalGovPaguTambah,
-        selisih: diff,
+        selisih: isDelegatedOrigin ? 0 : diff,
         audit_status: auditStatus,
-        letters: uLetters
+        delegated_to: isDelegatedOrigin ? isDelegatedOrigin.targetUnitName : null,
+        delegated_note: isDelegatedOrigin ? isDelegatedOrigin.note : null,
+        letters: combinedLetters
       };
     });
 
-    // 🔴 REQUIREMENT 2: FILTER OUT UNITS WITH 0 MUTATION (Alias totalSuratNominalDisetujui === 0 && totalGovPaguTambah === 0)
+    // 🔴 REQUIREMENT: FILTER OUT UNITS WITH 0 MUTATION
     return calculated.filter(u => u.surat_nominal_disetujui > 0 || u.total_gov_tambah > 0 || u.total_surat_count > 0);
-  }, [unitList, rawTambahPagu, rawGovPagu, selectedYear]);
+  }, [unitList, rawTambahPagu, rawGovPagu, selectedYear, usePembebananMapping]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -244,6 +301,28 @@ export default function KomparasiTambahPaguPage() {
       selisihAnggaran: totalSelisihAnggaran
     };
   }, [auditUnitComparison]);
+
+  // GRAND TOTAL SUMMARY FOR ALL FILTERED UNITS (JUMLAH SURAT DISETUJUI & TERCATAT DB)
+  const grandTotalSummary = useMemo(() => {
+    // Catatan: Jika status DIBEBANKAN, nominal surat tidak dihitung ganda karena sudah dialihkan ke unit penerima beban
+    const activeUnits = filteredAuditUnits;
+    
+    const totalSuratNominal = activeUnits.reduce((acc, u) => acc + (u.audit_status === 'DIBEBANKAN' ? 0 : u.surat_nominal_disetujui), 0);
+    const totalSuratCount = activeUnits.reduce((acc, u) => acc + (u.audit_status === 'DIBEBANKAN' ? 0 : u.approved_surat_count), 0);
+    const totalGovPagu = activeUnits.reduce((acc, u) => acc + u.total_gov_tambah, 0);
+    const totalGovInisiatif = activeUnits.reduce((acc, u) => acc + u.gov_inisiatif, 0);
+    const totalGovPenugasan = activeUnits.reduce((acc, u) => acc + u.gov_penugasan, 0);
+    const totalDiff = totalSuratNominal - totalGovPagu;
+
+    return {
+      totalSuratNominal,
+      totalSuratCount,
+      totalGovPagu,
+      totalGovInisiatif,
+      totalGovPenugasan,
+      totalDiff
+    };
+  }, [filteredAuditUnits]);
 
   // Toggle Accordion Expand per Unit
   const toggleUnitAccordion = (unitId: string) => {
@@ -445,14 +524,31 @@ export default function KomparasiTambahPaguPage() {
       'Nominal Inisiatif DB': u.gov_inisiatif,
       'Nominal Penugasan DB': u.gov_penugasan,
       'Selisih / Diff (Rp)': u.selisih,
-      'Status Audit': u.audit_status === 'MATCH' ? '🟢 MATCH (Sesuai)' : u.audit_status === 'KELEWAT' ? '⚠️ KELEWAT (Belum Dicatat)' : u.audit_status === 'SELISIH' ? '🔴 SELISIH (Ada Beda)' : 'KOSONG'
+      'Status Audit': u.audit_status === 'DIBEBANKAN' ? `ℹ️ DIBEBANKAN ke ${u.delegated_to}` : u.audit_status === 'MATCH' ? '🟢 MATCH (Sesuai)' : u.audit_status === 'KELEWAT' ? '⚠️ KELEWAT (Belum Dicatat)' : u.audit_status === 'SELISIH' ? '🔴 SELISIH (Ada Beda)' : 'KOSONG'
     }));
+
+    // Tambahkan Baris Grand Total di akhir data Excel
+    auditRows.push({
+      'No': 'TOTAL',
+      'Kode Unit': '-',
+      'Nama Unit Kerja': 'TOTAL KESELURUHAN (AUDIT SUMMARY)',
+      'Group Org': `${filteredAuditUnits.length} Unit Kerja`,
+      'Jumlah Surat Disetujui': grandTotalSummary.totalSuratCount,
+      'Nominal Disetujui Surat (tambah_pagu)': grandTotalSummary.totalSuratNominal,
+      'Nominal Inisiatif Surat': filteredAuditUnits.reduce((a, b) => a + (b.audit_status === 'DIBEBANKAN' ? 0 : b.surat_inisiatif), 0),
+      'Nominal Penugasan Surat': filteredAuditUnits.reduce((a, b) => a + (b.audit_status === 'DIBEBANKAN' ? 0 : b.surat_penugasan), 0),
+      'Nominal Tercatat DB (gov_pagu_anggaran)': grandTotalSummary.totalGovPagu,
+      'Nominal Inisiatif DB': grandTotalSummary.totalGovInisiatif,
+      'Nominal Penugasan DB': grandTotalSummary.totalGovPenugasan,
+      'Selisih / Diff (Rp)': grandTotalSummary.totalDiff,
+      'Status Audit': grandTotalSummary.totalDiff === 0 ? '🟢 MATCH (Balance)' : '⚠️ SELISIH'
+    } as any);
 
     const worksheet = XLSX.utils.json_to_sheet(auditRows);
     worksheet['!cols'] = [
-      { wch: 6 },  { wch: 12 }, { wch: 35 }, { wch: 16 }, { wch: 22 },
-      { wch: 32 }, { wch: 22 }, { wch: 22 }, { wch: 32 }, { wch: 20 },
-      { wch: 20 }, { wch: 20 }, { wch: 28 }
+      { wch: 8 },  { wch: 12 }, { wch: 38 }, { wch: 16 }, { wch: 24 },
+      { wch: 34 }, { wch: 24 }, { wch: 24 }, { wch: 34 }, { wch: 22 },
+      { wch: 22 }, { wch: 22 }, { wch: 32 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -593,13 +689,85 @@ export default function KomparasiTambahPaguPage() {
         </div>
       </div>
 
+      {/* ROW 2.5: GRAND TOTAL AUDIT SUMMARY STRIP */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 text-white shadow-md border border-indigo-900/60 relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-96 h-full bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          {/* Kolom 1: Total Surat Disetujui */}
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+              <FileText size={15} />
+              <span>Surat Disetujui (tambah_pagu)</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-amber-300">
+              Rp {formatRp(grandTotalSummary.totalSuratNominal)}
+            </div>
+            <p className="text-xs text-slate-300 font-medium">
+              Total dari <strong className="text-white font-mono">{grandTotalSummary.totalSuratCount}</strong> berkas surat disetujui ({filteredAuditUnits.length} unit difilter)
+            </p>
+          </div>
+
+          <div className="hidden lg:block w-px h-16 bg-white/10" />
+
+          {/* Kolom 2: Total Tercatat di DB */}
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+              <Layers size={15} />
+              <span>Tercatat DB (gov_pagu_anggaran)</span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-emerald-300">
+              Rp {formatRp(grandTotalSummary.totalGovPagu)}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-300 font-medium">
+              <span className="bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded text-emerald-200 font-mono">
+                Inisiatif: Rp {formatRp(grandTotalSummary.totalGovInisiatif)}
+              </span>
+              <span className="bg-emerald-950/70 border border-emerald-500/30 px-2 py-0.5 rounded text-emerald-200 font-mono">
+                Penugasan: Rp {formatRp(grandTotalSummary.totalGovPenugasan)}
+              </span>
+            </div>
+          </div>
+
+          <div className="hidden lg:block w-px h-16 bg-white/10" />
+
+          {/* Kolom 3: Net Selisih / Diff & Status */}
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center gap-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
+              <Scale size={15} />
+              <span>Net Selisih (Surat - DB)</span>
+            </div>
+            <div className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+              grandTotalSummary.totalDiff === 0 ? 'text-emerald-400' : grandTotalSummary.totalDiff > 0 ? 'text-amber-400' : 'text-rose-400'
+            }`}>
+              {grandTotalSummary.totalDiff === 0 
+                ? 'Rp 0' 
+                : (grandTotalSummary.totalDiff > 0 ? `+Rp ${formatRp(grandTotalSummary.totalDiff)}` : `-Rp ${formatRp(Math.abs(grandTotalSummary.totalDiff))}`)}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                grandTotalSummary.totalDiff === 0 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+              }`}>
+                {grandTotalSummary.totalDiff === 0 ? '🟢 Balance Sempurna' : '⚠️ Perlu Disesuaikan'}
+              </span>
+              {usePembebananMapping && (
+                <span className="text-[10px] text-sky-300 bg-sky-950/60 border border-sky-600/40 px-2 py-0.5 rounded">
+                  ⚡ Beban GMC & Masjid Terkonsolidasi
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ROW 3: FILTER TOOLBAR FOR AUDIT */}
       <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
         <div className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-wider shrink-0">
           <Zap size={14} className="text-amber-500" /> FILTER AUDIT:
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 w-full">
           {/* Status Audit Dropdown */}
           <div>
             <select
@@ -611,6 +779,7 @@ export default function KomparasiTambahPaguPage() {
               <option value="MATCH">🟢 MATCH (Sesuai)</option>
               <option value="KELEWAT">⚠️ KELEWAT (Belum Dicatat)</option>
               <option value="SELISIH">🔴 SELISIH (Ada Beda Nominal)</option>
+              <option value="DIBEBANKAN">ℹ️ DIBEBANKAN (GMC / Masjid)</option>
             </select>
           </div>
 
@@ -651,6 +820,23 @@ export default function KomparasiTambahPaguPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
             />
+          </div>
+
+          {/* Toggle Pembebanan Anggaran Khusus */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setUsePembebananMapping(prev => !prev)}
+              className={`w-full h-9 px-3 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs ${
+                usePembebananMapping
+                  ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                  : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+              }`}
+              title="Klik untuk beralih antara mode pembebanan anggaran khusus (GMC -> Dit Keu, Masjid -> Sekun) atau mode pengusul murni"
+            >
+              <ShieldAlert size={13} className={usePembebananMapping ? 'text-amber-600' : 'text-gray-400'} />
+              <span className="truncate">{usePembebananMapping ? '⚡ Beban GMC & Masjid' : 'Standar Pengusul'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -752,25 +938,35 @@ export default function KomparasiTambahPaguPage() {
                         {/* SURAT DISETUJUI NOMINAL */}
                         <TableCell className="text-right align-top pt-3 space-y-1">
                           <div className="font-mono font-bold text-amber-900">Rp {formatRp(u.surat_nominal_disetujui)}</div>
-                          <div className="text-[10px] text-slate-500 font-semibold">{u.approved_surat_count} Surat Disetujui</div>
+                          <div className="text-[10px] text-slate-500 font-semibold">
+                            {u.approved_surat_count} Surat Disetujui
+                            {u.audit_status === 'DIBEBANKAN' && <span className="text-sky-600 block text-[9px] font-medium">(Beban ke {u.delegated_to})</span>}
+                          </div>
                         </TableCell>
 
                         {/* GOV PAGU NOMINAL */}
                         <TableCell className="text-right align-top pt-3 space-y-1">
                           <div className="flex justify-end items-center gap-2">
-                            {u.selisih === 0 && u.surat_nominal_disetujui > 0 && (
+                            {(u.selisih === 0 && (u.surat_nominal_disetujui > 0 || u.audit_status === 'DIBEBANKAN')) && (
                               <CheckCircle2 size={16} className="text-emerald-500" />
                             )}
                             <div className="font-mono font-black text-emerald-800">Rp {formatRp(u.total_gov_tambah)}</div>
                           </div>
                           <div className="text-[10px] text-slate-400">
-                            Inisiatif: Rp {formatRp(u.gov_inisiatif)} | Penugasan: Rp {formatRp(u.gov_penugasan)}
+                            {u.audit_status === 'DIBEBANKAN' 
+                              ? `Dialihkan ke ${u.delegated_to}` 
+                              : `Inisiatif: Rp ${formatRp(u.gov_inisiatif)} | Penugasan: Rp ${formatRp(u.gov_penugasan)}`}
                           </div>
                         </TableCell>
 
                         {/* SELISIH / DIFF */}
                         <TableCell className="text-right align-top pt-3 space-y-1">
-                          {u.selisih === 0 ? (
+                          {u.audit_status === 'DIBEBANKAN' ? (
+                            <div className="inline-flex items-center gap-1 font-mono font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+                              <Info size={12} className="text-sky-600" />
+                              <span>Rp 0 (Dialihkan)</span>
+                            </div>
+                          ) : u.selisih === 0 ? (
                             <div className="inline-flex items-center gap-1 font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                               <CheckCircle2 size={12} className="text-emerald-500" />
                               <span>Rp 0</span>
@@ -781,13 +977,20 @@ export default function KomparasiTambahPaguPage() {
                             </div>
                           )}
                           <div className="text-[10px] text-gray-400">
-                            {u.selisih === 0 ? 'Tepat Sesuai' : (u.selisih > 0 ? 'Surat > DB' : 'Surat < DB')}
+                            {u.audit_status === 'DIBEBANKAN' 
+                              ? `Beban ${u.delegated_to}` 
+                              : (u.selisih === 0 ? 'Tepat Sesuai' : (u.selisih > 0 ? 'Surat > DB' : 'Surat < DB'))}
                           </div>
                         </TableCell>
 
                         {/* STATUS AUDIT & AKSI SINKRON */}
                         <TableCell className="text-center align-top pt-3 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                           <div>
+                            {u.audit_status === 'DIBEBANKAN' && (
+                              <Badge className="bg-sky-50 text-sky-800 border-sky-200 text-[10px] font-black px-2 py-0.5 shadow-2xs" title={u.delegated_note || ''}>
+                                ℹ️ DIBEBANKAN
+                              </Badge>
+                            )}
                             {u.audit_status === 'MATCH' && (
                               <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-black px-2 py-0.5 shadow-2xs">
                                 🟢 MATCH
@@ -803,10 +1006,15 @@ export default function KomparasiTambahPaguPage() {
                                 🟡 SELISIH
                               </Badge>
                             )}
+                            {u.audit_status === 'DIBEBANKAN' && (
+                              <div className="text-[9px] text-sky-700 font-medium truncate max-w-[130px] mx-auto">
+                                ke {u.delegated_to}
+                              </div>
+                            )}
                           </div>
 
                           <div>
-                            {u.audit_status !== 'MATCH' ? (
+                            {u.audit_status !== 'MATCH' && u.audit_status !== 'DIBEBANKAN' ? (
                               <Button
                                 size="sm"
                                 onClick={() => {
@@ -852,6 +1060,16 @@ export default function KomparasiTambahPaguPage() {
                                     Rincian Surat Usulan: {u.nama_unit} ({u.letters.length} Surat)
                                   </h4>
                                 </div>
+
+                                {u.delegated_to && (
+                                  <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 font-medium flex items-center gap-2.5">
+                                    <Info size={16} className="text-sky-600 shrink-0" />
+                                    <span>
+                                      <strong>Catatan Pembebanan Anggaran:</strong> Surat usulan unit ini dialokasikan pembebanannya ke <strong>{u.delegated_to}</strong> ({u.delegated_note}). Pagu tercatat di unit {u.delegated_to}.
+                                    </span>
+                                  </div>
+                                )}
+
                                 <div className="overflow-x-auto">
                                   <Table>
                                     <TableHeader className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500">
@@ -868,25 +1086,38 @@ export default function KomparasiTambahPaguPage() {
                                         </TableRow>
                                       ) : (
                                         u.letters.map((subItem: any, subIdx: number) => {
+                                          const nominalDisetujui = getSuratDisetujuiNominal(subItem);
                                           return (
                                             <TableRow key={subItem.id || subIdx} className="hover:bg-slate-50 border-b border-slate-100 text-xs">
                                               <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{subIdx + 1}</TableCell>
                                               <TableCell className="space-y-1">
-                                                <div className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</div>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                  <span className="font-bold text-slate-900 font-mono text-[11px]">📄 {subItem.no_surat_pengajuan || '-'}</span>
+                                                  {subItem.is_delegated && (
+                                                    <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[9px] font-bold">
+                                                      ⚡ Beban Titipan: {subItem.delegated_from}
+                                                    </Badge>
+                                                  )}
+                                                </div>
                                                 <div className="text-[10px] text-slate-400">📅 {subItem.tanggal_surat_pengajuan || '-'}</div>
                                                 <div className="text-slate-600 text-[11px] leading-relaxed whitespace-pre-wrap">{subItem.hal_surat_pengajuan || '-'}</div>
-                                                <div className="pt-1">
+                                                <div className="pt-1 flex items-center gap-2">
                                                   <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px] font-bold">
                                                     {subItem.jenis_tambah_pagu || 'Penugasan'}
                                                   </Badge>
+                                                  {subItem.status_pengajuan && (
+                                                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                                      {subItem.status_pengajuan}
+                                                    </span>
+                                                  )}
                                                 </div>
                                               </TableCell>
                                               <TableCell className="text-right font-mono font-black text-emerald-700 text-xs align-top pt-3">
                                                 <div className="flex items-center justify-end gap-1.5">
-                                                  {dbRows.some(r => Number(r.nominal) === Number(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)) && (
+                                                  {dbRows.some(r => Number(r.nominal) === nominalDisetujui) && (
                                                     <CheckCircle2 size={16} className="text-emerald-500" />
                                                   )}
-                                                  <span>Rp {formatRp(subItem.nominal_tanggapan || subItem.nominal_disetujui || 0)}</span>
+                                                  <span>Rp {formatRp(nominalDisetujui)}</span>
                                                 </div>
                                               </TableCell>
                                             </TableRow>
@@ -962,6 +1193,46 @@ export default function KomparasiTambahPaguPage() {
                 })
               )}
             </TableBody>
+            <TableFooter className="bg-slate-100/90 font-black border-t-2 border-slate-300">
+              <TableRow className="hover:bg-slate-100">
+                <TableCell colSpan={3} className="text-center font-black text-slate-800 text-xs uppercase tracking-wider py-3.5">
+                  TOTAL KESELURUHAN ({filteredAuditUnits.length} UNIT)
+                </TableCell>
+                <TableCell className="text-right font-mono font-black text-amber-900 text-xs py-3.5 space-y-0.5">
+                  <div>Rp {formatRp(grandTotalSummary.totalSuratNominal)}</div>
+                  <div className="text-[10px] text-slate-500 font-normal">
+                    {grandTotalSummary.totalSuratCount} Berkas Surat Disetujui
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono font-black text-emerald-900 text-xs py-3.5 space-y-0.5">
+                  <div>Rp {formatRp(grandTotalSummary.totalGovPagu)}</div>
+                  <div className="text-[10px] text-slate-500 font-normal">
+                    Inisiatif: Rp {formatRp(grandTotalSummary.totalGovInisiatif)} | Penugasan: Rp {formatRp(grandTotalSummary.totalGovPenugasan)}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono font-black text-xs py-3.5 space-y-0.5">
+                  <div className={grandTotalSummary.totalDiff === 0 ? 'text-emerald-700' : 'text-rose-700'}>
+                    {grandTotalSummary.totalDiff === 0 
+                      ? 'Rp 0' 
+                      : (grandTotalSummary.totalDiff > 0 ? `+Rp ${formatRp(grandTotalSummary.totalDiff)}` : `-Rp ${formatRp(Math.abs(grandTotalSummary.totalDiff))}`)}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-normal">
+                    {grandTotalSummary.totalDiff === 0 ? 'Balance (Sesuai)' : 'Net Selisih'}
+                  </div>
+                </TableCell>
+                <TableCell className="text-center text-xs py-3.5">
+                  {grandTotalSummary.totalDiff === 0 ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px] font-black px-2 py-0.5 shadow-2xs">
+                      🟢 MATCH
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] font-black px-2 py-0.5 shadow-2xs">
+                      ⚠️ CEK SELISIH
+                    </Badge>
+                  )}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
           </Table>
         </CardContent>
 
