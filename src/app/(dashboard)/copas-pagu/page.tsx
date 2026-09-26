@@ -44,12 +44,17 @@ const JENIS_ANGGARAN_OPTIONS = [
 
 const STATUS_PAGU_OPTIONS = [
   'Bukan Pagu Awal',
-  'Pagu Awal',
-  'Draft',
-  'Diajukan',
-  'Disetujui',
-  'Final'
+  'Pagu Awal'
 ];
+
+const matchStatusPagu = (val: string): string => {
+  if (!val) return 'Bukan Pagu Awal';
+  const v = val.trim().toLowerCase();
+  if (v === 'pagu awal' || v === 'awal') {
+    return 'Pagu Awal';
+  }
+  return 'Bukan Pagu Awal';
+};
 
 export default function CopasPaguPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
@@ -324,7 +329,7 @@ export default function CopasPaguPage() {
 
       if (remaining.length >= 3) {
         keterangan = remaining[0] || '-';
-        statusPagu = remaining[1] || 'Bukan Pagu Awal';
+        statusPagu = matchStatusPagu(remaining[1]);
         jenisAnggaran = matchJenisAnggaran(remaining[2]) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
       } else if (remaining.length === 2) {
         const matchedSecondJenis = matchJenisAnggaran(remaining[1]);
