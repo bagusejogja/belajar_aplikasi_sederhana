@@ -13,6 +13,7 @@ import {
   TrendingUp, ArrowUpRight, ChevronUp, FileSpreadsheet, Download as DownloadIcon
 } from 'lucide-react';
 import Select from 'react-select';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell 
@@ -445,11 +446,23 @@ export default function DaftarSuratPage() {
                   <td className="px-10 py-8">
                     <div className="flex gap-2 justify-center">
                       {item.file_upload ? (
-                        <a href={item.file_upload} target="_blank" className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100" title="Buka File">
+                        <a 
+                          href={getSafeFileUrl(item.file_upload, `Surat_${(item.no_surat || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100" 
+                          title="Buka File Lampiran"
+                        >
                           <FileText size={20} />
                         </a>
                       ) : item.link_google_drive ? (
-                        <a href={item.link_google_drive} target="_blank" className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100" title="Buka Link">
+                        <a 
+                          href={getSafeFileUrl(item.link_google_drive)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100" 
+                          title="Buka Link GDrive"
+                        >
                           <ExternalLink size={20} />
                         </a>
                       ) : null}

@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { summarizeSubstanceWithAI } from '@/app/actions/ai-scan';
 import { updatePaguSummary } from '@/app/actions/tambah-pagu';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 export default function ViewPaguPage() {
   const router = useRouter();
@@ -241,12 +242,12 @@ export default function ViewPaguPage() {
                   <TableCell className="text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       {data.link_surat_pengajuan && (
-                        <a href={data.link_surat_pengajuan} target="_blank" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                        <a href={getSafeFileUrl(data.link_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
                           <ExternalLink size={14} /> GDrive Link
                         </a>
                       )}
                       {data.file_surat_pengajuan && (
-                        <a href={data.file_surat_pengajuan} target="_blank" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
+                        <a href={getSafeFileUrl(data.file_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
                           <FileText size={14} /> File PDF
                         </a>
                       )}
@@ -319,12 +320,12 @@ export default function ViewPaguPage() {
                   <TableCell className="text-xs">
                     <div className="flex flex-wrap items-center gap-2">
                       {data.link_surat_tanggapan && (
-                        <a href={data.link_surat_tanggapan} target="_blank" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                        <a href={getSafeFileUrl(data.link_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
                           <ExternalLink size={14} /> GDrive Link
                         </a>
                       )}
                       {data.file_surat_tanggapan && (
-                        <a href={data.file_surat_tanggapan} target="_blank" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
+                        <a href={getSafeFileUrl(data.file_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
                           <FileText size={14} /> File PDF
                         </a>
                       )}
@@ -365,8 +366,9 @@ export default function ViewPaguPage() {
                 </h4>
                 {data.file_surat_pengajuan && (
                   <a 
-                    href={data.file_surat_pengajuan} 
+                    href={getSafeFileUrl(data.file_surat_pengajuan)} 
                     target="_blank" 
+                    rel="noopener noreferrer"
                     className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"
                   >
                     <Maximize2 size={12} className="inline mr-1" /> Fullscreen
@@ -398,8 +400,9 @@ export default function ViewPaguPage() {
                 </h4>
                 {data.file_surat_tanggapan && (
                   <a 
-                    href={data.file_surat_tanggapan} 
+                    href={getSafeFileUrl(data.file_surat_tanggapan)} 
                     target="_blank" 
+                    rel="noopener noreferrer"
                     className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"
                   >
                     <Maximize2 size={12} className="inline mr-1" /> Fullscreen

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 export default function RekapTransferPage() {
   const [listData, setListData] = useState<any[]>([]);
@@ -179,7 +180,7 @@ export default function RekapTransferPage() {
                        />
                     </div>
                  ) : (
-                    <button key={idx} onClick={() => window.open(lnk, '_blank')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 p-2.5 rounded-xl border border-indigo-100 flex items-center gap-1.5 transition-colors">
+                    <button key={idx} onClick={() => window.open(getSafeFileUrl(lnk), '_blank')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 p-2.5 rounded-xl border border-indigo-100 flex items-center gap-1.5 transition-colors">
                        <Eye size={14}/> <span>Lihat {label} {idx + 1}</span>
                     </button>
                  );

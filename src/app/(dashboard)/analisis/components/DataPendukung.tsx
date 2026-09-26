@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { FileSpreadsheet, Plus, Trash2, History, Paperclip, ClipboardPaste, BarChart3 } from 'lucide-react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 export default function DataPendukung({ mainData, setMainData, detailData, setDetailData, historisData, setHistorisData, renderMode = 'tabs', readOnly = false }: any) {
   const [activeSubTab, setActiveSubTab] = useState('realisasi');
@@ -766,7 +767,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               {readOnly ? (
                 <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-2">
                   {mainData.link_lampiran ? (
-                    <a href={mainData.link_lampiran} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-2">
+                    <a href={getSafeFileUrl(mainData.link_lampiran)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-2">
                       <Paperclip size={16}/> Lihat Dokumen Lampiran
                     </a>
                   ) : (

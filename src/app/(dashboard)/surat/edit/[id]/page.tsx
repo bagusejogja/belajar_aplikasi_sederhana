@@ -10,6 +10,7 @@ import {
   Building2, User, CheckCircle2, Loader2,
   ExternalLink, Info, Edit3
 } from 'lucide-react';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 export default function EditSuratPage() {
   const router = useRouter();
@@ -336,7 +337,7 @@ export default function EditSuratPage() {
                </div>
             </div>
             {existingFile && (
-              <a href={existingFile} target="_blank" className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs flex items-center gap-2 shadow-lg shadow-indigo-100">
+              <a href={getSafeFileUrl(existingFile)} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-xs flex items-center gap-2 shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-colors">
                 <ExternalLink size={16} /> LIHAT FILE
               </a>
             )}

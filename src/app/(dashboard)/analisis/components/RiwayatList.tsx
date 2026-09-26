@@ -11,6 +11,7 @@ import {
   Printer, FileCheck, Landmark, BarChart3, Check, DollarSign, ListFilter, ArrowRight, PieChart,
   RefreshCw, Save
 } from 'lucide-react';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAnalisis: (id_analisis: string) => void, setActiveTab: (tab: string) => void }) {
   const router = useRouter();
@@ -778,7 +779,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                          </span>
                                          {(r.link_lampiran || r.file_lampiran) && (
                                            <a 
-                                             href={r.link_lampiran || r.file_lampiran} 
+                                             href={getSafeFileUrl(r.link_lampiran || r.file_lampiran)} 
                                              target="_blank" 
                                              rel="noreferrer" 
                                              className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"
@@ -912,7 +913,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                              </div>
                                            </div>
                                            <a
-                                             href={r.link_lampiran || r.file_lampiran}
+                                             href={getSafeFileUrl(r.link_lampiran || r.file_lampiran)}
                                              target="_blank"
                                              rel="noreferrer"
                                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0"
@@ -1298,7 +1299,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                   <Paperclip size={16} className="text-indigo-600" /> File PDF Lampiran Asli Pengajuan
                 </div>
                 <button
-                  onClick={() => window.open(viewModalData.link_lampiran, '_blank')}
+                  onClick={() => window.open(getSafeFileUrl(viewModalData.link_lampiran), '_blank')}
                   className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                 >
                   <ExternalLink size={13} /> Buka PDF Lampiran

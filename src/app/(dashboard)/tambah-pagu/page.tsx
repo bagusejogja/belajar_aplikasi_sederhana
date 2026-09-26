@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { getSafeFileUrl } from '@/lib/fileHelper';
 
 // Autocomplete Filter Unit Kerja Component (with Keyboard Navigation ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -1195,6 +1196,24 @@ export default function TambahPaguPage() {
                         Rp {formatRp(viewDetailData.nominal_diajukan)}
                       </TableCell>
                     </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Berkas / Lampiran</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {viewDetailData.link_surat_pengajuan && (
+                            <a href={getSafeFileUrl(viewDetailData.link_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                              <ExternalLink size={13} /> GDrive Link
+                            </a>
+                          )}
+                          {viewDetailData.file_surat_pengajuan && (
+                            <a href={getSafeFileUrl(viewDetailData.file_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
+                              <FileText size={13} /> File PDF
+                            </a>
+                          )}
+                          {!viewDetailData.link_surat_pengajuan && !viewDetailData.file_surat_pengajuan && <span className="text-slate-400 font-medium">-</span>}
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </div>
@@ -1218,6 +1237,24 @@ export default function TambahPaguPage() {
                       <TableCell className="bg-emerald-100/50 font-bold text-emerald-900">Nominal Disetujui</TableCell>
                       <TableCell className="font-mono font-black text-emerald-800 text-sm">
                         Rp {formatRp(viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Berkas Tanggapan</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {viewDetailData.link_surat_tanggapan && (
+                            <a href={getSafeFileUrl(viewDetailData.link_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
+                              <ExternalLink size={13} /> GDrive Link
+                            </a>
+                          )}
+                          {viewDetailData.file_surat_tanggapan && (
+                            <a href={getSafeFileUrl(viewDetailData.file_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
+                              <FileText size={13} /> File PDF
+                            </a>
+                          )}
+                          {!viewDetailData.link_surat_tanggapan && !viewDetailData.file_surat_tanggapan && <span className="text-slate-400 font-medium">-</span>}
+                        </div>
                       </TableCell>
                     </TableRow>
                   </TableBody>

@@ -297,13 +297,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
            </button>
         </div>
 
-        {/* Action Bar for Accordion & Search (Visible when expanded) */}
+        {/* Action Bar for Accordion (Visible when expanded) */}
         {!isCollapsed && (
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Navigasi Menu</span>
             <button 
               onClick={toggleAllGroups}
-              className="text-[10px] font-extrabold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-0.5 rounded-lg transition-all"
+              className="text-[10px] font-extrabold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
               title={allGroupsExpanded ? "Tutup Semua Menu Group" : "Buka Semua Menu Group"}
             >
               {allGroupsExpanded ? "Tutup Semua" : "Buka Semua"}
@@ -313,18 +313,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
 
         {/* Navigation - Grouped */}
         <nav className="flex-1 p-3 space-y-3 overflow-y-auto overflow-x-hidden custom-scrollbar">
-          {!isCollapsed && (
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={16} />
-              <input 
-                type="text"
-                placeholder="Cari menu..."
-                value={menuSearch}
-                onChange={e => setMenuSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all text-slate-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500"
-              />
-            </div>
-          )}
 
           {/* SECTION MENU FAVORIT (PERSONAL USER) */}
           {favoriteItems.length > 0 && (

@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PersuratanTabs from '@/components/PersuratanTabs';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 import * as XLSX from 'xlsx';
 
 interface DocumentItem {
@@ -1280,7 +1281,7 @@ NOTIFY pgrst, 'reload schema';`;
                         <div className="flex items-center justify-center gap-1.5">
                           {doc.file_url ? (
                             <a
-                              href={doc.file_url}
+                              href={getSafeFileUrl(doc.file_url, doc.file_name || undefined)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs"
@@ -1292,7 +1293,7 @@ NOTIFY pgrst, 'reload schema';`;
 
                           {doc.link_eksternal ? (
                             <a
-                              href={doc.link_eksternal}
+                              href={getSafeFileUrl(doc.link_eksternal)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors shadow-2xs"
@@ -1550,7 +1551,7 @@ NOTIFY pgrst, 'reload schema';`;
                 <div className="flex flex-wrap gap-2">
                   {selectedDoc.file_url ? (
                     <a
-                      href={selectedDoc.file_url}
+                      href={getSafeFileUrl(selectedDoc.file_url, selectedDoc.file_name || undefined)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-xs"
@@ -1562,7 +1563,7 @@ NOTIFY pgrst, 'reload schema';`;
 
                   {selectedDoc.link_eksternal ? (
                     <a
-                      href={selectedDoc.link_eksternal}
+                      href={getSafeFileUrl(selectedDoc.link_eksternal)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-3.5 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-colors shadow-xs"
