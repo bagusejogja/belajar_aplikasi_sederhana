@@ -99,8 +99,8 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: Konsisten dengan Standar Design System (min-h-[46px], Icon Kiri, Judul + Badge Tepat di Bawah) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      {/* Navigation Grid: Standar Design System (3 Tombol per Baris di Desktop, Sisanya di Baris Berikutnya) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
@@ -110,14 +110,14 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
               key={tab.id}
               href={tab.path}
               title={tab.title}
-              className={`group flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[46px] ${
+              className={`group flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs transition-all duration-200 select-none cursor-pointer border min-h-[48px] ${
                 isActive
                   ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
                   : 'bg-white hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 hover:shadow-2xs active:scale-[0.99]'
               }`}
             >
               {/* Icon di Sisi Kiri */}
-              <div className={`p-1.5 rounded-lg shrink-0 ${
+              <div className={`p-2 rounded-lg shrink-0 ${
                 isActive 
                   ? 'bg-white/20 text-white' 
                   : 'bg-blue-50 text-blue-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors'
@@ -127,10 +127,10 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
 
               {/* Konten Kanan: Judul Menu & Badge Tepat di Bawah Judul */}
               <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
-                <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
+                <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
                   {tab.title}
                 </span>
-                <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
                   isActive 
                     ? 'bg-white/25 text-white' 
                     : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100/70 group-hover:text-blue-700'

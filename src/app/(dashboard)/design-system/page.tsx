@@ -1793,17 +1793,17 @@ export default function DesignSystemPage() {
               </div>
             </div>
 
-            {/* Gaya 5: Tambah Pagu & Mutasi Suite 6-Column Grid Tabs (Baru) */}
+            {/* Gaya 5: Tambah Pagu & Mutasi Suite 3-Column Navigation Grid (Baru) */}
             <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-                  Gaya 5: Tambah Pagu & Mutasi Suite (6-Column Navigation Card)
+                  Gaya 5: Tambah Pagu & Mutasi Suite (3 Tombol per Baris, Sisanya di Baris Berikutnya)
                 </span>
                 <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                   Resmi: /tambah-pagu, /tambah, /komparasi, /analisis, /potret-mutasi-pagu, /copas-pagu
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {[
                   { id: 'daftar', title: 'Daftar Usulan', badge: 'Monitoring', icon: Layout, active: true },
                   { id: 'tambah', title: 'Input Pagu Baru', badge: 'Form Usulan', icon: PlusCircle, active: false },
@@ -1816,22 +1816,22 @@ export default function DesignSystemPage() {
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold text-xs select-none border min-h-[46px] transition-all ${
+                      className={`flex items-center gap-3 p-2.5 px-3.5 rounded-xl font-bold text-xs select-none border min-h-[48px] transition-all ${
                         item.active
                           ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]'
                           : 'bg-white text-slate-700 border-slate-200/90'
                       }`}
                     >
-                      <div className={`p-1.5 rounded-lg shrink-0 ${
+                      <div className={`p-2 rounded-lg shrink-0 ${
                         item.active ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
                       }`}>
                         <Icon size={16} />
                       </div>
                       <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
-                        <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
+                        <span className="line-clamp-1 font-bold tracking-tight text-[12.5px] leading-tight">
                           {item.title}
                         </span>
-                        <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
                           item.active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
                         }`}>
                           {item.badge}
