@@ -313,84 +313,109 @@ export default function GovPicsPage() {
   }, [appUsers]);
 
   return (
-    <div className="space-y-5 pb-12">
+    <div className="max-w-7xl mx-auto pb-24 space-y-4">
       {/* Tab Navigasi Master Suite */}
       <MasterUnitTabs activeTab="gov-pics" />
 
-      {/* Hero Header & Action Bar */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-xs font-bold text-blue-200 border border-white/10">
-              <Users size={14} className="text-blue-300" />
-              <span>Direktori Verifikator Resmi</span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              Master Data PIC & Email Verifikator
-            </h1>
-            <p className="text-blue-100/80 text-xs md:text-sm font-medium max-w-2xl leading-relaxed">
-              Kelola daftar penanggung jawab (PIC) anggaran, akun email resmi untuk dispatch notifikasi otomatis berkas masuk di 
-              <span className="font-bold text-white underline mx-1">/input-mak</span> dan pemberitahuan berkas tuntas di 
-              <span className="font-bold text-white underline ml-1">/anggaran/mak</span>.
-            </p>
+      {/* Slim & Unified Top Toolbar (Standar Design System Master Suite) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-br from-indigo-600 to-blue-600 p-2.5 rounded-xl text-white shadow-xs">
+            <Users size={20} />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {pics.length === 0 && (
-              <button
-                onClick={handleAutoImportFromGovUnits}
-                disabled={loading}
-                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95 border border-amber-400/40"
-                title="Impor Otomatis dari 4 PIC di Master Unit Kerja"
-              >
-                <Sparkles size={15} />
-                <span>Auto-Impor PIC Existing</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => fetchData()}
-              disabled={loading}
-              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center transition-all border border-white/15 active:scale-95"
-              title="Refresh Data"
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            </button>
-
-            <button
-              onClick={() => handleOpenModal()}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-950/30 active:scale-95 border border-emerald-400/30 cursor-pointer"
-            >
-              <Plus size={16} />
-              <span>Tambah PIC Baru</span>
-            </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+                Master Data PIC & Email Verifikator
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black">
+                {pics.length} PIC ({pics.filter(p => p.is_active).length} Aktif)
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
+              Kelola daftar penanggung jawab (PIC) anggaran dan email resmi untuk notifikasi otomatis revisi MAK dan disposisi surat.
+            </p>
           </div>
         </div>
 
-        {/* Mini KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10">
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-blue-200">Total PIC Terdaftar</span>
-            <div className="text-xl font-black text-white mt-0.5">{pics.length} Orang</div>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {pics.length === 0 && (
+            <button
+              onClick={handleAutoImportFromGovUnits}
+              disabled={loading}
+              className="h-9 px-3.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+              title="Impor Otomatis dari 4 PIC di Master Unit Kerja"
+            >
+              <Sparkles size={13} />
+              <span>Auto-Impor PIC</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => fetchData()}
+            disabled={loading}
+            className="h-9 px-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            title="Refresh Data"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenModal()}
+            className="h-9 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+          >
+            <Plus size={14} />
+            <span>Tambah PIC</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mini KPI Summary Cards (Standar Design System) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-3.5 px-4 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Total PIC Master</span>
+            <div className="text-lg font-black text-gray-900 mt-0.5">{pics.length} <span className="text-xs font-bold text-gray-500">Orang</span></div>
           </div>
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-200">PIC Aktif Bertugas</span>
-            <div className="text-xl font-black text-emerald-300 mt-0.5">
-              {pics.filter(p => p.is_active).length} Orang
+          <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+            <Users size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 px-4 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600">Aktif Bertugas</span>
+            <div className="text-lg font-black text-emerald-600 mt-0.5">
+              {pics.filter(p => p.is_active).length} <span className="text-xs font-bold text-emerald-500">Orang</span>
             </div>
           </div>
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-sky-200">Terhubung Akun Login</span>
-            <div className="text-xl font-black text-sky-300 mt-0.5">
-              {pics.filter(p => p.user_id).length} Akun
+          <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
+            <CheckCircle2 size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 px-4 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-sky-600">Terhubung User Login</span>
+            <div className="text-lg font-black text-sky-600 mt-0.5">
+              {pics.filter(p => p.user_id).length} <span className="text-xs font-bold text-sky-500">Akun</span>
             </div>
           </div>
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/10">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-amber-200">Unit Kerja Terdistribusi</span>
-            <div className="text-xl font-black text-amber-300 mt-0.5">
-              {Object.values(unitCounts).reduce((a, b) => a + b, 0)} Unit
+          <div className="p-2 rounded-xl bg-sky-50 text-sky-600">
+            <UserCheck size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white p-3.5 px-4 rounded-2xl border border-gray-200/80 shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-600">Unit Terdistribusi</span>
+            <div className="text-lg font-black text-indigo-600 mt-0.5">
+              {Object.values(unitCounts).reduce((a, b) => a + b, 0)} <span className="text-xs font-bold text-indigo-500">Unit</span>
             </div>
+          </div>
+          <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+            <Building2 size={18} />
           </div>
         </div>
       </div>

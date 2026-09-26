@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 export default function GovNarrativePage() {
    const [loading, setLoading] = useState(true);
    const [units, setUnits] = useState<any[]>([]);
+   const [picList, setPicList] = useState<any[]>([]);
    const [selectedUnit, setSelectedUnit] = useState<any>(null);
    const [isProcessed, setIsProcessed] = useState(false);
    const [picOverride, setPicOverride] = useState('');
@@ -18,15 +19,27 @@ export default function GovNarrativePage() {
 
    useEffect(() => {
       const fetchUnits = async () => {
-         const { data } = await supabase.from('gov_units').select('*').order('nama_unit');
-         if (data) {
-            setUnits(data.map(u => ({
+         const [unitRes, picRes] = await Promise.all([
+            supabase.from('gov_units').select('*').order('nama_unit'),
+            supabase.from('gov_pics').select('nama').eq('is_active', true).order('nama')
+         ]);
+
+         if (unitRes.data) {
+            setUnits(unitRes.data.map(u => ({
                value: u.id,
                label: u.nama_unit,
                group: u.group_org,
                pic: u.pic
             })));
          }
+
+         if (picRes.data && picRes.data.length > 0) {
+            setPicList(picRes.data.map(p => ({ value: p.nama, label: p.nama })));
+         } else if (unitRes.data) {
+            const unique = Array.from(new Set(unitRes.data.map(u => u.pic).filter(Boolean))).sort();
+            setPicList(unique.map(p => ({ value: p, label: p })));
+         }
+
          setLoading(false);
       };
       fetchUnits();

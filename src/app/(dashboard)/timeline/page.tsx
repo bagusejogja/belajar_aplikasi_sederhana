@@ -114,11 +114,19 @@ export default function TimelinePage() {
     
     let allPics: string[] = [];
     
+    // 1. Ambil dari master gov_pics utama
+    const { data: govPicData } = await supabase.from('gov_pics').select('nama').eq('is_active', true);
+    if (govPicData && govPicData.length > 0) {
+      allPics = [...allPics, ...govPicData.map(p => p.nama)];
+    }
+
+    // 2. Ambil dari ref_pic (jika ada)
     const { data: picData, error: picError } = await supabase.from('ref_pic').select('*');
     if (!picError && picData && picData.length > 0) {
       allPics = [...allPics, ...picData.map(u => u.pic || u.nama || u.nama_pic || u.name)];
     }
     
+    // 3. Ambil dari gov_units
     const { data: unitData } = await supabase.from('gov_units').select('pic').not('pic', 'is', null);
     if (unitData) {
       allPics = [...allPics, ...unitData.map(u => u.pic)];

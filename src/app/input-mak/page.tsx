@@ -20,10 +20,19 @@ export default function InputMakPage() {
 
   useEffect(() => {
     const fetchUnits = async () => {
-      const { data } = await supabase.from('gov_units').select('id, nama_unit, pic').order('nama_unit');
-      if (data) {
-        setUnits(data);
-        setUniquePics(Array.from(new Set(data.map(u => u.pic).filter(Boolean))));
+      const [unitsRes, picsRes] = await Promise.all([
+        supabase.from('gov_units').select('id, nama_unit, pic').order('nama_unit'),
+        supabase.from('gov_pics').select('nama').eq('is_active', true).order('nama')
+      ]);
+
+      if (unitsRes.data) {
+        setUnits(unitsRes.data);
+      }
+
+      if (picsRes.data && picsRes.data.length > 0) {
+        setUniquePics(picsRes.data.map(p => p.nama));
+      } else if (unitsRes.data) {
+        setUniquePics(Array.from(new Set(unitsRes.data.map(u => u.pic).filter(Boolean))));
       }
     };
     fetchUnits();
@@ -95,6 +104,51 @@ export default function InputMakPage() {
       const { error } = await supabase.from('mak_submissions').insert(payload);
       
       if (error) throw error;
+
+      // 🔴 NOTIFIKASI EMAIL KE PIC RESMI
+      try {
+        const assignedPicName = pic || selectedUnit.pic;
+        if (assignedPicName && assignedPicName !== '-') {
+          // Cari email resmi PIC dari tabel gov_pics
+          const { data: picRecord } = await supabase
+            .from('gov_pics')
+            .select('nama, email')
+            .ilike('nama', assignedPicName.trim())
+            .single();
+
+          if (picRecord?.email) {
+            await fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: picRecord.email,
+                subject: `[Usulan Baru] Berkas Revisi MAK Unit ${selectedUnit.nama_unit} (${tahun})`,
+                html: `
+                  <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 24px; border-radius: 12px 12px 0 0; color: white;">
+                      <h2 style="margin: 0; font-size: 20px;">📥 Berkas Pengajuan MAK Baru Masuk</h2>
+                      <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.9;">Halo <strong>${picRecord.nama}</strong>, ada usulan revisi anggaran baru dari unit binaan Anda.</p>
+                    </div>
+                    <div style="background: #ffffff; padding: 24px; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
+                      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <tr><td style="padding: 6px 0; color: #64748b; width: 35%;">Unit Pengusul</td><td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${selectedUnit.nama_unit}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #64748b;">Email Pengusul</td><td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${email}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #64748b;">Tahun Anggaran</td><td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${tahun}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #64748b;">Waktu Masuk</td><td style="padding: 6px 0; font-weight: bold; color: #0f172a;">${new Date().toLocaleString('id-ID')}</td></tr>
+                      </table>
+                      <div style="margin-top: 20px; padding: 12px; background: #eff6ff; border-radius: 8px; font-size: 13px; color: #1e40af;">
+                        Silakan buka menu <strong>Tolakan Verif / Monitoring Revisi MAK</strong> di aplikasi untuk memproses berkas ini.
+                      </div>
+                    </div>
+                  </div>
+                `
+              })
+            });
+          }
+        }
+      } catch (emailErr) {
+        console.warn('Gagal dispatch email ke PIC:', emailErr);
+      }
 
       setSuccess(true);
       setUnitSearch('');

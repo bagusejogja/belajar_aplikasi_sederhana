@@ -46,10 +46,13 @@ export default function TambahSuratPage() {
 
   const fetchData = async () => {
     try {
-      const { data: unitData } = await supabase
-        .from('gov_units')
-        .select('id, nama_unit, pic')
-        .order('nama_unit', { ascending: true });
+      const [unitRes, picRes] = await Promise.all([
+        supabase.from('gov_units').select('id, nama_unit, pic').order('nama_unit', { ascending: true }),
+        supabase.from('gov_pics').select('nama, email').eq('is_active', true).order('nama', { ascending: true })
+      ]);
+
+      const unitData = unitRes.data;
+      const picData = picRes.data;
 
       if (unitData) {
         // 1. Set Daftar Unit
@@ -58,12 +61,16 @@ export default function TambahSuratPage() {
           label: u.nama_unit,
           pic: u.pic 
         })));
+      }
 
-        // 2. Set Daftar PIC dari semua PIC unik yang ada di gov_units
+      if (picData && picData.length > 0) {
+        // 2. Set Daftar PIC dari Master gov_pics
+        setListPIC(picData.map(p => ({ value: p.nama, label: `${p.nama} (${p.email})` })));
+      } else if (unitData) {
+        // Fallback jika gov_pics belum terisi
         const uniquePICs = Array.from(new Set(unitData.map(u => u.pic).filter(Boolean)))
           .sort()
           .map(pic => ({ value: pic, label: pic }));
-        
         setListPIC(uniquePICs);
       }
     } catch (error) {

@@ -17,6 +17,7 @@ export default function EditSuratPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [listUnit, setListUnit] = useState<any[]>([]);
+  const [listPIC, setListPIC] = useState<any[]>([]);
   
   const [formData, setFormData] = useState<any>({
     tahun_anggaran: 2026,
@@ -42,10 +43,22 @@ export default function EditSuratPage() {
 
   const fetchInitialData = async () => {
     try {
-      // 1. Ambil List Unit
-      const { data: units } = await supabase.from('gov_units').select('id, nama_unit').order('nama_unit', { ascending: true });
-      const unitOptions = units?.map(u => ({ value: u.id, label: u.nama_unit })) || [];
+      // 1. Ambil List Unit & Master PIC
+      const [unitsRes, picsRes] = await Promise.all([
+        supabase.from('gov_units').select('id, nama_unit, pic').order('nama_unit', { ascending: true }),
+        supabase.from('gov_pics').select('id, nama, email').eq('is_active', true).order('nama', { ascending: true })
+      ]);
+
+      const units = unitsRes.data;
+      const unitOptions = units?.map(u => ({ value: u.id, label: u.nama_unit, pic: u.pic })) || [];
       setListUnit(unitOptions);
+
+      if (picsRes.data && picsRes.data.length > 0) {
+        setListPIC(picsRes.data.map(p => ({ value: p.nama, label: `${p.nama} (${p.email})` })));
+      } else if (units) {
+        const unique = Array.from(new Set(units.map(u => u.pic).filter(Boolean))).sort();
+        setListPIC(unique.map(p => ({ value: p, label: p })));
+      }
 
       // 2. Ambil Data Surat
       const { data: surat, error } = await supabase
@@ -215,12 +228,15 @@ export default function EditSuratPage() {
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">PIC / Person In Charge</label>
-              <input 
-                type="text" 
-                name="pic"
-                value={formData.pic}
-                onChange={handleInputChange}
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-bold text-gray-700"
+              <Select 
+                options={listPIC} 
+                value={listPIC.find(p => p.value === formData.pic) || (formData.pic ? { value: formData.pic, label: formData.pic } : null)}
+                onChange={(val) => setFormData({...formData, pic: val ? val.value : ''})}
+                placeholder="Pilih PIC..."
+                isClearable
+                styles={{
+                  control: (base) => ({ ...base, borderRadius: '1.25rem', padding: '0.4rem', border: 'none', backgroundColor: '#f9fafb', fontWeight: 'bold' }),
+                }}
               />
             </div>
           </div>
