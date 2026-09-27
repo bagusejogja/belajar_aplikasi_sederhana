@@ -27,6 +27,8 @@ interface ParsedPaguRow {
   nominal: number;
   sumber_dana: string;
   keterangan: string;
+  no_surat: string | null;
+  tgl_surat: string | null;
   status_pagu: string;
   jenis_anggaran: string;
   isValid: boolean;
@@ -55,6 +57,74 @@ const matchStatusPagu = (val: string): string => {
   }
   return 'Bukan Pagu Awal';
 };
+
+function parseIndoDateToIso(str: string): string | null {
+  if (!str) return null;
+  const s = str.trim().toLowerCase();
+
+  // Jika sudah format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // Format DD/MM/YYYY atau DD-MM-YYYY
+  const slashMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (slashMatch) {
+    const d = slashMatch[1].padStart(2, '0');
+    const m = slashMatch[2].padStart(2, '0');
+    const y = slashMatch[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // Kamus bulan bahasa Indonesia
+  const bulanMap: Record<string, string> = {
+    jan: '01', januari: '01',
+    feb: '02', februari: '02',
+    mar: '03', maret: '03',
+    apr: '04', april: '04',
+    mei: '05',
+    jun: '06', juni: '06',
+    jul: '07', juli: '07',
+    agu: '08', agt: '08', agustus: '08', agutus: '08',
+    sep: '09', september: '09',
+    okt: '10', oktober: '10',
+    nov: '11', nop: '11', november: '11', nopember: '11',
+    des: '12', desember: '12'
+  };
+
+  const textMatch = s.match(/^(\d{1,2})\s+([a-z]+)\.?\s+(\d{4})$/);
+  if (textMatch) {
+    const d = textMatch[1].padStart(2, '0');
+    const mName = textMatch[2];
+    const y = textMatch[3];
+    const m = bulanMap[mName];
+    if (m) {
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  return null;
+}
+
+function extractSuratInfo(ket: string): { no_surat: string | null; tgl_surat: string | null } {
+  if (!ket) return { no_surat: null, tgl_surat: null };
+
+  let no_surat: string | null = null;
+  const noMatch = ket.match(/(?:nomor|no\.?|nota dinas(?:\s+no\.?)?|surat)\s*:?\s*([0-9]+[A-Za-z0-9\.\-\_]*(?:\/[A-Za-z0-9\.\-\_]+){2,})/i) ||
+                  ket.match(/([0-9]+(?:\/[A-Za-z0-9\.\-\_]+){2,})/);
+  if (noMatch) {
+    no_surat = noMatch[1].replace(/[,;]+$/, '').trim();
+  }
+
+  let tgl_surat: string | null = null;
+  const tglMatch = ket.match(/(?:tanggal|tgl\.?|tertanggal)\s*:?\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})/i) ||
+                   ket.match(/(?:tanggal|tgl\.?|tertanggal)\s*:?\s*([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{4})/i) ||
+                   ket.match(/([0-9]{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+[0-9]{4})/i);
+  if (tglMatch) {
+    const rawTgl = tglMatch[1].trim();
+    tgl_surat = parseIndoDateToIso(rawTgl);
+  }
+
+  return { no_surat, tgl_surat };
+}
 
 export default function CopasPaguPage() {
   const [units, setUnits] = useState<GovUnit[]>([]);
@@ -355,6 +425,7 @@ export default function CopasPaguPage() {
       }
 
       const matched = matchUnit(unitInput);
+      const { no_surat, tgl_surat } = extractSuratInfo(keterangan);
 
       result.push({
         id: `row-${index}-${Date.now()}`,
@@ -366,6 +437,8 @@ export default function CopasPaguPage() {
         nominal: parsedNominal,
         sumber_dana: sumberDana || 'Dana Masyarakat Tidak Mengikat',
         keterangan: keterangan || '-',
+        no_surat: no_surat,
+        tgl_surat: tgl_surat,
         status_pagu: statusPagu || 'Bukan Pagu Awal',
         jenis_anggaran: jenisAnggaran || 'Pagu Awal',
         isValid: matched.id !== null && parsedNominal !== 0
@@ -434,6 +507,11 @@ export default function CopasPaguPage() {
         if (field === 'nominal') {
           updated.nominal = parseNum(value);
         }
+        if (field === 'keterangan') {
+          const { no_surat, tgl_surat } = extractSuratInfo(value);
+          if (no_surat) updated.no_surat = no_surat;
+          if (tgl_surat) updated.tgl_surat = tgl_surat;
+        }
         updated.isValid = updated.unit_id !== null && updated.nominal !== 0;
         return updated;
       }
@@ -459,6 +537,8 @@ export default function CopasPaguPage() {
       nominal: r.nominal,
       sumber_dana: r.sumber_dana,
       keterangan: r.keterangan,
+      no_surat: r.no_surat || null,
+      tgl_surat: r.tgl_surat || null,
       status_pagu: r.status_pagu || 'Bukan Pagu Awal',
       jenis_anggaran: r.jenis_anggaran
     }));
@@ -495,6 +575,7 @@ export default function CopasPaguPage() {
   const totalNominal = useMemo(() => parsedRows.reduce((acc, r) => acc + r.nominal, 0), [parsedRows]);
   const validRowsCount = useMemo(() => parsedRows.filter(r => r.unit_id !== null).length, [parsedRows]);
   const invalidRowsCount = useMemo(() => parsedRows.filter(r => r.unit_id === null).length, [parsedRows]);
+  const detectedSuratCount = useMemo(() => parsedRows.filter(r => r.no_surat || r.tgl_surat).length, [parsedRows]);
 
   const displayedParsedRows = useMemo(() => {
     if (filterIssueOnly) {
@@ -510,7 +591,9 @@ export default function CopasPaguPage() {
         r.jenis_anggaran?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         r.status_pagu?.toLowerCase().includes(searchFilter.toLowerCase()) ||
         r.sumber_dana?.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        r.keterangan?.toLowerCase().includes(searchFilter.toLowerCase());
+        r.keterangan?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        r.no_surat?.toLowerCase().includes(searchFilter.toLowerCase()) ||
+        r.tgl_surat?.toLowerCase().includes(searchFilter.toLowerCase());
       
       const matchYear = yearFilter === 'ALL' || r.tahun_anggaran === yearFilter;
       const matchUnit = selectedUnitFilter === 'ALL' || r.unit_id?.toString() === selectedUnitFilter.toString();
@@ -743,6 +826,13 @@ export default function CopasPaguPage() {
               </div>
               <div className="h-6 w-px bg-indigo-200" />
               <div>
+                <span className="text-gray-400 text-[10px] uppercase font-bold block">Surat Terdeteksi</span>
+                <span className="text-violet-700 font-bold font-mono">
+                  {detectedSuratCount} / {parsedRows.length} Baris
+                </span>
+              </div>
+              <div className="h-6 w-px bg-indigo-200" />
+              <div>
                 <span className="text-gray-400 text-[10px] uppercase font-bold block">Total Nominal</span>
                 <span className="text-gray-900 font-bold font-mono">Rp {formatRp(totalNominal)}</span>
               </div>
@@ -786,7 +876,9 @@ export default function CopasPaguPage() {
                   <th className="py-2.5 px-3 w-16 text-center">Tahun</th>
                   <th className="py-2.5 px-3 text-right">Nominal</th>
                   <th className="py-2.5 px-3">Sumber Dana</th>
-                  <th className="py-2.5 px-3">Keterangan</th>
+                  <th className="py-2.5 px-3 min-w-[200px]">Keterangan</th>
+                  <th className="py-2.5 px-3 min-w-[150px] text-indigo-700">No Surat (Ekstraksi)</th>
+                  <th className="py-2.5 px-3 min-w-[130px] text-indigo-700">Tgl Surat (Ekstraksi)</th>
                   <th className="py-2.5 px-3">Status Pagu</th>
                   <th className="py-2.5 px-3">Jenis Anggaran</th>
                   <th className="py-2.5 px-3 text-center w-10">Aksi</th>
@@ -859,7 +951,26 @@ export default function CopasPaguPage() {
                         value={r.keterangan}
                         onChange={e => handleRowChange(r.id, 'keterangan', e.target.value)}
                         placeholder="Keterangan / uraian..."
-                        className="w-full min-w-[220px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
+                        className="w-full min-w-[200px] p-1 bg-white border border-gray-200 rounded text-xs outline-none"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input
+                        type="text"
+                        value={r.no_surat || ''}
+                        onChange={e => handleRowChange(r.id, 'no_surat', e.target.value)}
+                        placeholder="No Surat..."
+                        className="w-full min-w-[140px] p-1 bg-white border border-indigo-200 rounded text-[11px] font-mono font-bold text-indigo-700 outline-none focus:border-indigo-500"
+                        title="Nomor Surat (Ekstraksi dari Keterangan)"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input
+                        type="date"
+                        value={r.tgl_surat || ''}
+                        onChange={e => handleRowChange(r.id, 'tgl_surat', e.target.value || null)}
+                        className="w-full min-w-[125px] p-1 bg-white border border-indigo-200 rounded text-[11px] font-mono font-medium text-slate-800 outline-none focus:border-indigo-500"
+                        title="Tanggal Surat (Ekstraksi dari Keterangan)"
                       />
                     </td>
                     <td className="py-2.5 px-3">
@@ -1051,7 +1162,23 @@ export default function CopasPaguPage() {
                     <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900 text-xs">
                       Rp {formatRp(parseNum(r.nominal))}
                     </td>
-                    <td className="py-2.5 px-4 text-gray-500 font-medium text-xs">{r.keterangan || '-'}</td>
+                    <td className="py-2.5 px-4">
+                      <div className="text-gray-700 font-medium text-xs leading-relaxed">{r.keterangan || '-'}</div>
+                      {(r.no_surat || r.tgl_surat) && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          {r.no_surat && (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded shadow-2xs">
+                              📄 {r.no_surat}
+                            </span>
+                          )}
+                          {r.tgl_surat && (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-2xs">
+                              📅 {r.tgl_surat}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
