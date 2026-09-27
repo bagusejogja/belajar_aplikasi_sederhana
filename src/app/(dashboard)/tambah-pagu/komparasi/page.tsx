@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import AutocompleteCombobox, { ComboboxOption } from '@/components/shared/AutocompleteCombobox';
 
 // TIPE ATURAN PEMBEBANAN ANGGARAN (DAPAT BERLAKU SEMUA SURAT ATAU SURAT TERTENTU)
 export interface PembebananConfig {
@@ -357,6 +358,7 @@ export default function KomparasiTambahPaguPage() {
         gov_inisiatif: govPaguInisiatif,
         gov_penugasan: govPaguPenugasan,
         total_gov_tambah: totalGovPaguTambah,
+        gov_row_count: uGovRows.length,
         selisih: allLettersTransferred ? 0 : diff,
         audit_status: auditStatus,
         delegated_to: allLettersTransferred ? ruleFromU?.targetUnitName : null,
@@ -368,6 +370,16 @@ export default function KomparasiTambahPaguPage() {
     // 🔴 REQUIREMENT: FILTER OUT UNITS WITH 0 MUTATION
     return calculated.filter(u => u.surat_nominal_disetujui > 0 || u.total_gov_tambah > 0 || u.total_surat_count > 0);
   }, [unitList, rawTambahPagu, rawGovPagu, selectedYear, usePembebananMapping, pembebananMapping]);
+
+  // Options combobox terstandar design system untuk unit kerja
+  const unitComboboxOptions: ComboboxOption[] = useMemo(() => {
+    return unitList.map(u => ({
+      value: u.id.toString(),
+      label: u.nama_unit,
+      badge: u.kode_unit || `ID ${u.id}`,
+      subtext: u.group_org || undefined
+    }));
+  }, [unitList]);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -399,6 +411,20 @@ export default function KomparasiTambahPaguPage() {
     const start = (currentPage - 1) * Number(pageSize);
     return filteredAuditUnits.slice(start, start + Number(pageSize));
   }, [filteredAuditUnits, currentPage, pageSize]);
+
+  // Buka / Tutup Semua Accordion Sekaligus
+  const isAllExpanded = paginatedAuditUnits.length > 0 && paginatedAuditUnits.every(u => !!expandedUnits[u.id]);
+  const toggleExpandAll = () => {
+    if (isAllExpanded) {
+      setExpandedUnits({});
+    } else {
+      const next: Record<string, boolean> = {};
+      paginatedAuditUnits.forEach(u => {
+        next[u.id] = true;
+      });
+      setExpandedUnits(next);
+    }
+  };
 
   // Overall KPI Summary
   const kpiAuditSummary = useMemo(() => {
@@ -897,7 +923,7 @@ export default function KomparasiTambahPaguPage() {
               <option value="MATCH">🟢 MATCH (Sesuai)</option>
               <option value="KELEWAT">⚠️ KELEWAT (Belum Dicatat)</option>
               <option value="SELISIH">🔴 SELISIH (Ada Beda Nominal)</option>
-              <option value="DIBEBANKAN">ℹ️ DIBEBANKAN (GMC / Masjid)</option>
+              <option value="DIBEBANKAN">ℹ️ Dibebankan unit lain</option>
             </select>
           </div>
 
@@ -1011,7 +1037,16 @@ export default function KomparasiTambahPaguPage() {
           <Table>
             <TableHeader className="bg-gray-50/80 text-gray-400 font-black text-[10px] uppercase tracking-wider border-b border-gray-200">
               <TableRow>
-                <TableHead className="w-10 text-center"></TableHead>
+                <TableHead className="w-10 text-center p-0">
+                  <button
+                    type="button"
+                    onClick={toggleExpandAll}
+                    className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-200/60 transition-colors"
+                    title={isAllExpanded ? "Tutup Semua Accordion Detail" : "Buka Semua Accordion Detail"}
+                  >
+                    {isAllExpanded ? <ChevronUp size={16} className="text-indigo-600 font-bold" /> : <ChevronDown size={16} />}
+                  </button>
+                </TableHead>
                 <TableHead className="w-10 text-center">No</TableHead>
                 <TableHead>Nama Unit Kerja & Group</TableHead>
                 <TableHead className="text-right text-amber-900">Surat Disetujui (tambah_pagu)</TableHead>
@@ -1118,8 +1153,8 @@ export default function KomparasiTambahPaguPage() {
                               </div>
                               <div className="text-[10px] text-slate-400">
                                 {u.audit_status === 'DIBEBANKAN' 
-                                  ? `Dialihkan ke ${u.delegated_to}` 
-                                  : `Inisiatif: Rp ${formatRp(u.gov_inisiatif)} | Penugasan: Rp ${formatRp(u.gov_penugasan)}`}
+                                  ? `Dialihkan ke ${u.delegated_to} | ${u.gov_row_count || 0} data` 
+                                  : `Inisiatif: Rp ${formatRp(u.gov_inisiatif)} | Penugasan: Rp ${formatRp(u.gov_penugasan)} | ${u.gov_row_count || 0} data`}
                               </div>
                             </TableCell>
 
@@ -2023,40 +2058,28 @@ export default function KomparasiTambahPaguPage() {
                   <label className="text-[11px] font-bold text-slate-700 block mb-1">
                     1. Unit Pengusul (Sumber Surat):
                   </label>
-                  <select
+                  <AutocompleteCombobox
+                    placeholder="Ketik / pilih Unit Pengusul..."
+                    options={unitComboboxOptions}
                     value={newSourceUnitId}
-                    onChange={(e) => {
-                      setNewSourceUnitId(e.target.value);
+                    onChange={(val) => {
+                      setNewSourceUnitId(val);
                       setNewScope('ALL');
                       setNewSelectedLetterIds([]);
                     }}
-                    className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">-- Pilih Unit Pengusul --</option>
-                    {unitList.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.nama_unit} ({u.kode_unit || `ID ${u.id}`})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div>
                   <label className="text-[11px] font-bold text-slate-700 block mb-1">
                     2. Unit Pembebanan (Tujuan DIPA/Pagu):
                   </label>
-                  <select
+                  <AutocompleteCombobox
+                    placeholder="Ketik / pilih Unit Pembebanan..."
+                    options={unitComboboxOptions}
                     value={newTargetUnitId}
-                    onChange={(e) => setNewTargetUnitId(e.target.value)}
-                    className="w-full h-9 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">-- Pilih Unit Pembebanan --</option>
-                    {unitList.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.nama_unit} ({u.kode_unit || `ID ${u.id}`})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setNewTargetUnitId(val)}
+                  />
                 </div>
               </div>
 
@@ -2249,6 +2272,24 @@ export default function KomparasiTambahPaguPage() {
                   <Plus size={13} />
                   <span>Simpan Aturan</span>
                 </Button>
+
+                {(newSourceUnitId || newTargetUnitId || newNote) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setNewSourceUnitId('');
+                      setNewTargetUnitId('');
+                      setNewScope('ALL');
+                      setNewSelectedLetterIds([]);
+                      setNewNote('');
+                    }}
+                    className="text-slate-500 hover:text-slate-800 text-xs h-8 px-3 rounded-xl"
+                  >
+                    Batal Input
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -2288,13 +2329,25 @@ export default function KomparasiTambahPaguPage() {
               </button>
             </div>
 
-            <Button
-              type="button"
-              onClick={() => setIsPembebananModalOpen(false)}
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs h-9 px-5 shrink-0"
-            >
-              Selesai & Terapkan
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPembebananModalOpen(false)}
+                className="border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs rounded-xl h-9 px-4"
+              >
+                Batal / Kembali
+              </Button>
+
+              <Button
+                type="button"
+                onClick={() => setIsPembebananModalOpen(false)}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs h-9 px-5 flex items-center gap-1.5"
+              >
+                <Check size={14} />
+                <span>Selesai & Terapkan</span>
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
