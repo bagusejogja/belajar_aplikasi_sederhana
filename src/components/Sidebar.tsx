@@ -54,6 +54,7 @@ import { supabase } from '@/lib/supabase';
 import { logActivity } from '@/lib/activityLogger';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
+import { fetchAuthUser, getCachedAuthUser, clearAuthCache } from '@/lib/authCache';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -184,32 +185,25 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
 
   useEffect(() => {
      const getUserProfile = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
+        const cached = getCachedAuthUser();
+        if (cached) {
+          setUserEmail(cached.email);
+          setUserRole(cached.role);
+          setAllowedPaths(cached.allowedPaths);
+          const key = `user_${cached.userId}`;
+          setUserKey(key);
+          loadUserFavorites(key).then(favs => setFavoritePaths(favs));
+          return;
+        }
+
+        const user = await fetchAuthUser();
         if (user) {
-           setUserEmail(user.email || '');
-           const key = getFavoriteUserKey(user);
-           setUserKey(key);
-           loadUserFavorites(key).then(favs => setFavoritePaths(favs));
-           
-           // Ambil hak akses/role dari tabel app_users
-           const { data: roleData } = await supabase.from('app_users').select('role').eq('id', user.id).single();
-              
-           if (roleData) {
-              setUserRole(roleData.role);
-              
-              // Tarik Menu Path yang diizinkan untuk Role tersebut dari app_role_menus
-              const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', roleData.role);
-              const roleLower = roleData.role.toLowerCase();
-              const dbPaths = (menuData || []).map(m => m.path);
-              const rolePresetPaths = (roleLower === 'admin' || roleLower === 'administrator')
-                 ? menuList.map(m => m.path)
-                 : menuList.filter(item => {
-                      const rolesLower = (item.roles || []).map(r => r.toLowerCase());
-                      return rolesLower.includes(roleLower) || rolesLower.includes('all');
-                   }).map(item => item.path);
-              const finalAllowed = Array.from(new Set([...dbPaths, ...rolePresetPaths]));
-              setAllowedPaths(finalAllowed);
-           }
+          setUserEmail(user.email);
+          setUserRole(user.role);
+          setAllowedPaths(user.allowedPaths);
+          const key = `user_${user.userId}`;
+          setUserKey(key);
+          loadUserFavorites(key).then(favs => setFavoritePaths(favs));
         }
      };
      getUserProfile();
@@ -217,6 +211,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
 
   const handleLogout = async () => {
     if (confirm("Ingin keluar dari sistem?")) {
+      clearAuthCache();
       logActivity({
         action_type: 'LOGOUT',
         action_title: 'Pengguna melakukan Logout',

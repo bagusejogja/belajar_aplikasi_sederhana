@@ -9,6 +9,7 @@ import { logActivity } from '@/lib/activityLogger';
 import { menuList } from '@/lib/mock-db';
 import CommandPalette from '@/components/shared/CommandPalette';
 import ThemeToggle from '@/components/shared/ThemeToggle';
+import { fetchAuthUser, getCachedAuthUser, clearAuthCache } from '@/lib/authCache';
 
 export default function DashboardLayout({
   children,
@@ -17,14 +18,21 @@ export default function DashboardLayout({
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => !getCachedAuthUser());
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const lastLoggedPath = useRef<string>('');
 
   const [isUnauthorized, setIsUnauthorized] = useState(false);
-  const [userRole, setUserRole] = useState<string>('');
+  const [userRole, setUserRole] = useState<string>(() => {
+    const cached = getCachedAuthUser();
+    if (cached) return cached.role;
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('user_role') || '';
+    }
+    return '';
+  });
 
   useEffect(() => {
      const savedCollapsed = localStorage.getItem('sidebar_collapsed');
@@ -52,96 +60,6 @@ export default function DashboardLayout({
      window.addEventListener('keydown', handleKeyDown);
      return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  useEffect(() => {
-     const checkAuth = async () => {
-        setIsUnauthorized(false);
-        setIsAuthChecking(true);
-
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-           router.push('/login');
-           return;
-        }
-
-        // --- AUTHORIZATION CHECK (Mencegah Akses URL Manual) ---
-        // Fetch role data
-        const { data: roleData } = await supabase.from('app_users').select('role').eq('id', session.user.id).single();
-        const currentRole = roleData?.role || 'Viewer';
-        setUserRole(currentRole);
-        
-        if (typeof window !== 'undefined') {
-           sessionStorage.setItem('user_role', currentRole);
-        }
-
-        // Track page view if path changed
-        if (lastLoggedPath.current !== pathname) {
-           lastLoggedPath.current = pathname;
-           logActivity({
-              action_type: 'PAGE_VIEW',
-              action_title: `Membuka menu ${getPageTitle(pathname)}`,
-              path: pathname,
-              user_email: session.user.email || '',
-              user_role: currentRole,
-              details: { page_title: getPageTitle(pathname) }
-           });
-        }
-
-        // 1. Jika sedang di root '/' atau '/dashboard', selalu biarkan lewat
-        if (pathname === '/' || pathname === '/dashboard') {
-           setIsUnauthorized(false);
-           setIsAuthChecking(false);
-           return;
-        }
-
-        // 2. Admin & Administrator selalu lolos ke semua halaman
-        const roleLower = currentRole.toLowerCase();
-        if (roleLower === 'admin' || roleLower === 'administrator') {
-           setIsUnauthorized(false);
-           setIsAuthChecking(false);
-           return;
-        }
-
-        // 3. Cek allowed paths dari database app_role_menus
-        const { data: menuData } = await supabase.from('app_role_menus').select('path').eq('role', currentRole);
-        const dbAllowedPaths = (menuData || []).map((m: any) => m.path);
-
-        // 4. Fallback ke menuList (di mock-db.ts) agar tidak salah blokir menu baru
-        const fallbackAllowedPaths = menuList
-           .filter(item => {
-              const itemRoles = (item.roles || []).map(r => r.toLowerCase());
-              return itemRoles.includes(roleLower) || itemRoles.includes('all');
-           })
-           .map(item => item.path);
-
-        const combinedAllowedPaths = Array.from(new Set([...dbAllowedPaths, ...fallbackAllowedPaths]));
-
-        // Cek apakah pathname saat ini diizinkan
-        const isAllowed = combinedAllowedPaths.some((p: string) => {
-           if (!p) return false;
-           return pathname === p || pathname.startsWith(p + '/');
-        });
-
-        if (!isAllowed) {
-           setIsUnauthorized(true);
-        } else {
-           setIsUnauthorized(false);
-        }
-        
-        setIsAuthChecking(false);
-     };
-
-     checkAuth();
-
-     // Listener untuk perubahan login/logout
-     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (!session) {
-           router.push('/login');
-        }
-     });
-
-     return () => subscription.unsubscribe();
-  }, [router, pathname]);
 
   // Get Page Title based on pathname
   const getPageTitle = (path: string) => {
@@ -176,6 +94,77 @@ export default function DashboardLayout({
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }
   };
+
+  // 1. Initial Authentication & Role Fetching (Only runs once on mount)
+  useEffect(() => {
+    let isMounted = true;
+
+    const initAuth = async () => {
+      const user = await fetchAuthUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      if (isMounted) {
+        setUserRole(user.role);
+        setIsAuthChecking(false);
+      }
+    };
+
+    initAuth();
+
+    // Listener untuk perubahan login/logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        clearAuthCache();
+        router.push('/login');
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
+  // 2. Synchronous & Instant Route Authorization Check (Never triggers full-screen unmount/loader!)
+  useEffect(() => {
+    // 1. Root '/' or '/dashboard' always allowed
+    if (pathname === '/' || pathname === '/dashboard') {
+      setIsUnauthorized(false);
+      return;
+    }
+
+    const cached = getCachedAuthUser();
+    const currentRole = cached?.role || userRole;
+    const roleLower = (currentRole || '').toLowerCase();
+
+    // 2. Admin & Administrator always allowed
+    if (roleLower === 'admin' || roleLower === 'administrator') {
+      setIsUnauthorized(false);
+    } else if (cached) {
+      // 3. Check allowed paths from cache
+      const isAllowed = cached.allowedPaths.some((p: string) => {
+        if (!p) return false;
+        return pathname === p || pathname.startsWith(p + '/');
+      });
+      setIsUnauthorized(!isAllowed);
+    }
+
+    // 4. Log page view in background asynchronously (fire-and-forget, non-blocking!)
+    if (lastLoggedPath.current !== pathname && cached) {
+      lastLoggedPath.current = pathname;
+      void logActivity({
+        action_type: 'PAGE_VIEW',
+        action_title: `Membuka menu ${getPageTitle(pathname)}`,
+        path: pathname,
+        user_email: cached.email,
+        user_role: cached.role,
+        details: { page_title: getPageTitle(pathname) }
+      });
+    }
+  }, [pathname, userRole]);
 
   if (isAuthChecking) {
      return <div className="h-screen w-full flex flex-col items-center justify-center bg-gray-50"><Loader2 size={48} className="animate-spin text-indigo-600 mb-4" /><p className="font-bold text-gray-500">Mengecek Kredensial Keamanan...</p></div>;
