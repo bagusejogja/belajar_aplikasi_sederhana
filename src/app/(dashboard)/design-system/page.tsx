@@ -74,6 +74,7 @@ import {
   ClipboardPaste,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Folder,
   FolderOpen
 } from 'lucide-react';
@@ -339,6 +340,123 @@ export default function DesignSystemPage() {
       const next: Record<string, boolean> = {};
       sampleGroupRowsData.forEach(g => { next[g.groupId] = true; });
       setExpandedGroupRows(next);
+    }
+  };
+
+  // 3-Level Nested Hierarchy Table State & Sample Data (Parent -> Child -> Grandchild)
+  const [expandedThreeLevelParent, setExpandedThreeLevelParent] = useState<Record<string, boolean>>({ 'grp-ft': true });
+  const [expandedThreeLevelChild, setExpandedThreeLevelChild] = useState<Record<string, boolean>>({ 'dept-teti': true });
+
+  const sampleThreeLevelData = [
+    {
+      id: 'grp-ft',
+      name: 'Fakultas Teknik (FT)',
+      code: '040000',
+      cluster: 'Saintek',
+      totalPagu: 2450000000,
+      totalRealisasi: 1820000000,
+      status: 'proses',
+      children: [
+        {
+          id: 'dept-teti',
+          name: 'Departemen Teknik Elektro & Teknologi Informasi',
+          code: '040201',
+          pic: 'Prof. Dr. Ir. Sunarno',
+          pagu: 980000000,
+          realisasi: 750000000,
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'lab-1', kode: '040201-LAB01', nama: 'Laboratorium Sistem Tenaga Listrik & Energi Terbarukan', pic: 'Dr. Eng. Suharyanto', pagu: 350000000, realisasi: 280000000, status: 'disetujui' },
+            { id: 'lab-2', kode: '040201-LAB02', nama: 'Laboratorium Jaringan Komputer & Keamanan Siber', pic: 'Dr. Widyawan, S.T., M.Sc.', pagu: 380000000, realisasi: 310000000, status: 'disetujui' },
+            { id: 'lab-3', kode: '040201-LAB03', nama: 'Laboratorium Sistem Tertanam & Robotika Cerdas', pic: 'Dr. Adha Imam Cahyadi', pagu: 250000000, realisasi: 160000000, status: 'proses' },
+          ]
+        },
+        {
+          id: 'dept-tsl',
+          name: 'Departemen Teknik Sipil & Lingkungan',
+          code: '040101',
+          pic: 'Dr. Ir. Budi Wibowo',
+          pagu: 820000000,
+          realisasi: 610000000,
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'lab-4', kode: '040101-LAB01', nama: 'Laboratorium Mekanika Tanah & Geoteknik', pic: 'Prof. Ir. Joko Sujono', pagu: 450000000, realisasi: 360000000, status: 'disetujui' },
+            { id: 'lab-5', kode: '040101-LAB02', nama: 'Laboratorium Rekayasa Sungai & Hidrolika', pic: 'Dr. Karlina, S.T., M.T.', pagu: 370000000, realisasi: 250000000, status: 'proses' },
+          ]
+        },
+        {
+          id: 'dept-tmi',
+          name: 'Departemen Teknik Mesin & Industri',
+          code: '040301',
+          pic: 'Dr. Fauzun, S.T., M.T.',
+          pagu: 650000000,
+          realisasi: 460000000,
+          status: 'proses',
+          grandChildren: [
+            { id: 'lab-6', kode: '040301-LAB01', nama: 'Laboratorium Desain & Manufaktur Presisi (CNC)', pic: 'Dr. Muslim Mahardika', pagu: 380000000, realisasi: 290000000, status: 'disetujui' },
+            { id: 'lab-7', kode: '040301-LAB02', nama: 'Laboratorium Ergonomi & Tata Letak Pabrik', pic: 'Ir. Subagyo, Ph.D.', pagu: 270000000, realisasi: 170000000, status: 'proses' },
+          ]
+        }
+      ]
+    },
+    {
+      id: 'grp-fkkmk',
+      name: 'Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan (FKKMK)',
+      code: '050000',
+      cluster: 'Kesehatan',
+      totalPagu: 2100000000,
+      totalRealisasi: 1850000000,
+      status: 'disetujui',
+      children: [
+        {
+          id: 'dept-ika',
+          name: 'Departemen Ilmu Kesehatan Anak',
+          code: '050101',
+          pic: 'dr. Ida Safitri, Sp.A(K)',
+          pagu: 1100000000,
+          realisasi: 980000000,
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'lab-8', kode: '050101-DIV01', nama: 'Divisi Pediatri Gawat Darurat & Intensive Care (PICU)', pic: 'dr. Intan F., Sp.A', pagu: 600000000, realisasi: 550000000, status: 'disetujui' },
+            { id: 'lab-9', kode: '050101-DIV02', nama: 'Divisi Nutrisi & Penyakit Metabolik Anak', pic: 'dr. Titis P., Sp.A', pagu: 500000000, realisasi: 430000000, status: 'disetujui' },
+          ]
+        },
+        {
+          id: 'dept-bedah',
+          name: 'Departemen Bedah & Bedah Saraf',
+          code: '050201',
+          pic: 'dr. Rachmat Andi, Sp.B',
+          pagu: 1000000000,
+          realisasi: 870000000,
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'lab-10', kode: '050201-DIV01', nama: 'Divisi Bedah Digestif & Minimal Invasif Laparoskopi', pic: 'dr. Hendra W., Sp.B-KBD', pagu: 550000000, realisasi: 490000000, status: 'disetujui' },
+            { id: 'lab-11', kode: '050201-DIV02', nama: 'Divisi Bedah Saraf, Spine & Neurotrauma', pic: 'dr. Adi Santoso, Sp.BS', pagu: 450000000, realisasi: 380000000, status: 'disetujui' },
+          ]
+        }
+      ]
+    }
+  ];
+
+  const isAllThreeLevelExpanded = 
+    sampleThreeLevelData.every(p => !!expandedThreeLevelParent[p.id]) &&
+    sampleThreeLevelData.every(p => p.children.every(c => !!expandedThreeLevelChild[c.id]));
+
+  const toggleAllThreeLevels = () => {
+    if (isAllThreeLevelExpanded) {
+      setExpandedThreeLevelParent({});
+      setExpandedThreeLevelChild({});
+    } else {
+      const nextParent: Record<string, boolean> = {};
+      const nextChild: Record<string, boolean> = {};
+      sampleThreeLevelData.forEach(p => {
+        nextParent[p.id] = true;
+        p.children.forEach(c => {
+          nextChild[c.id] = true;
+        });
+      });
+      setExpandedThreeLevelParent(nextParent);
+      setExpandedThreeLevelChild(nextChild);
     }
   };
 
@@ -2570,6 +2688,225 @@ export default function DesignSystemPage() {
                                 </tr>
                               ))
                             )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* SUB-SECTION 3: TEMPLATE 3-LEVEL NESTED HIERARCHY (ANAK MEMILIKI ANAK LAGI) */}
+              {/* ========================================================================= */}
+              <div className="pt-6 border-t border-gray-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                      <Layers size={16} className="text-violet-600" />
+                      <span>Template 4: 3-Level Nested Collapse Hierarchy (Induk &rarr; Anak &rarr; Cucu)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Hierarki bertingkat 3 level: Baris Induk (Fakultas) dapat di-collapse, dan baris Anak (Departemen) juga memiliki tombol collapse tersendiri untuk membuka/menutup rincian Cucu (Laboratorium / Sub-Kegiatan).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={toggleAllThreeLevels}
+                      className="px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold rounded-xl border border-violet-200 text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {isAllThreeLevelExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      <span>{isAllThreeLevelExpanded ? 'Tutup Semua Level' : 'Buka Semua Level'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Level Legends */}
+                <div className="flex flex-wrap items-center gap-2 py-1">
+                  <span className="text-[11px] font-bold text-gray-400">Tingkatan Hierarki:</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+                    <Folder size={11} className="text-slate-600" /> Level 1: Unit Induk (Fakultas)
+                  </span>
+                  <span className="text-gray-300 text-xs">&rarr;</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                    <Building2 size={11} className="text-indigo-600" /> Level 2: Sub-Unit (Departemen) - Expandable
+                  </span>
+                  <span className="text-gray-300 text-xs">&rarr;</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Level 3: Rincian Kegiatan / Lab (Cucu)
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                        <th className="w-10 text-center py-3 px-2">
+                          <button
+                            type="button"
+                            onClick={toggleAllThreeLevels}
+                            className="p-1 rounded-md text-slate-400 hover:text-violet-700 hover:bg-slate-200/60 transition-colors"
+                            title={isAllThreeLevelExpanded ? "Tutup Semua Level" : "Buka Semua Level"}
+                          >
+                            {isAllThreeLevelExpanded ? <ChevronUp size={15} className="text-violet-700 font-bold" /> : <ChevronDown size={15} />}
+                          </button>
+                        </th>
+                        <th className="py-3 px-3">Struktur Hierarki Unit / Sub-Unit / Lab</th>
+                        <th className="py-3 px-3">Kode & PIC</th>
+                        <th className="text-right py-3 px-3">Pagu (Rp)</th>
+                        <th className="text-right py-3 px-3">Realisasi (Rp)</th>
+                        <th className="text-center py-3 px-3">Status</th>
+                        <th className="text-center w-24 py-3 px-3">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {sampleThreeLevelData.map((parent) => {
+                        const isParentOpen = !!expandedThreeLevelParent[parent.id];
+                        const parentPercent = Math.round((parent.totalRealisasi / parent.totalPagu) * 100);
+
+                        return (
+                          <React.Fragment key={parent.id}>
+                            {/* LEVEL 1: Baris Induk (Fakultas / Unit Utama) */}
+                            <tr
+                              onClick={() => setExpandedThreeLevelParent(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))}
+                              className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
+                            >
+                              <td className="text-center py-3 px-2">
+                                <button className="p-1 rounded-md text-slate-700 hover:bg-slate-200 transition-colors">
+                                  {isParentOpen ? <ChevronUp size={16} className="text-slate-800 font-bold" /> : <ChevronDown size={16} />}
+                                </button>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2">
+                                  {isParentOpen ? (
+                                    <FolderOpen size={17} className="text-amber-600 shrink-0" />
+                                  ) : (
+                                    <Folder size={17} className="text-amber-600 shrink-0" />
+                                  )}
+                                  <span className="font-black text-slate-900 text-xs">{parent.name}</span>
+                                  <span className="text-[10px] font-bold bg-white text-slate-800 border border-slate-300 px-2 py-0.5 rounded-full shadow-2xs">
+                                    Level 1 ({parent.children.length} Departemen)
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
+                                <span className="font-mono text-[11px] font-bold text-slate-700 mr-2">{parent.code}</span>
+                                <span className="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  {parent.cluster}
+                                </span>
+                              </td>
+                              <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
+                                Rp {parent.totalPagu.toLocaleString('id-ID')}
+                              </td>
+                              <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
+                                <div>Rp {parent.totalRealisasi.toLocaleString('id-ID')}</div>
+                                <div className="text-[10px] text-emerald-600 font-sans font-bold">{parentPercent}% Serapan</div>
+                              </td>
+                              <td className="text-center py-3 px-3">
+                                <StatusBadge status={parent.status} />
+                              </td>
+                              <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-[10px] text-slate-400 font-bold">Induk</span>
+                              </td>
+                            </tr>
+
+                            {/* LEVEL 2: Baris Anak (Departemen) */}
+                            {isParentOpen && parent.children.map((child) => {
+                              const isChildOpen = !!expandedThreeLevelChild[child.id];
+                              const childPercent = Math.round((child.realisasi / child.pagu) * 100);
+
+                              return (
+                                <React.Fragment key={child.id}>
+                                  <tr
+                                    onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
+                                    className={`cursor-pointer transition-colors border-b border-indigo-100/70 ${
+                                      isChildOpen ? 'bg-indigo-50/70 hover:bg-indigo-100/50' : 'bg-indigo-50/30 hover:bg-indigo-50/60'
+                                    }`}
+                                  >
+                                    <td className="text-center py-2.5 px-2">
+                                      <button className="p-1 rounded-md text-indigo-700 hover:bg-indigo-200/60 transition-colors ml-2">
+                                        {isChildOpen ? <ChevronUp size={14} className="text-indigo-700 font-bold" /> : <ChevronDown size={14} />}
+                                      </button>
+                                    </td>
+                                    <td className="py-2.5 px-3 pl-8">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-indigo-400 font-mono">↳</span>
+                                        <Building2 size={15} className="text-indigo-600 shrink-0" />
+                                        <span className="font-bold text-indigo-950 text-xs">{child.name}</span>
+                                        <span className="text-[10px] font-bold bg-white text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">
+                                          Level 2 ({child.grandChildren.length} Lab/Cucu)
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-xs text-slate-600">
+                                      <div className="font-mono text-[11px] font-bold text-indigo-700">{child.code}</div>
+                                      <div className="text-[10px] text-slate-500">PIC: {child.pic}</div>
+                                    </td>
+                                    <td className="text-right font-mono font-bold text-slate-800 text-xs py-2.5 px-3">
+                                      Rp {child.pagu.toLocaleString('id-ID')}
+                                    </td>
+                                    <td className="text-right font-mono font-bold text-emerald-700 text-xs py-2.5 px-3">
+                                      <div>Rp {child.realisasi.toLocaleString('id-ID')}</div>
+                                      <div className="text-[10px] text-emerald-600 font-sans">{childPercent}% Serapan</div>
+                                    </td>
+                                    <td className="text-center py-2.5 px-3">
+                                      <StatusBadge status={child.status} />
+                                    </td>
+                                    <td className="text-center py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
+                                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2 py-0.5 rounded-md hover:bg-indigo-50 transition-colors shadow-2xs"
+                                      >
+                                        {isChildOpen ? 'Tutup Cucu' : 'Buka Cucu'}
+                                      </button>
+                                    </td>
+                                  </tr>
+
+                                  {/* LEVEL 3: Baris Cucu (Laboratorium / Sub-Kegiatan) */}
+                                  {isChildOpen && child.grandChildren.map((grandChild, gIdx) => (
+                                    <tr
+                                      key={grandChild.id}
+                                      className="bg-white hover:bg-slate-50/80 transition-colors text-xs border-b border-slate-100"
+                                    >
+                                      <td className="text-center py-2 px-2 text-slate-300 font-mono text-[10px]">
+                                        {gIdx + 1}
+                                      </td>
+                                      <td className="py-2 px-3 pl-16">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-300 font-mono text-xs">↳ ↳</span>
+                                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                                          <div>
+                                            <div className="font-medium text-slate-800 text-xs">{grandChild.nama}</div>
+                                            <div className="text-[10px] text-slate-400">Level 3 (Grandchild Unit)</div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3 text-xs text-slate-600">
+                                        <div className="font-mono text-[10px] font-bold text-slate-600">{grandChild.kode}</div>
+                                        <div className="text-[10px] text-slate-500">👤 {grandChild.pic}</div>
+                                      </td>
+                                      <td className="text-right font-mono font-medium text-slate-700 text-xs py-2 px-3">
+                                        Rp {grandChild.pagu.toLocaleString('id-ID')}
+                                      </td>
+                                      <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2 px-3">
+                                        Rp {grandChild.realisasi.toLocaleString('id-ID')}
+                                      </td>
+                                      <td className="text-center py-2 px-3">
+                                        <StatusBadge status={grandChild.status} />
+                                      </td>
+                                      <td className="text-center py-2 px-3">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <TableActionButton icon={Eye} variant="primary" title="Lihat Rincian" />
+                                          <TableActionButton icon={Pencil} variant="warning" title="Edit" />
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </React.Fragment>
+                              );
+                            })}
                           </React.Fragment>
                         );
                       })}
