@@ -71,7 +71,11 @@ import {
   Users,
   Scale,
   PlusCircle,
-  ClipboardPaste
+  ClipboardPaste,
+  ChevronDown,
+  ChevronUp,
+  Folder,
+  FolderOpen
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -228,6 +232,115 @@ export default function DesignSystemPage() {
     { id: 4, kode: '521211', nama: 'Belanja Bahan Operasional', unit: 'Fakultas Kedokteran', pagu: 95000000, realisasi: 0, status: 'revisi' },
     { id: 5, kode: '532111', nama: 'Belanja Modal Peralatan Mesin', unit: 'Direktorat Perencanaan', pagu: 600000000, realisasi: 120000000, status: 'ditolak' },
   ];
+
+  // Accordion Single Row & Group Row State & Sample Data
+  const [expandedSingleRows, setExpandedSingleRows] = useState<Record<number, boolean>>({ 1: true });
+  const [expandedGroupRows, setExpandedGroupRows] = useState<Record<string, boolean>>({ 'grp-ft': true });
+
+  const sampleSingleAccordionData = [
+    {
+      id: 1,
+      kode: '521211',
+      nama: 'Belanja Bahan Kimia Praktikum & Reagen Laboratorium',
+      unit: 'Fakultas Biologi',
+      pagu: 450000000,
+      realisasi: 310000000,
+      status: 'disetujui',
+      children: [
+        { no: 'TRX-01', tanggal: '2026-02-15', uraian: 'Pengadaan Buffer & Enzim Taq Polymerase', vendor: 'PT Bio Farma Medica', nominal: 125000000, status: 'Lunas' },
+        { no: 'TRX-02', tanggal: '2026-04-10', uraian: 'Reagen Kit Ekstraksi DNA/RNA Tanaman', vendor: 'CV Graha Science', nominal: 95000000, status: 'Lunas' },
+        { no: 'TRX-03', tanggal: '2026-07-22', uraian: 'Bahan Habis Pakai Mikrobiologi & Cawan Petri', vendor: 'PT Labora Jaya', nominal: 90000000, status: 'Proses SPK' },
+      ]
+    },
+    {
+      id: 2,
+      kode: '521213',
+      nama: 'Honorarium Narasumber Seminar & Reviewer Paper',
+      unit: 'Fakultas Teknik',
+      pagu: 180000000,
+      realisasi: 120000000,
+      status: 'proses',
+      children: [
+        { no: 'TRX-04', tanggal: '2026-03-05', uraian: 'Honor Keynote Speaker Tokyo University (Prof. Tanaka)', vendor: 'Transfer Bank Valas', nominal: 60000000, status: 'Lunas' },
+        { no: 'TRX-05', tanggal: '2026-03-06', uraian: 'Honor Moderator & Reviewer Paper Konferensi Nasional', vendor: 'Internal Dosen UGM', nominal: 60000000, status: 'Lunas' },
+      ]
+    },
+    {
+      id: 3,
+      kode: '532111',
+      nama: 'Pengadaan Alat Spektrofotometer UV-Vis Dual-Beam',
+      unit: 'Direktorat Penelitian',
+      pagu: 850000000,
+      realisasi: 850000000,
+      status: 'disetujui',
+      children: [
+        { no: 'TRX-06', tanggal: '2026-05-18', uraian: 'Unit Spektrofotometer Shimadzu UV-2600i Bergaransi', vendor: 'PT Duta Sarana Lab', nominal: 780000000, status: 'Lunas' },
+        { no: 'TRX-07', tanggal: '2026-05-25', uraian: 'Instalasi, Uji Fungsi & Pelatihan Teknis Laboran', vendor: 'PT Duta Sarana Lab', nominal: 70000000, status: 'Lunas' },
+      ]
+    }
+  ];
+
+  const sampleGroupRowsData = [
+    {
+      groupId: 'grp-ft',
+      groupName: 'Fakultas Teknik (FT)',
+      cluster: 'Saintek',
+      totalPagu: 1450000000,
+      totalRealisasi: 980000000,
+      status: 'proses',
+      children: [
+        { id: 'ft-1', kode: '040101', nama: 'Departemen Teknik Sipil & Lingkungan', pic: 'Dr. Ir. Budi W.', pagu: 550000000, realisasi: 390000000, status: 'disetujui' },
+        { id: 'ft-2', kode: '040201', nama: 'Departemen Teknik Elektro & Teknologi Informasi', pic: 'Prof. Dr. Ir. Sunarno', pagu: 520000000, realisasi: 380000000, status: 'disetujui' },
+        { id: 'ft-3', kode: '040301', nama: 'Departemen Teknik Mesin & Industri', pic: 'Dr. Fauzun, S.T., M.T.', pagu: 380000000, realisasi: 210000000, status: 'proses' },
+      ]
+    },
+    {
+      groupId: 'grp-fkkmk',
+      groupName: 'Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan (FKKMK)',
+      cluster: 'Kesehatan',
+      totalPagu: 2100000000,
+      totalRealisasi: 1850000000,
+      status: 'disetujui',
+      children: [
+        { id: 'med-1', kode: '050101', nama: 'Departemen Ilmu Kesehatan Anak', pic: 'dr. Ida Safitri, Sp.A(K)', pagu: 1100000000, realisasi: 980000000, status: 'disetujui' },
+        { id: 'med-2', kode: '050201', nama: 'Departemen Bedah & Bedah Saraf', pic: 'dr. Rachmat Andi, Sp.B', pagu: 1000000000, realisasi: 870000000, status: 'disetujui' },
+      ]
+    },
+    {
+      groupId: 'grp-ditkeu',
+      groupName: 'Direktorat Keuangan',
+      cluster: 'Kantor Pimpinan Universitas',
+      totalPagu: 890000000,
+      totalRealisasi: 420000000,
+      status: 'revisi',
+      children: [
+        { id: 'keu-1', kode: '010802A', nama: 'Subdirektorat Anggaran & Perbendaharaan', pic: 'Drs. Hendro Wibowo', pagu: 490000000, realisasi: 260000000, status: 'proses' },
+        { id: 'keu-2', kode: '010802B', nama: 'Subdirektorat Akuntansi & Pelaporan Keuangan', pic: 'Sri Mulyani, S.E., M.Acc.', pagu: 400000000, realisasi: 160000000, status: 'revisi' },
+      ]
+    }
+  ];
+
+  const isAllSingleExpanded = sampleSingleAccordionData.every(r => !!expandedSingleRows[r.id]);
+  const toggleAllSingleRows = () => {
+    if (isAllSingleExpanded) {
+      setExpandedSingleRows({});
+    } else {
+      const next: Record<number, boolean> = {};
+      sampleSingleAccordionData.forEach(r => { next[r.id] = true; });
+      setExpandedSingleRows(next);
+    }
+  };
+
+  const isAllGroupExpanded = sampleGroupRowsData.every(g => !!expandedGroupRows[g.groupId]);
+  const toggleAllGroupRows = () => {
+    if (isAllGroupExpanded) {
+      setExpandedGroupRows({});
+    } else {
+      const next: Record<string, boolean> = {};
+      sampleGroupRowsData.forEach(g => { next[g.groupId] = true; });
+      setExpandedGroupRows(next);
+    }
+  };
 
   // Tree View State & Sample Data
   const [treeTab, setTreeTab] = useState<'unit' | 'akun'>('unit');
@@ -2166,6 +2279,304 @@ export default function DesignSystemPage() {
                 onItemsPerPageChange={(size) => setItemsPerPage(size)}
                 pageSizeOptions={[10, 25, 50, 100]}
               />
+
+              {/* ========================================================================= */}
+              {/* SUB-SECTION 1: TEMPLATE EXPANDABLE SINGLE ROW (CHILD TRANSAKSI/SURAT)     */}
+              {/* ========================================================================= */}
+              <div className="pt-6 border-t border-gray-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                      <Layers size={16} className="text-indigo-600" />
+                      <span>Template 2: Single Row Accordion (Expandable Child Rows)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pola baris tunggal yang dapat diperluas untuk menginspeksi rincian transaksi / sub-item langsung di bawah baris induk tanpa berpindah halaman.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={toggleAllSingleRows}
+                      className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl border border-indigo-200 text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {isAllSingleExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      <span>{isAllSingleExpanded ? 'Tutup Semua Rincian' : 'Buka Semua Rincian'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                        <th className="w-10 text-center py-3 px-2">
+                          <button
+                            type="button"
+                            onClick={toggleAllSingleRows}
+                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-slate-200/60 transition-colors"
+                            title={isAllSingleExpanded ? "Tutup Semua Accordion" : "Buka Semua Accordion"}
+                          >
+                            {isAllSingleExpanded ? <ChevronUp size={15} className="text-indigo-600 font-bold" /> : <ChevronDown size={15} />}
+                          </button>
+                        </th>
+                        <th className="w-10 text-center py-3 px-2">No</th>
+                        <th className="py-3 px-3">Kode & Uraian Akun</th>
+                        <th className="py-3 px-3">Unit Kerja</th>
+                        <th className="text-right py-3 px-3">Pagu (Rp)</th>
+                        <th className="text-right py-3 px-3">Realisasi (Rp)</th>
+                        <th className="text-center py-3 px-3">Status</th>
+                        <th className="text-center w-20 py-3 px-3">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {sampleSingleAccordionData.map((row, idx) => {
+                        const isExpanded = !!expandedSingleRows[row.id];
+                        return (
+                          <React.Fragment key={row.id}>
+                            {/* Baris Induk */}
+                            <tr
+                              onClick={() => setExpandedSingleRows(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
+                              className={`cursor-pointer transition-colors ${
+                                isExpanded 
+                                  ? 'bg-indigo-50/50 hover:bg-indigo-50/70 border-l-4 border-l-indigo-600 font-medium' 
+                                  : 'hover:bg-slate-50 border-l-4 border-l-transparent text-gray-700'
+                              }`}
+                            >
+                              <td className="text-center py-3 px-2">
+                                <button className="p-1 rounded-md text-slate-400 hover:text-indigo-600">
+                                  {isExpanded ? <ChevronUp size={15} className="text-indigo-600" /> : <ChevronDown size={15} />}
+                                </button>
+                              </td>
+                              <td className="text-center font-mono text-gray-400 text-xs py-3 px-2">{idx + 1}</td>
+                              <td className="py-3 px-3">
+                                <div className="font-mono font-bold text-indigo-700 text-xs">{row.kode}</div>
+                                <div className="font-semibold text-gray-900 text-xs">{row.nama}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">Memiliki {row.children.length} rincian SPK/transaksi</div>
+                              </td>
+                              <td className="py-3 px-3 text-xs text-gray-600">{row.unit}</td>
+                              <td className="text-right font-mono font-bold text-gray-900 text-xs py-3 px-3">
+                                Rp {row.pagu.toLocaleString('id-ID')}
+                              </td>
+                              <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-3 px-3">
+                                Rp {row.realisasi.toLocaleString('id-ID')}
+                              </td>
+                              <td className="text-center py-3 px-3">
+                                <StatusBadge status={row.status} />
+                              </td>
+                              <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                <TableActionButton icon={Eye} variant="primary" title="Detail Akun" />
+                              </td>
+                            </tr>
+
+                            {/* Baris Anak (Accordion Detail) */}
+                            {isExpanded && (
+                              <tr className="bg-indigo-50/30 border-b border-indigo-100">
+                                <td colSpan={8} className="p-4 pl-12 pr-6">
+                                  <div className="bg-white rounded-xl border border-indigo-200/80 p-3.5 shadow-2xs space-y-2">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                      <div className="flex items-center gap-2">
+                                        <FileText size={14} className="text-indigo-600" />
+                                        <span className="text-xs font-bold text-gray-800">
+                                          Rincian Surat Perintah Kerja (SPK) & Bukti Transaksi: {row.nama}
+                                        </span>
+                                      </div>
+                                      <span className="text-[11px] font-mono text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                                        Total {row.children.length} Transaksi
+                                      </span>
+                                    </div>
+
+                                    <table className="w-full text-left border-collapse text-xs">
+                                      <thead>
+                                        <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                          <th className="py-2 px-2.5">No Referensi</th>
+                                          <th className="py-2 px-2.5">Tanggal</th>
+                                          <th className="py-2 px-2.5">Uraian / Deskripsi Belanja</th>
+                                          <th className="py-2 px-2.5">Penyedia / Vendor</th>
+                                          <th className="text-right py-2 px-2.5">Nominal (Rp)</th>
+                                          <th className="text-center py-2 px-2.5">Status</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {row.children.map((child, cIdx) => (
+                                          <tr key={cIdx} className="hover:bg-slate-50/80">
+                                            <td className="py-2 px-2.5 font-mono font-bold text-indigo-700 text-[11px]">{child.no}</td>
+                                            <td className="py-2 px-2.5 text-gray-500 text-[11px]">📅 {child.tanggal}</td>
+                                            <td className="py-2 px-2.5 font-medium text-gray-800">{child.uraian}</td>
+                                            <td className="py-2 px-2.5 text-gray-600">{child.vendor}</td>
+                                            <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-700">
+                                              Rp {child.nominal.toLocaleString('id-ID')}
+                                            </td>
+                                            <td className="py-2 px-2.5 text-center">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                child.status === 'Lunas' 
+                                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                              }`}>
+                                                {child.status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* SUB-SECTION 2: TEMPLATE MULTI-LEVEL GROUP ROW HIERARKI (PUNYA ANAK-ANAK) */}
+              {/* ========================================================================= */}
+              <div className="pt-6 border-t border-gray-200/80 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                      <FolderTree size={16} className="text-emerald-600" />
+                      <span>Template 3: Multi-Level Group Row (Parent Group Memiliki Anak-Anak)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pola pengelompokan data bertingkat (Grouping) berdasarkan Fakultas / Unit Induk dengan subtotal otomatis dan baris anak (departemen/sub-unit).
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={toggleAllGroupRows}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-200 text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
+                    >
+                      {isAllGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      <span>{isAllGroupExpanded ? 'Tutup Semua Group' : 'Buka Semua Group'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                        <th className="w-10 text-center py-3 px-2">
+                          <button
+                            type="button"
+                            onClick={toggleAllGroupRows}
+                            className="p-1 rounded-md text-slate-400 hover:text-emerald-700 hover:bg-slate-200/60 transition-colors"
+                            title={isAllGroupExpanded ? "Tutup Semua Group" : "Buka Semua Group"}
+                          >
+                            {isAllGroupExpanded ? <ChevronUp size={15} className="text-emerald-700 font-bold" /> : <ChevronDown size={15} />}
+                          </button>
+                        </th>
+                        <th className="py-3 px-3">Nama Group Unit Kerja / Departemen</th>
+                        <th className="py-3 px-3">Klaster / Penanggung Jawab (PIC)</th>
+                        <th className="text-right py-3 px-3">Subtotal Pagu (Rp)</th>
+                        <th className="text-right py-3 px-3">Subtotal Realisasi (Rp)</th>
+                        <th className="text-center py-3 px-3">Status</th>
+                        <th className="text-center w-24 py-3 px-3">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {sampleGroupRowsData.map((group) => {
+                        const isGroupOpen = !!expandedGroupRows[group.groupId];
+                        const persentase = Math.round((group.totalRealisasi / group.totalPagu) * 100);
+
+                        return (
+                          <React.Fragment key={group.groupId}>
+                            {/* Baris Header Group (Parent) */}
+                            <tr
+                              onClick={() => setExpandedGroupRows(prev => ({ ...prev, [group.groupId]: !prev[group.groupId] }))}
+                              className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
+                            >
+                              <td className="text-center py-3 px-2">
+                                <button className="p-1 rounded-md text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                  {isGroupOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-2">
+                                  {isGroupOpen ? (
+                                    <FolderOpen size={16} className="text-emerald-600 shrink-0" />
+                                  ) : (
+                                    <Folder size={16} className="text-emerald-600 shrink-0" />
+                                  )}
+                                  <span className="font-black text-slate-900 text-xs">{group.groupName}</span>
+                                  <span className="text-[10px] font-bold bg-white text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs">
+                                    {group.children.length} Anak Unit
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
+                                <span className="bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                  {group.cluster}
+                                </span>
+                              </td>
+                              <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
+                                Rp {group.totalPagu.toLocaleString('id-ID')}
+                              </td>
+                              <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
+                                <div>Rp {group.totalRealisasi.toLocaleString('id-ID')}</div>
+                                <div className="text-[10px] text-emerald-600 font-sans font-bold">{persentase}% Serapan</div>
+                              </td>
+                              <td className="text-center py-3 px-3">
+                                <StatusBadge status={group.status} />
+                              </td>
+                              <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-[10px] text-slate-400 font-bold">Parent Group</span>
+                              </td>
+                            </tr>
+
+                            {/* Baris Anak-anak (Children Rows) */}
+                            {isGroupOpen && (
+                              group.children.map((child, cIdx) => (
+                                <tr
+                                  key={child.id}
+                                  className="hover:bg-emerald-50/40 bg-white transition-colors text-xs border-b border-slate-100"
+                                >
+                                  <td className="text-center py-2.5 px-2 text-slate-300 font-mono text-[11px]">
+                                    {cIdx + 1}
+                                  </td>
+                                  <td className="py-2.5 px-3 pl-8">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-slate-300 font-mono">↳</span>
+                                      <div>
+                                        <div className="font-bold text-slate-800">{child.nama}</div>
+                                        <div className="font-mono text-[10px] text-indigo-600 font-bold">Kode: {child.kode}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-600 text-xs">
+                                    👤 {child.pic}
+                                  </td>
+                                  <td className="text-right font-mono font-bold text-slate-700 text-xs py-2.5 px-3">
+                                    Rp {child.pagu.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2.5 px-3">
+                                    Rp {child.realisasi.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="text-center py-2.5 px-3">
+                                    <StatusBadge status={child.status} />
+                                  </td>
+                                  <td className="text-center py-2.5 px-3">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <TableActionButton icon={Eye} variant="primary" title="Lihat Unit" />
+                                      <TableActionButton icon={Pencil} variant="warning" title="Edit Unit" />
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </>
           )}
         </div>

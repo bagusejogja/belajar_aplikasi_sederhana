@@ -209,8 +209,9 @@ export default function KomparasiTambahPaguPage() {
 
     return rawTambahPagu.filter(l => {
       const status = (l.status_pengajuan || '').toLowerCase();
-      // Surat Ditolak tidak usah ditampilkan
-      if (status.includes('tolak')) return false;
+      const nom = getSuratDisetujuiNominal(l);
+      // 🔴 REQUIREMENT: Surat Ditolak atau bernominal Rp 0 tidak usah ditampilkan untuk dibandingkan
+      if (status.includes('tolak') || nom <= 0) return false;
 
       const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || '').toLowerCase();
       const matchesUnit = l.unit_id === srcIdNum || (srcUnitName && letterUnit === srcUnitName);
@@ -229,8 +230,9 @@ export default function KomparasiTambahPaguPage() {
 
       let uLetters = rawTambahPagu.filter(l => {
         const status = (l.status_pengajuan || '').toLowerCase();
-        // 🔴 REQUIREMENT: Surat Ditolak tidak usah ditampilkan untuk dibandingkan
-        if (status.includes('tolak')) return false;
+        const nom = getSuratDisetujuiNominal(l);
+        // 🔴 REQUIREMENT: Surat Ditolak atau bernominal Rp 0 tidak usah ditampilkan untuk dibandingkan
+        if (status.includes('tolak') || nom <= 0) return false;
 
         const letterUnit = (l.gov_units?.nama_unit || l.unit_kerja_nama || '').toLowerCase();
         const matchesUnit = letterUnit === uName || l.unit_id === u.id;
@@ -270,7 +272,9 @@ export default function KomparasiTambahPaguPage() {
 
             const incoming = rawTambahPagu.filter(l => {
               const status = (l.status_pengajuan || '').toLowerCase();
-              if (status.includes('tolak')) return false;
+              const nom = getSuratDisetujuiNominal(l);
+              // Abaikan surat jika ditolak atau nominal Rp 0
+              if (status.includes('tolak') || nom <= 0) return false;
 
               const matchesUnit = l.unit_id === srcId;
               const matchesYear = (l.tahun_anggaran || '2026').toString() === selectedYear;
@@ -1430,8 +1434,18 @@ export default function KomparasiTambahPaguPage() {
                                             <TableRow key={dbRow.id || dbIdx} className={dbRowClass}>
                                               <TableCell className="font-bold text-slate-400 text-center text-[11px] align-top pt-3">{dbIdx + 1}</TableCell>
                                               <TableCell className="space-y-1">
-                                                <div className="font-bold text-slate-900 font-mono text-[11px] capitalize">
-                                                  {dbRow.jenis_anggaran || '-'}
+                                                <div className="flex flex-wrap items-center gap-1.5 font-bold text-slate-900 font-mono text-[11px] capitalize">
+                                                  <span>{dbRow.jenis_anggaran || '-'}</span>
+                                                  {dbRow.no_surat && (
+                                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[9px] font-bold">
+                                                      📄 {dbRow.no_surat}
+                                                    </Badge>
+                                                  )}
+                                                  {dbRow.tgl_surat && (
+                                                    <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 text-[9px] font-bold">
+                                                      📅 {dbRow.tgl_surat}
+                                                    </Badge>
+                                                  )}
                                                 </div>
                                                 {dbRow.keterangan && (
                                                   <div className="text-[10px] text-slate-500 font-medium whitespace-pre-wrap leading-relaxed">
