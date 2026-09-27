@@ -507,10 +507,11 @@ export default function AnalisisPaguPage() {
 
           <button 
             onClick={handleBaru} 
-            className="h-9 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 shrink-0"
+            className="h-9 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+            title="Mulai formulir usulan analisis pagu baru"
           >
-            <PlusCircle size={13} />
-            <span>Baru</span>
+            <PlusCircle size={14} />
+            <span>Buat Analisis Baru</span>
           </button>
 
           {activeStep === 'riwayat' ? null : activeStep === 'pdf' ? (
@@ -992,23 +993,16 @@ export default function AnalisisPaguPage() {
                 {/* RIWAYAT ANALISIS TAB */}
         {activeStep === 'riwayat' && (
           <div className="space-y-4 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between bg-gradient-to-r from-amber-900 to-slate-900 text-white p-3.5 px-4 rounded-2xl shadow-xs">
+            <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-3.5 px-4 rounded-2xl shadow-xs border border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-white/10 text-amber-300">
+                <div className="p-2 rounded-xl bg-white/10 text-indigo-300">
                   <History size={18} />
                 </div>
                 <div>
                   <h2 className="text-xs font-bold text-white uppercase tracking-wider">Daftar Riwayat Dokumen Analisis Pagu</h2>
-                  <p className="text-[11px] text-amber-200/80">Buka kembali atau edit dokumen analisis usulan pagu yang pernah tersimpan</p>
+                  <p className="text-[11px] text-slate-300">Buka kembali, cetak, atau kelola keputusan lembar presentasi pimpinan</p>
                 </div>
               </div>
-              <button 
-                onClick={handleBaru}
-                className="h-8 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/20 flex items-center gap-1"
-              >
-                <PlusCircle size={13} />
-                <span>Buat Analisis Baru</span>
-              </button>
             </div>
 
             <div className="bg-white border border-gray-200/80 rounded-2xl p-5 md:p-6 shadow-xs">

@@ -29,9 +29,6 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   const [activeTabMap, setActiveTabMap] = useState<Record<string, string>>({});
   const [unitHistoryMap, setUnitHistoryMap] = useState<Record<string, any[]>>({});
 
-  // Pop Up View Detail (Original Modal)
-  const [viewModalData, setViewModalData] = useState<any | null>(null);
-
   // Lembar Presentasi PDF & Keputusan Pimpinan Modal State
   const [presentationModalData, setPresentationModalData] = useState<any | null>(null);
   const [modalKeputusan, setModalKeputusan] = useState('diajukan');
@@ -236,7 +233,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   };
 
   const handleSaveDecision = async () => {
-    const targetModal = presentationModalData || viewModalData;
+    const targetModal = presentationModalData;
     if (!targetModal) return;
     setIsSavingDecision(true);
     try {
@@ -279,7 +276,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
       };
 
       if (presentationModalData) setPresentationModalData(updatedRow);
-      if (viewModalData) setViewModalData(updatedRow);
+      
       setRiwayat(prev => prev.map(item => item.id_analisis === targetModal.id_analisis ? updatedRow : item));
       setFiltered(prev => prev.map(item => item.id_analisis === targetModal.id_analisis ? updatedRow : item));
 
@@ -292,8 +289,8 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
     }
   };
 
-  const handleDelete = async (id_analisis: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (id_analisis: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!confirm(`Apakah Anda yakin ingin menghapus arsip analisis ini (${id_analisis})?\nData realisasi dan pagu historis terkait juga akan dihapus.`)) return;
 
     try {
@@ -303,7 +300,6 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
 
       if (error) throw error;
       setRiwayat(prev => prev.filter(r => r.id_analisis !== id_analisis));
-      if (viewModalData?.id_analisis === id_analisis) setViewModalData(null);
       alert("Arsip analisis berhasil dihapus!");
     } catch (err: any) {
       alert("Gagal menghapus: " + err.message);
@@ -392,79 +388,100 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col pb-20">
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">TOTAL USULAN ANGGARAN</span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Card 1: Total Usulan */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between transition-all hover:shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Usulan Anggaran</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+              <Layers size={16} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-slate-900 font-mono tracking-tight">
               Rp {formatRp(kpiMetrics.totalAnggaranUsulan)}
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-slate-500 flex items-center justify-between">
-            <span>{kpiMetrics.totalCount} Usulan Arsip</span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">100%</span>
+          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-slate-500">
+            <span>{kpiMetrics.totalCount} Pengajuan Terdata</span>
+            <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold">100% Usulan</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 border border-emerald-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block mb-1">DISETUJUI SEMUA (100%)</span>
-            <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">
+        {/* Card 2: Disetujui Semua */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between transition-all hover:shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Disetujui Penuh (100%)</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+              <CheckCircle2 size={16} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-emerald-700 font-mono tracking-tight">
               Rp {formatRp(kpiMetrics.approvedSemuaAnggaran)}
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-emerald-700 flex items-center justify-between">
-            <span>{kpiMetrics.approvedSemuaCount} Item</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-mono font-bold">
-              {kpiMetrics.approvedPct}%
-            </span>
+          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-emerald-700">
+            <span>{kpiMetrics.approvedSemuaCount} Pengajuan ({kpiMetrics.approvedPct}%)</span>
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">ACC Penuh</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 border border-indigo-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 block mb-1">DISETUJUI SEBAGIAN</span>
-            <div className="text-2xl font-black text-indigo-700 font-mono tracking-tight">
+        {/* Card 3: Disetujui Sebagian */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between transition-all hover:shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-blue-700">Disetujui Sebagian</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+              <AlertCircle size={16} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-blue-700 font-mono tracking-tight">
               Rp {formatRp(kpiMetrics.approvedSebagianAnggaran)}
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-indigo-700 flex items-center justify-between">
-            <span>{kpiMetrics.approvedSebagianCount} Item</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Sebagian</span>
+          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-blue-700">
+            <span>{kpiMetrics.approvedSebagianCount} Pengajuan</span>
+            <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">Sebagian</span>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 block mb-1">DITOLAK / DIAJUKAN</span>
-            <div className="text-2xl font-black text-rose-700 font-mono tracking-tight">
+        {/* Card 4: Ditolak / Pending */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between transition-all hover:shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-black uppercase tracking-wider text-rose-700">Ditolak / Belum Diputus</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+              <XCircle size={16} />
+            </div>
+          </div>
+          <div className="mt-2">
+            <div className="text-xl font-black text-rose-700 font-mono tracking-tight">
               Rp {formatRp(kpiMetrics.rejectedAnggaran)}
             </div>
           </div>
-          <div className="mt-4 text-xs font-bold text-rose-700 flex items-center justify-between">
-            <span>{kpiMetrics.rejectedCount} Item</span>
-            <span className="text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold">Proses</span>
+          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-rose-700">
+            <span>{kpiMetrics.rejectedCount} Pengajuan</span>
+            <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">Pending/Tolak</span>
           </div>
-        </div>
-      </div>
+        </div></div>
 
-      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 bg-white p-3 rounded-2xl border border-gray-200/80 shadow-2xs">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
           <input 
             type="text"
-            placeholder="Cari perihal, no surat, subyek simaster, unit..."
+            placeholder="Cari perihal, no surat, subyek simaster, nama unit..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 rounded-2xl py-3 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-sm font-medium"
+            className="w-full bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl py-2 pl-9 pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-xs font-medium"
           />
           {search && (
-             <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-gray-600">Clear</button>
+             <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400 hover:text-gray-700 cursor-pointer">Clear</button>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-2xl border border-gray-200">
+        <div className="flex flex-wrap items-center gap-2">
+           <div className="flex items-center gap-0.5 bg-gray-100 p-0.5 rounded-xl border border-gray-200/70">
               {[
                 { id: 'semua', label: 'Semua' },
                 { id: 'diajukan', label: 'Diajukan' },
@@ -475,9 +492,9 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                 <button
                   key={tab.id}
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     statusFilter === tab.id
-                      ? 'bg-white text-indigo-700 shadow-sm'
+                      ? 'bg-white text-indigo-700 shadow-2xs border border-gray-200/60'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
@@ -489,47 +506,48 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
            <select 
              value={sortBy}
              onChange={e => setSortBy(e.target.value)}
-             className="bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer mr-2"
+             className="h-8 bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold rounded-xl px-2.5 outline-none focus:border-indigo-500 cursor-pointer"
            >
               <option value="terbaru">Terbaru</option>
               <option value="terlama">Terlama</option>
-              <option value="nominal_tertinggi">Nominal Usulan Tertinggi</option>
+              <option value="nominal_tertinggi">Nominal Tertinggi</option>
            </select>
+
            <button
              onClick={exportToExcel}
-             className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-2xl px-4 py-3 shadow-sm transition-all flex items-center gap-1.5"
+             className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl px-3 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
              title="Download Excel Seluruh Riwayat Analisis"
            >
-             <FileSpreadsheet size={14} />
+             <FileSpreadsheet size={13} />
              <span>Export Excel</span>
            </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-gray-200/80 shadow-sm overflow-hidden flex-1">
+      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-2xs overflow-hidden flex-1">
          {loading ? (
            <div className="flex justify-center items-center py-20">
-              <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
            </div>
          ) : filtered.length === 0 ? (
-           <div className="flex flex-col items-center justify-center text-gray-400 py-20 bg-white rounded-[3rem]">
-              <FileText size={64} className="opacity-20 mb-4" />
-              <h3 className="text-xl font-bold text-gray-700">Tidak ada data arsip yang cocok.</h3>
-              <p className="font-medium text-sm mt-2">Coba ubah filter status atau kata kunci pencarian Anda.</p>
+           <div className="flex flex-col items-center justify-center text-gray-400 py-16 bg-white">
+              <FileText size={48} className="opacity-20 mb-3 text-slate-500" />
+              <h3 className="text-base font-bold text-gray-700">Tidak ada data arsip yang cocok.</h3>
+              <p className="font-medium text-xs mt-1 text-gray-400">Coba ubah filter status atau kata kunci pencarian Anda.</p>
            </div>
          ) : (
            <div className="overflow-x-auto">
              <table className="w-full text-xs text-left border-collapse table-fixed">
-               <thead className="bg-slate-50 text-slate-500 uppercase font-black text-[11px] tracking-wider border-b border-slate-200">
+               <thead className="bg-slate-50 text-gray-600 uppercase font-black text-[11px] tracking-wider border-b border-gray-200">
                  <tr>
-                   <th className="px-3 py-4 text-center w-12">#</th>
-                   <th className="px-4 py-4 w-auto min-w-[240px]">Unit Kerja & Detail Surat Pengajuan</th>
-                   <th className="px-4 py-4 text-right w-48">Nominal Usulan & Disetujui</th>
-                   <th className="px-4 py-4 text-center w-36">Status Keputusan</th>
-                   <th className="px-3 py-4 text-center w-36">Aksi / Kontrol</th>
+                   <th className="px-3 py-3 text-center w-12">#</th>
+                   <th className="px-4 py-3 w-auto min-w-[260px]">Unit Kerja & Detail Surat Pengajuan</th>
+                   <th className="px-4 py-3 text-right w-48">Nominal Usulan & Disetujui</th>
+                   <th className="px-4 py-3 text-center w-36">Status Keputusan</th>
+                   <th className="px-3 py-3 text-center w-40">Aksi / Kontrol</th>
                  </tr>
                </thead>
-               <tbody className="divide-y divide-slate-100">
+               <tbody className="divide-y divide-gray-100">
                  {filtered.map((r, idx) => {
                    const isExpanded = expandedRowId === r.id_analisis;
                    const totalUsulan = parseNum(r.total_anggaran);
@@ -607,58 +625,53 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                             )}
                           </td>
 
-                          <td className="px-2 py-3 text-center align-middle" onClick={e => e.stopPropagation()}>
-                            <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[125px] mx-auto">
-                              {/* Baris 1: 👁️ Pop-up Detail (Asli) */}
-                              <button
-                                onClick={() => setViewModalData(r)}
-                                className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl transition-all border border-indigo-200 shadow-2xs flex items-center justify-center cursor-pointer"
-                                title="Lihat Pop-up Detail"
-                              >
-                                <Eye size={14} />
-                              </button>
-
-                              {/* Baris 1: 📑 Lembar Presentasi PDF & Keputusan (Halaman Baru) */}
+                          <td className="px-3 py-3 text-center align-middle" onClick={e => e.stopPropagation()}>
+                            <div className="flex flex-col items-center justify-center gap-1.5 max-w-[140px] mx-auto">
+                              {/* Hero Action: Lembar Presentasi Sidang & Keputusan */}
                               <Link
                                 href={`/analisis/presentasi/${r.id_analisis}`}
-                                className="p-2 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white rounded-xl transition-all border border-amber-200 shadow-2xs flex items-center justify-center cursor-pointer"
-                                title="Lembar Presentasi PDF & Keputusan Pimpinan (Halaman Baru)"
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                title="Buka Lembar Presentasi Sidang Usulan Pagu & Keputusan Pimpinan"
                               >
-                                <FileCheck size={14} />
+                                <Sparkles size={13} />
+                                <span>Presentasi</span>
                               </Link>
 
-                              {/* Baris 2: 🖨️ Pratinjau PDF Nota Analisis */}
-                              <button
-                                onClick={() => {
-                                  onLoadAnalisis(r.id_analisis);
-                                  setTimeout(() => setActiveTab('pdf'), 200);
-                                }}
-                                className="p-2 bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white rounded-xl transition-all border border-slate-200 shadow-2xs flex items-center justify-center cursor-pointer"
-                                title="Pratinjau PDF Nota Analisis"
-                              >
-                                <Printer size={14} />
-                              </button>
+                              {/* Secondary Actions Row: Edit, PDF, Hapus */}
+                              <div className="flex items-center justify-center gap-1 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onLoadAnalisis(r.id_analisis);
+                                    setTimeout(() => setActiveTab('form'), 200);
+                                  }}
+                                  className="flex-1 p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
+                                  title="Edit Form Analisis"
+                                >
+                                  <Edit3 size={13} />
+                                </button>
 
-                              {/* Baris 2: ✏️ Edit & Buka Form Analisis */}
-                              <button
-                                onClick={() => {
-                                  onLoadAnalisis(r.id_analisis);
-                                  setTimeout(() => setActiveTab('form'), 200);
-                                }}
-                                className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl transition-all border border-emerald-200 shadow-2xs flex items-center justify-center cursor-pointer"
-                                title="Edit & Buka Form Analisis"
-                              >
-                                <Edit3 size={14} />
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onLoadAnalisis(r.id_analisis);
+                                    setTimeout(() => setActiveTab('pdf'), 200);
+                                  }}
+                                  className="flex-1 p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-slate-800 text-gray-600 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
+                                  title="Pratinjau PDF Nota Analisis"
+                                >
+                                  <Printer size={13} />
+                                </button>
 
-                              {/* Baris 2: 🗑️ Hapus Analisis */}
-                              <button
-                                onClick={(e) => handleDelete(r.id_analisis, e)}
-                                className="p-2 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-xl transition-all border border-rose-200 shadow-2xs flex items-center justify-center cursor-pointer"
-                                title="Hapus Arsip Analisis"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(r.id_analisis)}
+                                  className="flex-1 p-1.5 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-600 text-rose-600 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
+                                  title="Hapus Usulan Analisis"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </div>
                           </td>
                        </tr>
@@ -1003,13 +1016,13 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                                    <td className="px-4 py-3 text-right font-bold text-emerald-700">Rp {formatRp(disetujuiNum)}</td>
                                                    <td className="px-4 py-3 text-center font-sans">{getStatusBadge(h.keputusan)}</td>
                                                    <td className="px-4 py-3 text-center font-sans">
-                                                     <button
-                                                       onClick={() => setViewModalData(h)}
-                                                       className="p-1.5 bg-slate-100 hover:bg-slate-900 hover:text-white rounded-lg transition-all text-slate-600"
-                                                       title="Lihat Detail Modal"
-                                                     >
-                                                       <Eye size={13} />
-                                                     </button>
+                                                     <Link
+                                                        href={`/analisis/presentasi/${h.id_analisis}`}
+                                                        className="px-2 py-1 bg-amber-50 hover:bg-amber-600 hover:text-white rounded-lg transition-all text-amber-700 inline-flex items-center gap-1 text-[11px] font-bold border border-amber-200 cursor-pointer"
+                                                        title="Buka Lembar Presentasi"
+                                                      >
+                                                        <Sparkles size={11} /> Presentasi
+                                                      </Link>
                                                    </td>
                                                  </tr>
                                                );
@@ -1168,12 +1181,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
 
                                  <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                                    <div className="flex items-center gap-2">
-                                     <button
-                                       onClick={() => setViewModalData(r)}
-                                       className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
-                                     >
-                                       <Eye size={14} /> Pop-up Detail
-                                     </button>
+                                     
 
                                      <Link
                                         href={`/analisis/presentasi/${r.id_analisis}`}
@@ -1218,135 +1226,6 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
              </div>
            )}
        </div>
-
-         {/* 1. ORIGINAL VIEW MODAL (POP-UP DETAIL MATA) */}
-      {viewModalData && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-3xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
-            
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(viewModalData.keputusan)}
-                  {viewModalData.subyek_persuratan_simaster && (
-                    <span className="px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[10px] font-bold">
-                      Simaster: {viewModalData.subyek_persuratan_simaster}
-                    </span>
-                  )}
-                </div>
-                <h3 className="font-black text-xl text-slate-900 pt-1">
-                  {viewModalData.perihal || 'Detail Nota Analisis'}
-                </h3>
-                <p className="text-xs text-slate-500 font-mono">
-                  📄 No Surat: <span className="font-bold text-slate-800">{viewModalData.no_surat || '-'}</span> • Unit: <span className="font-bold text-indigo-700">{viewModalData.unit_pengirim || '-'}</span>
-                </p>
-              </div>
-
-              <button 
-                onClick={() => setViewModalData(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Section 1: Financial Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
-                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Anggaran Diajukan</span>
-                <div className="text-xl font-black font-mono text-amber-800">
-                  Rp {formatRp(viewModalData.total_anggaran)}
-                </div>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 space-y-1">
-                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Nominal Disetujui Pimpinan</span>
-                <div className="text-xl font-black font-mono text-emerald-800">
-                  Rp {formatRp(viewModalData.nominal_disetujui)}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Section 2: Ringkasan AI & Substansi (FULL HTML FORMATTED) */}
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-2">
-              <span className="text-[11px] font-black text-indigo-900 uppercase tracking-widest block flex items-center gap-1.5">
-                <Sparkles size={14} className="text-indigo-600" /> Ringkasan Substansi &amp; AI Note (Lengkap)
-              </span>
-              {viewModalData.ringkasan_ai ? (
-                <div 
-                  className="prose prose-sm text-slate-800 max-w-none text-xs leading-relaxed font-sans bg-white p-4 rounded-xl border border-slate-200/80 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_h3]:font-bold [&_h3]:text-sm [&_strong]:font-bold"
-                  dangerouslySetInnerHTML={{ __html: viewModalData.ringkasan_ai }}
-                />
-              ) : (
-                <p className="text-xs text-slate-600 italic bg-white p-4 rounded-xl border border-slate-200">
-                  {viewModalData.perihal || 'Nota analisis usulan tambah pagu anggaran unit kerja UGM.'}
-                </p>
-              )}
-            </div>
-
-            {/* Modal Section 3: Keterangan Keputusan Pimpinan (If available) */}
-            {viewModalData.keterangan_keputusan && (
-              <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80 space-y-1">
-                <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest block">Catatan / Keterangan Persetujuan Pimpinan</span>
-                <p className="text-xs font-medium text-amber-950">{viewModalData.keterangan_keputusan}</p>
-              </div>
-            )}
-
-            {/* Modal Section 4: File Lampiran Original (If available) */}
-            {viewModalData.link_lampiran && (
-              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-200 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-indigo-900">
-                  <Paperclip size={16} className="text-indigo-600" /> File PDF Lampiran Asli Pengajuan
-                </div>
-                <button
-                  onClick={() => window.open(getSafeFileUrl(viewModalData.link_lampiran), '_blank')}
-                  className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
-                >
-                  <ExternalLink size={13} /> Buka PDF Lampiran
-                </button>
-              </div>
-            )}
-
-            {/* Modal Footer Controls */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-              <button
-                onClick={() => setViewModalData(null)}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
-              >
-                Tutup
-              </button>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const id = viewModalData.id_analisis;
-                    setViewModalData(null);
-                    onLoadAnalisis(id);
-                    setTimeout(() => setActiveTab('pdf'), 200);
-                  }}
-                  className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
-                >
-                  <Printer size={14} /> Pratinjau PDF Nota Lengkap
-                </button>
-
-                <button
-                  onClick={() => {
-                    const id = viewModalData.id_analisis;
-                    setViewModalData(null);
-                    onLoadAnalisis(id);
-                    setTimeout(() => setActiveTab('form'), 200);
-                  }}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2"
-                >
-                  <Edit3 size={14} /> Buka Form Edit Analisis
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      </div>
+    </div>
   );
 }

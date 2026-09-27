@@ -467,7 +467,7 @@ export default function PresentasiAnalisisPage() {
         </div>
 
         {/* SECTION 1: FORM DATA UTAMA USULAN (READ ONLY WEB INPUT STYLE) */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -617,7 +617,7 @@ export default function PresentasiAnalisisPage() {
           const totalPenugasanNominal = detailPenugasan.reduce((acc: number, curr: any) => acc + parseNum(curr.nominal), 0);
 
           return (
-            <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 text-slate-900">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white space-y-6 text-slate-900">
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-3">
                 <div>
@@ -863,7 +863,7 @@ export default function PresentasiAnalisisPage() {
         })()}
 
         {/* SECTION 3: DATA PENDUKUNG / TABEL REALISASI (DIBAWAH POSISI PAGU & HISTORI USULAN) */}
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white">
           <DataPendukung 
             mainData={data} 
             setMainData={setData} 
@@ -876,7 +876,7 @@ export default function PresentasiAnalisisPage() {
           />
         </div>
         {data.rekomendasi_ai && (
-          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
                 <Sparkles size={18} className="text-amber-500" />
@@ -898,7 +898,7 @@ export default function PresentasiAnalisisPage() {
         {/* ========================================================================= */}
         {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (DIBUAT SERAGAM DENGAN MENU LAIN) */}
         {/* ========================================================================= */}
-        <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 text-slate-900">
+        <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white space-y-6 text-slate-900">
           
           <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-3">
             <div>
