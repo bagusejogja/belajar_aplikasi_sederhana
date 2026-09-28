@@ -85,11 +85,24 @@ export async function generateNotaAnalisisPdfBlob(
   doc.setFillColor(37, 99, 235); // Blue line
   doc.rect(15, 10, 180, 2, 'F');
 
+  // ID Berkas & Date
+  const idBerkas = mainData?.id_analisis || mainData?.no_surat || 'ANALISIS-PAGU-UGM-2026';
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(`ID Berkas: ${idBerkas}`, 15, 16);
+  const tanggalDoc = mainData?.tanggal_surat || '25 September 2026';
+  doc.text(`Tanggal: ${tanggalDoc}`, 195, 16, { align: 'right' });
+
   // Title
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 64, 175);
-  doc.text('NOTA ANALISIS USULAN PAGU ANGGARAN', 105, 20, { align: 'center' });
+  doc.text('NOTA ANALISIS USULAN PAGU ANGGARAN', 105, 22, { align: 'center' });
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Nomor Surat Usulan: ${mainData?.no_surat || '-'}`, 105, 27, { align: 'center' });
   doc.setTextColor(0, 0, 0);
 
   // Helper for Section Header
@@ -106,7 +119,7 @@ export async function generateNotaAnalisisPdfBlob(
     return y + 8;
   };
 
-  let startY = 30;
+  let startY = 33;
 
   const parseNum = (str: string | number) => {
     if (typeof str === 'number') return isNaN(str) ? 0 : str;
