@@ -85,6 +85,8 @@ export default function DocumentViewerModal({
 }: DocumentViewerModalProps) {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
+  const [filterKegiatan, setFilterKegiatan] = useState('');
+  const [copiedId, setCopiedId] = useState(false);
 
   // Helper untuk mengubah URL Google Drive ke URL preview embed yang valid tanpa blocking X-Frame-Options
   const getEmbeddableUrl = (url?: string) => {
@@ -104,6 +106,8 @@ export default function DocumentViewerModal({
     if (isOpen) {
       setZoom(100);
       setRotation(0);
+      setFilterKegiatan('');
+      setCopiedId(false);
     }
   }, [isOpen]);
 
@@ -117,8 +121,6 @@ export default function DocumentViewerModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 20, 200));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 20, 60));
@@ -142,9 +144,6 @@ export default function DocumentViewerModal({
   };
 
   const isHasilAnalisis = mode === 'hasil_analisis' || (!fileUrl && Boolean(htmlContent));
-
-  const [filterKegiatan, setFilterKegiatan] = useState('');
-  const [copiedId, setCopiedId] = useState(false);
 
   const handleCopyId = (id: string) => {
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -253,6 +252,8 @@ export default function DocumentViewerModal({
     { label: 'Sisa Kapasitas Pagu', value: `Rp ${formatRp(sisaKapasitasHitung)}`, hl: 'emerald' },
     { label: 'Nominal Usulan Tambahan Pagu (Diajukan)', value: `Rp ${formatRp(nominalUsulanVal)}`, hl: 'amber' }
   ];
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
