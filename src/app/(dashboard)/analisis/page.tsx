@@ -64,7 +64,7 @@ export default function AnalisisPaguPage() {
   const [detailData, setDetailData] = useState<any[]>([]);
   const [historisData, setHistorisData] = useState<any[]>([]);
 
-  const loadRiwayatData = async (id_analisis: string) => {
+  const loadRiwayatData = async (id_analisis: string, targetStep?: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'all') => {
     setLoading(true);
     try {
        const { data: utama } = await supabase.from('app_analisis_utama').select('*').eq('id_analisis', id_analisis).single();
@@ -169,7 +169,7 @@ export default function AnalisisPaguPage() {
           setHistorisData([]);
        }
 
-       setActiveStep('step1');
+       setActiveStep(targetStep || 'step1');
     } catch (e) {
        console.error("Gagal load riwayat:", e);
     }
@@ -464,19 +464,21 @@ export default function AnalisisPaguPage() {
 
         {/* Action Buttons & Riwayat Switcher */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-          {/* View Mode Toggle */}
-          <button 
-            onClick={() => setActiveStep(activeStep === 'all' ? 'step1' : 'all')} 
-            className={`h-9 px-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs shrink-0 ${
-              activeStep === 'all' 
-                ? 'bg-indigo-600 text-white border-indigo-600' 
-                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-            }`}
-            title="Tampilkan Semua Form dalam 1 Halaman"
-          >
-            <Layers size={13} />
-            <span>{activeStep === 'all' ? 'Mode Wizard' : 'Mode 1 Halaman'}</span>
-          </button>
+          {/* View Mode Toggle (Only shown when active in form filling workflow) */}
+          {activeStep !== 'riwayat' && activeStep !== 'master-pagu' && (
+            <button 
+              onClick={() => setActiveStep(activeStep === 'all' ? 'step1' : 'all')} 
+              className={`h-9 px-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs shrink-0 ${
+                activeStep === 'all' 
+                  ? 'bg-indigo-600 text-white border-indigo-600' 
+                  : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+              }`}
+              title="Tampilkan Semua Form dalam 1 Halaman"
+            >
+              <Layers size={13} />
+              <span>{activeStep === 'all' ? 'Mode Wizard' : 'Mode 1 Halaman'}</span>
+            </button>
+          )}
 
           {/* Master Pagu (id_db) Button */}
           <button 

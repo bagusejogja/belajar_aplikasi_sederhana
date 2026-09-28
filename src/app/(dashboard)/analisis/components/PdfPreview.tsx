@@ -3,11 +3,13 @@ import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { renderWysiwygToPdf } from '@/lib/pdfRenderer';
-import { Printer, Download, Eye } from 'lucide-react';
+import { Printer, Download, Eye, Paperclip, AlertCircle, RefreshCw } from 'lucide-react';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 import { supabase } from '@/lib/supabase';
 
 export default function PdfPreview({ mainData, detailData, historisData, setActiveTab, readOnly }: any) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const [detailInisiatif, setDetailInisiatif] = useState<any[]>([]);
   const [detailPenugasan, setDetailPenugasan] = useState<any[]>([]);
 
@@ -48,10 +50,10 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
 
   // Auto generate on mount or when data changes significantly
   React.useEffect(() => {
-     if (mainData?.no_surat || mainData?.analisis_html) {
+     if (mainData?.id_analisis || mainData?.no_surat || mainData?.analisis_html || mainData?.total_anggaran || mainData?.perihal) {
         generatePDF();
      }
-  }, [mainData?.no_surat, mainData?.analisis_html, detailInisiatif, detailPenugasan]);
+  }, [mainData?.id_analisis, mainData?.no_surat, mainData?.analisis_html, mainData?.total_anggaran, mainData?.perihal, detailInisiatif, detailPenugasan]);
 
   const generatePDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -581,6 +583,17 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
               </button>
             </>
           )}
+          {(mainData?.link_lampiran || mainData?.file_lampiran) && (
+            <a
+              href={getSafeFileUrl(mainData.link_lampiran || mainData.file_lampiran)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              title="Buka Berkas PDF Lampiran Asli Surat Pengajuan dari Unit"
+            >
+              <Paperclip size={14} /> Buka PDF Lampiran Asli
+            </a>
+          )}
           <button onClick={handleDownload} disabled={!pdfUrl} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors shadow-md flex items-center gap-2 disabled:opacity-50">
             <Download size={16}/> Unduh PDF
           </button>
@@ -588,7 +601,16 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
       </div>
 
       <div className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl overflow-hidden shadow-inner p-2">
-         {pdfUrl ? (
+         {pdfError ? (
+            <div className="w-full h-full min-h-[400px] flex flex-col items-center justify-center text-rose-600 gap-3 p-6 text-center bg-rose-50/50 rounded-xl border border-rose-200">
+               <AlertCircle size={40} className="text-rose-500" />
+               <h4 className="font-bold text-sm">Terjadi Kendala saat Memuat Pratinjau Dokumen PDF</h4>
+               <p className="text-xs text-rose-700 max-w-md font-mono">{pdfError}</p>
+               <button onClick={generatePDF} className="mt-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer">
+                  <RefreshCw size={13} /> Coba Muat Ulang Preview
+               </button>
+            </div>
+         ) : pdfUrl ? (
             <iframe src={pdfUrl} className="w-full h-full min-h-[600px] rounded-xl border-none bg-white shadow-sm" />
          ) : (
             <div className="w-full h-full min-h-[400px] flex flex-col items-center justify-center text-gray-400 gap-4">

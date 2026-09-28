@@ -13,7 +13,13 @@ import {
 } from 'lucide-react';
 import { getSafeFileUrl } from '@/lib/fileHelper';
 
-export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAnalisis: (id_analisis: string) => void, setActiveTab: (tab: string) => void }) {
+export default function RiwayatList({ 
+  onLoadAnalisis, 
+  setActiveTab 
+}: { 
+  onLoadAnalisis: (id_analisis: string, targetStep?: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'all') => Promise<void> | void; 
+  setActiveTab: (tab: string) => void; 
+}) {
   const router = useRouter();
   const [riwayat, setRiwayat] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
@@ -637,31 +643,37 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                 <span>Presentasi</span>
                               </Link>
 
-                              {/* Secondary Actions Row: Edit, PDF, Hapus */}
+                              {/* Secondary Actions Row: Edit, Cetak PDF Nota, Lampiran (jika ada), Hapus */}
                               <div className="flex items-center justify-center gap-1 w-full">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onLoadAnalisis(r.id_analisis);
-                                    setTimeout(() => setActiveTab('form'), 200);
-                                  }}
+                                  onClick={() => onLoadAnalisis(r.id_analisis, 'step1')}
                                   className="flex-1 p-1.5 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
-                                  title="Edit Form Analisis"
+                                  title="Edit Formulir Analisis"
                                 >
                                   <Edit3 size={13} />
                                 </button>
 
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    onLoadAnalisis(r.id_analisis);
-                                    setTimeout(() => setActiveTab('pdf'), 200);
-                                  }}
+                                  onClick={() => onLoadAnalisis(r.id_analisis, 'pdf')}
                                   className="flex-1 p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-slate-800 text-gray-600 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
-                                  title="Pratinjau PDF Nota Analisis"
+                                  title="Cetak / Pratinjau Dokumen Nota Analisis PDF"
                                 >
                                   <Printer size={13} />
                                 </button>
+
+                                {(r.link_lampiran || r.file_lampiran) && (
+                                  <a
+                                    href={getSafeFileUrl(r.link_lampiran || r.file_lampiran)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 p-1.5 rounded-lg border border-amber-200 bg-amber-50/70 hover:bg-amber-600 text-amber-700 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
+                                    title="Buka Berkas PDF Lampiran Asli Surat Pengajuan"
+                                  >
+                                    <Paperclip size={13} />
+                                  </a>
+                                )}
 
                                 <button
                                   type="button"
@@ -953,10 +965,7 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
                                            </p>
                                          </div>
                                          <button
-                                           onClick={() => {
-                                             onLoadAnalisis(r.id_analisis);
-                                             setTimeout(() => setActiveTab('form'), 200);
-                                           }}
+                                           onClick={() => onLoadAnalisis(r.id_analisis, 'step1')}
                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm inline-flex items-center gap-1.5"
                                          >
                                            <Edit3 size={13} /> Upload Lampiran via Form Edit
@@ -1193,20 +1202,14 @@ export default function RiwayatList({ onLoadAnalisis, setActiveTab }: { onLoadAn
 
                                    <div className="flex items-center gap-2">
                                      <button
-                                       onClick={() => {
-                                         onLoadAnalisis(r.id_analisis);
-                                         setTimeout(() => setActiveTab('pdf'), 200);
-                                       }}
+                                       onClick={() => onLoadAnalisis(r.id_analisis, 'pdf')}
                                        className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                                      >
                                        <Printer size={14} /> Pratinjau PDF Nota
                                      </button>
 
                                      <button
-                                       onClick={() => {
-                                         onLoadAnalisis(r.id_analisis);
-                                         setTimeout(() => setActiveTab('form'), 200);
-                                       }}
+                                       onClick={() => onLoadAnalisis(r.id_analisis, 'step1')}
                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                                      >
                                        <Edit3 size={14} /> Edit Form Lengkap
