@@ -56,57 +56,80 @@ export default function RiwayatList({
     unitName?: string;
     perihal?: string;
     nominal?: string;
+    nominalUsulan?: string;
     keterangan?: string;
+    mode?: 'hasil_analisis' | 'lampiran' | 'template';
+    htmlContent?: string;
+    rekomendasi?: string;
+    tanggalSurat?: string;
   }>({
     isOpen: false,
-    title: 'SK_Rektor_Penetapan_Pagu_2026.pdf',
-    fileSize: '2.4 MB',
-    uploader: 'Direktorat Keuangan UGM',
-    status: 'disetujui'
+    title: 'Nota_Hasil_Analisis.pdf',
+    fileSize: '420 KB',
+    uploader: 'Tim Verifikasi Keuangan UGM',
+    status: 'diajukan',
+    mode: 'hasil_analisis'
   });
 
   const handleOpenPrinterModal = (r: any) => {
-    const totalDisetujui = parseNum(r.nominal_disetujui || r.nominal_usulan || 0);
+    const totalDisetujui = parseNum(r.nominal_disetujui || 0);
+    const totalUsulan = parseNum(r.total_anggaran || r.nominal_usulan || 0);
     const dateFormatted = r.created_at
       ? new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
       : '25 Sep 2026';
 
+    const cleanTitle = `Hasil_Analisis_${(r.no_surat || r.id_analisis || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+
     setDocViewerModal({
       isOpen: true,
-      title: `SK_Rektor_Penetapan_Pagu_${r.no_surat?.replace(/[^a-zA-Z0-9_-]/g, '_') || '2026'}.pdf`,
-      fileUrl: undefined,
-      fileSize: '2.4 MB',
-      uploader: r.unit_pengirim || 'Direktorat Keuangan UGM',
+      mode: 'hasil_analisis',
+      title: cleanTitle,
+      fileUrl: undefined, // Menampilkan lembar Nota Hasil Analisis resmi UGM
+      fileSize: '420 KB',
+      uploader: 'Tim Verifikasi Keuangan UGM',
       uploadedAt: `${dateFormatted}, 14:15 WIB`,
-      status: r.keputusan || 'disetujui',
-      docNumber: r.no_surat || '0411/UN1.P.IV/DIR-KEU/KU/2026',
-      unitName: r.unit_pengirim || 'Fakultas Biologi UGM',
-      perihal: r.perihal || 'Penetapan Pagu Anggaran Operasional & Riset',
-      nominal: totalDisetujui > 0 ? `Rp ${formatRp(totalDisetujui)}` : 'Rp 1.250.000.000',
-      keterangan: r.keterangan_keputusan || 'TELAH MEMENUHI KELAYAKAN ADMINISTRASI'
+      status: r.keputusan || 'diajukan',
+      docNumber: r.no_surat || '-',
+      unitName: r.unit_pengirim || '-',
+      perihal: r.perihal || 'Usulan Penambahan Pagu Anggaran',
+      nominal: totalDisetujui > 0 ? `Rp ${formatRp(totalDisetujui)}` : (totalUsulan > 0 ? `Rp ${formatRp(totalUsulan)}` : 'Rp 0'),
+      nominalUsulan: totalUsulan > 0 ? `Rp ${formatRp(totalUsulan)}` : 'Rp 0',
+      keterangan: r.keterangan_keputusan || '',
+      htmlContent: r.ringkasan_ai || r.analisis_html || '',
+      rekomendasi: r.rekomendasi_ai || '',
+      tanggalSurat: dateFormatted
     });
   };
 
   const handleOpenPaperclipModal = (r: any) => {
     const rawFile = r.link_lampiran || r.file_lampiran;
     const safeUrl = rawFile ? getSafeFileUrl(rawFile) : undefined;
+    const totalDisetujui = parseNum(r.nominal_disetujui || 0);
+    const totalUsulan = parseNum(r.total_anggaran || r.nominal_usulan || 0);
     const dateFormatted = r.created_at
       ? new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
       : '25 Sep 2026';
 
+    const cleanTitle = `Lampiran_${(r.no_surat || r.id_analisis || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+
     setDocViewerModal({
       isOpen: true,
-      title: `Lampiran_Surat_${r.no_surat?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'SK_Rektor_Penetapan_Pagu_2026'}.pdf`,
+      mode: 'lampiran',
+      title: cleanTitle,
       fileUrl: safeUrl,
-      fileSize: '2.4 MB',
-      uploader: r.unit_pengirim || 'Direktorat Keuangan UGM',
+      fileSize: safeUrl ? '2.4 MB' : '0 KB',
+      uploader: r.unit_pengirim || 'Unit Pengusul UGM',
       uploadedAt: `${dateFormatted}, 14:15 WIB`,
-      status: r.keputusan || 'disetujui',
-      docNumber: r.no_surat || '0411/UN1.P.IV/DIR-KEU/KU/2026',
-      unitName: r.unit_pengirim || 'Fakultas / Unit Pengusul UGM',
+      status: r.keputusan || 'diajukan',
+      docNumber: r.no_surat || '-',
+      unitName: r.unit_pengirim || '-',
       perihal: r.perihal || 'Berkas Lampiran Pengajuan Pagu Anggaran',
-      nominal: r.nominal_usulan ? `Rp ${formatRp(parseNum(r.nominal_usulan))}` : 'Rp 1.250.000.000',
-      keterangan: 'Dokumen Asli Lampiran Surat Pengajuan Unit Kerja'
+      nominal: totalDisetujui > 0 ? `Rp ${formatRp(totalDisetujui)}` : undefined,
+      nominalUsulan: totalUsulan > 0 ? `Rp ${formatRp(totalUsulan)}` : undefined,
+      keterangan: 'Dokumen Asli Lampiran Surat Pengajuan Unit Kerja',
+      htmlContent: '',
+      rekomendasi: '',
+      tanggalSurat: dateFormatted
     });
   };
 
@@ -1303,17 +1326,22 @@ export default function RiwayatList({
       <DocumentViewerModal
         isOpen={docViewerModal.isOpen}
         onClose={() => setDocViewerModal(prev => ({ ...prev, isOpen: false }))}
+        mode={docViewerModal.mode}
         title={docViewerModal.title}
         fileUrl={docViewerModal.fileUrl}
-        fileSize={docViewerModal.fileSize || "2.4 MB"}
+        fileSize={docViewerModal.fileSize || "420 KB"}
         uploadedAt={docViewerModal.uploadedAt || "25 Sep 2026, 14:15 WIB"}
         uploader={docViewerModal.uploader || "Direktorat Keuangan UGM"}
-        status={docViewerModal.status || "disetujui"}
+        status={docViewerModal.status || "diajukan"}
         docNumber={docViewerModal.docNumber}
         unitName={docViewerModal.unitName}
         perihal={docViewerModal.perihal}
         nominal={docViewerModal.nominal}
+        nominalUsulan={docViewerModal.nominalUsulan}
         keterangan={docViewerModal.keterangan}
+        htmlContent={docViewerModal.htmlContent}
+        rekomendasi={docViewerModal.rekomendasi}
+        tanggalSurat={docViewerModal.tanggalSurat}
       />
 
     </div>
