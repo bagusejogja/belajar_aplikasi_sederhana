@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Palette, 
   Layers, 
@@ -55,6 +55,9 @@ import {
   Gauge,
   Type,
   ArrowUpDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
   Bell,
   CheckCircle2,
   ShieldAlert,
@@ -190,8 +193,93 @@ export default function DesignSystemPage() {
   const [testerSize, setTesterSize] = useState<string>('text-lg');
   const [testerWeight, setTesterWeight] = useState<string>('font-bold');
 
-  // Upload Textbox & Camera
+  // Upload Textbox & Camera & Direct Upload
   const [uploadTextPath, setUploadTextPath] = useState<string>('SK_Rektor_Penetapan_Pagu_2026.pdf');
+  const [directUploadPath, setDirectUploadPath] = useState<string>('Surat_Pengantar_Dekan_2026.pdf');
+  const [isDirectUploading, setIsDirectUploading] = useState<boolean>(false);
+  const [directUploadProgress, setDirectUploadProgress] = useState<number>(0);
+  const [directUploadSuccess, setDirectUploadSuccess] = useState<boolean>(false);
+
+  // Interactive Charts Demo State
+  const [chartYear, setChartYear] = useState<'2026' | '2025' | '2024'>('2026');
+  const [chartUnitFilter, setChartUnitFilter] = useState<'all' | 'fakultas' | 'pusat'>('all');
+  const [chartMetricType, setChartMetricType] = useState<'nominal' | 'percent'>('nominal');
+  const [chartGaugeVal, setChartGaugeVal] = useState<number>(78.5);
+  const [activeDonutIndex, setActiveDonutIndex] = useState<number>(0);
+  const [hoveredMonthIdx, setHoveredMonthIdx] = useState<number | null>(null);
+  const [showPaguBar, setShowPaguBar] = useState<boolean>(true);
+  const [showRealisasiBar, setShowRealisasiBar] = useState<boolean>(true);
+  const [barHoveredIndex, setBarHoveredIndex] = useState<number | null>(null);
+  const [sortRankingAsc, setSortRankingAsc] = useState<boolean>(false);
+
+  // Data Koleksi Grafik Interaktif
+  const chartUnitData = useMemo(() => {
+    const mult = chartYear === '2026' ? 1.0 : chartYear === '2025' ? 0.88 : 0.74;
+    const base = [
+      { unit: 'Fakultas Biologi', type: 'fakultas', pagu: Math.round(1250 * mult), real: Math.round(1050 * mult), target: 84 },
+      { unit: 'Fakultas Teknik', type: 'fakultas', pagu: Math.round(2800 * mult), real: Math.round(2350 * mult), target: 83.9 },
+      { unit: 'Direktorat Keuangan', type: 'pusat', pagu: Math.round(950 * mult), real: Math.round(840 * mult), target: 88.4 },
+      { unit: 'Fakultas Kedokteran', type: 'fakultas', pagu: Math.round(2100 * mult), real: Math.round(1800 * mult), target: 85.7 },
+      { unit: 'Direktorat Perencanaan', type: 'pusat', pagu: Math.round(750 * mult), real: Math.round(560 * mult), target: 74.6 },
+      { unit: 'Sekolah Vokasi', type: 'fakultas', pagu: Math.round(1450 * mult), real: Math.round(1210 * mult), target: 83.4 },
+    ];
+    if (chartUnitFilter === 'fakultas') return base.filter(b => b.type === 'fakultas');
+    if (chartUnitFilter === 'pusat') return base.filter(b => b.type === 'pusat');
+    return base;
+  }, [chartYear, chartUnitFilter]);
+
+  const monthlyTrendData = useMemo(() => {
+    const mult = chartYear === '2026' ? 1.0 : chartYear === '2025' ? 0.9 : 0.75;
+    return [
+      { m: 'Jan', target: Math.round(1.5 * mult * 10) / 10, actual: Math.round(1.4 * mult * 10) / 10 },
+      { m: 'Feb', target: Math.round(2.8 * mult * 10) / 10, actual: Math.round(2.6 * mult * 10) / 10 },
+      { m: 'Mar', target: Math.round(4.2 * mult * 10) / 10, actual: Math.round(4.1 * mult * 10) / 10 },
+      { m: 'Apr', target: Math.round(5.8 * mult * 10) / 10, actual: Math.round(5.5 * mult * 10) / 10 },
+      { m: 'Mei', target: Math.round(7.2 * mult * 10) / 10, actual: Math.round(6.9 * mult * 10) / 10 },
+      { m: 'Jun', target: Math.round(8.9 * mult * 10) / 10, actual: Math.round(8.7 * mult * 10) / 10 },
+      { m: 'Jul', target: Math.round(10.5 * mult * 10) / 10, actual: Math.round(10.1 * mult * 10) / 10 },
+      { m: 'Agu', target: Math.round(12.3 * mult * 10) / 10, actual: Math.round(11.8 * mult * 10) / 10 },
+      { m: 'Sep', target: Math.round(14.0 * mult * 10) / 10, actual: Math.round(13.6 * mult * 10) / 10 },
+      { m: 'Okt', target: Math.round(15.8 * mult * 10) / 10, actual: Math.round(14.9 * mult * 10) / 10 },
+      { m: 'Nov', target: Math.round(17.5 * mult * 10) / 10, actual: Math.round(16.5 * mult * 10) / 10 },
+      { m: 'Des', target: Math.round(19.2 * mult * 10) / 10, actual: Math.round(18.4 * mult * 10) / 10 },
+    ];
+  }, [chartYear]);
+
+  const donutCategories = [
+    { label: 'Belanja Pegawai (51)', percent: 42, nominal: 'Rp 52,5 M', color: 'bg-blue-600', stroke: '#2563eb', desc: 'Gaji, tunjangan fungsional & honor dosen/tendik' },
+    { label: 'Belanja Barang & Jasa (52)', percent: 33, nominal: 'Rp 41,2 M', color: 'bg-emerald-500', stroke: '#10b981', desc: 'Operasional, utilitas, ATK, & pemeliharaan' },
+    { label: 'Belanja Modal & Alat (53)', percent: 18, nominal: 'Rp 22,5 M', color: 'bg-purple-600', stroke: '#9333ea', desc: 'Pengadaan peralatan lab, server TI, & fisik' },
+    { label: 'Hibah Riset & Pengabdian', percent: 7, nominal: 'Rp 8,8 M', color: 'bg-amber-500', stroke: '#f59e0b', desc: 'Dana riset dosen, inovasi, & publikasi' },
+  ];
+
+  const waterfallData = [
+    { label: 'Pagu Awal SK', amount: 100.0, type: 'base', desc: 'SK Rektor penetapan pagu indikatif 2026' },
+    { label: 'Usulan Tambahan', amount: 18.5, type: 'positive', desc: 'Pengajuan tambahan praktikum & akreditasi' },
+    { label: 'Efisiensi Penghematan', amount: -6.2, type: 'negative', desc: 'Penyisiran belanja konsumsi & perjalanan' },
+    { label: 'Pergeseran Antar Akun', amount: 2.1, type: 'positive', desc: 'Realokasi dana cadangan operasional' },
+    { label: 'Pagu Final Berjalan', amount: 114.4, type: 'total', desc: 'Total pagu definitif aktif yang disahkan' },
+  ];
+
+  const rankingData = useMemo(() => {
+    const list = [
+      { rank: 1, unit: 'Fakultas Biologi', percent: 92.4, status: 'Optimal', statusColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      { rank: 2, unit: 'Direktorat Keuangan', percent: 89.1, status: 'Optimal', statusColor: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      { rank: 3, unit: 'Fakultas Kedokteran', percent: 85.7, status: 'Baik', statusColor: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { rank: 4, unit: 'Fakultas Teknik', percent: 83.9, status: 'Baik', statusColor: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { rank: 5, unit: 'Sekolah Vokasi', percent: 81.2, status: 'Baik', statusColor: 'bg-blue-50 text-blue-700 border-blue-200' },
+      { rank: 6, unit: 'Direktorat Perencanaan', percent: 74.6, status: 'Perlu Dorongan', statusColor: 'bg-amber-50 text-amber-700 border-amber-200' },
+    ];
+    return sortRankingAsc ? [...list].reverse() : list;
+  }, [sortRankingAsc]);
+
+  const heatmapMatrix = [
+    { cluster: 'Klaster Agro (Pertanian, Kehutanan, Peternakan)', q1: 78, q2: 85, q3: 91, q4: 95 },
+    { cluster: 'Klaster Sains & Teknologi (Teknik, MIPA, Geografi)', q1: 72, q2: 81, q3: 88, q4: 93 },
+    { cluster: 'Klaster Medika (FK-KMK, FKG, Farmasi)', q1: 82, q2: 89, q3: 93, q4: 97 },
+    { cluster: 'Klaster Sosial Humaniora (FEB, Hukum, Fisipol)', q1: 75, q2: 83, q3: 87, q4: 92 },
+    { cluster: 'Sekolah Pascasarjana & Vokasi', q1: 70, q2: 79, q3: 85, q4: 90 },
+  ];
 
   // Card Selection (Colored Border Ring)
   const [selectedCardId, setSelectedCardId] = useState<string>('pagu');
@@ -695,6 +783,24 @@ export default function DesignSystemPage() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
+  const handleSimulateDirectUpload = () => {
+    if (!directUploadPath.trim()) {
+      triggerToast('warning', 'Pilih Berkas Terlebih Dahulu', 'Silakan pilih atau ketik nama dokumen sebelum mengunggah.');
+      return;
+    }
+    setIsDirectUploading(true);
+    setDirectUploadProgress(20);
+    setDirectUploadSuccess(false);
+
+    setTimeout(() => setDirectUploadProgress(70), 300);
+    setTimeout(() => {
+      setDirectUploadProgress(100);
+      setIsDirectUploading(false);
+      setDirectUploadSuccess(true);
+      triggerToast('success', 'Berkas Berhasil Diunggah', `${directUploadPath} berhasil disimpan ke server storage.`);
+    }, 800);
+  };
+
   return (
     <div className="space-y-4 pb-12">
       {/* 1. Standard Page Header */}
@@ -1186,73 +1292,189 @@ export default function DesignSystemPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
-                <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
-                  Input Textbox Berkas & Tombol Kamera
-                </span>
-
-                <div className="flex items-center gap-1.5">
-                  <div className="relative flex-1">
-                    <Paperclip size={14} className="absolute left-3 top-2.5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={uploadTextPath}
-                      onChange={(e) => setUploadTextPath(e.target.value)}
-                      placeholder="Pilih berkas atau tempel URL..."
-                      className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
-                    />
-                  </div>
-
-                  <label className="h-9 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs">
-                    <FolderTree size={14} />
-                    <span className="hidden sm:inline">Pilih File</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setUploadTextPath(e.target.files[0].name);
-                        }
-                      }}
-                    />
-                  </label>
-
-                  <label className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Ambil foto dari kamera">
-                    <Camera size={14} />
-                    <span className="hidden sm:inline">Foto</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          setUploadTextPath(`[Foto Kamera] ${e.target.files[0].name}`);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-
-                {uploadTextPath && (
-                  <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <FileText size={15} className="text-blue-600 shrink-0" />
-                      <span className="truncate font-semibold text-gray-700">{uploadTextPath}</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded shrink-0">
-                      Siap Diunggah
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* 1. Input Textbox Berkas & Tombol Kamera / Browse */}
+                <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                    <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                      1. Textbox Berkas & Tombol Kamera / Browse
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                      Mobile & Desktop
                     </span>
                   </div>
-                )}
+
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <Paperclip size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={uploadTextPath}
+                        onChange={(e) => setUploadTextPath(e.target.value)}
+                        placeholder="Pilih berkas atau tempel URL..."
+                        className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
+                      />
+                    </div>
+
+                    <label className="h-9 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs">
+                      <FolderTree size={14} />
+                      <span className="hidden sm:inline">Pilih File</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setUploadTextPath(e.target.files[0].name);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    <label className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Ambil foto dari kamera">
+                      <Camera size={14} />
+                      <span className="hidden sm:inline">Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setUploadTextPath(`[Foto Kamera] ${e.target.files[0].name}`);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {uploadTextPath && (
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText size={15} className="text-blue-600 shrink-0" />
+                        <span className="truncate font-semibold text-gray-700">{uploadTextPath}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded shrink-0">
+                        Siap Diunggah
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Textbox Berkas dengan Tombol Upload Langsung (Sebelah Kanan) */}
+                <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                    <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                      2. Textbox Berkas dengan Tombol Upload Langsung
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      Inline Action
+                    </span>
+                  </div>
+
+                  {/* Input Group: Textbox + Browse + Tombol Upload */}
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <FileText size={14} className="absolute left-3 top-2.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={directUploadPath}
+                        onChange={(e) => {
+                          setDirectUploadPath(e.target.value);
+                          setDirectUploadSuccess(false);
+                        }}
+                        placeholder="Ketik nama berkas atau pilih dari perangkat..."
+                        className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
+                      />
+                    </div>
+
+                    <label className="h-9 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Pilih berkas dari komputer">
+                      <FolderTree size={13} />
+                      <span className="hidden sm:inline">Browse</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            setDirectUploadPath(e.target.files[0].name);
+                            setDirectUploadSuccess(false);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    {/* Tombol Upload Interaktif di Sebelah Kanan */}
+                    <button
+                      type="button"
+                      disabled={isDirectUploading}
+                      onClick={handleSimulateDirectUpload}
+                      className="h-9 px-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs shrink-0 active:scale-95 disabled:opacity-60"
+                      title="Klik untuk mengunggah berkas sekarang"
+                    >
+                      {isDirectUploading ? (
+                        <>
+                          <RefreshCw size={13} className="animate-spin" />
+                          <span>Mengunggah...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UploadCloud size={14} />
+                          <span>Upload</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Upload Progress Bar atau Status Sukses */}
+                  {isDirectUploading && (
+                    <div className="space-y-1 p-2 bg-blue-50/70 border border-blue-200 rounded-xl">
+                      <div className="flex justify-between text-[11px] font-bold text-blue-800">
+                        <span>Sedang mengunggah {directUploadPath}...</span>
+                        <span className="font-mono">{directUploadProgress}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-blue-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-600 transition-all duration-200 rounded-full"
+                          style={{ width: `${directUploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!isDirectUploading && directUploadSuccess && (
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle size={15} className="text-emerald-600 shrink-0" />
+                        <span className="truncate font-semibold text-emerald-900">{directUploadPath}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded shrink-0">
+                        Tersimpan di Cloud
+                      </span>
+                    </div>
+                  )}
+
+                  {!isDirectUploading && !directUploadSuccess && directUploadPath && (
+                    <div className="flex items-center justify-between p-2 bg-white rounded-xl border border-gray-100 text-xs text-gray-500">
+                      <span className="truncate text-[11px]">Siap unggah: <strong className="text-gray-800">{directUploadPath}</strong></span>
+                      <span className="text-[10px] text-gray-400 font-mono">Format PDF/DOCX/JPG</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
+              {/* 3. Area Drag & Dropzone Berkas */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80">
+                <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-2">
+                  3. Area Drag & Dropzone Berkas (Seret & Lepas Dokumen)
+                </span>
                 <FileUploadDropzone
                   label=""
                   maxSizeMB={15}
-                  onFileSelect={(f) => setUploadTextPath(f.name)}
+                  onFileSelect={(f) => {
+                    setUploadTextPath(f.name);
+                    setDirectUploadPath(f.name);
+                    setDirectUploadSuccess(false);
+                  }}
                 />
               </div>
             </div>
@@ -1778,47 +2000,581 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: TEMPLATE GRAFIK (BAR, LINE, DONUT, GAUGE)                          */}
+      {/* TAB 4: TEMPLATE GRAFIK LENGKAP & INTERAKTIF (BAR, LINE, DONUT, GAUGE, DLL) */}
       {/* ========================================================================= */}
       {activeTab === 'charts' && (
         <div className="space-y-4">
+          {/* Header & Interactive Control Bar */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <div>
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                Koleksi Template Grafik Baku Lengkap
-              </h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Bar Komparasi, Tren Garis Bulanan, Donut Komposisi, dan Speedometer Gauge Target.
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="text-blue-600 w-5 h-5" />
+                  <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                    Koleksi Template Grafik Baku & Interaktif
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+                    Interaktif Realtime
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Katalog visualisasi data keuangan: Bar Komparasi, Tren Spline Bulanan, Donut Interaktif, Speedometer Slider, Waterfall Mutasi, Ranking Unit, dan Matriks Heatmap.
+                </p>
+              </div>
+
+              {/* Quick Global Controls for Demo */}
+              <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200 text-xs">
+                <span className="text-[10px] font-bold text-gray-400 uppercase px-1">Tahun:</span>
+                {(['2026', '2025', '2024'] as const).map((yr) => (
+                  <button
+                    key={yr}
+                    onClick={() => setChartYear(yr)}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                      chartYear === yr
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-gray-600 hover:text-blue-600 hover:bg-white'
+                    }`}
+                  >
+                    {yr}
+                  </button>
+                ))}
+
+                <div className="h-4 w-px bg-gray-300 mx-1" />
+
+                <span className="text-[10px] font-bold text-gray-400 uppercase px-1">Unit:</span>
+                {(
+                  [
+                    { id: 'all', label: 'Semua' },
+                    { id: 'fakultas', label: 'Fakultas' },
+                    { id: 'pusat', label: 'Pusat' },
+                  ] as const
+                ).map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => setChartUnitFilter(u.id)}
+                    className={`px-2 py-1 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                      chartUnitFilter === u.id
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-gray-600 hover:text-indigo-600 hover:bg-white'
+                    }`}
+                  >
+                    {u.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Grid 2 Kolom untuk Grafik Utama */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Bar Chart */}
+              {/* 1. INTERACTIVE GROUPED BAR CHART */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <BarChart3 size={16} className="text-blue-600" />
-                    <span className="text-xs font-bold text-gray-800">1. Bar Chart: Komparasi Pagu Unit</span>
+                    <div>
+                      <span className="text-xs font-bold text-gray-800 block">1. Bar Chart: Pagu vs Realisasi per Unit</span>
+                      <span className="text-[10px] text-gray-400">Tahun {chartYear} ({chartUnitData.length} unit)</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-gray-400 font-bold uppercase font-mono">Satuan Juta Rp</span>
+
+                  {/* Toggle series checkboxes */}
+                  <div className="flex items-center gap-3 text-[11px]">
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-blue-700">
+                      <input
+                        type="checkbox"
+                        checked={showPaguBar}
+                        onChange={(e) => setShowPaguBar(e.target.checked)}
+                        className="rounded text-blue-600 focus:ring-0"
+                      />
+                      <span>Pagu</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-emerald-700">
+                      <input
+                        type="checkbox"
+                        checked={showRealisasiBar}
+                        onChange={(e) => setShowRealisasiBar(e.target.checked)}
+                        className="rounded text-emerald-600 focus:ring-0"
+                      />
+                      <span>Realisasi</span>
+                    </label>
+                  </div>
                 </div>
 
-                <div className="space-y-2 pt-2">
-                  {[
-                    { label: 'Fakultas Biologi', val: 85, text: 'Rp 850 Jt' },
-                    { label: 'Fakultas Teknik', val: 95, text: 'Rp 950 Jt' },
-                    { label: 'Direktorat Keuangan', val: 70, text: 'Rp 700 Jt' },
-                    { label: 'Fakultas Kedokteran', val: 88, text: 'Rp 880 Jt' },
-                  ].map((bar, i) => (
-                    <div key={i} className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-semibold text-gray-700">
-                        <span>{bar.label}</span>
-                        <span className="font-mono text-blue-700 font-bold">{bar.text}</span>
+                {/* Bars List with Tooltip on Hover */}
+                <div className="space-y-3 pt-1">
+                  {chartUnitData.map((item, idx) => {
+                    const isHovered = barHoveredIndex === idx;
+                    const pct = Math.round((item.real / item.pagu) * 100);
+                    return (
+                      <div
+                        key={item.unit}
+                        onMouseEnter={() => setBarHoveredIndex(idx)}
+                        onMouseLeave={() => setBarHoveredIndex(null)}
+                        className={`p-2 rounded-xl transition-all ${
+                          isHovered ? 'bg-white shadow-sm ring-1 ring-blue-200' : 'hover:bg-white/60'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center text-[11px] font-semibold text-gray-700 mb-1">
+                          <span className="font-bold">{item.unit}</span>
+                          <div className="flex items-center gap-2 font-mono">
+                            <span className="text-[10px] text-gray-400">{pct}%</span>
+                            <span className="text-blue-700 font-bold">Rp {item.real.toLocaleString()} Jt</span>
+                          </div>
+                        </div>
+
+                        {/* Double Bar (Pagu & Realisasi) */}
+                        <div className="space-y-1">
+                          {showPaguBar && (
+                            <div className="w-full h-2.5 bg-gray-200/80 rounded-full overflow-hidden flex" title={`Pagu: Rp ${item.pagu} Jt`}>
+                              <div
+                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, (item.pagu / 3000) * 100)}%` }}
+                              />
+                            </div>
+                          )}
+                          {showRealisasiBar && (
+                            <div className="w-full h-2.5 bg-gray-200/80 rounded-full overflow-hidden flex" title={`Realisasi: Rp ${item.real} Jt`}>
+                              <div
+                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(100, (item.real / 3000) * 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Interactive Tooltip Card when hovered */}
+                        {isHovered && (
+                          <div className="mt-2 pt-1.5 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500 animate-in fade-in-50 duration-150">
+                            <span>Target: <strong className="text-gray-800">{item.target}%</strong></span>
+                            <span>Sisa Anggaran: <strong className="text-rose-600">Rp {(item.pagu - item.real).toLocaleString()} Jt</strong></span>
+                            <span className="text-emerald-700 font-bold">Status: {pct >= item.target ? '✓ Memenuhi Target' : '⚠️ Dibawah Target'}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="w-full h-3.5 bg-gray-200/70 rounded-lg overflow-hidden flex">
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. INTERACTIVE SPLINE AREA / LINE CHART (TREN BULANAN) */}
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={16} className="text-emerald-600" />
+                    <div>
+                      <span className="text-xs font-bold text-gray-800 block">2. Tren Kumulatif Realisasi (Spline Area)</span>
+                      <span className="text-[10px] text-gray-400">Target vs Aktual Tahun {chartYear}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                    Jan - Des (12 Bulan)
+                  </span>
+                </div>
+
+                {/* SVG Spline Chart */}
+                <div className="relative pt-4">
+                  <svg className="w-full h-36 overflow-visible" viewBox="0 0 330 110">
+                    <defs>
+                      <linearGradient id="areaInteractiveGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+                      </linearGradient>
+                      <linearGradient id="targetGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Grid horizontal lines */}
+                    <line x1="0" y1="20" x2="330" y2="20" stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <line x1="0" y1="55" x2="330" y2="55" stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <line x1="0" y1="90" x2="330" y2="90" stroke="#cbd5e1" strokeWidth="1" />
+
+                    {/* Area path for actual */}
+                    <path
+                      d="M 10 90 Q 50 82 90 70 T 170 48 T 250 25 T 320 12 L 320 90 L 10 90 Z"
+                      fill="url(#areaInteractiveGrad)"
+                    />
+
+                    {/* Target line (Dashed Blue) */}
+                    <path
+                      d="M 10 88 Q 50 80 90 66 T 170 44 T 250 20 T 320 8"
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="2"
+                      strokeDasharray="4 4"
+                    />
+
+                    {/* Actual spline line (Emerald Solid) */}
+                    <path
+                      d="M 10 90 Q 50 82 90 70 T 170 48 T 250 25 T 320 12"
+                      fill="none"
+                      stroke="#059669"
+                      strokeWidth="3"
+                    />
+
+                    {/* Interactive dots for months */}
+                    {[
+                      { x: 10, y: 90, idx: 0 },
+                      { x: 65, y: 76, idx: 2 },
+                      { x: 120, y: 62, idx: 4 },
+                      { x: 175, y: 46, idx: 6 },
+                      { x: 230, y: 30, idx: 8 },
+                      { x: 285, y: 18, idx: 10 },
+                      { x: 320, y: 12, idx: 11 },
+                    ].map((pt) => {
+                      const isSelected = hoveredMonthIdx === pt.idx;
+                      return (
+                        <g key={pt.idx} className="cursor-pointer" onClick={() => setHoveredMonthIdx(pt.idx)}>
+                          <circle
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={isSelected ? 6 : 4}
+                            className={`transition-all duration-200 ${
+                              isSelected ? 'fill-emerald-600 stroke-white stroke-2' : 'fill-emerald-700 hover:scale-125'
+                            }`}
+                          />
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+
+                {/* Month Pill Selector & Legend */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 font-bold text-blue-600">
+                        <span className="w-2.5 h-0.5 bg-blue-500 border border-blue-600" /> Target RKA
+                      </span>
+                      <span className="flex items-center gap-1 font-bold text-emerald-600">
+                        <span className="w-2.5 h-1.5 bg-emerald-500 rounded-sm" /> Realisasi Aktual
+                      </span>
+                    </div>
+                    <span>Klik bulan untuk melihat detail</span>
+                  </div>
+
+                  {/* Month Buttons */}
+                  <div className="grid grid-cols-6 sm:grid-cols-12 gap-1 text-center">
+                    {monthlyTrendData.map((d, i) => (
+                      <button
+                        key={d.m}
+                        onClick={() => setHoveredMonthIdx(i)}
+                        className={`py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          hoveredMonthIdx === i
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-white hover:bg-emerald-50 text-gray-600 border border-gray-100'
+                        }`}
+                      >
+                        {d.m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Detail Snapshot Card */}
+                  {hoveredMonthIdx !== null ? (
+                    <div className="p-2.5 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-xs animate-in fade-in-50 duration-150">
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Posisi Kumulatif Bulan:</span>
+                        <strong className="block text-gray-800">{monthlyTrendData[hoveredMonthIdx]?.m} {chartYear}</strong>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-blue-600">Target: Rp {monthlyTrendData[hoveredMonthIdx]?.target} M</span>
+                        <strong className="block text-emerald-700 font-mono text-sm">Aktual: Rp {monthlyTrendData[hoveredMonthIdx]?.actual} M</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2 bg-white/70 rounded-xl border border-gray-100 text-[11px] text-gray-400 text-center">
+                      Total s.d. Des {chartYear}: <strong className="text-emerald-700">Rp 18,4 M</strong> (95,8% dari Target Rp 19,2 M)
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. INTERACTIVE DONUT & PIE COMPOSITION CHART */}
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PieChart size={16} className="text-purple-600" />
+                    <div>
+                      <span className="text-xs font-bold text-gray-800 block">3. Donut: Komposisi Belanja Mata Anggaran</span>
+                      <span className="text-[10px] text-gray-400">Klik kategori untuk rincian</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+                    Total Rp 125,0 M
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-around gap-4 pt-2">
+                  {/* SVG Donut */}
+                  <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                      <path className="text-gray-100" strokeWidth="4.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      {/* Slice 1: Pegawai 42% */}
+                      <path
+                        className={`transition-all duration-300 cursor-pointer ${activeDonutIndex === 0 ? 'opacity-100 stroke-[5.5]' : 'opacity-85 stroke-[4.5]'}`}
+                        onClick={() => setActiveDonutIndex(0)}
+                        stroke="#2563eb"
+                        strokeDasharray="42, 100"
+                        strokeDashoffset="0"
+                        strokeLinecap="round"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      {/* Slice 2: Barang/Jasa 33% */}
+                      <path
+                        className={`transition-all duration-300 cursor-pointer ${activeDonutIndex === 1 ? 'opacity-100 stroke-[5.5]' : 'opacity-85 stroke-[4.5]'}`}
+                        onClick={() => setActiveDonutIndex(1)}
+                        stroke="#10b981"
+                        strokeDasharray="33, 100"
+                        strokeDashoffset="-42"
+                        strokeLinecap="round"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      {/* Slice 3: Modal 18% */}
+                      <path
+                        className={`transition-all duration-300 cursor-pointer ${activeDonutIndex === 2 ? 'opacity-100 stroke-[5.5]' : 'opacity-85 stroke-[4.5]'}`}
+                        onClick={() => setActiveDonutIndex(2)}
+                        stroke="#9333ea"
+                        strokeDasharray="18, 100"
+                        strokeDashoffset="-75"
+                        strokeLinecap="round"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      {/* Slice 4: Hibah 7% */}
+                      <path
+                        className={`transition-all duration-300 cursor-pointer ${activeDonutIndex === 3 ? 'opacity-100 stroke-[5.5]' : 'opacity-85 stroke-[4.5]'}`}
+                        onClick={() => setActiveDonutIndex(3)}
+                        stroke="#f59e0b"
+                        strokeDasharray="7, 100"
+                        strokeDashoffset="-93"
+                        strokeLinecap="round"
+                        fill="none"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <div className="absolute text-center flex flex-col items-center">
+                      <span className="text-base font-black text-gray-900 font-mono leading-none">
+                        {donutCategories[activeDonutIndex]?.percent}%
+                      </span>
+                      <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Proporsi</span>
+                    </div>
+                  </div>
+
+                  {/* Interactive Legend List */}
+                  <div className="space-y-1.5 flex-1 w-full">
+                    {donutCategories.map((cat, idx) => {
+                      const isSelected = activeDonutIndex === idx;
+                      return (
                         <div
-                          className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg"
-                          style={{ width: `${bar.val}%` }}
+                          key={cat.label}
+                          onClick={() => setActiveDonutIndex(idx)}
+                          className={`p-2 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
+                            isSelected
+                              ? 'bg-white border-purple-300 shadow-xs ring-1 ring-purple-100'
+                              : 'bg-white/50 border-gray-100 hover:bg-white text-gray-600'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-3 h-3 rounded-full ${cat.color} shrink-0`} />
+                            <div>
+                              <span className="font-bold text-gray-800 block text-[11px]">{cat.label}</span>
+                              <span className="text-[10px] text-gray-400">{cat.desc}</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="font-mono font-bold text-gray-900 text-[11px] block">{cat.nominal}</span>
+                            <span className="text-[10px] font-bold text-purple-700 font-mono">{cat.percent}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. INTERACTIVE GAUGE / SPEEDOMETER DENGAN RANGE SLIDER */}
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Gauge size={16} className="text-amber-600" />
+                    <div>
+                      <span className="text-xs font-bold text-gray-800 block">4. Gauge: Capaian Kinerja (Interactive Slider)</span>
+                      <span className="text-[10px] text-gray-400">Geser slider atau pilih preset</span>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border font-mono ${
+                    chartGaugeVal >= 80
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : chartGaugeVal >= 60
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  }`}>
+                    {chartGaugeVal >= 80 ? 'Target Tercapai' : chartGaugeVal >= 60 ? 'Mendekati Target' : 'Perlu Evaluasi'}
+                  </span>
+                </div>
+
+                {/* Speedometer Gauge Visual */}
+                <div className="flex flex-col items-center justify-center pt-1">
+                  <div className="relative w-44 h-24 overflow-hidden flex items-end justify-center">
+                    {/* Background track */}
+                    <div className="w-44 h-44 rounded-full border-[16px] border-gray-100 transform -rotate-45" />
+
+                    {/* Colored Fill */}
+                    <div
+                      className={`absolute w-44 h-44 rounded-full border-[16px] border-transparent transition-all duration-300 ${
+                        chartGaugeVal >= 80
+                          ? 'border-t-emerald-500 border-r-emerald-500'
+                          : chartGaugeVal >= 60
+                          ? 'border-t-amber-500 border-r-amber-500'
+                          : 'border-t-rose-500 border-r-rose-500'
+                      }`}
+                      style={{
+                        transform: `rotate(${-45 + (chartGaugeVal / 100) * 180}deg)`,
+                      }}
+                    />
+
+                    {/* Center Display Value */}
+                    <div className="absolute bottom-0 text-center">
+                      <span className="text-2xl font-black text-gray-900 font-mono tracking-tight">
+                        {chartGaugeVal.toFixed(1)}%
+                      </span>
+                      <span className="block text-[9px] text-gray-400 font-bold uppercase">
+                        Realisasi Fisik & Anggaran
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between w-full text-[10px] text-gray-400 font-mono px-4 pt-1">
+                    <span>0% (Awal)</span>
+                    <span className="font-bold text-amber-600">60% Waspada</span>
+                    <span className="font-bold text-emerald-600">80% Target</span>
+                    <span>100%</span>
+                  </div>
+
+                  {/* Interactive Slider Input */}
+                  <div className="w-full space-y-2 pt-3 border-t border-gray-100 mt-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">Simulasi Slider:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        value={chartGaugeVal}
+                        onChange={(e) => setChartGaugeVal(parseFloat(e.target.value))}
+                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                      <span className="font-mono text-xs font-bold text-gray-800 w-12 text-right">
+                        {chartGaugeVal}%
+                      </span>
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex items-center justify-between gap-1 pt-1">
+                      {[
+                        { label: '50% (Kritis)', val: 50 },
+                        { label: '74% (Sedang)', val: 74.2 },
+                        { label: '85% (Optimal)', val: 85 },
+                        { label: '98% (Sempurna)', val: 98 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          onClick={() => setChartGaugeVal(preset.val)}
+                          className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white hover:bg-blue-50 text-gray-600 border border-gray-200 transition-colors cursor-pointer"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 3 Kolom untuk Grafik Tambahan (Waterfall, Ranking Bar, Heatmap) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {/* 5. WATERFALL CHART (VARIANCE BRIDGE) */}
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <div className="flex items-center gap-1.5">
+                    <Scale size={15} className="text-blue-600" />
+                    <span className="text-xs font-bold text-gray-800">5. Waterfall: Mutasi Pagu</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-mono">
+                    Miliar Rp
+                  </span>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {waterfallData.map((w, idx) => {
+                    const isPositive = w.amount > 0 && w.type !== 'base' && w.type !== 'total';
+                    const isNegative = w.amount < 0;
+                    return (
+                      <div key={w.label} className="p-1.5 rounded-lg bg-white border border-gray-100 text-xs hover:border-blue-200 transition-all">
+                        <div className="flex justify-between items-center text-[11px]">
+                          <span className="font-bold text-gray-700">{w.label}</span>
+                          <span className={`font-mono font-bold ${
+                            isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-blue-700'
+                          }`}>
+                            {isPositive ? `+${w.amount}` : w.amount} M
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-1 flex">
+                          <div
+                            className={`h-full rounded-full ${
+                              w.type === 'base' || w.type === 'total'
+                                ? 'bg-blue-600'
+                                : isNegative
+                                ? 'bg-rose-500'
+                                : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (Math.abs(w.amount) / 120) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="block text-[9.5px] text-gray-400 mt-1 truncate">{w.desc}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 6. HORIZONTAL RANKING BAR CHART */}
+              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp size={15} className="text-emerald-600" />
+                    <span className="text-xs font-bold text-gray-800">6. Ranking Serapan Unit</span>
+                  </div>
+                  <button
+                    onClick={() => setSortRankingAsc(!sortRankingAsc)}
+                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {sortRankingAsc ? '▲ Terendah' : '▼ Tertinggi'}
+                  </button>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {rankingData.map((r, i) => (
+                    <div key={r.unit} className="p-1.5 rounded-lg bg-white border border-gray-100 text-xs">
+                      <div className="flex justify-between items-center text-[11px] mb-1">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 ${
+                            i === 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {i + 1}
+                          </span>
+                          <span className="font-bold text-gray-800 truncate">{r.unit}</span>
+                        </div>
+                        <span className="font-mono font-bold text-emerald-700 shrink-0">{r.percent}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden flex">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-300"
+                          style={{ width: `${r.percent}%` }}
                         />
                       </div>
                     </div>
@@ -1826,99 +2582,54 @@ export default function DesignSystemPage() {
                 </div>
               </div>
 
-              {/* Line / Area Chart */}
+              {/* 7. HEATMAP MATRIX PENYERAPAN ANGGARAN */}
               <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={16} className="text-emerald-600" />
-                    <span className="text-xs font-bold text-gray-800">2. Tren Realisasi Bulanan (Area Chart)</span>
+                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                  <div className="flex items-center gap-1.5">
+                    <Layers size={15} className="text-indigo-600" />
+                    <span className="text-xs font-bold text-gray-800">7. Heatmap: Triwulan x Klaster</span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                    Q1 - Q3 2026
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                    Matrix Q1-Q4
                   </span>
                 </div>
 
-                <div className="h-32 w-full pt-2 flex flex-col justify-end">
-                  <svg className="w-full h-24 overflow-visible" viewBox="0 0 300 80">
-                    <defs>
-                      <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <path d="M0,70 Q50,60 100,45 T200,30 T300,10 L300,80 L0,80 Z" fill="url(#areaGradient)" />
-                    <path d="M0,70 Q50,60 100,45 T200,30 T300,10" fill="none" stroke="#059669" strokeWidth="3" />
-                    <circle cx="0" cy="70" r="3.5" fill="#059669" />
-                    <circle cx="100" cy="45" r="3.5" fill="#059669" />
-                    <circle cx="200" cy="30" r="3.5" fill="#059669" />
-                    <circle cx="300" cy="10" r="4.5" fill="#047857" stroke="#fff" strokeWidth="2" />
-                  </svg>
-                  <div className="flex justify-between text-[10px] text-gray-400 font-mono pt-2 border-t border-gray-200">
-                    <span>Jan (Rp 2,1 M)</span>
-                    <span>Apr (Rp 4,5 M)</span>
-                    <span>Jul (Rp 7,8 M)</span>
-                    <span className="font-bold text-emerald-700">Sep (Rp 10,2 M)</span>
+                <div className="space-y-1.5 pt-1 text-xs">
+                  <div className="grid grid-cols-5 gap-1 text-[10px] font-bold text-gray-400 text-center uppercase">
+                    <span className="text-left">Klaster</span>
+                    <span>Q1</span>
+                    <span>Q2</span>
+                    <span>Q3</span>
+                    <span>Q4</span>
                   </div>
-                </div>
-              </div>
 
-              {/* Donut Chart */}
-              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <PieChart size={16} className="text-purple-600" />
-                    <span className="text-xs font-bold text-gray-800">3. Donut: Komposisi Belanja</span>
-                  </div>
-                  <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-2 py-0.5 rounded">
-                    Total 100%
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-around gap-4 pt-2">
-                  <div className="relative w-28 h-28 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                      <path className="text-gray-100" strokeWidth="3.8" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-blue-600" strokeDasharray="45, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-emerald-500" strokeDasharray="30, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                      <path className="text-purple-500" strokeDasharray="25, 100" strokeWidth="3.8" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    </svg>
-                    <div className="absolute text-center">
-                      <span className="text-xs font-black text-gray-800">48 M</span>
+                  {heatmapMatrix.map((row) => (
+                    <div key={row.cluster} className="grid grid-cols-5 gap-1 items-center">
+                      <span className="text-[10px] font-semibold text-gray-700 truncate" title={row.cluster}>
+                        {row.cluster.split(' ')[1] || row.cluster}
+                      </span>
+                      {[row.q1, row.q2, row.q3, row.q4].map((val, qIdx) => {
+                        const intensity =
+                          val >= 90 ? 'bg-emerald-600 text-white font-bold' :
+                          val >= 80 ? 'bg-emerald-400 text-emerald-950 font-bold' :
+                          val >= 70 ? 'bg-emerald-200 text-emerald-900' :
+                          'bg-emerald-100 text-emerald-800';
+                        return (
+                          <div
+                            key={qIdx}
+                            className={`p-1 rounded text-center text-[10px] font-mono transition-transform hover:scale-110 cursor-pointer ${intensity}`}
+                            title={`Q${qIdx + 1}: ${val}%`}
+                          >
+                            {val}%
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  ))}
 
-                  <div className="space-y-1.5 text-xs text-gray-600 font-semibold">
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-600" /><span>Pegawai (45%)</span></div>
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span>Barang/Jasa (30%)</span></div>
-                    <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /><span>Modal (25%)</span></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Gauge Chart */}
-              <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Gauge size={16} className="text-amber-600" />
-                    <span className="text-xs font-bold text-gray-800">4. Gauge: Capaian Kinerja Pagu</span>
-                  </div>
-                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
-                    Target 80%
-                  </span>
-                </div>
-
-                <div className="flex flex-col items-center justify-center pt-2">
-                  <div className="relative w-36 h-20 overflow-hidden flex items-end justify-center">
-                    <div className="w-36 h-36 rounded-full border-[14px] border-gray-100 border-t-amber-500 border-r-amber-500 transform -rotate-45" />
-                    <div className="absolute bottom-0 text-center">
-                      <span className="text-xl font-black text-gray-900 font-mono">74.2%</span>
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase">Tercapai</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between w-full text-[10px] text-gray-400 font-mono px-4 pt-2">
-                    <span>0% (Awal)</span>
-                    <span className="font-bold text-emerald-600">80% Target</span>
-                    <span>100%</span>
+                  <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[9px] text-gray-400 font-mono">
+                    <span>Warna: Semakin pekat = Serapan tinggi</span>
+                    <span className="text-emerald-700 font-bold">&gt;90% Optimal</span>
                   </div>
                 </div>
               </div>
