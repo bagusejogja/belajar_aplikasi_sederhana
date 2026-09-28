@@ -11,8 +11,11 @@ import {
   UploadCloud, CheckCircle2, Loader2, Sparkles,
   Link as LinkIcon, Info, Search, Lock, X, RefreshCw, AlertCircle,
   Landmark, ChevronRight, ChevronLeft, BarChart3, CheckCircle, HelpCircle, ShieldCheck,
-  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp, Plus
+  Download, Eye, ExternalLink, Wand2, Paperclip, FileCheck, Layers, TrendingUp, Plus,
+  FolderTree, Camera
 } from 'lucide-react';
+import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
+import { getSafeFileUrl } from '@/lib/fileHelper';
 import { parseOCRMetadata } from '@/app/(dashboard)/analisis/components/OCRPanel';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
@@ -49,6 +52,14 @@ export default function TambahPaguFormPage() {
   // PDF Preview Pop-up Modal State
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfModalTitle, setPdfModalTitle] = useState('Dokumen_Lampiran.pdf');
+
+  const openPdfModal = (url: string, title?: string) => {
+    if (!url) return;
+    setPdfPreviewUrl(url);
+    if (title) setPdfModalTitle(title);
+    setIsPdfModalOpen(true);
+  };
 
   // AI Scan Tanggapan State
   const [isScanningTanggapan, setIsScanningTanggapan] = useState(false);
@@ -468,16 +479,6 @@ export default function TambahPaguFormPage() {
     return rawUrl;
   };
 
-  const openPdfModal = (url: string) => {
-    const formatted = formatPdfPreviewUrl(url);
-    if (!formatted) {
-      alert("Link / File PDF belum tersedia.");
-      return;
-    }
-    setPdfPreviewUrl(formatted);
-    setIsPdfModalOpen(true);
-  };
-
   // AI OCR Scan for Surat Tanggapan (Step 3)
   
   const handlePengajuanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -768,45 +769,61 @@ const handleAutoExtractTanggapanAI = async () => {
         )}
       </div>
 
-      {/* STEP NAVIGATION TABS */}
-      <div className="flex justify-between items-center bg-white rounded-2xl p-1.5 shadow-xs border border-gray-200/80 overflow-x-auto gap-1.5">
-        {(selectedAnalisis 
-          ? [
-              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Data Surat Pengajuan', icon: FileText },
-              { id: 'step2', step: '2', title: '2. Rincian & Pagu', subtitle: 'Detail Kegiatan & Pagu', icon: Layers },
-              { id: 'step3', step: '3', title: '3. Ringkasan & Lampiran', subtitle: 'AI Summary & Surat Masuk', icon: Sparkles },
-              { id: 'step4', step: '4', title: '4. Tanggapan & Simpan', subtitle: 'Persetujuan & Surat Keluar', icon: CheckCircle2 },
-            ]
-          : [
-              { id: 'step1', step: '1', title: '1. Pengajuan Usulan', subtitle: 'Upload Surat Pengajuan & AI', icon: FileText },
-              { id: 'step2', step: '2', title: '2. Tanggapan & Keputusan', subtitle: 'Status Akhir & Simpan', icon: CheckCircle2 },
-            ]
-        ).map((tab) => {
-          const IconComponent = tab.icon;
-          const isActive = activeStep === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveStep(tab.id as any)}
-              className={`flex-1 flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all min-w-[200px] ${
-                isActive
-                  ? 'bg-slate-900 text-white shadow-xs font-black'
-                  : 'text-gray-500 hover:text-gray-900 font-bold hover:bg-gray-50'
-              }`}
-            >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
-                isActive ? 'bg-emerald-500 text-slate-950' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {tab.step}
-              </div>
-              <div className="text-left overflow-hidden">
-                <div className="text-xs font-black truncate">{tab.title}</div>
-                <div className={`text-[10px] truncate ${isActive ? 'text-slate-300' : 'text-gray-400'}`}>{tab.subtitle}</div>
-              </div>
-            </button>
-          );
-        })}
+      {/* STEP NAVIGATION TABS - STANDAR DESIGN SYSTEM */}
+      <div className="bg-white rounded-2xl p-2 shadow-2xs border border-gray-200/90 overflow-x-auto">
+        <div className="flex items-center gap-2 min-w-[620px]">
+          {(selectedAnalisis 
+            ? [
+                { id: 'step1', step: '01', title: '1. Pengajuan Usulan', subtitle: 'Data Surat & Unit Pengusul', icon: FileText },
+                { id: 'step2', step: '02', title: '2. Rincian & Pagu', subtitle: 'Detail Kegiatan & Pagu 2026', icon: Layers },
+                { id: 'step3', step: '03', title: '3. Telaah & Analisis AI', subtitle: 'Ringkasan AI & Posisi Kas', icon: Sparkles },
+                { id: 'step4', step: '04', title: '4. Tanggapan & Simpan', subtitle: 'Persetujuan & Surat Keluar', icon: CheckCircle2 },
+              ]
+            : [
+                { id: 'step1', step: '01', title: '1. Pengajuan Usulan', subtitle: 'Upload Berkas & Ekstraksi AI', icon: FileText },
+                { id: 'step2', step: '02', title: '2. Tanggapan & Keputusan', subtitle: 'Persetujuan & Simpan Data', icon: CheckCircle2 },
+              ]
+          ).map((tab, idx, arr) => {
+            const IconComponent = tab.icon;
+            const isActive = activeStep === tab.id;
+            return (
+              <React.Fragment key={tab.id}>
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveStep(tab.id as any)}
+                  className={`flex-1 flex items-center gap-3 p-2.5 px-3.5 rounded-xl transition-all duration-200 cursor-pointer border text-left ${
+                    isActive
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 border-blue-500 scale-[1.01]'
+                      : 'bg-white hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 border-slate-200/90 hover:border-blue-200 active:scale-[0.99]'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg shrink-0 ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
+                  }`}>
+                    <IconComponent size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[10px] font-mono font-bold ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>
+                        {tab.step}
+                      </span>
+                      <span className="truncate font-bold tracking-tight text-xs leading-tight">
+                        {tab.title}
+                      </span>
+                    </div>
+                    <span className={`block text-[10px] truncate font-medium mt-0.5 ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>
+                      {tab.subtitle}
+                    </span>
+                  </div>
+                </button>
+                {idx < arr.length - 1 && (
+                  <ChevronRight size={14} className="text-gray-300 shrink-0 hidden md:block" />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -823,16 +840,20 @@ const handleAutoExtractTanggapanAI = async () => {
               </div>
             )}
 
-            {/* UNIFIED CONTAINER FOR INFORMASI DASAR & DATA PENGAJUAN */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-xs border border-gray-200/80 relative overflow-hidden space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600 shadow-xs">
-                    <FileText size={20} />
+            {/* UNIFIED CONTAINER FOR INFORMASI DASAR & DATA PENGAJUAN (STANDAR DESIGN SYSTEM) */}
+            <div className="bg-white rounded-2xl p-5 md:p-6 shadow-2xs border border-gray-200/90 relative overflow-hidden space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 shadow-2xs">
+                    <FileText size={18} />
                   </div>
                   <div>
-                    <h2 className="text-base font-black text-gray-900 tracking-tight">Informasi & Data Pengajuan (Surat Masuk)</h2>
-                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">Informasi dasar usulan dan lampiran surat pengajuan dari unit kerja.</p>
+                    <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                      Informasi &amp; Data Pengajuan (Surat Masuk)
+                    </h2>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Informasi dasar usulan dan berkas lampiran pendukung dari unit kerja.
+                    </p>
                   </div>
                 </div>
 
@@ -841,22 +862,21 @@ const handleAutoExtractTanggapanAI = async () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => openPdfModal(currentPengajuanLink)}
-                      className="px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm border border-indigo-200/60"
+                      onClick={() => openPdfModal(filePengajuan ? URL.createObjectURL(filePengajuan) : currentPengajuanLink, 'Surat_Pengajuan.pdf')}
+                      className="h-8 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       title="Preview PDF Surat Pengajuan"
                     >
-                      <Eye size={16} /> Lihat PDF Pengajuan
+                      <Eye size={13} /> <span>Lihat PDF Pengajuan</span>
                     </button>
                     {currentPengajuanLink && (
                       <a
-                        href={currentPengajuanLink}
+                        href={getSafeFileUrl(currentPengajuanLink)}
                         target="_blank"
                         rel="noreferrer"
-                        download
-                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
-                        title="Download File PDF"
+                        className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        title="Buka / Download File PDF"
                       >
-                        <Download size={16} /> Download PDF
+                        <Download size={13} /> <span>Download PDF</span>
                       </a>
                     )}
                   </div>
@@ -865,7 +885,7 @@ const handleAutoExtractTanggapanAI = async () => {
 
               {/* LOCAL OCR PANEL PENGAJUAN (DI ATAS AGAR BISA MEMENUHI ISIAN DI BAWAHNYA) */}
               {!isReadOnlyPengajuan && (
-                <div className="bg-slate-50 border border-slate-200 p-5 md:p-6 rounded-2xl shadow-xs">
+                <div className="bg-slate-50/80 border border-slate-200/90 p-4 md:p-5 rounded-2xl shadow-2xs">
                   <OCRPanelPengajuan 
                     mainData={formData} 
                     setMainData={setFormData} 
@@ -879,24 +899,28 @@ const handleAutoExtractTanggapanAI = async () => {
                 </div>
               )}
 
-              {/* GRID DATA UTAMA & PENGAJUAN (BALANCED COLUMN SPANS) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tahun Anggaran</label>
+              {/* GRID DATA UTAMA & PENGAJUAN (STANDAR DESIGN SYSTEM INPUTS) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Tahun Anggaran
+                  </label>
                   <input 
                     type="number" 
                     name="tahun_anggaran"
                     disabled={isReadOnlyPengajuan}
                     value={formData.tahun_anggaran}
                     onChange={handleInputChange}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100'
+                    className={`w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                   />
                 </div>
 
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Unit Kerja Pengaju *</label>
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Unit Kerja Pengaju *
+                  </label>
                   <Select 
                     options={listUnit} 
                     isDisabled={isReadOnlyPengajuan}
@@ -907,11 +931,14 @@ const handleAutoExtractTanggapanAI = async () => {
                     styles={{
                       control: (base) => ({ 
                         ...base, 
-                        borderRadius: '1.25rem', 
-                        padding: '0.4rem', 
-                        border: '1px solid #f3f4f6', 
-                        backgroundColor: isReadOnlyPengajuan ? '#f1f5f9' : '#f9fafb', 
-                        fontWeight: 'bold',
+                        minHeight: '2.5rem',
+                        height: '2.5rem',
+                        borderRadius: '0.75rem', 
+                        padding: '0 0.25rem', 
+                        border: '1px solid #e5e7eb', 
+                        backgroundColor: isReadOnlyPengajuan ? '#f1f5f9' : '#ffffff', 
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
                         opacity: isReadOnlyPengajuan ? 0.9 : 1
                       }),
                       menuPortal: (base) => ({ ...base, zIndex: 9999 })
@@ -919,15 +946,17 @@ const handleAutoExtractTanggapanAI = async () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Jenis Usulan</label>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Jenis Usulan
+                  </label>
                   <select 
                     name="jenis_tambah_pagu"
                     disabled={isReadOnlyPengajuan}
                     value={formData.jenis_tambah_pagu}
                     onChange={handleInputChange}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold appearance-none ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-emerald-100 cursor-pointer'
+                    className={`w-full h-10 px-3 text-xs rounded-xl border border-gray-200 outline-none transition-all font-bold appearance-none cursor-pointer ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                   >
                     <option value="Penugasan">🚀 Penugasan</option>
@@ -936,108 +965,229 @@ const handleAutoExtractTanggapanAI = async () => {
                   </select>
                 </div>
 
-                {/* NOMINAL USULAN & TANGGAL SURAT - COMPACT SPANS */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Usulan (Diajukan Rp)</label>
-                  <input 
-                    type="text" 
-                    name="nominal_diajukan"
-                    readOnly={isReadOnlyPengajuan}
-                    value={formatNumber(formData.nominal_diajukan)}
-                    onChange={handleInputChange}
-                    placeholder="0"
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-black text-base ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-900 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-900 focus:ring-2 ring-indigo-100'
-                    }`}
-                  />
+                {/* NOMINAL USULAN & TANGGAL SURAT */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Nominal Usulan (Diajukan)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-blue-600 font-mono text-xs">Rp</span>
+                    <input 
+                      type="text" 
+                      name="nominal_diajukan"
+                      readOnly={isReadOnlyPengajuan}
+                      value={formatNumber(formData.nominal_diajukan)}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      className={`w-full h-10 pl-10 pr-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-mono font-bold ${
+                        isReadOnlyPengajuan ? 'bg-slate-100 text-slate-900 cursor-not-allowed' : 'bg-white text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Pengajuan</label>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Tanggal Surat Pengajuan
+                  </label>
                   <input 
                     type="date" 
                     name="tanggal_surat_pengajuan"
                     readOnly={isReadOnlyPengajuan}
                     value={formData.tanggal_surat_pengajuan}
                     onChange={handleInputChange}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    className={`w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-3">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Pengajuan *</label>
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Nomor Surat Pengajuan *
+                  </label>
                   <input 
                     type="text" 
                     name="no_surat_pengajuan"
                     readOnly={isReadOnlyPengajuan}
                     value={formData.no_surat_pengajuan}
                     onChange={handleInputChange}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-bold ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    className={`w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-mono font-bold ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                     placeholder="cth: 123/UN1/..."
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-3">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Pengajuan</label>
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Hal / Perihal Surat Pengajuan
+                  </label>
                   <textarea 
                     name="hal_surat_pengajuan"
                     readOnly={isReadOnlyPengajuan}
                     value={formData.hal_surat_pengajuan}
                     onChange={handleInputChange}
                     rows={2}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-700 focus:ring-2 ring-blue-100'
+                    className={`w-full p-3 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                     placeholder="Tulis perihal surat pengajuan..."
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-3">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Pengajuan di Simaster</label>
+                <div className="space-y-1.5 md:col-span-3">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                    Subyek Pengajuan di Simaster
+                  </label>
                   <input 
                     type="text" 
                     name="subyek_pengajuan_di_simaster_persuratan"
                     readOnly={isReadOnlyPengajuan}
                     value={formData.subyek_pengajuan_di_simaster_persuratan}
                     onChange={handleInputChange}
-                    className={`w-full border rounded-2xl p-4 outline-none transition-all font-medium text-xs italic ${
-                      isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed' : 'bg-gray-50 border-gray-100 text-gray-600 focus:ring-2 ring-blue-100'
+                    className={`w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium text-gray-700 ${
+                      isReadOnlyPengajuan ? 'bg-slate-100 text-slate-800 cursor-not-allowed' : 'bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
                     }`}
                     placeholder="Salin subyek lengkap dari Simaster..."
                   />
                 </div>
 
-                {/* LINK SURAT PENGAJUAN (LINK DIBAWAH BEGAMBAR CLIP) */}
-                <div className="md:col-span-3 space-y-2 pt-6 border-t border-gray-100">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                    <Paperclip size={14} className="text-gray-400" /> Link GDrive / SharePoint Lampiran (Optional)
-                  </label>
-                  <div className="relative">
-                    <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input 
-                      type="text" 
-                      name="link_surat_pengajuan"
-                      readOnly={isReadOnlyPengajuan}
-                      value={formData.link_surat_pengajuan}
-                      onChange={handleInputChange}
-                      className={`w-full border rounded-2xl pl-12 pr-4 py-4 outline-none transition-all text-sm italic shadow-sm ${
-                        isReadOnlyPengajuan ? 'bg-slate-100/80 text-slate-800 border-slate-200 cursor-not-allowed font-mono' : 'bg-gray-50 border-gray-100 text-blue-600 focus:ring-2 ring-blue-100'
-                      }`}
-                      placeholder="https://drive.google.com/..."
-                    />
+                {/* FASILITAS UPLOAD BERKAS PENGAJUAN (STANDAR DESIGN SYSTEM: TEXTBOX + BROWSE + KAMERA + UPLOAD) */}
+                <div className="md:col-span-3 space-y-3 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Paperclip size={14} className="text-blue-600" />
+                      Fasilitas Upload Berkas Surat Pengajuan (Standar Design System)
+                    </label>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                      Inline Upload &amp; Browse
+                    </span>
                   </div>
+
+                  {/* Unified Input Box */}
+                  <div className="relative flex items-center bg-white border border-gray-200 rounded-xl shadow-2xs hover:border-blue-300 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all pl-3.5 pr-1.5 h-10">
+                    <Paperclip size={15} className="text-gray-400 shrink-0 mr-2" />
+                    <input
+                      type="text"
+                      name="link_surat_pengajuan"
+                      disabled={isReadOnlyPengajuan}
+                      value={filePengajuan ? filePengajuan.name : formData.link_surat_pengajuan}
+                      onChange={handleInputChange}
+                      placeholder="Tempel tautan GDrive/SharePoint atau pilih berkas dari komputer..."
+                      className="w-full bg-transparent text-xs font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none pr-2 disabled:cursor-not-allowed"
+                    />
+
+                    {!isReadOnlyPengajuan && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label
+                          className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Pilih berkas dari komputer"
+                        >
+                          <FolderTree size={12} />
+                          <span className="hidden sm:inline">Browse</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFilePengajuan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="h-4 w-px bg-gray-200/90 mx-0.5" />
+
+                        <label
+                          className="h-7 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Ambil foto fisik berkas via kamera HP"
+                        >
+                          <Camera size={12} />
+                          <span className="hidden sm:inline">Foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFilePengajuan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="h-4 w-px bg-gray-200/90 mx-0.5" />
+
+                        <label
+                          className="h-7 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs active:scale-95"
+                          title="Pilih dan unggah berkas"
+                        >
+                          <UploadCloud size={12} />
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFilePengajuan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* File attachment preview card if selected */}
+                  {(filePengajuan || formData.link_surat_pengajuan) && (
+                    <div className="flex items-center justify-between p-3 bg-blue-50/60 border border-blue-200/80 rounded-xl text-xs animate-in fade-in duration-200">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-1.5 rounded-lg bg-blue-600 text-white shrink-0">
+                          <FileText size={14} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-800 truncate block">
+                            {filePengajuan ? filePengajuan.name : (formData.link_surat_pengajuan || 'Dokumen Surat Pengajuan')}
+                          </span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {filePengajuan ? `${(filePengajuan.size / 1024 / 1024).toFixed(2)} MB • Berkas Lokal Siap Unggah` : 'Tautan Terlampir (Cloud/Drive)'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => openPdfModal(filePengajuan ? URL.createObjectURL(filePengajuan) : formData.link_surat_pengajuan, 'Surat_Pengajuan.pdf')}
+                          className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <Eye size={12} /> Pratinjau
+                        </button>
+                        {!isReadOnlyPengajuan && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilePengajuan(null);
+                              setFormData((p: any) => ({ ...p, link_surat_pengajuan: '' }));
+                            }}
+                            className="p-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-[11px] font-bold shadow-2xs cursor-pointer"
+                            title="Hapus berkas"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-
-
-                {/* RINGKASAN SUBSTANSI DENGAN AI EDITOR (SEPERTI DI ANALISIS) */}
-                <div className="space-y-4 md:col-span-3 pt-6 border-t border-gray-100">
+                {/* RINGKASAN SUBSTANSI DENGAN AI EDITOR */}
+                <div className="space-y-3 md:col-span-3 pt-4 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                    <label className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles size={14} className="text-amber-500" /> Ringkasan AI Substansi Surat Usulan
                     </label>
                     
@@ -1046,27 +1196,27 @@ const handleAutoExtractTanggapanAI = async () => {
                         type="button"
                         onClick={handleGenerateAiSummary}
                         disabled={isGeneratingSummary}
-                        className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs border border-indigo-200/60 disabled:opacity-50"
+                        className="h-8 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs border border-indigo-200/60 disabled:opacity-50 cursor-pointer"
                       >
                         {isGeneratingSummary ? (
                           <>
-                            <Loader2 size={14} className="animate-spin" /> Menganalisis...
+                            <Loader2 size={13} className="animate-spin" /> Menganalisis...
                           </>
                         ) : (
                           <>
-                            <Wand2 size={14} /> Jalankan Analisis AI
+                            <Wand2 size={13} /> Jalankan Analisis AI
                           </>
                         )}
                       </button>
                     )}
                   </div>
 
-                  <div className="bg-white rounded-2xl overflow-hidden shadow-xs border border-gray-200">
+                  <div className="bg-white rounded-xl overflow-hidden shadow-2xs border border-gray-200">
                     <ReactQuill 
                       theme="snow"
                       value={formData.ringkasan_surat_pengajuan || ''}
                       onChange={(val) => setFormData((prev: any) => ({ ...prev, ringkasan_surat_pengajuan: val }))}
-                      className="h-[250px] pb-10 [&_.ql-editor_p]:text-justify"
+                      className="h-[220px] pb-10 [&_.ql-editor_p]:text-justify"
                       placeholder="Tulis ringkasan substansi di sini, atau jalankan Analisis AI setelah upload surat..."
                       readOnly={isReadOnlyPengajuan}
                     />
@@ -1075,13 +1225,13 @@ const handleAutoExtractTanggapanAI = async () => {
               </div>
             </div>
 
-            {/* STEP 1 NEXT BUTTON */}
-            <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-8">
+            {/* STEP 1 NEXT BUTTON - STANDAR DESIGN SYSTEM */}
+            <div className="flex justify-between items-center pt-2">
               {!selectedAnalisis ? (
                 <button
                   type="button"
                   onClick={() => router.back()}
-                  className="px-8 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
+                  className="h-10 px-5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs transition-all shadow-2xs cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1091,9 +1241,10 @@ const handleAutoExtractTanggapanAI = async () => {
               <button
                 type="button"
                 onClick={() => setActiveStep(selectedAnalisis ? 'step2' : 'step2')}
-                className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+                className="h-10 px-6 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md shadow-blue-200/60 transition-all cursor-pointer active:scale-95"
               >
-                Selanjutnya: {selectedAnalisis ? 'Rincian & Pagu' : 'Tanggapan & Keputusan'} <ChevronRight size={16} />
+                <span>Selanjutnya: {selectedAnalisis ? 'Rincian & Pagu' : 'Tanggapan & Keputusan'}</span>
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>
@@ -1115,21 +1266,22 @@ const handleAutoExtractTanggapanAI = async () => {
               />
             </div>
 
-            {/* Navigation buttons */}
-            <div className="flex justify-end gap-3 pb-8">
+            {/* Navigation buttons - STANDAR DESIGN SYSTEM */}
+            <div className="flex justify-between items-center pt-2">
               <button
                 type="button"
                 onClick={() => setActiveStep('step1')}
-                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+                className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
               >
-                Kembali
+                <ChevronLeft size={14} /> <span>Kembali ke Tahap 1</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveStep('step3')}
-                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
+                className="h-10 px-6 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md shadow-blue-200/60 transition-all cursor-pointer active:scale-95"
               >
-                Lanjutkan ke Posisi Pagu & AI
+                <span>Lanjutkan ke Posisi Pagu & AI</span>
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>
@@ -1162,46 +1314,62 @@ const handleAutoExtractTanggapanAI = async () => {
               />
             </div>
 
-            {/* Navigation buttons */}
-            <div className="flex justify-end gap-3 pb-8">
+            {/* Navigation buttons - STANDAR DESIGN SYSTEM */}
+            <div className="flex justify-between items-center pt-2">
               <button
                 type="button"
                 onClick={() => setActiveStep('step2')}
-                className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+                className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
               >
-                Kembali
+                <ChevronLeft size={14} /> <span>Kembali ke Rincian</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveStep('step4')}
-                className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-2xl transition-all"
+                className="h-10 px-6 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-md shadow-blue-200/60 transition-all cursor-pointer active:scale-95"
               >
-                Lanjutkan ke Tanggapan
+                <span>Lanjutkan ke Tanggapan</span>
+                <ChevronRight size={14} />
               </button>
             </div>
           </div>
         )}
 
-        {/* ================= TAHAP 2/4: TANGGAPAN & KEPUTUSAN ================= */}
+        {/* ================= TAHAP 2/4: TANGGAPAN & KEPUTUSAN (STANDAR DESIGN SYSTEM) ================= */}
         {((activeStep === 'step2' && !selectedAnalisis) || (activeStep === 'step4' && selectedAnalisis)) && (
-          <div className="space-y-8 animate-in fade-in duration-300">
+          <div className="space-y-6 animate-in fade-in duration-300">
             {/* UNIFIED CONTAINER FOR DATA TANGGAPAN */}
-            <div className="bg-white rounded-2xl p-6 md:p-8 shadow-xs border border-gray-200/80 space-y-6">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600 shadow-xs">
-                    <CheckCircle2 size={20} />
+            <div className="bg-white rounded-2xl p-5 md:p-6 shadow-2xs border border-gray-200/90 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-2xs">
+                    <CheckCircle2 size={18} />
                   </div>
                   <div>
-                    <h2 className="text-base font-black text-gray-900 tracking-tight">II. Data Tanggapan (Surat Keluar / Approval Pimpinan)</h2>
-                    <p className="text-[11px] text-gray-500 font-medium mt-0.5">Upload file tanggapan atau masukkan link di atas, lalu jalankan AI Ekstraksi untuk mengisikan form di bawahnya secara otomatis.</p>
+                    <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                      Data Tanggapan (Surat Keluar &amp; Approval Pimpinan)
+                    </h2>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Pencatatan keputusan pimpinan, nominal yang disetujui, dan surat tanggapan resmi.
+                    </p>
                   </div>
                 </div>
+
+                {(formData.link_surat_tanggapan || fileTanggapan) && (
+                  <button
+                    type="button"
+                    onClick={() => openPdfModal(fileTanggapan ? URL.createObjectURL(fileTanggapan) : formData.link_surat_tanggapan, 'Surat_Tanggapan.pdf')}
+                    className="h-8 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                    title="Preview PDF Surat Tanggapan"
+                  >
+                    <Eye size={13} /> <span>Lihat PDF Tanggapan</span>
+                  </button>
+                )}
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* 1. TOP SECTION: LOCAL OCR PANEL FOR TANGGAPAN */}
-                <div className="bg-slate-50 border border-slate-200 p-5 md:p-6 rounded-2xl shadow-xs">
+                <div className="bg-slate-50/80 border border-slate-200/90 p-4 md:p-5 rounded-2xl shadow-2xs">
                   <OCRPanelTanggapan 
                     mainData={formData} 
                     setMainData={setFormData} 
@@ -1209,229 +1377,327 @@ const handleAutoExtractTanggapanAI = async () => {
                   />
                 </div>
 
-                {/* 2. FORM ISIAN HASIL EKSTRAKSI TANGGAPAN BELOW */}
-                <div className="space-y-8 pt-4">
+                {/* 2. FORM ISIAN HASIL EKSTRAKSI TANGGAPAN (STANDAR DESIGN SYSTEM) */}
+                <div className="space-y-4 pt-2">
                   {/* Status Pengajuan Selector */}
-                  <div className="bg-indigo-50/40 p-6 rounded-3xl border border-indigo-100 space-y-2">
-                    <label className="text-xs font-black text-indigo-900 uppercase tracking-widest block">Status Keputusan Pimpinan Saat Ini *</label>
+                  <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-1.5">
+                    <label className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider block">
+                      Status Keputusan Pimpinan Saat Ini *
+                    </label>
                     <select 
                       name="status_pengajuan"
                       value={formData.status_pengajuan}
                       onChange={handleInputChange}
-                      className="w-full bg-white border border-indigo-200 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-200 transition-all font-black text-indigo-900 text-base cursor-pointer shadow-sm"
+                      className="w-full h-10 px-3.5 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-indigo-950 text-xs cursor-pointer shadow-2xs"
                     >
-                      <option value="Disetujui Semua">Disetujui Semua (100%)</option>
-                      <option value="Disetujui Sebagian">Disetujui Sebagian</option>
-                      <option value="Ditolak">Ditolak</option>
+                      <option value="Disetujui Semua">✅ Disetujui Semua (100%)</option>
+                      <option value="Disetujui Sebagian">⚠️ Disetujui Sebagian</option>
+                      <option value="Ditolak">❌ Ditolak</option>
+                      <option value="Diajukan">⏳ Menunggu / Diajukan</option>
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">No Surat Tanggapan</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Nomor Surat Tanggapan
+                      </label>
                       <input 
                         type="text" 
                         name="no_surat_tanggapan"
                         value={formData.no_surat_tanggapan}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
-                        placeholder="Input jika usulan sudah ditanggapi..."
+                        className="w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-mono font-bold bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Input nomor surat tanggapan jika sudah terbit..."
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Tanggal Surat Tanggapan</label>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Tanggal Surat Tanggapan
+                      </label>
                       <input 
                         type="date" 
                         name="tanggal_surat_tanggapan"
                         value={formData.tanggal_surat_tanggapan}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-bold text-gray-700"
+                        className="w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                       />
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Hal / Perihal Surat Tanggapan</label>
-                    <textarea 
-                      name="hal_surat_tanggapan"
-                      value={formData.hal_surat_tanggapan}
-                      onChange={handleInputChange}
-                      rows={2}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-gray-700"
-                      placeholder="Ringkasan keputusan dalam surat tanggapan..."
-                    />
-                  </div>
+                    <div className="md:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Nominal Disetujui Pimpinan (Rp)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-emerald-600 font-mono text-xs">Rp</span>
+                        <input 
+                          type="text" 
+                          name="nominal_tanggapan"
+                          value={formatNumber(formData.nominal_tanggapan)}
+                          onChange={handleInputChange}
+                          placeholder="0"
+                          className="w-full h-10 pl-10 pr-3.5 text-xs rounded-xl border border-emerald-200 bg-emerald-50/20 outline-none transition-all font-mono font-black text-emerald-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Subyek Tanggapan di Simaster</label>
-                    <input 
-                      type="text" 
-                      name="subyek_tanggapan_di_simaster_persuratan"
-                      value={formData.subyek_tanggapan_di_simaster_persuratan}
-                      onChange={handleInputChange}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-medium text-xs italic text-gray-600"
-                      placeholder="Salin subyek lengkap tanggapan dari Simaster..."
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Nominal Disetujui Pimpinan (Rp)</label>
-                    <div className="relative">
-                      <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-indigo-500">Rp</span>
-                      <input 
-                        type="text" 
-                        name="nominal_tanggapan"
-                        value={formatNumber(formData.nominal_tanggapan)}
+                    <div className="md:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Hal / Perihal Surat Tanggapan
+                      </label>
+                      <textarea 
+                        name="hal_surat_tanggapan"
+                        value={formData.hal_surat_tanggapan}
                         onChange={handleInputChange}
-                        placeholder="0"
-                        className="w-full bg-indigo-50/30 border border-indigo-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-100 transition-all font-black text-indigo-800 text-lg"
+                        rows={2}
+                        className="w-full p-3 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium bg-white text-gray-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Ringkasan keputusan dalam surat tanggapan pimpinan..."
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                        Subyek Tanggapan di Simaster
+                      </label>
+                      <input 
+                        type="text" 
+                        name="subyek_tanggapan_di_simaster_persuratan"
+                        value={formData.subyek_tanggapan_di_simaster_persuratan}
+                        onChange={handleInputChange}
+                        className="w-full h-10 px-3.5 text-xs rounded-xl border border-gray-200 outline-none transition-all font-medium text-gray-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        placeholder="Salin subyek lengkap tanggapan dari Simaster..."
                       />
                     </div>
                   </div>
 
-                  {/* LINK SURAT TANGGAPAN (LINK DIBAWAH BEGAMBAR CLIP) */}
-                  <div className="space-y-2 pt-6 border-t border-gray-100">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                      <Paperclip size={14} className="text-gray-400" /> Link Surat Tanggapan (GDrive / SharePoint - Optional)
-                    </label>
-                    <div className="relative">
-                      <Paperclip size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input 
-                        type="text" 
+                  {/* FASILITAS UPLOAD BERKAS TANGGAPAN (STANDAR DESIGN SYSTEM: TEXTBOX + BROWSE + KAMERA + UPLOAD) */}
+                  <div className="space-y-3 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Paperclip size={14} className="text-indigo-600" />
+                        Fasilitas Upload Berkas Surat Tanggapan (Standar Design System)
+                      </label>
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                        Inline Upload &amp; Browse
+                      </span>
+                    </div>
+
+                    {/* Unified Input Box */}
+                    <div className="relative flex items-center bg-white border border-gray-200 rounded-xl shadow-2xs hover:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all pl-3.5 pr-1.5 h-10">
+                      <Paperclip size={15} className="text-gray-400 shrink-0 mr-2" />
+                      <input
+                        type="text"
                         name="link_surat_tanggapan"
-                        value={formData.link_surat_tanggapan}
+                        value={fileTanggapan ? fileTanggapan.name : formData.link_surat_tanggapan}
                         onChange={handleInputChange}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-2 ring-indigo-200 transition-all text-sm italic text-blue-600 shadow-sm"
-                        placeholder="https://drive.google.com/..."
+                        placeholder="Tempel tautan GDrive/SharePoint atau pilih berkas surat tanggapan..."
+                        className="w-full bg-transparent text-xs font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none pr-2"
                       />
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <label
+                          className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Pilih berkas dari komputer"
+                        >
+                          <FolderTree size={12} />
+                          <span className="hidden sm:inline">Browse</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFileTanggapan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="h-4 w-px bg-gray-200/90 mx-0.5" />
+
+                        <label
+                          className="h-7 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Ambil foto fisik via kamera HP"
+                        >
+                          <Camera size={12} />
+                          <span className="hidden sm:inline">Foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFileTanggapan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <div className="h-4 w-px bg-gray-200/90 mx-0.5" />
+
+                        <label
+                          className="h-7 px-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs active:scale-95"
+                          title="Pilih dan unggah berkas tanggapan"
+                        >
+                          <UploadCloud size={12} />
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                setFileTanggapan(e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
+
+                    {/* File attachment preview card if selected */}
+                    {(fileTanggapan || formData.link_surat_tanggapan) && (
+                      <div className="flex items-center justify-between p-3 bg-indigo-50/60 border border-indigo-200/80 rounded-xl text-xs animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0">
+                            <FileText size={14} />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-800 truncate block">
+                              {fileTanggapan ? fileTanggapan.name : (formData.link_surat_tanggapan || 'Dokumen Surat Tanggapan')}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {fileTanggapan ? `${(fileTanggapan.size / 1024 / 1024).toFixed(2)} MB • Berkas Lokal Siap Unggah` : 'Tautan Terlampir (Cloud/Drive)'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => openPdfModal(fileTanggapan ? URL.createObjectURL(fileTanggapan) : formData.link_surat_tanggapan, 'Surat_Tanggapan.pdf')}
+                            className="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-2xs cursor-pointer"
+                          >
+                            <Eye size={12} /> Pratinjau
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFileTanggapan(null);
+                              setFormData((p: any) => ({ ...p, link_surat_tanggapan: '' }));
+                            }}
+                            className="p-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-[11px] font-bold shadow-2xs cursor-pointer"
+                            title="Hapus berkas"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
               </div>
             </div>
 
-            {/* STEP 2/4 BUTTONS */}
-            <div className="flex justify-between items-center pt-6 border-t border-gray-100 mt-8">
+            {/* STEP 2/4 BUTTONS - STANDAR DESIGN SYSTEM */}
+            <div className="flex justify-between items-center pt-2">
               <button
                 type="button"
                 onClick={() => setActiveStep(selectedAnalisis ? 'step3' : 'step1')}
-                className="px-6 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm"
+                className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
               >
-                <ChevronLeft size={16} /> Kembali ke {selectedAnalisis ? 'Ringkasan' : 'Tahap 1'}
+                <ChevronLeft size={14} /> <span>Kembali ke {selectedAnalisis ? 'Ringkasan' : 'Tahap 1'}</span>
               </button>
 
-              {!selectedAnalisis && (
-                <div className="flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => router.back()}
-                    className="px-8 py-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-sm"
-                  >
-                    Batal
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={isSaving}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    {isSaving ? "MENYIMPAN..." : "SIMPAN USULAN PAGU"}
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2.5">
+                <button 
+                  type="button"
+                  onClick={() => router.back()}
+                  className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs transition-all shadow-2xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="h-10 px-6 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-200/60 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  <span>{isSaving ? "Menyimpan Data..." : "Simpan Usulan Tambah Pagu"}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* FLOATING ACTION BAR */}
-        {selectedAnalisis && (
-          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-40">
-          <div className="bg-slate-900/95 backdrop-blur-xl p-3 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-white/10 flex items-center justify-between gap-4">
-            <button 
-              type="button"
-              onClick={() => router.back()}
-              className="px-8 py-4 text-gray-400 hover:text-white font-bold text-xs transition-all uppercase tracking-widest"
-            >
-              Batal
-            </button>
-            <button 
-              type="submit" 
-              disabled={isSaving}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-4 rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              {isSaving ? "MENYIMPAN..." : "SIMPAN USULAN PAGU"}
-            </button>
-          </div>
-        </div>
-        )}
       </form>
 
-      {/* MODAL PILIH ANALISIS (UNLOCKED SELECTION BUTTON FOR ALL HISTORICAL PROPOSAL DATA) */}
+      {/* MODAL PILIH ANALISIS (STANDAR DESIGN SYSTEM) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-200/90 overflow-hidden flex flex-col max-h-[85vh]">
             
             {/* Modal Header */}
-            <div className="p-6 md:p-8 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+            <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
               <div>
-                <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest mb-1">
-                  <Sparkles size={14} className="text-amber-400" /> Database Riwayat Hasil Analisis AI (/analisis)
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider mb-1">
+                  <Sparkles size={13} className="text-amber-400" /> Database Riwayat Hasil Analisis AI (/analisis)
                 </div>
-                <h3 className="text-2xl font-black tracking-tight">Pilih Dokumen Analisis untuk Diimpor</h3>
-                <p className="text-slate-400 text-xs font-medium">Klik pada dokumen surat mana pun untuk mengisikan data pengajuan secara otomatis ke form Tambah Pagu.</p>
+                <h3 className="text-lg md:text-xl font-black tracking-tight">Pilih Dokumen Analisis untuk Diimpor</h3>
+                <p className="text-slate-400 text-xs font-medium">Klik pada salah satu usulan di bawah untuk mengisikan data pengajuan secara otomatis.</p>
               </div>
 
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all"
+                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Search & Tools */}
-            <div className="p-4 md:p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+            <div className="p-3.5 md:p-4 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row gap-3 justify-between items-center shrink-0">
               <div className="relative w-full md:w-96">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text"
                   placeholder="Cari perihal, no surat, subyek, unit..."
                   value={searchAnalisis}
                   onChange={e => setSearchAnalisis(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full bg-white border border-gray-200 rounded-xl h-10 pl-9 pr-3 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
               </div>
 
               <button
                 onClick={fetchAnalisisAndUsed}
-                className="px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all"
+                className="h-10 px-4 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-2xs cursor-pointer"
               >
-                <RefreshCw size={14} className={loadingAnalisis ? "animate-spin" : ""} /> Refresh Data
+                <RefreshCw size={13} className={loadingAnalisis ? "animate-spin" : ""} /> Refresh Data
               </button>
             </div>
 
             {/* Modal List Body */}
-            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+            <div className="p-4 md:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-3">
               {loadingAnalisis ? (
                 <div className="flex justify-center items-center py-16">
-                  <Loader2 className="animate-spin text-indigo-600 w-10 h-10" />
+                  <Loader2 className="animate-spin text-indigo-600 w-9 h-9" />
                 </div>
               ) : filteredAnalisisList.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">
-                  <FileText size={48} className="mx-auto opacity-20 mb-3" />
-                  <p className="font-bold text-gray-600">Tidak ada riwayat analisis yang cocok.</p>
+                  <FileText size={40} className="mx-auto opacity-20 mb-2" />
+                  <p className="font-bold text-gray-600 text-sm">Tidak ada riwayat analisis yang cocok.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   {filteredAnalisisList.map((item, idx) => (
                     <div 
                       key={item.id_analisis || idx}
-                      className={`p-5 bg-white border rounded-3xl transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${
+                      className={`p-4 bg-white border rounded-2xl transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 ${
                         item.is_used 
                           ? 'border-gray-200 bg-slate-50/50 opacity-60 cursor-not-allowed' 
-                          : 'border-gray-200 hover:border-indigo-400 hover:shadow-lg cursor-pointer'
+                          : 'border-gray-200 hover:border-blue-400 hover:shadow-md cursor-pointer'
                       }`}
                       onClick={() => {
                         if (item.is_used) {
@@ -1441,41 +1707,41 @@ const handleAutoExtractTanggapanAI = async () => {
                         handleSelectAnalisis(item);
                       }}
                     >
-                      <div className="space-y-1.5 flex-1">
+                      <div className="space-y-1.5 flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 text-[10px] font-black rounded-full uppercase tracking-wider">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-md uppercase tracking-wider">
                             {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                           
                           {item.is_used ? (
-                            <span className="flex items-center gap-1 px-3 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-amber-200">
-                              <Info size={12}/> Pernah Dicatat di Tambah Pagu
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md uppercase tracking-wider border border-amber-200">
+                              <Info size={11}/> Pernah Dicatat
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 px-3 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full uppercase tracking-wider border border-emerald-200">
-                              <Sparkles size={12}/> Tersedia (Siap Diimpor)
+                            <span className="flex items-center gap-1 px-2.5 py-0.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold rounded-md uppercase tracking-wider border border-emerald-200">
+                              <Sparkles size={11}/> Tersedia (Siap Diimpor)
                             </span>
                           )}
                         </div>
 
-                        <h4 className="font-black text-gray-900 text-base leading-snug">
+                        <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">
                           {item.perihal || 'Tanpa Perihal'}
                         </h4>
 
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-gray-500">
-                          <span>No Surat: <strong className="font-mono text-gray-700">{item.no_surat || '-'}</strong></span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium text-gray-500">
+                          <span>No: <strong className="font-mono text-gray-700">{item.no_surat || '-'}</strong></span>
                           <span>•</span>
                           <span>Unit: <strong className="text-gray-700">{item.unit_pengirim || '-'}</strong></span>
                           {item.subyek_persuratan_simaster && (
                             <>
                               <span>•</span>
-                              <span className="text-amber-700 font-bold">Simaster: {item.subyek_persuratan_simaster}</span>
+                              <span className="text-indigo-700 font-bold">Simaster: {item.subyek_persuratan_simaster}</span>
                             </>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                      <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-2 border-t md:border-t-0 pt-2.5 md:pt-0 border-gray-100 shrink-0">
                         <div className="text-right">
                           <span className="text-[10px] uppercase font-bold text-gray-400 block">Usulan:</span>
                           <span className="text-sm font-black font-mono text-gray-900">
@@ -1487,7 +1753,7 @@ const handleAutoExtractTanggapanAI = async () => {
                           <button
                             type="button"
                             disabled
-                            className="px-5 py-2.5 bg-slate-200 text-slate-400 text-xs font-black uppercase tracking-wider rounded-xl cursor-not-allowed border border-slate-300"
+                            className="h-8 px-3.5 bg-slate-200 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed border border-slate-300"
                           >
                             Sudah Diimpor
                           </button>
@@ -1498,9 +1764,10 @@ const handleAutoExtractTanggapanAI = async () => {
                               e.stopPropagation();
                               handleSelectAnalisis(item);
                             }}
-                            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 active:scale-95"
+                            className="h-8 px-3.5 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
                           >
-                            Impor Data Ini <ArrowLeft size={14} className="rotate-180" />
+                            <span>Impor Data Ini</span>
+                            <ArrowLeft size={13} className="rotate-180" />
                           </button>
                         )}
                       </div>
@@ -1511,10 +1778,10 @@ const handleAutoExtractTanggapanAI = async () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-gray-50 border-t border-gray-200 text-center shrink-0">
+            <div className="p-3 bg-gray-50 border-t border-gray-200 text-center shrink-0">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition-all"
+                className="h-9 px-5 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs transition-all shadow-2xs cursor-pointer"
               >
                 Tutup Modal
               </button>
@@ -1524,65 +1791,18 @@ const handleAutoExtractTanggapanAI = async () => {
         </div>
       )}
 
-      {/* PDF PREVIEW POP-UP MODAL */}
-      {isPdfModalOpen && pdfPreviewUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col h-[90vh]">
-            
-            {/* PDF Modal Header */}
-            <div className="p-5 md:p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-400/30">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black tracking-tight">Dokumen PDF Surat Pengajuan</h3>
-                  <p className="text-slate-400 text-xs font-medium truncate max-w-lg">{pdfPreviewUrl}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <a
-                  href={pdfPreviewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  download
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <Download size={14} /> Download PDF
-                </a>
-                <button 
-                  onClick={() => setIsPdfModalOpen(false)}
-                  className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-
-            {/* PDF Modal Content (iframe) */}
-            <div className="flex-1 bg-slate-100 p-2 overflow-hidden">
-              <iframe 
-                src={pdfPreviewUrl} 
-                className="w-full h-full rounded-2xl border border-slate-200"
-                title="Preview PDF Surat Pengajuan"
-              />
-            </div>
-
-            {/* PDF Modal Footer */}
-            <div className="p-4 bg-white border-t border-gray-200 flex justify-between items-center shrink-0 text-xs font-semibold text-gray-500">
-              <span>* Apabila PDF tidak muncul di preview, gunakan tombol Download PDF.</span>
-              <button
-                onClick={() => setIsPdfModalOpen(false)}
-                className="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all"
-              >
-                Tutup
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* STANDAR DESIGN SYSTEM DOCUMENT VIEWER MODAL */}
+      <DocumentViewerModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        title={pdfModalTitle || (formData.no_surat_pengajuan ? `Surat_${formData.no_surat_pengajuan}.pdf` : 'Dokumen_Surat.pdf')}
+        fileUrl={pdfPreviewUrl ? getSafeFileUrl(pdfPreviewUrl) : undefined}
+        docNumber={formData.no_surat_pengajuan || formData.no_surat_tanggapan || undefined}
+        unitName={formData.unit_id?.label || undefined}
+        perihal={formData.hal_surat_pengajuan || formData.hal_surat_tanggapan || undefined}
+        uploader={formData.unit_id?.label || 'Direktorat Keuangan UGM'}
+        status={formData.status_pengajuan === 'Disetujui Semua' || formData.status_pengajuan === 'disetujui' ? 'disetujui' : formData.status_pengajuan === 'Ditolak' || formData.status_pengajuan === 'ditolak' ? 'ditolak' : 'diajukan'}
+      />
 
     </div>
   );

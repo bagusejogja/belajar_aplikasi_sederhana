@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getSafeFileUrl } from '@/lib/fileHelper';
 import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
+import { generateNotaAnalisisPdfBlob } from '@/lib/notaPdfGenerator';
 
 export default function RiwayatList({ 
   onLoadAnalisis, 
@@ -71,20 +72,21 @@ export default function RiwayatList({
     mode: 'hasil_analisis'
   });
 
-  const handleOpenPrinterModal = (r: any) => {
+  const handleOpenPrinterModal = async (r: any) => {
     const totalDisetujui = parseNum(r.nominal_disetujui || 0);
     const totalUsulan = parseNum(r.total_anggaran || r.nominal_usulan || 0);
     const dateFormatted = r.created_at
       ? new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
       : '25 Sep 2026';
 
-    const cleanTitle = `Hasil_Analisis_${(r.no_surat || r.id_analisis || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+    const cleanTitle = `Nota_Analisis_${(r.no_surat || r.id_analisis || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
 
+    // Tampilkan modal terlebih dahulu dengan metadata resmi
     setDocViewerModal({
       isOpen: true,
       mode: 'hasil_analisis',
       title: cleanTitle,
-      fileUrl: undefined, // Menampilkan lembar Nota Hasil Analisis resmi UGM
+      fileUrl: undefined,
       fileSize: '420 KB',
       uploader: 'Tim Verifikasi Keuangan UGM',
       uploadedAt: `${dateFormatted}, 14:15 WIB`,
@@ -99,6 +101,21 @@ export default function RiwayatList({
       rekomendasi: r.rekomendasi_ai || '',
       tanggalSurat: dateFormatted
     });
+
+    // Hasilkan dokumen PDF identik dengan 'Tahap 4 dari 5: Pratinjau & Cetak Nota Analisis PDF'
+    try {
+      const details = expandedDetails[r.id_analisis]?.details;
+      const historis = expandedDetails[r.id_analisis]?.historis;
+      const pdfBlobUrl = await generateNotaAnalisisPdfBlob(r, details, historis);
+      if (pdfBlobUrl) {
+        setDocViewerModal(prev => ({
+          ...prev,
+          fileUrl: pdfBlobUrl
+        }));
+      }
+    } catch (e) {
+      console.warn('Fallback ke visual sheet analisis:', e);
+    }
   };
 
   const handleOpenPaperclipModal = (r: any) => {
