@@ -11,6 +11,7 @@ export interface MultiSelectOption {
 
 export interface MultiSelectFilterProps {
   label?: string;
+  icon?: React.ElementType;
   placeholder?: string;
   options: MultiSelectOption[];
   selectedValues: string[];
@@ -21,6 +22,7 @@ export interface MultiSelectFilterProps {
 
 export default function MultiSelectFilter({
   label,
+  icon: Icon,
   placeholder = 'Pilih beberapa opsi...',
   options = [],
   selectedValues = [],
@@ -75,19 +77,20 @@ export default function MultiSelectFilter({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-          {label}
+        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+          {Icon && <Icon size={11} className="text-gray-400 shrink-0" />}
+          <span>{label}</span>
         </label>
       )}
 
       {/* Main Filter Input Trigger */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="min-h-[36px] px-2.5 py-1 text-xs bg-white border border-gray-200 rounded-xl hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer transition-all flex items-center justify-between gap-2 shadow-2xs"
+        className="min-h-[40px] px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-2xl hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer transition-all flex items-center justify-between gap-2 shadow-2xs"
       >
         <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
           {selectedValues.length === 0 ? (
-            <span className="text-gray-400 font-medium">{placeholder}</span>
+            <span className="text-gray-400 font-bold">{placeholder}</span>
           ) : (
             <>
               {selectedValues.slice(0, maxDisplayTags).map(val => {
@@ -117,6 +120,7 @@ export default function MultiSelectFilter({
           )}
         </div>
 
+        {/* Action button, Vertical Separator Line |, and Chevron Down */}
         <div className="flex items-center gap-1 shrink-0 text-gray-400">
           {selectedValues.length > 0 && (
             <button
@@ -125,13 +129,19 @@ export default function MultiSelectFilter({
                 e.stopPropagation();
                 clearAll();
               }}
-              className="hover:text-gray-700 p-0.5 rounded transition-colors"
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               title="Hapus semua pilihan"
             >
               <X size={13} />
             </button>
           )}
-          <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+
+          {/* Garis Vertikal Samping Kiri Anak Panah Kebawah */}
+          <div className="h-5 w-px bg-gray-200/90 mx-0.5 shrink-0" />
+
+          <div className="p-1 rounded-md text-gray-400">
+            <ChevronDown size={15} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
         </div>
       </div>
 

@@ -170,7 +170,6 @@ export default function DesignSystemPage() {
 
   // Poin 1 & 2: Autocomplete & Multi-Select State
   const [demoSearchKeyword, setDemoSearchKeyword] = useState<string>('');
-  const [demoSelectedGroup, setDemoSelectedGroup] = useState<string>('');
   const [autocompleteUnit, setAutocompleteUnit] = useState<string>('3');
   const [singleStatus, setSingleStatus] = useState<string>('approved');
   const [selectedUnits, setSelectedUnits] = useState<string[]>(['1', '3']);
@@ -220,14 +219,6 @@ export default function DesignSystemPage() {
     { value: '5', label: 'Fakultas Biologi', badge: 'Fakultas', subtext: 'Kode Unit: 02000010' },
     { value: '6', label: 'Fakultas Ekonomika dan Bisnis', badge: 'Fakultas', subtext: 'Kode Unit: 03000010' },
     { value: '7', label: 'Fakultas Teknik', badge: 'Fakultas', subtext: 'Kode Unit: 04000010' },
-  ];
-
-  const sampleGroups = [
-    { value: 'fakultas', label: 'Fakultas / Sekolah', badge: '18 Unit', subtext: 'Klaster Agro, Saintek, Soshum, Medika' },
-    { value: 'direktorat', label: 'Direktorat', badge: '12 Unit', subtext: 'Keuangan, Perencanaan, SDM, Aset' },
-    { value: 'lembaga', label: 'Lembaga & Badan', badge: '8 Unit', subtext: 'LPPT, LPPM, Badan Penerbit, Penjaminan Mutu' },
-    { value: 'kptu', label: 'Kantor Pimpinan (KPTU)', badge: '6 Unit', subtext: 'Rektorat, MWA, DGB, Senat Akademik' },
-    { value: 'upt', label: 'Unit Pelaksana Teknis (UPT)', badge: '5 Unit', subtext: 'Perpustakaan, Arsip, Rumah Sakit Akademik' },
   ];
 
   const sampleStatuses = [
@@ -1038,139 +1029,104 @@ export default function DesignSystemPage() {
               </p>
             </div>
 
-            {/* LIVE DEMO: PERSIS SESUAI SCREENSHOT (CARI KODE / NAMA + GROUP ORG COMBOBOX) */}
-            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-                <span className="text-xs font-bold text-gray-800 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                  Live Preview Pasangan Filter Baku (Sesuai Screenshot Desain)
-                </span>
-                {(demoSearchKeyword || demoSelectedGroup) && (
-                  <button
-                    onClick={() => {
-                      setDemoSearchKeyword('');
-                      setDemoSelectedGroup('');
-                    }}
-                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-                  >
-                    Reset Filter
-                  </button>
-                )}
-              </div>
-
-              {/* Baris 2 Kolom Persis Seperti Screenshot */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-2xl">
+            {/* Baris 1: Textbox Cari Kode / Nama & Autocomplete Keyboard-Friendly */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 1. Textbox: CARI KODE / NAMA */}
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    CARI KODE / NAMA
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                    <input
-                      type="text"
-                      placeholder="Ketik untuk mencari..."
-                      value={demoSearchKeyword}
-                      onChange={(e) => setDemoSearchKeyword(e.target.value)}
-                      className="w-full h-10 pl-9 pr-9 bg-white hover:bg-white border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-medium placeholder:text-gray-400 shadow-2xs"
-                    />
-                    {demoSearchKeyword && (
-                      <button
-                        onClick={() => setDemoSearchKeyword('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
-                        title="Hapus pencarian"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
+                <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                      <Search size={13} className="text-blue-600" />
+                      Textbox Pencarian Cepat
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                      Realtime Filter
+                    </span>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      CARI KODE / NAMA
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                      <input
+                        type="text"
+                        placeholder="Ketik untuk mencari..."
+                        value={demoSearchKeyword}
+                        onChange={(e) => setDemoSearchKeyword(e.target.value)}
+                        className="w-full h-10 pl-9 pr-9 bg-white hover:bg-white border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs font-medium placeholder:text-gray-400 shadow-2xs"
+                      />
+                      {demoSearchKeyword && (
+                        <button
+                          onClick={() => setDemoSearchKeyword('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                          title="Hapus pencarian"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="text-[11px] text-gray-500 font-medium block pt-0.5">
+                    Hasil ketik: <strong className="text-blue-700">{demoSearchKeyword ? `"${demoSearchKeyword}"` : '(Ketik kata kunci pencarian)'}</strong>
+                  </span>
                 </div>
 
-                {/* 2. Combobox: GROUP ORG with Layers Icon */}
-                <div>
+                {/* 2. Autocomplete Combobox dengan Navigasi Keyboard & Garis Pemisah Panah */}
+                <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                      <ArrowUpDown size={13} className="text-blue-600" />
+                      Autocomplete Keyboard-Friendly (Unit Kerja)
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                      ↑ / ↓ + Enter
+                    </span>
+                  </div>
+
                   <AutocompleteCombobox
-                    label="GROUP ORG"
-                    icon={Layers}
-                    placeholder="Semua Group..."
-                    options={sampleGroups}
-                    value={demoSelectedGroup}
-                    onChange={setDemoSelectedGroup}
+                    label="PILIH UNIT KERJA (KETIK & GUNAKAN PANAH ↑/↓)"
+                    icon={Building2}
+                    placeholder="Ketik nama unit (misal: Biologi, Keuangan)..."
+                    options={sampleUnits}
+                    value={autocompleteUnit}
+                    onChange={setAutocompleteUnit}
                   />
-                </div>
-              </div>
 
-              {/* Status / Output Feedback */}
-              <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                <span className="font-semibold text-gray-600">Status Filter Terpilih:</span>
-                {demoSearchKeyword ? (
-                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200">
-                    Keyword: "{demoSearchKeyword}"
-                  </span>
-                ) : (
-                  <span className="text-gray-400 italic">Keyword: (kosong)</span>
-                )}
-                <span className="text-gray-300">•</span>
-                {demoSelectedGroup ? (
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
-                    Group: {sampleGroups.find(g => g.value === demoSelectedGroup)?.label}
-                  </span>
-                ) : (
-                  <span className="text-gray-400 italic">Group: Semua Group...</span>
-                )}
-              </div>
-            </div>
-
-            {/* Variasi Tambahan: Autocomplete Unit Kerja + Multi-Select */}
-            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Autocomplete Combobox dengan Navigasi Keyboard */}
-              <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
-                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
-                    <ArrowUpDown size={13} className="text-blue-600" />
-                    Autocomplete Keyboard-Friendly (Unit Kerja)
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                    ↑ / ↓ + Enter
+                  <span className="text-[11px] text-gray-500 font-medium block pt-0.5">
+                    Unit terpilih: <strong className="text-blue-700">{sampleUnits.find(u => u.value === autocompleteUnit)?.label || 'Belum dipilih'}</strong>
                   </span>
                 </div>
-
-                <AutocompleteCombobox
-                  label="PILIH UNIT KERJA (KETIK & GUNAKAN PANAH ↑/↓)"
-                  icon={Building2}
-                  placeholder="Ketik nama unit (misal: Biologi, Keuangan)..."
-                  options={sampleUnits}
-                  value={autocompleteUnit}
-                  onChange={setAutocompleteUnit}
-                />
-
-                <span className="text-[11px] text-gray-500 font-medium block pt-1">
-                  Unit terpilih: <strong className="text-blue-700">{sampleUnits.find(u => u.value === autocompleteUnit)?.label || 'Belum dipilih'}</strong>
-                </span>
               </div>
 
-              {/* Multi-Select Filter */}
-              <div className="space-y-2 p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs">
+              {/* 3. Multi-Select Filter dengan Garis Samping Kiri Anak Panah Kebawah */}
+              <div className="p-3.5 bg-white rounded-xl border border-gray-200 shadow-2xs space-y-2">
                 <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
                   <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-indigo-600" />
                     Multi-Select Filter (Banyak Pilihan Sekaligus)
                   </span>
                   <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                    Centang + Tag
+                    Centang + Tag + Garis Pemisah Panah
                   </span>
                 </div>
 
-                <MultiSelectFilter
-                  label="PILIH BEBERAPA UNIT (MULTI-SELECT)"
-                  placeholder="Pilih beberapa unit kerja..."
-                  options={sampleUnits}
-                  selectedValues={selectedUnits}
-                  onChange={setSelectedUnits}
-                  maxDisplayTags={2}
-                />
+                <div className="max-w-xl">
+                  <MultiSelectFilter
+                    label="PILIH BEBERAPA UNIT (MULTI-SELECT)"
+                    icon={Building2}
+                    placeholder="Pilih beberapa unit kerja..."
+                    options={sampleUnits}
+                    selectedValues={selectedUnits}
+                    onChange={setSelectedUnits}
+                    maxDisplayTags={3}
+                  />
+                </div>
 
-                <span className="text-[11px] text-gray-500 font-medium block pt-1">
-                  Terpilih ({selectedUnits.length}): <span className="font-mono text-indigo-700 font-bold">[{selectedUnits.join(', ')}]</span>
+                <span className="text-[11px] text-gray-500 font-medium block pt-0.5">
+                  Terpilih ({selectedUnits.length}): <span className="font-mono text-indigo-700 font-bold">[{selectedUnits.map(id => sampleUnits.find(u => u.value === id)?.label || id).join(', ')}]</span>
                 </span>
               </div>
             </div>
