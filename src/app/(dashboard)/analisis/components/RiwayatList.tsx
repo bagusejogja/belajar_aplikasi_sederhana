@@ -87,6 +87,20 @@ export default function RiwayatList({
     let detailInisiatif = (expandedDetails[r.id_analisis] as any)?.detailInisiatif;
     let detailPenugasan = (expandedDetails[r.id_analisis] as any)?.detailPenugasan;
 
+    let paguBerjalan = r.pagu_berjalan;
+    if (!paguBerjalan || Object.keys(paguBerjalan).length === 0) {
+      if (r.analisis_html) {
+        try {
+          const parsed = typeof r.analisis_html === 'string' ? JSON.parse(r.analisis_html) : r.analisis_html;
+          if (parsed?.pagu_berjalan) paguBerjalan = parsed.pagu_berjalan;
+        } catch (e) {}
+      }
+    }
+    let fullMainData = {
+      ...r,
+      pagu_berjalan: paguBerjalan || {}
+    };
+
     // Tampilkan modal terlebih dahulu dengan lembar template visual resmi (kertas rounded, tanpa bar PDF browser)
     setDocViewerModal({
       isOpen: true,
@@ -107,7 +121,7 @@ export default function RiwayatList({
       rekomendasi: r.rekomendasi_ai || '',
       tanggalSurat: r.tanggal_surat || dateFormatted,
       notaData: {
-        mainData: r,
+        mainData: fullMainData,
         detailData: details || [],
         historisData: historis || [],
         detailInisiatif: detailInisiatif || [],
@@ -117,6 +131,31 @@ export default function RiwayatList({
 
     // Ambil data detail & historis dari database jika belum di-cache
     try {
+      if ((!paguBerjalan?.rencana_penerimaan || !paguBerjalan?.realisasi_penerimaan)) {
+        try {
+          const res = await fetch(`/api/analisis/global-pagu?date=${encodeURIComponent(r.created_at || '')}&year=2026`);
+          const json = await res.json();
+          if (json?.success && json?.data) {
+            const g = json.data;
+            paguBerjalan = {
+              ...paguBerjalan,
+              pagu_awal: paguBerjalan?.pagu_awal || g.pagu_awal || '0',
+              pengalihan: paguBerjalan?.pengalihan || g.pengalihan || '0',
+              tambah_inisiatif: paguBerjalan?.tambah_inisiatif || g.tambah_inisiatif || '0',
+              efisiensi: paguBerjalan?.efisiensi || g.efisiensi || '0',
+              tambah_penugasan: paguBerjalan?.tambah_penugasan || g.tambah_penugasan || '0',
+              luncuran: paguBerjalan?.luncuran || g.talangan || '0',
+              talangan_pindah: paguBerjalan?.talangan_pindah || g.talangan_pindah || '0',
+              rencana_penerimaan: paguBerjalan?.rencana_penerimaan || g.rencana_penerimaan || '0',
+              realisasi_penerimaan: paguBerjalan?.realisasi_penerimaan || g.realisasi_penerimaan || '0'
+            };
+            fullMainData = { ...fullMainData, pagu_berjalan: paguBerjalan };
+          }
+        } catch (err) {
+          console.warn('Could not fetch global pagu fallback:', err);
+        }
+      }
+
       if ((!details || details.length === 0 || !historis || historis.length === 0) && r.id_analisis) {
         const [detRes, histRes] = await Promise.all([
           supabase.from('app_detail_realisasi').select('*').eq('id_analisis', r.id_analisis).order('no_urut', { ascending: true }),
@@ -124,22 +163,22 @@ export default function RiwayatList({
         ]);
         if (detRes.data) details = detRes.data;
         if (histRes.data) historis = histRes.data;
-        
-        // Update notaData in state
-        setDocViewerModal(prev => ({
-          ...prev,
-          notaData: {
-            mainData: r,
-            detailData: details || [],
-            historisData: historis || [],
-            detailInisiatif: detailInisiatif || [],
-            detailPenugasan: detailPenugasan || []
-          }
-        }));
       }
+      
+      // Update notaData in state with fully populated data
+      setDocViewerModal(prev => ({
+        ...prev,
+        notaData: {
+          mainData: fullMainData,
+          detailData: details || [],
+          historisData: historis || [],
+          detailInisiatif: detailInisiatif || [],
+          detailPenugasan: detailPenugasan || []
+        }
+      }));
 
       // Generate blob PDF di background untuk keperluan tombol Unduh Dokumen
-      const pdfBlobUrl = await generateNotaAnalisisPdfBlob(r, details, historis, detailInisiatif, detailPenugasan);
+      const pdfBlobUrl = await generateNotaAnalisisPdfBlob(fullMainData, details, historis, detailInisiatif, detailPenugasan);
       if (pdfBlobUrl) {
         setDocViewerModal(prev => ({
           ...prev,
@@ -266,6 +305,7 @@ export default function RiwayatList({
            let ketKeputusan = '';
            let rekomendasiAi = '';
            let suratBalasanHtml = '';
+           let paguBerjalan = (r as any).pagu_berjalan || {};
            if (r.analisis_html) {
               try {
                  const parsed = JSON.parse(r.analisis_html);
@@ -276,6 +316,7 @@ export default function RiwayatList({
                  if (parsed.keterangan_keputusan) ketKeputusan = parsed.keterangan_keputusan;
                  if (parsed.rekomendasi) rekomendasiAi = parsed.rekomendasi;
                  if (parsed.surat_balasan_html) suratBalasanHtml = parsed.surat_balasan_html;
+                 if (parsed.pagu_berjalan) paguBerjalan = parsed.pagu_berjalan;
               } catch(e) {
                  ringkasanAi = r.analisis_html;
               }
@@ -289,6 +330,7 @@ export default function RiwayatList({
               rekomendasi_ai: rekomendasiAi,
               surat_balasan_html: suratBalasanHtml,
               keterangan_keputusan: ketKeputusan,
+              pagu_berjalan: paguBerjalan,
               keputusan: keputusan || 'diajukan',
               nominal_disetujui: nominalDisetujui || '0'
            };

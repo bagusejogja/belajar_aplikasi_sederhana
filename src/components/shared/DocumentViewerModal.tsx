@@ -154,17 +154,28 @@ export default function DocumentViewerModal({
   const historisYearRow = hData.find((d: any) => d.tahun === targetYear) || hData[hData.length - 1] || {};
   const totalRealisasiDetail = dData.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
 
-  const pBerjalan = mData?.pagu_berjalan || {};
+  let pBerjalan = mData?.pagu_berjalan;
+  if (!pBerjalan || Object.keys(pBerjalan).length === 0) {
+    const raw = mData?.raw_analisis_html || mData?.analisis_html || htmlContent;
+    if (raw) {
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed?.pagu_berjalan) pBerjalan = parsed.pagu_berjalan;
+      } catch (e) {}
+    }
+  }
+  pBerjalan = pBerjalan || {};
+
   const cPaguAwal = parseNum(pBerjalan.pagu_awal) || parseNum(historisYearRow.pagu_awal) || 0;
   const cPengalihan = parseNum(pBerjalan.pengalihan) || parseNum(historisYearRow.pengalihan) || 0;
   const cInisiatif = parseNum(pBerjalan.tambah_inisiatif) || parseNum(historisYearRow.tambah_pagu_inisiatif) || 0;
   const cEfisiensi = parseNum(pBerjalan.efisiensi) || parseNum(historisYearRow.efisiensi) || 0;
   const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || parseNum(historisYearRow.tambah_pagu_penugasan) || 0;
-  const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(historisYearRow.talangan) || 0;
+  const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(pBerjalan.talangan_pindah) || parseNum(pBerjalan.talangan) || parseNum(historisYearRow.talangan) || 0;
   const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
   const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
-  const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
-  const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || totalRealisasiDetail || 0;
+  const cTotal = parseNum(pBerjalan.total_pagu) || (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran);
+  const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || parseNum(mData?.total_realisasi) || totalRealisasiDetail || 0;
 
   const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
   const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : (cTotal > 0 ? ((cPengeluaran / cTotal) * 100).toFixed(1) + '%' : '0%');
@@ -184,6 +195,18 @@ export default function DocumentViewerModal({
       const d2 = new Date(ts);
       d2.setMonth(d2.getMonth() - 1);
       bulanSebelum = d2.toLocaleDateString('id-ID', { month: 'long' });
+    }
+  }
+  if (!tanggalInput && (mData?.created_at || uploadedAt)) {
+    const rawDate = mData?.created_at || (uploadedAt ? uploadedAt.split(',')[0] : null);
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        tanggalInput = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        const d2 = new Date(d);
+        d2.setMonth(d2.getMonth() - 1);
+        bulanSebelum = d2.toLocaleDateString('id-ID', { month: 'long' });
+      }
     }
   }
 

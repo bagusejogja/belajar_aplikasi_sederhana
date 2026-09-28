@@ -23,6 +23,7 @@ import {
   ChevronLeft, 
   Layers,
   ArrowRight,
+  ArrowLeft,
   BookmarkCheck,
   CheckCircle2,
   Sparkles,
@@ -527,6 +528,15 @@ export default function AnalisisPaguPage() {
           ) : (
             <>
               <button 
+                onClick={() => setActiveStep('riwayat')} 
+                className="h-9 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 border border-slate-200"
+                title="Kembali ke Daftar Riwayat Dokumen Analisis"
+              >
+                <ArrowLeft size={13} />
+                <span>Kembali ke Riwayat</span>
+              </button>
+
+              <button 
                 onClick={() => setActiveStep('pdf')} 
                 className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 shrink-0 active:scale-95"
               >
@@ -538,9 +548,10 @@ export default function AnalisisPaguPage() {
                 onClick={handleSave} 
                 disabled={loading} 
                 className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50 shrink-0 active:scale-95"
+                title="Simpan Dokumen dan Kembali ke Riwayat"
               >
                 {loading ? <div className="w-3.5 h-3.5 border-2 border-indigo-200 border-t-white rounded-full animate-spin"/> : <Save size={13} />}
-                <span>Simpan</span>
+                <span>Simpan / Kembali</span>
               </button>
             </>
           )}
@@ -967,7 +978,7 @@ export default function AnalisisPaguPage() {
                 className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 active:scale-95"
               >
                 <Save size={15} />
-                <span>Simpan Seluruh Dokumen Analisis</span>
+                <span>Simpan / Kembali</span>
               </button>
             </div>
           </div>
