@@ -161,8 +161,74 @@ export default function RiwayatList({
           supabase.from('app_detail_realisasi').select('*').eq('id_analisis', r.id_analisis).order('no_urut', { ascending: true }),
           supabase.from('app_pagu_historis').select('*').eq('id_analisis', r.id_analisis).order('tahun', { ascending: true })
         ]);
-        if (detRes.data) details = detRes.data;
-        if (histRes.data) historis = histRes.data;
+        if (detRes.data) {
+          const cleanedDetail = detRes.data.map(d => {
+            let uraian = (d.uraian_kegiatan || '').toString();
+            const firstLetter = uraian.match(/[a-zA-Z]/);
+            if (firstLetter && firstLetter.index !== undefined) {
+              uraian = uraian.substring(firstLetter.index).trim();
+            } else {
+              uraian = uraian.trim();
+            }
+            return { ...d, uraian_kegiatan: uraian || '-' };
+          });
+          const sortedDetail = cleanedDetail.sort((a, b) => {
+            const sisaA = parseNum(a.anggaran) - parseNum(a.realisasi);
+            const sisaB = parseNum(b.anggaran) - parseNum(b.realisasi);
+            return sisaB - sisaA;
+          });
+          details = sortedDetail.map((d, idx) => ({ ...d, no_urut: idx + 1 }));
+        }
+        if (histRes.data) {
+          historis = histRes.data.map(h => {
+            let parsed: any = {};
+            try {
+              if (h.tambah && typeof h.tambah === 'string' && h.tambah.startsWith('{')) {
+                parsed = JSON.parse(h.tambah);
+              }
+            } catch (e) {}
+            const pagu = parseNum(h.total_pagu);
+            const real = parseNum(h.realisasi_historis);
+            return {
+              ...h,
+              pengalihan: parsed.pengalihan || (h.tambah && !h.tambah.startsWith('{') ? h.tambah : '0'),
+              tambah_pagu_penugasan: parsed.tambah_pagu_penugasan || '0',
+              tambah_pagu_inisiatif: parsed.tambah_pagu_inisiatif || '0',
+              efisiensi: parsed.efisiensi || '0',
+              talangan: parsed.talangan || '0',
+              persen_serapan: pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '-'
+            };
+          });
+        }
+      }
+
+      // Ambil detailInisiatif dan detailPenugasan jika belum ada (sesuai Tahap 4 PdfPreview.tsx)
+      if ((!detailInisiatif || detailInisiatif.length === 0 || !detailPenugasan || detailPenugasan.length === 0) && r.unit_pengirim) {
+        const { data: unitsData } = await supabase.from('gov_units').select('id').ilike('nama_unit', `%${r.unit_pengirim}%`).limit(1);
+        if (unitsData && unitsData.length > 0) {
+          const unitId = unitsData[0].id;
+          const [inisiatifRes, penugasanRes] = await Promise.all([
+            supabase
+              .from('gov_pagu_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
+              .eq('unit_id', unitId)
+              .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
+              .eq('tahun_anggaran', '2026')
+              .order('tahun_anggaran', { ascending: false }),
+            supabase
+              .from('gov_pagu_anggaran')
+              .select('id, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
+              .eq('unit_id', unitId)
+              .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
+              .eq('tahun_anggaran', '2026')
+              .order('tahun_anggaran', { ascending: false })
+          ]);
+          let tsAnalisis = 0;
+          if (r.id_analisis?.startsWith('ANL-')) tsAnalisis = parseInt(r.id_analisis.split('-')[1]) || 0;
+          const maxTime = tsAnalisis > 0 ? tsAnalisis + 86400000 : Date.now();
+          if (inisiatifRes.data) detailInisiatif = inisiatifRes.data.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime);
+          if (penugasanRes.data) detailPenugasan = penugasanRes.data.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime);
+        }
       }
       
       // Update notaData in state with fully populated data
@@ -235,11 +301,54 @@ export default function RiwayatList({
           : Promise.resolve({ data: [] })
       ]);
 
+      let cleanedDetails = detailRes.data || [];
+      if (cleanedDetails.length > 0) {
+        const mapped = cleanedDetails.map((d: any) => {
+          let uraian = (d.uraian_kegiatan || '').toString();
+          const firstLetter = uraian.match(/[a-zA-Z]/);
+          if (firstLetter && firstLetter.index !== undefined) {
+            uraian = uraian.substring(firstLetter.index).trim();
+          } else {
+            uraian = uraian.trim();
+          }
+          return { ...d, uraian_kegiatan: uraian || '-' };
+        });
+        const sorted = mapped.sort((a: any, b: any) => {
+          const sisaA = parseNum(a.anggaran) - parseNum(a.realisasi);
+          const sisaB = parseNum(b.anggaran) - parseNum(b.realisasi);
+          return sisaB - sisaA;
+        });
+        cleanedDetails = sorted.map((d: any, idx: number) => ({ ...d, no_urut: idx + 1 }));
+      }
+
+      let parsedHistoris = historisRes.data || [];
+      if (parsedHistoris.length > 0) {
+        parsedHistoris = parsedHistoris.map((h: any) => {
+          let parsed: any = {};
+          try {
+            if (h.tambah && typeof h.tambah === 'string' && h.tambah.startsWith('{')) {
+              parsed = JSON.parse(h.tambah);
+            }
+          } catch (e) {}
+          const pagu = parseNum(h.total_pagu);
+          const real = parseNum(h.realisasi_historis);
+          return {
+            ...h,
+            pengalihan: parsed.pengalihan || (h.tambah && !h.tambah.startsWith('{') ? h.tambah : '0'),
+            tambah_pagu_penugasan: parsed.tambah_pagu_penugasan || '0',
+            tambah_pagu_inisiatif: parsed.tambah_pagu_inisiatif || '0',
+            efisiensi: parsed.efisiensi || '0',
+            talangan: parsed.talangan || '0',
+            persen_serapan: pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '-'
+          };
+        });
+      }
+
       setExpandedDetails(prev => ({
         ...prev,
         [id]: {
-          details: detailRes.data || [],
-          historis: historisRes.data || []
+          details: cleanedDetails,
+          historis: parsedHistoris
         }
       }));
 

@@ -79,6 +79,61 @@ export async function generateNotaAnalisisPdfBlob(
     console.warn('Gagal memuat detail data tambahan untuk PDF:', err);
   }
 
+  const parseNum = (str: string | number) => {
+    if (typeof str === 'number') return isNaN(str) ? 0 : str;
+    let s = (str || '0').toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
+        return parseFloat(s) || 0;
+      }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+  // Parse h.tambah in historisData (sesuai Tahap 4)
+  historisData = (historisData || []).map((h: any) => {
+    let parsed: any = {};
+    try {
+      if (h.tambah && typeof h.tambah === 'string' && h.tambah.startsWith('{')) {
+        parsed = JSON.parse(h.tambah);
+      }
+    } catch (e) {}
+    const pagu = parseNum(h.total_pagu);
+    const real = parseNum(h.realisasi_historis);
+    return {
+      ...h,
+      pengalihan: parsed.pengalihan ?? (h.pengalihan || (h.tambah && !h.tambah.startsWith('{') ? h.tambah : '0')),
+      tambah_pagu_penugasan: parsed.tambah_pagu_penugasan ?? (h.tambah_pagu_penugasan || '0'),
+      tambah_pagu_inisiatif: parsed.tambah_pagu_inisiatif ?? (h.tambah_pagu_inisiatif || '0'),
+      efisiensi: parsed.efisiensi ?? (h.efisiensi || '0'),
+      talangan: parsed.talangan ?? (h.talangan || '0'),
+      persen_serapan: h.persen_serapan || (pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '-')
+    };
+  });
+
+  // Clean and sort detailData by sisa anggaran descending (sesuai Tahap 4)
+  if (detailData && detailData.length > 0) {
+    const cleanedDetail = detailData.map((d: any) => {
+      let uraian = (d.uraian_kegiatan || '').toString();
+      const firstLetter = uraian.match(/[a-zA-Z]/);
+      if (firstLetter && firstLetter.index !== undefined) {
+        uraian = uraian.substring(firstLetter.index).trim();
+      } else {
+        uraian = uraian.trim();
+      }
+      return { ...d, uraian_kegiatan: uraian || '-' };
+    });
+    const sortedDetail = cleanedDetail.sort((a: any, b: any) => {
+      const sisaA = parseNum(a.anggaran) - parseNum(a.realisasi);
+      const sisaB = parseNum(b.anggaran) - parseNum(b.realisasi);
+      return sisaB - sisaA;
+    });
+    detailData = sortedDetail.map((d: any, idx: number) => ({ ...d, no_urut: idx + 1 }));
+  }
+
   const doc = new jsPDF('p', 'mm', 'a4');
 
   // Header Line
@@ -120,20 +175,6 @@ export async function generateNotaAnalisisPdfBlob(
   };
 
   let startY = 33;
-
-  const parseNum = (str: string | number) => {
-    if (typeof str === 'number') return isNaN(str) ? 0 : str;
-    let s = (str || '0').toString().trim();
-    if (!s.includes(',') && s.includes('.')) {
-      const parts = s.split('.');
-      if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
-        return parseFloat(s) || 0;
-      }
-    }
-    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
-    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
-  };
-  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
 
   let tanggalInput = '';
   let bulanSebelum = '';
@@ -177,7 +218,7 @@ export async function generateNotaAnalisisPdfBlob(
   const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(pBerjalan.talangan_pindah) || parseNum(pBerjalan.talangan) || parseNum(historisYearRow.talangan) || 0;
   const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
   const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
-  const cTotal = parseNum(pBerjalan.total_pagu) || (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran);
+  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran) || parseNum(pBerjalan.total_pagu) || 0;
   const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || parseNum(mainData?.total_realisasi) || totalRealisasiDetail || 0;
 
   const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';

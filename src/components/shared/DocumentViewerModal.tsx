@@ -156,15 +156,9 @@ export default function DocumentViewerModal({
   // Data helpers for rich Tahap 4 rendering
   const mData = notaData?.mainData || {};
   const dData = notaData?.detailData || [];
-  const hData = notaData?.historisData || [];
-  const dIni = notaData?.detailInisiatif || [];
-  const dPen = notaData?.detailPenugasan || [];
-
-  const filteredDetailData = filterKegiatan.trim()
-    ? dData.filter((d: any) => 
-        (d.uraian_kegiatan || '').toLowerCase().includes(filterKegiatan.toLowerCase())
-      )
-    : dData;
+  const rawHData = notaData?.historisData || [];
+  const dIni = (notaData?.detailInisiatif || []).filter((h: any) => h.tahun_anggaran === '2026' || h.tahun_anggaran === 2026);
+  const dPen = (notaData?.detailPenugasan || []).filter((h: any) => h.tahun_anggaran === '2026' || h.tahun_anggaran === 2026);
 
   const parseNum = (str: string | number) => {
     if (typeof str === 'number') return isNaN(str) ? 0 : str;
@@ -179,6 +173,33 @@ export default function DocumentViewerModal({
     return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
   };
   const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+  // Parse h.tambah JSON string in historisData (sesuai Tahap 4)
+  const hData = rawHData.map((h: any) => {
+    let parsed: any = {};
+    try {
+      if (h.tambah && typeof h.tambah === 'string' && h.tambah.startsWith('{')) {
+        parsed = JSON.parse(h.tambah);
+      }
+    } catch (e) {}
+    const pagu = parseNum(h.total_pagu);
+    const real = parseNum(h.realisasi_historis);
+    return {
+      ...h,
+      pengalihan: parsed.pengalihan ?? (h.pengalihan || (h.tambah && !h.tambah.startsWith('{') ? h.tambah : '0')),
+      tambah_pagu_penugasan: parsed.tambah_pagu_penugasan ?? (h.tambah_pagu_penugasan || '0'),
+      tambah_pagu_inisiatif: parsed.tambah_pagu_inisiatif ?? (h.tambah_pagu_inisiatif || '0'),
+      efisiensi: parsed.efisiensi ?? (h.efisiensi || '0'),
+      talangan: parsed.talangan ?? (h.talangan || '0'),
+      persen_serapan: h.persen_serapan || (pagu > 0 ? ((real / pagu) * 100).toFixed(2) + '%' : '-')
+    };
+  });
+
+  const filteredDetailData = filterKegiatan.trim()
+    ? dData.filter((d: any) => 
+        (d.uraian_kegiatan || '').toLowerCase().includes(filterKegiatan.toLowerCase())
+      )
+    : dData;
 
   const targetYear = '2026';
   const historisYearRow = hData.find((d: any) => d.tahun === targetYear) || hData[hData.length - 1] || {};
@@ -204,7 +225,9 @@ export default function DocumentViewerModal({
   const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(pBerjalan.talangan_pindah) || parseNum(pBerjalan.talangan) || parseNum(historisYearRow.talangan) || 0;
   const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
   const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
-  const cTotal = parseNum(pBerjalan.total_pagu) || (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran);
+  
+  // Persis seperti PdfPreview.tsx (Tahap 4)
+  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran) || parseNum(pBerjalan.total_pagu) || 0;
   const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || parseNum(mData?.total_realisasi) || totalRealisasiDetail || 0;
 
   const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
@@ -388,14 +411,14 @@ export default function DocumentViewerModal({
             dengan sudut melengkung halus (rounded-3xl shadow-2xl), persis seperti template!
         */}
         {displayUrl && mode !== 'hasil_analisis' ? (
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 flex justify-center bg-slate-950/90">
+          <div className={`flex-1 min-h-0 ${zoom > 100 ? 'overflow-auto' : 'overflow-hidden'} p-2 sm:p-3 flex items-center justify-center bg-slate-950/90`}>
             <div 
-              className="w-full max-w-5xl h-[84vh] rounded-2xl overflow-hidden shadow-2xl border border-slate-800 transition-transform duration-200"
+              className="w-full h-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl border border-slate-800 transition-transform duration-200"
               style={{ transform: `scale(${zoom / 100}) rotate(${rotation}deg)` }}
             >
               <iframe
                 src={`${displayUrl}#toolbar=0&navpanes=0`}
-                className="w-full h-full rounded-2xl border-0 bg-white"
+                className="w-full h-full border-0 bg-white block"
                 title={title}
               />
             </div>
@@ -704,6 +727,12 @@ export default function DocumentViewerModal({
                                     <td className="p-2.5 text-right font-mono font-bold text-slate-800">Rp {formatRp(parseNum(h.nominal || '0'))}</td>
                                   </tr>
                                 ))}
+                                <tr className="bg-indigo-100/60 font-bold text-slate-900 border-t border-indigo-200">
+                                  <td colSpan={2} className="p-2.5 text-right font-bold">Total Tambah Pagu Inisiatif:</td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-indigo-950">
+                                    Rp {formatRp(dIni.reduce((acc: number, curr: any) => acc + parseNum(curr.nominal), 0))}
+                                  </td>
+                                </tr>
                               </>
                             )}
                             {dPen.length > 0 && (
@@ -721,6 +750,12 @@ export default function DocumentViewerModal({
                                     <td className="p-2.5 text-right font-mono font-bold text-slate-800">Rp {formatRp(parseNum(h.nominal || '0'))}</td>
                                   </tr>
                                 ))}
+                                <tr className="bg-indigo-100/60 font-bold text-slate-900 border-t border-indigo-200">
+                                  <td colSpan={2} className="p-2.5 text-right font-bold">Total Tambah Pagu Penugasan:</td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-indigo-950">
+                                    Rp {formatRp(dPen.reduce((acc: number, curr: any) => acc + parseNum(curr.nominal), 0))}
+                                  </td>
+                                </tr>
                               </>
                             )}
                           </tbody>
@@ -746,6 +781,9 @@ export default function DocumentViewerModal({
                               <th className="p-2.5 font-bold text-right">+ Penugasan</th>
                               <th className="p-2.5 font-bold text-right">+ Inisiatif</th>
                               <th className="p-2.5 font-bold text-right">- Efisiensi</th>
+                              {hData.some((d: any) => parseNum(d.talangan) > 0) && (
+                                <th className="p-2.5 font-bold text-right">+ Talangan</th>
+                              )}
                               <th className="p-2.5 font-bold text-right">Total Pagu</th>
                               <th className="p-2.5 font-bold text-right">Realisasi</th>
                               <th className="p-2.5 font-bold text-center">% Serapan</th>
@@ -760,6 +798,9 @@ export default function DocumentViewerModal({
                                 <td className="p-2.5 text-right font-mono text-emerald-700">{formatRp(parseNum(d.tambah_pagu_penugasan))}</td>
                                 <td className="p-2.5 text-right font-mono text-emerald-700">{formatRp(parseNum(d.tambah_pagu_inisiatif))}</td>
                                 <td className="p-2.5 text-right font-mono text-rose-700">{formatRp(parseNum(d.efisiensi))}</td>
+                                {hData.some((d: any) => parseNum(d.talangan) > 0) && (
+                                  <td className="p-2.5 text-right font-mono text-amber-700">{formatRp(parseNum(d.talangan))}</td>
+                                )}
                                 <td className="p-2.5 text-right font-mono font-bold text-slate-900">{formatRp(parseNum(d.total_pagu))}</td>
                                 <td className="p-2.5 text-right font-mono text-slate-800">{formatRp(parseNum(d.realisasi_historis))}</td>
                                 <td className="p-2.5 text-center font-bold text-blue-700">{d.persen_serapan || '-'}</td>
