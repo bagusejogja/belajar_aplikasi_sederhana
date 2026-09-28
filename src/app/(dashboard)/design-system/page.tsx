@@ -1372,57 +1372,64 @@ export default function DesignSystemPage() {
                     </span>
                   </div>
 
-                  {/* Input Group: Textbox + Browse + Tombol Upload */}
-                  <div className="flex items-center gap-1.5">
-                    <div className="relative flex-1">
-                      <FileText size={14} className="absolute left-3 top-2.5 text-gray-400" />
-                      <input
-                        type="text"
-                        value={directUploadPath}
-                        onChange={(e) => {
-                          setDirectUploadPath(e.target.value);
-                          setDirectUploadSuccess(false);
-                        }}
-                        placeholder="Ketik nama berkas atau pilih dari perangkat..."
-                        className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
-                      />
+                  {/* Unified Input Container: Tombol Upload & Browse Menyatu di Dalam Textbox */}
+                  <div className="relative flex items-center bg-white border border-gray-200 rounded-2xl shadow-2xs hover:border-blue-300 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all pl-3.5 pr-1.5 h-10">
+                    <FileText size={15} className="text-gray-400 shrink-0 mr-2" />
+                    <input
+                      type="text"
+                      value={directUploadPath}
+                      onChange={(e) => {
+                        setDirectUploadPath(e.target.value);
+                        setDirectUploadSuccess(false);
+                      }}
+                      placeholder="Ketik nama berkas atau pilih dari perangkat..."
+                      className="w-full bg-transparent text-xs font-semibold text-gray-800 placeholder:text-gray-400 focus:outline-none pr-2"
+                    />
+
+                    {/* Cluster Tombol Aksi di DALAM Textbox Sebelah Kanan */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <label
+                        className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Pilih berkas dari komputer"
+                      >
+                        <FolderTree size={12} />
+                        <span className="hidden sm:inline">Browse</span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              setDirectUploadPath(e.target.files[0].name);
+                              setDirectUploadSuccess(false);
+                            }
+                          }}
+                        />
+                      </label>
+
+                      {/* Garis Pemisah Vertikal | */}
+                      <div className="h-4 w-px bg-gray-200/90 mx-0.5" />
+
+                      {/* Tombol Upload Interaktif Langsung Menyatu di Kanan */}
+                      <button
+                        type="button"
+                        disabled={isDirectUploading}
+                        onClick={handleSimulateDirectUpload}
+                        className="h-7 px-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs active:scale-95 disabled:opacity-60"
+                        title="Klik untuk mengunggah berkas sekarang"
+                      >
+                        {isDirectUploading ? (
+                          <>
+                            <RefreshCw size={11} className="animate-spin" />
+                            <span>Mengunggah...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud size={12} />
+                            <span>Upload</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-
-                    <label className="h-9 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-xl text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shrink-0 shadow-2xs" title="Pilih berkas dari komputer">
-                      <FolderTree size={13} />
-                      <span className="hidden sm:inline">Browse</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            setDirectUploadPath(e.target.files[0].name);
-                            setDirectUploadSuccess(false);
-                          }
-                        }}
-                      />
-                    </label>
-
-                    {/* Tombol Upload Interaktif di Sebelah Kanan */}
-                    <button
-                      type="button"
-                      disabled={isDirectUploading}
-                      onClick={handleSimulateDirectUpload}
-                      className="h-9 px-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs shrink-0 active:scale-95 disabled:opacity-60"
-                      title="Klik untuk mengunggah berkas sekarang"
-                    >
-                      {isDirectUploading ? (
-                        <>
-                          <RefreshCw size={13} className="animate-spin" />
-                          <span>Mengunggah...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud size={14} />
-                          <span>Upload</span>
-                        </>
-                      )}
-                    </button>
                   </div>
 
                   {/* Upload Progress Bar atau Status Sukses */}
@@ -4142,6 +4149,7 @@ triggerToast('error', 'Gagal Memproses Permintaan', 'Koneksi database timeout.')
                 type="button"
                 onClick={() => handleCopy(`<VerificationStepper
   currentStepIndex={2}
+  variant="chevron" // Pilihan: 'cards' | 'chevron' | 'timeline' | 'compact'
   onStepClick={(step, index) => console.log(step)}
 />`, 'stepper-code')}
                 className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"

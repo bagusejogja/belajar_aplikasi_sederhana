@@ -103,15 +103,16 @@ export default function DateRangePicker({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-          {label}
+        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+          <Calendar size={11} className="text-gray-400 shrink-0" />
+          <span>{label}</span>
         </label>
       )}
 
-      {/* Unified Trigger Box with Date and Time */}
+      {/* Unified Trigger Box with Date and Time & Vertical Separator Line */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 text-xs bg-white border border-gray-200 rounded-xl hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer transition-all flex items-center justify-between gap-2 shadow-2xs select-none"
+        className="h-10 px-3.5 text-xs bg-white border border-gray-200 rounded-2xl hover:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 cursor-pointer transition-all flex items-center justify-between gap-2 shadow-2xs select-none"
       >
         <div className="flex items-center gap-2 text-gray-700 min-w-0">
           <Calendar size={14} className="text-blue-600 shrink-0" />
@@ -120,7 +121,7 @@ export default function DateRangePicker({
             {showTime && value.startTime && (
               <span className="font-mono text-gray-500 font-normal"> ({value.startTime})</span>
             )}{' '}
-            <span className="text-gray-400">s/d</span>{' '}
+            <span className="text-gray-400 font-normal">s/d</span>{' '}
             {formatDateIndo(value.endDate)}
             {showTime && value.endTime && (
               <span className="font-mono text-gray-500 font-normal"> ({value.endTime})</span>
@@ -128,7 +129,13 @@ export default function DateRangePicker({
           </span>
         </div>
 
-        <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-1 shrink-0 text-gray-400">
+          {/* Garis Pemisah Vertikal | Sesuai Standar Autocomplete & MultiSelect */}
+          <div className="h-5 w-px bg-gray-200/90 mx-0.5 shrink-0" />
+          <div className="p-1 rounded-md text-gray-400">
+            <ChevronDown size={15} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </div>
       </div>
 
       {/* Unified Popover Panel with Date & Time */}
