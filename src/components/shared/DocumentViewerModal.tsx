@@ -226,8 +226,8 @@ export default function DocumentViewerModal({
   const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
   const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
   
-  // Persis seperti PdfPreview.tsx (Tahap 4)
-  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran) || parseNum(pBerjalan.total_pagu) || 0;
+  // Luncuran / talangan tidak termasuk dijumlah ke dalam Total Pagu (Kapasitas Tahun Berjalan)
+  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan) || parseNum(pBerjalan.total_pagu) || 0;
   const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || parseNum(mData?.total_realisasi) || totalRealisasiDetail || 0;
 
   const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
@@ -275,6 +275,34 @@ export default function DocumentViewerModal({
     { label: 'Sisa Kapasitas Pagu', value: `Rp ${formatRp(sisaKapasitasHitung)}`, hl: 'emerald' },
     { label: 'Nominal Usulan Tambahan Pagu (Diajukan)', value: `Rp ${formatRp(nominalUsulanVal)}`, hl: 'amber' }
   ];
+
+  let rawRekomendasi = rekomendasi || (notaData?.mainData?.rekomendasi_html) || (notaData?.mainData?.rekomendasi_ai) || '';
+  if (typeof rawRekomendasi === 'string' && rawRekomendasi.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(rawRekomendasi);
+      if (parsed.rekomendasi) rawRekomendasi = parsed.rekomendasi;
+      else if (parsed.rekomendasi_html) rawRekomendasi = parsed.rekomendasi_html;
+      else if (parsed.analisis) rawRekomendasi = parsed.analisis;
+    } catch (e) {}
+  }
+  const cleanRekomendasiHtml = rawRekomendasi
+    ? (/<[a-z][\s\S]*>/i.test(rawRekomendasi) 
+        ? rawRekomendasi 
+        : `<p>${rawRekomendasi.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>')}</p>`)
+    : '';
+
+  let rawKeterangan = keterangan || (notaData?.mainData?.keterangan_keputusan) || '';
+  if (typeof rawKeterangan === 'string' && rawKeterangan.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(rawKeterangan);
+      if (parsed.keterangan) rawKeterangan = parsed.keterangan;
+    } catch (e) {}
+  }
+  const cleanKeteranganHtml = rawKeterangan
+    ? (/<[a-z][\s\S]*>/i.test(rawKeterangan) 
+        ? rawKeterangan 
+        : `<p>${rawKeterangan.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br/>')}</p>`)
+    : '';
 
   if (!isOpen) return null;
 
@@ -886,29 +914,31 @@ export default function DocumentViewerModal({
                   )}
 
                   {/* 8. REKOMENDASI & CATATAN KEPUTUSAN */}
-                  {(rekomendasi || (notaData?.mainData?.rekomendasi_ai) || keterangan || (notaData?.mainData?.keterangan_keputusan)) && (
+                  {(cleanRekomendasiHtml || cleanKeteranganHtml) && (
                     <div className="space-y-3 pt-3">
-                      {(rekomendasi || (notaData?.mainData?.rekomendasi_ai)) && (
+                      {cleanRekomendasiHtml && (
                         <div className="space-y-1.5">
                           <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
                             <FileCheck2 size={14} className="text-emerald-600" />
                             8. Rekomendasi Tim Verifikator Keuangan
                           </h6>
-                          <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 text-xs text-emerald-950 leading-relaxed font-medium shadow-2xs">
-                            {rekomendasi || (notaData?.mainData?.rekomendasi_ai)}
-                          </div>
+                          <div 
+                            className="bg-emerald-50/70 p-4 sm:p-5 rounded-2xl border border-emerald-200 text-xs text-emerald-950 leading-relaxed font-sans shadow-2xs prose prose-xs sm:prose-sm max-w-none break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_p]:mb-2 [&_strong]:font-bold [&_strong]:text-emerald-950"
+                            dangerouslySetInnerHTML={{ __html: cleanRekomendasiHtml }}
+                          />
                         </div>
                       )}
 
-                      {(keterangan || (notaData?.mainData?.keterangan_keputusan)) && (
+                      {cleanKeteranganHtml && (
                         <div className="space-y-1.5">
                           <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
                             <AlertCircle size={14} className="text-amber-600" />
                             Catatan Keputusan Pimpinan
                           </h6>
-                          <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 text-xs text-amber-950 leading-relaxed font-medium shadow-2xs">
-                            {keterangan || (notaData?.mainData?.keterangan_keputusan)}
-                          </div>
+                          <div 
+                            className="bg-amber-50/70 p-4 sm:p-5 rounded-2xl border border-amber-200 text-xs text-amber-950 leading-relaxed font-sans shadow-2xs prose prose-xs max-w-none break-words [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_strong]:font-bold [&_strong]:text-amber-950"
+                            dangerouslySetInnerHTML={{ __html: cleanKeteranganHtml }}
+                          />
                         </div>
                       )}
                     </div>

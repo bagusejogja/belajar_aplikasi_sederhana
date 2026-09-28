@@ -124,7 +124,8 @@ export default function PdfPreview({ mainData, detailData, historisData, setActi
     const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(historisYearRow.talangan) || 0;
     const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
     const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
-    const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
+    // Luncuran / talangan tidak termasuk dijumlah ke dalam Total Pagu (Kapasitas Tahun Berjalan)
+    const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan;
     const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || totalRealisasiDetail || 0;
     
     const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';

@@ -118,7 +118,7 @@ export default function RiwayatList({
       nominalUsulan: totalUsulan > 0 ? `Rp ${formatRp(totalUsulan)}` : 'Rp 0',
       keterangan: r.keterangan_keputusan || '',
       htmlContent: r.ringkasan_ai || r.analisis_html || '',
-      rekomendasi: r.rekomendasi_ai || '',
+      rekomendasi: r.rekomendasi_html || r.rekomendasi_ai || '',
       tanggalSurat: r.tanggal_surat || dateFormatted,
       notaData: {
         mainData: fullMainData,

@@ -218,7 +218,8 @@ export async function generateNotaAnalisisPdfBlob(
   const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(pBerjalan.talangan_pindah) || parseNum(pBerjalan.talangan) || parseNum(historisYearRow.talangan) || 0;
   const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
   const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
-  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran) || parseNum(pBerjalan.total_pagu) || 0;
+  // Luncuran / talangan tidak termasuk dijumlah ke dalam Total Pagu (Kapasitas Tahun Berjalan)
+  const cTotal = (cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan) || parseNum(pBerjalan.total_pagu) || 0;
   const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || parseNum(mainData?.total_realisasi) || totalRealisasiDetail || 0;
 
   const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
