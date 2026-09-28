@@ -63,6 +63,7 @@ export default function RiwayatList({
     htmlContent?: string;
     rekomendasi?: string;
     tanggalSurat?: string;
+    notaData?: any;
   }>({
     isOpen: false,
     title: 'Nota_Hasil_Analisis.pdf',
@@ -81,7 +82,12 @@ export default function RiwayatList({
 
     const cleanTitle = `Nota_Analisis_${(r.no_surat || r.id_analisis || 'Dokumen').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
 
-    // Tampilkan modal terlebih dahulu dengan metadata resmi
+    let details = expandedDetails[r.id_analisis]?.details;
+    let historis = expandedDetails[r.id_analisis]?.historis;
+    let detailInisiatif = (expandedDetails[r.id_analisis] as any)?.detailInisiatif;
+    let detailPenugasan = (expandedDetails[r.id_analisis] as any)?.detailPenugasan;
+
+    // Tampilkan modal terlebih dahulu dengan lembar template visual resmi (kertas rounded, tanpa bar PDF browser)
     setDocViewerModal({
       isOpen: true,
       mode: 'hasil_analisis',
@@ -99,14 +105,41 @@ export default function RiwayatList({
       keterangan: r.keterangan_keputusan || '',
       htmlContent: r.ringkasan_ai || r.analisis_html || '',
       rekomendasi: r.rekomendasi_ai || '',
-      tanggalSurat: dateFormatted
+      tanggalSurat: r.tanggal_surat || dateFormatted,
+      notaData: {
+        mainData: r,
+        detailData: details || [],
+        historisData: historis || [],
+        detailInisiatif: detailInisiatif || [],
+        detailPenugasan: detailPenugasan || []
+      }
     });
 
-    // Hasilkan dokumen PDF identik dengan 'Tahap 4 dari 5: Pratinjau & Cetak Nota Analisis PDF'
+    // Ambil data detail & historis dari database jika belum di-cache
     try {
-      const details = expandedDetails[r.id_analisis]?.details;
-      const historis = expandedDetails[r.id_analisis]?.historis;
-      const pdfBlobUrl = await generateNotaAnalisisPdfBlob(r, details, historis);
+      if ((!details || details.length === 0 || !historis || historis.length === 0) && r.id_analisis) {
+        const [detRes, histRes] = await Promise.all([
+          supabase.from('app_detail_realisasi').select('*').eq('id_analisis', r.id_analisis).order('no_urut', { ascending: true }),
+          supabase.from('app_pagu_historis').select('*').eq('id_analisis', r.id_analisis).order('tahun', { ascending: true })
+        ]);
+        if (detRes.data) details = detRes.data;
+        if (histRes.data) historis = histRes.data;
+        
+        // Update notaData in state
+        setDocViewerModal(prev => ({
+          ...prev,
+          notaData: {
+            mainData: r,
+            detailData: details || [],
+            historisData: historis || [],
+            detailInisiatif: detailInisiatif || [],
+            detailPenugasan: detailPenugasan || []
+          }
+        }));
+      }
+
+      // Generate blob PDF di background untuk keperluan tombol Unduh Dokumen
+      const pdfBlobUrl = await generateNotaAnalisisPdfBlob(r, details, historis, detailInisiatif, detailPenugasan);
       if (pdfBlobUrl) {
         setDocViewerModal(prev => ({
           ...prev,
@@ -1359,6 +1392,7 @@ export default function RiwayatList({
         htmlContent={docViewerModal.htmlContent}
         rekomendasi={docViewerModal.rekomendasi}
         tanggalSurat={docViewerModal.tanggalSurat}
+        notaData={docViewerModal.notaData}
       />
 
     </div>

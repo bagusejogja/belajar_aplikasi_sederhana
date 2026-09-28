@@ -38,6 +38,13 @@ export interface DocumentViewerModalProps {
   htmlContent?: string;
   rekomendasi?: string;
   tanggalSurat?: string;
+  notaData?: {
+    mainData?: any;
+    detailData?: any[];
+    historisData?: any[];
+    detailInisiatif?: any[];
+    detailPenugasan?: any[];
+  };
 }
 
 export default function DocumentViewerModal({
@@ -60,6 +67,7 @@ export default function DocumentViewerModal({
   htmlContent,
   rekomendasi,
   tanggalSurat,
+  notaData,
 }: DocumentViewerModalProps) {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
@@ -108,13 +116,89 @@ export default function DocumentViewerModal({
 
   const handleDownload = () => {
     if (fileUrl) {
-      window.open(fileUrl, '_blank');
+      const a = document.createElement('a');
+      a.href = fileUrl;
+      a.download = title || 'Dokumen_Nota_Analisis.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       window.print();
     }
   };
 
   const isHasilAnalisis = mode === 'hasil_analisis' || (!fileUrl && Boolean(htmlContent));
+
+  // Data helpers for rich Tahap 4 rendering
+  const mData = notaData?.mainData || {};
+  const dData = notaData?.detailData || [];
+  const hData = notaData?.historisData || [];
+  const dIni = notaData?.detailInisiatif || [];
+  const dPen = notaData?.detailPenugasan || [];
+
+  const parseNum = (str: string | number) => {
+    if (typeof str === 'number') return isNaN(str) ? 0 : str;
+    let s = (str || '0').toString().trim();
+    if (!s.includes(',') && s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 2 && (parts[1].length !== 3 || parts[0].length > 3)) {
+        return parseFloat(s) || 0;
+      }
+    }
+    const cleaned = s.replace(/\./g, '').replace(/,/g, '.');
+    return parseFloat(cleaned.replace(/[^0-9.-]+/g, '')) || 0;
+  };
+  const formatRp = (num: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num);
+
+  const targetYear = '2026';
+  const historisYearRow = hData.find((d: any) => d.tahun === targetYear) || hData[hData.length - 1] || {};
+  const totalRealisasiDetail = dData.reduce((acc: number, d: any) => acc + parseNum(d.realisasi), 0) || 0;
+
+  const pBerjalan = mData?.pagu_berjalan || {};
+  const cPaguAwal = parseNum(pBerjalan.pagu_awal) || parseNum(historisYearRow.pagu_awal) || 0;
+  const cPengalihan = parseNum(pBerjalan.pengalihan) || parseNum(historisYearRow.pengalihan) || 0;
+  const cInisiatif = parseNum(pBerjalan.tambah_inisiatif) || parseNum(historisYearRow.tambah_pagu_inisiatif) || 0;
+  const cEfisiensi = parseNum(pBerjalan.efisiensi) || parseNum(historisYearRow.efisiensi) || 0;
+  const cPenugasan = parseNum(pBerjalan.tambah_penugasan) || parseNum(historisYearRow.tambah_pagu_penugasan) || 0;
+  const cLuncuran = parseNum(pBerjalan.luncuran) || parseNum(historisYearRow.talangan) || 0;
+  const cRencana = parseNum(pBerjalan.rencana_penerimaan) || 0;
+  const cRealisasi = parseNum(pBerjalan.realisasi_penerimaan) || 0;
+  const cTotal = cPaguAwal + cPengalihan + cInisiatif + cEfisiensi + cPenugasan + cLuncuran;
+  const cPengeluaran = parseNum(pBerjalan.realisasi_keseluruhan) || totalRealisasiDetail || 0;
+
+  const persentaseTotal = cPaguAwal > 0 ? ((cTotal / cPaguAwal) * 100).toFixed(1) + '%' : '0%';
+  const persentaseRealisasi = cRencana > 0 ? ((cRealisasi / cRencana) * 100).toFixed(1) + '%' : (cTotal > 0 ? ((cPengeluaran / cTotal) * 100).toFixed(1) + '%' : '0%');
+  const pctPengeluaran = cRealisasi > 0 ? ((cPengeluaran / cRealisasi) * 100).toFixed(1) + '%' : (cTotal > 0 ? ((cPengeluaran / cTotal) * 100).toFixed(1) + '%' : '0%');
+
+  const cTotalPaguHistoris = parseNum(historisYearRow.total_pagu || '0');
+  const sisaKapasitasHitung = (cTotalPaguHistoris > 0 ? cTotalPaguHistoris : cTotal) - totalRealisasiDetail;
+  const nominalUsulanVal = parseNum(mData?.total_anggaran || nominalUsulan || nominal || '0');
+
+  let tanggalInput = '';
+  let bulanSebelum = '';
+  if (mData?.id_analisis && mData.id_analisis.startsWith('ANL-')) {
+    const ts = parseInt(mData.id_analisis.split('-')[1]);
+    if (!isNaN(ts)) {
+      const d = new Date(ts);
+      tanggalInput = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const d2 = new Date(ts);
+      d2.setMonth(d2.getMonth() - 1);
+      bulanSebelum = d2.toLocaleDateString('id-ID', { month: 'long' });
+    }
+  }
+
+  const rowsPosisiPagu = [
+    { label: 'Pagu Awal', value: `Rp ${formatRp(cPaguAwal)}`, hl: '' },
+    { label: 'Pengalihan (+/-)', value: `Rp ${formatRp(cPengalihan)}`, hl: '' },
+    ...(cInisiatif !== 0 ? [{ label: 'Tambah Pagu Inisiatif (+)', value: `+ Rp ${formatRp(Math.abs(cInisiatif))}`, hl: '' }] : []),
+    ...(cPenugasan !== 0 ? [{ label: 'Tambah Pagu Penugasan (+)', value: `+ Rp ${formatRp(Math.abs(cPenugasan))}`, hl: '' }] : []),
+    ...(cEfisiensi !== 0 ? [{ label: 'Efisiensi (-)', value: `- Rp ${formatRp(Math.abs(cEfisiensi))}`, hl: '' }] : []),
+    ...(cLuncuran !== 0 ? [{ label: 'Talangan / Luncuran (+)', value: `+ Rp ${formatRp(cLuncuran)}`, hl: '' }] : []),
+    { label: 'Pagu Sampai Saat Ini', value: `Rp ${formatRp(cTotalPaguHistoris || cTotal)}`, hl: 'indigo' },
+    { label: 'Realisasi S.d. Saat Ini', value: `Rp ${formatRp(totalRealisasiDetail)}`, hl: '' },
+    { label: 'Sisa Kapasitas Pagu', value: `Rp ${formatRp(sisaKapasitasHitung)}`, hl: 'emerald' },
+    { label: 'Nominal Usulan Tambahan Pagu (Diajukan)', value: `Rp ${formatRp(nominalUsulanVal)}`, hl: 'amber' }
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
@@ -245,16 +329,21 @@ export default function DocumentViewerModal({
         </div>
 
         {/* Document Canvas Body:
-            Jika ada fileUrl: TIDAK BOLEH overflow-auto di parent container agar TIDAK terjadi scrollbar ganda!
-            Iframe mengisi 100% penuh tinggi dan lebar dengan mulus.
+            Jika mode === 'hasil_analisis', SELALU render lembar kertas template visual (tanpa toolbar browser / guid)
+            dengan sudut melengkung halus (rounded-3xl shadow-2xl), persis seperti template!
         */}
-        {displayUrl ? (
-          <div className="flex-1 w-full h-full min-h-0 overflow-hidden p-0 m-0 bg-slate-950 flex flex-col">
-            <iframe
-              src={displayUrl}
-              className="w-full h-full flex-1 border-0 bg-white"
-              title={title}
-            />
+        {displayUrl && mode !== 'hasil_analisis' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 flex justify-center bg-slate-950/90">
+            <div 
+              className="w-full max-w-5xl h-[84vh] rounded-2xl overflow-hidden shadow-2xl border border-slate-800 transition-transform duration-200"
+              style={{ transform: `scale(${zoom / 100}) rotate(${rotation}deg)` }}
+            >
+              <iframe
+                src={`${displayUrl}#toolbar=0&navpanes=0`}
+                className="w-full h-full rounded-2xl border-0 bg-white"
+                title={title}
+              />
+            </div>
           </div>
         ) : (
           <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-8 flex justify-center bg-slate-950/90">
@@ -264,10 +353,13 @@ export default function DocumentViewerModal({
                 transform: `scale(${zoom / 100}) rotate(${rotation}deg)` 
               }}
             >
-              {/* JIKA MODE: HASIL ANALISIS (Tombol Printer) */}
+              {/* JIKA MODE: HASIL ANALISIS (Tombol Printer - Format Lengkap Tahap 4) */}
               {isHasilAnalisis ? (
-                <div className="w-full min-h-[820px] bg-white text-slate-900 p-8 sm:p-12 shadow-2xl rounded-2xl border border-slate-200 font-sans leading-relaxed text-xs space-y-6 my-auto">
+                <div className="w-full min-h-[920px] bg-white text-slate-900 p-8 sm:p-12 shadow-2xl rounded-3xl border border-slate-200/90 font-sans leading-relaxed text-xs space-y-6 my-auto">
                   
+                  {/* Blue Top Accent Bar */}
+                  <div className="h-1.5 w-full bg-blue-600 rounded-full mb-2" />
+
                   {/* Kop Surat Resmi UGM */}
                   <div className="text-center pb-4 border-b-2 border-slate-900 space-y-1">
                     <div className="w-12 h-12 mx-auto rounded-full bg-blue-900 text-amber-300 flex items-center justify-center font-bold text-lg font-sans shadow-sm ring-2 ring-amber-400/40">
@@ -286,89 +378,323 @@ export default function DocumentViewerModal({
 
                   {/* Judul Dokumen Hasil Analisis */}
                   <div className="text-center space-y-1 py-1">
-                    <h5 className="font-black text-sm uppercase tracking-wider text-slate-950 underline font-sans">
-                      NOTA HASIL ANALISIS USULAN PAGU ANGGARAN
+                    <h5 className="font-black text-base uppercase tracking-wider text-blue-900 font-sans">
+                      NOTA ANALISIS USULAN PAGU ANGGARAN
                     </h5>
                     <p className="text-[11px] font-mono font-semibold text-slate-600">
-                      Nomor Surat Usulan: {docNumber || '-'}
+                      Nomor Surat Usulan: {docNumber || (notaData?.mainData?.no_surat) || '-'}
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      Tanggal: {tanggalSurat || uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026'}
+                      Tanggal: {tanggalSurat || (notaData?.mainData?.tanggal_surat) || (uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026')}
                     </p>
                   </div>
 
-                  {/* Identitas Ringkasan Usulan */}
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-[11px] space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-                      <div>
-                        <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Unit Kerja Pengusul</span>
-                        <strong className="text-slate-900 text-xs">{unitName || 'Fakultas / Unit Pengusul UGM'}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Status Keputusan</span>
-                        <div className="mt-0.5 inline-block">
-                          <StatusBadge status={status} />
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Perihal Usulan</span>
-                        <span className="text-slate-800 font-medium">{perihal || 'Usulan Penambahan Pagu Anggaran Operasional / Kegiatan'}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Total Usulan vs Disetujui</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-600 line-through text-[10px]">{nominalUsulan ? nominalUsulan : ''}</span>
-                          <strong className="text-indigo-700 text-xs font-mono">{nominal || 'Rp 0'}</strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Substansi Hasil Analisis AI / Tim Verifikasi */}
-                  <div className="space-y-2.5 pt-2">
-                    <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-indigo-600" />
-                      I. Ringkasan &amp; Analisis Kelayakan Substansi
+                  {/* 1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN (KARTU GRID) */}
+                  <div className="space-y-2 pt-2">
+                    <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                      <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      1. DETAIL PAGU KESELURUHAN TAHUN BERJALAN{tanggalInput ? ` (per ${tanggalInput})` : ''}:
                     </h6>
-                    {htmlContent ? (
-                      <div 
-                        className="prose prose-xs sm:prose-sm text-slate-800 max-w-none text-xs leading-relaxed font-sans bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs break-words overflow-hidden [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2.5 [&_h3]:font-bold [&_h3]:text-sm [&_h4]:font-bold [&_strong]:font-bold"
-                        dangerouslySetInnerHTML={{ __html: htmlContent }}
-                      />
-                    ) : (
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-700 italic">
-                        {perihal ? `Usulan diajukan oleh ${unitName || 'unit pengusul'} dengan perihal: ${perihal}.` : 'Data hasil analisis usulan pagu belum diinputkan.'}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                      {/* Row 1 */}
+                      <div className="bg-amber-500 text-white p-3 rounded-xl flex items-center justify-between shadow-2xs">
+                        <span className="text-[11px] font-bold">Pagu Awal</span>
+                        <span className="text-sm font-black font-mono">Rp {formatRp(cPaguAwal)}</span>
                       </div>
-                    )}
+                      <div className="bg-emerald-600 text-white p-3 rounded-xl flex items-center justify-between shadow-2xs">
+                        <span className="text-[11px] font-bold">Total Pagu</span>
+                        <span className="text-sm font-black font-mono">Rp {formatRp(cTotal)} ({persentaseTotal})</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      {/* Row 2 */}
+                      <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-emerald-800 block">Tambah Pagu - Inisiatif (+)</span>
+                        <span className="text-xs font-black font-mono text-emerald-950 mt-1 block">Rp {formatRp(cInisiatif)}</span>
+                      </div>
+                      <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-emerald-800 block">Tambah Pagu - Penugasan (+)</span>
+                        <span className="text-xs font-black font-mono text-emerald-950 mt-1 block">Rp {formatRp(cPenugasan)}</span>
+                      </div>
+                      <div className="bg-indigo-50 border border-indigo-200 p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-indigo-800 block">Luncuran (+)</span>
+                        <span className="text-xs font-black font-mono text-indigo-950 mt-1 block">Rp {formatRp(cLuncuran)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {/* Row 3 */}
+                      <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-slate-700 block">Pengalihan (+/-)</span>
+                        <span className="text-xs font-black font-mono text-slate-900 mt-1 block">Rp {formatRp(cPengalihan)}</span>
+                      </div>
+                      <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-rose-800 block">Efisiensi (-)</span>
+                        <span className="text-xs font-black font-mono text-rose-900 mt-1 block">Rp {formatRp(cEfisiensi)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      {/* Row 4 */}
+                      <div className="bg-indigo-600 text-white p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-indigo-100 block">RENCANA PENERIMAAN</span>
+                        <span className="text-xs font-black font-mono mt-1 block">Rp {formatRp(cRencana)}</span>
+                      </div>
+                      <div className="bg-sky-600 text-white p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-sky-100 block">REALISASI PENERIMAAN{bulanSebelum ? ` (${bulanSebelum})` : ''}</span>
+                        <span className="text-xs font-black font-mono mt-1 block">Rp {formatRp(cRealisasi)} ({persentaseRealisasi})</span>
+                      </div>
+                      <div className="bg-teal-600 text-white p-2.5 rounded-xl">
+                        <span className="text-[10px] font-bold text-teal-100 block">TOTAL PENGELUARAN</span>
+                        <span className="text-xs font-black font-mono mt-1 block">Rp {formatRp(cPengeluaran)} ({pctPengeluaran})</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Rekomendasi Tim Verifikator (Jika ada) */}
-                  {rekomendasi && (
-                    <div className="space-y-2 pt-2">
-                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
-                        <FileCheck2 size={14} className="text-emerald-600" />
-                        II. Rekomendasi Tim Verifikator Keuangan
+                  {/* 2. IDENTITAS SURAT & INFORMASI UNIT */}
+                  <div className="space-y-2 pt-3">
+                    <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                      <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      2. IDENTITAS SURAT &amp; INFORMASI UNIT:
+                    </h6>
+                    <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/90 text-[11px] space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-1.5 gap-x-4">
+                        <span className="font-bold text-slate-600">Unit Pengusul</span>
+                        <span className="sm:col-span-2 font-bold text-slate-900">: {unitName || (notaData?.mainData?.unit_pengirim) || '-'}</span>
+
+                        <span className="font-bold text-slate-600">No Surat | Tgl</span>
+                        <span className="sm:col-span-2 font-mono text-slate-800">: {docNumber || (notaData?.mainData?.no_surat) || '-'} | {tanggalSurat || (notaData?.mainData?.tanggal_surat) || '-'}</span>
+
+                        <span className="font-bold text-slate-600">Perihal</span>
+                        <span className="sm:col-span-2 text-slate-800">: {perihal || (notaData?.mainData?.perihal) || '-'}</span>
+
+                        <span className="font-bold text-slate-600">Nominal Usulan</span>
+                        <span className="sm:col-span-2 font-black font-mono text-blue-700">: Rp {formatRp(nominalUsulanVal)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. RINGKASAN SUBSTANSI (WYSIWYG) */}
+                  {(htmlContent || (notaData?.mainData?.analisis_html) || (notaData?.mainData?.ringkasan_ai)) && (
+                    <div className="space-y-2 pt-3">
+                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        3. RINGKASAN SUBSTANSI USULAN:
                       </h6>
-                      <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200 text-xs text-emerald-950 leading-relaxed font-medium">
-                        {rekomendasi}
+                      <div 
+                        className="prose prose-xs sm:prose-sm text-slate-800 max-w-none text-xs leading-relaxed font-sans bg-white p-4 rounded-xl border border-slate-200 shadow-2xs break-words overflow-hidden [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2.5 [&_h3]:font-bold [&_h3]:text-sm [&_h4]:font-bold [&_strong]:font-bold"
+                        dangerouslySetInnerHTML={{ __html: htmlContent || (notaData?.mainData?.analisis_html) || (notaData?.mainData?.ringkasan_ai) || '' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* 4. POSISI PAGU TAHUN 2026 */}
+                  <div className="space-y-2 pt-3">
+                    <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                      <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      4. POSISI PAGU TAHUN 2026:
+                    </h6>
+                    <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
+                      <table className="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                            <th className="p-2.5 font-bold">Komponen Posisi Pagu</th>
+                            <th className="p-2.5 font-bold text-right">Nominal (Rp)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {rowsPosisiPagu.map((row, idx) => (
+                            <tr 
+                              key={idx}
+                              className={
+                                row.hl === 'indigo' 
+                                  ? 'bg-indigo-50/80 font-bold text-indigo-950'
+                                  : row.hl === 'emerald'
+                                    ? 'bg-emerald-50/80 font-bold text-emerald-950'
+                                    : row.hl === 'amber'
+                                      ? 'bg-amber-50/80 font-bold text-amber-950'
+                                      : 'hover:bg-slate-50'
+                              }
+                            >
+                              <td className="p-2 font-medium">{row.label}</td>
+                              <td className="p-2 text-right font-mono font-bold">{row.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* 5. HISTORI USULAN TAMBAH PAGU UNIT KERJA */}
+                  {(dIni.length > 0 || dPen.length > 0) && (
+                    <div className="space-y-2 pt-3">
+                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        5. HISTORI USULAN TAMBAH PAGU UNIT KERJA:
+                      </h6>
+                      <div className="rounded-xl overflow-hidden border border-slate-200 shadow-2xs">
+                        <table className="w-full text-left border-collapse text-[11px]">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                              <th className="p-2 font-bold w-10 text-center">No</th>
+                              <th className="p-2 font-bold">Uraian / Keterangan Tambah Pagu</th>
+                              <th className="p-2 font-bold text-right">Nominal (Rp)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {dIni.length > 0 && (
+                              <>
+                                <tr className="bg-indigo-50/70 font-bold text-indigo-900">
+                                  <td colSpan={3} className="p-2">A. Tambah Pagu Inisiatif</td>
+                                </tr>
+                                {dIni.map((h: any, idx: number) => (
+                                  <tr key={`ini-${idx}`} className="hover:bg-slate-50">
+                                    <td className="p-2 text-center text-slate-500">{idx + 1}</td>
+                                    <td className="p-2">
+                                      <div className="font-medium text-slate-900">{h.keterangan || '-'}</div>
+                                      <div className="text-[10px] text-slate-500 font-mono">Tahun: {h.tahun_anggaran || '-'} | Status: {h.status_pagu || 'Disetujui'}</div>
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-bold text-slate-800">Rp {formatRp(parseNum(h.nominal || '0'))}</td>
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                            {dPen.length > 0 && (
+                              <>
+                                <tr className="bg-indigo-50/70 font-bold text-indigo-900">
+                                  <td colSpan={3} className="p-2">B. Tambah Pagu Penugasan</td>
+                                </tr>
+                                {dPen.map((h: any, idx: number) => (
+                                  <tr key={`pen-${idx}`} className="hover:bg-slate-50">
+                                    <td className="p-2 text-center text-slate-500">{idx + 1}</td>
+                                    <td className="p-2">
+                                      <div className="font-medium text-slate-900">{h.keterangan || '-'}</div>
+                                      <div className="text-[10px] text-slate-500 font-mono">Tahun: {h.tahun_anggaran || '-'} | Status: {h.status_pagu || 'Disetujui'}</div>
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-bold text-slate-800">Rp {formatRp(parseNum(h.nominal || '0'))}</td>
+                                  </tr>
+                                ))}
+                              </>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
 
-                  {/* Catatan Keputusan Pimpinan (Jika ada) */}
-                  {keterangan && (
-                    <div className="space-y-2 pt-2">
-                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 border-b border-slate-200 pb-1.5 flex items-center gap-1.5">
-                        <AlertCircle size={14} className="text-amber-600" />
-                        III. Catatan Keputusan Pimpinan
+                  {/* 6. DATA HISTORIS PAGU MULTI-TAHUN */}
+                  {hData && hData.length > 0 && (
+                    <div className="space-y-2 pt-3">
+                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        6. DATA HISTORIS PAGU MULTI-TAHUN:
                       </h6>
-                      <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200 text-xs text-amber-950 leading-relaxed font-medium">
-                        {keterangan}
+                      <div className="rounded-xl overflow-x-auto border border-slate-200 shadow-2xs">
+                        <table className="w-full text-left border-collapse text-[10px] min-w-[600px]">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                              <th className="p-2 font-bold">Tahun</th>
+                              <th className="p-2 font-bold text-right">Pagu Awal</th>
+                              <th className="p-2 font-bold text-right">Pengalihan</th>
+                              <th className="p-2 font-bold text-right">+ Penugasan</th>
+                              <th className="p-2 font-bold text-right">+ Inisiatif</th>
+                              <th className="p-2 font-bold text-right">- Efisiensi</th>
+                              <th className="p-2 font-bold text-right">Total Pagu</th>
+                              <th className="p-2 font-bold text-right">Realisasi</th>
+                              <th className="p-2 font-bold text-center">% Serapan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {hData.map((d: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="p-2 font-bold text-slate-800 font-mono">{d.tahun}</td>
+                                <td className="p-2 text-right font-mono">{formatRp(parseNum(d.pagu_awal))}</td>
+                                <td className="p-2 text-right font-mono">{formatRp(parseNum(d.pengalihan))}</td>
+                                <td className="p-2 text-right font-mono text-emerald-700">{formatRp(parseNum(d.tambah_pagu_penugasan))}</td>
+                                <td className="p-2 text-right font-mono text-emerald-700">{formatRp(parseNum(d.tambah_pagu_inisiatif))}</td>
+                                <td className="p-2 text-right font-mono text-rose-700">{formatRp(parseNum(d.efisiensi))}</td>
+                                <td className="p-2 text-right font-mono font-bold text-slate-900">{formatRp(parseNum(d.total_pagu))}</td>
+                                <td className="p-2 text-right font-mono text-slate-800">{formatRp(parseNum(d.realisasi_historis))}</td>
+                                <td className="p-2 text-center font-bold text-blue-700">{d.persen_serapan || '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
 
-                  {/* Pengesahan & Tanda Tangan */}
+                  {/* 7. DETAIL SERAPAN REALISASI BELANJA TAHUN INI */}
+                  {dData && dData.length > 0 && (
+                    <div className="space-y-2 pt-3">
+                      <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        7. DETAIL SERAPAN REALISASI BELANJA TAHUN INI:
+                      </h6>
+                      <div className="rounded-xl overflow-x-auto border border-slate-200 shadow-2xs">
+                        <table className="w-full text-left border-collapse text-[10px] min-w-[500px]">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                              <th className="p-2 font-bold w-8 text-center">No</th>
+                              <th className="p-2 font-bold">Uraian Kegiatan / Akun</th>
+                              <th className="p-2 font-bold text-right">Anggaran (Rp)</th>
+                              <th className="p-2 font-bold text-right">Realisasi (Rp)</th>
+                              <th className="p-2 font-bold text-right">Sisa Pagu (Rp)</th>
+                              <th className="p-2 font-bold text-center">% Serapan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {dData.map((d: any, idx: number) => {
+                              const sisa = parseNum(d.anggaran) - parseNum(d.realisasi);
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="p-2 text-center text-slate-500 font-mono">{d.no_urut || idx + 1}</td>
+                                  <td className="p-2 font-medium text-slate-900">{d.uraian_kegiatan || '-'}</td>
+                                  <td className="p-2 text-right font-mono">{formatRp(parseNum(d.anggaran))}</td>
+                                  <td className="p-2 text-right font-mono text-emerald-800 font-bold">{formatRp(parseNum(d.realisasi))}</td>
+                                  <td className="p-2 text-right font-mono text-slate-700">{formatRp(sisa)}</td>
+                                  <td className="p-2 text-center font-bold text-blue-700">{d.persen_serapan || '-'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 8. REKOMENDASI & CATATAN KEPUTUSAN */}
+                  {(rekomendasi || (notaData?.mainData?.rekomendasi_ai) || keterangan || (notaData?.mainData?.keterangan_keputusan)) && (
+                    <div className="space-y-3 pt-3">
+                      {(rekomendasi || (notaData?.mainData?.rekomendasi_ai)) && (
+                        <div className="space-y-1.5">
+                          <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                            <FileCheck2 size={14} className="text-emerald-600" />
+                            8. Rekomendasi Tim Verifikator Keuangan
+                          </h6>
+                          <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 text-xs text-emerald-950 leading-relaxed font-medium">
+                            {rekomendasi || (notaData?.mainData?.rekomendasi_ai)}
+                          </div>
+                        </div>
+                      )}
+
+                      {(keterangan || (notaData?.mainData?.keterangan_keputusan)) && (
+                        <div className="space-y-1.5">
+                          <h6 className="font-extrabold text-xs uppercase tracking-wider text-slate-900 pb-1 flex items-center gap-1.5 border-b border-slate-200">
+                            <AlertCircle size={14} className="text-amber-600" />
+                            Catatan Keputusan Pimpinan
+                          </h6>
+                          <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-950 leading-relaxed font-medium">
+                            {keterangan || (notaData?.mainData?.keterangan_keputusan)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 9. PENGESAHAN & TANDA TANGAN */}
                   <div className="pt-8 flex justify-between items-end font-sans border-t border-slate-200 mt-6">
                     <div className="text-[10px] text-slate-400 space-y-1">
                       <p className="flex items-center gap-1 font-mono text-slate-500">
@@ -377,9 +703,9 @@ export default function DocumentViewerModal({
                       <p>ID Berkas: {docNumber ? encodeURIComponent(docNumber) : 'ANALISIS-PAGU-UGM-2026'}</p>
                     </div>
 
-                    <div className="text-center space-y-4 w-60">
+                    <div className="text-center space-y-3 w-60">
                       <p className="text-[10px] text-slate-600">
-                        Yogyakarta, {tanggalSurat || (uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026')}<br />
+                        Yogyakarta, {tanggalSurat || (notaData?.mainData?.tanggal_surat) || (uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026')}<br />
                         <span className="font-bold">Tim Verifikator Pagu Anggaran UGM</span>
                       </p>
                       <div className="w-24 h-11 border border-emerald-500/40 bg-emerald-50 text-emerald-700 text-[10px] font-mono font-bold flex flex-col items-center justify-center mx-auto rounded shadow-2xs">
