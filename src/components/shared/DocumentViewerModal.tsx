@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
@@ -25,6 +27,11 @@ export interface DocumentViewerModalProps {
   uploadedAt?: string;
   uploader?: string;
   status?: string;
+  docNumber?: string;
+  unitName?: string;
+  perihal?: string;
+  nominal?: string;
+  keterangan?: string;
 }
 
 export default function DocumentViewerModal({
@@ -36,7 +43,12 @@ export default function DocumentViewerModal({
   fileSize = '2.4 MB',
   uploadedAt = '25 Sep 2026, 14:15 WIB',
   uploader = 'Direktorat Keuangan UGM',
-  status = 'disetujui'
+  status = 'disetujui',
+  docNumber,
+  unitName,
+  perihal,
+  nominal,
+  keterangan,
 }: DocumentViewerModalProps) {
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
@@ -70,6 +82,14 @@ export default function DocumentViewerModal({
     setRotation(0);
   };
 
+  const handleDownload = () => {
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    } else {
+      alert(`Mengunduh dokumen: ${title}`);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
       {/* Backdrop */}
@@ -99,12 +119,23 @@ export default function DocumentViewerModal({
             </div>
           </div>
 
-          {/* Action Icons */}
-          <div className="flex items-center gap-1.5">
+          {/* Quick Header Actions */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {fileUrl && (
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                title="Buka Berkas di Tab Baru"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
             <button
               type="button"
-              onClick={() => alert(`Mengunduh berkas: ${title}`)}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              onClick={handleDownload}
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Unduh Berkas"
             >
               <Download className="w-4 h-4" />
@@ -112,7 +143,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={() => window.print()}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Cetak Berkas"
             >
               <Printer className="w-4 h-4" />
@@ -120,7 +151,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition-colors ml-1"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-300 transition-colors ml-1 cursor-pointer"
               title="Tutup (Esc)"
             >
               <X className="w-4 h-4" />
@@ -134,7 +165,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={handleZoomOut}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Perkecil (-)"
             >
               <ZoomOut className="w-4 h-4" />
@@ -145,7 +176,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={handleZoomIn}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Perbesar (+)"
             >
               <ZoomIn className="w-4 h-4" />
@@ -154,7 +185,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={handleRotate}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Putar 90° (Rotate)"
             >
               <RotateCw className="w-4 h-4" />
@@ -162,7 +193,7 @@ export default function DocumentViewerModal({
             <button
               type="button"
               onClick={handleReset}
-              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold"
+              className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors text-[11px] font-semibold cursor-pointer"
               title="Reset Zoom"
             >
               Reset
@@ -170,81 +201,91 @@ export default function DocumentViewerModal({
           </div>
 
           <div className="text-[11px] text-slate-400 hidden sm:block font-mono">
-            Halaman 1 dari 4 (Tampilan Resolusi Tinggi)
+            {fileUrl ? 'Tampilan Dokumen Asli Lampiran (PDF Viewer)' : 'Halaman 1 dari 4 (Tampilan Resolusi Tinggi UGM)'}
           </div>
         </div>
 
         {/* Document Canvas Body */}
-        <div className="flex-1 overflow-auto p-6 sm:p-10 flex items-center justify-center bg-slate-950/90">
-          <div 
-            className="transition-transform duration-200 ease-out origin-center"
-            style={{ 
-              transform: `scale(${zoom / 100}) rotate(${rotation}deg)` 
-            }}
-          >
-            {/* Visual Document Mockup (Representing SK / Nota Dinas UGM) */}
-            <div className="w-[560px] min-h-[760px] bg-white text-slate-900 p-10 shadow-2xl rounded-sm border border-slate-300 font-serif leading-relaxed text-xs space-y-6">
-              {/* Kop Surat UGM */}
-              <div className="text-center pb-4 border-b-2 border-slate-900 space-y-1">
-                <div className="w-12 h-12 mx-auto rounded-full bg-blue-900 text-amber-300 flex items-center justify-center font-bold text-lg font-sans shadow-sm">
-                  UGM
-                </div>
-                <h4 className="font-bold text-sm tracking-wide font-sans text-slate-950 uppercase pt-1">
-                  UNIVERSITAS GADJAH MADA
-                </h4>
-                <p className="text-[10px] font-sans text-slate-600">
-                  DIREKTORAT KEUANGAN • KANTOR PUSAT TATA USAHA (KPTU)
-                </p>
-                <p className="text-[9px] font-sans text-slate-400">
-                  Bulaksumur, Yogyakarta 55281 • Telp: (0274) 588688 • Email: keu@ugm.ac.id
-                </p>
-              </div>
-
-              {/* Judul Dokumen */}
-              <div className="text-center space-y-1 py-1">
-                <h5 className="font-bold text-xs uppercase tracking-wider underline font-sans">
-                  LEMBAR PENETAPAN VERIFIKASI PAGU ANGGARAN
-                </h5>
-                <p className="text-[10px] font-mono text-slate-600">
-                  Nomor: 0411/UN1.P.IV/DIR-KEU/KU/2026
-                </p>
-              </div>
-
-              {/* Isi Surat */}
-              <div className="space-y-3 font-sans text-[11px] text-slate-800">
-                <p>
-                  Berdasarkan hasil penelaahan dan verifikasi berkas usulan Rencana Kerja dan Anggaran (RKA) Tahun Anggaran 2026 yang diajukan oleh unit kerja:
-                </p>
-
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[10px] space-y-1">
-                  <div><strong>Nama Unit:</strong> Fakultas Biologi UGM (Kode: 02000010)</div>
-                  <div><strong>Mata Anggaran:</strong> 511111 - Belanja Gaji Pokok PNS</div>
-                  <div><strong>Pagu Disetujui:</strong> Rp 1.250.000.000 (Satu Milyar Dua Ratus Lima Puluh Juta Rupiah)</div>
-                  <div><strong>Sumber Pendanaan:</strong> Dana Masyarakat (PTNBH)</div>
-                </div>
-
-                <p>
-                  Dinyatakan <strong>TELAH MEMENUHI KELAYAKAN ADMINISTRASI</strong> dan disahkan untuk dimasukkan ke dalam penetapan SK Rektor periode anggaran berjalan.
-                </p>
-              </div>
-
-              {/* Tanda Tangan */}
-              <div className="pt-10 flex justify-end font-sans">
-                <div className="text-center space-y-8 w-56">
-                  <p className="text-[10px] text-slate-600">
-                    Yogyakarta, 25 September 2026<br />Direktur Keuangan UGM
-                  </p>
-                  <div className="w-20 h-10 border border-emerald-500/40 bg-emerald-50 text-emerald-700 text-[9px] font-mono font-bold flex items-center justify-center mx-auto rounded">
-                    TTE Valid
+        <div className="flex-1 overflow-auto p-4 sm:p-8 flex items-center justify-center bg-slate-950/90">
+          {fileUrl ? (
+            <div className="w-full h-full min-h-[580px] max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
+              <iframe
+                src={fileUrl}
+                className="w-full h-full min-h-[580px] border-0"
+                title={title}
+              />
+            </div>
+          ) : (
+            <div 
+              className="transition-transform duration-200 ease-out origin-center"
+              style={{ 
+                transform: `scale(${zoom / 100}) rotate(${rotation}deg)` 
+              }}
+            >
+              {/* Visual Document Mockup (Representing SK / Nota Dinas UGM) */}
+              <div className="w-[560px] min-h-[760px] bg-white text-slate-900 p-10 shadow-2xl rounded-sm border border-slate-300 font-serif leading-relaxed text-xs space-y-6">
+                {/* Kop Surat UGM */}
+                <div className="text-center pb-4 border-b-2 border-slate-900 space-y-1">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-blue-900 text-amber-300 flex items-center justify-center font-bold text-lg font-sans shadow-sm">
+                    UGM
                   </div>
-                  <div>
-                    <p className="font-bold text-[11px] underline">Prof. Dr. Ir. Keuangan, M.Sc.</p>
-                    <p className="text-[9px] text-slate-500 font-mono">NIP. 19750812 200003 1 002</p>
+                  <h4 className="font-bold text-sm tracking-wide font-sans text-slate-950 uppercase pt-1">
+                    UNIVERSITAS GADJAH MADA
+                  </h4>
+                  <p className="text-[10px] font-sans text-slate-600">
+                    DIREKTORAT KEUANGAN • KANTOR PUSAT TATA USAHA (KPTU)
+                  </p>
+                  <p className="text-[9px] font-sans text-slate-400">
+                    Bulaksumur, Yogyakarta 55281 • Telp: (0274) 588688 • Email: keu@ugm.ac.id
+                  </p>
+                </div>
+
+                {/* Judul Dokumen */}
+                <div className="text-center space-y-1 py-1">
+                  <h5 className="font-bold text-xs uppercase tracking-wider underline font-sans">
+                    {title.toLowerCase().includes('sk') ? 'SURAT KEPUTUSAN PENETAPAN PAGU ANGGARAN' : 'LEMBAR PENETAPAN VERIFIKASI PAGU ANGGARAN'}
+                  </h5>
+                  <p className="text-[10px] font-mono text-slate-600">
+                    Nomor: {docNumber || '0411/UN1.P.IV/DIR-KEU/KU/2026'}
+                  </p>
+                </div>
+
+                {/* Isi Surat */}
+                <div className="space-y-3 font-sans text-[11px] text-slate-800">
+                  <p>
+                    Berdasarkan hasil penelaahan dan verifikasi berkas usulan Rencana Kerja dan Anggaran (RKA) Tahun Anggaran 2026 yang diajukan oleh unit kerja:
+                  </p>
+
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 font-mono text-[10px] space-y-1">
+                    <div><strong>Nama Unit:</strong> {unitName || 'Fakultas Biologi UGM (Kode: 02000010)'}</div>
+                    <div><strong>Perihal Usulan:</strong> {perihal || 'Penetapan Pagu Anggaran Operasional & Riset'}</div>
+                    <div><strong>Pagu Disetujui:</strong> {nominal || 'Rp 1.250.000.000 (Satu Milyar Dua Ratus Lima Puluh Juta Rupiah)'}</div>
+                    <div><strong>Sumber Pendanaan:</strong> Dana Masyarakat (PTNBH)</div>
+                  </div>
+
+                  <p>
+                    Dinyatakan <strong>{keterangan || 'TELAH MEMENUHI KELAYAKAN ADMINISTRASI'}</strong> dan disahkan untuk dimasukkan ke dalam penetapan SK Rektor periode anggaran berjalan.
+                  </p>
+                </div>
+
+                {/* Tanda Tangan */}
+                <div className="pt-10 flex justify-end font-sans">
+                  <div className="text-center space-y-8 w-56">
+                    <p className="text-[10px] text-slate-600">
+                      Yogyakarta, {uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026'}<br />Direktur Keuangan UGM
+                    </p>
+                    <div className="w-20 h-10 border border-emerald-500/40 bg-emerald-50 text-emerald-700 text-[9px] font-mono font-bold flex items-center justify-center mx-auto rounded">
+                      TTE Valid
+                    </div>
+                    <div>
+                      <p className="font-bold text-[11px] underline">Prof. Dr. Ir. Keuangan, M.Sc.</p>
+                      <p className="text-[9px] text-slate-500 font-mono">NIP. 19750812 200003 1 002</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ import {
   RefreshCw, Save
 } from 'lucide-react';
 import { getSafeFileUrl } from '@/lib/fileHelper';
+import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
 
 export default function RiwayatList({ 
   onLoadAnalisis, 
@@ -41,6 +42,73 @@ export default function RiwayatList({
   const [modalNominalDisetujui, setModalNominalDisetujui] = useState('');
   const [modalKeteranganKeputusan, setModalKeteranganKeputusan] = useState('');
   const [isSavingDecision, setIsSavingDecision] = useState(false);
+
+  // Document Viewer Modal State (Printer & Paperclip Pop Up)
+  const [docViewerModal, setDocViewerModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    fileUrl?: string;
+    fileSize?: string;
+    uploadedAt?: string;
+    uploader?: string;
+    status?: string;
+    docNumber?: string;
+    unitName?: string;
+    perihal?: string;
+    nominal?: string;
+    keterangan?: string;
+  }>({
+    isOpen: false,
+    title: 'SK_Rektor_Penetapan_Pagu_2026.pdf',
+    fileSize: '2.4 MB',
+    uploader: 'Direktorat Keuangan UGM',
+    status: 'disetujui'
+  });
+
+  const handleOpenPrinterModal = (r: any) => {
+    const totalDisetujui = parseNum(r.nominal_disetujui || r.nominal_usulan || 0);
+    const dateFormatted = r.created_at
+      ? new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '25 Sep 2026';
+
+    setDocViewerModal({
+      isOpen: true,
+      title: `SK_Rektor_Penetapan_Pagu_${r.no_surat?.replace(/[^a-zA-Z0-9_-]/g, '_') || '2026'}.pdf`,
+      fileUrl: undefined,
+      fileSize: '2.4 MB',
+      uploader: r.unit_pengirim || 'Direktorat Keuangan UGM',
+      uploadedAt: `${dateFormatted}, 14:15 WIB`,
+      status: r.keputusan || 'disetujui',
+      docNumber: r.no_surat || '0411/UN1.P.IV/DIR-KEU/KU/2026',
+      unitName: r.unit_pengirim || 'Fakultas Biologi UGM',
+      perihal: r.perihal || 'Penetapan Pagu Anggaran Operasional & Riset',
+      nominal: totalDisetujui > 0 ? `Rp ${formatRp(totalDisetujui)}` : 'Rp 1.250.000.000',
+      keterangan: r.keterangan_keputusan || 'TELAH MEMENUHI KELAYAKAN ADMINISTRASI'
+    });
+  };
+
+  const handleOpenPaperclipModal = (r: any) => {
+    const rawFile = r.link_lampiran || r.file_lampiran;
+    const safeUrl = rawFile ? getSafeFileUrl(rawFile) : undefined;
+    const dateFormatted = r.created_at
+      ? new Date(r.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '25 Sep 2026';
+
+    setDocViewerModal({
+      isOpen: true,
+      title: `Lampiran_Surat_${r.no_surat?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'SK_Rektor_Penetapan_Pagu_2026'}.pdf`,
+      fileUrl: safeUrl,
+      fileSize: '2.4 MB',
+      uploader: r.unit_pengirim || 'Direktorat Keuangan UGM',
+      uploadedAt: `${dateFormatted}, 14:15 WIB`,
+      status: r.keputusan || 'disetujui',
+      docNumber: r.no_surat || '0411/UN1.P.IV/DIR-KEU/KU/2026',
+      unitName: r.unit_pengirim || 'Fakultas / Unit Pengusul UGM',
+      perihal: r.perihal || 'Berkas Lampiran Pengajuan Pagu Anggaran',
+      nominal: r.nominal_usulan ? `Rp ${formatRp(parseNum(r.nominal_usulan))}` : 'Rp 1.250.000.000',
+      keterangan: 'Dokumen Asli Lampiran Surat Pengajuan Unit Kerja'
+    });
+  };
 
   const loadDetailsForId = async (id: string) => {
     if (expandedDetails[id]) return;
@@ -656,24 +724,25 @@ export default function RiwayatList({
 
                                 <button
                                   type="button"
-                                  onClick={() => onLoadAnalisis(r.id_analisis, 'pdf')}
+                                  onClick={() => handleOpenPrinterModal(r)}
                                   className="flex-1 p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-slate-800 text-gray-600 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
-                                  title="Cetak / Pratinjau Dokumen Nota Analisis PDF"
+                                  title="Cetak / Pratinjau Pop-up Dokumen Nota Analisis PDF"
                                 >
                                   <Printer size={13} />
                                 </button>
 
-                                {(r.link_lampiran || r.file_lampiran) && (
-                                  <a
-                                    href={getSafeFileUrl(r.link_lampiran || r.file_lampiran)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex-1 p-1.5 rounded-lg border border-amber-200 bg-amber-50/70 hover:bg-amber-600 text-amber-700 hover:text-white transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer"
-                                    title="Buka Berkas PDF Lampiran Asli Surat Pengajuan"
-                                  >
-                                    <Paperclip size={13} />
-                                  </a>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPaperclipModal(r)}
+                                  className={`flex-1 p-1.5 rounded-lg border transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer ${
+                                    r.link_lampiran || r.file_lampiran
+                                      ? 'border-amber-200 bg-amber-50/70 hover:bg-amber-600 text-amber-700 hover:text-white'
+                                      : 'border-slate-200 bg-slate-50 hover:bg-slate-700 text-slate-500 hover:text-white'
+                                  }`}
+                                  title={r.link_lampiran || r.file_lampiran ? "Buka Pop-up Berkas PDF Lampiran Asli Surat Pengajuan" : "Pratinjau Pop-up Dokumen Lampiran Pengajuan"}
+                                >
+                                  <Paperclip size={13} />
+                                </button>
 
                                 <button
                                   type="button"
@@ -1229,6 +1298,24 @@ export default function RiwayatList({
              </div>
            )}
        </div>
+
+      {/* Pop-up Document Viewer Modal (Sesuai Template Design System) */}
+      <DocumentViewerModal
+        isOpen={docViewerModal.isOpen}
+        onClose={() => setDocViewerModal(prev => ({ ...prev, isOpen: false }))}
+        title={docViewerModal.title}
+        fileUrl={docViewerModal.fileUrl}
+        fileSize={docViewerModal.fileSize || "2.4 MB"}
+        uploadedAt={docViewerModal.uploadedAt || "25 Sep 2026, 14:15 WIB"}
+        uploader={docViewerModal.uploader || "Direktorat Keuangan UGM"}
+        status={docViewerModal.status || "disetujui"}
+        docNumber={docViewerModal.docNumber}
+        unitName={docViewerModal.unitName}
+        perihal={docViewerModal.perihal}
+        nominal={docViewerModal.nominal}
+        keterangan={docViewerModal.keterangan}
+      />
+
     </div>
   );
 }
