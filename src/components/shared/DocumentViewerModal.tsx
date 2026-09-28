@@ -358,33 +358,17 @@ export default function DocumentViewerModal({
                 <div className="w-full min-h-[920px] bg-white text-slate-900 p-8 sm:p-12 shadow-2xl rounded-3xl border border-slate-200/90 font-sans leading-relaxed text-xs space-y-6 my-auto">
                   
                   {/* Blue Top Accent Bar */}
-                  <div className="h-1.5 w-full bg-blue-600 rounded-full mb-2" />
+                  <div className="h-1.5 w-full bg-blue-600 rounded-full mb-3" />
 
-                  {/* Kop Surat Resmi UGM */}
-                  <div className="text-center pb-4 border-b-2 border-slate-900 space-y-1">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-blue-900 text-amber-300 flex items-center justify-center font-bold text-lg font-sans shadow-sm ring-2 ring-amber-400/40">
-                      UGM
-                    </div>
-                    <h4 className="font-extrabold text-sm sm:text-base tracking-wide font-sans text-slate-950 uppercase pt-1">
-                      UNIVERSITAS GADJAH MADA
-                    </h4>
-                    <p className="text-[11px] font-sans font-bold text-slate-700 tracking-wider">
-                      DIREKTORAT KEUANGAN • KANTOR PUSAT TATA USAHA (KPTU)
-                    </p>
-                    <p className="text-[10px] font-sans text-slate-500">
-                      Gedung Pusat UGM Lantai 3 Sayap Selatan, Bulaksumur, Yogyakarta 55281 • Telp: (0274) 588688 • Email: keu@ugm.ac.id
-                    </p>
-                  </div>
-
-                  {/* Judul Dokumen Hasil Analisis */}
-                  <div className="text-center space-y-1 py-1">
-                    <h5 className="font-black text-base uppercase tracking-wider text-blue-900 font-sans">
+                  {/* Judul Dokumen Hasil Analisis (Tanpa Kop Surat) */}
+                  <div className="text-center space-y-1 py-1 pb-3 border-b border-slate-100">
+                    <h5 className="font-black text-lg sm:text-xl uppercase tracking-wider text-blue-900 font-sans">
                       NOTA ANALISIS USULAN PAGU ANGGARAN
                     </h5>
-                    <p className="text-[11px] font-mono font-semibold text-slate-600">
+                    <p className="text-xs font-mono font-semibold text-slate-600">
                       Nomor Surat Usulan: {docNumber || (notaData?.mainData?.no_surat) || '-'}
                     </p>
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-[11px] text-slate-500">
                       Tanggal: {tanggalSurat || (notaData?.mainData?.tanggal_surat) || (uploadedAt ? uploadedAt.split(',')[0] : '25 September 2026')}
                     </p>
                   </div>
