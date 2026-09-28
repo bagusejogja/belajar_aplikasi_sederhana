@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Landmark, Plus, Search, Edit2, Loader2, Save, X, AlertTriangle, Building2, 
   Filter, User as UserIcon, Layers, RefreshCw, CheckCircle2, XCircle,
-  CheckSquare, Square, RotateCcw, Check
+  CheckSquare, Square, RotateCcw, Check, FileSpreadsheet
 } from 'lucide-react';
 import Select from 'react-select';
+import * as XLSX from 'xlsx';
 import { supabase } from '@/lib/supabase';
 import toast from 'react-hot-toast';
 import MasterUnitTabs from '@/components/MasterUnitTabs';
@@ -215,6 +216,46 @@ export default function GovUnitsPage() {
 
   const activeCount = units.filter(u => u.is_active).length;
 
+  // Export to Excel sesuai filter aktif
+  const handleExportExcel = () => {
+    if (filteredUnits.length === 0) {
+      toast.error('Tidak ada data yang sesuai filter untuk diekspor!');
+      return;
+    }
+
+    const exportRows = filteredUnits.map((u, idx) => ({
+      'No': idx + 1,
+      'Kode Unit': u.kode_unit || '',
+      'Nama Unit Kerja': u.nama_unit || '',
+      'Group Org': u.group_org || '',
+      'Penanggung Jawab (PIC)': u.pic || '',
+      'Jenis': u.jenis || '',
+      'Status': u.is_active ? 'Aktif' : 'Non-Aktif',
+      'Catatan': u.catatan || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+
+    // Styling lebar kolom proporsional
+    worksheet['!cols'] = [
+      { wch: 6 },  // No
+      { wch: 15 }, // Kode Unit
+      { wch: 45 }, // Nama Unit
+      { wch: 25 }, // Group Org
+      { wch: 30 }, // PIC
+      { wch: 20 }, // Jenis
+      { wch: 14 }, // Status
+      { wch: 30 }, // Catatan
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Unit Kerja');
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Data_Unit_Kerja_Filtered_${dateStr}.xlsx`);
+    toast.success(`Berhasil mengekspor ${filteredUnits.length} data unit kerja ke Excel!`);
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
       {/* UNIFIED MASTER UNIT TABS */}
@@ -240,6 +281,19 @@ export default function GovUnitsPage() {
         </div>
         
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          {/* Tombol Export Excel Berdasarkan Filter */}
+          <button
+            onClick={handleExportExcel}
+            className="h-9 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shadow-2xs"
+            title={`Export ${filteredUnits.length} data sesuai filter saat ini`}
+          >
+            <FileSpreadsheet size={14} className="text-emerald-600" />
+            <span className="hidden sm:inline">Export Excel</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-emerald-100/90 text-[10px] text-emerald-800 font-black">
+              {filteredUnits.length}
+            </span>
+          </button>
+
           <button
             onClick={fetchData}
             className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-1.5 transition-colors shadow-2xs"
@@ -265,14 +319,24 @@ export default function GovUnitsPage() {
             <div className="flex items-center gap-2 text-gray-700 text-xs font-black uppercase tracking-wider">
                <Filter size={14} className="text-sky-600" /> Filter Data Unit
             </div>
-            {(filterUnit || filterGroup.length > 0 || filterPic.length > 0 || filterJenis.length > 0) && (
-              <button 
-                onClick={() => { setFilterUnit(''); setFilterGroup([]); setFilterPic([]); setFilterJenis([]); }}
-                className="text-[11px] font-bold text-rose-600 hover:underline"
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                title="Download file Excel untuk data yang tersaring"
               >
-                Reset Filter
+                <FileSpreadsheet size={13} className="text-emerald-600" />
+                <span>Export Sesuai Filter ({filteredUnits.length})</span>
               </button>
-            )}
+              {(filterUnit || filterGroup.length > 0 || filterPic.length > 0 || filterJenis.length > 0) && (
+                <button 
+                  onClick={() => { setFilterUnit(''); setFilterGroup([]); setFilterPic([]); setFilterJenis([]); }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
          </div>
 
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

@@ -12,6 +12,7 @@ export interface ComboboxOption {
 
 export interface AutocompleteComboboxProps {
   label?: string;
+  icon?: React.ElementType;
   placeholder?: string;
   options: ComboboxOption[];
   value: string;
@@ -22,6 +23,7 @@ export interface AutocompleteComboboxProps {
 
 export default function AutocompleteCombobox({
   label,
+  icon: Icon,
   placeholder = 'Ketik untuk mencari...',
   options = [],
   value,
@@ -134,8 +136,9 @@ export default function AutocompleteCombobox({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-          {label}
+        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+          {Icon && <Icon size={11} className="text-gray-400 shrink-0" />}
+          <span>{label}</span>
         </label>
       )}
 
@@ -157,30 +160,34 @@ export default function AutocompleteCombobox({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full h-9 pl-3 pr-16 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800 transition-all shadow-2xs placeholder:text-gray-400"
+          className="w-full h-10 pl-3.5 pr-14 text-xs bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-gray-800 transition-all shadow-2xs placeholder:text-gray-400 placeholder:font-bold"
         />
 
-        {/* Clear & Dropdown Icon */}
-        <div className="absolute right-2 top-2 flex items-center gap-1 text-gray-400">
+        {/* Clear & Separator Divider & Dropdown Icon (Styled as screenshot) */}
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-gray-400">
           {value && (
             <button
               type="button"
               onClick={clearSelection}
-              className="p-0.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              className="p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               title="Hapus pilihan"
             >
               <X size={13} />
             </button>
           )}
+
+          {/* Vertical Separator Line | */}
+          <div className="h-5 w-px bg-gray-200/90 mx-0.5 shrink-0" />
+
           <button
             type="button"
             onClick={() => {
               setIsOpen(!isOpen);
               if (!isOpen) inputRef.current?.focus();
             }}
-            className="p-0.5 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+            className="p-1 rounded-md hover:bg-gray-100 transition-colors cursor-pointer text-gray-400 hover:text-gray-600"
           >
-            <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={15} className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
