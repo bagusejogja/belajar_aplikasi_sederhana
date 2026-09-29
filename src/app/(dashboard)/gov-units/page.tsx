@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Landmark, Plus, Search, Edit2, Loader2, Save, X, AlertTriangle, Building2, 
   Filter, User as UserIcon, Layers, RefreshCw, CheckCircle2, XCircle,
-  CheckSquare, Square, RotateCcw, Check, FileSpreadsheet
+  CheckSquare, Square, RotateCcw, Check, FileSpreadsheet, Copy, FileText,
+  Sparkles, Download, Type, CheckCheck
 } from 'lucide-react';
 import Select from 'react-select';
 import * as XLSX from 'xlsx';
@@ -73,6 +74,111 @@ export default function GovUnitsPage() {
   const handleClearAllChecks = () => {
     setCheckedUnitIds(new Set());
     toast.success('Semua tanda ceklis visual dibersihkan');
+  };
+
+  // Redaksi Template State & Presets
+  const PRESET_REDAKSI = [
+    { label: 'Kode - Nama', value: '[{kode_unit}] {nama_unit}' },
+    { label: 'Nota / Resmi', value: 'Unit Kerja: {nama_unit} (Kode Unit: {kode_unit})' },
+    { label: 'Surat Keluar', value: 'Yth. Pimpinan {nama_unit} ({kode_unit})' },
+    { label: 'Usulan Anggaran', value: 'Usulan penambahan alokasi pagu anggaran {nama_unit} (Kode: {kode_unit})' },
+    { label: 'Disposisi & PIC', value: '{nama_unit} (Kode: {kode_unit}) - PIC: {pic}' },
+  ];
+
+  const [showRedaksi, setShowRedaksi] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('gov_units_show_redaksi') === 'true';
+      } catch (e) {}
+    }
+    return false;
+  });
+
+  const [redaksiTemplate, setRedaksiTemplate] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('gov_units_redaksi_template');
+        if (saved) return saved;
+      } catch (e) {}
+    }
+    return '[{kode_unit}] {nama_unit}';
+  });
+
+  const [copiedUnitKey, setCopiedUnitKey] = useState<string | number | null>(null);
+  const [isAllCopied, setIsAllCopied] = useState<boolean>(false);
+
+  // Simpan setting redaksi di localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('gov_units_show_redaksi', String(showRedaksi));
+        localStorage.setItem('gov_units_redaksi_template', redaksiTemplate);
+      } catch (e) {}
+    }
+  }, [showRedaksi, redaksiTemplate]);
+
+  // Fungsi helper untuk generate teks redaksi per unit
+  const generateRedaksi = (unit: GovUnit, template: string): string => {
+    if (!template) return '';
+    return template
+      .replace(/\{nama_unit\}|\{nama\}|\[NAMA_UNIT\]|\[NAMA\]/gi, unit.nama_unit || '')
+      .replace(/\{kode_unit\}|\{kode\}|\[KODE_UNIT\]|\[KODE\]/gi, unit.kode_unit || '')
+      .replace(/\{pic\}|\[PIC\]/gi, unit.pic || '')
+      .replace(/\{group_org\}|\{group\}|\[GROUP_ORG\]/gi, unit.group_org || '')
+      .replace(/\{jenis\}|\[JENIS\]/gi, unit.jenis || '')
+      .replace(/\{catatan\}|\[CATATAN\]/gi, unit.catatan || '');
+  };
+
+  const copyToClipboard = async (text: string, unitKey?: string | number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (unitKey !== undefined) {
+        setCopiedUnitKey(unitKey);
+        setTimeout(() => setCopiedUnitKey(null), 2000);
+        toast.success('Redaksi unit berhasil disalin ke clipboard!');
+      } else {
+        setIsAllCopied(true);
+        setTimeout(() => setIsAllCopied(false), 2000);
+        toast.success(`Berhasil menyalin redaksi ${filteredUnits.length} unit ke clipboard!`);
+      }
+    } catch (err) {
+      toast.error('Gagal menyalin ke clipboard');
+    }
+  };
+
+  const handleCopyAllRedaksi = () => {
+    if (filteredUnits.length === 0) {
+      toast.error('Tidak ada data unit yang tersaring!');
+      return;
+    }
+    const allLines = filteredUnits.map((u, idx) => `${idx + 1}. ${generateRedaksi(u, redaksiTemplate)}`).join('\n');
+    copyToClipboard(allLines);
+  };
+
+  const handleDownloadTxtRedaksi = () => {
+    if (filteredUnits.length === 0) {
+      toast.error('Tidak ada data unit kerja!');
+      return;
+    }
+    const content = filteredUnits.map((u, idx) => `${idx + 1}. ${generateRedaksi(u, redaksiTemplate)}`).join('\r\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Redaksi_Unit_Kerja_${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Berkas teks redaksi berhasil diunduh!');
+  };
+
+  const insertVariable = (variable: string) => {
+    setRedaksiTemplate(prev => {
+      if (!prev) return variable;
+      const separator = prev.endsWith(' ') ? '' : ' ';
+      return `${prev}${separator}${variable}`;
+    });
   };
 
   // Modal State
@@ -227,6 +333,7 @@ export default function GovUnitsPage() {
       'No': idx + 1,
       'Kode Unit': u.kode_unit || '',
       'Nama Unit Kerja': u.nama_unit || '',
+      ...(showRedaksi ? { 'Hasil Redaksi': generateRedaksi(u, redaksiTemplate) } : {}),
       'Group Org': u.group_org || '',
       'Penanggung Jawab (PIC)': u.pic || '',
       'Jenis': u.jenis || '',
@@ -241,6 +348,7 @@ export default function GovUnitsPage() {
       { wch: 6 },  // No
       { wch: 15 }, // Kode Unit
       { wch: 45 }, // Nama Unit
+      ...(showRedaksi ? [{ wch: 45 }] : []), // Hasil Redaksi
       { wch: 25 }, // Group Org
       { wch: 30 }, // PIC
       { wch: 20 }, // Jenis
@@ -419,11 +527,190 @@ export default function GovUnitsPage() {
                   }}
                />
             </div>
-         </div>
+          </div>
+
+          {/* DIVIDER & CHECKBOX REDAKSI UNIT KERJA */}
+          <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <label className="inline-flex items-center gap-2.5 cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={showRedaksi}
+                onChange={(e) => setShowRedaksi(e.target.checked)}
+                className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 accent-sky-600 cursor-pointer transition-transform group-hover:scale-110"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-gray-800 group-hover:text-sky-700 transition-colors flex items-center gap-1.5">
+                  <FileText size={13} className="text-sky-600" />
+                  Format Redaksi Nama & Kode Unit Kerja
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">
+                  {'{nama_unit}'} & {'{kode_unit}'}
+                </span>
+              </div>
+            </label>
+
+            <span className={`text-[11px] font-bold flex items-center gap-1.5 ${showRedaksi ? 'text-emerald-600' : 'text-gray-400'}`}>
+              {showRedaksi ? (
+                <>
+                  <CheckCircle2 size={12} className="text-emerald-500" />
+                  <span>Kolom Redaksi Tampil di Setiap Baris Unit</span>
+                </>
+              ) : (
+                <span>Centang untuk membuka editor redaksi teks</span>
+              )}
+            </span>
+          </div>
       </div>
 
+      {/* CARD REDAKSI UNIT KERJA (MUNCUL JIKA CHECKBOX AKTIF) */}
+      {showRedaksi && (
+        <div className="bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/70 p-4 px-5 rounded-2xl shadow-xs border border-sky-200/90 space-y-3.5 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-sky-100">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-sky-600 text-white shadow-2xs">
+                <Sparkles size={14} />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+                  Generator Redaksi Teks Unit Kerja
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800 border border-sky-200">
+                    Live Preview ke Baris Tabel
+                  </span>
+                </h3>
+                <p className="text-[11px] text-gray-500 font-medium">
+                  Atur format redaksi kustom dengan variabel dinamis. Hasilnya langsung otomatis direalisasikan pada setiap baris unit kerja di bawah.
+                </p>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={handleCopyAllRedaksi}
+                className="h-8 px-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="Salin seluruh redaksi unit yang sedang terfilter ke clipboard"
+              >
+                {isAllCopied ? <CheckCheck size={13} /> : <Copy size={13} />}
+                <span>{isAllCopied ? 'Tersalin Semua!' : `Salin Semua (${filteredUnits.length})`}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadTxtRedaksi}
+                className="h-8 px-2.5 rounded-xl bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                title="Download daftar redaksi unit sebagai file .txt"
+              >
+                <Download size={13} />
+                <span className="hidden sm:inline">Unduh TXT</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRedaksiTemplate('[{kode_unit}] {nama_unit}')}
+                className="h-8 px-2 rounded-xl bg-white hover:bg-gray-100 text-gray-500 border border-gray-200 text-xs font-bold transition-all shadow-2xs flex items-center gap-1"
+                title="Kembalikan ke format default"
+              >
+                <RotateCcw size={12} />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Variable Insert Chips & Presets */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+            {/* Variable Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <Type size={11} /> Sisipkan Variabel:
+              </span>
+              <button
+                type="button"
+                onClick={() => insertVariable('{nama_unit}')}
+                className="px-2 py-1 rounded-lg bg-sky-100/80 hover:bg-sky-200 text-sky-800 text-[11px] font-black border border-sky-300/80 transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Klik untuk menyisipkan variabel Nama Unit Kerja"
+              >
+                <span>+</span> {'{nama_unit}'}
+              </button>
+              <button
+                type="button"
+                onClick={() => insertVariable('{kode_unit}')}
+                className="px-2 py-1 rounded-lg bg-sky-100/80 hover:bg-sky-200 text-sky-800 text-[11px] font-black border border-sky-300/80 transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Klik untuk menyisipkan variabel Kode Unit"
+              >
+                <span>+</span> {'{kode_unit}'}
+              </button>
+              <button
+                type="button"
+                onClick={() => insertVariable('{pic}')}
+                className="px-2 py-1 rounded-lg bg-emerald-100/80 hover:bg-emerald-200 text-emerald-800 text-[11px] font-black border border-emerald-300/80 transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Klik untuk menyisipkan variabel PIC"
+              >
+                <span>+</span> {'{pic}'}
+              </button>
+              <button
+                type="button"
+                onClick={() => insertVariable('{group_org}')}
+                className="px-2 py-1 rounded-lg bg-indigo-100/80 hover:bg-indigo-200 text-indigo-800 text-[11px] font-black border border-indigo-300/80 transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Klik untuk menyisipkan variabel Grup Organisasi"
+              >
+                <span>+</span> {'{group_org}'}
+              </button>
+              <button
+                type="button"
+                onClick={() => insertVariable('{jenis}')}
+                className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-black border border-gray-300 transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Klik untuk menyisipkan variabel Jenis Unit"
+              >
+                <span>+</span> {'{jenis}'}
+              </button>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Preset Cepat:</span>
+              {PRESET_REDAKSI.map((preset, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setRedaksiTemplate(preset.value)}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                    redaksiTemplate === preset.value
+                      ? 'bg-sky-600 text-white border-sky-600 shadow-2xs font-black'
+                      : 'bg-white hover:bg-sky-50 text-gray-600 hover:text-sky-700 border-gray-200'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Text Box Input Area */}
+          <div className="relative">
+            <textarea
+              rows={2}
+              value={redaksiTemplate}
+              onChange={(e) => setRedaksiTemplate(e.target.value)}
+              placeholder="Ketik teks redaksi di sini, gunakan {nama_unit} dan {kode_unit} sebagai variabel dinamis..."
+              className="w-full p-2.5 px-3 rounded-xl bg-white border border-sky-300/90 text-gray-900 text-xs font-mono font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all shadow-inner"
+            />
+          </div>
+
+          {/* Sample Preview Card */}
+          {filteredUnits.length > 0 && (
+            <div className="flex items-center gap-2 p-2 px-3 rounded-xl bg-sky-100/60 border border-sky-200/90 text-xs">
+              <span className="text-[10px] font-black uppercase text-sky-800 tracking-wider shrink-0">Contoh Hasil:</span>
+              <p className="font-mono text-xs font-bold text-sky-950 truncate flex-1">
+                {generateRedaksi(filteredUnits[0], redaksiTemplate)}
+              </p>
+              <span className="text-[10px] text-sky-600 font-semibold shrink-0">
+                (Diterapkan ke {filteredUnits.length} unit di tabel)
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* QUICK STATUS INFO */}
-      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2 text-xs font-bold text-gray-500">
         <div className="flex items-center gap-3">
           <span>Menampilkan <strong className="text-gray-900">{filteredUnits.length}</strong> unit kerja</span>
           {checkedUnitIds.size > 0 && (
@@ -443,6 +730,19 @@ export default function GovUnitsPage() {
             </span>
           )}
         </div>
+
+        {/* Quick Checkbox Toggle on right */}
+        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showRedaksi}
+            onChange={(e) => setShowRedaksi(e.target.checked)}
+            className="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 accent-sky-600 cursor-pointer"
+          />
+          <span className="text-xs font-bold text-gray-700 hover:text-sky-700 transition-colors">
+            Kolom Redaksi Teks Unit ({showRedaksi ? 'Aktif' : 'Nonaktif'})
+          </span>
+        </label>
       </div>
 
       {/* TABLE DATA */}
@@ -459,6 +759,24 @@ export default function GovUnitsPage() {
                   <tr>
                      <th className="px-5 py-3 whitespace-nowrap">Kode Unit</th>
                      <th className="px-5 py-3">Nama Unit Kerja</th>
+                     {showRedaksi && (
+                        <th className="px-5 py-3 min-w-[320px] bg-sky-50/70 border-l border-sky-100 text-sky-900 font-black">
+                           <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                 <FileText size={12} className="text-sky-600" />
+                                 <span>Hasil Redaksi Teks</span>
+                              </div>
+                              <button
+                                 type="button"
+                                 onClick={handleCopyAllRedaksi}
+                                 className="px-2 py-0.5 rounded-md bg-white border border-sky-200 text-sky-700 hover:bg-sky-600 hover:text-white text-[9px] font-black uppercase tracking-wider transition-all shadow-2xs cursor-pointer"
+                                 title="Salin seluruh hasil redaksi pada tabel"
+                              >
+                                 Salin Semua
+                              </button>
+                           </div>
+                        </th>
+                     )}
                      <th className="px-5 py-3">Grup & Jenis</th>
                      <th className="px-5 py-3">Penanggung Jawab (PIC)</th>
                      <th className="px-5 py-3 text-center">Status</th>
@@ -500,6 +818,44 @@ export default function GovUnitsPage() {
                                  </p>
                               )}
                            </td>
+
+                           {/* Hasil Redaksi Kustom (Muncul jika checkbox aktif) */}
+                           {showRedaksi && (
+                              <td className="px-5 py-3 bg-sky-50/20 border-l border-sky-100/70">
+                                 <div className="flex items-start justify-between gap-2 p-2 px-2.5 rounded-xl bg-white border border-sky-200/80 shadow-2xs group-hover:border-sky-300 group-hover:shadow-xs transition-all">
+                                    <div className="flex-1 min-w-0">
+                                       <p className="text-xs font-semibold text-gray-800 leading-relaxed break-words font-mono select-all">
+                                          {generateRedaksi(u, redaksiTemplate)}
+                                       </p>
+                                    </div>
+                                    <button
+                                       type="button"
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          copyToClipboard(generateRedaksi(u, redaksiTemplate), unitKey);
+                                       }}
+                                       className={`shrink-0 h-6 px-2 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-90 ${
+                                          copiedUnitKey === unitKey
+                                             ? 'bg-emerald-600 text-white shadow-xs'
+                                             : 'bg-sky-50 hover:bg-sky-600 text-sky-700 hover:text-white border border-sky-200 hover:border-sky-600 shadow-2xs'
+                                       }`}
+                                       title="Salin redaksi unit ini ke clipboard"
+                                    >
+                                       {copiedUnitKey === unitKey ? (
+                                          <>
+                                             <Check size={11} />
+                                             <span>Tersalin!</span>
+                                          </>
+                                       ) : (
+                                          <>
+                                             <Copy size={11} />
+                                             <span>Salin</span>
+                                          </>
+                                       )}
+                                    </button>
+                                 </div>
+                              </td>
+                           )}
 
                            {/* Grup & Jenis */}
                            <td className="px-5 py-3">
@@ -582,7 +938,7 @@ export default function GovUnitsPage() {
                   })}
                   {filteredUnits.length === 0 && (
                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
+                        <td colSpan={showRedaksi ? 7 : 6} className="px-6 py-12 text-center text-gray-400">
                            <AlertTriangle size={28} className="mx-auto text-gray-300 mb-2"/>
                            <p className="text-xs font-bold">Tidak ada unit kerja yang sesuai dengan filter.</p>
                         </td>
