@@ -306,6 +306,11 @@ export default function MonitoringMakPage() {
       .sort((a, b) => b.Total - a.Total);
   }, [filtered]);
 
+  const topUnitChange = useMemo(() => {
+    if (!chartData || chartData.length === 0) return { name: '-', count: 0 };
+    return { name: chartData[0].name, count: chartData[0].Total };
+  }, [chartData]);
+
   // Options for filters
   const availableTahun = Array.from(new Set(data.map(d => String(d.tahun)).filter(Boolean))).sort().reverse();
   const availableUnits = Array.from(new Set(data.map(d => d.unit).filter(Boolean))).sort();
@@ -545,25 +550,30 @@ export default function MonitoringMakPage() {
     );
   };
 
+  const completionRate = total > 0 ? Math.round((selesai / total) * 100) : 0;
+
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-rose-600 to-indigo-700 p-2 rounded-xl text-white shadow-xs">
-            <ClipboardList size={20} />
+      {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 bg-gradient-to-br from-rose-600 via-pink-600 to-indigo-700 rounded-xl flex items-center justify-center text-white shadow-md shadow-rose-200/60 shrink-0">
+            <ClipboardList size={22} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-rose-50 text-rose-700 font-extrabold uppercase tracking-wider text-[10px] px-2.5 py-0.5 rounded-md border border-rose-200/80">
+                REVISI TOLAKAN VERIFIKATOR
+              </span>
+              <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">
                 Revisi Tolakan dari Verifikator
               </h1>
-              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">
-                {filtered.length} Pengajuan ({filterTahun || 'Semua Tahun'})
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
+                {filtered.length} Berkas ({filterTahun || 'Semua Tahun'})
               </span>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Daftar perubahan tolakan verifikator, pemrosesan status, & notifikasi email pengaju.
+            <p className="text-gray-500 font-medium text-xs mt-1">
+              Daftar perubahan tolakan verifikator, pemrosesan status, audit SLA respon, & notifikasi email pengaju.
             </p>
           </div>
         </div>
@@ -571,7 +581,8 @@ export default function MonitoringMakPage() {
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={fetchData}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+            className="h-9 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            title="Muat ulang data dari database"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
@@ -579,119 +590,187 @@ export default function MonitoringMakPage() {
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Total Pengajuan */}
-        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+      {/* ROW 2: 4 KPI STAT CARDS (SESUAI STANDAR DESIGN SYSTEM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: Total Pengajuan */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-indigo-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">TOTAL PENGAJUAN</span>
-              <div className="text-2xl font-black text-indigo-900 font-mono tracking-tight">{total}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">
+                TOTAL PENGAJUAN
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+                {total}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-              <ClipboardList size={18} />
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
+              <ClipboardList size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-100/60 pt-2">
-            <span>Seluruh Usulan Tolakan</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">100%</span>
+          <div className="mt-3.5 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-50 pt-2.5">
+            <span>Usulan Tolakan</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-black border border-indigo-100">
+              100% Berkas
+            </span>
           </div>
         </div>
 
-        {/* Proses Revisi */}
-        <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex flex-col justify-between">
+        {/* Card 2: Menunggu Verifikasi */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">PROSES REVISI</span>
-              <div className="text-2xl font-black text-amber-700 font-mono tracking-tight">{proses}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+                PROSES REVISI
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-amber-900 font-mono tracking-tight">
+                {proses}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-              <Clock size={18} />
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs shrink-0">
+              <Clock size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
-            <span>Menunggu Verifikasi</span>
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold">Pending</span>
+          <div className="mt-3.5 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-50 pt-2.5">
+            <span>Menunggu verifikasi</span>
+            <span className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded-md font-black border border-amber-200">
+              Pending
+            </span>
           </div>
         </div>
 
-        {/* Selesai */}
-        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+        {/* Card 3: Selesai Diproses */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-emerald-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">SELESAI</span>
-              <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">{selesai}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+                SELESAI DIPROSES
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-emerald-900 font-mono tracking-tight">
+                {selesai}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-              <CheckCircle2 size={18} />
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs shrink-0">
+              <CheckCircle2 size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
-            <span>Telah Ditindaklanjuti</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">Selesai</span>
+          <div className="mt-3.5 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-50 pt-2.5">
+            <span>Telah ditindaklanjuti</span>
+            <span className="text-[10px] bg-emerald-100/80 text-emerald-800 px-2 py-0.5 rounded-md font-black border border-emerald-200">
+              Selesai
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Tingkat Ketuntasan & Progress */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-rose-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">
+                TINGKAT KETUNTASAN
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-rose-950 font-mono tracking-tight">
+                {completionRate}%
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shadow-2xs shrink-0">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          <div className="mt-2.5 space-y-1">
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-rose-500 to-indigo-600 rounded-full transition-all duration-500"
+                style={{ width: `${completionRate}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 pt-1">
+              <span>{selesai} dari {total} berkas</span>
+              <span className="text-rose-700 font-black">{completionRate === 100 ? 'Tuntas Penuh' : `${100 - completionRate}% belum`}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Alert Messages */}
       {successMsg && (
-        <div className="p-3.5 px-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-3 text-xs font-bold">
+        <div className="p-3.5 px-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl flex items-center gap-3 text-xs font-bold shadow-2xs">
           <CheckCircle2 size={16} className="shrink-0" />
           <p>{successMsg}</p>
         </div>
       )}
       {errorMsg && (
-        <div className="p-3.5 px-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-3 text-xs font-bold">
+        <div className="p-3.5 px-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center gap-3 text-xs font-bold shadow-2xs">
           <div className="shrink-0 font-black">!</div>
           <p>{errorMsg}</p>
         </div>
       )}
 
-      {/* Dashboard Gambaran Revisi */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
+      {/* ROW 3: GAMBARAN REVISI SECTION DENGAN GLOW PILL TABS */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-gray-100 pb-3">
           <div>
-            <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
-              <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}
+            <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 size={16} className="text-indigo-600" />
+              <span>Gambaran Revisi Anggaran {filterTahun ? `(${filterTahun})` : ''}</span>
             </h2>
             <p className="text-[11px] text-gray-500 font-medium mt-0.5">
               Monitoring kinerja verifikator, durasi rata-rata penyelesaian (SLA), dan sebaran revisi per unit.
             </p>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-xl">
+          {/* GLOW PILL TABS (DESIGN SYSTEM STYLE 1) */}
+          <div className="inline-flex p-1 bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-inner gap-1">
             <button 
               onClick={() => setActiveTab('pic-report')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'pic-report' 
-                  ? 'bg-white text-indigo-700 shadow-xs' 
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'pic-report'
+                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
               }`}
             >
-              <UserCheck size={13} />
-              <span>Report per PIC & SLA ({picSummaryData.length})</span>
+              <UserCheck size={13} className={activeTab === 'pic-report' ? 'text-white' : 'text-slate-500'} />
+              <span>Report per PIC & SLA</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'pic-report' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {picSummaryData.length}
+              </span>
             </button>
             <button 
               onClick={() => setActiveTab('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'table' 
-                  ? 'bg-white text-indigo-700 shadow-xs' 
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'table'
+                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
               }`}
             >
-              <Building2 size={13} />
+              <Building2 size={13} className={activeTab === 'table' ? 'text-white' : 'text-slate-500'} />
               <span>Frekuensi Unit</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'table' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {dashboardData.length}
+              </span>
             </button>
             <button 
               onClick={() => setActiveTab('chart')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                activeTab === 'chart' 
-                  ? 'bg-white text-indigo-700 shadow-xs' 
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'chart'
+                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
               }`}
             >
-              <BarChart3 size={13} />
+              <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
               <span>Grafik Batang</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {chartData.length}
+              </span>
             </button>
           </div>
         </div>
@@ -702,94 +781,98 @@ export default function MonitoringMakPage() {
             {/* 4 KPI SUMMARY CARDS SESUAI STANDAR DESIGN SYSTEM */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Card 1: Rata-Rata SLA */}
-              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+              <div className="bg-white rounded-2xl p-4 border border-indigo-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group flex flex-col justify-between">
+                <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">
                       RATA-RATA PENYELESAIAN (SLA)
                     </span>
-                    <div className="text-xl font-black text-indigo-900 font-mono tracking-tight">
+                    <div className="text-xl md:text-2xl font-black text-indigo-950 font-mono tracking-tight">
                       {globalSlaSummary.avgGlobalFormatted}
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl bg-indigo-100/70 text-indigo-700 border border-indigo-200">
-                    <Clock size={16} />
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center shadow-2xs shrink-0">
+                    <Clock size={18} />
                   </div>
                 </div>
-                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
-                  <span>Dari berkas masuk s/d selesai</span>
-                  <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-black">
+                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-50 pt-2">
+                  <span>Dari masuk s/d selesai</span>
+                  <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-black">
                     SLA Global
                   </span>
                 </div>
               </div>
 
               {/* Card 2: Tingkat Ketuntasan */}
-              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+              <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group flex flex-col justify-between">
+                <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
                       TINGKAT KETUNTASAN
                     </span>
-                    <div className="text-xl font-black text-emerald-800 font-mono tracking-tight">
+                    <div className="text-xl md:text-2xl font-black text-emerald-950 font-mono tracking-tight">
                       {globalSlaSummary.completionRate}%
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl bg-emerald-100/70 text-emerald-700 border border-emerald-200">
-                    <CheckCircle2 size={16} />
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-2xs shrink-0">
+                    <CheckCircle2 size={18} />
                   </div>
                 </div>
-                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-emerald-50 pt-2">
                   <span>{selesai} selesai dari {total} berkas</span>
-                  <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-black">
+                  <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-black">
                     {proses} Pending
                   </span>
                 </div>
               </div>
 
               {/* Card 3: Waktu Selesai Tercepat */}
-              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+              <div className="bg-white rounded-2xl p-4 border border-amber-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group flex flex-col justify-between">
+                <div className="absolute -right-8 -top-8 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
                       RESPON TERCEPAT
                     </span>
-                    <div className="text-xl font-black text-amber-900 font-mono tracking-tight flex items-center gap-1">
-                      <Zap size={16} className="text-amber-500 fill-amber-500" />
+                    <div className="text-xl md:text-2xl font-black text-amber-950 font-mono tracking-tight flex items-center gap-1">
+                      <Zap size={18} className="text-amber-500 fill-amber-500" />
                       <span>{globalSlaSummary.fastestFormatted}</span>
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl bg-amber-100/70 text-amber-700 border border-amber-200">
-                    <Sparkles size={16} />
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shadow-2xs shrink-0">
+                    <Sparkles size={18} />
                   </div>
                 </div>
-                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
+                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-amber-50 pt-2">
                   <span>Waktu penanganan minimum</span>
-                  <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-black">
+                  <span className="text-[9px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-black">
                     Kilat
                   </span>
                 </div>
               </div>
 
-              {/* Card 4: PIC Paling Produktif */}
-              <div className="bg-slate-50/70 rounded-2xl p-3.5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-1">
-                      PIC TERBANYAK TUNTAS
+              {/* Card 4: 🔴 DIGANTI: UNIT TERBANYAK MELAKUKAN PERUBAHAN */}
+              <div className="bg-white rounded-2xl p-4 border border-purple-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group flex flex-col justify-between">
+                <div className="absolute -right-8 -top-8 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 block mb-1">
+                      UNIT TERBANYAK PERUBAHAN
                     </span>
-                    <div className="text-sm font-black text-slate-900 line-clamp-1" title={globalSlaSummary.mostProductivePic}>
-                      {globalSlaSummary.mostProductivePic}
+                    <div className="text-sm md:text-base font-black text-purple-950 truncate" title={topUnitChange.name}>
+                      {topUnitChange.name}
                     </div>
                   </div>
-                  <div className="p-2 rounded-xl bg-purple-100/70 text-purple-700 border border-purple-200">
-                    <Award size={16} />
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shadow-2xs shrink-0">
+                    <Building2 size={18} />
                   </div>
                 </div>
-                <div className="mt-2.5 text-[11px] font-medium text-slate-500 flex items-center justify-between border-t border-slate-200/60 pt-2">
-                  <span>Menyelesaikan pekerjaan</span>
-                  <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-black">
-                    {globalSlaSummary.mostProductiveCount} Berkas
+                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-purple-50 pt-2">
+                  <span>Frekuensi revisi/usulan</span>
+                  <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md font-black">
+                    {topUnitChange.count} Kali Revisi
                   </span>
                 </div>
               </div>
@@ -984,29 +1067,39 @@ export default function MonitoringMakPage() {
         {/* TAB 3: GRAFIK BATANG UNIT */}
         {activeTab === 'chart' && (
           chartData.length > 0 ? (
-            <div className="h-[280px] w-full pt-2">
+            <div className="h-[300px] w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <defs>
+                    <linearGradient id="makChartGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#e11d48" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} 
+                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
                     angle={-45} 
                     textAnchor="end" 
                     interval={0}
                     height={80}
                     tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
                   />
-                  <YAxis tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
                   <Tooltip 
-                    cursor={{ fill: '#f9fafb' }}
-                    contentStyle={{ borderRadius: '0.75rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
+                    contentStyle={{ 
+                      borderRadius: '0.85rem', 
+                      border: '1px solid #e2e8f0', 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                      fontWeight: 'bold'
+                    }}
                   />
-                  <Bar dataKey="Total" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={1000}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#4f46e5" />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="Total" fill="url(#makChartGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

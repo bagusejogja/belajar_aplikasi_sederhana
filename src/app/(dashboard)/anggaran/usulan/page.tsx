@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { 
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
-  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2, ExternalLink
+  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2, ExternalLink,
+  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
@@ -443,26 +444,30 @@ export default function UsulanAnggaranPage() {
   const total = filteredData.length;
   const selesai = filteredData.filter(d => d.status === 'Sudah Diproses').length;
   const proses = filteredData.filter(d => d.status !== 'Sudah Diproses').length;
+  const completionRate = total > 0 ? Math.round((selesai / total) * 100) : 0;
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
-            <ClipboardList size={20} />
+      {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-200/60 shrink-0">
+            <ClipboardList size={22} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-indigo-50 text-indigo-700 font-extrabold uppercase tracking-wider text-[10px] px-2.5 py-0.5 rounded-md border border-indigo-200/80">
+                USULAN REVISI ANGGARAN
+              </span>
+              <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">
                 Usulan Revisi Terjadwal
               </h1>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                {filteredData.length} Pengajuan ({selectedTP === 'ALL' || !selectedTP ? 'Semua Periode' : `${selectedTP}${selectedTP === availableTPs[0] ? ' (Terbaru)' : ''}`})
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
+                {filteredData.length} Pengajuan
               </span>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Monitoring data revisi anggaran dari form submissions unit kerja.
+            <p className="text-gray-500 font-medium text-xs mt-1">
+              Monitoring data revisi anggaran unit kerja, pelacakan proses verifikator, & unduh berkas lampiran.
             </p>
           </div>
         </div>
@@ -470,7 +475,8 @@ export default function UsulanAnggaranPage() {
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={fetchData}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+            className="h-9 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            title="Muat ulang data dari database"
           >
             <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
             <span>Refresh</span>
@@ -480,17 +486,17 @@ export default function UsulanAnggaranPage() {
             <button 
               onClick={handleMultiDownload}
               disabled={isDownloadingMulti}
-              className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+              className="h-9 px-4 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-200/60 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {isDownloadingMulti ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-              <span>Download {selectedIds.length} Data</span>
+              <span>Unduh {selectedIds.length} Data Terpilih</span>
             </button>
           )}
 
           <button 
             onClick={exportToCSV}
             disabled={filteredData.length === 0}
-            className="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-200/60 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <Download size={13} />
             <span>Export CSV</span>
@@ -498,93 +504,170 @@ export default function UsulanAnggaranPage() {
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Total Pengajuan */}
-        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+      {/* ROW 2: 4 KPI STAT CARDS (SESUAI STANDAR DESIGN SYSTEM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: Total Pengajuan */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-indigo-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">TOTAL PENGAJUAN</span>
-              <div className="text-2xl font-black text-indigo-900 font-mono tracking-tight">{total}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">
+                TOTAL PENGAJUAN
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+                {total}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-              <ClipboardList size={18} />
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
+              <ClipboardList size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-100/60 pt-2">
-            <span>Periode {selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">100%</span>
+          <div className="mt-3.5 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-50 pt-2.5">
+            <span className="truncate max-w-[130px]" title={selectedTP === 'ALL' || !selectedTP ? 'Semua Periode' : selectedTP}>
+              Periode {selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}
+            </span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-black border border-indigo-100">
+              100% Usulan
+            </span>
           </div>
         </div>
 
-        {/* Proses Revisi */}
-        <div className="bg-white rounded-2xl p-4 border border-amber-200/80 shadow-xs flex flex-col justify-between">
+        {/* Card 2: Menunggu Proses */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">PROSES REVISI</span>
-              <div className="text-2xl font-black text-amber-700 font-mono tracking-tight">{proses}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+                MENUNGGU PROSES
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-amber-900 font-mono tracking-tight">
+                {proses}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-              <Clock size={18} />
+            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs shrink-0">
+              <Clock size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-100/60 pt-2">
-            <span>Menunggu Proses</span>
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold">Pending</span>
+          <div className="mt-3.5 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-50 pt-2.5">
+            <span>Antrean verifikasi</span>
+            <span className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded-md font-black border border-amber-200">
+              Pending
+            </span>
           </div>
         </div>
 
-        {/* Selesai */}
-        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+        {/* Card 3: Selesai Diproses */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-emerald-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">SELESAI</span>
-              <div className="text-2xl font-black text-emerald-700 font-mono tracking-tight">{selesai}</div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+                SELESAI DIPROSES
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-emerald-900 font-mono tracking-tight">
+                {selesai}
+              </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-              <CheckCircle size={18} />
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs shrink-0">
+              <CheckCircle2 size={20} />
             </div>
           </div>
-          <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
-            <span>Selesai Diproses</span>
-            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">Selesai</span>
+          <div className="mt-3.5 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-50 pt-2.5">
+            <span>Telah ditindaklanjuti</span>
+            <span className="text-[10px] bg-emerald-100/80 text-emerald-800 px-2 py-0.5 rounded-md font-black border border-emerald-200">
+              Selesai
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Tingkat Ketuntasan & Progress */}
+        <div className="bg-white rounded-2xl p-4 md:p-5 border border-sky-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+          <div className="absolute -right-8 -top-8 w-24 h-24 bg-sky-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 block mb-1">
+                TINGKAT KETUNTASAN
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-sky-950 font-mono tracking-tight">
+                {completionRate}%
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-2xs shrink-0">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          <div className="mt-2.5 space-y-1">
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-sky-500 to-indigo-600 rounded-full transition-all duration-500"
+                style={{ width: `${completionRate}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 pt-1">
+              <span>{selesai} dari {total} usulan</span>
+              <span className="text-sky-700 font-black">{completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Dashboard Section */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 gap-3">
-          <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-2">
-            <BarChart3 size={15} className="text-indigo-600" /> Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}
-          </h2>
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/60 shadow-2xs gap-0.5">
+      {/* ROW 3: GAMBARAN REVISI SECTION DENGAN GLOW PILL TABS */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+          <div>
+            <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+              <BarChart3 size={16} className="text-indigo-600" />
+              <span>Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}</span>
+            </h2>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              Distribusi pengajuan revisi antar unit kerja dan visualisasi frekuensi kumulatif.
+            </p>
+          </div>
+          
+          {/* GLOW PILL TABS (DESIGN SYSTEM STYLE 1) */}
+          <div className="inline-flex p-1 bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-inner gap-1">
             <button 
               onClick={() => setActiveTab('table')}
-              className={`p-1.5 px-2.5 rounded-lg transition-all flex items-center justify-center ${activeTab === 'table' ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60' : 'text-gray-400 hover:text-gray-700'}`}
-              title="Tabel Frekuensi"
-              aria-label="Tabel Frekuensi"
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'table'
+                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+              }`}
             >
-              <Table2 size={16} strokeWidth={activeTab === 'table' ? 2.5 : 2} />
+              <Table2 size={13} className={activeTab === 'table' ? 'text-white' : 'text-slate-500'} />
+              <span>Tabel Frekuensi</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'table' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {dashboardData.length}
+              </span>
             </button>
             <button 
               onClick={() => setActiveTab('chart')}
-              className={`p-1.5 px-2.5 rounded-lg transition-all flex items-center justify-center ${activeTab === 'chart' ? 'bg-white text-indigo-700 shadow-xs border border-gray-200/60' : 'text-gray-400 hover:text-gray-700'}`}
-              title="Grafik Batang"
-              aria-label="Grafik Batang"
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'chart'
+                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+              }`}
             >
-              <BarChart3 size={16} strokeWidth={activeTab === 'chart' ? 2.5 : 2} />
+              <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
+              <span>Grafik Batang</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {chartData.length}
+              </span>
             </button>
           </div>
         </div>
 
         {activeTab === 'table' ? (
           dashboardData.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-gray-100">
+            <div className="overflow-x-auto rounded-xl border border-gray-200/80">
               <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">Unit (Frekuensi Sama)</th>
+                    <th className="px-4 py-3">Unit Kerja (Frekuensi Sama)</th>
                     <th className="px-4 py-3 text-center w-36">Frekuensi Revisi</th>
                   </tr>
                 </thead>
@@ -601,7 +684,7 @@ export default function UsulanAnggaranPage() {
                     };
                     const units = d.name.split(', ');
                     return (
-                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                      <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1.5">
                             {units.map((unit: string, ui: number) => {
@@ -616,7 +699,7 @@ export default function UsulanAnggaranPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono">
+                          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono shadow-2xs">
                             {d.Total} kali
                           </span>
                         </td>
@@ -634,29 +717,39 @@ export default function UsulanAnggaranPage() {
           )
         ) : (
           chartData.length > 0 ? (
-            <div className="h-[280px] w-full pt-2">
+            <div className="h-[300px] w-full pt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <defs>
+                    <linearGradient id="usulanBarGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.65} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
                     dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} 
+                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
                     angle={-45} 
                     textAnchor="end" 
                     interval={0}
                     height={80}
                     tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
                   />
-                  <YAxis tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 'bold' }} allowDecimals={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
                   <Tooltip 
-                    cursor={{ fill: '#f9fafb' }}
-                    contentStyle={{ borderRadius: '0.75rem', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
+                    contentStyle={{ 
+                      borderRadius: '0.85rem', 
+                      border: '1px solid #e2e8f0', 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(8px)',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                      fontWeight: 'bold'
+                    }}
                   />
-                  <Bar dataKey="Total" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={1000}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#4f46e5" />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="Total" fill="url(#usulanBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -669,46 +762,63 @@ export default function UsulanAnggaranPage() {
         )}
       </div>
 
-      {/* FILTER & TABLE SECTION */}
+      {/* ROW 4: FILTER & TABLE SECTION (DESIGN SYSTEM STANDARD) */}
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
-        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-3 items-center">
+        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-3 items-center justify-between bg-slate-50/50">
           <div className="flex-1 relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
             <input 
               type="text" 
-              placeholder="Cari data apa saja..." 
+              placeholder="Cari pengirim, unit, email, keterangan..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-8 pr-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-10 pl-9 pr-3 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
             />
           </div>
           
-          <div className="w-full md:w-64">
-            <select 
-              value={selectedTP}
-              onChange={(e) => setSelectedTP(e.target.value)}
-              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
-            >
-              {availableTPs.map((tp, idx) => (
-                <option key={idx} value={tp}>
-                  {tp} {idx === 0 ? '★ (Terbaru)' : '(Sebelumnya)'}
-                </option>
-              ))}
-              <option value="ALL">Semua Periode (Semua Tahun)</option>
-            </select>
-          </div>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full md:w-auto">
+            <div className="w-full sm:w-60">
+              <select 
+                value={selectedTP}
+                onChange={(e) => setSelectedTP(e.target.value)}
+                className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-all shadow-2xs"
+              >
+                {availableTPs.map((tp, idx) => (
+                  <option key={idx} value={tp}>
+                    {tp} {idx === 0 ? '★ (Terbaru)' : '(Sebelumnya)'}
+                  </option>
+                ))}
+                <option value="ALL">Semua Periode (Semua Tahun)</option>
+              </select>
+            </div>
 
-          <div className="w-full md:w-52">
-            <select 
-              value={picFilter}
-              onChange={(e) => setPicFilter(e.target.value)}
-              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-            >
-              <option value="">Semua PIC</option>
-              {availablePics.map((pic, idx) => (
-                <option key={idx} value={String(pic)}>{pic}</option>
-              ))}
-            </select>
+            <div className="w-full sm:w-48">
+              <select 
+                value={picFilter}
+                onChange={(e) => setPicFilter(e.target.value)}
+                className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">Semua PIC</option>
+                {availablePics.map((pic, idx) => (
+                  <option key={idx} value={String(pic)}>{pic}</option>
+                ))}
+              </select>
+            </div>
+
+            {(searchQuery || picFilter || (selectedTP && selectedTP !== (availableTPs[0] || ''))) && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setPicFilter('');
+                  if (availableTPs.length > 0) setSelectedTP(availableTPs[0]);
+                }}
+                className="h-10 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shrink-0 shadow-2xs cursor-pointer"
+                title="Reset Semua Filter"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
         </div>
 
