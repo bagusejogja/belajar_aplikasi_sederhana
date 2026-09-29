@@ -15,11 +15,13 @@ import {
   ChevronUp, BarChart3, TrendingUp, LayoutGrid, ChevronDown,
   Wallet, CheckCircle, BarChart as ChartIcon, Eye,
   ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet,
-  ExternalLink, X, XCircle, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3
+  ExternalLink, X, XCircle, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3,
+  RotateCcw, PieChart as PieIcon, Activity
 } from 'lucide-react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Cell, Legend
+  Tooltip, ResponsiveContainer, Cell, Legend,
+  PieChart, Pie, AreaChart, Area
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -171,6 +173,11 @@ export default function TambahPaguPage() {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  // Tab 3 Interactive Visual Analytics States
+  const [chartSeriesFilter, setChartSeriesFilter] = useState<'all' | 'proposed' | 'approved'>('all');
+  const [hoveredPieIndex, setHoveredPieIndex] = useState<number | null>(null);
+  const [hoveredUnitIdx, setHoveredUnitIdx] = useState<number | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -342,6 +349,53 @@ export default function TambahPaguPage() {
 
     return Object.values(monthlyCounts);
   }, [filteredData]);
+
+  // Tab 3 Memo: Distribution of Status for Interactive Donut Chart
+  const statusDistributionData = useMemo(() => {
+    return [
+      { name: 'Disetujui Semua', value: kpiMetrics.approvedSemuaCount, amount: kpiMetrics.approvedSemuaAnggaran, color: '#10b981' },
+      { name: 'Disetujui Sebagian', value: kpiMetrics.approvedSebagianCount, amount: kpiMetrics.approvedSebagianAnggaran, color: '#6366f1' },
+      { name: 'Ditolak / Dipending', value: kpiMetrics.rejectedCount, amount: kpiMetrics.rejectedAnggaran, color: '#f43f5e' },
+      { 
+        name: 'Dalam Proses / Lainnya', 
+        value: Math.max(0, kpiMetrics.totalCount - (kpiMetrics.approvedSemuaCount + kpiMetrics.approvedSebagianCount + kpiMetrics.rejectedCount)),
+        amount: Math.max(0, kpiMetrics.totalAnggaranUsulan - (kpiMetrics.approvedSemuaAnggaran + kpiMetrics.approvedSebagianAnggaran + kpiMetrics.rejectedAnggaran)),
+        color: '#f59e0b'
+      },
+    ].filter(item => item.value > 0);
+  }, [kpiMetrics]);
+
+  // Tab 3 Memo: Top 5 Units by Total Nominal Proposed
+  const top5Units = useMemo(() => {
+    return unitSummaryData.slice(0, 5);
+  }, [unitSummaryData]);
+
+  // Tab 3 Memo: Cumulative Growth Data (Jan - Des) for Spline Area Chart
+  const cumulativeGrowthData = useMemo(() => {
+    let cumProposed = 0;
+    let cumApproved = 0;
+    let cumCount = 0;
+    return (statsData as any[]).map(item => {
+      cumProposed += item.proposed;
+      cumApproved += item.approved;
+      cumCount += item.count;
+      return {
+        ...item,
+        cumProposed,
+        cumApproved,
+        cumCount
+      };
+    });
+  }, [statsData]);
+
+  // Reset Filters Function
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSelectedSingleUnit('ALL');
+    setSelectedYear('Semua Tahun');
+    setSelectedStatusFilter('ALL');
+    setCurrentPage(1);
+  };
 
   // Toggle Accordion Collapse for Summary Unit
   const toggleUnitAccordion = (unitName: string) => {
@@ -537,10 +591,11 @@ export default function TambahPaguPage() {
         </div>
       </div>
 
-      {/* ROW 2: 4 SUMMARY KPI CARDS */}
+      {/* ROW 2: 4 SUMMARY KPI CARDS (DESIGN SYSTEM HARMONIZED) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* CARD 1: TOTAL USULAN ANGGARAN */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col justify-between">
+        <div className="group bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-400 to-slate-600 opacity-80" />
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">TOTAL USULAN ANGGARAN</span>
@@ -548,18 +603,19 @@ export default function TambahPaguPage() {
                 Rp {formatRp(kpiMetrics.totalAnggaranUsulan)}
               </div>
             </div>
-            <div className="p-2 rounded-xl bg-gray-50 text-gray-600 border border-gray-100">
+            <div className="p-2.5 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 group-hover:scale-105 transition-transform">
               <Wallet size={18} />
             </div>
           </div>
           <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 pt-2">
             <span>{kpiMetrics.totalCount} Usulan Item</span>
-            <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md font-mono font-bold">100%</span>
+            <span className="text-[10px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono font-bold">100% Usulan</span>
           </div>
         </div>
 
         {/* CARD 2: DISETUJUI SEMUA (100%) */}
-        <div className="bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+        <div className="group bg-white rounded-2xl p-4 border border-emerald-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-80" />
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">DISETUJUI SEMUA (100%)</span>
@@ -567,20 +623,21 @@ export default function TambahPaguPage() {
                 Rp {formatRp(kpiMetrics.approvedSemuaAnggaran)}
               </div>
             </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 group-hover:scale-105 transition-transform">
               <CheckCircle2 size={18} />
             </div>
           </div>
           <div className="mt-3 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-100/60 pt-2">
             <span>{kpiMetrics.approvedSemuaCount} Item</span>
             <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-mono font-bold">
-              {kpiMetrics.approvedPct}%
+              {kpiMetrics.approvedPct}% Lolos Penuh
             </span>
           </div>
         </div>
 
         {/* CARD 3: DISETUJUI SEBAGIAN */}
-        <div className="bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs flex flex-col justify-between">
+        <div className="group bg-white rounded-2xl p-4 border border-indigo-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-blue-600 opacity-80" />
           <div className="flex items-start justify-between">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">DISETUJUI SEBAGIAN</span>
@@ -588,43 +645,45 @@ export default function TambahPaguPage() {
                 Rp {formatRp(kpiMetrics.approvedSebagianAnggaran)}
               </div>
             </div>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 group-hover:scale-105 transition-transform">
               <Clock size={18} />
             </div>
           </div>
           <div className="mt-3 text-xs font-bold text-indigo-700 flex items-center justify-between border-t border-indigo-100/60 pt-2">
             <span>{kpiMetrics.approvedSebagianCount} Item</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Sebagian</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">Persetujuan Parsial</span>
           </div>
         </div>
 
         {/* CARD 4: DITOLAK / DIAJUKAN */}
-        <div className="bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs flex flex-col justify-between">
+        <div className="group bg-white rounded-2xl p-4 border border-rose-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-amber-500 opacity-80" />
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">DITOLAK / DIAJUKAN</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">DITOLAK / DIPENDING</span>
               <div className="text-xl font-black text-rose-700 font-mono tracking-tight">
                 Rp {formatRp(kpiMetrics.rejectedAnggaran)}
               </div>
             </div>
-            <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100">
+            <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 group-hover:scale-105 transition-transform">
               <XCircle size={18} />
             </div>
           </div>
           <div className="mt-3 text-xs font-bold text-rose-700 flex items-center justify-between border-t border-rose-100/60 pt-2">
             <span>{kpiMetrics.rejectedCount} Item</span>
-            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md font-bold">Proses/Tolak</span>
+            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md font-bold">Proses / Penolakan</span>
           </div>
         </div>
       </div>
 
-      {/* ROW 3: SEPARATE FILTER TOOLBAR WITH SEARCHABLE AUTOCOMPLETE UNIT FILTER */}
-      <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
+      {/* ROW 3: SEPARATE FILTER TOOLBAR WITH SEARCHABLE AUTOCOMPLETE UNIT FILTER & RESET BUTTON */}
+      <div className="bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs font-black text-gray-700 uppercase tracking-wider shrink-0">
-          <Zap size={14} className="text-amber-500" /> FILTER DATA:
+          <Zap size={15} className="text-amber-500" />
+          <span>Filter Data:</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full">
           {/* Autocomplete Searchable Filter Unit Kerja */}
           <div>
             <UnitAutocompleteFilter 
@@ -639,7 +698,7 @@ export default function TambahPaguPage() {
             <select
               value={selectedYear}
               onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-gray-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-gray-800 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
             >
               <option value="Semua Tahun">📅 Semua Tahun</option>
               {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
@@ -651,7 +710,7 @@ export default function TambahPaguPage() {
             <select
               value={selectedStatusFilter}
               onChange={(e) => { setSelectedStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 text-indigo-700 font-bold text-xs rounded-xl px-3 outline-none cursor-pointer focus:ring-2 focus:ring-blue-500/20 transition-all"
             >
               <option value="ALL">✨ Semua Status</option>
               <option value="Disetujui Semua">Disetujui Semua</option>
@@ -669,48 +728,75 @@ export default function TambahPaguPage() {
               placeholder="Cari No Surat, Hal, Unit..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+              className="w-full h-9 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-blue-500/20 font-medium transition-all"
             />
           </div>
         </div>
+
+        {/* Reset Filter Button if any filter is active */}
+        {(searchTerm || selectedSingleUnit !== 'ALL' || selectedYear !== 'Semua Tahun' || selectedStatusFilter !== 'ALL') && (
+          <button
+            onClick={resetFilters}
+            title="Reset Semua Filter"
+            className="h-9 px-3 shrink-0 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95"
+          >
+            <RotateCcw size={13} />
+            <span>Reset</span>
+          </button>
+        )}
       </div>
 
-      {/* ROW 4: TAB NAVIGATION BAR (FULL WIDTH PAGE PILL NAVIGATION) */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row gap-2">
+      {/* ROW 4: GLOW PILL TABS (DESIGN SYSTEM GAYA 1) */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-inner max-w-full backdrop-blur-sm">
         <button
           onClick={() => setActiveTab('data')}
-          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 ${
             activeTab === 'data' 
-              ? 'bg-white text-slate-900 shadow-sm font-black' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
-          <FileText size={16} />
-          <span>📋 Tabel Data Detail ({filteredData.length})</span>
+          <FileText size={15} />
+          <span>Tabel Data Detail</span>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+            activeTab === 'data' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+          }`}>
+            {filteredData.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('summary')}
-          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 ${
             activeTab === 'summary' 
-              ? 'bg-white text-slate-900 shadow-sm font-black' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
-          <Building2 size={16} />
-          <span>🏢 Summary Per Unit Kerja ({unitSummaryData.length})</span>
+          <Building2 size={15} />
+          <span>Summary Per Unit Kerja</span>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+            activeTab === 'summary' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+          }`}>
+            {unitSummaryData.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('chart')}
-          className={`flex-1 py-3 px-6 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 ${
             activeTab === 'chart' 
-              ? 'bg-white text-slate-900 shadow-sm font-black' 
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
           }`}
         >
-          <BarChart3 size={16} />
-          <span>📊 Visualisasi Tren & Grafis</span>
+          <BarChart3 size={15} />
+          <span>Visualisasi Tren & Grafis</span>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+            activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+          }`}>
+            Analytics Suite
+          </span>
         </button>
       </div>
 
@@ -1101,36 +1187,556 @@ export default function TambahPaguPage() {
         </div>
       )}
 
-      {/* TAB 3: VISUALISASI TREN & GRAFIS */}
+      {/* TAB 3: VISUALISASI TREN & ANALISIS GRAFIS (ENHANCED INTERACTIVE SUITE) */}
       {activeTab === 'chart' && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <Card className="bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden p-6">
-            <CardHeader className="bg-gray-50/50 p-4 px-5 border-b border-gray-100 -mx-6 -mt-6 mb-6">
-              <CardTitle className="text-sm font-black text-gray-900">
-                Grafik Volume & Nominal Usulan Tambah Pagu ({selectedYear})
-              </CardTitle>
-              <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
-                Perbandingan nominal usulan diajukan vs disetujui per bulan
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-0">
-              <div className="h-[380px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={statsData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#475569' }} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} tickFormatter={(val) => `Rp ${(val/1e6).toFixed(0)}M`} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#f59e0b' }} />
-                    <Tooltip formatter={(value: any, name: any) => [`Rp ${formatRp(value)}`, name === 'proposed' ? 'Nominal Diajukan' : 'Nominal Disetujui']} />
-                    <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px', fontWeight: 'bold', fontSize: '12px' }} />
-                    <Bar yAxisId="left" dataKey="proposed" name="Nominal Diajukan" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={25} />
-                    <Bar yAxisId="left" dataKey="approved" name="Nominal Disetujui" fill="#10b981" radius={[4, 4, 0, 0]} barSize={25} />
-                    <Line yAxisId="right" type="monotone" dataKey="count" name="Jumlah Surat" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b' }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+        <div className="space-y-5 animate-in fade-in duration-300">
+          {/* TOP CONTROLS & KPI BANNER */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-5 shadow-sm border border-indigo-950 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10 text-blue-300 shadow-inner">
+                <BarChart3 size={24} />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-black tracking-tight text-white">
+                    Visual Analytics Suite • Usulan Tambah Pagu
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-200 border border-blue-400/30 text-[10px] font-black uppercase tracking-wider">
+                    Tahun {selectedYear}
+                  </span>
+                </div>
+                <p className="text-slate-300 text-xs font-medium mt-0.5">
+                  Visualisasi komprehensif tren bulanan, proporsi persetujuan, peringkat unit kerja, dan laju pertumbuhan pagu.
+                </p>
+              </div>
+            </div>
+
+            {/* Interactive Series Toggle Buttons */}
+            <div className="flex items-center gap-1.5 bg-black/30 p-1.5 rounded-xl border border-white/10 backdrop-blur-sm self-stretch md:self-auto justify-center">
+              <button
+                onClick={() => setChartSeriesFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  chartSeriesFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Semua Seri
+              </button>
+              <button
+                onClick={() => setChartSeriesFilter('proposed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  chartSeriesFilter === 'proposed'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Hanya Usulan
+              </button>
+              <button
+                onClick={() => setChartSeriesFilter('approved')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  chartSeriesFilter === 'approved'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                Hanya Disetujui
+              </button>
+            </div>
+          </div>
+
+          {/* GRID ROW 1: COMPOSED MONTHLY BAR & LINE + INTERACTIVE STATUS DONUT */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* PANEL 1: COMPOSED MONTHLY BAR & LINE (7 COLS) */}
+            <Card className="lg:col-span-7 bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
+              <CardHeader className="bg-gray-50/60 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={16} className="text-blue-600" />
+                    <CardTitle className="text-sm font-black text-gray-900">
+                      Tren Bulanan: Usulan vs Realisasi Disetujui
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    Komparasi nominal diajukan, nominal disetujui, dan jumlah surat usulan per bulan
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-md border border-blue-100">
+                    TA {selectedYear}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5 pt-4">
+                <div className="h-[340px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={statsData} margin={{ top: 15, right: 15, left: 5, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="colorProposedBar" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.95} />
+                          <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.8} />
+                        </linearGradient>
+                        <linearGradient id="colorApprovedBar" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity={0.95} />
+                          <stop offset="100%" stopColor="#047857" stopOpacity={0.8} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }} 
+                      />
+                      <YAxis 
+                        yAxisId="nominalAxis" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }} 
+                        tickFormatter={(val) => val === 0 ? '0' : `Rp ${(val/1e6).toFixed(0)}jt`} 
+                      />
+                      <YAxis 
+                        yAxisId="countAxis" 
+                        orientation="right" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} 
+                        tickFormatter={(val) => `${val} srt`} 
+                      />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const pItem = payload.find((p: any) => p.dataKey === 'proposed');
+                            const aItem = payload.find((p: any) => p.dataKey === 'approved');
+                            const cItem = payload.find((p: any) => p.dataKey === 'count');
+                            const proposedVal = pItem ? Number(pItem.value || 0) : 0;
+                            const approvedVal = aItem ? Number(aItem.value || 0) : 0;
+                            const countVal = cItem ? Number(cItem.value || 0) : 0;
+                            const pct = proposedVal > 0 ? Math.round((approvedVal / proposedVal) * 100) : 0;
+
+                            return (
+                              <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-xl border border-slate-700/60 text-xs min-w-[210px] space-y-2">
+                                <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
+                                  <span className="font-black text-slate-100">Bulan {label} {selectedYear}</span>
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                    {countVal} Surat
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5 pt-1">
+                                  <div className="flex items-center justify-between text-slate-300">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> Diajukan:
+                                    </span>
+                                    <span className="font-mono font-bold text-white">Rp {formatRp(proposedVal)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-slate-300">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Disetujui:
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-400">Rp {formatRp(approvedVal)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-slate-400 border-t border-slate-800 pt-1.5 text-[11px]">
+                                    <span>Tingkat Persetujuan:</span>
+                                    <span className={`font-bold ${pct >= 70 ? 'text-emerald-400' : pct >= 30 ? 'text-amber-400' : 'text-slate-400'}`}>
+                                      {pct}%
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        align="right" 
+                        wrapperStyle={{ paddingBottom: '12px', fontWeight: 700, fontSize: '11px' }} 
+                      />
+                      {(chartSeriesFilter === 'all' || chartSeriesFilter === 'proposed') && (
+                        <Bar 
+                          yAxisId="nominalAxis" 
+                          dataKey="proposed" 
+                          name="Nominal Diajukan" 
+                          fill="url(#colorProposedBar)" 
+                          radius={[5, 5, 0, 0]} 
+                          barSize={18} 
+                        />
+                      )}
+                      {(chartSeriesFilter === 'all' || chartSeriesFilter === 'approved') && (
+                        <Bar 
+                          yAxisId="nominalAxis" 
+                          dataKey="approved" 
+                          name="Nominal Disetujui" 
+                          fill="url(#colorApprovedBar)" 
+                          radius={[5, 5, 0, 0]} 
+                          barSize={18} 
+                        />
+                      )}
+                      <Line 
+                        yAxisId="countAxis" 
+                        type="monotone" 
+                        dataKey="count" 
+                        name="Jumlah Surat" 
+                        stroke="#f59e0b" 
+                        strokeWidth={2.5} 
+                        dot={{ r: 4, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} 
+                        activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* PANEL 2: INTERACTIVE STATUS DONUT CHART (5 COLS) */}
+            <Card className="lg:col-span-5 bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
+              <CardHeader className="bg-gray-50/60 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <PieIcon size={16} className="text-indigo-600" />
+                    <CardTitle className="text-sm font-black text-gray-900">
+                      Proporsi Status Keputusan
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    Distribusi hasil verifikasi surat usulan tambah pagu
+                  </CardDescription>
+                </div>
+                <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-100">
+                  {kpiMetrics.totalCount} Usulan
+                </span>
+              </CardHeader>
+              <CardContent className="p-5 pt-3 flex flex-col justify-between flex-1">
+                {/* Donut Chart Visual with Center Text */}
+                <div className="h-[210px] w-full relative flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={statusDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={58}
+                        outerRadius={84}
+                        paddingAngle={4}
+                        dataKey="value"
+                        onMouseEnter={(_, index) => setHoveredPieIndex(index)}
+                        onMouseLeave={() => setHoveredPieIndex(null)}
+                      >
+                        {statusDistributionData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color} 
+                            stroke={hoveredPieIndex === index ? '#1e293b' : '#fff'}
+                            strokeWidth={hoveredPieIndex === index ? 2 : 1.5}
+                            className="cursor-pointer transition-all duration-200"
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const d = payload[0].payload;
+                            const pct = kpiMetrics.totalCount > 0 ? Math.round((d.value / kpiMetrics.totalCount) * 100) : 0;
+                            return (
+                              <div className="bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-xl shadow-xl border border-slate-700/60 text-xs min-w-[170px]">
+                                <div className="font-bold flex items-center gap-1.5 mb-1" style={{ color: d.color }}>
+                                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
+                                  <span>{d.name}</span>
+                                </div>
+                                <div className="text-slate-300 flex justify-between font-medium">
+                                  <span>Jumlah Item:</span>
+                                  <span className="font-bold text-white">{d.value} ({pct}%)</span>
+                                </div>
+                                <div className="text-slate-300 flex justify-between font-medium mt-1">
+                                  <span>Total Nilai:</span>
+                                  <span className="font-mono font-bold text-amber-300">Rp {formatRp(d.amount)}</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Dynamic Donut Center Info */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                    {hoveredPieIndex !== null && statusDistributionData[hoveredPieIndex] ? (
+                      <>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 max-w-[90px] truncate">
+                          {statusDistributionData[hoveredPieIndex].name}
+                        </span>
+                        <span className="text-xl font-black text-slate-900 leading-tight">
+                          {statusDistributionData[hoveredPieIndex].value}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 font-mono">
+                          {Math.round((statusDistributionData[hoveredPieIndex].value / (kpiMetrics.totalCount || 1)) * 100)}%
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          TOTAL
+                        </span>
+                        <span className="text-2xl font-black text-slate-900 leading-none">
+                          {kpiMetrics.totalCount}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 mt-0.5">
+                          Usulan
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interactive Legend List with Percentages and Totals */}
+                <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                  {statusDistributionData.map((item, idx) => {
+                    const pct = kpiMetrics.totalCount > 0 ? Math.round((item.value / kpiMetrics.totalCount) * 100) : 0;
+                    const isHovered = hoveredPieIndex === idx;
+
+                    return (
+                      <div 
+                        key={item.name}
+                        onMouseEnter={() => setHoveredPieIndex(idx)}
+                        onMouseLeave={() => setHoveredPieIndex(null)}
+                        className={`flex items-center justify-between p-1.5 px-2.5 rounded-xl transition-all cursor-pointer ${
+                          isHovered ? 'bg-slate-100 scale-[1.02]' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
+                            style={{ backgroundColor: item.color }} 
+                          />
+                          <span className={`text-xs ${isHovered ? 'font-black text-slate-900' : 'font-medium text-slate-700'}`}>
+                            {item.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs font-bold text-slate-900">
+                            {item.value} <span className="text-[10px] font-medium text-slate-500">({pct}%)</span>
+                          </span>
+                          <span className="text-[11px] font-mono font-bold text-slate-600 hidden sm:inline-block">
+                            Rp {formatRp(item.amount)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* GRID ROW 2: TOP 5 UNIT KERJA RANKING + SPLINE AREA GROWTH CURVE */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* PANEL 3: TOP 5 UNIT KERJA BY USULAN (6 COLS) */}
+            <Card className="lg:col-span-6 bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
+              <CardHeader className="bg-gray-50/60 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Building2 size={16} className="text-emerald-600" />
+                    <CardTitle className="text-sm font-black text-gray-900">
+                      Top 5 Unit Kerja Usulan Terbesar
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    Peringkat unit kerja dengan akumulasi usulan penambahan pagu tertinggi
+                  </CardDescription>
+                </div>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-md border border-emerald-100">
+                  Ranking
+                </span>
+              </CardHeader>
+              <CardContent className="p-5 space-y-3.5 flex-1">
+                {top5Units.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs font-medium">
+                    Tidak ada data unit kerja yang ditemukan.
+                  </div>
+                ) : (
+                  top5Units.map((u, index) => {
+                    const maxNominal = top5Units[0]?.totalNominalDiajukan || 1;
+                    const proposedPct = Math.round((u.totalNominalDiajukan / maxNominal) * 100);
+                    const approvedPct = u.totalNominalDiajukan > 0 ? Math.round((u.totalNominalDisetujui / u.totalNominalDiajukan) * 100) : 0;
+                    const isHovered = hoveredUnitIdx === index;
+
+                    const rankBadges = [
+                      'bg-amber-100 text-amber-800 border-amber-300 font-black',
+                      'bg-slate-200 text-slate-800 border-slate-300 font-black',
+                      'bg-orange-100 text-orange-800 border-orange-300 font-black',
+                      'bg-slate-100 text-slate-600 border-slate-200 font-bold',
+                      'bg-slate-100 text-slate-600 border-slate-200 font-bold',
+                    ];
+
+                    return (
+                      <div 
+                        key={u.unit}
+                        onMouseEnter={() => setHoveredUnitIdx(index)}
+                        onMouseLeave={() => setHoveredUnitIdx(null)}
+                        className={`p-3 rounded-2xl border transition-all duration-200 ${
+                          isHovered 
+                            ? 'bg-blue-50/50 border-blue-200 shadow-sm -translate-y-0.5' 
+                            : 'bg-slate-50/60 border-slate-100 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className={`w-5 h-5 rounded-lg border text-[10px] flex items-center justify-center shrink-0 ${rankBadges[index] || rankBadges[3]}`}>
+                              #{index + 1}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 truncate">
+                              {u.unit}
+                            </span>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-mono font-black text-slate-900">
+                              Rp {formatRp(u.totalNominalDiajukan)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dual Progress Bar: Usulan vs Realisasi */}
+                        <div className="space-y-1">
+                          <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden flex">
+                            <div 
+                              className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500" 
+                              style={{ width: `${proposedPct}%` }}
+                              title={`Volume Usulan Relatif: ${proposedPct}%`}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] font-medium text-slate-500 pt-0.5">
+                            <span className="flex items-center gap-1 font-bold text-emerald-700">
+                              <CheckCircle2 size={11} /> Realisasi: Rp {formatRp(u.totalNominalDisetujui)}
+                            </span>
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded font-mono font-bold">
+                              {approvedPct}% Disetujui
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </CardContent>
+            </Card>
+
+            {/* PANEL 4: SPLINE AREA CUMULATIVE GROWTH CURVE (6 COLS) */}
+            <Card className="lg:col-span-6 bg-white border border-gray-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
+              <CardHeader className="bg-gray-50/60 p-4 px-5 border-b border-gray-100 flex flex-row items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Activity size={16} className="text-indigo-600" />
+                    <CardTitle className="text-sm font-black text-gray-900">
+                      Laju Pertumbuhan Akumulatif (Jan - Des)
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-[11px] text-gray-500 font-medium mt-0.5">
+                    Progresi kurva akumulasi anggaran usulan dan realisasi sepanjang tahun
+                  </CardDescription>
+                </div>
+                <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-100">
+                  Kumulatif
+                </span>
+              </CardHeader>
+              <CardContent className="p-5 pt-4">
+                <div className="h-[285px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={cumulativeGrowthData} margin={{ top: 15, right: 15, left: 5, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="areaProposedGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                        </linearGradient>
+                        <linearGradient id="areaApprovedGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }} 
+                        tickFormatter={(val) => val === 0 ? '0' : `Rp ${(val/1e6).toFixed(0)}jt`} 
+                      />
+                      <Tooltip 
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const pItem = payload.find((p: any) => p.dataKey === 'cumProposed');
+                            const aItem = payload.find((p: any) => p.dataKey === 'cumApproved');
+                            const cItem = payload.find((p: any) => p.dataKey === 'cumCount');
+                            const pVal = pItem ? Number(pItem.value || 0) : 0;
+                            const aVal = aItem ? Number(aItem.value || 0) : 0;
+                            const cVal = cItem ? Number(cItem.value || 0) : 0;
+
+                            return (
+                              <div className="bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-xl border border-slate-700/60 text-xs min-w-[210px] space-y-2">
+                                <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
+                                  <span className="font-black text-slate-100">s/d Bulan {label}</span>
+                                  <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                    {cVal} Surat Kumulatif
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5 pt-1">
+                                  <div className="flex items-center justify-between text-slate-300">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" /> Akumulasi Usulan:
+                                    </span>
+                                    <span className="font-mono font-bold text-white">Rp {formatRp(pVal)}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-slate-300">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                      <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" /> Akumulasi Disetujui:
+                                    </span>
+                                    <span className="font-mono font-bold text-emerald-400">Rp {formatRp(aVal)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Legend 
+                        verticalAlign="top" 
+                        align="right" 
+                        wrapperStyle={{ paddingBottom: '12px', fontWeight: 700, fontSize: '11px' }} 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="cumProposed" 
+                        name="Akumulasi Usulan" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#areaProposedGrad)" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="cumApproved" 
+                        name="Akumulasi Disetujui" 
+                        stroke="#10b981" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#areaApprovedGrad)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
