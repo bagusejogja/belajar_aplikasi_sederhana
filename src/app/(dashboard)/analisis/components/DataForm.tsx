@@ -402,7 +402,7 @@ ${mainData.ringkasan_ai}`;
             <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 w-16 text-center">No</th>
-                <th className="px-4 py-3">Uraian Kegiatan</th>
+                <th className="px-4 py-3 min-w-[280px]">Uraian Kegiatan</th>
                 <th className="px-4 py-3 text-right">Anggaran</th>
                 <th className="px-4 py-3 text-right">Realisasi</th>
                 <th className="px-4 py-3 text-right text-emerald-600">Sisa Anggaran</th>
@@ -414,12 +414,12 @@ ${mainData.ringkasan_ai}`;
               {detailData.map((d: any, idx: number) => (
                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-center font-medium">{d.no_urut}</td>
-                  <td className="px-4 py-3">
-                    <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
+                  <td className="px-4 py-3 min-w-[280px] max-w-[500px] whitespace-normal break-words">
+                    <textarea rows={d.uraian_kegiatan && d.uraian_kegiatan.length > 40 ? Math.min(5, Math.ceil(d.uraian_kegiatan.length / 40)) : 1} value={d.uraian_kegiatan || ''} onChange={(e) => {
                       const newD = [...detailData];
                       newD[idx].uraian_kegiatan = e.target.value;
                       setDetailData(newD);
-                    }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
+                    }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500 resize-y text-xs sm:text-sm leading-relaxed whitespace-normal break-words py-1 block transition-all" placeholder="Tuliskan uraian kegiatan..." />
                   </td>
                   <td className="px-4 py-3">
                     <input type="text" value={d.anggaran} onChange={(e) => {

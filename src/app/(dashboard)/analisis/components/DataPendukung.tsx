@@ -271,7 +271,7 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
               <thead className="bg-gray-50 text-gray-500 uppercase font-black text-xs sticky top-0 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3 w-16 text-center whitespace-nowrap">No</th>
-                  <th className="px-4 py-3">Uraian Kegiatan</th>
+                  <th className="px-4 py-3 min-w-[280px]">Uraian Kegiatan</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Anggaran</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Realisasi</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Sisa Anggaran</th>
@@ -296,18 +296,24 @@ export default function DataPendukung({ mainData, setMainData, detailData, setDe
                   return (
                     <tr key={idx} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-center font-bold text-gray-600 whitespace-nowrap">{d.no_urut}</td>
-                      <td className="px-4 py-3 min-w-[280px]">
+                      <td className="px-4 py-3 min-w-[280px] max-w-[500px] whitespace-normal break-words">
                         {readOnly ? (
                           <div className="whitespace-normal break-words leading-relaxed text-xs sm:text-sm text-gray-800 font-medium py-0.5">
                             {d.uraian_kegiatan || '-'}
                           </div>
                         ) : (
-                          <input type="text" value={d.uraian_kegiatan} onChange={(e) => {
-                            const newD = [...detailData];
-                            const targetIdx = detailData.findIndex((item: any) => item === d || item.no_urut === d.no_urut);
-                            if (targetIdx !== -1) newD[targetIdx].uraian_kegiatan = e.target.value;
-                            setDetailData(newD);
-                          }} className="w-full bg-transparent outline-none focus:border-b border-emerald-500"/>
+                          <textarea
+                            rows={d.uraian_kegiatan && d.uraian_kegiatan.length > 40 ? Math.min(5, Math.ceil(d.uraian_kegiatan.length / 40)) : 1}
+                            value={d.uraian_kegiatan || ''}
+                            onChange={(e) => {
+                              const newD = [...detailData];
+                              const targetIdx = detailData.findIndex((item: any) => item === d || item.no_urut === d.no_urut);
+                              if (targetIdx !== -1) newD[targetIdx].uraian_kegiatan = e.target.value;
+                              setDetailData(newD);
+                            }}
+                            className="w-full bg-transparent outline-none focus:border-b border-emerald-500 resize-y text-xs sm:text-sm leading-relaxed whitespace-normal break-words py-1 block transition-all"
+                            placeholder="Tuliskan uraian kegiatan..."
+                          />
                         )}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
