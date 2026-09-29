@@ -56,6 +56,7 @@ import {
   Type,
   ArrowUpDown,
   ArrowUpRight,
+  ExternalLink,
   ArrowDownRight,
   Activity,
   Bell,
@@ -3822,18 +3823,41 @@ export default function DesignSystemPage() {
                   {/* TEMPLATE E: HYBRID DETAIL & POP-UP MODAL */}
                   <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800">Template 5: Modal Pop-up & Full Page</span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Dual View</span>
+                      <span className="text-xs font-black text-slate-800">Template 5: Executive Action Console</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Dual View + Edit</span>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Standar Tambah Pagu: Tombol mata (modal pop-up cepat) + tombol link eksternal (buka halaman penuh).
+                      Standar Tambah Pagu: Konsol 2-tingkat dengan tombol utama Pop-up Detail Cepat (Modal) + tombol Halaman Penuh & Edit Usulan.
                     </p>
                     <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
-                      <TableActionGroup>
-                        <TableActionButton icon={Eye} variant="indigo" title="Buka Pop-up Cepat" size="sm" onClick={() => triggerToast('info', 'Modal Preview', 'Membuka pop-up inspeksi')} />
-                        <TableActionButton icon={ArrowUpRight} variant="default" title="Buka Halaman Penuh" size="sm" onClick={() => triggerToast('info', 'Halaman Penuh', 'Membuka halaman lengkap')} />
-                        <TableActionButton icon={Pencil} variant="warning" title="Edit Data" size="sm" onClick={() => triggerToast('warning', 'Edit', 'Membuka form edit')} />
-                      </TableActionGroup>
+                      <div className="flex flex-col gap-1.5 w-full max-w-[200px] p-1.5 bg-slate-50/90 border border-slate-200/80 rounded-2xl shadow-2xs">
+                        <button
+                          onClick={() => triggerToast('info', 'Pop-up Modal', 'Membuka pop-up inspeksi cepat usulan')}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 text-[11px] font-bold transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Eye size={13} className="text-indigo-100" />
+                            <span>Pop-up Detail</span>
+                          </div>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-white/20 text-white rounded-md">Modal</span>
+                        </button>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            onClick={() => triggerToast('info', 'Halaman Penuh', 'Membuka halaman rincian penuh')}
+                            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white hover:bg-slate-800 text-slate-700 hover:text-white rounded-xl border border-slate-200/90 text-[10px] font-bold transition-all cursor-pointer"
+                          >
+                            <ExternalLink size={11} className="text-slate-500" />
+                            <span>Halaman</span>
+                          </button>
+                          <button
+                            onClick={() => triggerToast('warning', 'Edit Usulan', 'Membuka form koreksi usulan')}
+                            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-50/90 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl border border-amber-200/90 text-[10px] font-bold transition-all cursor-pointer"
+                          >
+                            <Pencil size={11} className="text-amber-600" />
+                            <span>Edit</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

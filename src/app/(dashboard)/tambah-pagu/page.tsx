@@ -837,7 +837,7 @@ export default function TambahPaguPage() {
                     <TableHead className="text-gray-500 text-xs uppercase font-bold">Unit Kerja & Detail Surat Pengajuan (No, Tanggal, & Hal)</TableHead>
                     <TableHead className="w-56 text-right text-gray-500 text-xs uppercase font-bold">Nominal Usulan & Disetujui</TableHead>
                     <TableHead className="w-44 text-center text-gray-500 text-xs uppercase font-bold">Jenis & Status</TableHead>
-                    <TableHead className="w-28 text-center text-gray-500 text-xs uppercase font-bold">Aksi</TableHead>
+                    <TableHead className="w-52 text-center text-gray-500 text-xs uppercase font-bold">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -913,33 +913,49 @@ export default function TambahPaguPage() {
                             </div>
                           </TableCell>
 
-                          {/* 5. AKSI */}
+                          {/* 5. AKSI (EXECUTIVE ACTION CONSOLE) */}
                           <TableCell className="text-center align-top pt-3">
-                            <TableActionGroup>
-                              <TableActionButton
-                                icon={Eye}
-                                variant="indigo"
-                                title="Lihat Pop-up Detail"
-                                size="sm"
+                            <div className="flex flex-col gap-1.5 w-full min-w-[176px] max-w-[200px] mx-auto p-1.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl shadow-2xs transition-all">
+                              {/* 1. LIHAT POP-UP DETAIL */}
+                              <button
                                 onClick={() => setViewDetailData(item)}
-                              />
-                              <TableActionButton
-                                icon={ExternalLink}
-                                variant="default"
-                                title="Buka Halaman Penuh"
-                                size="sm"
-                                onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
-                              />
-                              {perms.can_create && (
-                                <TableActionButton
-                                  icon={Edit}
-                                  variant="warning"
-                                  title="Edit Data Usulan"
-                                  size="sm"
-                                  onClick={() => router.push(`/tambah-pagu/edit/${item.id}`)}
-                                />
-                              )}
-                            </TableActionGroup>
+                                title="Lihat Pop-up Detail Cepat (Modal Dialog)"
+                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 hover:shadow-indigo-400/60 transition-all duration-200 group active:scale-[0.98] cursor-pointer"
+                              >
+                                <div className="flex items-center gap-1.5 font-bold text-[11px] tracking-tight">
+                                  <Eye size={13} className="shrink-0 text-indigo-100 group-hover:scale-115 transition-transform" />
+                                  <span>Pop-up Detail</span>
+                                </div>
+                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-white/20 group-hover:bg-white/30 text-white rounded-md backdrop-blur-xs transition-colors">
+                                  Modal
+                                </span>
+                              </button>
+
+                              {/* 2. DUA TOMBOL DI BAWAHNYA: BUKA HALAMAN PENUH & EDIT DATA USULAN */}
+                              <div className={`grid ${perms.can_create ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
+                                {/* BUKA HALAMAN PENUH */}
+                                <button
+                                  onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
+                                  title="Buka Halaman Lengkap"
+                                  className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white hover:bg-slate-800 text-slate-700 hover:text-white rounded-xl border border-slate-200/90 hover:border-slate-800 shadow-2xs hover:shadow-slate-300 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer"
+                                >
+                                  <ExternalLink size={11} className="text-slate-500 group-hover:text-white shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                                  <span className="truncate">Halaman Penuh</span>
+                                </button>
+
+                                {/* EDIT DATA USULAN */}
+                                {perms.can_create && (
+                                  <button
+                                    onClick={() => router.push(`/tambah-pagu/edit/${item.id}`)}
+                                    title="Edit Data Usulan Tambah Pagu"
+                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-50/90 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl border border-amber-200/90 hover:border-amber-600 shadow-2xs hover:shadow-amber-200 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer"
+                                  >
+                                    <Edit3 size={11} className="text-amber-600 group-hover:text-white shrink-0 group-hover:rotate-12 transition-transform" />
+                                    <span className="truncate">Edit Usulan</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
