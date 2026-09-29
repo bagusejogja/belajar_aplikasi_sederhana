@@ -3833,13 +3833,14 @@ export default function DesignSystemPage() {
                       <div className="flex flex-col gap-1.5 w-full max-w-[200px] p-1.5 bg-slate-50/90 border border-slate-200/80 rounded-2xl shadow-2xs">
                         <button
                           onClick={() => triggerToast('info', 'Pop-up Modal', 'Membuka pop-up inspeksi cepat usulan')}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 text-[11px] font-bold transition-all cursor-pointer"
+                          className="relative overflow-hidden w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 text-[11px] font-bold transition-all cursor-pointer group active:scale-[0.97]"
                         >
                           <div className="flex items-center gap-1.5">
-                            <Eye size={13} className="text-indigo-100" />
+                            <Eye size={13} className="text-indigo-100 group-hover:scale-125 transition-transform" />
                             <span>Pop-up Detail</span>
                           </div>
                           <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-white/20 text-white rounded-md">Modal</span>
+                          <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
                         </button>
                         <div className="grid grid-cols-2 gap-1.5">
                           <button

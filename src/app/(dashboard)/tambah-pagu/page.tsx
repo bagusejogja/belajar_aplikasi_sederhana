@@ -16,7 +16,8 @@ import {
   Wallet, CheckCircle, BarChart as ChartIcon, Eye,
   ChevronLeft, Sparkles, TrendingDown, FileSpreadsheet,
   ExternalLink, X, XCircle, RefreshCw, Maximize2, Zap, Landmark, Scale, Edit3,
-  RotateCcw, PieChart as PieIcon, Activity
+  RotateCcw, PieChart as PieIcon, Activity,
+  Coins, Loader2, Copy, Check
 } from 'lucide-react';
 import { 
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, 
@@ -164,6 +165,18 @@ export default function TambahPaguPage() {
 
   // Pop Up Detail Dialog State
   const [viewDetailData, setViewDetailData] = useState<any | null>(null);
+
+  // Active Navigation loading state for action buttons (feedback saat diklik)
+  const [navigatingState, setNavigatingState] = useState<{ id: number | null, action: 'view' | 'edit' | null }>({ id: null, action: null });
+  // Copy to clipboard state inside modal
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, fieldName: string) => {
+    if (!text || text === '-') return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
 
   // Set of no_surat from app_analisis_utama for 100% accurate AI Import detection
   const [analisisNoSuratSet, setAnalisisNoSuratSet] = useState<Set<string>>(new Set());
@@ -920,38 +933,56 @@ export default function TambahPaguPage() {
                               <button
                                 onClick={() => setViewDetailData(item)}
                                 title="Lihat Pop-up Detail Cepat (Modal Dialog)"
-                                className="w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 hover:shadow-indigo-400/60 transition-all duration-200 group active:scale-[0.98] cursor-pointer"
+                                className="relative overflow-hidden w-full flex items-center justify-between px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl shadow-xs shadow-indigo-300/40 hover:shadow-md hover:shadow-indigo-300/60 transition-all duration-200 group active:scale-[0.97] cursor-pointer"
                               >
                                 <div className="flex items-center gap-1.5 font-bold text-[11px] tracking-tight">
-                                  <Eye size={13} className="shrink-0 text-indigo-100 group-hover:scale-115 transition-transform" />
+                                  <Eye size={13} className="shrink-0 text-indigo-100 group-hover:scale-125 transition-transform duration-200" />
                                   <span>Pop-up Detail</span>
                                 </div>
                                 <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-white/20 group-hover:bg-white/30 text-white rounded-md backdrop-blur-xs transition-colors">
                                   Modal
                                 </span>
+                                {/* Subtle Light Sheen Reflection Sweep on Hover */}
+                                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
                               </button>
 
                               {/* 2. DUA TOMBOL DI BAWAHNYA: BUKA HALAMAN PENUH & EDIT DATA USULAN */}
                               <div className={`grid ${perms.can_create ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
                                 {/* BUKA HALAMAN PENUH */}
                                 <button
-                                  onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
+                                  onClick={() => {
+                                    setNavigatingState({ id: item.id, action: 'view' });
+                                    router.push(`/tambah-pagu/view/${item.id}`);
+                                  }}
+                                  disabled={navigatingState.id === item.id && navigatingState.action === 'view'}
                                   title="Buka Halaman Lengkap"
-                                  className="flex items-center justify-center gap-1 px-2 py-1.5 bg-white hover:bg-slate-800 text-slate-700 hover:text-white rounded-xl border border-slate-200/90 hover:border-slate-800 shadow-2xs hover:shadow-slate-300 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer"
+                                  className="relative overflow-hidden flex items-center justify-center gap-1 px-2 py-1.5 bg-white hover:bg-slate-900 text-slate-700 hover:text-white rounded-xl border border-slate-200/90 hover:border-slate-900 shadow-2xs hover:shadow-md hover:shadow-slate-300 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer disabled:opacity-60"
                                 >
-                                  <ExternalLink size={11} className="text-slate-500 group-hover:text-white shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                                  <span className="truncate">Halaman Penuh</span>
+                                  {navigatingState.id === item.id && navigatingState.action === 'view' ? (
+                                    <Loader2 size={11} className="animate-spin text-indigo-600 shrink-0" />
+                                  ) : (
+                                    <ExternalLink size={11} className="text-slate-500 group-hover:text-white shrink-0 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-200" />
+                                  )}
+                                  <span className="truncate">{navigatingState.id === item.id && navigatingState.action === 'view' ? 'Membuka...' : 'Halaman Penuh'}</span>
                                 </button>
 
                                 {/* EDIT DATA USULAN */}
                                 {perms.can_create && (
                                   <button
-                                    onClick={() => router.push(`/tambah-pagu/edit/${item.id}`)}
+                                    onClick={() => {
+                                      setNavigatingState({ id: item.id, action: 'edit' });
+                                      router.push(`/tambah-pagu/edit/${item.id}`);
+                                    }}
+                                    disabled={navigatingState.id === item.id && navigatingState.action === 'edit'}
                                     title="Edit Data Usulan Tambah Pagu"
-                                    className="flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-50/90 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl border border-amber-200/90 hover:border-amber-600 shadow-2xs hover:shadow-amber-200 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer"
+                                    className="relative overflow-hidden flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-50/90 hover:bg-amber-600 text-amber-800 hover:text-white rounded-xl border border-amber-200/90 hover:border-amber-600 shadow-2xs hover:shadow-md hover:shadow-amber-200 text-[10px] font-bold transition-all duration-200 active:scale-95 group cursor-pointer disabled:opacity-60"
                                   >
-                                    <Edit3 size={11} className="text-amber-600 group-hover:text-white shrink-0 group-hover:rotate-12 transition-transform" />
-                                    <span className="truncate">Edit Usulan</span>
+                                    {navigatingState.id === item.id && navigatingState.action === 'edit' ? (
+                                      <Loader2 size={11} className="animate-spin text-amber-600 shrink-0" />
+                                    ) : (
+                                      <Edit3 size={11} className="text-amber-600 group-hover:text-white shrink-0 group-hover:rotate-12 transition-transform duration-200" />
+                                    )}
+                                    <span className="truncate">{navigatingState.id === item.id && navigatingState.action === 'edit' ? 'Membuka...' : 'Edit Usulan'}</span>
                                   </button>
                                 )}
                               </div>
@@ -1185,23 +1216,27 @@ export default function TambahPaguPage() {
                                                   }}
                                                 />
                                                 <TableActionButton
-                                                  icon={ExternalLink}
+                                                  icon={navigatingState.id === subItem.id && navigatingState.action === 'view' ? Loader2 : ExternalLink}
                                                   variant="default"
                                                   title="Buka Halaman Penuh"
                                                   size="xs"
+                                                  className={navigatingState.id === subItem.id && navigatingState.action === 'view' ? 'animate-spin text-indigo-600' : ''}
                                                   onClick={(e) => {
                                                     e?.stopPropagation();
+                                                    setNavigatingState({ id: subItem.id, action: 'view' });
                                                     router.push(`/tambah-pagu/view/${subItem.id}`);
                                                   }}
                                                 />
                                                 {perms.can_create && (
                                                   <TableActionButton
-                                                    icon={Edit}
+                                                    icon={navigatingState.id === subItem.id && navigatingState.action === 'edit' ? Loader2 : Edit}
                                                     variant="warning"
                                                     title="Edit Data Usulan"
                                                     size="xs"
+                                                    className={navigatingState.id === subItem.id && navigatingState.action === 'edit' ? 'animate-spin text-amber-600' : ''}
                                                     onClick={(e) => {
                                                       e?.stopPropagation();
+                                                      setNavigatingState({ id: subItem.id, action: 'edit' });
                                                       router.push(`/tambah-pagu/edit/${subItem.id}`);
                                                     }}
                                                   />
@@ -1782,164 +1817,336 @@ export default function TambahPaguPage() {
       )}
 
       {/* POP-UP DETAIL DIALOG (WHEN EYE ICON CLICKED) */}
-      <Dialog open={!!viewDetailData} onOpenChange={(open) => !open && setViewDetailData(null)}>
-        <DialogContent className="bg-white text-slate-900 border-slate-200 sm:max-w-[750px] w-full max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl">
-          <DialogHeader className="border-b border-slate-100 pb-4">
-            <div className="flex justify-between items-center gap-2">
-              <div>
-                <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
-                  <FileText className="text-emerald-600" size={20} />
-                  Detail Usulan Tambah Pagu #{viewDetailData?.id}
-                </DialogTitle>
-                <DialogDescription className="text-slate-500 text-xs mt-0.5">
-                  {viewDetailData?.gov_units?.nama_unit || viewDetailData?.unit_kerja_nama || viewDetailData?.unit_pengusul} — Tahun {viewDetailData?.tahun_anggaran}
-                </DialogDescription>
-              </div>
-
-              <Badge className={`px-3 py-1 text-xs font-black uppercase ${getStatusBadgeStyle(viewDetailData?.status_pengajuan)}`}>
-                {viewDetailData?.status_pengajuan || 'Diajukan'}
-              </Badge>
-            </div>
-          </DialogHeader>
-
+      <Dialog open={!!viewDetailData} onOpenChange={(open) => {
+        if (!open) {
+          setViewDetailData(null);
+          setCopiedField(null);
+        }
+      }}>
+        <DialogContent className="bg-white/95 backdrop-blur-md text-slate-900 border border-slate-200/90 sm:max-w-[780px] w-full max-h-[92vh] overflow-y-auto rounded-3xl p-0 shadow-2xl shadow-slate-900/20">
           {viewDetailData && (
-            <div className="space-y-6 text-xs mt-4">
-              {/* TABEL PENGAJUAN */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="bg-slate-50 px-4 py-2.5 font-black text-slate-800 text-xs border-b border-slate-200 flex items-center gap-2">
-                  <FileText size={14} className="text-indigo-600" /> I. Data Pengajuan Surat Masuk
+            <div>
+              {/* 1. HERO HEADER WITH GRADIENT & STATUS BADGE */}
+              <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-6 sm:p-7 rounded-t-3xl border-b border-indigo-900/50">
+                {/* Subtle background glow circle */}
+                <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 max-w-lg">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full bg-white/15 border border-white/20 text-white text-[10px] font-black uppercase tracking-wider backdrop-blur-xs flex items-center gap-1">
+                        <Building2 size={11} className="text-blue-300" />
+                        {viewDetailData.gov_units?.nama_unit || viewDetailData.unit_kerja_nama || viewDetailData.unit_pengusul || 'Unit Kerja'}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-[10px] font-bold">
+                        Tahun {viewDetailData.tahun_anggaran || '2026'}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        ID #{viewDetailData.id}
+                      </span>
+                    </div>
+
+                    <DialogTitle className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug pt-1">
+                      {viewDetailData.no_surat_pengajuan || 'Usulan Tambah Pagu'}
+                    </DialogTitle>
+                    <DialogDescription className="text-slate-300 text-xs font-normal line-clamp-2">
+                      {viewDetailData.hal_surat_pengajuan || 'Perihal pengajuan penambahan alokasi pagu anggaran unit kerja.'}
+                    </DialogDescription>
+                  </div>
+
+                  <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+                    <Badge className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider shadow-sm ${getStatusBadgeStyle(viewDetailData.status_pengajuan)}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-pulse" />
+                      {viewDetailData.status_pengajuan || 'Diajukan'}
+                    </Badge>
+                    <Badge variant="outline" className="bg-white/10 text-slate-200 border-white/20 text-[10px] font-bold">
+                      {viewDetailData.jenis_tambah_pagu || 'Penugasan'}
+                    </Badge>
+                  </div>
                 </div>
-                <Table>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="w-36 bg-slate-50/50 font-bold text-slate-500">No Surat Pengajuan</TableCell>
-                      <TableCell className="font-mono font-bold text-slate-900">{viewDetailData.no_surat_pengajuan || '-'}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Tanggal Pengajuan</TableCell>
-                      <TableCell className="font-bold text-slate-700">{viewDetailData.tanggal_surat_pengajuan || '-'}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Hal / Perihal</TableCell>
-                      <TableCell className="font-medium text-slate-800">{viewDetailData.hal_surat_pengajuan || '-'}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Sumber Entry Data</TableCell>
-                      <TableCell>
-                        {analisisNoSuratSet.has((viewDetailData.no_surat_pengajuan || '').trim().toLowerCase()) ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl">
-                            <Sparkles size={13} className="text-indigo-600" /> Impor Analisis AI (/analisis)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl">
-                            <Edit3 size={13} className="text-slate-500" /> Input Manual
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-amber-50/40">
-                      <TableCell className="bg-amber-100/50 font-bold text-amber-900">Nominal Diajukan</TableCell>
-                      <TableCell className="font-mono font-black text-amber-900 text-sm">
-                        Rp {formatRp(viewDetailData.nominal_diajukan)}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Berkas / Lampiran</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {viewDetailData.link_surat_pengajuan && (
-                            <a href={getSafeFileUrl(viewDetailData.link_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
-                              <ExternalLink size={13} /> GDrive Link
-                            </a>
-                          )}
-                          {viewDetailData.file_surat_pengajuan && (
-                            <a href={getSafeFileUrl(viewDetailData.file_surat_pengajuan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
-                              <FileText size={13} /> File PDF
-                            </a>
-                          )}
-                          {!viewDetailData.link_surat_pengajuan && !viewDetailData.file_surat_pengajuan && <span className="text-slate-400 font-medium">-</span>}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
               </div>
 
-              {/* TABEL TANGGAPAN */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="bg-slate-50 px-4 py-2.5 font-black text-slate-800 text-xs border-b border-slate-200 flex items-center gap-2">
-                  <CheckCircle2 size={14} className="text-emerald-600" /> II. Data Tanggapan Pimpinan
+              {/* 2. BODY CONTENT */}
+              <div className="p-6 sm:p-7 space-y-6 text-xs bg-slate-50/50">
+                
+                {/* FINANCIAL COMPARISON STAT CARDS */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* CARD USULAN */}
+                  <div className="relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-50/80 to-white border border-amber-200/80 shadow-2xs">
+                    <div className="flex items-center justify-between text-amber-800 mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <Coins size={12} className="text-amber-600" /> Nominal Usulan (Diajukan)
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100/80 text-amber-800 rounded">
+                        Permohonan
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-black font-mono text-amber-950 tracking-tight">
+                      Rp {formatRp(viewDetailData.nominal_diajukan)}
+                    </div>
+                    <p className="text-[10px] text-amber-700/80 mt-1 font-medium">
+                      Alokasi usulan belanja yang diajukan dalam surat
+                    </p>
+                  </div>
+
+                  {/* CARD DISETUJUI */}
+                  <div className="relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-50/80 to-white border border-emerald-200/80 shadow-2xs">
+                    <div className="flex items-center justify-between text-emerald-800 mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle2 size={12} className="text-emerald-600" /> Nominal Disetujui (Persetujuan)
+                      </span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                        (viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0) >= (viewDetailData.nominal_diajukan || 1)
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-indigo-100 text-indigo-800'
+                      }`}>
+                        {viewDetailData.nominal_diajukan > 0 
+                          ? `${Math.round(((viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0) / viewDetailData.nominal_diajukan) * 100)}% Rasio`
+                          : '100%'}
+                      </span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-black font-mono text-emerald-950 tracking-tight">
+                      Rp {formatRp(viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0)}
+                    </div>
+                    <p className="text-[10px] text-emerald-700/80 mt-1 font-medium">
+                      {viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui 
+                        ? 'Besaran pagu yang ditetapkan oleh pimpinan' 
+                        : 'Menunggu keputusan / verifikasi pimpinan'}
+                    </p>
+                  </div>
                 </div>
-                <Table>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="w-36 bg-slate-50/50 font-bold text-slate-500">No Surat Tanggapan</TableCell>
-                      <TableCell className="font-mono font-bold text-slate-900">{viewDetailData.no_surat_tanggapan || '-'}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Tanggal Tanggapan</TableCell>
-                      <TableCell className="font-bold text-slate-700">{viewDetailData.tanggal_surat_tanggapan || '-'}</TableCell>
-                    </TableRow>
-                    <TableRow className="bg-emerald-50/40">
-                      <TableCell className="bg-emerald-100/50 font-bold text-emerald-900">Nominal Disetujui</TableCell>
-                      <TableCell className="font-mono font-black text-emerald-800 text-sm">
-                        Rp {formatRp(viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui || 0)}
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="bg-slate-50/50 font-bold text-slate-500">Berkas Tanggapan</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {viewDetailData.link_surat_tanggapan && (
-                            <a href={getSafeFileUrl(viewDetailData.link_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline flex items-center gap-1">
-                              <ExternalLink size={13} /> GDrive Link
-                            </a>
+
+                {/* TWO MAIN SECTION CARDS: PENGAJUAN & TANGGAPAN */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* SEKSI 1: DATA PENGAJUAN */}
+                  <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-1.5 font-black text-slate-800 text-xs">
+                        <FileText size={14} className="text-indigo-600" />
+                        <span>I. Surat Pengajuan Masuk</span>
+                      </div>
+                      {analisisNoSuratSet.has((viewDetailData.no_surat_pengajuan || '').trim().toLowerCase()) ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full">
+                          <Sparkles size={10} className="text-indigo-600" /> AI Import
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">
+                          <Edit3 size={10} className="text-slate-500" /> Manual
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Nomor Surat</span>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <span className="font-mono font-bold text-slate-900 text-xs truncate">
+                            {viewDetailData.no_surat_pengajuan || '-'}
+                          </span>
+                          {viewDetailData.no_surat_pengajuan && (
+                            <button
+                              onClick={() => copyToClipboard(viewDetailData.no_surat_pengajuan, 'no_surat')}
+                              title="Salin Nomor Surat"
+                              className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            >
+                              {copiedField === 'no_surat' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                            </button>
                           )}
-                          {viewDetailData.file_surat_tanggapan && (
-                            <a href={getSafeFileUrl(viewDetailData.file_surat_tanggapan)} target="_blank" rel="noopener noreferrer" className="text-emerald-600 font-bold hover:underline flex items-center gap-1 ml-2">
-                              <FileText size={13} /> File PDF
-                            </a>
-                          )}
-                          {!viewDetailData.link_surat_tanggapan && !viewDetailData.file_surat_tanggapan && <span className="text-slate-400 font-medium">-</span>}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Tanggal Surat</span>
+                        <div className="flex items-center gap-1 font-semibold text-slate-700 mt-0.5">
+                          <Calendar size={12} className="text-slate-400" />
+                          <span>{viewDetailData.tanggal_surat_pengajuan || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Perihal / Hal</span>
+                        <p className="text-slate-700 font-medium leading-snug mt-0.5 line-clamp-3 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          {viewDetailData.hal_surat_pengajuan || '-'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Berkas Surat Masuk</span>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {viewDetailData.file_surat_pengajuan ? (
+                            <a
+                              href={getSafeFileUrl(viewDetailData.file_surat_pengajuan)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/90 rounded-xl font-bold text-[10px] transition-colors shadow-2xs"
+                            >
+                              <FileText size={12} className="text-emerald-600" />
+                              <span>Dokumen PDF</span>
+                              <ExternalLink size={10} className="text-emerald-500" />
+                            </a>
+                          ) : null}
+
+                          {viewDetailData.link_surat_pengajuan ? (
+                            <a
+                              href={getSafeFileUrl(viewDetailData.link_surat_pengajuan)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/90 rounded-xl font-bold text-[10px] transition-colors shadow-2xs"
+                            >
+                              <ExternalLink size={12} className="text-blue-600" />
+                              <span>Google Drive</span>
+                            </a>
+                          ) : null}
+
+                          {!viewDetailData.file_surat_pengajuan && !viewDetailData.link_surat_pengajuan && (
+                            <span className="text-slate-400 italic">Tidak ada lampiran berkas</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEKSI 2: DATA TANGGAPAN */}
+                  <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-1.5 font-black text-slate-800 text-xs">
+                        <CheckCircle2 size={14} className="text-emerald-600" />
+                        <span>II. Tanggapan & Penetapan</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400">Pimpinan</span>
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">No Surat Tanggapan</span>
+                        <div className="flex items-center justify-between gap-2 mt-0.5">
+                          <span className="font-mono font-bold text-slate-900 text-xs truncate">
+                            {viewDetailData.no_surat_tanggapan || '-'}
+                          </span>
+                          {viewDetailData.no_surat_tanggapan && (
+                            <button
+                              onClick={() => copyToClipboard(viewDetailData.no_surat_tanggapan, 'no_tanggapan')}
+                              title="Salin Nomor Surat Tanggapan"
+                              className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                            >
+                              {copiedField === 'no_tanggapan' ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Tanggal Tanggapan</span>
+                        <div className="flex items-center gap-1 font-semibold text-slate-700 mt-0.5">
+                          <Calendar size={12} className="text-slate-400" />
+                          <span>{viewDetailData.tanggal_surat_tanggapan || '-'}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Catatan Keputusan</span>
+                        <div className="p-2 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 font-medium">
+                          Status: <strong className="text-slate-900">{viewDetailData.status_pengajuan || 'Diajukan'}</strong>.
+                          {viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui 
+                            ? ' Alokasi disetujui Rp ' + formatRp(viewDetailData.nominal_tanggapan || viewDetailData.nominal_disetujui) + '.' 
+                            : ' Menunggu penetapan atau verifikasi nota analisis pimpinan.'}
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Berkas Surat Tanggapan</span>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          {viewDetailData.file_surat_tanggapan ? (
+                            <a
+                              href={getSafeFileUrl(viewDetailData.file_surat_tanggapan)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/90 rounded-xl font-bold text-[10px] transition-colors shadow-2xs"
+                            >
+                              <FileText size={12} className="text-emerald-600" />
+                              <span>PDF Tanggapan</span>
+                              <ExternalLink size={10} className="text-emerald-500" />
+                            </a>
+                          ) : null}
+
+                          {viewDetailData.link_surat_tanggapan ? (
+                            <a
+                              href={getSafeFileUrl(viewDetailData.link_surat_tanggapan)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/90 rounded-xl font-bold text-[10px] transition-colors shadow-2xs"
+                            >
+                              <ExternalLink size={12} className="text-blue-600" />
+                              <span>Google Drive</span>
+                            </a>
+                          ) : null}
+
+                          {!viewDetailData.file_surat_tanggapan && !viewDetailData.link_surat_tanggapan && (
+                            <span className="text-slate-400 italic">Belum ada berkas tanggapan</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RINGKASAN SUBSTANSI CERDAS AI */}
+                {viewDetailData.ringkasan_substansi && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50/40 to-amber-50 border border-amber-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-amber-950 uppercase text-[10px] tracking-wide flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-amber-600" /> Ringkasan Cerdas AI (Gemini Insight)
+                      </span>
+                      <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-200/60 text-amber-900 rounded-full">
+                        Automated Extraction
+                      </span>
+                    </div>
+                    <div 
+                      className="text-slate-800 text-[11px] font-medium leading-relaxed bg-white/80 p-3 rounded-xl border border-amber-100 shadow-2xs"
+                      dangerouslySetInnerHTML={{ __html: viewDetailData.ringkasan_substansi }}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* RINGKASAN AI */}
-              {viewDetailData.ringkasan_substansi && (
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
-                  <span className="font-black text-amber-900 uppercase text-[10px] flex items-center gap-1.5">
-                    <Sparkles size={12} className="text-amber-600" /> Ringkasan Substansi AI
-                  </span>
-                  <div 
-                    className="text-slate-800 font-medium leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: viewDetailData.ringkasan_substansi }}
-                  />
-                </div>
-              )}
-
-              {/* FOOTER ACTIONS */}
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              {/* 3. MODAL FOOTER ACTIONS */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-5 sm:p-6 bg-white border-t border-slate-100 rounded-b-3xl">
                 <Button 
                   variant="outline" 
                   onClick={() => setViewDetailData(null)}
-                  className="rounded-xl font-bold text-xs"
+                  className="w-full sm:w-auto rounded-xl font-bold text-xs border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer"
                 >
-                  Tutup
+                  Tutup Pratinjau
                 </Button>
-                <Button 
-                  onClick={() => {
-                    const targetId = viewDetailData.id;
-                    setViewDetailData(null);
-                    router.push(`/tambah-pagu/view/${targetId}`);
-                  }}
-                  className="bg-slate-900 text-white rounded-xl font-bold text-xs"
-                >
-                  <ExternalLink size={14} className="mr-1.5" /> Buka Halaman Penuh
-                </Button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {perms.can_create && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const targetId = viewDetailData.id;
+                        setViewDetailData(null);
+                        router.push(`/tambah-pagu/edit/${targetId}`);
+                      }}
+                      className="flex-1 sm:flex-none border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-bold text-xs shadow-2xs cursor-pointer"
+                    >
+                      <Edit3 size={13} className="mr-1.5 text-amber-600" /> Edit Usulan
+                    </Button>
+                  )}
+
+                  <Button 
+                    onClick={() => {
+                      const targetId = viewDetailData.id;
+                      setViewDetailData(null);
+                      router.push(`/tambah-pagu/view/${targetId}`);
+                    }}
+                    className="flex-1 sm:flex-none bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 hover:from-slate-800 hover:to-indigo-900 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-950/20 cursor-pointer group"
+                  >
+                    <span>Buka Halaman Penuh</span>
+                    <ExternalLink size={13} className="ml-1.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
