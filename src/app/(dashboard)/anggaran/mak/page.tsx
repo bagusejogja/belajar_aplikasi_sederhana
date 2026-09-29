@@ -7,9 +7,12 @@ import {
   Download, Mail, ExternalLink, RefreshCw, ClipboardList,
   Filter, Calendar, BarChart3, Database, Building2, Eye,
   Users, UserCheck, Award, Zap, TrendingUp, ArrowRight,
-  RotateCcw, Sparkles, Check, ChevronDown, ChevronUp, AlertCircle
+  RotateCcw, Sparkles, Check, ChevronDown, ChevronUp, AlertCircle,
+  PieChart as PieChartIcon
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
+
+const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#94a3b8'];
 
 // Helper Format Durasi Waktu Bahasa Indonesia
 const formatDuration = (ms: number): string => {
@@ -109,6 +112,7 @@ export default function MonitoringMakPage() {
   const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pic-report' | 'table' | 'chart'>('pic-report');
+  const [pieViewMode, setPieViewMode] = useState<'unit' | 'status'>('unit');
   
   // Filters
   const [search, setSearch] = useState('');
@@ -330,6 +334,26 @@ export default function MonitoringMakPage() {
   const total = filtered.length;
   const selesai = filtered.filter(d => d.status === 'Selesai').length;
   const proses = filtered.filter(d => d.status !== 'Selesai').length;
+
+  const unitPieData = useMemo(() => {
+    if (!chartData || chartData.length === 0) return [];
+    if (chartData.length <= 5) {
+      return chartData.map((c, i) => ({ name: c.name, value: c.Total, color: PIE_COLORS[i % PIE_COLORS.length] }));
+    }
+    const top5 = chartData.slice(0, 5).map((c, i) => ({ name: c.name, value: c.Total, color: PIE_COLORS[i % PIE_COLORS.length] }));
+    const othersTotal = chartData.slice(5).reduce((acc, curr) => acc + curr.Total, 0);
+    if (othersTotal > 0) {
+      top5.push({ name: 'Unit Lainnya', value: othersTotal, color: '#94a3b8' });
+    }
+    return top5;
+  }, [chartData]);
+
+  const statusPieData = useMemo(() => {
+    return [
+      { name: 'Selesai Diproses', value: selesai, color: '#10b981' },
+      { name: 'Proses Revisi', value: proses, color: '#f59e0b' }
+    ].filter(d => d.value > 0);
+  }, [selesai, proses]);
 
   const extractFilesFromValue = (val: any) => {
     let files: {url: string, name: string}[] = [];
@@ -765,7 +789,7 @@ export default function MonitoringMakPage() {
               }`}
             >
               <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
-              <span>Grafik Batang</span>
+              <span>Grafik Batang & Pie</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
                 activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
               }`}>
@@ -853,7 +877,7 @@ export default function MonitoringMakPage() {
                 </div>
               </div>
 
-              {/* Card 4: 🔴 DIGANTI: UNIT TERBANYAK MELAKUKAN PERUBAHAN */}
+              {/* Card 4: 🔴 UNIT TERBANYAK MELAKUKAN PERUBAHAN (Frekuensi di atas, Unit di bawah) */}
               <div className="bg-white rounded-2xl p-4 border border-purple-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group flex flex-col justify-between">
                 <div className="absolute -right-8 -top-8 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
                 <div className="flex items-start justify-between gap-2">
@@ -861,18 +885,19 @@ export default function MonitoringMakPage() {
                     <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 block mb-1">
                       UNIT TERBANYAK PERUBAHAN
                     </span>
-                    <div className="text-sm md:text-base font-black text-purple-950 truncate" title={topUnitChange.name}>
-                      {topUnitChange.name}
+                    <div className="text-xl md:text-2xl font-black text-purple-950 font-mono tracking-tight flex items-baseline gap-1.5">
+                      <span>{topUnitChange.count}</span>
+                      <span className="text-xs font-bold text-purple-600 font-sans">Kali Revisi</span>
                     </div>
                   </div>
                   <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shadow-2xs shrink-0">
                     <Building2 size={18} />
                   </div>
                 </div>
-                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-purple-50 pt-2">
-                  <span>Frekuensi revisi/usulan</span>
-                  <span className="text-[9px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md font-black">
-                    {topUnitChange.count} Kali Revisi
+                <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-purple-50 pt-2 gap-2">
+                  <span className="text-[11px] text-gray-500 font-medium shrink-0">Unit Kerja</span>
+                  <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-md font-black truncate max-w-[190px]" title={topUnitChange.name}>
+                    {topUnitChange.name}
                   </span>
                 </div>
               </div>
@@ -1064,44 +1089,162 @@ export default function MonitoringMakPage() {
           )
         )}
 
-        {/* TAB 3: GRAFIK BATANG UNIT */}
+        {/* TAB 3: 🔴 GRAFIK BATANG & GRAFIK PIE INTERAKTIF */}
         {activeTab === 'chart' && (
           chartData.length > 0 ? (
-            <div className="h-[300px] w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                  <defs>
-                    <linearGradient id="makChartGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#e11d48" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
-                    angle={-45} 
-                    textAnchor="end" 
-                    interval={0}
-                    height={80}
-                    tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
-                  />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
-                    contentStyle={{ 
-                      borderRadius: '0.85rem', 
-                      border: '1px solid #e2e8f0', 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      backdropFilter: 'blur(8px)',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-                      fontSize: '11px',
-                      fontWeight: 'bold'
-                    }}
-                  />
-                  <Bar dataKey="Total" fill="url(#makChartGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* Panel 1: Grafik Batang Frekuensi Revisi per Unit (lg:col-span-7) */}
+                <div className="lg:col-span-7 bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
+                    <div>
+                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <BarChart3 size={15} className="text-indigo-600" />
+                        <span>Frekuensi Revisi per Unit Kerja</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        Distribusi jumlah berkas revisi yang diajukan oleh masing-masing unit kerja.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-md border border-indigo-200/60 shrink-0">
+                      {chartData.length} Unit
+                    </span>
+                  </div>
+
+                  <div className="h-[300px] w-full pt-1">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 20, right: 20, left: 10, bottom: 75 }}>
+                        <defs>
+                          <linearGradient id="makChartGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#e11d48" stopOpacity={0.9} />
+                            <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="name" 
+                          tick={{ fontSize: 9.5, fill: '#64748b', fontWeight: 'bold' }} 
+                          angle={-40} 
+                          textAnchor="end" 
+                          interval={0}
+                          height={75}
+                          tickFormatter={(val) => val.length > 22 ? val.substring(0, 22) + '...' : val}
+                        />
+                        <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
+                        <Tooltip 
+                          cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
+                          contentStyle={{ 
+                            borderRadius: '0.85rem', 
+                            border: '1px solid #e2e8f0', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                            fontSize: '11px',
+                            fontWeight: 'bold'
+                          }}
+                          formatter={(value: any) => [`${value} Berkas`, 'Total Revisi']}
+                        />
+                        <Bar dataKey="Total" fill="url(#makChartGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Panel 2: Grafik Pie Komposisi / Sebaran (lg:col-span-5) */}
+                <div className="lg:col-span-5 bg-white rounded-2xl p-4 md:p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2.5">
+                    <div>
+                      <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <PieChartIcon size={15} className="text-rose-600" />
+                        <span>Komposisi Proporsi Revisi</span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {pieViewMode === 'unit' ? 'Proporsi per unit kerja (Top 5 + Lainnya)' : 'Proporsi status penyelesaian revisi'}
+                      </p>
+                    </div>
+
+                    {/* Toggle Mode Pie: Unit vs Status */}
+                    <div className="inline-flex p-0.5 bg-slate-100 rounded-lg text-[10px] font-bold shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPieViewMode('unit')}
+                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                          pieViewMode === 'unit' ? 'bg-white text-indigo-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Unit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPieViewMode('status')}
+                        className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                          pieViewMode === 'status' ? 'bg-white text-rose-700 shadow-2xs font-black' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Status
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Pie / Donut Chart */}
+                  <div className="h-[300px] w-full flex items-center justify-center relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip 
+                          contentStyle={{ 
+                            borderRadius: '0.85rem', 
+                            border: '1px solid #e2e8f0', 
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                            fontSize: '11px',
+                            fontWeight: 'bold'
+                          }}
+                          formatter={(value: any, name: any) => [
+                            `${value} Berkas (${Math.round((Number(value) / (total || 1)) * 100)}%)`, 
+                            name
+                          ]}
+                        />
+                        <Pie
+                          data={pieViewMode === 'unit' ? unitPieData : statusPieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="46%"
+                          innerRadius={55}
+                          outerRadius={88}
+                          paddingAngle={3}
+                          animationDuration={800}
+                        >
+                          {(pieViewMode === 'unit' ? unitPieData : statusPieData).map((entry, index) => (
+                            <Cell 
+                              key={`cell-pie-${index}`} 
+                              fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]} 
+                            />
+                          ))}
+                        </Pie>
+                        <Legend 
+                          verticalAlign="bottom" 
+                          height={40} 
+                          iconType="circle"
+                          iconSize={8}
+                          formatter={(value) => <span className="text-[10px] font-bold text-slate-600 mr-2">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    {/* Donut Center Info */}
+                    <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                      <div className="text-xl font-black text-slate-900 font-mono tracking-tight leading-none">
+                        {total}
+                      </div>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                        Total Berkas
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="h-32 flex flex-col items-center justify-center text-gray-400">
