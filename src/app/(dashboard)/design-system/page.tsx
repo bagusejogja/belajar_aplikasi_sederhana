@@ -108,7 +108,8 @@ import {
   PrimaryButton, 
   SecondaryButton, 
   DangerButton, 
-  TableActionButton 
+  TableActionButton,
+  TableActionGroup 
 } from '@/components/shared/ActionButtons';
 
 export default function DesignSystemPage() {
@@ -3144,12 +3145,35 @@ export default function DesignSystemPage() {
                         <td className={`text-center ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                           <StatusBadge status={row.status} />
                         </td>
-                        <td className={`text-center ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
-                          <div className="flex items-center justify-center gap-1">
-                            <TableActionButton icon={Eye} variant="primary" title="Detail" />
-                            <TableActionButton icon={Pencil} variant="warning" title="Edit" />
-                            <TableActionButton icon={Trash2} variant="danger" title="Hapus" />
-                          </div>
+                        <td className={`text-center ${tableDensity === 'compact' ? 'py-1.5 px-2' : 'py-2.5 px-3'}`}>
+                          <TableActionGroup>
+                            <TableActionButton 
+                              icon={Eye} 
+                              variant="primary" 
+                              title="Lihat Detail Akun" 
+                              size={tableDensity === 'compact' ? 'xs' : 'sm'} 
+                              onClick={() => triggerToast('info', 'Membuka Detail', `Membuka detail akun ${row.kode}`)}
+                            />
+                            <TableActionButton 
+                              icon={Pencil} 
+                              variant="warning" 
+                              title="Ubah Data Usulan" 
+                              size={tableDensity === 'compact' ? 'xs' : 'sm'} 
+                              onClick={() => triggerToast('warning', 'Mode Edit', `Membuka form edit untuk ${row.nama}`)}
+                            />
+                            <TableActionButton 
+                              icon={Trash2} 
+                              variant="danger" 
+                              title="Hapus Usulan" 
+                              size={tableDensity === 'compact' ? 'xs' : 'sm'} 
+                              onClick={() => {
+                                setModalTitle(`Hapus Akun ${row.kode}?`);
+                                setModalDesc(`Apakah Anda yakin ingin menghapus data pengajuan untuk ${row.nama}? Tindakan ini permanen.`);
+                                setModalVariant('danger');
+                                setModalOpen(true);
+                              }}
+                            />
+                          </TableActionGroup>
                         </td>
                       </tr>
                     ))}
@@ -3252,7 +3276,16 @@ export default function DesignSystemPage() {
                                 <StatusBadge status={row.status} />
                               </td>
                               <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                                <TableActionButton icon={Eye} variant="primary" title="Detail Akun" />
+                                <TableActionGroup>
+                                  <TableActionButton 
+                                    icon={Eye} 
+                                    variant="indigo" 
+                                    title="Lihat Detail Transaksi" 
+                                    label="Detail" 
+                                    size="sm" 
+                                    onClick={() => setDrawerOpen(true)}
+                                  />
+                                </TableActionGroup>
                               </td>
                             </tr>
 
@@ -3449,10 +3482,22 @@ export default function DesignSystemPage() {
                                     <StatusBadge status={child.status} />
                                   </td>
                                   <td className="text-center py-2.5 px-3">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <TableActionButton icon={Eye} variant="primary" title="Lihat Unit" />
-                                      <TableActionButton icon={Pencil} variant="warning" title="Edit Unit" />
-                                    </div>
+                                    <TableActionGroup>
+                                      <TableActionButton 
+                                        icon={Eye} 
+                                        variant="primary" 
+                                        title="Lihat Rincian Unit" 
+                                        size="xs" 
+                                        onClick={() => triggerToast('info', 'Unit Kerja', `Membuka detail ${child.nama}`)}
+                                      />
+                                      <TableActionButton 
+                                        icon={Pencil} 
+                                        variant="warning" 
+                                        title="Edit Unit Kerja" 
+                                        size="xs" 
+                                        onClick={() => triggerToast('warning', 'Edit Unit', `Mengedit unit ${child.nama}`)}
+                                      />
+                                    </TableActionGroup>
                                   </td>
                                 </tr>
                               ))
@@ -3666,10 +3711,10 @@ export default function DesignSystemPage() {
                                         <StatusBadge status={grandChild.status} />
                                       </td>
                                       <td className="text-center py-2 px-3">
-                                        <div className="flex items-center justify-center gap-1">
-                                          <TableActionButton icon={Eye} variant="primary" title="Lihat Rincian" />
-                                          <TableActionButton icon={Pencil} variant="warning" title="Edit" />
-                                        </div>
+                                        <TableActionGroup>
+                                          <TableActionButton icon={Eye} variant="primary" title="Lihat Rincian" size="xs" onClick={() => triggerToast('info', 'Rincian Akun', `Melihat rincian ${grandChild.nama}`)} />
+                                          <TableActionButton icon={Pencil} variant="warning" title="Edit" size="xs" onClick={() => triggerToast('warning', 'Edit Akun', `Mengedit ${grandChild.nama}`)} />
+                                        </TableActionGroup>
                                       </td>
                                     </tr>
                                   ))}
@@ -3681,6 +3726,132 @@ export default function DesignSystemPage() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* ========================================================================= */}
+              {/* SUB-SECTION 4: STANDARISASI TEMPLATE KOLOM AKSI (ACTION COLUMNS CATALOG)  */}
+              {/* ========================================================================= */}
+              <div className="pt-6 border-t border-gray-200/80 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles size={16} className="text-amber-500" />
+                      <span>Standarisasi Template Kolom &quot;Aksi&quot; (Action Columns Suite)</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pilihan template terstandar untuk tombol tindakan di kolom tabel berdasarkan tingkat urgensi, alur kerja, dan jumlah aksi.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 self-start sm:self-auto">
+                    Design System Standards
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* TEMPLATE A: TRIO ACTION GROUP (DEFAULT) */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 1: Trio Compact Pill</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Master Data</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Format standar untuk baris data umum. Menyediakan aksi cepat Detail (Biru), Edit (Amber), dan Hapus (Rose).
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
+                      <TableActionGroup>
+                        <TableActionButton icon={Eye} variant="primary" title="Lihat Detail" size="sm" onClick={() => triggerToast('info', 'Aksi Detail', 'Tombol detail ditekan')} />
+                        <TableActionButton icon={Pencil} variant="warning" title="Ubah Data" size="sm" onClick={() => triggerToast('warning', 'Aksi Edit', 'Tombol edit ditekan')} />
+                        <TableActionButton icon={Trash2} variant="danger" title="Hapus Data" size="sm" onClick={() => triggerToast('error', 'Aksi Hapus', 'Tombol hapus ditekan')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
+
+                  {/* TEMPLATE B: PRIMARY BUTTON WITH LABEL */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 2: Action with Text Label</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">High Clarity</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Disertai label teks untuk aksi prioritas tinggi yang memerlukan kejelasan instan oleh pengguna.
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center gap-1.5">
+                      <TableActionGroup>
+                        <TableActionButton icon={Eye} variant="indigo" label="Buka Nota" title="Lihat Nota" size="sm" onClick={() => triggerToast('info', 'Buka Nota', 'Membuka dokumen nota analisis')} />
+                        <TableActionButton icon={Pencil} variant="warning" title="Ubah Dokumen" size="sm" onClick={() => triggerToast('warning', 'Edit Dokumen', 'Membuka form koreksi')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
+
+                  {/* TEMPLATE C: QUICK APPROVAL / VERIFIKASI */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 3: Quick Approval Switch</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Verifikasi</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Khusus alur kerja persetujuan pagu: tombol hijau untuk Setujui Penuh dan tombol merah untuk Tolak / Kembalikan.
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
+                      <TableActionGroup>
+                        <TableActionButton icon={CheckCircle2} variant="success" label="Setujui" title="Setujui Usulan" size="sm" onClick={() => triggerToast('success', 'Disetujui', 'Usulan pagu telah disetujui')} />
+                        <TableActionButton icon={X} variant="danger" label="Tolak" title="Tolak Usulan" size="sm" onClick={() => triggerToast('error', 'Ditolak', 'Usulan pagu ditolak / dikembalikan')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
+
+                  {/* TEMPLATE D: DOKUMEN CETAK & PREVIEW */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 4: Dokumen & Cetak Cetak</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Laporan</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Ditujukan untuk baris yang menghasilkan berkas fisik: Pratinjau PDF, Cetak Langsung, dan Ekspor Excel.
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
+                      <TableActionGroup>
+                        <TableActionButton icon={Eye} variant="primary" title="Pratinjau PDF" size="sm" onClick={() => setDocViewerOpen(true)} />
+                        <TableActionButton icon={Printer} variant="default" title="Cetak Langsung" size="sm" onClick={() => triggerToast('info', 'Cetak', 'Menyiapkan dialog pencetakan nota')} />
+                        <TableActionButton icon={FileSpreadsheet} variant="success" title="Unduh Excel" size="sm" onClick={() => triggerToast('success', 'Excel', 'Mengunduh rekap dalam format Excel')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
+
+                  {/* TEMPLATE E: HYBRID DETAIL & POP-UP MODAL */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 5: Modal Pop-up & Full Page</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">Dual View</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Standar Tambah Pagu: Tombol mata (modal pop-up cepat) + tombol link eksternal (buka halaman penuh).
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
+                      <TableActionGroup>
+                        <TableActionButton icon={Eye} variant="indigo" title="Buka Pop-up Cepat" size="sm" onClick={() => triggerToast('info', 'Modal Preview', 'Membuka pop-up inspeksi')} />
+                        <TableActionButton icon={ArrowUpRight} variant="default" title="Buka Halaman Penuh" size="sm" onClick={() => triggerToast('info', 'Halaman Penuh', 'Membuka halaman lengkap')} />
+                        <TableActionButton icon={Pencil} variant="warning" title="Edit Data" size="sm" onClick={() => triggerToast('warning', 'Edit', 'Membuka form edit')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
+
+                  {/* TEMPLATE F: ACCORDION EXPAND TRIGGER */}
+                  <div className="p-4 rounded-2xl border border-gray-200/80 bg-slate-50/50 space-y-3 hover:bg-slate-50 hover:shadow-xs transition-all">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">Template 6: Single Inspector Pill</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">Sub-Item</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Desain tombol tunggal hemat ruang dengan rounded lembut untuk tabel bersarang atau baris anak.
+                    </p>
+                    <div className="p-3 bg-white rounded-xl border border-slate-200/80 flex items-center justify-center">
+                      <TableActionGroup>
+                        <TableActionButton icon={Eye} variant="primary" label="Lihat Rincian" title="Periksa Item" size="sm" onClick={() => triggerToast('info', 'Rincian', 'Membuka rincian sub-item')} />
+                      </TableActionGroup>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

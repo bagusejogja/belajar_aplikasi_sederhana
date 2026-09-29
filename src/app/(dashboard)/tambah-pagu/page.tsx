@@ -29,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { getSafeFileUrl } from '@/lib/fileHelper';
+import { TableActionButton, TableActionGroup } from '@/components/shared/ActionButtons';
 
 // Autocomplete Filter Unit Kerja Component (with Keyboard Navigation ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -914,31 +915,31 @@ export default function TambahPaguPage() {
 
                           {/* 5. AKSI */}
                           <TableCell className="text-center align-top pt-3">
-                            <div className="flex items-center justify-center gap-1">
-                              <button
-                                onClick={() => setViewDetailData(item)}
+                            <TableActionGroup>
+                              <TableActionButton
+                                icon={Eye}
+                                variant="indigo"
                                 title="Lihat Pop-up Detail"
-                                className="p-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-xl transition-all shadow-sm"
-                              >
-                                <Eye size={14} />
-                              </button>
-                              <button
-                                onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
+                                size="sm"
+                                onClick={() => setViewDetailData(item)}
+                              />
+                              <TableActionButton
+                                icon={ExternalLink}
+                                variant="default"
                                 title="Buka Halaman Penuh"
-                                className="p-2 bg-slate-100 hover:bg-slate-800 text-slate-600 hover:text-white rounded-xl transition-all shadow-sm"
-                              >
-                                <ExternalLink size={14} />
-                              </button>
+                                size="sm"
+                                onClick={() => router.push(`/tambah-pagu/view/${item.id}`)}
+                              />
                               {perms.can_create && (
-                                <button
+                                <TableActionButton
+                                  icon={Edit}
+                                  variant="warning"
+                                  title="Edit Data Usulan"
+                                  size="sm"
                                   onClick={() => router.push(`/tambah-pagu/edit/${item.id}`)}
-                                  title="Edit Data"
-                                  className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-xl transition-all shadow-sm"
-                                >
-                                  <Edit size={14} />
-                                </button>
+                                />
                               )}
-                            </div>
+                            </TableActionGroup>
                           </TableCell>
                         </TableRow>
                       );
@@ -1156,16 +1157,40 @@ export default function TambahPaguPage() {
                                               </div>
                                             </TableCell>
                                             <TableCell className="text-center">
-                                              <button
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setViewDetailData(subItem);
-                                                }}
-                                                className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition-all"
-                                                title="Lihat Pop-up Detail"
-                                              >
-                                                <Eye size={14} />
-                                              </button>
+                                              <TableActionGroup>
+                                                <TableActionButton
+                                                  icon={Eye}
+                                                  variant="indigo"
+                                                  title="Lihat Pop-up Detail"
+                                                  size="xs"
+                                                  onClick={(e) => {
+                                                    e?.stopPropagation();
+                                                    setViewDetailData(subItem);
+                                                  }}
+                                                />
+                                                <TableActionButton
+                                                  icon={ExternalLink}
+                                                  variant="default"
+                                                  title="Buka Halaman Penuh"
+                                                  size="xs"
+                                                  onClick={(e) => {
+                                                    e?.stopPropagation();
+                                                    router.push(`/tambah-pagu/view/${subItem.id}`);
+                                                  }}
+                                                />
+                                                {perms.can_create && (
+                                                  <TableActionButton
+                                                    icon={Edit}
+                                                    variant="warning"
+                                                    title="Edit Data Usulan"
+                                                    size="xs"
+                                                    onClick={(e) => {
+                                                      e?.stopPropagation();
+                                                      router.push(`/tambah-pagu/edit/${subItem.id}`);
+                                                    }}
+                                                  />
+                                                )}
+                                              </TableActionGroup>
                                             </TableCell>
                                           </TableRow>
                                         ))}
