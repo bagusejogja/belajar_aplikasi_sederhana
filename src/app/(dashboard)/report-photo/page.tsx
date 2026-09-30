@@ -144,6 +144,16 @@ export default function ReportPhotoPage() {
        if (!teks) return null;
        const links = teks.split(',').map(s => s.trim()).filter(Boolean);
        return links.map((lnk, idx) => {
+            const isFolder = lnk.includes('/folders/');
+            if (isFolder) {
+               return (
+                  <div key={idx} className="border-2 border-blue-200 bg-blue-50 p-3 rounded inline-block mx-1 mb-2 max-w-full print:border-gray-300 print:bg-white overflow-hidden">
+                     <p className="font-bold text-blue-700 print:text-black text-[13px] mb-1">📁 Lampiran (Folder Google Drive)</p>
+                     <a href={lnk} target="_blank" rel="noreferrer" className="text-blue-600 print:text-black text-[10px] break-all underline">{lnk}</a>
+                  </div>
+               );
+            }
+
             let imgSrc = lnk;
             const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
             if (gdriveMatch && gdriveMatch[1]) {
