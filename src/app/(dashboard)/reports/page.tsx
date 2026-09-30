@@ -125,7 +125,8 @@ export default function ReportsPage() {
             <p className="text-xs font-black text-gray-500 mb-4">{label}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                {links.map((lnk, idx) => {
-                   let imgSrc = lnk;
+                   const isFolder = lnk.includes('/folders/');
+                   let imgSrc = isFolder ? '' : lnk;
                    const isGDrive = lnk.match(/drive\.google\.com/);
                    const gdriveMatch = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
                    
@@ -134,18 +135,28 @@ export default function ReportsPage() {
                    }
 
                    return (
-                      <div key={idx} className="relative group cursor-pointer overflow-hidden rounded-xl border border-gray-200 hover:border-indigo-500 transition-all shadow-sm bg-gray-50 flex items-center justify-center aspect-[4/3] w-full" onClick={() => setPreviewImage({ src: imgSrc, original: lnk })}>
+                      <div key={idx} className={`relative group cursor-pointer overflow-hidden rounded-xl border transition-all shadow-sm flex items-center justify-center aspect-[4/3] w-full ${isFolder ? 'border-blue-200 hover:border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-indigo-500 bg-gray-50'}`} onClick={() => isFolder ? window.open(lnk, '_blank') : setPreviewImage({ src: imgSrc, original: lnk })}>
                          
-                         <img src={imgSrc} alt="Bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={(e) => { 
-                            (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-                            (e.target as HTMLImageElement).className = 'w-16 h-16 object-contain mx-auto opacity-50';
-                         }} />
+                         {isFolder ? (
+                            <div className="flex flex-col items-center justify-center text-center p-4">
+                               <svg className="w-16 h-16 text-blue-500 mb-2 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                               <span className="text-xs font-bold text-blue-700">Folder Google Drive</span>
+                               <span className="text-[10px] font-medium text-blue-500 mt-1">Klik untuk membuka di tab baru</span>
+                            </div>
+                         ) : (
+                            <>
+                               <img src={imgSrc} alt="Bukti" className="w-full h-full object-cover group-hover:scale-105 transition-transform" onError={(e) => { 
+                                  (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
+                                  (e.target as HTMLImageElement).className = 'w-16 h-16 object-contain mx-auto opacity-50';
+                               }} />
 
-                         <div className="absolute inset-0 bg-indigo-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm backdrop-blur-sm z-10">
-                            🔍 Perbesar
-                         </div>
+                               <div className="absolute inset-0 bg-indigo-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-bold text-sm backdrop-blur-sm z-10">
+                                  🔍 Perbesar
+                               </div>
+                            </>
+                         )}
                          
-                         {isGDrive && (
+                         {isGDrive && !isFolder && (
                             <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] px-3 py-1 font-black rounded-bl-xl z-0 shadow-sm">GDRIVE</div>
                          )}
                       </div>
@@ -305,8 +316,8 @@ export default function ReportsPage() {
                                        </div>
                                     </td>
 
-                                    <td className="py-3 px-4 text-right font-black font-mono">
-                                       <span className={`px-2 py-0.5 rounded-md text-xs ${isPemasukan ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                    <td className="py-3 px-4 text-right font-black font-mono whitespace-nowrap">
+                                       <span className={`px-2 py-0.5 rounded-md text-xs inline-block ${isPemasukan ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
                                           {isPemasukan ? '+' : '-'} Rp {nominal.toLocaleString('id-ID')}
                                        </span>
                                     </td>

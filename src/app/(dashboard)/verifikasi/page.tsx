@@ -121,29 +121,40 @@ export default function VerificationPage() {
            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">{label}</h4>
            <div className="flex flex-col gap-3">
               {links.map((lnk, idx) => {
-                  const imgSrc = getSafeImage(lnk);
+                  const isFolder = lnk.includes('/folders/');
+                  const imgSrc = isFolder ? '' : getSafeImage(lnk);
 
                   return (
-                     <div key={idx} onClick={() => setPreviewImage({ src: imgSrc, original: lnk })} className="cursor-pointer overflow-hidden rounded-xl border-2 border-indigo-100 hover:border-indigo-400 shadow-sm relative group bg-gray-50 max-w-sm flex items-center justify-center">
-                        <img 
-                           src={imgSrc} 
-                           alt="Lampiran" 
-                           className="w-full h-auto max-h-64 object-contain" 
-                           onError={(e) => {
-                              // Jika direct link gagal dimuat, fallback otomatis lewat proxy server
-                              const target = e.target as HTMLImageElement;
-                              if (!target.src.includes('/api/image-cors') && lnk.startsWith('http')) {
-                                 target.src = `/api/image-cors?url=${encodeURIComponent(lnk)}`;
-                                 return;
-                              }
-                              // Gunakan SVG lokal sebagai placeholder jika gambar gagal dimuat (misal PDF)
-                              target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAydjRzMiA0IDQgNEgyIi8+PHBhdGggZD0iTTQgMjJWMm0xNiAyMHYtOG0wIDBoLTQiLz48L3N2Zz4=';
-                              target.className = 'w-16 h-16 object-contain opacity-50 m-6';
-                           }} 
-                        />
-                        <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                           <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Buka Lampiran</span>
-                        </div>
+                     <div key={idx} onClick={() => isFolder ? window.open(lnk, '_blank') : setPreviewImage({ src: imgSrc, original: lnk })} className={`cursor-pointer overflow-hidden rounded-xl border-2 ${isFolder ? 'border-blue-200 hover:border-blue-400 bg-blue-50' : 'border-indigo-100 hover:border-indigo-400 bg-gray-50'} shadow-sm relative group max-w-sm flex flex-col items-center justify-center p-4 min-h-[140px] text-center`}>
+                        {isFolder ? (
+                           <>
+                              <svg className="w-16 h-16 text-blue-500 mb-2 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                              <span className="text-xs font-bold text-blue-700">Folder Google Drive</span>
+                              <span className="text-[10px] font-medium text-blue-500 mt-1">Klik untuk membuka di tab baru</span>
+                           </>
+                        ) : (
+                           <>
+                              <img 
+                                 src={imgSrc} 
+                                 alt="Lampiran" 
+                                 className="w-full h-auto max-h-64 object-contain" 
+                                 onError={(e) => {
+                                    // Jika direct link gagal dimuat, fallback otomatis lewat proxy server
+                                    const target = e.target as HTMLImageElement;
+                                    if (!target.src.includes('/api/image-cors') && lnk.startsWith('http')) {
+                                       target.src = `/api/image-cors?url=${encodeURIComponent(lnk)}`;
+                                       return;
+                                    }
+                                    // Gunakan SVG lokal sebagai placeholder jika gambar gagal dimuat (misal PDF)
+                                    target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNCAydjRzMiA0IDQgNEgyIi8+PHBhdGggZD0iTTQgMjJWMm0xNiAyMHYtOG0wIDBoLTQiLz48L3N2Zz4=';
+                                    target.className = 'w-16 h-16 object-contain opacity-50 m-6';
+                                 }} 
+                              />
+                              <div className="absolute inset-0 bg-indigo-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                                 <span className="text-white font-bold bg-black/50 px-3 py-1.5 rounded-full text-xs">🔍 Buka Lampiran</span>
+                              </div>
+                           </>
+                        )}
                      </div>
                   );
               })}
