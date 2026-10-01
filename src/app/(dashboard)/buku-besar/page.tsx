@@ -2,8 +2,33 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Search, Filter, Printer, BookOpen, Calendar as CalendarIcon, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { 
+  BookOpen, 
+  Calendar as CalendarIcon, 
+  ArrowDownRight, 
+  ArrowUpRight, 
+  Search, 
+  RotateCcw, 
+  Filter, 
+  Coins, 
+  TrendingUp, 
+  TrendingDown, 
+  Scale, 
+  Wallet, 
+  Loader2, 
+  Building2,
+  FileSpreadsheet,
+  Printer
+} from 'lucide-react';
 import Select from 'react-select';
+import * as XLSX from 'xlsx';
+
+import PageHeader from '@/components/shared/PageHeader';
+import StatCard from '@/components/shared/StatCard';
+import TablePagination from '@/components/shared/TablePagination';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import ExportButtons from '@/components/shared/ExportButtons';
+import EmptyState from '@/components/shared/EmptyState';
 
 const fmt = (n: number) => Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 2 });
 
@@ -53,6 +78,13 @@ export default function BukuBesarPage() {
   const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
   const [selectedRekening, setSelectedRekening] = useState<string>('all');
   const [selectedAkun, setSelectedAkun] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // UI state conforming to Design System
+  const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   const fetchAllPages = async (queryBuilder: any) => {
     let allData: any[] = [];
@@ -82,11 +114,16 @@ export default function BukuBesarPage() {
       setAllBank(bankData);
       setAllAkun(akunData);
       setAllRekening(rekData);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error('Error fetching data for Buku Besar:', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   // Unified Transactions
   const unifiedData = useMemo(() => {
@@ -137,11 +174,11 @@ export default function BukuBesarPage() {
       list.push({
         id: `bank-${b.id}`,
         tanggal: d,
-        uraian: b.uraian || '-',
+        uraian: b.deskripsi || b.uraian || '-',
         masuk,
         keluar,
         rekening_id: rId,
-        nama_rekening: rekMap[rId]?.nama_rekening || rekMap[rId]?.nama || rekMap[rId]?.no_rekening || 'Bank',
+        nama_rekening: rekMap[rId]?.nama_rekening || rekMap[rId]?.nama || (b.rekening_id ? `Bank Rekening ${b.rekening_id}` : 'Bank'),
         akun_id: b.akun_id,
         nomor_akun: b.akun_id ? (akunMap[b.akun_id]?.nomor_akun || '-') : '-',
         nama_akun: b.akun_id ? (akunMap[b.akun_id]?.nama_akun || 'Tanpa Akun') : 'Tanpa Akun',
@@ -151,9 +188,9 @@ export default function BukuBesarPage() {
     // Sort by date ascending
     list.sort((a, b) => a.tanggal.getTime() - b.tanggal.getTime());
     return list;
-  }, [allTrx, allBank, allAkun]);
+  }, [allTrx, allBank, allAkun, allRekening]);
 
-  // Derived filters options
+  // Derived filter options for Akun
   const activeAkunOptions = useMemo(() => {
     const ids = new Set<string>();
     unifiedData.forEach(d => {
@@ -171,189 +208,491 @@ export default function BukuBesarPage() {
     return options;
   }, [unifiedData, allAkun]);
 
-  // Calculate Ledger Data
+  // Calculate Ledger Data with Filters
   const ledgerData = useMemo(() => {
-    if (!startDate || !endDate) return { rows: [], finalSaldo: 0 };
+    if (!startDate || !endDate) return { rows: [], finalSaldo: 0, totalDebit: 0, totalKredit: 0 };
     
     const startT = new Date(`${startDate}T00:00:00`).getTime();
     const endT = new Date(`${endDate}T23:59:59`).getTime();
 
     const filteredRows: any[] = [];
+    const q = searchQuery.toLowerCase().trim();
 
     unifiedData.forEach(d => {
       // Filter by Rekening
       if (selectedRekening !== 'all') {
-          if (selectedRekening === 'bank') {
-              if (d.rekening_id === 'kas') return;
-          } else {
-              if (d.rekening_id !== selectedRekening) return;
-          }
+        if (selectedRekening === 'kas') {
+          if (d.rekening_id !== 'kas') return;
+        } else if (selectedRekening === 'bank') {
+          if (d.rekening_id === 'kas') return;
+        } else {
+          if (d.rekening_id !== selectedRekening) return;
+        }
       }
+
       // Filter by Akun
       if (selectedAkun !== 'all' && String(d.akun_id) !== selectedAkun) return;
 
+      // Filter by Date
       const t = d.tanggal.getTime();
-      if (t >= startT && t <= endT) {
-        filteredRows.push(d);
+      if (t < startT || t > endT) return;
+
+      // Filter by Search Query
+      if (q) {
+        const matchUraian = d.uraian.toLowerCase().includes(q);
+        const matchAkunNo = d.nomor_akun.toLowerCase().includes(q);
+        const matchAkunNama = d.nama_akun.toLowerCase().includes(q);
+        const matchRekening = d.nama_rekening.toLowerCase().includes(q);
+        if (!matchUraian && !matchAkunNo && !matchAkunNama && !matchRekening) return;
       }
+
+      filteredRows.push(d);
     });
 
-    let runningSaldo = 0; // Tidak ada saldo awal sebelumnya (mulai dari 0)
+    let runningSaldo = 0;
+    let totalDebit = 0;
+    let totalKredit = 0;
+
     const rowsWithSaldo = filteredRows.map(r => {
       runningSaldo += (r.masuk - r.keluar);
+      totalDebit += r.masuk;
+      totalKredit += r.keluar;
       return { ...r, runningSaldo };
     });
 
-    return { rows: rowsWithSaldo, finalSaldo: runningSaldo };
-  }, [unifiedData, startDate, endDate, selectedRekening, selectedAkun]);
+    return { 
+      rows: rowsWithSaldo, 
+      finalSaldo: runningSaldo,
+      totalDebit,
+      totalKredit
+    };
+  }, [unifiedData, startDate, endDate, selectedRekening, selectedAkun, searchQuery]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 size={48} className="animate-spin text-indigo-500" />
-    </div>
-  );
+  // Reset pagination on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, selectedRekening, selectedAkun, searchQuery, itemsPerPage]);
+
+  // Paginated Rows
+  const totalItems = ledgerData.rows.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return ledgerData.rows.slice(start, start + itemsPerPage);
+  }, [ledgerData.rows, currentPage, itemsPerPage]);
+
+  // Export Excel
+  const handleExportExcel = async () => {
+    try {
+      setIsExportingExcel(true);
+      const rows = ledgerData.rows.map((r, i) => ({
+        'No': i + 1,
+        'Tanggal': r.tanggal.toLocaleDateString('id-ID'),
+        'Uraian & Keterangan': r.uraian,
+        'Sumber Rekening / Kas': r.nama_rekening,
+        'Nomor Akun': r.nomor_akun,
+        'Nama Akun': r.nama_akun,
+        'Debit (+)': r.masuk,
+        'Kredit (-)': r.keluar,
+        'Saldo Berjalan': r.runningSaldo,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Buku Besar');
+      XLSX.writeFile(wb, `Buku_Besar_${startDate}_sd_${endDate}.xlsx`);
+    } catch (err) {
+      console.error('Gagal export excel:', err);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  const resetFilters = () => {
+    setStartDate(firstDay.toISOString().split('T')[0]);
+    setEndDate(today.toISOString().split('T')[0]);
+    setSelectedRekening('all');
+    setSelectedAkun('all');
+    setSearchQuery('');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-blue-600 space-y-3">
+        <Loader2 size={40} className="animate-spin text-blue-600" />
+        <p className="text-xs font-semibold text-gray-500">Memuat Buku Besar (General Ledger)...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
+    <div className="space-y-4 pb-20 font-sans text-gray-900">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          @page { size: portrait; margin: 15mm; }
+          @page { size: portrait; margin: 12mm; }
           .print-hidden { display: none !important; }
-          body { background: white !important; }
+          body { background: white !important; font-size: 11px !important; }
           .print-header { display: block !important; text-align: center; margin-bottom: 20px; }
           table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #000 !important; padding: 6px !important; font-size: 11px !important; color: #000 !important; }
+          th, td { border: 1px solid #d1d5db !important; padding: 6px !important; font-size: 10px !important; color: #000 !important; }
           th { background-color: #f3f4f6 !important; font-weight: bold !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .text-emerald-600 { color: #059669 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .text-rose-600 { color: #e11d48 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .print-full-table { display: table-row-group !important; }
+          .web-paged-table { display: none !important; }
         }
       `}} />
 
-      {/* WEB HEADER & FILTERS */}
-      <div className="print-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
-            <BookOpen size={20} />
+      {/* 1. STANDARD PAGE HEADER (DESIGN SYSTEM) */}
+      <div className="print-hidden">
+        <PageHeader
+          title="Buku Besar (General Ledger)"
+          subtitle="Rincian kronologis mutasi debit & kredit per akun anggaran serta rekening kas/bank"
+          icon={BookOpen}
+          breadcrumbs={[
+            { label: 'Akuntansi & Keuangan' },
+            { label: 'Buku Besar' }
+          ]}
+          badge={{ text: `${ledgerData.rows.length} Transaksi`, variant: 'purple' }}
+          actions={
+            <ExportButtons
+              onExportExcel={handleExportExcel}
+              isExportingExcel={isExportingExcel}
+              onExportPdf={() => window.print()}
+              pdfLabel="Cetak PDF"
+            />
+          }
+        />
+      </div>
+
+      {/* 2. STATCARDS KPI METRICS (DESIGN SYSTEM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print-hidden">
+        <StatCard
+          title="Total Masuk / Debit (+)"
+          value={`Rp ${fmt(ledgerData.totalDebit)}`}
+          subtitle="Pemasukan & Pemindahbukuan"
+          icon={TrendingUp}
+          variant="emerald"
+        />
+        <StatCard
+          title="Total Keluar / Kredit (-)"
+          value={`Rp ${fmt(ledgerData.totalKredit)}`}
+          subtitle="Pengeluaran Beban & Mutasi"
+          icon={TrendingDown}
+          variant="rose"
+        />
+        <StatCard
+          title="Total Saldo Periode"
+          value={`Rp ${fmt(ledgerData.finalSaldo)}`}
+          subtitle="Akumulasi Selisih Periode"
+          icon={Scale}
+          variant="indigo"
+        />
+        <StatCard
+          title="Volume Transaksi"
+          value={`${ledgerData.rows.length} Data`}
+          subtitle={`Periode ${new Date(startDate).toLocaleDateString('id-ID')} s/d ${new Date(endDate).toLocaleDateString('id-ID')}`}
+          icon={Coins}
+          variant="blue"
+        />
+      </div>
+
+      {/* 3. INTERACTIVE FILTER CONSOLE (DESIGN SYSTEM) */}
+      <div className="print-hidden bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Filter size={15} className="text-blue-600" />
+            <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+              Filter Parameter Buku Besar
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
-                Buku Besar
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                {ledgerData.rows.length} Transaksi
-              </span>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
+              <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Rincian mutasi debit & kredit per akun dan rekening kas/bank.
-            </p>
+
+            {(searchQuery || selectedRekening !== 'all' || selectedAkun !== 'all') && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                title="Reset Semua Filter"
+              >
+                <RotateCcw size={12} />
+                <span>Reset Filter</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-          <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
-             <CalendarIcon size={13} className="text-gray-400" />
-             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-28" />
-             <span className="text-gray-300">-</span>
-             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-28" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Quick Search */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              Pencarian Cepat
+            </label>
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cari uraian / kode akun..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full h-9 pl-8 pr-3 text-xs font-semibold bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+              />
+            </div>
           </div>
 
-          <select value={selectedRekening} onChange={e => setSelectedRekening(e.target.value)} className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer">
-            <option value="all">Semua Rekening & Kas</option>
-            <option value="kas">Kas Kecil (KK1)</option>
-            <option value="bank">Semua Bank Saja</option>
-            {allRekening.map(r => <option key={r.id} value={String(r.id)}>{r.nama_rekening || r.nama || r.no_rekening}</option>)}
-          </select>
-
-          <div className="min-w-[200px]">
-             <Select 
-                options={[{value: 'all', label: 'Semua Akun (Gabungan)'}, ...activeAkunOptions.map(a => ({ value: a.id, label: `${a.nomor} - ${a.nama}` }))]}
-                value={selectedAkun === 'all' ? {value: 'all', label: 'Semua Akun (Gabungan)'} : {value: selectedAkun, label: activeAkunOptions.find(a => a.id === selectedAkun) ? `${activeAkunOptions.find(a => a.id === selectedAkun)?.nomor} - ${activeAkunOptions.find(a => a.id === selectedAkun)?.nama}` : 'Pilih Akun'}}
-                onChange={(val: any) => setSelectedAkun(val?.value || 'all')}
-                styles={{
-                   control: (b) => ({ ...b, minHeight: '36px', height: '36px', borderRadius: '0.75rem', border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', fontSize: '12px', fontWeight: 600 }),
-                   valueContainer: (b) => ({ ...b, padding: '0 8px' }),
-                }}
-             />
+          {/* Date Range */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              Rentang Tanggal
+            </label>
+            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
+              <CalendarIcon size={13} className="text-gray-400 shrink-0" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-full"
+              />
+              <span className="text-gray-300">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-full"
+              />
+            </div>
           </div>
 
-          <button onClick={() => window.print()} className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95">
-             <Printer size={13} />
-             <span>Cetak PDF</span>
-          </button>
+          {/* Rekening Filter */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              Sumber Dana / Kas
+            </label>
+            <select
+              value={selectedRekening}
+              onChange={e => setSelectedRekening(e.target.value)}
+              className="w-full h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
+            >
+              <option value="all">Semua Rekening & Kas</option>
+              <option value="kas">Kas Kecil (KK1)</option>
+              <option value="bank">Semua Bank Saja</option>
+              {allRekening.map(r => (
+                <option key={r.id} value={String(r.id)}>
+                  {r.nama_rekening || r.nama || (r.no_rekening ? `Rek. ${r.no_rekening}` : `Bank ${r.id}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Akun Anggaran Selector */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              Akun Anggaran (MAK)
+            </label>
+            <Select 
+              options={[
+                { value: 'all', label: 'Semua Akun (Gabungan)' }, 
+                ...activeAkunOptions.map(a => ({ value: a.id, label: `${a.nomor} - ${a.nama}` }))
+              ]}
+              value={
+                selectedAkun === 'all' 
+                  ? { value: 'all', label: 'Semua Akun (Gabungan)' } 
+                  : { 
+                      value: selectedAkun, 
+                      label: activeAkunOptions.find(a => a.id === selectedAkun) 
+                        ? `${activeAkunOptions.find(a => a.id === selectedAkun)?.nomor} - ${activeAkunOptions.find(a => a.id === selectedAkun)?.nama}` 
+                        : 'Pilih Akun' 
+                    }
+              }
+              onChange={(val: any) => setSelectedAkun(val?.value || 'all')}
+              styles={{
+                control: (b) => ({ 
+                  ...b, 
+                  minHeight: '36px', 
+                  height: '36px', 
+                  borderRadius: '0.75rem', 
+                  border: '1px solid #e5e7eb', 
+                  backgroundColor: '#f9fafb', 
+                  fontSize: '12px', 
+                  fontWeight: 600,
+                  boxShadow: 'none'
+                }),
+                valueContainer: (b) => ({ ...b, padding: '0 8px' }),
+                menu: (b) => ({ ...b, zIndex: 50, fontSize: '12px', borderRadius: '0.75rem' }),
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* PRINT HEADER */}
+      {/* PRINT HEADER ONLY */}
       <div className="hidden print-header">
-        <h1 className="text-2xl font-black uppercase tracking-widest">BUKU BESAR</h1>
-        <p className="text-sm font-medium mt-1">Periode: {new Date(startDate).toLocaleDateString('id-ID')} - {new Date(endDate).toLocaleDateString('id-ID')}</p>
-        <p className="text-sm font-medium">Rekening: {selectedRekening === 'all' ? 'Semua Rekening' : selectedRekening === 'kas' ? 'Kas Kecil' : allRekening.find(r => String(r.id) === selectedRekening)?.nama_rekening || 'Bank'}</p>
-        <p className="text-sm font-medium">Akun: {selectedAkun === 'all' ? 'Semua Akun' : activeAkunOptions.find(a => a.id === selectedAkun)?.nama}</p>
+        <h1 className="text-xl font-black uppercase tracking-widest text-gray-900">BUKU BESAR (GENERAL LEDGER)</h1>
+        <p className="text-xs font-semibold mt-1 text-gray-600">
+          Periode: {new Date(startDate).toLocaleDateString('id-ID')} s/d {new Date(endDate).toLocaleDateString('id-ID')}
+        </p>
+        <p className="text-xs font-medium text-gray-600">
+          Sumber Dana: {selectedRekening === 'all' ? 'Semua Rekening & Kas' : selectedRekening === 'kas' ? 'Kas Kecil (KK1)' : allRekening.find(r => String(r.id) === selectedRekening)?.nama_rekening || 'Bank'} | Akun: {selectedAkun === 'all' ? 'Semua Akun' : activeAkunOptions.find(a => a.id === selectedAkun)?.nama || '-'}
+        </p>
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+      {/* 4. TABLE VIEW (DESIGN SYSTEM) */}
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
-                <th className="py-3 px-4 w-28">Tanggal</th>
-                <th className="py-3 px-4">Uraian & Keterangan</th>
-                <th className="py-3 px-4">Sumber Bank/Kas</th>
-                <th className="py-3 px-4">Akun Anggaran</th>
-                <th className="py-3 px-4 text-right">Debit (+)</th>
-                <th className="py-3 px-4 text-right">Kredit (-)</th>
-                <th className="py-3 px-4 text-right w-36">Saldo Berjalan</th>
+              <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                <th className={`w-12 text-center ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>No</th>
+                <th className={`w-28 ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Tanggal</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Uraian Transaksi</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Sumber Dana</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Akun Anggaran</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Debit (+)</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Kredit (-)</th>
+                <th className={`text-right w-36 ${tableDensity === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'}`}>Saldo Berjalan</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 font-medium">
-              {/* Transactions */}
-              {ledgerData.rows.length === 0 ? (
-                <tr><td colSpan={7} className="py-16 text-center text-gray-400 font-medium">Tidak ada transaksi pada periode ini.</td></tr>
-              ) : (
-                ledgerData.rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-indigo-50/20 transition-colors">
-                    <td className="py-3 px-4 text-gray-600 font-semibold whitespace-nowrap">
-                      {row.tanggal.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="py-3 px-4 text-gray-900 font-semibold">{row.uraian}</td>
-                    <td className="py-3 px-4 text-indigo-700 font-bold text-[11px]">
-                       <span className="bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">{row.nama_rekening}</span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600 text-[11px]">
-                       <span className="bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded font-mono font-bold">{row.nomor_akun}</span>
-                       <div className="mt-0.5 truncate max-w-[150px] text-gray-500 font-semibold">{row.nama_akun}</div>
-                    </td>
-                    <td className="py-3 px-4 text-right font-black font-mono text-emerald-600">
-                      {row.masuk > 0 ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <ArrowDownRight size={12} className="text-emerald-500" /> {fmt(row.masuk)}
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-right font-black font-mono text-rose-600">
-                      {row.keluar > 0 ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <ArrowUpRight size={12} className="text-rose-500" /> {fmt(row.keluar)}
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td className="py-3 px-4 text-right font-black font-mono text-gray-800">
-                      {fmt(row.runningSaldo)}
-                    </td>
-                  </tr>
-                ))
-              )}
 
-              {/* Saldo Akhir Row */}
-              <tr className="bg-gray-50/90 font-bold">
-                <td colSpan={6} className="py-3.5 px-4 text-right text-gray-700 uppercase tracking-wider text-[11px] font-black">Total Saldo Periode</td>
-                <td className="py-3.5 px-4 text-right text-indigo-700 font-mono font-black text-sm">{fmt(ledgerData.finalSaldo)}</td>
-              </tr>
+            {/* WEB PAGED TBODY */}
+            <tbody className="divide-y divide-gray-100 web-paged-table">
+              {paginatedRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8">
+                    <EmptyState
+                      type="search"
+                      title="Tidak Ada Mutasi Transaksi"
+                      description="Tidak ada transaksi debit/kredit yang cocok dengan filter tanggal, rekening, atau akun terpilih."
+                      actionLabel="Bersihkan Filter"
+                      onAction={resetFilters}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                paginatedRows.map((row, idx) => {
+                  const itemIndex = (currentPage - 1) * itemsPerPage + idx + 1;
+                  return (
+                    <tr 
+                      key={row.id} 
+                      className={`hover:bg-blue-50/40 transition-colors even:bg-slate-50/30 ${
+                        tableDensity === 'compact' ? 'text-[11px]' : 'text-xs'
+                      }`}
+                    >
+                      <td className={`text-center font-mono text-gray-400 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {itemIndex}
+                      </td>
+                      <td className={`whitespace-nowrap font-medium text-gray-700 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {row.tanggal.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className={`font-semibold text-gray-900 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {row.uraian}
+                      </td>
+                      <td className={`${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                          row.rekening_id === 'kas'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          {row.nama_rekening}
+                        </span>
+                      </td>
+                      <td className={`${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-bold text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded border border-gray-200">
+                            {row.nomor_akun}
+                          </span>
+                          <span className="text-gray-600 truncate max-w-[170px]" title={row.nama_akun}>
+                            {row.nama_akun}
+                          </span>
+                        </div>
+                      </td>
+                      <td className={`text-right font-black font-mono whitespace-nowrap text-emerald-600 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {row.masuk > 0 ? (
+                          <div className="inline-flex items-center gap-0.5">
+                            <ArrowDownRight size={12} className="text-emerald-500" />
+                            <span>{fmt(row.masuk)}</span>
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className={`text-right font-black font-mono whitespace-nowrap text-rose-600 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {row.keluar > 0 ? (
+                          <div className="inline-flex items-center gap-0.5">
+                            <ArrowUpRight size={12} className="text-rose-500" />
+                            <span>{fmt(row.keluar)}</span>
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className={`text-right font-black font-mono whitespace-nowrap text-gray-900 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
+                        {fmt(row.runningSaldo)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
+
+            {/* PRINT-ONLY FULL TABLE BODY */}
+            <tbody className="hidden print-full-table divide-y divide-gray-200">
+              {ledgerData.rows.map((row, idx) => (
+                <tr key={`print-${row.id}`}>
+                  <td className="text-center font-mono text-gray-500">{idx + 1}</td>
+                  <td className="whitespace-nowrap font-medium text-gray-700">
+                    {row.tanggal.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </td>
+                  <td className="font-semibold text-gray-900">{row.uraian}</td>
+                  <td>{row.nama_rekening}</td>
+                  <td>{row.nomor_akun} - {row.nama_akun}</td>
+                  <td className="text-right font-mono font-bold text-emerald-700">
+                    {row.masuk > 0 ? fmt(row.masuk) : '-'}
+                  </td>
+                  <td className="text-right font-mono font-bold text-rose-700">
+                    {row.keluar > 0 ? fmt(row.keluar) : '-'}
+                  </td>
+                  <td className="text-right font-mono font-bold text-gray-900">
+                    {fmt(row.runningSaldo)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+            {/* SUMMARY FOOTER */}
+            {ledgerData.rows.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-100/90 font-bold border-t-2 border-gray-200 text-xs">
+                  <td colSpan={5} className="py-3 px-4 text-right text-gray-700 uppercase tracking-wider text-[11px] font-black">
+                    Total Debit & Kredit Periode
+                  </td>
+                  <td className="py-3 px-4 text-right text-emerald-700 font-mono font-black whitespace-nowrap">
+                    {fmt(ledgerData.totalDebit)}
+                  </td>
+                  <td className="py-3 px-4 text-right text-rose-700 font-mono font-black whitespace-nowrap">
+                    {fmt(ledgerData.totalKredit)}
+                  </td>
+                  <td className="py-3 px-4 text-right text-indigo-700 font-mono font-black whitespace-nowrap bg-indigo-50/50">
+                    {fmt(ledgerData.finalSaldo)}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
+
+        {/* 5. TABLE PAGINATION (DESIGN SYSTEM) */}
+        {totalItems > 0 && (
+          <div className="print-hidden">
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+              pageSizeOptions={[15, 25, 50, 100]}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

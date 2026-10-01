@@ -30,7 +30,17 @@ export default function DateRangePicker({
   const [tempEnd, setTempEnd] = useState(value.endDate);
   const [tempStartTime, setTempStartTime] = useState(value.startTime || '08:00');
   const [tempEndTime, setTempEndTime] = useState(value.endTime || '17:00');
+  
+  // State Filter Per Bulan
+  const currentDate = new Date();
+  const [filterMonth, setFilterMonth] = useState<number>(currentDate.getMonth()); // 0-11
+  const [filterYear, setFilterYear] = useState<number>(currentDate.getFullYear());
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const MONTH_NAMES = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
 
   useEffect(() => {
     setTempStart(value.startDate);
@@ -81,6 +91,26 @@ export default function DateRangePicker({
       endTime: tempEndTime 
     });
     setIsOpen(false);
+  };
+
+  // Helper untuk filter per bulan (1x Klik)
+  const applyMonthRange = (mIdx: number, y: number, autoClose = false) => {
+    const lastDay = new Date(y, mIdx + 1, 0).getDate();
+    const startStr = `${y}-${String(mIdx + 1).padStart(2, '0')}-01`;
+    const endStr = `${y}-${String(mIdx + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    setTempStart(startStr);
+    setTempEnd(endStr);
+
+    if (autoClose) {
+      onChange({
+        startDate: startStr,
+        endDate: endStr,
+        startTime: tempStartTime,
+        endTime: tempEndTime
+      });
+      setIsOpen(false);
+    }
   };
 
   const applyTimePreset = (startT: string, endT: string) => {
@@ -158,7 +188,7 @@ export default function DateRangePicker({
           {/* Quick Date Presets */}
           <div className="space-y-1">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Preset Tanggal:
+              Preset Tanggal Cepat:
             </span>
             <div className="flex flex-wrap gap-1.5">
               <button
@@ -182,10 +212,90 @@ export default function DateRangePicker({
               >
                 30 Hari Terakhir
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date();
+                  setFilterMonth(now.getMonth());
+                  setFilterYear(now.getFullYear());
+                  applyMonthRange(now.getMonth(), now.getFullYear(), true);
+                }}
+                className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200 transition-colors cursor-pointer"
+              >
+                Bulan Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const prev = new Date();
+                  prev.setMonth(prev.getMonth() - 1);
+                  setFilterMonth(prev.getMonth());
+                  setFilterYear(prev.getFullYear());
+                  applyMonthRange(prev.getMonth(), prev.getFullYear(), true);
+                }}
+                className="px-2 py-0.5 text-[10px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200 transition-colors cursor-pointer"
+              >
+                Bulan Lalu
+              </button>
             </div>
           </div>
 
-          {/* Date Range Inputs */}
+          {/* Filter Per Bulan & Tahun (1x Klik) */}
+          <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} className="text-emerald-600" />
+                Filter Per Bulan (Pilihan Bulan & Tahun):
+              </span>
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                1x Klik Auto Range
+              </span>
+            </div>
+            <div className="grid grid-cols-12 gap-1.5 items-center">
+              <div className="col-span-6">
+                <select
+                  value={filterMonth}
+                  onChange={(e) => {
+                    const m = parseInt(e.target.value);
+                    setFilterMonth(m);
+                    applyMonthRange(m, filterYear, false);
+                  }}
+                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {MONTH_NAMES.map((mName, idx) => (
+                    <option key={idx} value={idx}>{mName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-3">
+                <select
+                  value={filterYear}
+                  onChange={(e) => {
+                    const y = parseInt(e.target.value);
+                    setFilterYear(y);
+                    applyMonthRange(filterMonth, y, false);
+                  }}
+                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  {[2023, 2024, 2025, 2026, 2027, 2028].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-3">
+                <button
+                  type="button"
+                  onClick={() => applyMonthRange(filterMonth, filterYear, true)}
+                  className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
+                  title="Terapkan rentang bulan ini langsung"
+                >
+                  Terapkan
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Range Inputs Manual */}
           <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-gray-500 uppercase">Tanggal Mulai:</span>
