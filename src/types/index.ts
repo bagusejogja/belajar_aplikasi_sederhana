@@ -23,6 +23,7 @@ export interface MenuItem {
   icon: string;
   roles: Role[];
   group?: string;
+  hiddenInSidebar?: boolean;
 }
 
 export interface RefAkun {

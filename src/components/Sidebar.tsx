@@ -231,6 +231,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   const favoriteItems = useMemo(() => {
     const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
     return menuList.filter(item => {
+      if (item.hiddenInSidebar) return false;
       if (userRole === 'Pending') return false;
       const hasAccess = isAdmin || allowedPaths.includes(item.path);
       const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
@@ -470,6 +471,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
           ).map(([group, items]) => {
             // Filter items by role/access AND search query
             const visibleItems = items.filter(item => {
+              if (item.hiddenInSidebar) return false;
               if (userRole === 'Pending') return false;
               const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
               const hasAccess = allowedPaths.includes(item.path) || isAdmin;
