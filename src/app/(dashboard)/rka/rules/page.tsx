@@ -23,9 +23,10 @@ import {
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
-// Definisi Preset Format Laporan (Hanya Proposal RKAT sesuai permintaan user)
+// Definisi Preset Format Laporan (Proposal RKAT & RKA Kementrian)
 const PRESET_TARGETS = [
   { id: 'proposal rkat', label: 'Proposal RKAT' },
+  { id: 'RKA Kementrian', label: 'RKA Kementrian' },
 ];
 
 // Autocomplete Filter Unit Kerja Component (Input Langsung di Box tanpa klik dua kali - Seragam dengan /rka/laporan)
@@ -388,14 +389,15 @@ export default function RkaRulesPage() {
       ];
     }
     return [
-      { id: 'proposal rkat', label: 'Proposal RKAT' }
+      { id: 'proposal rkat', label: 'Proposal RKAT' },
+      { id: 'RKA Kementrian', label: 'RKA Kementrian' }
     ];
   }, [activeModul]);
 
   // Opsi Target Format yang terdaftar di sistem
   const allTargetOptions = useMemo(() => {
     const list = Array.from(new Set(rules.map(r => r.target_field).filter(Boolean)));
-    const base = activeModul === 'penerimaan' ? ['format_proposal', 'kelompok_penerimaan'] : ['proposal rkat'];
+    const base = activeModul === 'penerimaan' ? ['format_proposal', 'kelompok_penerimaan'] : ['proposal rkat', 'RKA Kementrian'];
     return Array.from(new Set([...base, ...list]));
   }, [rules, activeModul]);
 
@@ -420,7 +422,16 @@ export default function RkaRulesPage() {
       const aVal = cols[2] || '*';
       const kVal = cols[3] || '';
       const rawTarget = (cols[4] || '').toLowerCase();
-      const target = (rawTarget.includes('webo') || rawTarget.includes('webometrics')) ? 'laporan_webometrics' : 'laporan_kementerian';
+      let target = 'RKA Kementrian';
+      if (rawTarget.includes('proposal') || rawTarget.includes('rkat')) {
+        target = 'proposal rkat';
+      } else if (rawTarget.includes('webo') || rawTarget.includes('webometrics')) {
+        target = 'laporan_webometrics';
+      } else if (rawTarget.includes('kementr') || rawTarget.includes('kementer')) {
+        target = 'RKA Kementrian';
+      } else if (cols[4]) {
+        target = cols[4].trim();
+      }
       const nilaiVal = cols[5] || '';
       const ket = cols[6] || '';
 
@@ -1447,10 +1458,15 @@ export default function RkaRulesPage() {
                           <span>🌐</span>
                           <span>Laporan Webometrics</span>
                         </div>
-                      ) : rule.target_field === 'laporan_kementerian' ? (
+                      ) : (rule.target_field === 'laporan_kementerian' || rule.target_field?.toLowerCase().includes('kementr') || rule.target_field?.toLowerCase().includes('kementer')) ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-xs font-bold shadow-2xs">
                           <span>🏛️</span>
-                          <span>Laporan Kementerian</span>
+                          <span>RKA Kementrian</span>
+                        </div>
+                      ) : (rule.target_field === 'proposal rkat' || rule.target_field === 'format_proposal') ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-lg text-xs font-bold shadow-2xs">
+                          <span>📊</span>
+                          <span>Proposal RKAT</span>
                         </div>
                       ) : rule.target_field === 'laporan_sdgs' ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 border border-teal-200 rounded-lg text-xs font-bold shadow-2xs">

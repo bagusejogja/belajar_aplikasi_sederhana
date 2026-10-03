@@ -195,9 +195,10 @@ export async function PUT(request: Request) {
 
       // Opsional: Bersihkan klasifikasi terkait di rkat_pengeluaran jika diminta
       if (resetPengeluaran) {
-        if (targetFormat === 'laporan_kementerian') {
+        const tfLower = (targetFormat || '').toLowerCase();
+        if (targetFormat === 'laporan_kementerian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
           await supabaseAdmin.from('rkat_pengeluaran').update({ laporan_kementerian: null }).not('laporan_kementerian', 'is', null);
-        } else if (targetFormat === 'laporan_webometrics') {
+        } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
           await supabaseAdmin.from('rkat_pengeluaran').update({ laporan_webometrics: null }).not('laporan_webometrics', 'is', null);
         } else {
           await supabaseAdmin.from('rkat_pengeluaran').update({ identifikasi_lain: null }).not('identifikasi_lain', 'is', null);
@@ -213,6 +214,7 @@ export async function PUT(request: Request) {
     // 3. Aksi Reset / Bersihkan Klasifikasi pada Data Belanja
     if (body.action === 'reset_classification') {
       const { targetFormat, targetYear } = body;
+      const tfLower = (targetFormat || '').toLowerCase();
 
       const applyYearFilter = (query: any) => {
         if (targetYear && targetYear !== 'ALL') {
@@ -221,10 +223,10 @@ export async function PUT(request: Request) {
         return query;
       };
 
-      if (targetFormat === 'laporan_kementerian') {
+      if (targetFormat === 'laporan_kementerian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
         let q = supabaseAdmin.from('rkat_pengeluaran').update({ laporan_kementerian: null }).not('laporan_kementerian', 'is', null);
         await applyYearFilter(q);
-      } else if (targetFormat === 'laporan_webometrics') {
+      } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
         let q = supabaseAdmin.from('rkat_pengeluaran').update({ laporan_webometrics: null }).not('laporan_webometrics', 'is', null);
         await applyYearFilter(q);
       } else if (targetFormat === 'ALL') {
@@ -394,13 +396,21 @@ export async function PUT(request: Request) {
           updated_at: new Date().toISOString()
         };
 
-        if (tf === 'laporan_webometrics') {
+        if (tf === 'laporan_webometrics' || tf.includes('webo')) {
           updatePayload.laporan_webometrics = nilai;
-        } else if (tf === 'laporan_kementerian') {
+        } else if (
+          tf === 'laporan_kementerian' || 
+          tf === 'rka kementrian' || 
+          tf === 'rka kementerian' ||
+          tf === 'kementerian' ||
+          tf.includes('kementr') ||
+          tf.includes('kementer')
+        ) {
           updatePayload.laporan_kementerian = nilai;
+          updatePayload.tags = { ['RKA Kementrian']: nilai };
         } else {
           updatePayload.identifikasi_lain = nilai;
-          updatePayload.tags = { [tf]: nilai };
+          updatePayload.tags = { [rule.target_field || tf]: nilai };
         }
 
         for (let startId = 1; startId <= maxTableId + 1000; startId += CHUNK_SIZE) {
