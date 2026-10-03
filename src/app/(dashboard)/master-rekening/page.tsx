@@ -186,6 +186,7 @@ export default function MasterRekeningPage() {
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
       {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
       <PageHeader
+        layout="stacked"
         title="Master Rekening Bank Penerima"
         subtitle="Kelola daftar nomor rekening bank penampung & vendor yang dikelompokkan berdasarkan kategori unit kerja"
         icon={CreditCard}
@@ -195,7 +196,7 @@ export default function MasterRekeningPage() {
         ]}
         badge={{ text: `${listRekening.length} Rekening Terdaftar`, variant: 'info' }}
         actions={
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 w-full">
             {/* View Mode Switcher */}
             <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-xl border border-gray-200/80 dark:border-slate-700">
               <button
@@ -212,51 +213,54 @@ export default function MasterRekeningPage() {
               </button>
             </div>
 
-            {/* Jenis Filter */}
-            <select
-              value={selectedJenisFilter}
-              onChange={(e) => setSelectedJenisFilter(e.target.value)}
-              className="h-9 px-2.5 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-            >
-              <option value="ALL">Semua Jenis ({listRekening.length})</option>
-              {uniqueJenis.map(j => (
-                <option key={j} value={j}>{j} ({listRekening.filter(r => (r.jenis || 'Lainnya') === j).length})</option>
-              ))}
-            </select>
+            {/* Right Controls: Filters & Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Jenis Filter */}
+              <select
+                value={selectedJenisFilter}
+                onChange={(e) => setSelectedJenisFilter(e.target.value)}
+                className="h-9 px-2.5 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              >
+                <option value="ALL">Semua Jenis ({listRekening.length})</option>
+                {uniqueJenis.map(j => (
+                  <option key={j} value={j}>{j} ({listRekening.filter(r => (r.jenis || 'Lainnya') === j).length})</option>
+                ))}
+              </select>
 
-            {/* Search Input */}
-            <div className="relative flex-1 md:w-52">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-              <input 
-                type="text" 
-                placeholder="Cari rekening / nama..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-9 pl-7 pr-7 bg-gray-50 hover:bg-white dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs font-semibold text-gray-800 dark:text-slate-200"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  <X size={12} />
-                </button>
-              )}
+              {/* Search Input */}
+              <div className="relative flex-1 md:w-52">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+                <input 
+                  type="text" 
+                  placeholder="Cari rekening / nama..." 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full h-9 pl-7 pr-7 bg-gray-50 hover:bg-white dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs font-semibold text-gray-800 dark:text-slate-200"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={fetchData}
+                className="h-9 px-3 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-200 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                title="Refresh Data"
+              >
+                <RefreshCw size={13} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+
+              <button 
+                onClick={() => openModal()}
+                className="h-9 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Tambah Rekening</span>
+              </button>
             </div>
-
-            <button
-              onClick={fetchData}
-              className="h-9 px-3 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-200 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
-              title="Refresh Data"
-            >
-              <RefreshCw size={13} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            <button 
-              onClick={() => openModal()}
-              className="h-9 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <Plus size={15} />
-              <span>Tambah Rekening</span>
-            </button>
           </div>
         }
       />
