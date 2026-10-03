@@ -398,8 +398,25 @@ export default function RkaRulesPage() {
   const allTargetOptions = useMemo(() => {
     const list = Array.from(new Set(rules.map(r => r.target_field).filter(Boolean)));
     const base = activeModul === 'penerimaan' ? ['format_proposal', 'kelompok_penerimaan'] : ['proposal rkat', 'RKA Kementrian'];
-    return Array.from(new Set([...base, ...list]));
+    const merged = Array.from(new Set([...base, ...list]));
+    if (activeModul === 'penerimaan') {
+      return merged.filter(x => x !== 'proposal rkat');
+    }
+    return merged;
   }, [rules, activeModul]);
+
+  // Helper Label Target Format yang Standar & Konsisten
+  const formatTargetLabel = (t: string) => {
+    const lower = (t || '').toLowerCase();
+    if (activeModul === 'penerimaan') {
+      if (lower === 'format_proposal' || lower === 'proposal rkat') return 'Proposal RKAT Penerimaan';
+      if (lower === 'kelompok_penerimaan') return 'Kelompok Pendapatan';
+    }
+    if (lower === 'proposal rkat' || lower === 'format_proposal') return 'Proposal RKAT';
+    if (lower === 'rka kementrian' || lower === 'laporan_kementerian' || lower.includes('kementr') || lower.includes('kementer')) return 'RKA Kementrian';
+    if (lower === 'laporan_webometrics' || lower.includes('webo')) return 'Laporan Webometrics';
+    return t.replace(/^(laporan_|target_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+  };
 
   // Parser helper untuk Paste Zone
   const parsedPasteLines = useMemo(() => {
@@ -1452,9 +1469,10 @@ export default function RkaRulesPage() {
                 <option value="ALL">Semua Format Laporan ({rules.length})</option>
                 {allTargetOptions.map(t => {
                   const count = rules.filter(r => (r.target_field || '').toLowerCase() === t.toLowerCase()).length;
-                  const pretty = t.replace(/^(laporan_|target_)/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                  const label = formatTargetLabel(t);
+                  const icon = t.includes('kementr') ? '🏛️' : t.includes('kelompok') ? '💰' : '📊';
                   return (
-                    <option key={t} value={t}>📊 {pretty} ({count})</option>
+                    <option key={t} value={t}>{icon} {label} ({count})</option>
                   );
                 })}
               </select>
@@ -1535,10 +1553,15 @@ export default function RkaRulesPage() {
                           <span>🏛️</span>
                           <span>RKA Kementrian</span>
                         </div>
+                      ) : rule.target_field === 'kelompok_penerimaan' ? (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg text-xs font-bold shadow-2xs">
+                          <span>💰</span>
+                          <span>Kelompok Pendapatan</span>
+                        </div>
                       ) : (rule.target_field === 'proposal rkat' || rule.target_field === 'format_proposal') ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-lg text-xs font-bold shadow-2xs">
                           <span>📊</span>
-                          <span>Proposal RKAT</span>
+                          <span>{activeModul === 'penerimaan' ? 'Proposal RKAT Penerimaan' : 'Proposal RKAT'}</span>
                         </div>
                       ) : rule.target_field === 'laporan_sdgs' ? (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 text-teal-900 border border-teal-200 rounded-lg text-xs font-bold shadow-2xs">
