@@ -25,6 +25,8 @@ export default function MenusPage() {
   // Mapping: { "/path": { can_view: true, can_create: false, ... } }
   const [rolePermissions, setRolePermissions] = useState<Record<string, any>>({});
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [isSuiteExpanded, setIsSuiteExpanded] = useState<boolean>(false);
+  const [hierarchyLevel, setHierarchyLevel] = useState<1 | 2 | 3>(2);
 
   // Kelompokkan menu berdasarkan grup
   const groupedMenus = useMemo(() => {
@@ -42,12 +44,31 @@ export default function MenusPage() {
     fetchRolesAndPermissions();
   }, [selectedRole]);
 
-  // Expand all groups by default on first load
+  // Expand all groups by default on first load (Level 2: Induk + Anak)
   useEffect(() => {
-    if (allGroupNames.length > 0 && expandedGroups.length === 0) {
+    if (allGroupNames.length > 0 && expandedGroups.length === 0 && hierarchyLevel === 2) {
       setExpandedGroups(allGroupNames);
+      setIsSuiteExpanded(false);
     }
   }, [allGroupNames]);
+
+  // Handler set hierarki berjenjang
+  const handleSetLevel = (lvl: 1 | 2 | 3) => {
+    setHierarchyLevel(lvl);
+    if (lvl === 1) {
+      // Level 1: Hanya Induk (semua grup tertutup)
+      setExpandedGroups([]);
+      setIsSuiteExpanded(false);
+    } else if (lvl === 2) {
+      // Level 2: +Anak (semua grup terbuka, sub-suite ditutup)
+      setExpandedGroups(allGroupNames);
+      setIsSuiteExpanded(false);
+    } else if (lvl === 3) {
+      // Level 3: +Cucu (semua grup dan sub-suite terbuka lengkap)
+      setExpandedGroups(allGroupNames);
+      setIsSuiteExpanded(true);
+    }
+  };
 
   // If searching, auto-expand groups that have matching items
   useEffect(() => {
@@ -191,8 +212,8 @@ export default function MenusPage() {
     );
   };
 
-  const expandAll = () => setExpandedGroups(allGroupNames);
-  const collapseAll = () => setExpandedGroups([]);
+  const expandAll = () => handleSetLevel(3);
+  const collapseAll = () => handleSetLevel(1);
 
   const handleSave = async () => {
     setSaving(true);
@@ -386,26 +407,64 @@ export default function MenusPage() {
         </div>
       </div>
 
-      {/* QUICK CONTROLS BAR & LEGEND */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-xs">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={expandAll}
-            className="text-[11px] font-bold text-gray-500 hover:text-indigo-600 underline cursor-pointer"
-          >
-            Buka Semua Cabang
-          </button>
-          <span className="text-gray-300">•</span>
-          <button 
-            onClick={collapseAll}
-            className="text-[11px] font-bold text-gray-500 hover:text-indigo-600 underline cursor-pointer"
-          >
-            Tutup Semua Cabang
-          </button>
+      {/* QUICK CONTROLS BAR & HIERARCHY SEGMENTED CONTROL */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-1 bg-white dark:bg-slate-900 border border-gray-200/80 dark:border-slate-800 rounded-2xl p-2.5 shadow-2xs text-xs">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Smart Segmented Level & Stepper Bar (Induk -> +Anak -> +Cucu) */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500">
+              Jenjang Pohon:
+            </span>
+            <div className="inline-flex items-center rounded-xl p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleSetLevel(1)}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  hierarchyLevel === 1
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 1: Tampilkan hanya Induk (Grup saja)"
+              >
+                Induk
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLevel(2)}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  hierarchyLevel === 2
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 2: Buka Grup dan Menu Utama (+Anak)"
+              >
+                +Anak
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLevel(3)}
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  hierarchyLevel === 3
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 3: Buka Lengkap Semua Sub-Menu (+Cucu)"
+              >
+                +Cucu
+              </button>
+            </div>
+          </div>
+
+          {/* Hierarchy Level Status Badge */}
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+            {hierarchyLevel === 1 && 'Level 1: Hanya Induk (Grup Tertutup)'}
+            {hierarchyLevel === 2 && 'Level 2: +Anak (Menu Utama Terbuka, Sub-Suite Tertutup)'}
+            {hierarchyLevel === 3 && 'Level 3: +Cucu (Semua Level & Sub-Menu Suite Terbuka)'}
+          </span>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 text-[11px] font-bold text-gray-500">
+        <div className="flex items-center gap-3 text-[11px] font-bold text-gray-500 dark:text-slate-400">
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-600 inline-block"/> Lihat</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-600 inline-block"/> Tambah</span>
           <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500 inline-block"/> Ubah</span>
@@ -567,9 +626,27 @@ export default function MenusPage() {
                                       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${perms.can_view ? 'bg-indigo-600' : 'bg-gray-300'}`} />
                                       <p className="text-xs font-bold text-gray-900 truncate">{menu.title}</p>
                                       {isGovUnits && (
-                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.2 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                          Induk Suite Unit Kerja
-                                        </span>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            Induk Suite Unit Kerja
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setIsSuiteExpanded(prev => !prev);
+                                            }}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border cursor-pointer ${
+                                              isSuiteExpanded 
+                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs' 
+                                                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                            }`}
+                                            title={isSuiteExpanded ? 'Tutup 3 Sub-Menu Suite' : 'Buka 3 Sub-Menu Suite'}
+                                          >
+                                            {isSuiteExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                            <span>{isSuiteExpanded ? 'Tutup Sub-Suite (3)' : 'Buka Sub-Suite (3)'}</span>
+                                          </button>
+                                        </div>
                                       )}
                                     </div>
                                     <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{menu.path}</p>
@@ -613,10 +690,10 @@ export default function MenusPage() {
                                       setRolePermissions(prev => ({
                                         ...prev,
                                         [menu.path]: {
-                                          can_view: !isFull,
-                                          can_create: !isFull,
-                                          can_edit: !isFull,
-                                          can_delete: !isFull
+                                           can_view: !isFull,
+                                           can_create: !isFull,
+                                           can_edit: !isFull,
+                                           can_delete: !isFull
                                         }
                                       }));
                                     }}
@@ -634,12 +711,19 @@ export default function MenusPage() {
                               </div>
 
                               {/* Nested Sub-Menu Suite Unit Kerja directly under Master Unit Kerja (/gov-units) */}
-                              {isGovUnits && (
+                              {isGovUnits && (isSuiteExpanded || !!menuSearch) && (
                                 <div className="pl-6 border-l-2 border-indigo-200/80 ml-4 space-y-1.5 my-1.5 pt-1.5 border-t border-dashed border-indigo-100">
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
                                     <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/80">
-                                      ↳ Sub-Menu Suite Unit Kerja (Pengaturan Role Akses)
+                                      ↳ Sub-Menu Suite Unit Kerja (Tingkat Cucu)
                                     </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsSuiteExpanded(false)}
+                                      className="text-[10px] text-gray-400 hover:text-indigo-600 underline cursor-pointer"
+                                    >
+                                      Tutup Sub-Suite
+                                    </button>
                                   </div>
                                   {[
                                     { title: 'Master PIC & Email', path: '/gov-pics' },
