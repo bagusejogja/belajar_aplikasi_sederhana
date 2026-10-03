@@ -204,6 +204,7 @@ export default function UsersPage() {
     <div className="max-w-7xl mx-auto space-y-4 pb-24">
       {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
       <PageHeader
+        layout="stacked"
         title="Manajemen User & Hak Akses"
         subtitle="Kelola penetapan peran (role), status kunci/aktif akun, serta perbaikan reset password pengguna"
         icon={ShieldCheck}
@@ -486,23 +487,6 @@ export default function UsersPage() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Role Badge */}
-                    <div className="shrink-0">
-                      {isAdmin ? (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shadow-2xs">
-                          👑 Admin
-                        </span>
-                      ) : isPending ? (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800 shadow-2xs">
-                          🚫 Terkunci
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs">
-                          👤 {u.role}
-                        </span>
-                      )}
-                    </div>
                   </div>
 
                   {/* Metadata Chips */}
@@ -520,7 +504,7 @@ export default function UsersPage() {
 
                 {/* Card Action Footer */}
                 <div className="p-3 bg-gray-50/70 dark:bg-slate-800/40 border-t border-gray-100 dark:border-slate-800 flex items-center gap-2 justify-between">
-                  {/* Reset Password Button */}
+                  {/* Reset Password Button (Hanya Ikon Kunci) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -529,11 +513,10 @@ export default function UsersPage() {
                       setResetResult(null);
                       setResetMode('default');
                     }}
-                    className="h-8 px-2.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-95 cursor-pointer"
+                    className="w-8 h-8 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-200 rounded-xl transition-all flex items-center justify-center shrink-0 shadow-2xs active:scale-95 cursor-pointer"
                     title="Reset Password Pengguna"
                   >
-                    <KeyRound size={12} className="text-amber-600 dark:text-amber-400" />
-                    <span>Reset Pass</span>
+                    <KeyRound size={14} className="text-amber-600 dark:text-amber-400" />
                   </button>
 
                   {/* Role Selector Dropdown */}
@@ -657,11 +640,10 @@ export default function UsersPage() {
                               setResetResult(null);
                               setResetMode('default');
                             }}
-                            className="h-7 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1 cursor-pointer"
-                            title="Reset Password"
+                            className="w-7 h-7 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/60 rounded-lg transition-colors flex items-center justify-center shrink-0 cursor-pointer shadow-2xs"
+                            title="Reset Password Pengguna"
                           >
-                            <KeyRound size={11} />
-                            <span>Reset</span>
+                            <KeyRound size={12} className="text-amber-600 dark:text-amber-400" />
                           </button>
 
                           <div className="relative w-36">

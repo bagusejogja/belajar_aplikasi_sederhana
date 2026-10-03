@@ -263,6 +263,7 @@ export default function MenusPage() {
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
       {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
       <PageHeader
+        layout="stacked"
         title="Akses & Hirarki Menu Sistem"
         subtitle="Kelola konfigurasi hak akses modul role pengguna dengan struktur pohon (tree view) bertingkat"
         icon={FolderTree}
@@ -272,7 +273,7 @@ export default function MenusPage() {
         ]}
         badge={{ text: `${totalAccessibleMenus} / ${menuList.length} Menu Aktif`, variant: 'purple' }}
         actions={
-          <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 w-full">
             {/* View Mode Toggle */}
             <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-xl border border-gray-200/80 dark:border-slate-700">
               <button
@@ -292,6 +293,9 @@ export default function MenusPage() {
                 <span>Matriks</span>
               </button>
             </div>
+
+            {/* Right Controls: Role, Add Role, Search, Save */}
+            <div className="flex flex-wrap items-center gap-2">
 
             {/* Select Role */}
             <div className="relative">
@@ -358,6 +362,7 @@ export default function MenusPage() {
               {saving ? <Loader2 className="animate-spin text-white" size={14} /> : <Save size={14} className="text-white" />}
               <span>{saving ? 'Menyimpan...' : 'Simpan Hak Akses'}</span>
             </button>
+            </div>
           </div>
         }
       />
