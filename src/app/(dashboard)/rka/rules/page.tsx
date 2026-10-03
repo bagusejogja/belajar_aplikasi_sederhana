@@ -596,18 +596,37 @@ export default function RkaRulesPage() {
     }
   };
 
-  // Handle Terapkan Rule Engine ke Seluruh Data (Pengeluaran atau Penerimaan)
-  const handleApplyRules = async () => {
+  // Handle Terapkan Rule Engine (Bisa semua format atau khusus format yang sedang difilter)
+  const handleApplyRules = async (forceAll = false) => {
     const isPenerimaan = activeModul === 'penerimaan';
     const targetName = isPenerimaan ? 'RKAT Penerimaan' : 'RKAT Pengeluaran';
-    if (!confirm(`Jalankan Rule Engine Klasifikasi ke seluruh data ${targetName}?\n\nSistem akan memindai seluruh ${isPenerimaan ? 'nama akun penerimaan, keterangan, tarif & unit kerja' : 'uraian belanja, kegiatan, kode akun, dan unit kerja'} untuk memetakan format laporan secara otomatis.`)) return;
+    const isSpecificFormat = !forceAll && filterTarget !== 'ALL';
+    const formatRulesCount = isSpecificFormat
+      ? rules.filter(r => (r.target_field || '').toLowerCase() === filterTarget.toLowerCase()).length
+      : rules.length;
+    
+    let confirmMsg = '';
+    if (isSpecificFormat) {
+      confirmMsg = `Jalankan Rule Engine KHUSUS format "${filterTarget}" (${formatRulesCount} aturan)?\n\nSistem HANYA akan memindai dan memperbarui data laporan "${filterTarget}" tanpa menghapus atau mengganggu klasifikasi format laporan lainnya.`;
+    } else {
+      confirmMsg = `Jalankan Rule Engine untuk SEMUA format laporan ${targetName} (${rules.length} aturan)?\n\nSistem akan memindai seluruh ${isPenerimaan ? 'nama akun penerimaan, keterangan, tarif & unit kerja' : 'uraian belanja, kegiatan, kode akun, dan unit kerja'} untuk memetakan seluruh format laporan secara otomatis.`;
+    }
+
+    if (!confirm(confirmMsg)) return;
 
     setIsApplying(true);
     try {
+      const payload: any = { modul: activeModul };
+      if (isSpecificFormat) {
+        payload.targetFormat = filterTarget;
+      } else {
+        payload.targetFormat = 'ALL';
+      }
+
       const res = await fetch('/api/rka/rules', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modul: activeModul })
+        body: JSON.stringify(payload)
       });
       const json = await res.json();
       if (json.success) {
@@ -764,6 +783,12 @@ export default function RkaRulesPage() {
     return !tf.includes('proposal rkat');
   }).length;
 
+  // Metrik KPI Dinamis & Status Filter Target
+  const isTargetFiltered = filterTarget !== 'ALL';
+  const targetRulesCount = isTargetFiltered
+    ? rules.filter(r => (r.target_field || '').toLowerCase() === filterTarget.toLowerCase()).length
+    : rules.length;
+
   // Filter List Aturan
   const filteredRules = rules.filter(r => {
     if (filterTarget !== 'ALL' && (r.target_field || '').toLowerCase() !== filterTarget.toLowerCase()) return false;
@@ -817,12 +842,20 @@ export default function RkaRulesPage() {
           {/* Tombol Jalankan Rule Engine */}
           <Button
             size="sm"
-            onClick={handleApplyRules}
+            onClick={() => handleApplyRules()}
             disabled={isApplying}
             className="h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-black gap-1.5 shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
           >
             {isApplying ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
-            <span>{isApplying ? 'Memproses Data...' : activeModul === 'penerimaan' ? 'Jalankan Rule Penerimaan' : 'Jalankan Rule Pengeluaran'}</span>
+            <span>
+              {isApplying 
+                ? 'Memproses Data...' 
+                : isTargetFiltered 
+                  ? `Jalankan Rule (${filterTarget})` 
+                  : activeModul === 'penerimaan' 
+                    ? 'Jalankan Rule Penerimaan' 
+                    : 'Jalankan Rule Pengeluaran'}
+            </span>
           </Button>
 
           {/* Tombol Buka/Tutup Paste Zone */}
@@ -901,78 +934,117 @@ export default function RkaRulesPage() {
         </div>
       </div>
 
-      {/* KPI METRIC CARDS (SERAGAM DENGAN MODUL LAIN) */}
+      {/* Active Filter Banner jika filterTarget !== 'ALL' */}
+      {isTargetFiltered && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50/60 border border-blue-200/90 rounded-2xl text-xs text-blue-950 shadow-2xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🎯</span>
+            <span className="font-semibold">
+              Filter Aktif Target Format: <strong className="text-blue-900 font-extrabold">{filterTarget}</strong>
+            </span>
+            <Badge variant="outline" className="bg-white text-blue-800 border-blue-300 text-[10px] font-bold">
+              {targetRulesCount} Aturan Terdaftar
+            </Badge>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleApplyRules(true)}
+              className="text-[11px] text-indigo-700 hover:text-indigo-900 font-bold hover:underline cursor-pointer"
+            >
+              ⚡ Jalankan Semua Format
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterTarget('ALL')}
+              className="text-[11px] text-gray-600 hover:text-gray-900 font-bold flex items-center gap-1 cursor-pointer bg-white px-2 py-0.5 rounded-lg border border-gray-200 shadow-2xs hover:bg-gray-50"
+            >
+              <X size={12} /> Reset ke Semua Format
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* KPI METRIC CARDS (REAKTIF TERHADAP FILTER TARGET FORMAT) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Card 1: Total Aturan */}
-        <Card className="rounded-2xl border-gray-200/80 shadow-xs">
+        {/* Card 1: Total Aturan / Aturan Terfilter */}
+        <Card className={`rounded-2xl transition-all shadow-xs ${isTargetFiltered ? 'border-blue-300 bg-gradient-to-b from-white to-blue-50/40' : 'border-gray-200/80'}`}>
           <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
-              Total Aturan Aktif
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
+              {isTargetFiltered ? `Aturan: ${filterTarget}` : 'Total Aturan Aktif'}
             </span>
             <div className="text-2xl font-black font-mono text-gray-900">
-              {rules.length} <span className="text-xs font-semibold text-gray-500 font-sans">Aturan</span>
+              {isTargetFiltered ? targetRulesCount : rules.length} <span className="text-xs font-semibold text-gray-500 font-sans">Aturan</span>
             </div>
             <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Urutan Evaluasi Aturan</span>
-              <Badge variant="secondary" className="text-[10px] font-bold">Prioritas #1 (Utama)</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Aturan Proposal RKAT / Penerimaan */}
-        <Card className="rounded-2xl border-indigo-200 shadow-xs bg-gradient-to-b from-white to-indigo-50/40">
-          <CardContent className="p-5 space-y-2">
-            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
-              <span>📊</span> <span>{activeModul === 'penerimaan' ? 'Aturan Proposal Penerimaan' : 'Aturan Proposal RKAT'}</span>
-            </span>
-            <div className="text-2xl font-black font-mono text-indigo-950">
-              {countProposal} <span className="text-xs font-semibold text-indigo-700 font-sans">Aturan</span>
-            </div>
-            <div className="text-xs text-indigo-800 font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60">
-              <span>Target: `{activeModul === 'penerimaan' ? 'format_proposal' : 'proposal rkat'}`</span>
-              <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px] font-bold">
-                {rules.length > 0 ? ((countProposal / rules.length) * 100).toFixed(0) : 0}%
+              <span>{isTargetFiltered ? `Dari total ${rules.length} aturan` : 'Urutan Evaluasi Aturan'}</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">
+                {isTargetFiltered ? `${rules.length > 0 ? ((targetRulesCount / rules.length) * 100).toFixed(0) : 0}% Porsi` : 'Prioritas #1 (Utama)'}
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Target Format Aktif */}
+        {/* Card 2: Fokus Target Format */}
+        <Card className={`rounded-2xl shadow-xs transition-all ${isTargetFiltered ? 'border-indigo-300 bg-gradient-to-b from-white to-indigo-50/50' : 'border-indigo-200 bg-gradient-to-b from-white to-indigo-50/40'}`}>
+          <CardContent className="p-5 space-y-2">
+            <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block flex items-center gap-1">
+              <span>📊</span> <span>{isTargetFiltered ? 'Fokus Target Format' : activeModul === 'penerimaan' ? 'Aturan Proposal Penerimaan' : 'Aturan Proposal RKAT'}</span>
+            </span>
+            <div className="text-2xl font-black font-mono text-indigo-950 truncate" title={isTargetFiltered ? filterTarget : undefined}>
+              {isTargetFiltered ? filterTarget : countProposal} {!isTargetFiltered && <span className="text-xs font-semibold text-indigo-700 font-sans">Aturan</span>}
+            </div>
+            <div className="text-xs text-indigo-800 font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60">
+              <span>{isTargetFiltered ? `${targetRulesCount} Aturan Terdaftar` : `Target: \`${activeModul === 'penerimaan' ? 'format_proposal' : 'proposal rkat'}\``}</span>
+              <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-300 text-[10px] font-bold">
+                {isTargetFiltered ? 'Aktif Dipilih' : `${rules.length > 0 ? ((countProposal / rules.length) * 100).toFixed(0) : 0}%`}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Lingkup Target / Format Terdaftar */}
         <Card className="rounded-2xl border-gray-200/80 shadow-xs">
           <CardContent className="p-5 space-y-2">
             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block flex items-center gap-1">
-              <span>🔖</span> <span>Target Format Terdaftar</span>
+              <span>🔖</span> <span>{isTargetFiltered ? 'Lingkup Kerja & Unit' : 'Target Format Terdaftar'}</span>
             </span>
-            <div className="text-2xl font-black font-mono text-gray-900">
-              {allTargetOptions.length} <span className="text-xs font-semibold text-gray-500 font-sans">Format</span>
+            <div className="text-2xl font-black font-mono text-gray-900 truncate">
+              {isTargetFiltered ? (filterUnit === '*' || filterUnit === 'ALL' ? 'Semua Unit (*)' : filterUnit) : allTargetOptions.length} {!isTargetFiltered && <span className="text-xs font-semibold text-gray-500 font-sans">Format</span>}
             </div>
             <div className="text-xs text-gray-500 font-semibold flex items-center justify-between pt-1 border-t border-gray-100">
-              <span>Format Utama: {activeModul === 'penerimaan' ? 'Proposal Penerimaan' : 'Proposal RKAT'}</span>
-              <Badge variant="secondary" className="text-[10px] font-bold">Aktif</Badge>
+              <span>{isTargetFiltered ? `Pencarian: ${search ? `"${search}"` : 'Semua Kata'}` : `Format: Proposal & Kementerian`}</span>
+              <Badge variant="secondary" className="text-[10px] font-bold">
+                {isTargetFiltered ? 'Tersaring' : 'Aktif'}
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
         {/* Card 4: Aksi Cepat Rule Engine */}
-        <Card className="rounded-2xl border-emerald-200 shadow-xs bg-gradient-to-b from-white to-emerald-50/40">
+        <Card className={`rounded-2xl shadow-xs transition-all ${isTargetFiltered ? 'border-blue-300 bg-gradient-to-b from-white to-blue-50/50' : 'border-emerald-200 bg-gradient-to-b from-white to-emerald-50/40'}`}>
           <CardContent className="p-5 space-y-2">
             <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block flex items-center gap-1">
-              <Sparkles size={13} /> <span>Status Auto-Tagging</span>
+              <Sparkles size={13} /> <span>{isTargetFiltered ? `Eksekusi: ${filterTarget}` : 'Status Auto-Tagging'}</span>
             </span>
-            <div className="text-xs text-indigo-950 font-bold leading-snug">
-              {activeModul === 'penerimaan'
-                ? 'Siap memindai penerimaan & memberi label laporan'
-                : 'Siap memindai belanja & memberi label laporan'}
+            <div className="text-xs text-indigo-950 font-bold leading-snug truncate">
+              {isTargetFiltered
+                ? `Hanya perbarui format '${filterTarget}'`
+                : activeModul === 'penerimaan'
+                ? 'Siap memindai penerimaan & label'
+                : 'Siap memindai belanja & label'}
             </div>
             <div className="pt-2 border-t border-indigo-100/80">
               <Button
                 size="sm"
-                onClick={handleApplyRules}
+                onClick={() => handleApplyRules()}
                 disabled={isApplying}
-                className="w-full h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer"
+                className={`w-full h-7 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer ${
+                  isTargetFiltered ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
               >
-                {isApplying ? 'Sedang Memindai...' : '⚡ Jalankan Sekarang'}
+                {isApplying ? 'Sedang Memindai...' : isTargetFiltered ? `⚡ Jalankan (${filterTarget})` : '⚡ Jalankan Sekarang'}
               </Button>
             </div>
           </CardContent>

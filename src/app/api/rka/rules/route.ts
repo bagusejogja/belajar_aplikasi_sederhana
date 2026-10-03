@@ -266,23 +266,35 @@ export async function PUT(request: Request) {
     }
 
     // 5. Jalankan Rule Engine (Direct DB Execution - Super Cepat 50x)
-    const { ruleId, targetYear, cleanSync = true, modul = 'all' } = body;
+    const { ruleId, targetYear, cleanSync = true, modul = 'all', targetFormat } = body;
 
     async function executePenerimaanRules() {
       let rulesQuery = supabaseAdmin.from('rka_rules').select('*').eq('modul', 'penerimaan').order('priority', { ascending: false }).order('id', { ascending: true });
       if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
+      if (targetFormat && targetFormat !== 'ALL') {
+        rulesQuery = rulesQuery.ilike('target_field', `%${targetFormat}%`);
+      }
       const { data: rulesList, error: rulesErr } = await rulesQuery;
       if (rulesErr) throw rulesErr;
 
       let totalUpdated = 0;
       if (cleanSync) {
+        let resetFields: any = {
+          format_proposal: null,
+          kelompok_penerimaan: null,
+          tags: {}
+        };
+        if (targetFormat && targetFormat !== 'ALL') {
+          if (targetFormat.toLowerCase().includes('kelompok')) {
+            resetFields = { kelompok_penerimaan: null };
+          } else {
+            resetFields = { format_proposal: null };
+          }
+        }
+
         let resetQ = supabaseAdmin
           .from('rkat_penerimaan')
-          .update({
-            format_proposal: null,
-            kelompok_penerimaan: null,
-            tags: {}
-          }, { count: 'exact' })
+          .update(resetFields, { count: 'exact' })
           .gt('id', 0);
 
         if (targetYear && targetYear !== 'ALL') {
@@ -358,6 +370,18 @@ export async function PUT(request: Request) {
     async function executePengeluaranRules() {
       let rulesQuery = supabaseAdmin.from('rka_rules').select('*').or('modul.eq.pengeluaran,modul.is.null').order('priority', { ascending: false }).order('id', { ascending: true });
       if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
+      if (targetFormat && targetFormat !== 'ALL') {
+        const tfLower = targetFormat.toLowerCase().trim();
+        if (tfLower.includes('kementr') || tfLower.includes('kementer')) {
+          rulesQuery = rulesQuery.or('target_field.ilike.%kementr%,target_field.ilike.%kementer%,target_field.eq.laporan_kementerian');
+        } else if (tfLower.includes('webo')) {
+          rulesQuery = rulesQuery.or('target_field.ilike.%webo%,target_field.eq.laporan_webometrics');
+        } else if (tfLower.includes('proposal') || tfLower.includes('rkat')) {
+          rulesQuery = rulesQuery.or('target_field.ilike.%proposal%,target_field.ilike.%rkat%,target_field.eq.format_proposal');
+        } else {
+          rulesQuery = rulesQuery.ilike('target_field', `%${targetFormat}%`);
+        }
+      }
       const { data: rulesList, error: rulesErr } = await rulesQuery;
       if (rulesErr) throw rulesErr;
 
@@ -367,15 +391,28 @@ export async function PUT(request: Request) {
       const CHUNK_SIZE = 2000;
 
       if (cleanSync) {
+        const tfLower = (targetFormat || '').toLowerCase().trim();
         for (let s = 1; s <= maxTableId + 1000; s += CHUNK_SIZE) {
+          let resetPayload: any = {
+            laporan_kementerian: null,
+            laporan_webometrics: null,
+            identifikasi_lain: null,
+            tags: {}
+          };
+
+          if (targetFormat && targetFormat !== 'ALL') {
+            if (tfLower.includes('kementr') || tfLower.includes('kementer')) {
+              resetPayload = { laporan_kementerian: null };
+            } else if (tfLower.includes('webo')) {
+              resetPayload = { laporan_webometrics: null };
+            } else {
+              resetPayload = { identifikasi_lain: null };
+            }
+          }
+
           let resetQ = supabaseAdmin
             .from('rkat_pengeluaran')
-            .update({
-              laporan_kementerian: null,
-              laporan_webometrics: null,
-              identifikasi_lain: null,
-              tags: {}
-            })
+            .update(resetPayload)
             .gte('id', s)
             .lt('id', s + CHUNK_SIZE);
 
@@ -468,11 +505,13 @@ export async function PUT(request: Request) {
       return { totalUpdated, rulesApplied: (rulesList || []).length };
     }
 
+    const formatSuffix = targetFormat && targetFormat !== 'ALL' ? ` (Format '${targetFormat}')` : '';
+
     if (modul === 'penerimaan') {
       const result = await executePenerimaanRules();
       return NextResponse.json({
         success: true,
-        message: `Rule Engine Penerimaan sukses dijalankan! Sebanyak ${result.totalUpdated} baris data penerimaan berhasil dipetakan sesuai aturan aktif.`,
+        message: `Rule Engine Penerimaan${formatSuffix} sukses dijalankan! Sebanyak ${result.totalUpdated} baris data penerimaan berhasil dipetakan (${result.rulesApplied} aturan aktif).`,
         updatedCount: result.totalUpdated,
         rulesApplied: result.rulesApplied
       });
@@ -480,7 +519,7 @@ export async function PUT(request: Request) {
       const result = await executePengeluaranRules();
       return NextResponse.json({
         success: true,
-        message: `Rule Engine Pengeluaran sukses dijalankan! Seluruh data lama telah dibersihkan, dan ${result.totalUpdated} baris data belanja berhasil dipetakan.`,
+        message: `Rule Engine Pengeluaran${formatSuffix} sukses dijalankan! Sebanyak ${result.totalUpdated} baris data belanja berhasil dipetakan (${result.rulesApplied} aturan aktif).`,
         updatedCount: result.totalUpdated,
         rulesApplied: result.rulesApplied
       });
