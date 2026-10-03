@@ -240,115 +240,149 @@ export default function MenusPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
-        
-        {/* Title & Role Info */}
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-2 rounded-xl text-white shadow-xs">
-            <FolderTree size={20} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Akses & Hirarki Menu</h2>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                {totalAccessibleMenus} / {menuList.length} Menu Aktif
-              </span>
+      {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
+      <PageHeader
+        title="Akses & Hirarki Menu Sistem"
+        subtitle="Kelola konfigurasi hak akses modul role pengguna dengan struktur pohon (tree view) bertingkat"
+        icon={FolderTree}
+        breadcrumbs={[
+          { label: 'Master Data' },
+          { label: 'Menu Akses' }
+        ]}
+        badge={{ text: `${totalAccessibleMenus} / ${menuList.length} Menu Aktif`, variant: 'purple' }}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-xl border border-gray-200/80 dark:border-slate-700">
+              <button
+                onClick={() => setViewMode('tree')}
+                className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'tree' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-gray-500 hover:text-gray-800 dark:text-slate-400'}`}
+                title="Tampilan Pohon Berjenjang (Hierarchical Tree)"
+              >
+                <FolderTree size={13} />
+                <span>Pohon (Tree)</span>
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-gray-500 hover:text-gray-800 dark:text-slate-400'}`}
+                title="Tampilan Kartu Matriks"
+              >
+                <Layers size={13} />
+                <span>Matriks</span>
+              </button>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Kelola hak akses menu role pengguna dengan struktur pohon (tree view) bertingkat.
-            </p>
+
+            {/* Select Role */}
+            <div className="relative">
+              <select 
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+                disabled={isFetching || saving}
+                className="h-8.5 pl-3 pr-8 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-black text-indigo-900 dark:text-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors appearance-none"
+              >
+                {roles.map(r => (
+                  <option key={r} value={r}>
+                    {r === 'ADMIN' ? '👑 ADMIN' : `👤 ${r}`}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" />
+              {isFetching && <Loader2 size={12} className="animate-spin text-indigo-600 absolute right-7 top-1/2 -translate-y-1/2" />}
+            </div>
+
+            {/* Add New Role Inline */}
+            <div className="flex items-center gap-1 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-0.5 h-8.5">
+              <input 
+                type="text" 
+                placeholder="Role baru..." 
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
+                className="bg-transparent pl-2.5 pr-1 text-xs font-bold text-gray-800 dark:text-slate-200 outline-none w-24 md:w-32 placeholder:text-gray-400"
+              />
+              <button 
+                type="button"
+                onClick={handleAddRole}
+                disabled={!newRole.trim()}
+                className="h-7 px-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                + Role
+              </button>
+            </div>
+
+            {/* Search Menu */}
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cari menu..."
+                value={menuSearch}
+                onChange={(e) => setMenuSearch(e.target.value)}
+                className="h-8.5 pl-7 pr-6 bg-gray-50 hover:bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-gray-800 dark:text-slate-200 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 w-32 md:w-40 transition-all"
+              />
+              {menuSearch && (
+                <button onClick={() => setMenuSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            {/* Save Button */}
+            <button 
+              onClick={handleSave}
+              disabled={saving || isFetching}
+              className="h-8.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Simpan Hak Akses"
+            >
+              {saving ? <Loader2 className="animate-spin text-white" size={14} /> : <Save size={14} className="text-white" />}
+              <span>{saving ? 'Menyimpan...' : 'Simpan Hak Akses'}</span>
+            </button>
+          </div>
+        }
+      />
+
+      {/* 3 KPI SUMMARY CARDS FOR MENUS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+              TOTAL MENU SISTEM
+            </span>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+              {menuList.length} <span className="text-xs text-slate-500 font-sans font-bold">Modul</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs">
+            <Layers size={20} />
           </div>
         </div>
 
-        {/* Action Controls: View Toggle, Role Select, Add Role, Save */}
-        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-end">
-          
-          {/* View Mode Toggle */}
-          <div className="flex bg-gray-100 p-0.5 rounded-xl">
-            <button
-              onClick={() => setViewMode('tree')}
-              className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'tree' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-800'}`}
-              title="Tampilan Pohon Berjenjang (Hierarchical Tree)"
-            >
-              <FolderTree size={13} />
-              <span>Pohon (Tree)</span>
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`h-8 px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${viewMode === 'grid' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-800'}`}
-              title="Tampilan Kartu Matriks"
-            >
-              <Layers size={13} />
-              <span>Matriks</span>
-            </button>
+        <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+              MENU DIAKSES ({selectedRole})
+            </span>
+            <div className="text-2xl font-black text-emerald-950 dark:text-emerald-100 font-mono tracking-tight">
+              {totalAccessibleMenus} <span className="text-xs text-emerald-600 font-sans font-bold">({menuList.length > 0 ? Math.round((totalAccessibleMenus / menuList.length) * 100) : 0}%)</span>
+            </div>
           </div>
-
-          {/* Select Role */}
-          <div className="relative">
-            <select 
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              disabled={isFetching || saving}
-              className="h-8.5 pl-3 pr-8 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 rounded-xl text-xs font-black text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors appearance-none"
-            >
-              {roles.map(r => (
-                <option key={r} value={r}>
-                  {r === 'ADMIN' ? '👑 ADMIN' : `👤 ${r}`}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" />
-            {isFetching && <Loader2 size={12} className="animate-spin text-indigo-600 absolute right-7 top-1/2 -translate-y-1/2" />}
+          <div className="p-3 rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
+            <CheckCircle2 size={20} />
           </div>
+        </div>
 
-          {/* Add New Role Inline */}
-          <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl p-0.5 h-8.5">
-            <input 
-              type="text" 
-              placeholder="Role baru..." 
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddRole()}
-              className="bg-transparent pl-2.5 pr-1 text-xs font-bold text-gray-800 outline-none w-24 md:w-32 placeholder:text-gray-400"
-            />
-            <button 
-              type="button"
-              onClick={handleAddRole}
-              disabled={!newRole.trim()}
-              className="h-7 px-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              + Role
-            </button>
+        <div className="bg-gradient-to-br from-purple-500/10 via-purple-50/40 to-white dark:from-purple-950/30 dark:via-slate-900 dark:to-slate-900 border border-purple-200/80 dark:border-purple-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 block mb-1">
+              ROLE TERDAFTAR
+            </span>
+            <div className="text-2xl font-black text-purple-950 dark:text-purple-100 font-mono tracking-tight">
+              {roles.length} <span className="text-xs text-purple-600 font-sans font-bold">Peran User</span>
+            </div>
           </div>
-
-          {/* Search Menu */}
-          <div className="relative">
-            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cari menu..."
-              value={menuSearch}
-              onChange={(e) => setMenuSearch(e.target.value)}
-              className="h-8.5 pl-7 pr-6 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 w-32 md:w-40 transition-all"
-            />
-            {menuSearch && (
-              <button onClick={() => setMenuSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={12} />
-              </button>
-            )}
+          <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shadow-xs">
+            <ShieldCheck size={20} />
           </div>
-
-          {/* Save Button */}
-          <button 
-            onClick={handleSave}
-            disabled={saving || isFetching}
-            className="h-8.5 px-4 bg-gray-900 hover:bg-black text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
-            title="Simpan Hak Akses"
-          >
-            {saving ? <Loader2 className="animate-spin text-emerald-400" size={14} /> : <Save size={14} className="text-emerald-400" />}
-            <span>{saving ? 'Menyimpan...' : 'Simpan'}</span>
-          </button>
         </div>
       </div>
 

@@ -261,6 +261,51 @@ export default function MasterRekeningPage() {
         }
       />
 
+      {/* 3 KPI SUMMARY CARDS FOR MASTER REKENING */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+              TOTAL REKENING TERDAFTAR
+            </span>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+              {listRekening.length} <span className="text-xs text-slate-500 font-sans font-bold">Rekening</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs">
+            <CreditCard size={20} />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+              BANK PENAMPUNG AKTIF
+            </span>
+            <div className="text-2xl font-black text-emerald-950 dark:text-emerald-100 font-mono tracking-tight">
+              {listBank.length} <span className="text-xs text-emerald-600 font-sans font-bold">Mitra Bank</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
+            <Database size={20} />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500/10 via-purple-50/40 to-white dark:from-purple-950/30 dark:via-slate-900 dark:to-slate-900 border border-purple-200/80 dark:border-purple-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 block mb-1">
+              KATEGORI JENIS REKENING
+            </span>
+            <div className="text-2xl font-black text-purple-950 dark:text-purple-100 font-mono tracking-tight">
+              {uniqueJenis.length} <span className="text-xs text-purple-600 font-sans font-bold">Kategori</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-purple-100/80 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shadow-xs">
+            <CreditCard size={20} />
+          </div>
+        </div>
+      </div>
+
       {/* CATEGORY CHIPS BAR & CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">

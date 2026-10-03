@@ -259,15 +259,60 @@ export default function UsersPage() {
         }
       />
 
+      {/* 3 KPI SUMMARY CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+              TOTAL USER TERDAFTAR
+            </span>
+            <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+              {users.length} <span className="text-xs text-slate-500 font-sans font-bold">Akun</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs">
+            <UsersIcon size={20} />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+              AKUN AKTIF (BERHAK AKSES)
+            </span>
+            <div className="text-2xl font-black text-emerald-950 dark:text-emerald-100 font-mono tracking-tight">
+              {activeUsersCount} <span className="text-xs text-emerald-600 font-sans font-bold">({users.length > 0 ? Math.round((activeUsersCount / users.length) * 100) : 0}%)</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
+            <UserCheck size={20} />
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-rose-500/10 via-rose-50/40 to-white dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900 border border-rose-200/80 dark:border-rose-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 block mb-1">
+              AKUN TERKUNCI / PENDING
+            </span>
+            <div className="text-2xl font-black text-rose-950 dark:text-rose-100 font-mono tracking-tight">
+              {pendingUsersCount} <span className="text-xs text-rose-600 font-sans font-bold">({users.length > 0 ? Math.round((pendingUsersCount / users.length) * 100) : 0}%)</span>
+            </div>
+          </div>
+          <div className="p-3 rounded-2xl bg-rose-100/80 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/60 shadow-xs">
+            <ShieldAlert size={20} />
+          </div>
+        </div>
+      </div>
+
       {/* QUICK STATUS BAR */}
-      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
-        <span>Menampilkan <strong>{filteredUsers.length}</strong> dari <strong>{users.length}</strong> pengguna terdaftar</span>
+      <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500 dark:text-slate-400">
+        <span>Menampilkan <strong className="text-indigo-600 dark:text-indigo-400">{filteredUsers.length}</strong> dari <strong>{users.length}</strong> pengguna terdaftar</span>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1 text-emerald-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {activeUsersCount} Aktif
+          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" /> {activeUsersCount} Aktif
           </span>
           {pendingUsersCount > 0 && (
-            <span className="flex items-center gap-1 text-rose-700">
+            <span className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-1 rounded-full border border-rose-200 dark:border-rose-800/60">
               <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {pendingUsersCount} Terkunci
             </span>
           )}
