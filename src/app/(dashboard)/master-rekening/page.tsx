@@ -8,6 +8,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import Select from 'react-select';
 import toast from 'react-hot-toast';
+import PageHeader from '@/components/shared/PageHeader';
 
 export default function MasterRekeningPage() {
   const [listRekening, setListRekening] = useState<any[]>([]);
@@ -183,89 +184,82 @@ export default function MasterRekeningPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-20">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
-        <div className="flex items-center gap-3">
-           <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-2 rounded-xl text-white shadow-xs">
-              <CreditCard size={20} />
-           </div>
-           <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Master Rekening Bank</h2>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                  {listRekening.length} Rekening Terdaftar
-                </span>
-              </div>
-              <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-                Kelola daftar nomor rekening bank penerima dikelompokkan berdasarkan kategori.
-              </p>
-           </div>
-        </div>
+      {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
+      <PageHeader
+        title="Master Rekening Bank Penerima"
+        subtitle="Kelola daftar nomor rekening bank penampung & vendor yang dikelompokkan berdasarkan kategori unit kerja"
+        icon={CreditCard}
+        breadcrumbs={[
+          { label: 'Master Data' },
+          { label: 'Master Rekening' }
+        ]}
+        badge={{ text: `${listRekening.length} Rekening Terdaftar`, variant: 'info' }}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            {/* View Mode Switcher */}
+            <div className="flex bg-gray-100 dark:bg-slate-800 p-0.5 rounded-xl border border-gray-200/80 dark:border-slate-700">
+              <button
+                onClick={() => setDisplayMode('grouped')}
+                className={`h-8 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${displayMode === 'grouped' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-gray-500 hover:text-gray-800 dark:text-slate-400'}`}
+              >
+                Grup Kategori
+              </button>
+              <button
+                onClick={() => setDisplayMode('flat')}
+                className={`h-8 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${displayMode === 'flat' ? 'bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-gray-500 hover:text-gray-800 dark:text-slate-400'}`}
+              >
+                Tabel Biasa
+              </button>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-           {/* View Mode Switcher */}
-           <div className="flex bg-gray-100 p-0.5 rounded-xl">
-             <button
-               onClick={() => setDisplayMode('grouped')}
-               className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${displayMode === 'grouped' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-800'}`}
-             >
-               Grup Kategori
-             </button>
-             <button
-               onClick={() => setDisplayMode('flat')}
-               className={`h-8 px-3 rounded-lg text-xs font-bold transition-all ${displayMode === 'flat' ? 'bg-white text-indigo-700 shadow-xs' : 'text-gray-500 hover:text-gray-800'}`}
-             >
-               Tabel Biasa
-             </button>
-           </div>
+            {/* Jenis Filter */}
+            <select
+              value={selectedJenisFilter}
+              onChange={(e) => setSelectedJenisFilter(e.target.value)}
+              className="h-9 px-2.5 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+            >
+              <option value="ALL">Semua Jenis ({listRekening.length})</option>
+              {uniqueJenis.map(j => (
+                <option key={j} value={j}>{j} ({listRekening.filter(r => (r.jenis || 'Lainnya') === j).length})</option>
+              ))}
+            </select>
 
-           {/* Jenis Filter */}
-           <select
-             value={selectedJenisFilter}
-             onChange={(e) => setSelectedJenisFilter(e.target.value)}
-             className="h-9 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-           >
-             <option value="ALL">Semua Jenis ({listRekening.length})</option>
-             {uniqueJenis.map(j => (
-               <option key={j} value={j}>{j} ({listRekening.filter(r => (r.jenis || 'Lainnya') === j).length})</option>
-             ))}
-           </select>
-
-           {/* Search Input */}
-           <div className="relative flex-1 md:w-52">
+            {/* Search Input */}
+            <div className="relative flex-1 md:w-52">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
               <input 
-                 type="text" 
-                 placeholder="Cari rekening / nama..." 
-                 value={search}
-                 onChange={(e) => setSearch(e.target.value)}
-                 className="w-full h-9 pl-7 pr-7 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all text-xs font-semibold"
+                type="text" 
+                placeholder="Cari rekening / nama..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-9 pl-7 pr-7 bg-gray-50 hover:bg-white dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs font-semibold text-gray-800 dark:text-slate-200"
               />
               {search && (
                 <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <X size={12} />
                 </button>
               )}
-           </div>
+            </div>
 
-           <button
-             onClick={fetchData}
-             className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-1.5 transition-colors shadow-2xs"
-             title="Refresh Data"
-           >
-             <RefreshCw size={13} />
-             <span className="hidden sm:inline">Refresh</span>
-           </button>
+            <button
+              onClick={fetchData}
+              className="h-9 px-3 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-200 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Refresh Data"
+            >
+              <RefreshCw size={13} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
 
-           <button 
+            <button 
               onClick={() => openModal()}
-              className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
-           >
+              className="h-9 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            >
               <Plus size={15} />
               <span>Tambah Rekening</span>
-           </button>
-        </div>
-      </div>
+            </button>
+          </div>
+        }
+      />
 
       {/* CATEGORY CHIPS BAR & CONTROLS */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs">

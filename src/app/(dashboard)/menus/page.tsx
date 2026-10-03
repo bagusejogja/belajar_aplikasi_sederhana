@@ -9,6 +9,7 @@ import {
   Folder, FolderOpen, Minus, CornerDownRight
 } from 'lucide-react';
 import { menuList } from '@/lib/mock-db';
+import PageHeader from '@/components/shared/PageHeader';
 import toast from 'react-hot-toast';
 
 export default function MenusPage() {
@@ -507,87 +508,195 @@ export default function MenusPage() {
                     {/* Child Menu Tree Leaves */}
                     {isExpanded && (
                       <div className="p-3 px-4 bg-gray-50/30 space-y-1.5 border-t border-gray-50">
-                        {filteredGroupMenus.map((menu: any, mIdx: number) => {
+                        {filteredGroupMenus.filter((m: any) => {
+                          if (!menuSearch && ['/gov-pics', '/gov-mapping', '/units'].includes(m.path)) return false;
+                          return true;
+                        }).map((menu: any, mIdx: number) => {
                           const perms = rolePermissions[menu.path] || { can_view: false, can_create: false, can_edit: false, can_delete: false };
                           const isFull = perms.can_view && perms.can_create && perms.can_edit && perms.can_delete;
+                          const isGovUnits = menu.path === '/gov-units';
 
                           return (
-                            <div 
-                              key={menu.path} 
-                              className={`flex flex-col sm:flex-row sm:items-center justify-between p-2.5 px-3 rounded-xl transition-all border ${
-                                perms.can_view 
-                                  ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-200' 
-                                  : 'bg-white/60 border-gray-200/60 opacity-70 hover:opacity-100'
-                              }`}
-                            >
-                              {/* Left: Branch elbow & Menu info */}
-                              <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-                                <CornerDownRight size={14} className="text-indigo-400 shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${perms.can_view ? 'bg-indigo-600' : 'bg-gray-300'}`} />
-                                    <p className="text-xs font-bold text-gray-900 truncate">{menu.title}</p>
+                            <React.Fragment key={menu.path}>
+                              <div 
+                                className={`flex flex-col sm:flex-row sm:items-center justify-between p-2.5 px-3 rounded-xl transition-all border ${
+                                  perms.can_view 
+                                    ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-200' 
+                                    : 'bg-white/60 border-gray-200/60 opacity-70 hover:opacity-100'
+                                }`}
+                              >
+                                {/* Left: Branch elbow & Menu info */}
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+                                  <CornerDownRight size={14} className="text-indigo-400 shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${perms.can_view ? 'bg-indigo-600' : 'bg-gray-300'}`} />
+                                      <p className="text-xs font-bold text-gray-900 truncate">{menu.title}</p>
+                                      {isGovUnits && (
+                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.2 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                          Induk Suite Unit Kerja
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{menu.path}</p>
                                   </div>
-                                  <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{menu.path}</p>
+                                </div>
+
+                                {/* Right: Permission Toggles */}
+                                <div className="flex items-center gap-1.5 justify-end mt-2 sm:mt-0 shrink-0">
+                                  <PermissionToggle 
+                                    active={perms.can_view} 
+                                    onClick={() => togglePermission(menu.path, 'can_view')} 
+                                    icon={<Eye size={12}/>} 
+                                    title="Lihat"
+                                    color="indigo" 
+                                  />
+                                  <PermissionToggle 
+                                    active={perms.can_create} 
+                                    onClick={() => togglePermission(menu.path, 'can_create')} 
+                                    icon={<PlusCircle size={12}/>} 
+                                    title="Tambah"
+                                    color="emerald" 
+                                  />
+                                  <PermissionToggle 
+                                    active={perms.can_edit} 
+                                    onClick={() => togglePermission(menu.path, 'can_edit')} 
+                                    icon={<Edit3 size={12}/>} 
+                                    title="Ubah"
+                                    color="amber" 
+                                  />
+                                  <PermissionToggle 
+                                    active={perms.can_delete} 
+                                    onClick={() => togglePermission(menu.path, 'can_delete')} 
+                                    icon={<Trash2 size={12}/>} 
+                                    title="Hapus"
+                                    color="rose" 
+                                  />
+                                  
+                                  <button 
+                                    type="button"
+                                    onClick={() => {
+                                      setRolePermissions(prev => ({
+                                        ...prev,
+                                        [menu.path]: {
+                                          can_view: !isFull,
+                                          can_create: !isFull,
+                                          can_edit: !isFull,
+                                          can_delete: !isFull
+                                        }
+                                      }));
+                                    }}
+                                    className={`h-7 px-2 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                      isFull 
+                                        ? 'bg-purple-600 border-purple-600 text-white shadow-2xs' 
+                                        : 'bg-white border-gray-200 text-gray-400 hover:text-purple-600 hover:border-purple-300'
+                                    }`}
+                                    title="Toggle Full Akses untuk Menu Ini"
+                                  >
+                                    <Check size={11} strokeWidth={3} />
+                                    <span>Full</span>
+                                  </button>
                                 </div>
                               </div>
 
-                              {/* Right: Permission Toggles */}
-                              <div className="flex items-center gap-1.5 justify-end mt-2 sm:mt-0 shrink-0">
-                                <PermissionToggle 
-                                  active={perms.can_view} 
-                                  onClick={() => togglePermission(menu.path, 'can_view')} 
-                                  icon={<Eye size={12}/>} 
-                                  title="Lihat"
-                                  color="indigo" 
-                                />
-                                <PermissionToggle 
-                                  active={perms.can_create} 
-                                  onClick={() => togglePermission(menu.path, 'can_create')} 
-                                  icon={<PlusCircle size={12}/>} 
-                                  title="Tambah"
-                                  color="emerald" 
-                                />
-                                <PermissionToggle 
-                                  active={perms.can_edit} 
-                                  onClick={() => togglePermission(menu.path, 'can_edit')} 
-                                  icon={<Edit3 size={12}/>} 
-                                  title="Ubah"
-                                  color="amber" 
-                                />
-                                <PermissionToggle 
-                                  active={perms.can_delete} 
-                                  onClick={() => togglePermission(menu.path, 'can_delete')} 
-                                  icon={<Trash2 size={12}/>} 
-                                  title="Hapus"
-                                  color="rose" 
-                                />
-                                
-                                <button 
-                                  type="button"
-                                  onClick={() => {
-                                    setRolePermissions(prev => ({
-                                      ...prev,
-                                      [menu.path]: {
-                                        can_view: !isFull,
-                                        can_create: !isFull,
-                                        can_edit: !isFull,
-                                        can_delete: !isFull
-                                      }
-                                    }));
-                                  }}
-                                  className={`h-7 px-2 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer active:scale-95 ${
-                                    isFull 
-                                      ? 'bg-purple-600 border-purple-600 text-white shadow-2xs' 
-                                      : 'bg-white border-gray-200 text-gray-400 hover:text-purple-600 hover:border-purple-300'
-                                  }`}
-                                  title="Toggle Full Akses untuk Menu Ini"
-                                >
-                                  <Check size={11} strokeWidth={3} />
-                                  <span>Full</span>
-                                </button>
-                              </div>
-                            </div>
+                              {/* Nested Sub-Menu Suite Unit Kerja directly under Master Unit Kerja (/gov-units) */}
+                              {isGovUnits && (
+                                <div className="pl-6 border-l-2 border-indigo-200/80 ml-4 space-y-1.5 my-1.5 pt-1.5 border-t border-dashed border-indigo-100">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/80">
+                                      ↳ Sub-Menu Suite Unit Kerja (Pengaturan Role Akses)
+                                    </span>
+                                  </div>
+                                  {[
+                                    { title: 'Master PIC & Email', path: '/gov-pics' },
+                                    { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping' },
+                                    { title: 'Manajemen Unit', path: '/units' }
+                                  ].map((child) => {
+                                    const childPerms = rolePermissions[child.path] || { can_view: false, can_create: false, can_edit: false, can_delete: false };
+                                    const isChildFull = childPerms.can_view && childPerms.can_create && childPerms.can_edit && childPerms.can_delete;
+
+                                    return (
+                                      <div 
+                                        key={child.path} 
+                                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-2.5 px-3 rounded-xl transition-all border ${
+                                          childPerms.can_view 
+                                            ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-200' 
+                                            : 'bg-white/60 border-gray-200/60 opacity-70 hover:opacity-100'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+                                          <CornerDownRight size={14} className="text-indigo-400 shrink-0 ml-1" />
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${childPerms.can_view ? 'bg-indigo-600' : 'bg-gray-300'}`} />
+                                              <p className="text-xs font-bold text-gray-900 truncate">{child.title}</p>
+                                              <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-mono">
+                                                Sub-Unit
+                                              </span>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{child.path}</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 justify-end mt-2 sm:mt-0 shrink-0">
+                                          <PermissionToggle 
+                                            active={childPerms.can_view} 
+                                            onClick={() => togglePermission(child.path, 'can_view')} 
+                                            icon={<Eye size={12}/>} 
+                                            title="Lihat"
+                                            color="indigo" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_create} 
+                                            onClick={() => togglePermission(child.path, 'can_create')} 
+                                            icon={<PlusCircle size={12}/>} 
+                                            title="Tambah"
+                                            color="emerald" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_edit} 
+                                            onClick={() => togglePermission(child.path, 'can_edit')} 
+                                            icon={<Edit3 size={12}/>} 
+                                            title="Ubah"
+                                            color="amber" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_delete} 
+                                            onClick={() => togglePermission(child.path, 'can_delete')} 
+                                            icon={<Trash2 size={12}/>} 
+                                            title="Hapus"
+                                            color="rose" 
+                                          />
+                                          <button 
+                                            type="button"
+                                            onClick={() => {
+                                              setRolePermissions(prev => ({
+                                                ...prev,
+                                                [child.path]: {
+                                                  can_view: !isChildFull,
+                                                  can_create: !isChildFull,
+                                                  can_edit: !isChildFull,
+                                                  can_delete: !isChildFull
+                                                }
+                                              }));
+                                            }}
+                                            className={`h-7 px-2 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                              isChildFull 
+                                                ? 'bg-purple-600 border-purple-600 text-white shadow-2xs' 
+                                                : 'bg-white border-gray-200 text-gray-400 hover:text-purple-600 hover:border-purple-300'
+                                            }`}
+                                            title="Toggle Full Akses untuk Sub-Menu Ini"
+                                          >
+                                            <Check size={11} strokeWidth={3} />
+                                            <span>Full</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </div>

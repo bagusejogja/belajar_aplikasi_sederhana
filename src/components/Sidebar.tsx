@@ -602,7 +602,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                   <div className="space-y-1.5">
                   {visibleItems.map((item) => {
                     const Icon = iconMap[item.icon] || LayoutDashboard;
-                    const isActive = pathname === item.path;
+                    const isActive = pathname === item.path || (item.path === '/gov-units' && ['/gov-units', '/gov-pics', '/gov-mapping', '/units'].includes(pathname)) || (item.path !== '/' && item.path !== '/dashboard' && pathname.startsWith(item.path + '/'));
 
                     return (
                       <div key={item.path} className="relative group/item flex justify-center items-center">

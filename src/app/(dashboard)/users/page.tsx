@@ -10,6 +10,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PageHeader from '@/components/shared/PageHeader';
 
 interface AppUser {
   id: string;
@@ -200,71 +201,63 @@ export default function UsersPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-24">
-      {/* SLIM & COMPACT HEADER BAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl shadow-xs border border-gray-200/80">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-2 rounded-xl text-white shadow-xs">
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-gray-900 tracking-tight leading-none">Manajemen User</h2>
-              <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
-                {users.length} Total Akun
-              </span>
+      {/* STANDARD DESIGN SYSTEM PAGE HEADER */}
+      <PageHeader
+        title="Manajemen User & Hak Akses"
+        subtitle="Kelola penetapan peran (role), status kunci/aktif akun, serta perbaikan reset password pengguna"
+        icon={ShieldCheck}
+        breadcrumbs={[
+          { label: 'Master Data' },
+          { label: 'Manajemen User' }
+        ]}
+        badge={{ text: `${users.length} Total Akun`, variant: 'purple' }}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Role Filter */}
+            <div className="relative">
+              <select
+                value={selectedRoleFilter}
+                onChange={(e) => setSelectedRoleFilter(e.target.value)}
+                className="h-9 pl-3 pr-8 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors appearance-none"
+              >
+                <option value="ALL">Semua Role ({users.length})</option>
+                <option value="ADMIN">👑 Administrator ({users.filter(u => u.role === 'ADMIN').length})</option>
+                {availableRoles.filter(r => r.value !== 'ADMIN' && r.value !== 'Pending').map(r => (
+                  <option key={r.value} value={r.value}>{r.label} ({users.filter(u => u.role === r.value).length})</option>
+                ))}
+                <option value="Pending">🚫 Terkunci / Pending ({pendingUsersCount})</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Kelola hak akses role, status akun, dan reset password pengguna.
-            </p>
-          </div>
-        </div>
 
-        {/* Search & Filters in Header */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {/* Role Filter */}
-          <div className="relative">
-            <select
-              value={selectedRoleFilter}
-              onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              className="h-9 pl-3 pr-8 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-amber-500/20 cursor-pointer transition-colors appearance-none"
+            {/* Search Input */}
+            <div className="relative flex-1 md:w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input 
+                type="text" 
+                placeholder="Cari email atau role..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 w-full pl-9 pr-7 bg-gray-50 hover:bg-white dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-semibold text-xs text-gray-800 dark:text-slate-200"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={fetchUsers}
+              className="h-9 px-3 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-200 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Refresh Data"
             >
-              <option value="ALL">Semua Role ({users.length})</option>
-              <option value="ADMIN">👑 Administrator ({users.filter(u => u.role === 'ADMIN').length})</option>
-              {availableRoles.filter(r => r.value !== 'ADMIN' && r.value !== 'Pending').map(r => (
-                <option key={r.value} value={r.value}>{r.label} ({users.filter(u => u.role === r.value).length})</option>
-              ))}
-              <option value="Pending">🚫 Terkunci / Pending ({pendingUsersCount})</option>
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <RefreshCw size={13} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
           </div>
-
-          {/* Search Input */}
-          <div className="relative flex-1 md:w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-            <input 
-              type="text" 
-              placeholder="Cari email atau role..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 w-full pl-9 pr-7 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-semibold text-xs text-gray-800"
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={fetchUsers}
-            className="h-9 px-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 flex items-center gap-1.5 transition-colors shadow-2xs"
-            title="Refresh Data"
-          >
-            <RefreshCw size={13} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* QUICK STATUS BAR */}
       <div className="flex items-center justify-between px-2 text-xs font-bold text-gray-500">
