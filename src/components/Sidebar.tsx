@@ -40,7 +40,9 @@ import {
   ListTodo,
   BarChart4,
   Star,
-  Palette
+  Palette,
+  ChevronsUp,
+  ChevronsDown
 } from 'lucide-react';
 import { 
   getFavoriteUserKey, 
@@ -297,11 +299,17 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Navigasi Menu</span>
             <button 
+              type="button"
               onClick={toggleAllGroups}
-              className="text-[10px] font-extrabold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
-              title={allGroupsExpanded ? "Tutup Semua Menu Group" : "Buka Semua Menu Group"}
+              className="w-5.5 h-5.5 flex items-center justify-center rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50/80 border border-transparent hover:border-indigo-100 transition-all cursor-pointer"
+              title={allGroupsExpanded ? "Tutup Semua Menu" : "Buka Semua Menu"}
+              aria-label={allGroupsExpanded ? "Tutup Semua Menu" : "Buka Semua Menu"}
             >
-              {allGroupsExpanded ? "Tutup Semua" : "Buka Semua"}
+              {allGroupsExpanded ? (
+                <ChevronsUp size={13} className="text-gray-500 hover:text-indigo-600" />
+              ) : (
+                <ChevronsDown size={13} className="text-gray-500 hover:text-indigo-600" />
+              )}
             </button>
           </div>
         )}

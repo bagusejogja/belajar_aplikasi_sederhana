@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Cell, AreaChart, Area, ComposedChart, Legend, Line 
 } from 'recharts';
+import StatCard from '@/components/shared/StatCard';
 
 export default function GovDashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -227,60 +228,47 @@ export default function GovDashboardPage() {
         </div>
       </div>
 
-      {/* KPI SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Total Pagu */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Pagu {selectedYear}</p>
-            <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalPagu)}`}>
-              Rp {formatIDR(stats.totalPagu)}
-            </h3>
-            <span className="text-[10px] font-semibold text-indigo-600">Alokasi Anggaran Belanja</span>
-          </div>
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Wallet size={20} />
-          </div>
-        </div>
+      {/* KPI SUMMARY CARDS (DESIGN SYSTEM STANDARDS) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <StatCard
+          title={`TOTAL PAGU ${selectedYear}`}
+          value={`Rp ${formatIDR(stats.totalPagu)}`}
+          icon={Wallet}
+          subtitle="Alokasi anggaran belanja pemerintah"
+          variant="indigo"
+          lightBg={true}
+        />
 
-        {/* Total Realisasi */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 flex-1 mr-3">
-            <div className="flex justify-between items-center">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Realisasi</p>
-              <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100">
-                {stats.percent.toFixed(2)}% Terpakai
-              </span>
-            </div>
-            <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalSpent)}`}>
-              Rp {formatIDR(stats.totalSpent)}
-            </h3>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
-               <div className="h-1.5 rounded-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(stats.percent, 100)}%` }}></div>
-            </div>
-          </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
-            <TrendingUp size={20} />
-          </div>
-        </div>
+        <StatCard
+          title="TOTAL REALISASI"
+          value={`Rp ${formatIDR(stats.totalSpent)}`}
+          icon={TrendingDown}
+          progress={{
+            percentage: Math.min(stats.percent, 100),
+            label: `${stats.percent.toFixed(2)}% Terpakai`
+          }}
+          subtitle="Realisasi belanja berjalan"
+          variant="emerald"
+          lightBg={true}
+        />
 
-        {/* Sisa Pagu */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sisa Pagu Anggaran</p>
-            <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.balance)}`}>
-              Rp {formatIDR(stats.balance)}
-            </h3>
-            <span className="text-[10px] font-semibold text-emerald-600">Saldo Tersedia</span>
-          </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <Scale size={20} />
-          </div>
-        </div>
+        <StatCard
+          title="SISA PAGU ANGGARAN"
+          value={`Rp ${formatIDR(stats.balance)}`}
+          icon={Scale}
+          subtitle="Saldo anggaran belum terserap"
+          trend={{
+            value: `${(100 - stats.percent).toFixed(1)}% Tersisa`,
+            isUp: stats.balance >= 0,
+            isGood: stats.balance >= 0
+          }}
+          variant="blue"
+          lightBg={true}
+        />
       </div>
 
       {/* CHART: KOMPOSISI REALISASI VS PAGU */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col h-[380px]">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs flex flex-col h-[380px]">
          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
             <div className="flex items-center gap-2">
               <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">

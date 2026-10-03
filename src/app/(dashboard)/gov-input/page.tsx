@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Users, Layers, Search, Save, X, Plus, Loader2, ChevronRight, Check, 
-  FileSpreadsheet, Calendar, CreditCard, UserPlus, RefreshCw, AlertCircle, CheckCircle2
+  FileSpreadsheet, Calendar, CreditCard, UserPlus, RefreshCw, AlertCircle, CheckCircle2,
+  Copy, Sparkles, Info
 } from 'lucide-react';
 import { mockUnits } from '@/lib/mock-db';
 import { supabase } from '@/lib/supabase';
@@ -30,12 +31,18 @@ export default function GovInputPage() {
   // Bulk Import State
   const [bulkData, setBulkData] = useState<any[]>([]);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [copiedHeader, setCopiedHeader] = useState(false);
 
   // Live Data State
   const [liveMappings, setLiveMappings] = useState<Record<string, number>>({});
   const [units, setUnits] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const sample8ColTSV = `101\tFakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t2026\t1850000000\tBOPTN\tOperasional Lab Biomedis & Riset Terpadu\tDisetujui\tBelanja Barang
+102\tFakultas Teknik\t2026\t2450000000\tRKAT-UGM\tPemeliharaan Fasilitas Laboratorium Terpadu\tDisetujui\tBelanja Modal
+103\tDirektorat Sistem & Sumber Daya Informasi (DSSDI)\t2026\t950000000\tAPBN\tUpgrade Infrastruktur Jaringan & Server Kampus\tUsulan\tBelanja Modal
+104\tPerpustakaan Pusat UGM\t2026\t620000000\tPNBP\tLangganan Basis Data Jurnal Ilmiah Internasional\tDisetujui\tOperasional`;
 
   const fetchData = async () => {
     const { data: mMap, error: eMap } = await supabase.from('ref_mapping_unit').select('nama_sumber, unit_id');
@@ -61,69 +68,157 @@ export default function GovInputPage() {
     personSearch && u.pic?.toLowerCase().includes(personSearch.toLowerCase())
   );
 
-  const handleExcelPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault();
-    const text = e.clipboardData.getData('text');
-    const rows = text.split('\n').filter(row => row.trim());
-    
+  const parseTSVText = (text: string) => {
+    const rows = text.split(/\r?\n/).filter(row => row.trim());
+    if (rows.length === 0) return;
+
     const parsed = rows.map((row, idx) => {
       const parts = row.split('\t').map(p => p.trim());
-      let [tgl, aCode, nom, jns, nama] = parts;
-
-      if (parts.length < 5) {
-         const foundJenis = JENIS_PAGU.find(v => row.toLowerCase().includes(v));
-         if (foundJenis) {
-            const [pre, post] = row.split(new RegExp(foundJenis, 'i'));
-            const preParts = pre.trim().split(/\s+/);
-            tgl = preParts[0];
-            aCode = preParts[1];
-            nom = preParts[2];
-            jns = foundJenis;
-            nama = post.trim();
-         } else {
-            const fallbackParts = row.split(/\s+/);
-            [tgl, aCode, nom, jns] = fallbackParts;
-            nama = fallbackParts.slice(4).join(' ');
-         }
-      }
       
-      if (tgl?.includes('/')) {
-        const [d, m, y] = tgl.split('/');
-        if (d && m && y) tgl = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-      }
-      
-      const searchNama = (nama || '').trim();
-      let matchedUnitId = null;
+      // Auto-detect & skip header row
+      const isHeader = idx === 0 && (
+        parts[0]?.toLowerCase().includes('[1]') ||
+        parts[0]?.toLowerCase().includes('id') ||
+        parts[1]?.toLowerCase().includes('unit') ||
+        parts[1]?.toLowerCase().includes('nama') ||
+        parts[2]?.toLowerCase().includes('tahun') ||
+        parts[0]?.toLowerCase().includes('tanggal')
+      );
+      if (isHeader) return null;
 
-      const exactMatchKey = Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama.toLowerCase());
-      if (exactMatchKey) {
-        matchedUnitId = liveMappings[exactMatchKey];
+      // Detect whether it's 8-column standard format or legacy format
+      const is8Col = parts.length >= 6 || !isNaN(Number(parts[2])) || parts[0]?.match(/^\d+$/);
+
+      let idDb = '';
+      let namaUnit = '';
+      let tahun = `${new Date().getFullYear()}`;
+      let nominal = 0;
+      let sumberDana = 'BOPTN';
+      let keterangan = '';
+      let statusPagu = 'Disetujui';
+      let jenisAnggaran = 'Belanja Barang';
+      let tgl = `${tahun}-01-01`;
+
+      if (is8Col && parts.length >= 3) {
+        idDb = parts[0] || `auto-${idx + 1}`;
+        namaUnit = parts[1] || '';
+        tahun = parts[2] || `${new Date().getFullYear()}`;
+        tgl = `${tahun}-01-01`;
+        const rawNominal = (parts[3] || '0').replace(/[^0-9.-]+/g, '');
+        nominal = parseFloat(rawNominal) || 0;
+        sumberDana = parts[4] || 'BOPTN';
+        keterangan = parts[5] || '-';
+        statusPagu = parts[6] || 'Disetujui';
+        jenisAnggaran = parts[7] || 'Belanja Barang';
       } else {
-        matchedUnitId = units.find(u => u.pic?.toLowerCase() === searchNama.toLowerCase())?.id || null;
+        // Fallback legacy 5-column: [Tanggal, Akun, Nominal, Jenis, Nama]
+        let [legacyTgl, aCode, nom, jns, nama] = parts;
+        if (legacyTgl?.includes('/')) {
+          const [d, m, y] = legacyTgl.split('/');
+          if (d && m && y) legacyTgl = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        tgl = legacyTgl || `${new Date().getFullYear()}-01-01`;
+        tahun = tgl.split('-')[0] || `${new Date().getFullYear()}`;
+        namaUnit = nama || '';
+        nominal = parseFloat(nom?.toString().replace(/\D/g, '') || '0');
+        statusPagu = jns || 'pagu awal';
+        keterangan = `Import Akun ${aCode || ''}`;
+        jenisAnggaran = 'Operasional';
       }
 
-      const matchedUnit = units.find(ux => Number(ux.id) === Number(matchedUnitId));
-      const cleanACode = (aCode || '').trim();
-      const matchedAkun = accounts.find(ax => ax.account_code?.toString().trim() === cleanACode);
+      // Smart Unit Matching:
+      let matchedUnit = null;
+      if (idDb && !isNaN(Number(idDb))) {
+        matchedUnit = units.find(u => Number(u.id) === Number(idDb));
+      }
+      if (!matchedUnit && namaUnit) {
+        const searchNama = namaUnit.trim().toLowerCase();
+        const exactMatchKey = Object.keys(liveMappings).find(k => k.toLowerCase() === searchNama);
+        if (exactMatchKey) {
+          const matchedUnitId = liveMappings[exactMatchKey];
+          matchedUnit = units.find(u => Number(u.id) === Number(matchedUnitId));
+        }
+        if (!matchedUnit) {
+          matchedUnit = units.find(u => 
+            u.nama_unit?.toLowerCase() === searchNama || 
+            u.nama_unit?.toLowerCase().includes(searchNama) ||
+            searchNama.includes(u.nama_unit?.toLowerCase() || '___') ||
+            u.kode_unit?.toLowerCase() === searchNama ||
+            u.pic?.toLowerCase().includes(searchNama)
+          );
+        }
+      }
+
+      // Smart Account Matching:
+      let matchedAkun = null;
+      const combinedText = `${jenisAnggaran} ${keterangan}`;
+      const codeMatch = combinedText.match(/\b(5\d{5})\b/);
+      if (codeMatch) {
+        matchedAkun = accounts.find(a => a.account_code?.toString().trim() === codeMatch[1]);
+      }
+      if (!matchedAkun && accounts.length > 0) {
+        const lowJenis = jenisAnggaran.toLowerCase();
+        if (lowJenis.includes('modal')) {
+          matchedAkun = accounts.find(a => a.account_code?.toString().startsWith('53') || a.account_name?.toLowerCase().includes('modal'));
+        } else if (lowJenis.includes('gaji') || lowJenis.includes('pegawai')) {
+          matchedAkun = accounts.find(a => a.account_code?.toString().startsWith('51') || a.account_name?.toLowerCase().includes('pegawai'));
+        } else {
+          matchedAkun = accounts.find(a => a.account_code?.toString().startsWith('52') || a.account_name?.toLowerCase().includes('barang'));
+        }
+        if (!matchedAkun) {
+          matchedAkun = accounts[0];
+        }
+      }
+
+      // Map statusPagu to valid jenis in JENIS_PAGU:
+      let mappedJenis = 'pagu awal';
+      const lowStatus = (statusPagu || '').toLowerCase();
+      if (lowStatus.includes('tambah pagu') || lowStatus.includes('tambah')) {
+        mappedJenis = 'tambah pagu';
+      } else if (lowStatus.includes('kurang') || lowStatus.includes('pengurangan')) {
+        mappedJenis = 'pengurangan pagu';
+      } else if (lowStatus.includes('realokasi tambah')) {
+        mappedJenis = 'realokasi tambah';
+      } else if (lowStatus.includes('realokasi kurang')) {
+        mappedJenis = 'realokasi kurang';
+      } else if (lowStatus.includes('realisasi')) {
+        mappedJenis = 'realisasi';
+      } else {
+        mappedJenis = 'pagu awal';
+      }
+
+      const isValid = Boolean(matchedUnit && matchedAkun && nominal > 0);
 
       return {
         id: idx,
-        tanggal: tgl || new Date().toISOString().split('T')[0],
+        idDb: idDb || (matchedUnit ? `${matchedUnit.id}` : '-'),
+        namaUnit: namaUnit || (matchedUnit ? matchedUnit.nama_unit : 'TIDAK DITEMUKAN'),
+        tahun,
+        tanggal: tgl,
+        nominal,
+        sumberDana,
+        keterangan,
+        statusPagu,
+        jenisAnggaran,
         unitCode: matchedUnit?.kode_unit || '?',
         unitId: matchedUnit?.id || null,
         unitName: matchedUnit?.nama_unit || 'TIDAK DITEMUKAN',
-        akunCode: cleanACode || '?',
+        akunCode: matchedAkun?.account_code || '?',
         akunId: matchedAkun?.id || null,
-        akunName: matchedAkun?.account_name || 'Akun Salah',
-        nominal: parseFloat(nom?.toString().replace(/\D/g, '') || '0'), 
-        jenis: jns || 'pagu awal',
-        nama: nama,
-        isValid: !!matchedUnit && !!matchedAkun
+        akunName: matchedAkun?.account_name || 'Akun Default',
+        jenis: mappedJenis,
+        isValid
       };
-    });
+    }).filter(Boolean);
 
     setBulkData(parsed);
     setIsImportModalOpen(true);
+  };
+
+  const handleExcelPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    parseTSVText(text);
   };
 
   const resetForm = () => {
@@ -174,19 +269,19 @@ export default function GovInputPage() {
     setIsSaving(true);
     try {
       const payload = validRows.map(row => ({
-        tanggal: row.tanggal,
+        tanggal: row.tanggal || `${row.tahun}-01-01`,
         account_id: row.akunId,
         unit_id: row.unitId,
         nominal: row.nominal,
-        jenis: row.jenis,
-        nama_input: row.nama,
-        keterangan: 'Impor Massal Excel/Paste'
+        jenis: row.jenis || 'pagu awal',
+        nama_input: `${row.sumberDana || 'BOPTN'} • ${row.namaUnit || row.unitName}`,
+        keterangan: `${row.keterangan || ''} (${row.jenisAnggaran || ''})`.trim()
       }));
 
       const { error } = await supabase.from('gov_transactions').insert(payload);
       if (error) throw error;
 
-      alert(`✅ Berhasil Mengimpor ${validRows.length} baris data!`);
+      alert(`✅ Berhasil Mengimpor ${validRows.length} baris data ke database!`);
       setBulkData([]);
       setIsImportModalOpen(false);
     } catch (err: any) {
@@ -198,15 +293,15 @@ export default function GovInputPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+      {/* SLIM & UNIFIED TOP TOOLBAR (DESIGN SYSTEM STANDARDS) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2.5 rounded-xl text-white shadow-2xs">
             <FileSpreadsheet size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Input Belanja Gaji & Mutasi Pagu</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Input Belanja Gaji &amp; Mutasi Pagu</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 Fast-Sync Excel Ready
               </span>
@@ -224,7 +319,7 @@ export default function GovInputPage() {
 
           <button
             onClick={fetchData}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             title="Sinkronkan Master Data"
           >
             <RefreshCw size={14} className="text-gray-500" />
@@ -233,30 +328,90 @@ export default function GovInputPage() {
         </div>
       </div>
 
-      {/* QUICK PASTE ZONE */}
-      <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-3">
-        <div className="min-w-[120px] flex flex-col items-center justify-center p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">
-          <FileSpreadsheet size={24} className="mb-1 text-indigo-600" />
-          <p className="text-[10px] font-bold uppercase tracking-wider">Paste Zone</p>
-          <span className="text-[9px] text-indigo-500">Excel Clipboard</span>
+      {/* QUICK PASTE ZONE (STANDAR 8 KOLOM BAKU) */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-indigo-200/90 shadow-2xs space-y-3 bg-gradient-to-br from-white via-indigo-50/15 to-blue-50/20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
+              Paste Zone Standar
+            </span>
+            <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+              Import Massal Clipboard Excel (8 Kolom Baku)
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText("[1] ID DB\t[2] Nama Unit\t[3] Tahun\t[4] Nominal\t[5] Sumber Dana\t[6] Keterangan\t[7] Status Pagu\t[8] Jenis Anggaran");
+                setCopiedHeader(true);
+                setTimeout(() => setCopiedHeader(false), 2000);
+              }}
+              className="h-7 px-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+            >
+              {copiedHeader ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+              <span>{copiedHeader ? 'Header Disalin!' : 'Salin Header 8 Kolom'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => parseTSVText(sample8ColTSV)}
+              className="h-7 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+            >
+              <Sparkles size={11} className="text-indigo-600" />
+              <span>✨ Isi Contoh TSV (8 Kolom)</span>
+            </button>
+          </div>
         </div>
-        <div className="flex-1 w-full">
-          <textarea 
-            onPaste={handleExcelPaste}
-            placeholder="COPY data baris dari EXCEL lalu PASTE di sini... (Format kolom: Tanggal [TAB] Akun [TAB] Nominal [TAB] Jenis [TAB] Nama (Mapping))"
-            className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl py-2.5 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 placeholder:font-sans resize-none h-16"
-          />
+
+        {/* Quick Header Ribbon */}
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white/80 rounded-xl border border-gray-200/80">
+          <span className="text-[10px] font-black uppercase text-gray-400 mr-1">Urutan Header:</span>
+          {[
+            '[1] ID DB',
+            '[2] Nama Unit',
+            '[3] Tahun',
+            '[4] Nominal',
+            '[5] Sumber Dana',
+            '[6] Keterangan',
+            '[7] Status Pagu',
+            '[8] Jenis Anggaran'
+          ].map((colName, cIdx) => (
+            <span key={cIdx} className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-mono font-bold">
+              {colName}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex flex-col md:flex-row items-stretch gap-3">
+          <div className="min-w-[120px] flex flex-col items-center justify-center p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">
+            <FileSpreadsheet size={24} className="mb-1 text-indigo-600" />
+            <p className="text-[10px] font-bold uppercase tracking-wider">Paste Zone</p>
+            <span className="text-[9px] text-indigo-600 font-semibold">8 Kolom TSV</span>
+          </div>
+          <div className="flex-1 w-full space-y-1">
+            <textarea 
+              onPaste={handleExcelPaste}
+              placeholder="COPY data baris tabel dari EXCEL (blok baris lalu Ctrl+C), kemudian PASTE (Ctrl+V) di sini...&#10;Format urutan kolom: [1] ID DB [TAB] [2] Nama Unit [TAB] [3] Tahun [TAB] [4] Nominal [TAB] [5] Sumber Dana [TAB] [6] Keterangan [TAB] [7] Status Pagu [TAB] [8] Jenis Anggaran"
+              className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl py-2.5 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 placeholder:font-sans resize-none h-20 shadow-2xs leading-relaxed"
+            />
+            <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium px-1">
+              <span>Tekan <strong>Ctrl + V</strong> di dalam kotak untuk memicu modal pratinjau impor massal otomatis</span>
+              <span className="font-mono">Auto-Match Database Unit &amp; Akun</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* MODAL: BULK IMPORT PREVIEW */}
       {bulkData.length > 0 && isImportModalOpen && (
         <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-5xl max-h-[85vh] rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200">
+          <div className="bg-white w-full max-w-6xl max-h-[85vh] rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200">
             <div className="p-4 px-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">Preview Impor Massal</h3>
-                <p className="text-gray-500 text-[11px]">Validasi {bulkData.length} baris data sebelum disimpan ke database</p>
+                <h3 className="font-bold text-gray-900 text-sm">Preview Impor Massal (8 Kolom Baku)</h3>
+                <p className="text-gray-500 text-[11px]">Validasi {bulkData.length} baris data dan pemetaan database sebelum disimpan</p>
               </div>
               <button 
                 onClick={() => { setBulkData([]); setIsImportModalOpen(false); }} 
@@ -271,13 +426,15 @@ export default function GovInputPage() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
                     <th className="py-2.5 px-3 text-center w-12">Status</th>
-                    <th className="py-2.5 px-3">Tanggal</th>
-                    <th className="py-2.5 px-3">Unit</th>
-                    <th className="py-2.5 px-3">Akun</th>
-                    <th className="py-2.5 px-3 text-right">Nominal</th>
-                    <th className="py-2.5 px-3">Jenis</th>
-                    <th className="py-2.5 px-3">Nama Input</th>
-                    <th className="py-2.5 px-3 text-center">Aksi</th>
+                    <th className="py-2.5 px-3 w-16 font-mono">[1] ID DB</th>
+                    <th className="py-2.5 px-3 font-mono">[2] Nama Unit (Pemetaan)</th>
+                    <th className="py-2.5 px-3 w-16 font-mono text-center">[3] Tahun</th>
+                    <th className="py-2.5 px-3 text-right w-36 font-mono">[4] Nominal</th>
+                    <th className="py-2.5 px-3 w-24 font-mono">[5] Sumber Dana</th>
+                    <th className="py-2.5 px-3 font-mono">[6] Keterangan</th>
+                    <th className="py-2.5 px-3 text-center w-24 font-mono">[7] Status Pagu</th>
+                    <th className="py-2.5 px-3 font-mono">[8] Akun &amp; Jenis</th>
+                    <th className="py-2.5 px-3 text-center w-16">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -285,37 +442,49 @@ export default function GovInputPage() {
                     <tr key={row.id} className={row.isValid ? "hover:bg-indigo-50/20" : "bg-rose-50/50"}>
                       <td className="py-2 px-3 text-center">
                         {row.isValid ? (
-                          <CheckCircle2 className="text-emerald-600 inline" size={15} />
+                          <span className="inline-flex items-center gap-0.5 text-emerald-700 text-[10px] font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            <CheckCircle2 size={11} /> Valid
+                          </span>
                         ) : (
-                          <AlertCircle className="text-rose-500 inline" size={15} />
+                          <span className="inline-flex items-center gap-0.5 text-rose-700 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title={!row.unitId ? 'Unit tidak ditemukan' : !row.akunId ? 'Akun tidak valid' : 'Nominal salah'}>
+                            <AlertCircle size={11} /> Cek
+                          </span>
                         )}
                       </td>
-                      <td className="py-2 px-3 font-mono text-gray-600">{row.tanggal}</td>
+                      <td className="py-2 px-3 font-mono text-gray-500 text-[11px]">{row.idDb}</td>
                       <td className="py-2 px-3">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-gray-800">{row.unitName}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{row.unitCode}</span>
+                          <span className="font-semibold text-gray-800 leading-tight">{row.unitName}</span>
+                          <span className="text-[10px] text-gray-400 font-mono mt-0.5">{row.unitCode} {row.namaUnit && row.namaUnit !== row.unitName ? `• Ref: "${row.namaUnit}"` : ''}</span>
                         </div>
                       </td>
-                      <td className="py-2 px-3">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-gray-800">{row.akunName}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{row.akunCode}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-indigo-700">
+                      <td className="py-2 px-3 font-mono text-center text-gray-700 text-xs font-bold">{row.tahun}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-indigo-700 text-xs">
                         Rp {row.nominal.toLocaleString('id-ID')}
                       </td>
                       <td className="py-2 px-3">
-                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[10px] font-mono font-semibold">
+                          {row.sumberDana}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-gray-600 text-[11px] max-w-[180px] truncate" title={row.keterangan}>
+                        {row.keterangan}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
                           {row.jenis}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-gray-600 italic">{row.nama}</td>
+                      <td className="py-2 px-3">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-800 text-[11px] leading-tight">{row.akunName}</span>
+                          <span className="text-[10px] text-gray-400 font-mono mt-0.5">{row.akunCode} • {row.jenisAnggaran}</span>
+                        </div>
+                      </td>
                       <td className="py-2 px-3 text-center">
                         <button 
                           onClick={() => setBulkData(prev => prev.filter(p => p.id !== row.id))}
-                          className="text-rose-500 hover:text-rose-700 text-xs font-semibold"
+                          className="text-rose-500 hover:text-rose-700 text-xs font-semibold cursor-pointer"
                         >
                           Hapus
                         </button>
@@ -333,14 +502,14 @@ export default function GovInputPage() {
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => { setBulkData([]); setIsImportModalOpen(false); }} 
-                  className="h-9 px-4 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-2xs"
+                  className="h-9 px-4 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer"
                 >
                   Batal
                 </button>
                 <button 
                   onClick={handleSaveBulk}
                   disabled={bulkData.some(d => !d.isValid) || isSaving}
-                  className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                  className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
                   <span>{isSaving ? 'Menyimpan...' : 'Simpan ke Database'}</span>
@@ -354,7 +523,7 @@ export default function GovInputPage() {
       {/* MAIN LAYOUT: FORM & SIDE PREVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* FORM INPUT */}
-        <div className="lg:col-span-8 bg-white rounded-2xl p-5 border border-gray-200/80 shadow-xs space-y-4">
+        <div className="lg:col-span-8 bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/90 shadow-2xs space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <h3 className="font-bold text-gray-900 text-xs uppercase tracking-wider">Borang Input Transaksi</h3>
             <span className="text-[10px] font-mono text-gray-400 font-semibold">ID GEN: AUTO</span>
@@ -493,7 +662,7 @@ export default function GovInputPage() {
             <button 
               onClick={handleSaveSingle}
               disabled={isSaving}
-              className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+              className="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
             >
               {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
               <span>{isSaving ? 'Menyimpan...' : 'Simpan Transaksi'}</span>
@@ -504,7 +673,7 @@ export default function GovInputPage() {
         {/* SIDE PANEL: INFO & SUMMARY */}
         <div className="lg:col-span-4 space-y-4">
           {/* Status Unit Terkait */}
-          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs space-y-3">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-200/90 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 border-b border-gray-100 pb-2.5">
               <Building2 size={16} className="text-indigo-600" />
               <span>Status Unit Terkait</span>
@@ -538,7 +707,7 @@ export default function GovInputPage() {
           </div>
 
           {/* Ringkasan Simpan */}
-          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-xs space-y-3">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-200/90 shadow-2xs space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-900 border-b border-gray-100 pb-2.5">
               <Check size={16} className="text-emerald-600" />
               <span>Ringkasan Transaksi</span>

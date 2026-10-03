@@ -251,8 +251,8 @@ export default function DateRangePicker({
                 1x Klik Auto Range
               </span>
             </div>
-            <div className="grid grid-cols-12 gap-1.5 items-center">
-              <div className="col-span-6">
+            <div className="grid grid-cols-2 gap-2 items-center">
+              <div>
                 <select
                   value={filterMonth}
                   onChange={(e) => {
@@ -260,14 +260,15 @@ export default function DateRangePicker({
                     setFilterMonth(m);
                     applyMonthRange(m, filterYear, false);
                   }}
-                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2.5 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+                  title="Pilih Bulan"
                 >
                   {MONTH_NAMES.map((mName, idx) => (
                     <option key={idx} value={idx}>{mName}</option>
                   ))}
                 </select>
               </div>
-              <div className="col-span-3">
+              <div>
                 <select
                   value={filterYear}
                   onChange={(e) => {
@@ -275,22 +276,13 @@ export default function DateRangePicker({
                     setFilterYear(y);
                     applyMonthRange(filterMonth, y, false);
                   }}
-                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  className="w-full h-8 text-xs bg-white border border-gray-200 rounded-lg px-2.5 font-bold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+                  title="Pilih Tahun"
                 >
                   {[2023, 2024, 2025, 2026, 2027, 2028].map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
-              </div>
-              <div className="col-span-3">
-                <button
-                  type="button"
-                  onClick={() => applyMonthRange(filterMonth, filterYear, true)}
-                  className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
-                  title="Terapkan rentang bulan ini langsung"
-                >
-                  Terapkan
-                </button>
               </div>
             </div>
           </div>
@@ -367,21 +359,22 @@ export default function DateRangePicker({
             </div>
           )}
 
-          {/* Action Buttons */}
+          {/* Action Buttons (Hanya 1 Tombol Terapkan Utama) */}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
             >
               Batal
             </button>
             <button
               type="button"
               onClick={handleApply}
-              className="px-4 py-1.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer"
+              className="px-4 py-1.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
             >
-              Terapkan Rentang & Jam
+              <Check size={13} />
+              <span>{showTime ? 'Terapkan Rentang & Jam' : 'Terapkan Filter'}</span>
             </button>
           </div>
         </div>

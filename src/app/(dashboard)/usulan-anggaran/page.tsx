@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import StatCard from '@/components/shared/StatCard';
 
 const accountLinks: Record<string, string> = {
   '511111': '/dana-pemerintah?tab=gaji-pns',
@@ -294,10 +295,10 @@ export default function UsulanAnggaranPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+      {/* SLIM & UNIFIED TOP TOOLBAR (DESIGN SYSTEM STANDARDS) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2.5 rounded-xl text-white shadow-2xs">
             <Scale size={20} />
           </div>
           <div>
@@ -341,7 +342,7 @@ export default function UsulanAnggaranPage() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             title="Muat Ulang Data"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
@@ -349,7 +350,7 @@ export default function UsulanAnggaranPage() {
 
           <button 
             onClick={handleExport}
-            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
           >
             <Download size={14} />
             <span>Export Excel</span>
@@ -357,55 +358,43 @@ export default function UsulanAnggaranPage() {
         </div>
       </div>
 
-      {/* KPI SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Total Usulan TA 2026 */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Usulan TA 2026</p>
-            <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalUsulan)}`}>
-              Rp {formatIDR(stats.totalUsulan)}
-            </h3>
-            <span className="text-[10px] font-semibold text-emerald-600">Hasil Kalkulasi Pegawai</span>
-          </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <TrendingUp size={20} />
-          </div>
-        </div>
+      {/* KPI SUMMARY CARDS (DESIGN SYSTEM STANDARDS) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <StatCard
+          title="TOTAL USULAN TA 2026"
+          value={`Rp ${formatIDR(stats.totalUsulan)}`}
+          icon={TrendingUp}
+          subtitle="Hasil kalkulasi pagu pegawai"
+          variant="emerald"
+          lightBg={true}
+        />
 
-        {/* Total Realisasi Acuan */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Realisasi TA {selectedYear}</p>
-            <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={`Rp ${formatIDR(stats.totalRealisasi)}`}>
-              Rp {formatIDR(stats.totalRealisasi)}
-            </h3>
-            <span className="text-[10px] font-semibold text-blue-600">Dana Terserap Tahun Lalu</span>
-          </div>
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-            <Wallet size={20} />
-          </div>
-        </div>
+        <StatCard
+          title={`REALISASI TA ${selectedYear}`}
+          value={`Rp ${formatIDR(stats.totalRealisasi)}`}
+          icon={Wallet}
+          subtitle="Dana terserap tahun acuan"
+          variant="blue"
+          lightBg={true}
+        />
 
-        {/* Pertumbuhan / Selisih */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Selisih Pertumbuhan</p>
-            <h3 className={`text-base font-black mt-0.5 font-mono truncate ${totalGrowth >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-              {totalGrowth > 0 ? '+' : ''}{totalGrowth.toFixed(1)}%
-            </h3>
-            <span className="text-[10px] font-semibold text-gray-500">
-              Rp {formatIDR(Math.abs(stats.totalUsulan - stats.totalRealisasi))} ({stats.totalUsulan >= stats.totalRealisasi ? 'Kenaikan' : 'Penurunan'})
-            </span>
-          </div>
-          <div className={`p-2.5 rounded-xl ${totalGrowth >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-            {totalGrowth >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
-          </div>
-        </div>
+        <StatCard
+          title="SELISIH PERTUMBUHAN"
+          value={`${totalGrowth > 0 ? '+' : ''}${totalGrowth.toFixed(1)}%`}
+          icon={Scale}
+          subtitle={`Rp ${formatIDR(Math.abs(stats.totalUsulan - stats.totalRealisasi))} (${stats.totalUsulan >= stats.totalRealisasi ? 'Kenaikan' : 'Penurunan'})`}
+          trend={{
+            value: totalGrowth >= 0 ? 'Kenaikan Usulan' : 'Penurunan Usulan',
+            isUp: totalGrowth >= 0,
+            isGood: totalGrowth >= 0
+          }}
+          variant={totalGrowth >= 0 ? 'indigo' : 'rose'}
+          lightBg={true}
+        />
       </div>
 
       {/* TABLE: PERBANDINGAN AKUN */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
         <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
           <div>
             <h3 className="font-bold text-gray-900 text-xs">Detail Perbandingan Akun Anggaran</h3>

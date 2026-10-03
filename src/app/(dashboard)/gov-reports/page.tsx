@@ -1,18 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, PieChart, TrendingDown, TrendingUp, Search, Filter, 
   Loader2, Download, ChevronRight, ArrowUpRight, ArrowDownRight, 
-  Wallet, RefreshCw, Calendar
+  Wallet, RefreshCw, Calendar, Scale, Layers
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import TablePagination from '@/components/shared/TablePagination';
 
 export default function GovReportsPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
 
   const fetchReport = async () => {
     setLoading(true);
@@ -58,10 +63,19 @@ export default function GovReportsPage() {
     fetchReport();
   }, [selectedYear]);
 
-  const filteredData = data.filter(d => 
-    d.nama_unit.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    d.kode_unit.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredData = useMemo(() => {
+    return data.filter(d => 
+      d.nama_unit.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      d.kode_unit.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.group_org && d.group_org.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [data, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+  const currentItems = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage, itemsPerPage]);
 
   const totalPagu = data.reduce((s, d) => s + d.pagu, 0);
   const totalSpent = data.reduce((s, d) => s + d.spent, 0);
@@ -92,15 +106,15 @@ export default function GovReportsPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+      {/* SLIM & UNIFIED TOP TOOLBAR (DESIGN SYSTEM STANDARDS) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2.5 rounded-xl text-white shadow-2xs">
             <PieChart size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Pagu & Realisasi</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Pagu &amp; Realisasi</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 Monitoring TA {selectedYear}
               </span>
@@ -115,7 +129,7 @@ export default function GovReportsPage() {
             <Calendar size={14} className="text-gray-400" />
             <select 
               value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
+              onChange={e => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
               className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
             >
               <option value={2024}>TA 2024</option>
@@ -124,29 +138,38 @@ export default function GovReportsPage() {
             </select>
           </div>
 
+          {/* Search Box */}
           <div className="relative w-full sm:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
             <input 
               type="text" 
               placeholder="Cari unit kerja..." 
               value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs"
             />
           </div>
 
+          {/* Kerapatan Toggle */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
+            <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
+          </div>
+
+          {/* Refresh Button */}
           <button
             onClick={fetchReport}
             disabled={loading}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             title="Muat Ulang Data"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
           </button>
 
+          {/* Export CSV Button */}
           <button 
             onClick={handleExportCSV}
-            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
           >
             <Download size={14} />
             <span>Export CSV</span>
@@ -154,57 +177,116 @@ export default function GovReportsPage() {
         </div>
       </div>
 
-      {/* KPI SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Total Alokasi Pagu */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Alokasi Pagu</p>
-            <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={`Rp ${totalPagu.toLocaleString('id-ID')}`}>
-              Rp {totalPagu.toLocaleString('id-ID')}
-            </h3>
-            <span className="text-[10px] font-semibold text-indigo-600">Dana Aktif TA {selectedYear}</span>
+      {/* 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* CARD 1: TOTAL ALOKASI PAGU */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="pr-2">
+              <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-gray-400">
+                TOTAL ALOKASI PAGU
+              </span>
+              <div className="text-xl font-black font-mono tracking-tight text-gray-900">
+                Rp {totalPagu.toLocaleString('id-ID')}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl shrink-0 bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Wallet size={18} />
+            </div>
           </div>
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Wallet size={20} />
-          </div>
-        </div>
-
-        {/* Total Realisasi */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Realisasi</p>
-            <h3 className="text-base font-black text-rose-600 mt-0.5 font-mono truncate" title={`Rp ${totalSpent.toLocaleString('id-ID')}`}>
-              Rp {totalSpent.toLocaleString('id-ID')}
-            </h3>
-            <span className="text-[10px] font-semibold text-rose-600">{totalPercent.toFixed(1)}% Terpakai</span>
-          </div>
-          <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
-            <TrendingDown size={20} />
+          <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-gray-100 pt-2 text-gray-500">
+            <span>{filteredData.length} Unit Terdata</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-indigo-50 text-indigo-700">
+              TA {selectedYear}
+            </span>
           </div>
         </div>
 
-        {/* Sisa Saldo Anggaran */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sisa Saldo Anggaran</p>
-            <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={`Rp ${totalBalance.toLocaleString('id-ID')}`}>
-              Rp {totalBalance.toLocaleString('id-ID')}
-            </h3>
-            <span className="text-[10px] font-semibold text-emerald-600">{(100 - totalPercent).toFixed(1)}% Tersedia</span>
+        {/* CARD 2: TOTAL REALISASI BELANJA */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="pr-2">
+              <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-rose-600">
+                TOTAL REALISASI BELANJA
+              </span>
+              <div className="text-xl font-black font-mono tracking-tight text-rose-700">
+                Rp {totalSpent.toLocaleString('id-ID')}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl shrink-0 bg-rose-50 text-rose-600 border border-rose-100">
+              <TrendingDown size={18} />
+            </div>
           </div>
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-            <TrendingUp size={20} />
+          <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-rose-100/60 pt-2 text-rose-700">
+            <span>{totalPercent.toFixed(1)}% Realisasi</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-rose-50 text-rose-700">
+              Serapan Berjalan
+            </span>
+          </div>
+        </div>
+
+        {/* CARD 3: SISA SALDO ANGGARAN */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="pr-2">
+              <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-emerald-600">
+                SISA SALDO ANGGARAN
+              </span>
+              <div className="text-xl font-black font-mono tracking-tight text-emerald-700">
+                Rp {totalBalance.toLocaleString('id-ID')}
+              </div>
+            </div>
+            <div className="p-2 rounded-xl shrink-0 bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <Scale size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-emerald-100/60 pt-2 text-emerald-700">
+            <span>{(100 - totalPercent).toFixed(1)}% Tersedia</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+              totalBalance >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+            }`}>
+              {totalBalance >= 0 ? 'Surplus / Aman' : 'Defisit'}
+            </span>
+          </div>
+        </div>
+
+        {/* CARD 4: RATA-RATA SERAPAN */}
+        <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-start justify-between">
+            <div className="pr-2">
+              <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-amber-600">
+                RATA-RATA SERAPAN
+              </span>
+              <div className="text-xl font-black font-mono tracking-tight text-amber-700">
+                {totalPercent.toFixed(1)}%
+              </div>
+            </div>
+            <div className="p-2 rounded-xl shrink-0 bg-amber-50 text-amber-600 border border-amber-100">
+              <PieChart size={18} />
+            </div>
+          </div>
+          <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-amber-100/60 pt-2 text-amber-700">
+            <span>Target Nasional ≥ 90%</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+              totalPercent >= 90 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            }`}>
+              {totalPercent >= 90 ? 'Optimal' : 'Perlu Akselerasi'}
+            </span>
           </div>
         </div>
       </div>
 
       {/* REPORT TABLE */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
-        <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-          <h3 className="font-bold text-gray-900 text-xs">
-            Rincian Pagu & Realisasi per Unit Kerja
-          </h3>
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+        <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex flex-wrap justify-between items-center gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-gray-900 text-xs">
+              Rincian Pagu &amp; Realisasi per Unit Kerja
+            </h3>
+            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+              Hal {currentPage} dari {totalPages}
+            </span>
+          </div>
           <span className="text-[11px] font-mono font-bold text-gray-600">
             {filteredData.length} Unit Terdata
           </span>
@@ -214,11 +296,11 @@ export default function GovReportsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                <th className="py-3 px-4">Unit Kerja / Organisasi</th>
-                <th className="py-3 px-4 text-right w-44">Alokasi Pagu</th>
-                <th className="py-3 px-4 text-right w-44 text-rose-600">Realisasi</th>
-                <th className="py-3 px-4 text-right w-44 text-emerald-700 bg-emerald-50/20">Sisa Saldo</th>
-                <th className="py-3 px-4 text-left w-48">% Serapan</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'}`}>Unit Kerja / Organisasi</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44`}>Alokasi Pagu</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44 text-rose-600`}>Realisasi</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44 text-emerald-700 bg-emerald-50/20`}>Sisa Saldo</th>
+                <th className={`${tableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-left w-48`}>% Serapan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -226,7 +308,7 @@ export default function GovReportsPage() {
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-gray-400 text-xs">
                     <RefreshCw size={20} className="animate-spin inline-block text-indigo-600 mr-2" />
-                    Menghitung pagu & realisasi unit...
+                    Menghitung pagu &amp; realisasi unit...
                   </td>
                 </tr>
               ) : filteredData.length === 0 ? (
@@ -236,9 +318,9 @@ export default function GovReportsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredData.map((row) => (
+                currentItems.map((row) => (
                   <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors">
-                    <td className="py-2.5 px-4">
+                    <td className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
                       <div className="flex items-center gap-2.5">
                         <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
                           <Building2 size={16} />
@@ -249,16 +331,16 @@ export default function GovReportsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-800 text-xs">
+                    <td className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-gray-800 text-xs`}>
                       {row.pagu > 0 ? `Rp ${row.pagu.toLocaleString('id-ID')}` : '-'}
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-rose-600 text-xs">
+                    <td className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-rose-600 text-xs`}>
                       {row.spent > 0 ? `Rp ${row.spent.toLocaleString('id-ID')}` : '-'}
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 text-xs">
+                    <td className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 text-xs`}>
                       {row.balance !== 0 ? `Rp ${row.balance.toLocaleString('id-ID')}` : '-'}
                     </td>
-                    <td className="py-2.5 px-4">
+                    <td className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
                       <div className="space-y-1">
                         <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                           <div 
@@ -277,7 +359,20 @@ export default function GovReportsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* STANDARISASI TABEL DATA, PAGING */}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredData.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+          pageSizeOptions={[10, 25, 50, 100]}
+          isLoading={loading}
+        />
       </div>
     </div>
   );
 }
+

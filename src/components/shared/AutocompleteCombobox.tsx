@@ -49,12 +49,16 @@ export default function AutocompleteCombobox({
     }
   }, [value, selectedOption]);
 
-  // Filter options based on typed query
-  const filteredOptions = options.filter((opt) =>
-    opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (opt.badge && opt.badge.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (opt.subtext && opt.subtext.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const isSelectedLabel = Boolean(selectedOption && searchQuery.trim() === selectedOption.label.trim());
+
+  // Filter options based on typed query: if matching the selected label or empty, show all options
+  const filteredOptions = (isSelectedLabel || !searchQuery.trim())
+    ? options
+    : options.filter((opt) =>
+        opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (opt.badge && opt.badge.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (opt.subtext && opt.subtext.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
 
   // Close when clicking outside
   useEffect(() => {
@@ -154,9 +158,15 @@ export default function AutocompleteCombobox({
             setIsOpen(true);
             setHighlightedIndex(0);
           }}
-          onFocus={() => {
+          onFocus={(e) => {
             setIsOpen(true);
-            setHighlightedIndex(0);
+            e.target.select();
+            if (selectedOption) {
+              const idx = options.findIndex(o => o.value === selectedOption.value);
+              setHighlightedIndex(idx >= 0 ? idx : 0);
+            } else {
+              setHighlightedIndex(0);
+            }
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}

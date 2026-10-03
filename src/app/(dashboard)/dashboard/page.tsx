@@ -1,37 +1,72 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, TrendingUp, TrendingDown, Wallet, PiggyBank, ChevronDown, ChevronRight, Filter, BarChart2, Printer } from 'lucide-react';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Wallet, 
+  PiggyBank, 
+  ChevronDown, 
+  ChevronRight, 
+  Filter, 
+  BarChart2, 
+  Printer,
+  RefreshCw,
+  Search,
+  Building2,
+  FolderOpen,
+  Folder,
+  Layers,
+  Sparkles,
+  ArrowUpRight,
+  ArrowDownRight,
+  CreditCard,
+  SlidersHorizontal,
+  Table as TableIcon,
+  Activity,
+  Calendar
+} from 'lucide-react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell
+  ComposedChart, Bar, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer
 } from 'recharts';
+import * as XLSX from 'xlsx';
+
+import PageHeader from '@/components/shared/PageHeader';
+import StatCard from '@/components/shared/StatCard';
+import SkeletonTable from '@/components/shared/SkeletonTable';
+import EmptyState from '@/components/shared/EmptyState';
+import ExportButtons from '@/components/shared/ExportButtons';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import QuickFilterChips from '@/components/shared/QuickFilterChips';
+import ToastNotification, { ToastItem } from '@/components/shared/ToastNotification';
+import { PrimaryButton, SecondaryButton } from '@/components/shared/ActionButtons';
 
 const BULAN = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 2 });
+
+// Format Rupiah bulat (tanpa desimal ,00)
+const fmt = (n: number) => {
+  if (n === null || n === undefined || isNaN(n)) return '0';
+  return Math.round(n).toLocaleString('id-ID');
+};
 
 // Fungsi membersihkan angka dari string (handle titik/koma ribuan)
 const cleanNum = (val: any): number => {
   if (typeof val === 'number') return val;
   if (!val) return 0;
   const s = String(val).trim();
-  // Jika ada titik ribuan dan koma desimal, bersihkan. 
-  // Tapi hati-hati dengan format DB yang mungkin sudah bersih.
-  // Strategi: Jika ada koma, asumsikan itu desimal ala Indo, ganti ke titik.
   let cleaned = s;
   if (s.includes(',') && s.includes('.')) {
-    // Format "1.000,00" -> "1000.00"
     cleaned = s.replace(/\./g, '').replace(',', '.');
   } else if (s.includes(',')) {
-    // Format "1000,00" -> "1000.00"
     cleaned = s.replace(',', '.');
   }
   const n = Number(cleaned);
   return isNaN(n) ? 0 : n;
 };
 
-// Fungsi parse tanggal universal: sangat tangguh terhadap format apapun
+// Fungsi parse tanggal universal
 const parseAnyDate = (val: any): Date | null => {
   if (val === undefined || val === null || val === '') return null;
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
@@ -39,19 +74,15 @@ const parseAnyDate = (val: any): Date | null => {
   const s = String(val).trim();
   if (!s) return null;
 
-  // 1. Coba parse ISO atau format standar JS
   const d = new Date(s);
   if (!isNaN(d.getTime()) && d.getFullYear() > 1900) return d;
 
-  // 2. Coba handle format Excel Serial (misal: "45300.5")
   const num = Number(s.replace(',', '.'));
   if (!isNaN(num) && num > 30000 && num < 60000) {
-     // 30rb ~ thn 1982, 60rb ~ thn 2064
      const excelDate = new Date((num - 25569) * 86400 * 1000);
      if (!isNaN(excelDate.getTime())) return excelDate;
   }
   
-  // 3. Fallback: coba paksa ganti '/' ke '-' jika ada
   if (s.includes('/')) {
     const d2 = new Date(s.replace(/\//g, '-'));
     if (!isNaN(d2.getTime())) return d2;
@@ -60,55 +91,69 @@ const parseAnyDate = (val: any): Date | null => {
   return null;
 };
 
-// ───── Summary Card Ultra Premium (Soft Bright) ─────
-function SummaryCard({ label, value, icon, color, subValue, subLabel, hideOnPrint }: any) {
+// Nama Baku Golongan Akun (2 Digit Pertama)
+const GOLONGAN_NAMES: Record<string, string> = {
+  '11': 'Kas & Setara Kas',
+  '12': 'Piutang & Uang Muka',
+  '41': 'Penerimaan Infaq, Wakaf & Kerjasama',
+  '42': 'Penerimaan Usaha & Bagi Hasil',
+  '43': 'Penerimaan Bank & Jasa Giro',
+  '51': 'Bisyaroh & Tunjangan Takmir/Petugas',
+  '52': 'Kerumahtanggaan, Konsumsi & Operasional',
+  '53': 'Pemeliharaan, Perbaikan & Gedung',
+  '54': 'Perjalanan Dinas & Akomodasi',
+  '55': 'Pembelian Aset & Inventaris',
+  '90': 'Koreksi & Transaksi Antar Kas',
+};
+
+// Custom Tooltip Recharts Ultra-Modern & Elegan
+function CustomChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  
+  const masukVal = payload.find((p: any) => p.dataKey === 'masuk')?.value || 0;
+  const keluarVal = payload.find((p: any) => p.dataKey === 'keluar')?.value || 0;
+  const saldoVal = payload.find((p: any) => p.dataKey === 'saldo')?.value || 0;
+  const diff = masukVal - keluarVal;
+
   return (
-    <div className={`relative overflow-hidden rounded-[2rem] p-6 text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group border border-white/20 ${color} ${hideOnPrint ? 'print:hidden' : 'print-card'}`}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-40 pointer-events-none"></div>
-      
-      {/* Decorative Icon Background */}
-      <div className="absolute -right-6 -bottom-8 text-white/10 text-[9rem] transform -rotate-12 group-hover:rotate-0 transition-transform duration-700 select-none pointer-events-none">
-        {icon}
+    <div className="bg-slate-900/95 dark:bg-slate-950/95 text-white rounded-2xl p-4 shadow-2xl text-xs space-y-3 border border-slate-700/80 backdrop-blur-xl min-w-[220px]">
+      <div className="flex items-center justify-between border-b border-slate-700/80 pb-2">
+        <div className="flex items-center gap-1.5">
+          <Calendar size={13} className="text-indigo-400" />
+          <span className="font-black text-sm tracking-wide text-white">Bulan {label}</span>
+        </div>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          diff >= 0 ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800' : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+        }`}>
+          {diff >= 0 ? `+Rp ${fmt(diff)}` : `-Rp ${fmt(Math.abs(diff))}`}
+        </span>
       </div>
-      
-      <div className="relative z-10 flex flex-col justify-between h-full min-h-[130px]">
-        <div>
-          <p className="text-[10px] font-black opacity-70 uppercase tracking-[0.2em] mb-3 drop-shadow-sm">{label}</p>
-          <div className="flex flex-col">
-            <span className="text-xs font-bold opacity-40">IDR</span>
-            <h4 className="text-3xl font-black tracking-tight drop-shadow-md">
-               {fmt(value).split(',')[0]}<span className="text-sm opacity-60 font-medium">,{fmt(value).split(',')[1] || '00'}</span>
-            </h4>
-          </div>
+
+      <div className="space-y-2 font-mono">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-slate-300 font-sans text-xs">
+            <span className="w-2.5 h-2.5 rounded-md bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+            Uang Masuk:
+          </span>
+          <strong className="text-emerald-400 font-bold">Rp {fmt(masukVal)}</strong>
         </div>
 
-        {subValue !== undefined && subValue !== value && (
-          <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-end transition-colors group-hover:border-white/30">
-            <div className="flex flex-col">
-              <span className="text-[9px] font-bold opacity-50 uppercase tracking-widest">{subLabel}</span>
-              <span className="text-xs font-mono font-black text-white/90">{fmt(subValue)}</span>
-            </div>
-            <div className="p-1.5 rounded-lg bg-white/10 backdrop-blur-md">
-               <TrendingUp size={12} className="text-white/60" />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-slate-300 font-sans text-xs">
+            <span className="w-2.5 h-2.5 rounded-md bg-rose-500 shadow-sm shadow-rose-500/50" />
+            Uang Keluar:
+          </span>
+          <strong className="text-rose-400 font-bold">Rp {fmt(keluarVal)}</strong>
+        </div>
 
-// ───── Custom Tooltip Chart ─────
-function CustomTooltip({ active, payload, label }: any) {
-  if (!active || !payload) return null;
-  return (
-    <div className="bg-gray-900 text-white rounded-xl p-4 shadow-2xl text-xs space-y-1 border border-gray-700">
-      <p className="font-black text-sm mb-2">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <p key={i} style={{ color: p.color }}>
-          {p.name}: <strong>Rp {fmt(p.value)}</strong>
-        </p>
-      ))}
+        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+          <span className="flex items-center gap-2 text-indigo-300 font-sans font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50" />
+            Saldo Berjalan:
+          </span>
+          <strong className="text-indigo-300 font-black font-mono">Rp {fmt(saldoVal)}</strong>
+        </div>
+      </div>
     </div>
   );
 }
@@ -127,17 +172,44 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState({ saldoAwal: 0, masuk: 0, keluar: 0, saldoAkhir: 0 });
   const [perRekening, setPerRekening] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [coaTree, setCoaTree] = useState<any[]>([]);
   const [coaMonthTable, setCoaMonthTable] = useState<any[]>([]);
+  const [hierarchyLevel, setHierarchyLevel] = useState<number>(1);
   const [expandedCoa, setExpandedCoa] = useState<Record<string, boolean>>({});
+  const [expandedGol, setExpandedGol] = useState<Record<string, boolean>>({});
   const [expandedKel, setExpandedKel] = useState<Record<string, boolean>>({});
   const [expandPosisiAwal, setExpandPosisiAwal] = useState(false);
   const [expandPosisiAkhir, setExpandPosisiAkhir] = useState(false);
   const [monthlyAccountSaldo, setMonthlyAccountSaldo] = useState<any[]>([]);
 
+  // Design System Standard States
+  const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedCategoryChip, setSelectedCategoryChip] = useState('all');
+  const [showRekeningBreakdown, setShowRekeningBreakdown] = useState(true);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
+  // Chart Series Toggles
+  const [chartSeries, setChartSeries] = useState({
+    masuk: true,
+    keluar: true,
+    saldo: true,
+  });
+
+  // Toasts
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const triggerToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message?: string) => {
+    const newId = Date.now().toString();
+    const newToast: ToastItem = { id: newId, type, title, message };
+    setToasts((prev) => [...prev, newToast]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== newId));
+    }, 4000);
+  };
+  const removeToast = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
   const tahunList = [2023, 2024, 2025, 2026, 2027];
 
-  // ────── FETCH dengan Pagination (atasi limit 1000 Supabase) ──────
+  // FETCH dengan Pagination
   const fetchAllPages = async (builder: any, pageSize = 1000) => {
     let allData: any[] = [];
     let from = 0;
@@ -146,7 +218,6 @@ export default function DashboardPage() {
       if (error) throw error;
       if (!data || data.length === 0) break;
       allData = [...allData, ...data];
-      // Jika data yang didapat kurang dari yang diminta, berarti sudah habis
       if (data.length < pageSize) break;
       from += pageSize;
     }
@@ -166,13 +237,19 @@ export default function DashboardPage() {
       setAllBank(bankData);
       setAllAkun(akunData);
       setAllRekening(rekData);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error(e);
+      triggerToast('error', 'Gagal Memuat Data', 'Terjadi kesalahan saat mengambil data dari database.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
-  // ────── COMPUTE ──────
+  // COMPUTE DATA
   useEffect(() => {
     if (loading) return;
     compute();
@@ -199,7 +276,6 @@ export default function DashboardPage() {
   };
 
   const compute = () => {
-    // ── BANK per rekening ──  
     const seen = new Set();
     const uniqueBank = allBank.filter(b => {
       const key = `${b.rekening_id}-${b.waktu_transaksi}-${b.noref_bank}-${b.debet}-${b.kredit}`;
@@ -211,12 +287,32 @@ export default function DashboardPage() {
     const bankBefore = filterBeforeYear(uniqueBank, 'waktu_transaksi');
     const bankYear   = filterByYear(uniqueBank, 'waktu_transaksi');
 
+    // 1. REKENING BANK & KAS KECIL MAP
     const rekMap: Record<string, any> = {};
     allRekening.forEach(r => {
       const idStr = String(r.id);
+      const namaBank = r.nama_bank || '';
+      const noRek = r.nomor_rekening || '';
+      const pemilik = r.nama_pemilik || '';
+
+      // Tampilkan Nama Bank dan No Rekening yang Jelas (Bukan "Rek-1")
+      let displayName = '';
+      if (namaBank && noRek) {
+        displayName = `${namaBank} - ${noRek}`;
+      } else if (namaBank) {
+        displayName = namaBank;
+      } else if (noRek) {
+        displayName = `No. Rek: ${noRek}`;
+      } else {
+        displayName = pemilik || `Rekening Bank #${r.id}`;
+      }
+
       rekMap[idStr] = { 
         id: r.id, 
-        nama: r.nama_rekening || r.nama || r.no_rekening || `Rek-${r.id}`, 
+        nama: displayName,
+        nama_bank: namaBank,
+        nomor_rekening: noRek,
+        nama_pemilik: pemilik,
         saldoAwal: 0, masuk: 0, keluar: 0 
       };
     });
@@ -224,7 +320,7 @@ export default function DashboardPage() {
     bankBefore.forEach(b => {
       const rId = String(b.rekening_id || 'unknown');
       if (!rekMap[rId]) {
-        rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
+        rekMap[rId] = { id: rId, nama: `Rekening #${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
       }
       rekMap[rId].saldoAwal += cleanNum(b.kredit) - cleanNum(b.debet);
     });
@@ -232,7 +328,7 @@ export default function DashboardPage() {
     bankYear.forEach(b => {
       const rId = String(b.rekening_id || 'unknown');
       if (!rekMap[rId]) {
-        rekMap[rId] = { id: rId, nama: `Rekening ID: ${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
+        rekMap[rId] = { id: rId, nama: `Rekening #${rId}`, saldoAwal: 0, masuk: 0, keluar: 0 };
       }
       rekMap[rId].masuk += cleanNum(b.kredit);
       rekMap[rId].keluar += cleanNum(b.debet);
@@ -241,7 +337,15 @@ export default function DashboardPage() {
     const trxYear = filterByYear(allTrx, 'tanggal');
     const trxBefore = filterBeforeYear(allTrx, 'tanggal');
 
-    const kasRek = { id: 'kas', nama: 'Kas Kecil - KK1', saldoAwal: 0, masuk: 0, keluar: 0 };
+    const kasRek = { 
+      id: 'kas', 
+      nama: 'Kas Kecil (Tunai)', 
+      nama_bank: 'Kas Tunai Masjid',
+      nomor_rekening: 'Operasional',
+      nama_pemilik: 'Takmir',
+      saldoAwal: 0, masuk: 0, keluar: 0 
+    };
+
     trxBefore.forEach(t => { 
       kasRek.saldoAwal += (Number(t.uang_masuk) || 0) - (Number(t.uang_keluar) || 0); 
     });
@@ -267,6 +371,7 @@ export default function DashboardPage() {
       saldoAkhir: total.saldoAwal + total.masuk - total.keluar,
     });
 
+    // 2. CHART BULANAN
     const monthlyData = BULAN.map((bln, idx) => {
       const m = idx + 1;
       const trxM = trxYear.filter(t => { const d = parseAnyDate(t.tanggal); return d && d.getMonth() + 1 === m; });
@@ -284,45 +389,65 @@ export default function DashboardPage() {
       return { ...m, saldo };
     });
     
-    // Hanya tampilkan sampai bulan terakhir yang ada mutasinya
     let lastActiveMonthIdx = -1;
     for (let i = 0; i < 12; i++) {
         if (cd[i].masuk > 0 || cd[i].keluar > 0) lastActiveMonthIdx = i;
     }
     const finalCd = lastActiveMonthIdx >= 0 ? cd.slice(0, lastActiveMonthIdx + 1) : (cd[0].saldo > 0 ? [cd[0]] : []);
-    
     setChartData(finalCd);
 
-    const akunMap: Record<string, any> = {};
-    allAkun.forEach(a => { akunMap[a.id] = a; });
+    // 3. TREE HIERARKI BAGAN AKUN STANDAR (COA) BERLAPIS:
+    // Induk (Level 1: 50000 Biaya) 
+    //   -> Golongan (Level 2: 51..., 52..., 53..., 54..., 55...)
+    //     -> Kelompok (Level 3: 51010, 51020, dst)
+    //       -> Detail / Anak (Level 4: 51010.01, 51010.02, dst)
 
     const indukMap: Record<string, any> = {};
     allAkun.forEach(a => {
       const no = String(a.nomor_akun);
       if (no.endsWith('0000') && !no.includes('.')) {
-        indukMap[no] = { ...a, kelompoks: {} };
+        indukMap[no] = { ...a, golongans: {} };
       }
     });
+
+    // Buat Golongan (2 Digit: 51, 52, 53, 41, 43, dsb) & Kelompok (5 digit tanpa titik)
     allAkun.forEach(a => {
       const no = String(a.nomor_akun);
-      if (!no.endsWith('0000') && !no.includes('.')) {
-        const parentKey = no[0] + '0000';
-        if (indukMap[parentKey]) {
-          indukMap[parentKey].kelompoks[no] = { ...a, anaks: [] };
-        }
+      if (no.endsWith('0000')) return;
+
+      const indukKey = no[0] + '0000';
+      if (!indukMap[indukKey]) return;
+
+      const golKey = no.substring(0, 2);
+      if (!indukMap[indukKey].golongans[golKey]) {
+        indukMap[indukKey].golongans[golKey] = {
+          id: `gol-${golKey}`,
+          nomor_akun: golKey,
+          nama_akun: GOLONGAN_NAMES[golKey] || `Kelompok ${golKey}`,
+          isGolongan: true,
+          kelompoks: {},
+        };
+      }
+
+      if (!no.includes('.')) {
+        indukMap[indukKey].golongans[golKey].kelompoks[no] = { ...a, anaks: [] };
       }
     });
+
+    // Masukkan Detail Anak (titik, contoh: 51010.01)
     allAkun.forEach(a => {
       const no = String(a.nomor_akun);
       if (no.includes('.')) {
-        const kelNo = no.split('.')[0];
-        const parentKey = kelNo[0] + '0000';
-        if (indukMap[parentKey]?.kelompoks[kelNo]) {
-          indukMap[parentKey].kelompoks[kelNo].anaks.push(a);
+        const indukKey = no[0] + '0000';
+        const golKey = no.substring(0, 2);
+        const kelKey = no.split('.')[0];
+        if (indukMap[indukKey]?.golongans[golKey]?.kelompoks[kelKey]) {
+          indukMap[indukKey].golongans[golKey].kelompoks[kelKey].anaks.push(a);
         }
       }
     });
 
+    // Total Nominal per Akun
     const trxAmt: Record<string, { masuk: number; keluar: number; ct: number }> = {};
     [...trxYear, ...bankYear].forEach((row: any) => {
       const aId = String(row.akun_id ?? '');
@@ -333,31 +458,7 @@ export default function DashboardPage() {
       trxAmt[aId].ct += 1;
     });
 
-    const result = Object.values(indukMap).map((induk: any) => {
-      const kels = Object.values(induk.kelompoks).map((kel: any) => {
-        const anaks = kel.anaks.map((anak: any) => {
-          const amt = trxAmt[String(anak.id)] || { masuk: 0, keluar: 0, ct: 0 };
-          return { ...anak, masuk: amt.masuk, keluar: amt.keluar, ct: amt.ct };
-        });
-        const kelTot = anaks.reduce((acc: any, a: any) => ({ masuk: acc.masuk + a.masuk, keluar: acc.keluar + a.keluar, ct: acc.ct + a.ct }), { masuk: 0, keluar: 0, ct: 0 });
-        const kelDirect = trxAmt[String(kel.id)] || { masuk: 0, keluar: 0, ct: 0 };
-        return {
-          ...kel, anaks,
-          masuk: kelTot.masuk + kelDirect.masuk,
-          keluar: kelTot.keluar + kelDirect.keluar,
-          ct: kelTot.ct + kelDirect.ct,
-        };
-      });
-      const indukTot = kels.reduce((acc: any, k: any) => ({ masuk: acc.masuk + k.masuk, keluar: acc.keluar + k.keluar, ct: acc.ct + k.ct }), { masuk: 0, keluar: 0, ct: 0 });
-      const indukDirect = trxAmt[String(induk.id)] || { masuk: 0, keluar: 0, ct: 0 };
-      return {
-        ...induk, kelompoks: kels,
-        masuk: indukTot.masuk + indukDirect.masuk,
-        keluar: indukTot.keluar + indukDirect.keluar,
-        ct: indukTot.ct + indukDirect.ct,
-      };
-    }).filter((i: any) => i.masuk + i.keluar > 0 || i.ct > 0);
-
+    // Total Bulanan per Akun
     const monthlyTrxAmt: Record<string, Record<number, { masuk: number; keluar: number }>> = {};
     [...trxYear, ...bankYear].forEach((row: any) => {
       const aId = String(row.akun_id ?? '');
@@ -388,21 +489,65 @@ export default function DashboardPage() {
       return mt;
     };
 
-    const finalTree = result.map((induk: any) => {
+    // Rollup Akun 4 Tingkat
+    const result = Object.values(indukMap).map((induk: any) => {
       const indukIdSet = new Set<string>([String(induk.id)]);
-      const kels = induk.kelompoks.map((kel: any) => {
-        const kelIdSet = new Set<string>([String(kel.id)]);
-        const anaks = kel.anaks.map((anak: any) => {
-          const anakIdSet = new Set<string>([String(anak.id)]);
-          kelIdSet.add(String(anak.id));
-          indukIdSet.add(String(anak.id));
-          return { ...anak, monthTotals: getMonthTotals(anakIdSet) };
-        });
-        indukIdSet.add(String(kel.id));
-        return { ...kel, anaks, monthTotals: getMonthTotals(kelIdSet) };
-      });
-      return { ...induk, kelompoks: kels, monthTotals: getMonthTotals(indukIdSet) };
-    });
+
+      const gols = Object.values(induk.golongans).map((gol: any) => {
+        const golIdSet = new Set<string>();
+
+        const kels = Object.values(gol.kelompoks).map((kel: any) => {
+          const kelIdSet = new Set<string>([String(kel.id)]);
+
+          const anaks = (kel.anaks || []).map((anak: any) => {
+            const anakIdSet = new Set<string>([String(anak.id)]);
+            kelIdSet.add(String(anak.id));
+            golIdSet.add(String(anak.id));
+            indukIdSet.add(String(anak.id));
+            const amt = trxAmt[String(anak.id)] || { masuk: 0, keluar: 0, ct: 0 };
+            return { ...anak, masuk: amt.masuk, keluar: amt.keluar, ct: amt.ct, monthTotals: getMonthTotals(anakIdSet) };
+          });
+
+          golIdSet.add(String(kel.id));
+          indukIdSet.add(String(kel.id));
+
+          const kelTot = anaks.reduce((acc: any, a: any) => ({ masuk: acc.masuk + a.masuk, keluar: acc.keluar + a.keluar, ct: acc.ct + a.ct }), { masuk: 0, keluar: 0, ct: 0 });
+          const kelDirect = trxAmt[String(kel.id)] || { masuk: 0, keluar: 0, ct: 0 };
+
+          return {
+            ...kel,
+            anaks,
+            masuk: kelTot.masuk + kelDirect.masuk,
+            keluar: kelTot.keluar + kelDirect.keluar,
+            ct: kelTot.ct + kelDirect.ct,
+            monthTotals: getMonthTotals(kelIdSet),
+          };
+        }).filter((k: any) => k.masuk + k.keluar > 0 || k.ct > 0);
+
+        const golTot = kels.reduce((acc: any, k: any) => ({ masuk: acc.masuk + k.masuk, keluar: acc.keluar + k.keluar, ct: acc.ct + k.ct }), { masuk: 0, keluar: 0, ct: 0 });
+
+        return {
+          ...gol,
+          kelompoks: kels,
+          masuk: golTot.masuk,
+          keluar: golTot.keluar,
+          ct: golTot.ct,
+          monthTotals: getMonthTotals(golIdSet),
+        };
+      }).filter((g: any) => g.masuk + g.keluar > 0 || g.ct > 0);
+
+      const indukTot = gols.reduce((acc: any, g: any) => ({ masuk: acc.masuk + g.masuk, keluar: acc.keluar + g.keluar, ct: acc.ct + g.ct }), { masuk: 0, keluar: 0, ct: 0 });
+      const indukDirect = trxAmt[String(induk.id)] || { masuk: 0, keluar: 0, ct: 0 };
+
+      return {
+        ...induk,
+        golongans: gols,
+        masuk: indukTot.masuk + indukDirect.masuk,
+        keluar: indukTot.keluar + indukDirect.keluar,
+        ct: indukTot.ct + indukDirect.ct,
+        monthTotals: getMonthTotals(indukIdSet),
+      };
+    }).filter((i: any) => i.masuk + i.keluar > 0 || i.ct > 0);
 
     const accRunning: any[] = rekList.map(r => {
       const perMonth: Record<number, number> = {};
@@ -426,12 +571,39 @@ export default function DashboardPage() {
     });
 
     setMonthlyAccountSaldo(accRunning);
-    setCoaMonthTable(finalTree);
-    setCoaTree(finalTree);
+    setCoaMonthTable(result);
   };
 
-  const toggleCoa = (id: string) => setExpandedCoa(p => ({ ...p, [id]: !p[id] }));
-  const toggleKel = (id: string) => setExpandedKel(p => ({ ...p, [id]: !p[id] }));
+  const toggleCoa = (id: string) => setExpandedCoa(p => ({ ...p, [id]: p[id] !== undefined ? !p[id] : !(hierarchyLevel >= 2) }));
+  const toggleGol = (id: string) => setExpandedGol(p => ({ ...p, [id]: p[id] !== undefined ? !p[id] : !(hierarchyLevel >= 3) }));
+  const toggleKel = (id: string) => setExpandedKel(p => ({ ...p, [id]: p[id] !== undefined ? !p[id] : !(hierarchyLevel >= 4) }));
+
+  // Expand / Collapse Bertingkat Sesuai Standar Template Design System Tab 08
+  const setHierarchyTo = (lvl: number) => {
+    setHierarchyLevel(lvl);
+    const nextCoa: Record<string, boolean> = {};
+    const nextGol: Record<string, boolean> = {};
+    const nextKel: Record<string, boolean> = {};
+    coaMonthTable.forEach((induk: any) => {
+      nextCoa[induk.id] = lvl >= 2;
+      (induk.golongans || []).forEach((gol: any) => {
+        nextGol[gol.id] = lvl >= 3;
+        (gol.kelompoks || []).forEach((kel: any) => {
+          nextKel[kel.id] = lvl >= 4;
+        });
+      });
+    });
+    setExpandedCoa(nextCoa);
+    setExpandedGol(nextGol);
+    setExpandedKel(nextKel);
+    if (lvl === 1) {
+      setExpandPosisiAwal(false);
+      setExpandPosisiAkhir(false);
+    }
+  };
+
+  const handleExpandAll = () => setHierarchyTo(4);
+  const handleCollapseAll = () => setHierarchyTo(1);
 
   const yFmt = (v: number) => {
     if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}M`;
@@ -439,419 +611,1239 @@ export default function DashboardPage() {
     return `${(v / 1e3).toFixed(0)}rb`;
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 size={48} className="animate-spin text-indigo-500" />
-    </div>
-  );
+  // Active Month Indices
+  const activeMonthIdx = useMemo(() => {
+    return BULAN.map((_, i) => i + 1).filter(m => {
+      return coaMonthTable.some(row => (row.monthTotals[m]?.masuk || 0) + (row.monthTotals[m]?.keluar || 0) > 0);
+    });
+  }, [coaMonthTable]);
+
+  // Filtered COA Month Table (Search & Quick Category Chips)
+  const filteredCoaMonthTable = useMemo(() => {
+    let list = coaMonthTable;
+    
+    // Quick filter category
+    if (selectedCategoryChip === '4') {
+      list = list.filter(induk => String(induk.nomor_akun).startsWith('4'));
+    } else if (selectedCategoryChip === '5') {
+      list = list.filter(induk => String(induk.nomor_akun).startsWith('5'));
+    } else if (selectedCategoryChip === '1') {
+      list = list.filter(induk => String(induk.nomor_akun).startsWith('1'));
+    } else if (selectedCategoryChip === '9') {
+      list = list.filter(induk => String(induk.nomor_akun).startsWith('9') || induk.nama_akun?.toLowerCase().includes('koreksi'));
+    }
+
+    // Search filter
+    if (!searchKeyword.trim()) return list;
+
+    const kw = searchKeyword.toLowerCase();
+    return list.map(induk => {
+      const indukMatch = induk.nama_akun?.toLowerCase().includes(kw) || String(induk.nomor_akun).toLowerCase().includes(kw);
+
+      const matchingGols = (induk.golongans || []).map((gol: any) => {
+        const golMatch = gol.nama_akun?.toLowerCase().includes(kw) || String(gol.nomor_akun).toLowerCase().includes(kw);
+
+        const matchingKels = (gol.kelompoks || []).map((kel: any) => {
+          const kelMatch = kel.nama_akun?.toLowerCase().includes(kw) || String(kel.nomor_akun).toLowerCase().includes(kw);
+          const matchingAnaks = (kel.anaks || []).filter((anak: any) => 
+            anak.nama_akun?.toLowerCase().includes(kw) || String(anak.nomor_akun).toLowerCase().includes(kw)
+          );
+          if (kelMatch || matchingAnaks.length > 0) {
+            return { ...kel, anaks: matchingAnaks.length > 0 ? matchingAnaks : kel.anaks };
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (golMatch || matchingKels.length > 0) {
+          return { ...gol, kelompoks: matchingKels.length > 0 ? matchingKels : gol.kelompoks };
+        }
+        return null;
+      }).filter(Boolean);
+
+      if (indukMatch || matchingGols.length > 0) {
+        return { ...induk, golongans: matchingGols.length > 0 ? matchingGols : induk.golongans };
+      }
+      return null;
+    }).filter(Boolean);
+  }, [coaMonthTable, selectedCategoryChip, searchKeyword]);
+
+  // Real Excel (.xlsx) Export Handler
+  const handleExportExcel = () => {
+    try {
+      setIsExportingExcel(true);
+      const exportRows: any[] = [];
+      
+      // 1. Baris Posisi Awal
+      const awalRow: any = {
+        'Kode Akun': '-',
+        'Nama Akun / Uraian': 'TOTAL POSISI AWAL',
+        'Tingkat': 'Summary',
+        'Saldo Awal': summary.saldoAwal,
+      };
+      activeMonthIdx.forEach(m => {
+        const prevM = m - 1;
+        const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
+        awalRow[BULAN[m - 1]] = val;
+      });
+      awalRow['Saldo Akhir'] = summary.saldoAwal;
+      exportRows.push(awalRow);
+
+      // 2. Baris Hierarki Akun (Induk -> Golongan -> Kelompok -> Detail)
+      coaMonthTable.forEach((induk: any) => {
+        const indukRow: any = {
+          'Kode Akun': induk.nomor_akun,
+          'Nama Akun / Uraian': induk.nama_akun,
+          'Tingkat': 'Induk Utama',
+          'Saldo Awal': induk.saldoAwal || 0,
+        };
+        activeMonthIdx.forEach(m => {
+          const val = induk.monthTotals[m] || { masuk: 0, keluar: 0 };
+          indukRow[BULAN[m - 1]] = val.masuk - val.keluar;
+        });
+        indukRow['Saldo Akhir'] = induk.masuk - induk.keluar;
+        exportRows.push(indukRow);
+
+        (induk.golongans || []).forEach((gol: any) => {
+          const golRow: any = {
+            'Kode Akun': `  ${gol.nomor_akun}`,
+            'Nama Akun / Uraian': `  ${gol.nama_akun}`,
+            'Tingkat': 'Golongan',
+            'Saldo Awal': 0,
+          };
+          activeMonthIdx.forEach(m => {
+            const val = gol.monthTotals[m] || { masuk: 0, keluar: 0 };
+            golRow[BULAN[m - 1]] = val.masuk - val.keluar;
+          });
+          golRow['Saldo Akhir'] = gol.masuk - gol.keluar;
+          exportRows.push(golRow);
+
+          (gol.kelompoks || []).forEach((kel: any) => {
+            const kelRow: any = {
+              'Kode Akun': `    ${kel.nomor_akun}`,
+              'Nama Akun / Uraian': `    ${kel.nama_akun}`,
+              'Tingkat': 'Kelompok',
+              'Saldo Awal': 0,
+            };
+            activeMonthIdx.forEach(m => {
+              const val = kel.monthTotals[m] || { masuk: 0, keluar: 0 };
+              kelRow[BULAN[m - 1]] = val.masuk - val.keluar;
+            });
+            kelRow['Saldo Akhir'] = kel.masuk - kel.keluar;
+            exportRows.push(kelRow);
+
+            (kel.anaks || []).forEach((anak: any) => {
+              const anakRow: any = {
+                'Kode Akun': `      ${anak.nomor_akun}`,
+                'Nama Akun / Uraian': `      ${anak.nama_akun}`,
+                'Tingkat': 'Detail',
+                'Saldo Awal': 0,
+              };
+              activeMonthIdx.forEach(m => {
+                const val = anak.monthTotals[m] || { masuk: 0, keluar: 0 };
+                anakRow[BULAN[m - 1]] = val.masuk - val.keluar;
+              });
+              anakRow['Saldo Akhir'] = anak.masuk - anak.keluar;
+              exportRows.push(anakRow);
+            });
+          });
+        });
+      });
+
+      // 3. Baris Posisi Akhir
+      const akhirRow: any = {
+        'Kode Akun': '-',
+        'Nama Akun / Uraian': 'TOTAL POSISI AKHIR',
+        'Tingkat': 'Summary',
+        'Saldo Awal': '-',
+      };
+      activeMonthIdx.forEach(m => {
+        akhirRow[BULAN[m - 1]] = chartData[m - 1]?.saldo || 0;
+      });
+      akhirRow['Saldo Akhir'] = summary.saldoAkhir;
+      exportRows.push(akhirRow);
+
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `Dashboard_${tahun}`);
+      XLSX.writeFile(workbook, `Laporan_Dashboard_Konsolidasi_${tahun}.xlsx`);
+      triggerToast('success', 'Export Excel Berhasil', `File Laporan_Dashboard_Konsolidasi_${tahun}.xlsx telah diunduh.`);
+    } catch (err: any) {
+      triggerToast('error', 'Export Gagal', err.message || 'Terjadi gangguan saat membuat berkas Excel.');
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Surplus / Defisit Bersih
+  const netSurplus = summary.masuk - summary.keluar;
+  const avgMasuk = Math.round(summary.masuk / Math.max(1, activeMonthIdx.length));
+  const avgKeluar = Math.round(summary.keluar / Math.max(1, activeMonthIdx.length));
+
+  // Render Shimmer Skeleton State jika masih memuat data
+  if (loading) {
+    return (
+      <div className="space-y-4 pb-16">
+        <PageHeader
+          title="Dashboard Keuangan & Konsolidasi"
+          subtitle="Memuat ringkasan kas, mutasi rekening bank, dan buku besar..."
+          icon={BarChart2}
+          breadcrumbs={[
+            { label: 'Beranda', href: '/dashboard' },
+            { label: 'Dashboard Konsolidasi' },
+          ]}
+          badge={{ text: `Tahun Anggaran ${tahun}`, variant: 'purple' }}
+        />
+        <SkeletonTable rows={8} columns={10} showStatCards={true} statCardCount={4} />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
-      {/* FORCE LANDSCAPE & STYLING KHUSUS CETAK PDF */}
+    <div className="space-y-4 pb-20 font-sans text-gray-900 dark:text-slate-100">
+      {/* Toast Notification Container */}
+      <ToastNotification toasts={toasts} onDismiss={removeToast} position="top-right" />
+
+      {/* FORCE LANDSCAPE & STYLING CETAK PDF TANPA TERPOTONG */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          @page { size: landscape; margin: 10mm; }
+          @page { 
+            size: landscape; 
+            margin: 6mm 4mm; 
+          }
 
-          /* PAKSA BROWSER MENCETAK WARNA BACKGROUND */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
+            box-sizing: border-box !important;
           }
-          
-          /* Kartu Summary Cetak (Ramping & Seragam) */
+
+          body, html {
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+          }
+
+          .print:hidden, nav, header, aside, .sticky, button {
+            display: none !important;
+          }
+
           .print-card-container {
              display: flex !important;
-             gap: 20px !important;
-             margin-bottom: 20px !important;
+             gap: 12px !important;
+             margin-bottom: 16px !important;
           }
+
           .print-card {
              flex: 1;
              border: 1px solid #64748b !important;
              background-color: #ffffff !important;
-             padding: 8px 12px !important;
-             border-radius: 0 !important;
+             padding: 6px 10px !important;
+             border-radius: 4px !important;
              box-shadow: none !important;
              color: #000000 !important;
              min-height: auto !important;
           }
+
           .print-card * {
              color: #000000 !important;
              opacity: 1 !important;
              text-shadow: none !important;
              box-shadow: none !important;
           }
-          .print-card .absolute { display: none !important; }
-          .print-card .text-[10px] { font-size: 11px !important; margin-bottom: 4px !important; }
-          .print-card h4 { font-size: 16px !important; font-weight: bold !important; margin-top: 0 !important; }
-          .print-card .mt-4 { display: none !important; }
-          
-          /* Sembunyikan kolom Saldo Awal (Kolom ke-2) */
-          table th:nth-child(2), table td:nth-child(2) {
-             display: none !important;
+
+          /* Sembunyikan elemen web yang tidak perlu */
+          svg.lucide-chevron-right, svg.lucide-chevron-down { display: none !important; }
+          .overflow-x-auto { overflow: visible !important; }
+
+          /* TABEL CETAK PAS 100% KERTAS LANDSCAPE AGAR BULAN TIDAK TERPOTONG */
+          table { 
+            width: 100% !important; 
+            max-width: 100% !important;
+            table-layout: fixed !important; 
+            border-collapse: collapse !important; 
           }
-          
-          /* Tema Kertas Resmi (Hilangkan efek gelap/Web, buat ringkas) */
-          table { width: 100%; border-collapse: collapse !important; }
+
           table tr { background-color: transparent !important; }
+
           th, td { 
-             border: 1px solid #64748b !important;
+             border: 0.5px solid #64748b !important;
              color: #000000 !important; 
              background-color: #ffffff !important; 
              box-shadow: none !important;
-             padding: 4px 6px !important;
-             font-size: 10px !important;
-             line-height: 1.2 !important;
+             padding: 3px 2px !important;
+             font-size: 7.5px !important;
+             line-height: 1.15 !important;
              opacity: 1 !important;
+             min-width: 0 !important;
+             word-break: break-all !important;
+             white-space: normal !important;
           }
+
           th { 
-             background-color: #e2e8f0 !important;
+             background-color: #e2e8f0 !important; 
              font-weight: 900 !important; 
              text-align: center !important;
+             font-size: 8px !important;
+          }
+
+          /* Kolom 1 (Akun Hirarki) proporsi 22% */
+          table th:first-child, table td:first-child {
+             width: 22% !important;
+             max-width: 22% !important;
+             text-align: left !important;
+             padding-left: 4px !important;
+             font-size: 8px !important;
+             overflow: hidden !important;
+             text-overflow: ellipsis !important;
+          }
+
+          /* Sembunyikan Saldo Awal di tabel mutasi agar 12 bulan tidak terpotong */
+          table th:nth-child(2), table td:nth-child(2) {
+             display: none !important;
+          }
+
+          /* Kolom 12 Bulan Rata ~5.8% masing-masing */
+          table th:not(:first-child):not(:last-child), table td:not(:first-child):not(:last-child) {
+             width: 5.8% !important;
+             text-align: right !important;
+             font-size: 7px !important;
+             padding: 2.5px 1.5px !important;
+          }
+
+          /* Kolom Total Setahun ~8.4% */
+          table th:last-child, table td:last-child {
+             width: 8.4% !important;
+             text-align: right !important;
+             font-weight: bold !important;
+             font-size: 7.5px !important;
           }
           
-          /* PENERIMAAN (4xxxx) */
+          /* WARNA CETAK KHUSUS SESUAI COA */
           tr.print-induk-masuk td {
              background-color: #bbf7d0 !important;
              font-weight: bold !important;
              color: #000000 !important;
           }
-          tr.print-kel-masuk td {
+          tr.print-gol-masuk td {
              background-color: #dcfce7 !important;
+             font-weight: 700 !important;
+             color: #000000 !important;
+          }
+          tr.print-kel-masuk td {
+             background-color: #f0fdf4 !important;
              font-weight: 600 !important;
              color: #000000 !important;
           }
 
-          /* PENGELUARAN (5xxxx) */
           tr.print-induk-keluar td {
              background-color: #fecaca !important;
              font-weight: bold !important;
              color: #000000 !important;
           }
-          tr.print-kel-keluar td {
+          tr.print-gol-keluar td {
              background-color: #fee2e2 !important;
+             font-weight: 700 !important;
+             color: #000000 !important;
+          }
+          tr.print-kel-keluar td {
+             background-color: #fff1f2 !important;
              font-weight: 600 !important;
              color: #000000 !important;
           }
           
-          /* DEFAULT / LAINNYA */
           tr.print-induk td {
              background-color: #e2e8f0 !important; 
              font-weight: bold !important;
              color: #000000 !important;
           }
-          tr.print-kel td {
+          tr.print-gol td {
              background-color: #f1f5f9 !important; 
+             font-weight: 700 !important;
+             color: #000000 !important;
+          }
+          tr.print-kel td {
+             background-color: #f8fafc !important; 
              font-weight: 600 !important;
              color: #000000 !important;
           }
           
-          /* Baris Anak/Detail dibiarkan putih polos */
           tr.print-anak td {
              background-color: #ffffff !important; 
              font-weight: normal !important;
           }
-          
-          /* Hilangkan elemen web yang tidak perlu di kertas */
-          svg.lucide-chevron-right, svg.lucide-chevron-down { display: none !important; }
-          .sticky { position: static !important; }
-          
-          .text-white, .text-sky-100, .text-sky-200, .text-sky-300, .text-sky-400, .text-cyan-200, .text-cyan-400 {
-             color: #000000 !important;
-          }
-          
+
           .print-expand { display: table-row !important; }
         }
       `}} />
 
-      {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
-            <BarChart2 size={20} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">
-                Dashboard Keuangan Masjid
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                Tahun {tahun}
-              </span>
-            </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">
-              Konsolidasi transaksi kas masjid & mutasi bank secara interaktif.
-            </p>
-          </div>
-        </div>
+      {/* 1. STANDARD PAGE HEADER (Design System Baku) */}
+      <div className="print:hidden">
+        <PageHeader
+          title="Dashboard Keuangan & Konsolidasi"
+          subtitle="Konsolidasi transaksi kas masjid, mutasi rekening bank, dan pembukuan akun secara interaktif"
+          icon={BarChart2}
+          breadcrumbs={[
+            { label: 'Beranda', href: '/dashboard' },
+            { label: 'Dashboard Konsolidasi' },
+          ]}
+          badge={{ text: `Tahun Anggaran ${tahun}`, variant: 'purple' }}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Year Filter Pill */}
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 h-8 sm:h-9 shadow-2xs">
+                <Filter size={13} className="text-slate-400 dark:text-slate-500" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tahun:</span>
+                <select
+                  value={tahun}
+                  onChange={e => {
+                    const newYr = Number(e.target.value);
+                    setTahun(newYr);
+                    triggerToast('info', 'Periode Berubah', `Memuat data konsolidasi tahun ${newYr}`);
+                  }}
+                  className="bg-transparent text-slate-900 dark:text-slate-100 font-bold text-xs outline-none cursor-pointer"
+                >
+                  {tahunList.map(y => (
+                    <option key={y} value={y} className="text-slate-900 bg-white dark:bg-slate-800">
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
-            <Filter size={13} className="text-gray-400" />
-            <select
-              value={tahun}
-              onChange={e => setTahun(Number(e.target.value))}
-              className="bg-transparent text-gray-800 font-bold text-xs outline-none cursor-pointer"
-            >
-              {tahunList.map(y => <option key={y} value={y} className="text-gray-900">{y}</option>)}
-            </select>
-          </div>
-          <button 
-            onClick={() => window.print()} 
-            className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
-          >
-            <Printer size={13} />
-            <span>Cetak PDF</span>
-          </button>
-        </div>
+              {/* Refresh Button */}
+              <button
+                type="button"
+                onClick={fetchAll}
+                title="Muat Ulang Data Server"
+                className="h-8 sm:h-9 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center justify-center"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin text-blue-600' : ''} />
+              </button>
+
+              {/* Export Buttons */}
+              <ExportButtons
+                onExportExcel={handleExportExcel}
+                onExportPdf={() => window.print()}
+                isExportingExcel={isExportingExcel}
+                excelLabel="Unduh Excel"
+                pdfLabel="Cetak PDF"
+                size="sm"
+              />
+            </div>
+          }
+        />
       </div>
 
       {/* HEADER KHUSUS CETAK PDF */}
-      <div className="hidden print:block text-center mb-8 border-b-2 border-black pb-4">
-          <h1 className="text-3xl font-black tracking-widest uppercase">Laporan Dashboard Konsolidasi</h1>
-          <p className="font-bold text-gray-700 mt-2">Periode Data: Tahun {tahun}</p>
+      <div className="hidden print:block text-center mb-6 border-b-2 border-black pb-3">
+        <h1 className="text-2xl font-black tracking-widest uppercase">Laporan Konsolidasi Kas & Bank Masjid</h1>
+        <p className="font-bold text-gray-700 text-xs mt-1">Tahun Anggaran: {tahun} | Dicetak: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       </div>
 
-      {/* SUMMARY CARDS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print:flex print-card-container">
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Saldo Awal</p>
-            <p className="text-lg font-black text-gray-900 leading-none">Rp {fmt(summary.saldoAwal).split(',')[0]}</p>
-            <p className="text-[10px] text-gray-500 font-semibold">1 Januari {tahun}</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-slate-50 text-slate-600">
-            <Wallet size={18} />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Total Uang Masuk</p>
-            <p className="text-lg font-black text-emerald-700 leading-none">Rp {fmt(summary.masuk).split(',')[0]}</p>
-            <p className="text-[10px] text-gray-500 font-semibold">Penerimaan & Infaq</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
-            <TrendingDown size={18} />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase text-rose-600 tracking-wider">Total Uang Keluar</p>
-            <p className="text-lg font-black text-rose-700 leading-none">Rp {fmt(summary.keluar).split(',')[0]}</p>
-            <p className="text-[10px] text-gray-500 font-semibold">Pengeluaran & Belanja</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600">
-            <TrendingUp size={18} />
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black uppercase text-sky-600 tracking-wider">Saldo Akhir</p>
-            <p className="text-lg font-black text-sky-700 leading-none">Rp {fmt(summary.saldoAkhir).split(',')[0]}</p>
-            <p className="text-[10px] text-gray-500 font-semibold">Sisa Dana Kas + Bank</p>
-          </div>
-          <div className="p-2.5 rounded-xl bg-sky-50 text-sky-600">
-            <PiggyBank size={18} />
-          </div>
-        </div>
+      {/* 2. STAT CARDS GRID (Design System Baku: 4 Kolom, Ketahanan Likuiditas Ditiadakan) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 print:flex print-card-container">
+        <StatCard
+          title="TOTAL SALDO AWAL"
+          value={`Rp ${fmt(summary.saldoAwal)}`}
+          subtitle={`Posisi per 1 Januari ${tahun}`}
+          icon={Wallet}
+          variant="indigo"
+          lightBg={true}
+        />
+        <StatCard
+          title="TOTAL PENERIMAAN"
+          value={`Rp ${fmt(summary.masuk)}`}
+          subtitle="Infaq, Donasi & Mutasi Bank"
+          icon={TrendingDown}
+          variant="emerald"
+          trend={{ value: 'Penerimaan', isUp: true, isGood: true }}
+          lightBg={true}
+        />
+        <StatCard
+          title="TOTAL PENGELUARAN"
+          value={`Rp ${fmt(summary.keluar)}`}
+          subtitle="Operasional, Belanja & Mutasi"
+          icon={TrendingUp}
+          variant="rose"
+          trend={{ value: 'Pengeluaran', isUp: false, isGood: false }}
+          lightBg={true}
+        />
+        <StatCard
+          title="POSISI SALDO AKHIR"
+          value={`Rp ${fmt(summary.saldoAkhir)}`}
+          subtitle="Total Kas Kecil + Rekening Bank"
+          icon={PiggyBank}
+          variant="blue"
+          lightBg={true}
+        />
       </div>
 
-      {/* CHART BULANAN */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 md:p-6">
-        <div className="flex items-center justify-between mb-6">
+      {/* 3. RINCIAN LIKUIDITAS REKENING BANK & KAS KECIL (Nama Bank & No Rek Lengkap) */}
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-4 md:p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs print:hidden space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Building2 size={16} className="text-blue-600 dark:text-blue-400" />
+            <h3 className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+              Rincian Likuiditas Rekening Bank & Kas Kecil
+            </h3>
+            <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[10px] font-bold">
+              {perRekening.length} Kantong Dana
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowRekeningBreakdown(!showRekeningBreakdown)}
+            className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <span>{showRekeningBreakdown ? 'Sembunyikan Rincian' : 'Tampilkan Rincian'}</span>
+            {showRekeningBreakdown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
+        </div>
+
+        {showRekeningBreakdown && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pt-1">
+            {perRekening.map((rek) => {
+              const rekSaldoAkhir = rek.saldoAwal + rek.masuk - rek.keluar;
+              const isKas = rek.id === 'kas';
+
+              return (
+                <div
+                  key={rek.id}
+                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/60 hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xs transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate pr-2">
+                      {isKas ? (
+                        <Wallet size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      ) : (
+                        <CreditCard size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      )}
+                      <div className="truncate">
+                        <span className="text-xs font-black text-gray-900 dark:text-slate-100 block truncate" title={rek.nama}>
+                          {rek.nama_bank || rek.nama}
+                        </span>
+                        {rek.nomor_rekening && (
+                          <span className="text-[10px] text-gray-500 dark:text-slate-400 font-mono block">
+                            No. Rek: {rek.nomor_rekening}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ${
+                      isKas 
+                        ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800' 
+                        : 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                    }`}>
+                      {isKas ? 'Kas Tunai' : 'Bank'}
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1 text-[11px] font-mono">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Saldo Awal:</span>
+                      <span>Rp {fmt(rek.saldoAwal)}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>+ Masuk:</span>
+                      <span>Rp {fmt(rek.masuk)}</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                      <span>- Keluar:</span>
+                      <span>Rp {fmt(rek.keluar)}</span>
+                    </div>
+                    <div className="flex justify-between font-black text-gray-900 dark:text-slate-100 pt-1.5 border-t border-slate-200/80 dark:border-slate-700/80">
+                      <span>Saldo Akhir:</span>
+                      <span className={rekSaldoAkhir >= 0 ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-rose-600 dark:text-rose-400 font-bold'}>
+                        Rp {fmt(rekSaldoAkhir)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. GRAFIK TREN ARUS KAS BULANAN (DIPERCANTIK: GLOW AREA + KPI SUMMARY + MODERN BAR) */}
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-2xl shadow-2xs border border-gray-200/90 dark:border-slate-800 p-5 md:p-6 space-y-4 print:hidden">
+        {/* Top Header of Chart */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-slate-800">
           <div>
-            <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider">Tren Arus Kas Bulanan</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">Pergerakan Saldo dan Surplus per Bulan</p>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
+                <Activity size={16} />
+              </div>
+              <h3 className="font-black text-gray-900 dark:text-slate-100 text-sm uppercase tracking-wider">
+                Tren Arus Kas Bulanan (Tahun {tahun})
+              </h3>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+              Visualisasi dinamika mutasi uang masuk, belanja keluar, serta saldo kas berjalan
+            </p>
+          </div>
+
+          {/* Quick Metrics KPI Bar */}
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            {/* Net Surplus / Defisit Badge */}
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border shadow-2xs ${
+              netSurplus >= 0
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+            }`}>
+              {netSurplus >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              <span>Net {netSurplus >= 0 ? 'Surplus' : 'Defisit'}: Rp {fmt(Math.abs(netSurplus))}</span>
+            </div>
+
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              <span className="text-slate-400">Rata-rata Masuk:</span>
+              <strong className="text-emerald-600 dark:text-emerald-400 font-mono">Rp {fmt(avgMasuk)}/bln</strong>
+            </div>
+
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              <span className="text-slate-400">Rata-rata Keluar:</span>
+              <strong className="text-rose-600 dark:text-rose-400 font-mono">Rp {fmt(avgKeluar)}/bln</strong>
+            </div>
+
+            {/* Series Toggles (Modern Pills) */}
+            <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-slate-800 p-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+              <label className="flex items-center gap-1.5 cursor-pointer text-emerald-700 dark:text-emerald-400 hover:opacity-80 transition-opacity">
+                <input
+                  type="checkbox"
+                  checked={chartSeries.masuk}
+                  onChange={(e) => setChartSeries({ ...chartSeries, masuk: e.target.checked })}
+                  className="rounded text-emerald-600 focus:ring-0"
+                />
+                <span>Uang Masuk</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer text-rose-700 dark:text-rose-400 hover:opacity-80 transition-opacity">
+                <input
+                  type="checkbox"
+                  checked={chartSeries.keluar}
+                  onChange={(e) => setChartSeries({ ...chartSeries, keluar: e.target.checked })}
+                  className="rounded text-rose-600 focus:ring-0"
+                />
+                <span>Uang Keluar</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer text-indigo-700 dark:text-indigo-400 hover:opacity-80 transition-opacity">
+                <input
+                  type="checkbox"
+                  checked={chartSeries.saldo}
+                  onChange={(e) => setChartSeries({ ...chartSeries, saldo: e.target.checked })}
+                  className="rounded text-indigo-600 focus:ring-0"
+                />
+                <span>Saldo</span>
+              </label>
+            </div>
           </div>
         </div>
-        <div className="h-[400px]">
+
+        {/* Recharts Canvas */}
+        <div className="h-[380px] w-full pt-1">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }} barGap={8}>
-              <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="#f1f5f9" />
+            <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 10 }} barGap={8}>
+              <defs>
+                {/* Glow Area untuk Saldo Berjalan */}
+                <linearGradient id="saldoGlowArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                  <stop offset="60%" stopColor="#818cf8" stopOpacity={0.08} />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.0} />
+                </linearGradient>
+
+                {/* Rounded Bar Gradient Masuk */}
+                <linearGradient id="masukBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                </linearGradient>
+
+                {/* Rounded Bar Gradient Keluar */}
+                <linearGradient id="keluarBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f43f5e" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#e11d48" stopOpacity={0.8} />
+                </linearGradient>
+              </defs>
+
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" opacity={0.6} />
+
               <XAxis 
                 dataKey="bln" 
-                tick={{ fontSize: 13, fontWeight: 800, fill: '#64748b' }} 
+                tick={{ fontSize: 12, fontWeight: 800, fill: '#64748b' }} 
                 axisLine={false}
                 tickLine={false}
-                dy={10}
+                dy={8}
               />
+
               <YAxis 
                 tickFormatter={yFmt} 
                 tick={{ fontSize: 11, fontWeight: 600, fill: '#94a3b8' }} 
                 axisLine={false}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: 12, fontWeight: 700, paddingBottom: 20 }} />
-              <Bar dataKey="masuk" name="Masuk" fill="#34d399" radius={[6, 6, 0, 0]} barSize={24} />
-              <Bar dataKey="keluar" name="Keluar" fill="#f87171" radius={[6, 6, 0, 0]} barSize={24} />
-              <Line 
-                type="monotone" 
-                dataKey="saldo" 
-                name="Saldo Berjalan" 
-                stroke="#6366f1" 
-                strokeWidth={5} 
-                dot={{ r: 7, fill: '#6366f1', strokeWidth: 4, stroke: '#fff' }} 
+
+              <Tooltip content={<CustomChartTooltip />} />
+
+              <Legend 
+                verticalAlign="top" 
+                height={36} 
+                wrapperStyle={{ fontSize: 12, fontWeight: 700, paddingBottom: 15 }} 
               />
+
+              {/* Area Saldo Berjalan (Glow Bawah) */}
+              {chartSeries.saldo && (
+                <Area 
+                  type="monotone" 
+                  dataKey="saldo" 
+                  fill="url(#saldoGlowArea)" 
+                  stroke="none" 
+                  isAnimationActive={true}
+                />
+              )}
+
+              {/* Bar Masuk */}
+              {chartSeries.masuk && (
+                <Bar 
+                  dataKey="masuk" 
+                  name="Uang Masuk" 
+                  fill="url(#masukBarGradient)" 
+                  radius={[8, 8, 2, 2]} 
+                  barSize={20} 
+                  isAnimationActive={true}
+                />
+              )}
+
+              {/* Bar Keluar */}
+              {chartSeries.keluar && (
+                <Bar 
+                  dataKey="keluar" 
+                  name="Uang Keluar" 
+                  fill="url(#keluarBarGradient)" 
+                  radius={[8, 8, 2, 2]} 
+                  barSize={20} 
+                  isAnimationActive={true}
+                />
+              )}
+
+              {/* Line Saldo Berjalan */}
+              {chartSeries.saldo && (
+                <Line 
+                  type="monotone" 
+                  dataKey="saldo" 
+                  name="Saldo Berjalan" 
+                  stroke="#4f46e5" 
+                  strokeWidth={3.5} 
+                  dot={{ r: 5, fill: '#4f46e5', strokeWidth: 2.5, stroke: '#ffffff' }} 
+                  activeDot={{ r: 8, stroke: '#ffffff', strokeWidth: 3 }}
+                  isAnimationActive={true}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* COA MONTH TABLE - DYNAMIC TREE ENHANCED */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
-        <div className="p-4 px-5 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-          <div>
-            <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-2">
-              <BarChart2 size={16} className="text-indigo-600" /> Group COA Induk / Kelompok — Mutasi Per Bulan
+      {/* 5. COA MONTH TABLE HIERARKI BAKU (Induk -> Golongan 51,52,53 -> Kelompok -> Detail) */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xs border border-gray-200/90 dark:border-slate-800 overflow-hidden space-y-0">
+        {/* Table Top Toolbar */}
+        <div className="p-4 px-5 border-b border-gray-100 dark:border-slate-800 bg-gray-50/60 dark:bg-slate-850/60 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 print:hidden">
+          <div className="space-y-0.5">
+            <h3 className="font-black text-gray-900 dark:text-slate-100 text-xs uppercase tracking-wider flex items-center gap-2">
+              <TableIcon size={16} className="text-blue-600 dark:text-blue-400" /> 
+              Bagan Akun Standar (COA) — Mutasi Per Bulan
             </h3>
-            <p className="text-[11px] font-medium text-gray-500 mt-0.5">Klik nama akun untuk melihat rincian kelompok dan anak akun di bawahnya.</p>
+            <p className="text-[11px] font-medium text-gray-500 dark:text-slate-400">
+              Hirarki bertingkat: Induk ➔ Golongan (51, 52, 53...) ➔ Kelompok ➔ Detail. Klik nama akun untuk membuka rinciannya.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+            {/* Search Input Filter */}
+            <div className="relative min-w-[210px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="Cari kode atau nama akun..."
+                className="w-full pl-8 pr-3 h-8 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+              />
+            </div>
+
+            {/* Selector Jenjang Hierarki Bertahap Sesuai Template Design System Tab 08 */}
+            <div className="inline-flex items-center rounded-xl p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 shadow-2xs">
+              {[
+                { lvl: 1, label: 'Induk', title: 'Tingkat 1: Tampilkan hanya Akun Induk (40000 / 50000)' },
+                { lvl: 2, label: '+Golongan', title: 'Tingkat 2: Buka sampai Golongan MAK (41, 51, dst)' },
+                { lvl: 3, label: '+Kelompok', title: 'Tingkat 3: Buka sampai Kelompok Sub-Akun' },
+                { lvl: 4, label: '+Detail', title: 'Tingkat 4: Buka seluruh Rincian Akun Detail' },
+              ].map((item) => (
+                <button
+                  key={item.lvl}
+                  type="button"
+                  onClick={() => setHierarchyTo(item.lvl)}
+                  title={item.title}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    hierarchyLevel === item.lvl
+                      ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Table Density Toggle */}
+            <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
           </div>
         </div>
+
+        {/* Quick Filter Chips (All, Penerimaan, Pengeluaran, Kas & Bank) */}
+        <div className="px-5 py-2.5 bg-slate-50/40 dark:bg-slate-850/40 border-b border-gray-100 dark:border-slate-800 print:hidden flex items-center justify-between">
+          <QuickFilterChips
+            selectedChipId={selectedCategoryChip}
+            onSelect={setSelectedCategoryChip}
+            chips={[
+              { id: 'all', label: 'Semua Akun' },
+              { id: '4', label: 'Penerimaan (4xxxx)', variant: 'emerald' },
+              { id: '5', label: 'Biaya / Pengeluaran (5xxxx)', variant: 'rose' },
+              { id: '1', label: 'Kas & Bank (1xxxx)', variant: 'blue' },
+              { id: '9', label: 'Koreksi (9xxxx)', variant: 'amber' },
+            ]}
+          />
+
+          <span className="text-[11px] text-gray-400 dark:text-slate-500 font-mono hidden md:inline">
+            Menampilkan {filteredCoaMonthTable.length} akun utama
+          </span>
+        </div>
+
+        {/* Table Content Container */}
         <div className="overflow-x-auto">
           {(() => {
-            const activeMonthIdx = BULAN.map((_, i) => i + 1).filter(m => {
-              return coaMonthTable.some(row => (row.monthTotals[m]?.masuk || 0) + (row.monthTotals[m]?.keluar || 0) > 0);
-            });
-
             if (activeMonthIdx.length === 0) {
-              return <div className="p-10 text-center text-gray-400 font-medium">Tidak ada data transaksi untuk tahun {tahun}</div>;
+              return (
+                <EmptyState
+                  type="empty"
+                  title={`Tidak Ada Data Transaksi Tahun ${tahun}`}
+                  description="Belum ada transaksi kas atau mutasi bank yang tercatat pada tahun anggaran yang dipilih."
+                  actionLabel="Muat Ulang Data"
+                  onAction={fetchAll}
+                />
+              );
             }
+
+            if (filteredCoaMonthTable.length === 0) {
+              return (
+                <EmptyState
+                  type="search"
+                  title="Akun Tidak Ditemukan"
+                  description={`Tidak ditemukan akun yang cocok dengan kata kunci "${searchKeyword}". Silakan periksa kembali atau bersihkan filter.`}
+                  actionLabel="Bersihkan Pencarian"
+                  onAction={() => {
+                    setSearchKeyword('');
+                    setSelectedCategoryChip('all');
+                  }}
+                />
+              );
+            }
+
+            // Cell Padding berdasarkan Density (Luwes vs Rapat)
+            const cellPadClass = tableDensity === 'compact' ? 'py-1.5 px-2 text-[11px]' : 'py-3 px-3 text-xs';
+            const headPadClass = tableDensity === 'compact' ? 'py-2 px-2 text-[11px]' : 'py-3.5 px-3 text-xs';
 
             const renderTable = (mode: 'web' | 'print-summary' | 'print-detail') => {
               const wrapperClass = mode === 'web' ? 'print:hidden' : mode === 'print-summary' ? 'hidden print:table mb-12' : 'hidden print:table';
 
+              // Komponen Baris Rekursif Hirarki 4 Tingkat
               const TableRow = ({ row, depth = 0, type = 'induk', isHiddenByParent = false }: any) => {
                 const isInduk = type === 'induk';
+                const isGol = type === 'gol';
                 const isKel = type === 'kel';
-                // For web: use state. For print-summary: always false. For print-detail: always true (or use CSS)
-                const isExpanded = mode === 'web' ? (isInduk ? expandedCoa[row.id] : isKel ? expandedKel[row.id] : false) : mode === 'print-detail';
-                const toggle = mode === 'web' ? (isInduk ? () => toggleCoa(row.id) : isKel ? () => toggleKel(row.id) : null) : null;
-                const hasChildren = (isInduk && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
+                const isAnak = type === 'anak';
 
-                // If mode is print-summary, we NEVER render children.
+                const isExpanded = mode === 'web' 
+                  ? (isInduk 
+                      ? (expandedCoa[row.id] ?? (hierarchyLevel >= 2)) 
+                      : isGol 
+                        ? (expandedGol[row.id] ?? (hierarchyLevel >= 3)) 
+                        : isKel 
+                          ? (expandedKel[row.id] ?? (hierarchyLevel >= 4)) 
+                          : false)
+                  : mode === 'print-detail';
+
+                const toggle = mode === 'web' 
+                  ? (isInduk ? () => toggleCoa(row.id) : isGol ? () => toggleGol(row.id) : isKel ? () => toggleKel(row.id) : null)
+                  : null;
+
+                const hasChildren = (isInduk && row.golongans?.length > 0) || (isGol && row.kelompoks?.length > 0) || (isKel && row.anaks?.length > 0);
                 const shouldRenderChildren = mode !== 'print-summary' && (mode === 'print-detail' || isExpanded);
 
-                if (row.masuk === 0 && row.keluar === 0) return null; // Sembunyikan jika tidak ada transaksi setahun
+                if (row.masuk === 0 && row.keluar === 0) return null;
 
-                const isHiddenAccount = row.nama_akun?.toLowerCase().includes('kas & bank') || row.nama_akun?.toLowerCase().includes('koreksi bank') || row.nomor_akun?.startsWith('10') || row.nomor_akun?.startsWith('90');
+                const isHiddenAccount = row.nama_akun?.toLowerCase().includes('koreksi bank') || (row.nomor_akun?.startsWith('10') && mode !== 'web');
                 if (mode !== 'web' && isHiddenAccount) return null;
 
                 const accPrefix = String(row.nomor_akun).charAt(0);
-                const isPengeluaran = accPrefix === '5';
-                const typeSuffix = accPrefix === '4' ? '-masuk' : isPengeluaran ? '-keluar' : '';
-                const printClass = mode !== 'web' ? (isInduk ? `print-induk${typeSuffix}` : isKel ? `print-kel${typeSuffix}` : 'print-anak') : '';
+                const isKoreksi = accPrefix === '9' || row.nama_akun?.toLowerCase().includes('koreksi');
+                const isKas = accPrefix === '1';
+                const isPenerimaan = accPrefix === '4';
+                const isBeban = accPrefix === '5';
+                const isPengeluaran = isBeban;
+                const typeSuffix = isPenerimaan ? '-masuk' : isPengeluaran ? '-keluar' : '';
+                const printClass = mode !== 'web' 
+                  ? (isInduk ? `print-induk${typeSuffix}` : isGol ? `print-gol${typeSuffix}` : isKel ? `print-kel${typeSuffix}` : 'print-anak')
+                  : '';
+
+                // Style Baris Berdasarkan Kategori Akun & Tingkat Hirarki:
+                // 4xxxx Penerimaan -> Hijau Soft (Emerald)
+                // 5xxxx Biaya      -> Merah Soft (Rose)
+                // 1xxxx Kas & Bank -> Ungu Soft (Purple)
+                // 9xxxx Koreksi    -> Kuning Soft (Amber)
+                // Lainnya          -> Biru Soft (Sky)
+                let rowBgClass = 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors';
+                let labelStyle = 'font-normal text-gray-600 dark:text-slate-400';
+                let badgePrefix = '';
+                let stickyLeftBg = 'bg-white dark:bg-slate-900';
+                let stickyRightBg = 'bg-white text-indigo-800 dark:bg-[#0f172a] dark:text-indigo-300';
+                let badgeBg = 'text-slate-400 dark:text-slate-500 font-mono';
+                let monthCellBg = 'border-indigo-50 dark:border-slate-800';
+
+                if (isPenerimaan) {
+                  // 4xxxx Penerimaan: Gradasi Hijau Soft (Emerald)
+                  if (isInduk) {
+                    rowBgClass = 'bg-[#a7f3d0] dark:bg-emerald-950/70 text-emerald-950 dark:text-emerald-100 font-black border-t-2 border-emerald-400';
+                    labelStyle = 'font-black text-emerald-950 dark:text-emerald-100 text-xs sm:text-sm';
+                    stickyLeftBg = 'bg-[#a7f3d0] text-emerald-950 dark:bg-emerald-900 dark:text-emerald-100';
+                    monthCellBg = 'bg-[#a7f3d0] dark:bg-emerald-900/60 text-emerald-950 dark:text-emerald-100 font-bold border-emerald-300/80';
+                    stickyRightBg = 'bg-[#86efac] text-emerald-950 dark:bg-emerald-800 dark:text-emerald-100 font-black';
+                    badgeBg = 'text-emerald-950 dark:text-emerald-100 font-black';
+                  } else if (isGol) {
+                    rowBgClass = 'bg-[#d1fae5] dark:bg-emerald-950/50 text-emerald-950 dark:text-emerald-100 font-extrabold hover:bg-[#bbf7d0]';
+                    labelStyle = 'font-extrabold text-emerald-950 dark:text-emerald-100 text-xs';
+                    badgePrefix = 'Gol. ';
+                    stickyLeftBg = 'bg-[#d1fae5] text-emerald-950 dark:bg-emerald-950 dark:text-emerald-200';
+                    monthCellBg = 'bg-[#d1fae5] dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 font-bold border-emerald-200/80';
+                    stickyRightBg = 'bg-[#bbf7d0] text-emerald-950 dark:bg-emerald-900 dark:text-emerald-200 font-extrabold';
+                    badgeBg = 'text-emerald-900 dark:text-emerald-200 font-extrabold';
+                  } else if (isKel) {
+                    rowBgClass = 'bg-[#ecfdf5] dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 font-semibold hover:bg-[#d1fae5]';
+                    labelStyle = 'font-bold text-emerald-900 dark:text-emerald-200 text-xs';
+                    stickyLeftBg = 'bg-[#ecfdf5] text-emerald-900 dark:bg-slate-900 dark:text-emerald-300';
+                    monthCellBg = 'bg-[#ecfdf5] dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 font-medium border-emerald-100/70';
+                    stickyRightBg = 'bg-[#d1fae5] text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300 font-bold';
+                    badgeBg = 'text-emerald-800 dark:text-emerald-300 font-bold';
+                  } else {
+                    stickyLeftBg = 'bg-white dark:bg-slate-900';
+                    monthCellBg = 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-100';
+                    stickyRightBg = 'bg-white text-emerald-700 dark:bg-slate-900 dark:text-emerald-300 font-medium';
+                    badgeBg = 'text-slate-400 dark:text-slate-500 font-normal';
+                  }
+                } else if (isBeban) {
+                  // 5xxxx Biaya / Beban: Gradasi Merah Soft (Rose)
+                  if (isInduk) {
+                    rowBgClass = 'bg-[#fecdd3] dark:bg-rose-950/70 text-rose-950 dark:text-rose-100 font-black border-t-2 border-rose-400';
+                    labelStyle = 'font-black text-rose-950 dark:text-rose-100 text-xs sm:text-sm';
+                    stickyLeftBg = 'bg-[#fecdd3] text-rose-950 dark:bg-rose-900 dark:text-rose-100';
+                    monthCellBg = 'bg-[#fecdd3] dark:bg-rose-900/60 text-rose-950 dark:text-rose-100 font-bold border-rose-300/80';
+                    stickyRightBg = 'bg-[#fda4af] text-rose-950 dark:bg-rose-800 dark:text-rose-100 font-black';
+                    badgeBg = 'text-rose-950 dark:text-rose-100 font-black';
+                  } else if (isGol) {
+                    rowBgClass = 'bg-[#ffe4e6] dark:bg-rose-950/50 text-rose-950 dark:text-rose-100 font-extrabold hover:bg-[#fecdd3]';
+                    labelStyle = 'font-extrabold text-rose-950 dark:text-rose-100 text-xs';
+                    badgePrefix = 'Gol. ';
+                    stickyLeftBg = 'bg-[#ffe4e6] text-rose-950 dark:bg-rose-950 dark:text-rose-200';
+                    monthCellBg = 'bg-[#ffe4e6] dark:bg-rose-950/40 text-rose-900 dark:text-rose-200 font-bold border-rose-200/80';
+                    stickyRightBg = 'bg-[#fecdd3] text-rose-950 dark:bg-rose-900 dark:text-rose-200 font-extrabold';
+                    badgeBg = 'text-rose-900 dark:text-rose-200 font-extrabold';
+                  } else if (isKel) {
+                    rowBgClass = 'bg-[#fff1f2] dark:bg-rose-950/30 text-rose-900 dark:text-rose-200 font-semibold hover:bg-[#ffe4e6]';
+                    labelStyle = 'font-bold text-rose-900 dark:text-rose-200 text-xs';
+                    stickyLeftBg = 'bg-[#fff1f2] text-rose-900 dark:bg-slate-900 dark:text-rose-300';
+                    monthCellBg = 'bg-[#fff1f2] dark:bg-rose-950/20 text-rose-800 dark:text-rose-300 font-medium border-rose-100/70';
+                    stickyRightBg = 'bg-[#ffe4e6] text-rose-900 dark:bg-rose-950 dark:text-rose-300 font-bold';
+                    badgeBg = 'text-rose-800 dark:text-rose-300 font-bold';
+                  } else {
+                    stickyLeftBg = 'bg-white dark:bg-slate-900';
+                    monthCellBg = 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-100';
+                    stickyRightBg = 'bg-white text-rose-700 dark:bg-slate-900 dark:text-rose-300 font-medium';
+                    badgeBg = 'text-slate-400 dark:text-slate-500 font-normal';
+                  }
+                } else if (isKas) {
+                  // 1xxxx Kas & Bank: Gradasi Ungu Soft (Purple / Violet)
+                  if (isInduk) {
+                    rowBgClass = 'bg-[#e9d5ff] dark:bg-purple-950/70 text-purple-950 dark:text-purple-100 font-black border-t-2 border-purple-400';
+                    labelStyle = 'font-black text-purple-950 dark:text-purple-100 text-xs sm:text-sm';
+                    stickyLeftBg = 'bg-[#e9d5ff] text-purple-950 dark:bg-purple-900 dark:text-purple-100';
+                    monthCellBg = 'bg-[#e9d5ff] dark:bg-purple-900/60 text-purple-950 dark:text-purple-100 font-bold border-purple-300/80';
+                    stickyRightBg = 'bg-[#d8b4fe] text-purple-950 dark:bg-purple-800 dark:text-purple-100 font-black';
+                    badgeBg = 'text-purple-950 dark:text-purple-100 font-black';
+                  } else if (isGol) {
+                    rowBgClass = 'bg-[#f3e8ff] dark:bg-purple-950/50 text-purple-950 dark:text-purple-100 font-extrabold hover:bg-[#e9d5ff]';
+                    labelStyle = 'font-extrabold text-purple-950 dark:text-purple-100 text-xs';
+                    badgePrefix = 'Gol. ';
+                    stickyLeftBg = 'bg-[#f3e8ff] text-purple-950 dark:bg-purple-950 dark:text-purple-200';
+                    monthCellBg = 'bg-[#f3e8ff] dark:bg-purple-950/40 text-purple-950 dark:text-purple-200 font-bold border-purple-200/80';
+                    stickyRightBg = 'bg-[#e9d5ff] text-purple-950 dark:bg-purple-900 dark:text-purple-200 font-extrabold';
+                    badgeBg = 'text-purple-900 dark:text-purple-200 font-extrabold';
+                  } else if (isKel) {
+                    rowBgClass = 'bg-[#faf5ff] dark:bg-purple-950/30 text-purple-900 dark:text-purple-200 font-semibold hover:bg-[#f3e8ff]';
+                    labelStyle = 'font-bold text-purple-900 dark:text-purple-200 text-xs';
+                    stickyLeftBg = 'bg-[#faf5ff] text-purple-900 dark:bg-slate-900 dark:text-purple-300';
+                    monthCellBg = 'bg-[#faf5ff] dark:bg-purple-950/20 text-purple-800 dark:text-purple-300 font-medium border-purple-100/70';
+                    stickyRightBg = 'bg-[#f3e8ff] text-purple-900 dark:bg-purple-950 dark:text-purple-300 font-bold';
+                    badgeBg = 'text-purple-800 dark:text-purple-300 font-bold';
+                  } else {
+                    stickyLeftBg = 'bg-white dark:bg-slate-900';
+                    monthCellBg = 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-100';
+                    stickyRightBg = 'bg-white text-purple-700 dark:bg-slate-900 dark:text-purple-300 font-medium';
+                    badgeBg = 'text-slate-400 dark:text-slate-500 font-normal';
+                  }
+                } else if (isKoreksi) {
+                  // 9xxxx Koreksi: Gradasi Kuning Soft (Amber / Yellow)
+                  if (isInduk) {
+                    rowBgClass = 'bg-[#fef08a] dark:bg-amber-950/70 text-amber-950 dark:text-amber-100 font-black border-t-2 border-amber-400';
+                    labelStyle = 'font-black text-amber-950 dark:text-amber-100 text-xs sm:text-sm';
+                    stickyLeftBg = 'bg-[#fef08a] text-amber-950 dark:bg-amber-900 dark:text-amber-100';
+                    monthCellBg = 'bg-[#fef08a] dark:bg-amber-900/60 text-amber-950 dark:text-amber-100 font-bold border-amber-300/80';
+                    stickyRightBg = 'bg-[#fde047] text-amber-950 dark:bg-amber-800 dark:text-amber-100 font-black';
+                    badgeBg = 'text-amber-950 dark:text-amber-100 font-black';
+                  } else if (isGol) {
+                    rowBgClass = 'bg-[#fef9c3] dark:bg-amber-950/50 text-amber-950 dark:text-amber-100 font-extrabold hover:bg-[#fef08a]';
+                    labelStyle = 'font-extrabold text-amber-950 dark:text-amber-100 text-xs';
+                    badgePrefix = 'Gol. ';
+                    stickyLeftBg = 'bg-[#fef9c3] text-amber-950 dark:bg-amber-950 dark:text-amber-200';
+                    monthCellBg = 'bg-[#fef9c3] dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 font-bold border-amber-200/80';
+                    stickyRightBg = 'bg-[#fef08a] text-amber-950 dark:bg-amber-900 dark:text-amber-200 font-extrabold';
+                    badgeBg = 'text-amber-900 dark:text-amber-200 font-extrabold';
+                  } else if (isKel) {
+                    rowBgClass = 'bg-[#fefce8] dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 font-semibold hover:bg-[#fef9c3]';
+                    labelStyle = 'font-bold text-amber-900 dark:text-amber-200 text-xs';
+                    stickyLeftBg = 'bg-[#fefce8] text-amber-900 dark:bg-slate-900 dark:text-amber-300';
+                    monthCellBg = 'bg-[#fefce8] dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 font-medium border-amber-100/70';
+                    stickyRightBg = 'bg-[#fef9c3] text-amber-900 dark:bg-amber-950 dark:text-amber-300 font-bold';
+                    badgeBg = 'text-amber-800 dark:text-amber-300 font-bold';
+                  } else {
+                    stickyLeftBg = 'bg-white dark:bg-slate-900';
+                    monthCellBg = 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-100';
+                    stickyRightBg = 'bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300 font-medium';
+                    badgeBg = 'text-slate-400 dark:text-slate-500 font-normal';
+                  }
+                } else {
+                  // Kategori Lainnya (Biru / Sky Soft)
+                  if (isInduk) {
+                    rowBgClass = 'bg-[#bae6fd] dark:bg-sky-950/70 text-sky-950 dark:text-sky-100 font-black border-t-2 border-sky-400';
+                    labelStyle = 'font-black text-sky-950 dark:text-sky-100 text-xs sm:text-sm';
+                    stickyLeftBg = 'bg-[#bae6fd] text-sky-950 dark:bg-sky-900 dark:text-sky-100';
+                    monthCellBg = 'bg-[#bae6fd] dark:bg-sky-900/60 text-sky-950 dark:text-sky-100 font-bold border-sky-300/80';
+                    stickyRightBg = 'bg-[#7dd3fc] text-sky-950 dark:bg-sky-800 dark:text-sky-100 font-black';
+                    badgeBg = 'text-sky-950 dark:text-sky-100 font-black';
+                  } else if (isGol) {
+                    rowBgClass = 'bg-[#e0f2fe] dark:bg-sky-950/50 text-sky-950 dark:text-sky-100 font-extrabold hover:bg-[#bae6fd]';
+                    labelStyle = 'font-extrabold text-sky-950 dark:text-sky-100 text-xs';
+                    badgePrefix = 'Gol. ';
+                    stickyLeftBg = 'bg-[#e0f2fe] text-sky-950 dark:bg-sky-950 dark:text-sky-200';
+                    monthCellBg = 'bg-[#e0f2fe] dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 font-bold border-sky-200/80';
+                    stickyRightBg = 'bg-[#bae6fd] text-sky-950 dark:bg-sky-900 dark:text-sky-200 font-extrabold';
+                    badgeBg = 'text-sky-900 dark:text-sky-200 font-extrabold';
+                  } else if (isKel) {
+                    rowBgClass = 'bg-[#f0f9ff] dark:bg-sky-950/30 text-sky-900 dark:text-sky-200 font-semibold hover:bg-[#e0f2fe]';
+                    labelStyle = 'font-bold text-sky-900 dark:text-sky-200 text-xs';
+                    stickyLeftBg = 'bg-[#f0f9ff] text-sky-900 dark:bg-slate-900 dark:text-sky-300';
+                    monthCellBg = 'bg-[#f0f9ff] dark:bg-sky-950/20 text-sky-800 dark:text-sky-300 font-medium border-sky-100/70';
+                    stickyRightBg = 'bg-[#e0f2fe] text-sky-900 dark:bg-sky-950 dark:text-sky-300 font-bold';
+                    badgeBg = 'text-sky-800 dark:text-sky-300 font-bold';
+                  } else {
+                    stickyLeftBg = 'bg-white dark:bg-slate-900';
+                    monthCellBg = 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-100';
+                    stickyRightBg = 'bg-white text-sky-700 dark:bg-slate-900 dark:text-sky-300 font-medium';
+                    badgeBg = 'text-slate-400 dark:text-slate-500 font-normal';
+                  }
+                }
 
                 return (
-                  <>
-                    <tr className={`hover:bg-slate-50 transition-colors ${isInduk ? 'bg-slate-50/50 font-bold' : ''} ${isHiddenByParent ? (mode === 'print-detail' ? '' : 'hidden') : ''} ${printClass}`}>
+                  <React.Fragment key={`${type}-${row.id}`}>
+                    <tr className={`${rowBgClass} ${isHiddenByParent ? (mode === 'print-detail' ? '' : 'hidden') : ''} ${printClass}`}>
                       <td 
-                        className="p-3 border-r bg-white sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] cursor-pointer select-none"
-                        onClick={toggle || undefined}
-                        style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
+                        className={`${cellPadClass} border-r border-gray-100 dark:border-slate-800 sticky left-0 z-10 ${stickyLeftBg} shadow-[2px_0_5px_rgba(0,0,0,0.02)] ${hasChildren ? 'cursor-pointer select-none' : ''}`}
+                        onClick={hasChildren ? (toggle || undefined) : undefined}
+                        style={{ paddingLeft: `${depth * 1.25 + 0.75}rem` }}
                       >
                         <div className="flex items-center gap-2">
                           {hasChildren ? (
-                             isExpanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronRight size={14} className="text-gray-400" />
-                          ) : <div className="w-3.5" />}
-                          <div className="flex flex-col truncate">
-                            <span className="text-[10px] text-gray-400 leading-none">{row.nomor_akun}</span>
-                            <span className={`${isInduk ? 'text-xs font-black' : 'text-xs font-bold'} text-gray-700`}>{row.nama_akun}</span>
+                             isExpanded ? <ChevronDown size={14} className="text-gray-500 dark:text-slate-400 shrink-0" /> : <ChevronRight size={14} className="text-gray-400 dark:text-slate-500 shrink-0" />
+                          ) : <div className="w-3.5 shrink-0" />}
+                          <div className="flex items-center gap-2 truncate">
+                            <span className={`text-[11px] font-mono shrink-0 ${badgeBg}`}>
+                              {badgePrefix}{row.nomor_akun}
+                            </span>
+                            <span className={`${labelStyle} truncate`} title={row.nama_akun}>
+                              {row.nama_akun}
+                            </span>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3 text-right bg-white border-r border-indigo-50 text-xs font-mono text-gray-400 italic">
+
+                      {/* Saldo Awal (Disembunyikan pada cetak landscape agar bulan muat utuh) */}
+                      <td className={`${cellPadClass} text-right border-r border-indigo-50 dark:border-slate-800 font-mono text-gray-400 dark:text-slate-500 italic`}>
                         {isInduk ? fmt(row.saldoAwal || 0) : ''}
                       </td>
+
+                      {/* Kolom 12 Bulan Mutasi (Senada dengan Akun Hirarki & Total Setahun) */}
                       {activeMonthIdx.map(m => {
                         const val = row.monthTotals[m] || { masuk: 0, keluar: 0 };
                         const diff = val.masuk - val.keluar;
                         return (
-                          <td key={m} className={`p-2 text-right border-r border-indigo-50 font-mono font-bold ${diff > 0 ? 'text-emerald-500' : diff < 0 ? 'text-rose-500' : 'text-gray-300'}`}>
+                          <td key={m} className={`${cellPadClass} text-right border-r font-mono font-bold ${monthCellBg}`}>
                             {diff !== 0 ? fmt(Math.abs(diff)) : '-'}
                           </td>
                         );
                       })}
-                      <td className={`p-3 text-right font-black bg-indigo-50 text-indigo-600 text-xs border-l border-indigo-100 sticky right-0 z-10 shadow-[-4px_0_10px_rgba(0,0,0,0.02)]`}>
+
+                      {/* Total Saldo Akhir (Kolom Terakhir Sticky Kanan Solid 100% Opaque Bebas Tembus) */}
+                      <td className={`${cellPadClass} text-right font-black border-l border-indigo-200 dark:border-slate-800 sticky right-0 z-10 shadow-[-5px_0_12px_rgba(0,0,0,0.06)] ${stickyRightBg}`}>
                         {fmt(isPengeluaran ? Math.abs(row.masuk - row.keluar) : (row.masuk - row.keluar))}
                       </td>
                     </tr>
-                    {shouldRenderChildren && isInduk && row.kelompoks.map((k: any) => <TableRow key={k.id} row={k} depth={1} type="kel" isHiddenByParent={isHiddenByParent} />)}
-                    {shouldRenderChildren && isKel && row.anaks.map((a: any) => <TableRow key={a.id} row={a} depth={2} type="anak" isHiddenByParent={isHiddenByParent} />)}
-                  </>
+
+                    {/* Anak Hirarki Golongan (51, 52, 53) */}
+                    {shouldRenderChildren && isInduk && (row.golongans || []).map((g: any) => (
+                      <TableRow key={g.id} row={g} depth={1} type="gol" isHiddenByParent={isHiddenByParent} />
+                    ))}
+
+                    {/* Anak Hirarki Kelompok (51010, 51020) */}
+                    {shouldRenderChildren && isGol && (row.kelompoks || []).map((k: any) => (
+                      <TableRow key={k.id} row={k} depth={2} type="kel" isHiddenByParent={isHiddenByParent} />
+                    ))}
+
+                    {/* Anak Hirarki Detail (.01, .02) */}
+                    {shouldRenderChildren && isKel && (row.anaks || []).map((a: any) => (
+                      <TableRow key={a.id} row={a} depth={3} type="anak" isHiddenByParent={isHiddenByParent} />
+                    ))}
+                  </React.Fragment>
                 );
               };
 
               return (
                 <div className={mode !== 'web' ? wrapperClass : ''}>
-                  {mode === 'print-summary' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase">Ringkasan Mutasi (Induk)</h2>}
-                  {mode === 'print-detail' && <h2 className="hidden print:block text-xl font-black mb-4 uppercase mt-8 border-t-2 border-black pt-8">Rincian Lengkap Mutasi (Detail)</h2>}
-                  <table className={`text-xs text-left border-separate border-spacing-0 min-w-full ${mode === 'web' ? wrapperClass : ''}`}>
+                  {mode === 'print-summary' && <h2 className="hidden print:block text-lg font-black mb-3 uppercase">Ringkasan Mutasi Bagan Akun</h2>}
+                  {mode === 'print-detail' && <h2 className="hidden print:block text-lg font-black mb-3 uppercase mt-6 border-t-2 border-black pt-6">Rincian Lengkap Seluruh Mutasi Akun</h2>}
+                  
+                  <table className={`text-left border-separate border-spacing-0 min-w-full ${mode === 'web' ? wrapperClass : ''}`}>
                     <thead>
-                      <tr className="bg-indigo-50 text-indigo-900 uppercase tracking-tighter sticky top-0 z-[60]">
-                        <th className="p-4 border-r border-indigo-100 bg-indigo-50 sticky left-0 z-[70] min-w-[250px] text-xs font-black">Akun Hirarki</th>
-                        <th className="p-4 border-r border-indigo-100 text-center text-xs bg-indigo-50">Saldo Awal</th>
+                      <tr className="bg-indigo-50/80 dark:bg-slate-800 text-indigo-950 dark:text-slate-100 uppercase tracking-tighter sticky top-0 z-[60]">
+                        <th className={`${headPadClass} border-r border-indigo-100 dark:border-slate-700 bg-indigo-50 dark:bg-slate-800 sticky left-0 z-[70] min-w-[240px] font-black`}>
+                          Akun Hirarki
+                        </th>
+                        <th className={`${headPadClass} border-r border-indigo-100 dark:border-slate-700 text-center bg-indigo-50 dark:bg-slate-800 font-bold min-w-[110px]`}>
+                          Saldo Awal
+                        </th>
                         {activeMonthIdx.map(m => (
-                          <th key={m} className="p-2 border-r border-indigo-100 text-center bg-indigo-100/50 text-xs shadow-inner">
+                          <th key={m} className={`${headPadClass} border-r border-indigo-100 dark:border-slate-700 text-center bg-indigo-100/50 dark:bg-slate-750 font-bold min-w-[85px]`}>
                             {BULAN[m-1]}
                           </th>
                         ))}
-                        <th className="p-4 text-center bg-indigo-50 sticky right-0 z-[70] border-l border-indigo-100 text-xs font-black shadow-[-4px_0_15px_rgba(0,0,0,0.05)]">Saldo Akhir</th>
+                        <th className={`${headPadClass} text-center bg-[#e0e7ff] dark:bg-[#1e293b] sticky right-0 z-[70] border-l border-indigo-200 dark:border-slate-700 font-black min-w-[120px] shadow-[-5px_0_15px_rgba(0,0,0,0.08)]`}>
+                          Total Setahun
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                       <tr className="bg-indigo-600 text-white font-black cursor-pointer group sticky top-[52px] z-[50]" onClick={mode === 'web' ? () => setExpandPosisiAwal(!expandPosisiAwal) : undefined}>
-                          <td className="p-4 sticky left-0 bg-indigo-600 z-[55] border-r border-indigo-500 flex items-center gap-2 group-hover:bg-indigo-700 transition-colors">
-                            {mode === 'web' ? (expandPosisiAwal ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : <div className="w-4"></div>}
-                            <span className="text-indigo-200">▶</span> TOTAL POSISI AWAL
-                          </td>
-                          <td className="p-4 text-right border-r border-indigo-500 text-indigo-100 bg-indigo-600 font-mono text-xs">{fmt(summary.saldoAwal)}</td>
-                          {activeMonthIdx.map(m => {
-                            const prevM = m - 1;
-                            const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
-                            return <td key={m} className="p-2 text-right border-r border-indigo-500 font-mono text-white bg-indigo-600/90">{fmt(val)}</td>;
-                          })}
-                          <td className="p-4 text-right bg-indigo-700 font-black sticky right-0 z-[55] border-l border-indigo-500 text-white font-mono text-xs shadow-[-4px_0_15px_rgba(0,0,0,0.1)]">{fmt(summary.saldoAwal)}</td>
-                       </tr>
-
-                       {((mode === 'web' && expandPosisiAwal) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
-                         <tr key={`awal-${r.id}`} className="bg-indigo-50/50 text-xs text-slate-500 italic">
-                            <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-b border-indigo-50">{r.nama}</td>
-                            <td className="p-3 text-right border-r bg-slate-50/50 border-b border-indigo-50">{fmt(r.saldoAwal)}</td>
-                            {activeMonthIdx.map(m => {
-                              const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
-                              return <td key={`awal-${r.id}-${m}`} className="p-1 text-right border-r border-indigo-50 font-mono opacity-60 border-b">{fmt(val)}</td>;
-                            })}
-                            <td className="p-3 text-right bg-indigo-50 text-indigo-600 border-l border-indigo-100 sticky right-0 z-[40] font-bold border-b shadow-[-4px_0_10px_rgba(0,0,0,0.02)]">{fmt(r.saldoAwal)}</td>
-                         </tr>
-                       ))}
-
-                       {coaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
-                      
-                       <tr className="bg-indigo-900 text-white font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-8px_20px_rgba(0,0,0,0.1)]" onClick={mode === 'web' ? () => setExpandPosisiAkhir(!expandPosisiAkhir) : undefined}>
-                        <td className="p-4 border-r border-indigo-800 sticky left-0 bg-indigo-900 z-[65] flex items-center gap-2 uppercase text-xs group-hover:bg-indigo-800 transition-colors border-t">
-                          {mode === 'web' ? (expandPosisiAkhir ? <ChevronDown size={16} /> : <ChevronRight size={16} />) : <div className="w-4"></div>}
-                          <span className="text-indigo-300">▶</span> TOTAL POSISI AKHIR
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                      {/* BARIS POSISI AWAL (WARNA SOFT INDIGO) */}
+                      <tr 
+                        className="bg-[#e0e7ff] text-indigo-950 font-black cursor-pointer group sticky top-[48px] z-[50] border-b border-indigo-200/80 dark:border-slate-800 shadow-xs" 
+                        onClick={mode === 'web' ? () => setExpandPosisiAwal(!expandPosisiAwal) : undefined}
+                      >
+                        <td className={`${cellPadClass} sticky left-0 bg-[#e0e7ff] text-indigo-950 dark:bg-[#1e1b4b] dark:text-indigo-200 z-[55] border-r border-indigo-200 dark:border-slate-800 flex items-center gap-2 group-hover:bg-[#c7d2fe] dark:group-hover:bg-[#2e2a72] transition-colors`}>
+                          {mode === 'web' ? (expandPosisiAwal ? <ChevronDown size={15} className="text-indigo-700 dark:text-indigo-400" /> : <ChevronRight size={15} className="text-indigo-600 dark:text-indigo-400" />) : <div className="w-4" />}
+                          <span className="text-indigo-600 dark:text-indigo-400 font-bold">▶</span> TOTAL POSISI AWAL
                         </td>
-                        <td className="p-4 text-right border-r border-indigo-800 opacity-60 bg-indigo-900 border-t">-</td>
+                        <td className={`${cellPadClass} text-right border-r border-indigo-200 dark:border-slate-800 text-indigo-950 dark:text-indigo-100 bg-[#e0e7ff] dark:bg-[#1e1b4b]/80 font-mono font-bold`}>
+                          {fmt(summary.saldoAwal)}
+                        </td>
+                        {activeMonthIdx.map(m => {
+                          const prevM = m - 1;
+                          const val = prevM === 0 ? summary.saldoAwal : (chartData[prevM - 1]?.saldo || 0);
+                          return (
+                            <td key={m} className={`${cellPadClass} text-right border-r border-indigo-200 dark:border-slate-800 font-mono text-indigo-950 dark:text-indigo-100 bg-[#e0e7ff] dark:bg-[#1e1b4b]/60 font-semibold`}>
+                              {fmt(val)}
+                            </td>
+                          );
+                        })}
+                        <td className={`${cellPadClass} text-right bg-[#c7d2fe] dark:bg-[#2e2a72] font-black sticky right-0 z-[55] border-l border-indigo-300 dark:border-slate-700 text-indigo-950 dark:text-indigo-100 font-mono shadow-[-4px_0_12px_rgba(0,0,0,0.06)]`}>
+                          {fmt(summary.saldoAwal)}
+                        </td>
+                      </tr>
+
+                      {/* RINCIAN POSISI AWAL PER REKENING / KAS */}
+                      {((mode === 'web' && expandPosisiAwal) || mode === 'print-detail') && monthlyAccountSaldo.map((r) => (
+                        <tr key={`awal-${r.id}`} className="bg-indigo-50/40 dark:bg-indigo-950/20 text-slate-600 dark:text-slate-400 italic">
+                          <td className={`${cellPadClass} pl-10 border-r border-indigo-50 dark:border-slate-800 sticky left-0 bg-white dark:bg-slate-900 z-[40] truncate max-w-[200px]`}>
+                            {r.nama}
+                          </td>
+                          <td className={`${cellPadClass} text-right border-r border-indigo-50 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850/50 font-mono`}>
+                            {fmt(r.saldoAwal)}
+                          </td>
+                          {activeMonthIdx.map(m => {
+                            const val = m === 1 ? r.saldoAwal : (r.monthlySaldo[m-1] || 0);
+                            return (
+                              <td key={`awal-${r.id}-${m}`} className={`${cellPadClass} text-right border-r border-indigo-50 dark:border-slate-800 font-mono opacity-70`}>
+                                {fmt(val)}
+                              </td>
+                            );
+                          })}
+                          <td className={`${cellPadClass} text-right bg-white dark:bg-[#0f172a] text-indigo-700 dark:text-indigo-300 border-l border-indigo-200 dark:border-slate-800 sticky right-0 z-[40] font-bold font-mono shadow-[-5px_0_10px_rgba(0,0,0,0.05)]`}>
+                            {fmt(r.saldoAwal)}
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* DATA TABEL COA (TERSTRUKTUR: INDUK -> GOLONGAN 51,52,53 -> KELOMPOK -> DETAIL) */}
+                      {filteredCoaMonthTable.map((induk: any) => <TableRow key={induk.id} row={induk} />)}
+                      
+                      {/* BARIS POSISI AKHIR (SERAGAM DENGAN POSISI AWAL) */}
+                      <tr 
+                        className="bg-[#e0e7ff] text-indigo-950 font-black cursor-pointer group sticky bottom-[0px] z-[60] shadow-[0_-6px_16px_rgba(0,0,0,0.08)] border-t-2 border-indigo-300 dark:border-slate-700" 
+                        onClick={mode === 'web' ? () => setExpandPosisiAkhir(!expandPosisiAkhir) : undefined}
+                      >
+                        <td className={`${cellPadClass} border-r border-indigo-200 dark:border-slate-700 sticky left-0 bg-[#e0e7ff] dark:bg-slate-800 text-indigo-950 dark:text-slate-100 z-[65] flex items-center gap-2 uppercase group-hover:bg-[#c7d2fe] dark:group-hover:bg-slate-700 transition-colors`}>
+                          {mode === 'web' ? (expandPosisiAkhir ? <ChevronDown size={15} className="text-indigo-700 dark:text-slate-300" /> : <ChevronRight size={15} className="text-indigo-600 dark:text-slate-400" />) : <div className="w-4" />}
+                          <span className="text-indigo-600 dark:text-slate-400 font-bold">▶</span> TOTAL POSISI AKHIR
+                        </td>
+                        <td className={`${cellPadClass} text-right border-r border-indigo-200 dark:border-slate-700 text-slate-400 bg-[#e0e7ff] dark:bg-slate-850 font-mono`}>
+                          -
+                        </td>
                         {activeMonthIdx.map(m => (
-                          <td key={m} className="p-2 text-right border-r border-indigo-800 font-mono text-indigo-100 text-xs bg-indigo-900 border-t">
+                          <td key={m} className={`${cellPadClass} text-right border-r border-indigo-200 dark:border-slate-700 font-mono text-indigo-950 dark:text-slate-200 bg-[#e0e7ff] dark:bg-slate-850 font-bold`}>
                             {fmt(chartData[m-1]?.saldo || 0)}
                           </td>
                         ))}
-                        <td className="p-4 text-right font-mono bg-indigo-950 sticky right-0 z-[65] border-l border-indigo-800 text-white text-xs shadow-[-4px_0_20px_rgba(0,0,0,0.2)] border-t">{fmt(summary.saldoAkhir)}</td>
+                        <td className={`${cellPadClass} text-right font-mono bg-[#c7d2fe] dark:bg-slate-800 sticky right-0 z-[65] border-l border-indigo-300 dark:border-slate-700 text-indigo-950 dark:text-white font-black shadow-[-4px_0_15px_rgba(0,0,0,0.08)]`}>
+                          {fmt(summary.saldoAkhir)}
+                        </td>
                       </tr>
 
-                       {((mode === 'web' && expandPosisiAkhir) || mode === 'print-detail') && monthlyAccountSaldo.map((r, ri) => (
-                         <tr key={`akhir-${r.id}`} className="bg-slate-50 text-xs text-slate-500 italic">
-                            <td className="p-3 pl-12 border-r sticky left-0 bg-white z-[40] truncate max-w-[200px] border-t border-slate-100">{r.nama}</td>
-                            <td className="p-3 text-right border-r bg-slate-50 opacity-40 border-t border-slate-100">-</td>
-                            {activeMonthIdx.map(m => (
-                              <td key={`akhir-${r.id}-${m}`} className="p-1 text-right border-r font-mono opacity-60 border-t border-slate-100">{fmt(r.monthlySaldo[m] || 0)}</td>
-                            ))}
-                            <td className="p-3 text-right bg-indigo-50 border-l border-indigo-100 sticky right-0 z-[40] font-black border-t text-indigo-700 shadow-[-4px_0_10px_rgba(0,0,0,0.05)]">{fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}</td>
-                         </tr>
-                       ))}
+                      {/* RINCIAN POSISI AKHIR PER REKENING / KAS */}
+                      {((mode === 'web' && expandPosisiAkhir) || mode === 'print-detail') && monthlyAccountSaldo.map((r) => (
+                        <tr key={`akhir-${r.id}`} className="bg-slate-50 dark:bg-slate-850 text-slate-600 dark:text-slate-400 italic">
+                          <td className={`${cellPadClass} pl-10 border-r border-slate-100 dark:border-slate-800 sticky left-0 bg-white dark:bg-slate-900 z-[40] truncate max-w-[200px] border-t`}>
+                            {r.nama}
+                          </td>
+                          <td className={`${cellPadClass} text-right border-r border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 opacity-40 border-t`}>
+                            -
+                          </td>
+                          {activeMonthIdx.map(m => (
+                            <td key={`akhir-${r.id}-${m}`} className={`${cellPadClass} text-right border-r border-slate-100 dark:border-slate-800 font-mono opacity-70 border-t`}>
+                              {fmt(r.monthlySaldo[m] || 0)}
+                            </td>
+                          ))}
+                          <td className={`${cellPadClass} text-right bg-white dark:bg-[#0f172a] border-l border-indigo-200 dark:border-slate-800 sticky right-0 z-[40] font-black border-t text-indigo-700 dark:text-indigo-300 font-mono shadow-[-5px_0_10px_rgba(0,0,0,0.05)]`}>
+                            {fmt(r.monthlySaldo[activeMonthIdx[activeMonthIdx.length-1] as number] || 0)}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

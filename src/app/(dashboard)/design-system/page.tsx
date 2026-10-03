@@ -40,6 +40,11 @@ import {
   Bold,
   Italic,
   Underline,
+  Strikethrough,
+  Code,
+  Quote,
+  Highlighter,
+  Minus,
   List,
   ListOrdered,
   AlignLeft,
@@ -91,6 +96,7 @@ import StatCard from '@/components/shared/StatCard';
 import MultiSelectFilter from '@/components/shared/MultiSelectFilter';
 import AutocompleteCombobox from '@/components/shared/AutocompleteCombobox';
 import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
+import MonthRangePicker, { MonthRange } from '@/components/shared/MonthRangePicker';
 import FileUploadDropzone from '@/components/shared/FileUploadDropzone';
 import EmptyState from '@/components/shared/EmptyState';
 import SkeletonTable from '@/components/shared/SkeletonTable';
@@ -105,6 +111,7 @@ import VerificationStepper from '@/components/shared/VerificationStepper';
 import QuickFilterChips from '@/components/shared/QuickFilterChips';
 import ThemeToggle from '@/components/shared/ThemeToggle';
 import TreeView, { TreeNodeItem } from '@/components/shared/TreeView';
+import GalleryLightbox, { GalleryItem } from '@/components/shared/GalleryLightbox';
 import { 
   PrimaryButton, 
   SecondaryButton, 
@@ -117,6 +124,27 @@ export default function DesignSystemPage() {
   const [activeTab, setActiveTab] = useState<
     'forms' | 'typography' | 'cards' | 'charts' | 'tab-styles' | 'editor' | 'colors' | 'table' | 'modals'
   >('forms');
+
+  // Interactive Gallery Lightbox Demo State
+  const [isDemoGalleryOpen, setIsDemoGalleryOpen] = useState(false);
+  const [demoGalleryIndex, setDemoGalleryIndex] = useState(0);
+  const sampleGalleryItems: GalleryItem[] = [
+    {
+      src: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80',
+      original: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80',
+      label: 'Kuitansi & Bukti Pembayaran No. TRF-2026-001 (Bukti Transfer Vendor Konsumsi)'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
+      original: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
+      label: 'Faktur Pajak & Invoice Pengadaan Alat Tulis (PPh 22 & Rincian Belanja)'
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=1200&q=80',
+      original: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&w=1200&q=80',
+      label: 'Nota Rekapitulasi & Surat Perintah Bayar (Otorisasi Pencairan Bendahara)'
+    }
+  ];
 
   // Table Density & Simulation State
   const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
@@ -180,15 +208,26 @@ export default function DesignSystemPage() {
   const [selectedUnits, setSelectedUnits] = useState<string[]>(['1', '3']);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['approved', 'pending']);
 
-  // Poin 2 (Baru): Unified Date Range Picker with Time (Jam)
-  const [dateRange, setDateRange] = useState<DateRange>({
+  // Poin 2A: Filter Rentang Tanggal Laporan (Tanpa Jam)
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRange>({
     startDate: '2026-09-01',
-    endDate: '2026-09-30',
-    startTime: '08:00',
-    endTime: '17:00'
+    endDate: '2026-09-30'
   });
-  const [singleDate, setSingleDate] = useState<string>('2026-09-25');
-  const [dateTimeVal, setDateTimeVal] = useState<string>('2026-09-25T08:30');
+
+  // Poin 2A: Filter Rentang Bulan Laporan (Tanpa Menampilkan Tanggal)
+  const [monthRangeFilter, setMonthRangeFilter] = useState<MonthRange>({
+    startMonth: '2026-03',
+    endMonth: '2026-10',
+    startDate: '2026-03-01',
+    endDate: '2026-10-31',
+  });
+
+  // Poin 2B: Input Tanggal & Jam Data Transaksi (Form Input Data, Bukan Filter)
+  const [formDate, setFormDate] = useState<string>('2026-10-01');
+  const [formStartTime, setFormStartTime] = useState<string>('08:30');
+  const [formEndTime, setFormEndTime] = useState<string>('16:00');
+  const [dateTimeVal, setDateTimeVal] = useState<string>('2026-10-01T08:30');
+  const [singleDate, setSingleDate] = useState<string>('2026-10-01');
 
   // Poin 3 (Baru): Typography Tester State
   const [sampleTesterText, setSampleTesterText] = useState<string>('Universitas Gadjah Mada - Sistem Verifikasi Anggaran Terpadu');
@@ -201,6 +240,70 @@ export default function DesignSystemPage() {
   const [isDirectUploading, setIsDirectUploading] = useState<boolean>(false);
   const [directUploadProgress, setDirectUploadProgress] = useState<number>(0);
   const [directUploadSuccess, setDirectUploadSuccess] = useState<boolean>(false);
+
+  // Paste Zone Demo State & Parsed Data (Standar 8 Kolom: [1] ID DB, [2] Nama Unit, [3] Tahun, [4] Nominal, [5] Sumber Dana, [6] Keterangan, [7] Status Pagu, [8] Jenis Anggaran)
+  const [demoPasteText, setDemoPasteText] = useState<string>('');
+  const sampleTSVRows = `101\tFakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t2026\t1850000000\tBOPTN\tOperasional Lab Biomedis & Riset Terpadu\tDisetujui\tBelanja Barang
+102\tFakultas Teknik\t2026\t2450000000\tRKAT-UGM\tPemeliharaan Fasilitas Laboratorium Terpadu\tDisetujui\tBelanja Modal
+103\tDirektorat Sistem & Sumber Daya Informasi (DSSDI)\t2026\t950000000\tAPBN\tUpgrade Infrastruktur Jaringan & Server Kampus\tUsulan\tBelanja Modal
+104\tPerpustakaan Pusat UGM\t2026\t620000000\tPNBP\tLangganan Basis Data Jurnal Ilmiah Internasional\tDisetujui\tOperasional`;
+
+  const parsedPasteRows = useMemo(() => {
+    if (!demoPasteText.trim()) return [];
+    const lines = demoPasteText.split(/\r?\n/).filter(line => line.trim().length > 0);
+    return lines.map((line, idx) => {
+      const parts = line.split('\t').map(p => p.trim());
+      const isHeader = idx === 0 && (
+        parts[0]?.toLowerCase().includes('id') || 
+        parts[0]?.toLowerCase().includes('[1]') ||
+        parts[1]?.toLowerCase().includes('unit') || 
+        parts[1]?.toLowerCase().includes('nama') ||
+        parts[2]?.toLowerCase().includes('tahun')
+      );
+      if (isHeader) return null;
+
+      const idDb = parts[0] || `auto-${idx + 1}`;
+      const namaUnit = parts[1] || '';
+      const tahun = parts[2] || '2026';
+      const rawNominal = (parts[3] || '0').replace(/[^0-9.-]+/g, '');
+      const nominal = parseFloat(rawNominal) || 0;
+      const sumberDana = parts[4] || 'BOPTN';
+      const keterangan = parts[5] || '-';
+      const statusPagu = parts[6] || 'Disetujui';
+      const jenisAnggaran = parts[7] || 'Operasional';
+
+      const isValid = Boolean(namaUnit && tahun && nominal > 0);
+      const issues = !namaUnit ? 'Nama Unit kosong' : !tahun ? 'Tahun kosong' : nominal <= 0 ? 'Nominal harus > 0' : null;
+
+      return {
+        id: `row-${idx}`,
+        lineNum: idx + 1,
+        idDb,
+        namaUnit,
+        tahun,
+        nominal,
+        sumberDana,
+        keterangan,
+        statusPagu,
+        jenisAnggaran,
+        isValid,
+        issues
+      };
+    }).filter(Boolean) as Array<{
+      id: string;
+      lineNum: number;
+      idDb: string;
+      namaUnit: string;
+      tahun: string;
+      nominal: number;
+      sumberDana: string;
+      keterangan: string;
+      statusPagu: string;
+      jenisAnggaran: string;
+      isValid: boolean;
+      issues: string | null;
+    }>;
+  }, [demoPasteText]);
 
   // Interactive Charts Demo State
   const [chartYear, setChartYear] = useState<'2026' | '2025' | '2024'>('2026');
@@ -292,8 +395,29 @@ export default function DesignSystemPage() {
   const [demoSegmentedTab, setDemoSegmentedTab] = useState<string>('monthly');
 
   // Editor Demo State
+  const [editorMode, setEditorMode] = useState<'edit' | 'preview'>('edit');
+  const [activeAvatarShape, setActiveAvatarShape] = useState<'circle' | 'square'>('circle');
+  const [showLightboxModal, setShowLightboxModal] = useState<boolean>(false);
+  const [lightboxImageTitle, setLightboxImageTitle] = useState<string>('Bukti Kuitansi & Faktur Pajak Belanja');
   const [editorContent, setEditorContent] = useState<string>(
-    'Yth. Pimpinan Unit Kerja di Lingkungan Universitas Gadjah Mada,\n\nBersama ini kami sampaikan ketentuan penyesuaian usulan pagu anggaran tahun 2026...\n\n1. Seluruh transaksi wajib mencantumkan kode akun yang valid.\n2. Batas akhir pengajuan revisi tanggal 30 September 2026.'
+    `Yth. Pimpinan Unit Kerja di Lingkungan Universitas Gadjah Mada,
+
+Bersama ini kami sampaikan petunjuk teknis penyesuaian usulan pagu anggaran & realisasi belanja semester berjalan:
+
+• Seluruh transaksi belanja wajib mencantumkan kode MAK (Mata Anggaran Kegiatan) yang valid.
+• Pembayaran di atas Rp 50.000.000,- wajib melampirkan berkas SPK dan berita acara serah terima (BAST).
+• Pengajuan verifikasi SPJ selambat-lambatnya diajukan pada tanggal 25 setiap bulannya.
+
+Daftar Rincian Akun & Alokasi Pagu Kegiatan:
+| Kode MAK | Uraian Kegiatan / Belanja | Pagu (Rp) | Realisasi (Rp) | Status |
+| 521211 | Bahan Kimia Praktikum & Reagen | 450.000.000 | 310.000.000 | Disetujui |
+| 521213 | Honor Narasumber Seminar & Reviewer | 180.000.000 | 120.000.000 | Proses |
+| 532111 | Pengadaan Spektrofotometer Dual-Beam | 850.000.000 | 850.000.000 | Selesai |
+
+Catatan Penting:
+> "Pastikan semua bukti kuitansi bertanda tangan basah dan telah divalidasi oleh Pejabat Pembuat Komitmen (PPK)."
+
+Atas perhatian dan kerja sama Bapak/Ibu, kami sampaikan terima kasih.`
   );
 
   // Table & Pagination Demo
@@ -382,9 +506,45 @@ export default function DesignSystemPage() {
       totalRealisasi: 980000000,
       status: 'proses',
       children: [
-        { id: 'ft-1', kode: '040101', nama: 'Departemen Teknik Sipil & Lingkungan', pic: 'Dr. Ir. Budi W.', pagu: 550000000, realisasi: 390000000, status: 'disetujui' },
-        { id: 'ft-2', kode: '040201', nama: 'Departemen Teknik Elektro & Teknologi Informasi', pic: 'Prof. Dr. Ir. Sunarno', pagu: 520000000, realisasi: 380000000, status: 'disetujui' },
-        { id: 'ft-3', kode: '040301', nama: 'Departemen Teknik Mesin & Industri', pic: 'Dr. Fauzun, S.T., M.T.', pagu: 380000000, realisasi: 210000000, status: 'proses' },
+        { 
+          id: 'ft-1', 
+          kode: '040101', 
+          nama: 'Departemen Teknik Sipil & Lingkungan', 
+          pic: 'Dr. Ir. Budi W.', 
+          pagu: 550000000, 
+          realisasi: 390000000, 
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'ft-1-1', kode: '040101-LAB01', nama: 'Laboratorium Mekanika Tanah & Geoteknik', pic: 'Prof. Joko Sujono', pagu: 300000000, realisasi: 220000000, status: 'disetujui' },
+            { id: 'ft-1-2', kode: '040101-LAB02', nama: 'Laboratorium Rekayasa Struktur & Bahan Bangunan', pic: 'Dr. Karlina', pagu: 250000000, realisasi: 170000000, status: 'disetujui' },
+          ]
+        },
+        { 
+          id: 'ft-2', 
+          kode: '040201', 
+          nama: 'Departemen Teknik Elektro & Teknologi Informasi', 
+          pic: 'Prof. Dr. Ir. Sunarno', 
+          pagu: 520000000, 
+          realisasi: 380000000, 
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'ft-2-1', kode: '040201-LAB01', nama: 'Laboratorium Sistem Tenaga Listrik & Energi Terbarukan', pic: 'Dr. Suharyanto', pagu: 270000000, realisasi: 200000000, status: 'disetujui' },
+            { id: 'ft-2-2', kode: '040201-LAB02', nama: 'Laboratorium Jaringan Komputer & Keamanan Siber', pic: 'Dr. Widyawan', pagu: 250000000, realisasi: 180000000, status: 'disetujui' },
+          ]
+        },
+        { 
+          id: 'ft-3', 
+          kode: '040301', 
+          nama: 'Departemen Teknik Mesin & Industri', 
+          pic: 'Dr. Fauzun, S.T., M.T.', 
+          pagu: 380000000, 
+          realisasi: 210000000, 
+          status: 'proses',
+          grandChildren: [
+            { id: 'ft-3-1', kode: '040301-LAB01', nama: 'Laboratorium Desain Manufaktur Presisi (CNC)', pic: 'Dr. Muslim Mahardika', pagu: 220000000, realisasi: 120000000, status: 'proses' },
+            { id: 'ft-3-2', kode: '040301-LAB02', nama: 'Laboratorium Ergonomi & Sistem Industri', pic: 'Ir. Subagyo, Ph.D.', pagu: 160000000, realisasi: 90000000, status: 'disetujui' },
+          ]
+        },
       ]
     },
     {
@@ -395,8 +555,32 @@ export default function DesignSystemPage() {
       totalRealisasi: 1850000000,
       status: 'disetujui',
       children: [
-        { id: 'med-1', kode: '050101', nama: 'Departemen Ilmu Kesehatan Anak', pic: 'dr. Ida Safitri, Sp.A(K)', pagu: 1100000000, realisasi: 980000000, status: 'disetujui' },
-        { id: 'med-2', kode: '050201', nama: 'Departemen Bedah & Bedah Saraf', pic: 'dr. Rachmat Andi, Sp.B', pagu: 1000000000, realisasi: 870000000, status: 'disetujui' },
+        { 
+          id: 'med-1', 
+          kode: '050101', 
+          nama: 'Departemen Ilmu Kesehatan Anak', 
+          pic: 'dr. Ida Safitri, Sp.A(K)', 
+          pagu: 1100000000, 
+          realisasi: 980000000, 
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'med-1-1', kode: '050101-DIV01', nama: 'Divisi Pediatri Gawat Darurat & Intensive Care (PICU)', pic: 'dr. Intan F., Sp.A', pagu: 600000000, realisasi: 550000000, status: 'disetujui' },
+            { id: 'med-1-2', kode: '050101-DIV02', nama: 'Divisi Nutrisi & Penyakit Metabolik Anak', pic: 'dr. Titis P., Sp.A', pagu: 500000000, realisasi: 430000000, status: 'disetujui' },
+          ]
+        },
+        { 
+          id: 'med-2', 
+          kode: '050201', 
+          nama: 'Departemen Bedah & Bedah Saraf', 
+          pic: 'dr. Rachmat Andi, Sp.B', 
+          pagu: 1000000000, 
+          realisasi: 870000000, 
+          status: 'disetujui',
+          grandChildren: [
+            { id: 'med-2-1', kode: '050201-DIV01', nama: 'Divisi Bedah Digestif & Laparoskopi', pic: 'dr. Hendra W., Sp.B', pagu: 550000000, realisasi: 490000000, status: 'disetujui' },
+            { id: 'med-2-2', kode: '050201-DIV02', nama: 'Divisi Bedah Saraf & Neurotrauma', pic: 'dr. Adi Santoso, Sp.BS', pagu: 450000000, realisasi: 380000000, status: 'disetujui' },
+          ]
+        },
       ]
     },
     {
@@ -407,8 +591,32 @@ export default function DesignSystemPage() {
       totalRealisasi: 420000000,
       status: 'revisi',
       children: [
-        { id: 'keu-1', kode: '010802A', nama: 'Subdirektorat Anggaran & Perbendaharaan', pic: 'Drs. Hendro Wibowo', pagu: 490000000, realisasi: 260000000, status: 'proses' },
-        { id: 'keu-2', kode: '010802B', nama: 'Subdirektorat Akuntansi & Pelaporan Keuangan', pic: 'Sri Mulyani, S.E., M.Acc.', pagu: 400000000, realisasi: 160000000, status: 'revisi' },
+        { 
+          id: 'keu-1', 
+          kode: '010802A', 
+          nama: 'Subdirektorat Anggaran & Perbendaharaan', 
+          pic: 'Drs. Hendro Wibowo', 
+          pagu: 490000000, 
+          realisasi: 260000000, 
+          status: 'proses',
+          grandChildren: [
+            { id: 'keu-1-1', kode: '010802A-S01', nama: 'Seksi Perencanaan & Alokasi Pagu Anggaran', pic: 'Bagus S., M.Acc.', pagu: 250000000, realisasi: 140000000, status: 'disetujui' },
+            { id: 'keu-1-2', kode: '010802A-S02', nama: 'Seksi Verifikasi SPJ & Kas Operasional', pic: 'Nurul H., S.E.', pagu: 240000000, realisasi: 120000000, status: 'proses' },
+          ]
+        },
+        { 
+          id: 'keu-2', 
+          kode: '010802B', 
+          nama: 'Subdirektorat Akuntansi & Pelaporan Keuangan', 
+          pic: 'Sri Mulyani, S.E., M.Acc.', 
+          pagu: 400000000, 
+          realisasi: 160000000, 
+          status: 'revisi',
+          grandChildren: [
+            { id: 'keu-2-1', kode: '010802B-S01', nama: 'Seksi Pembukuan & Rekonsiliasi Bank', pic: 'Wahyu P., S.Ak.', pagu: 210000000, realisasi: 90000000, status: 'proses' },
+            { id: 'keu-2-2', kode: '010802B-S02', nama: 'Seksi Penyusunan Laporan Keuangan Tahunan', pic: 'Rina S., S.E.', pagu: 190000000, realisasi: 70000000, status: 'revisi' },
+          ]
+        },
       ]
     }
   ];
@@ -424,16 +632,92 @@ export default function DesignSystemPage() {
     }
   };
 
-  const isAllGroupExpanded = sampleGroupRowsData.every(g => !!expandedGroupRows[g.groupId]);
-  const toggleAllGroupRows = () => {
-    if (isAllGroupExpanded) {
+  // State dan Logika Buka Tutup Perjenjang untuk Template 3 (Induk -> Anak -> Cucu)
+  const [expandedGroupSubRows, setExpandedGroupSubRows] = useState<Record<string, boolean>>({ 'ft-1': true });
+  const [groupRowsMode, setGroupRowsMode] = useState<'expanding' | 'collapsing'>('expanding');
+
+  const setGroupRowsTo = (level: 1 | 2 | 3) => {
+    if (level === 1) {
       setExpandedGroupRows({});
-    } else {
-      const next: Record<string, boolean> = {};
-      sampleGroupRowsData.forEach(g => { next[g.groupId] = true; });
-      setExpandedGroupRows(next);
+      setExpandedGroupSubRows({});
+      setGroupRowsMode('expanding');
+    } else if (level === 2) {
+      const nextGroup: Record<string, boolean> = {};
+      sampleGroupRowsData.forEach(g => { nextGroup[g.groupId] = true; });
+      setExpandedGroupRows(nextGroup);
+      setExpandedGroupSubRows({});
+      setGroupRowsMode('expanding');
+    } else if (level === 3) {
+      const nextGroup: Record<string, boolean> = {};
+      const nextSub: Record<string, boolean> = {};
+      sampleGroupRowsData.forEach(g => {
+        nextGroup[g.groupId] = true;
+        g.children.forEach(c => {
+          if (c.grandChildren && c.grandChildren.length > 0) {
+            nextSub[c.id] = true;
+          }
+        });
+      });
+      setExpandedGroupRows(nextGroup);
+      setExpandedGroupSubRows(nextSub);
+      setGroupRowsMode('collapsing');
     }
   };
+
+  const handleStepGroupRows = () => {
+    const allGroups = sampleGroupRowsData.every(g => !!expandedGroupRows[g.groupId]);
+    const allSubs = sampleGroupRowsData.every(g => g.children.every(c => !c.grandChildren || !!expandedGroupSubRows[c.id]));
+
+    if (!allGroups) {
+      setGroupRowsTo(2);
+    } else if (!allSubs && groupRowsMode === 'expanding') {
+      setGroupRowsTo(3);
+    } else if (allSubs) {
+      setGroupRowsTo(2);
+      setGroupRowsMode('collapsing');
+    } else {
+      setGroupRowsTo(1);
+    }
+  };
+
+  const getGroupRowsButtonInfo = () => {
+    const allGroups = sampleGroupRowsData.every(g => !!expandedGroupRows[g.groupId]);
+    const allSubs = sampleGroupRowsData.every(g => g.children.every(c => !c.grandChildren || !!expandedGroupSubRows[c.id]));
+
+    if (!allGroups) {
+      return {
+        label: 'Buka Tingkat 2 (Anak)',
+        levelText: 'Level 1: Induk Saja',
+        icon: ChevronDown,
+        level: 1
+      };
+    }
+    if (allSubs) {
+      return {
+        label: 'Tutup Tingkat 3 (Cucu)',
+        levelText: 'Level 3: Lengkap (+Cucu)',
+        icon: ChevronUp,
+        level: 3
+      };
+    }
+    if (groupRowsMode === 'collapsing') {
+      return {
+        label: 'Tutup Semua (Kembali ke Induk)',
+        levelText: 'Level 2: Cucu Ditutup',
+        icon: ChevronUp,
+        level: 2
+      };
+    }
+    return {
+      label: 'Buka Tingkat 3 (Cucu)',
+      levelText: 'Level 2: +Anak Terbuka',
+      icon: ChevronDown,
+      level: 2
+    };
+  };
+
+  const isAllGroupExpanded = sampleGroupRowsData.every(g => !!expandedGroupRows[g.groupId]);
+  const toggleAllGroupRows = handleStepGroupRows;
 
   // 3-Level Nested Hierarchy Table State & Sample Data (Parent -> Child -> Grandchild)
   const [expandedThreeLevelParent, setExpandedThreeLevelParent] = useState<Record<string, boolean>>({ 'grp-ft': true });
@@ -530,15 +814,21 @@ export default function DesignSystemPage() {
     }
   ];
 
-  const isAllThreeLevelExpanded = 
-    sampleThreeLevelData.every(p => !!expandedThreeLevelParent[p.id]) &&
-    sampleThreeLevelData.every(p => p.children.every(c => !!expandedThreeLevelChild[c.id]));
+  // State dan Logika Buka Tutup Perjenjang untuk Template 4 (Induk -> Anak -> Cucu)
+  const [threeLevelMode, setThreeLevelMode] = useState<'expanding' | 'collapsing'>('expanding');
 
-  const toggleAllThreeLevels = () => {
-    if (isAllThreeLevelExpanded) {
+  const setThreeLevelTo = (level: 1 | 2 | 3) => {
+    if (level === 1) {
       setExpandedThreeLevelParent({});
       setExpandedThreeLevelChild({});
-    } else {
+      setThreeLevelMode('expanding');
+    } else if (level === 2) {
+      const nextParent: Record<string, boolean> = {};
+      sampleThreeLevelData.forEach(p => { nextParent[p.id] = true; });
+      setExpandedThreeLevelParent(nextParent);
+      setExpandedThreeLevelChild({});
+      setThreeLevelMode('expanding');
+    } else if (level === 3) {
       const nextParent: Record<string, boolean> = {};
       const nextChild: Record<string, boolean> = {};
       sampleThreeLevelData.forEach(p => {
@@ -549,8 +839,340 @@ export default function DesignSystemPage() {
       });
       setExpandedThreeLevelParent(nextParent);
       setExpandedThreeLevelChild(nextChild);
+      setThreeLevelMode('collapsing');
     }
   };
+
+  const handleStepThreeLevels = () => {
+    const allParents = sampleThreeLevelData.every(p => !!expandedThreeLevelParent[p.id]);
+    const allChildren = sampleThreeLevelData.every(p => p.children.every(c => !!expandedThreeLevelChild[c.id]));
+
+    if (!allParents) {
+      setThreeLevelTo(2);
+    } else if (!allChildren && threeLevelMode === 'expanding') {
+      setThreeLevelTo(3);
+    } else if (allChildren) {
+      setThreeLevelTo(2);
+      setThreeLevelMode('collapsing');
+    } else {
+      setThreeLevelTo(1);
+    }
+  };
+
+  const getThreeLevelButtonInfo = () => {
+    const allParents = sampleThreeLevelData.every(p => !!expandedThreeLevelParent[p.id]);
+    const allChildren = sampleThreeLevelData.every(p => p.children.every(c => !!expandedThreeLevelChild[c.id]));
+
+    if (!allParents) {
+      return {
+        label: 'Buka Tingkat 2 (Anak)',
+        levelText: 'Level 1: Induk Saja',
+        icon: ChevronDown,
+        level: 1
+      };
+    }
+    if (allChildren) {
+      return {
+        label: 'Tutup Tingkat 3 (Cucu)',
+        levelText: 'Level 3: Lengkap (+Cucu)',
+        icon: ChevronUp,
+        level: 3
+      };
+    }
+    if (threeLevelMode === 'collapsing') {
+      return {
+        label: 'Tutup Semua (Kembali ke Induk)',
+        levelText: 'Level 2: Cucu Ditutup',
+        icon: ChevronUp,
+        level: 2
+      };
+    }
+    return {
+      label: 'Buka Tingkat 3 (Cucu)',
+      levelText: 'Level 2: +Anak Terbuka',
+      icon: ChevronDown,
+      level: 2
+    };
+  };
+
+  const isAllThreeLevelExpanded = 
+    sampleThreeLevelData.every(p => !!expandedThreeLevelParent[p.id]) &&
+    sampleThreeLevelData.every(p => p.children.every(c => !!expandedThreeLevelChild[c.id]));
+
+  const toggleAllThreeLevels = handleStepThreeLevels;
+
+  // =========================================================================
+  // STATE & DATA SAMPLE: PIVOT MATRIX BAGAN AKUN STANDAR (COA) 12-BULAN
+  // =========================================================================
+  const [pivotHierarchyLevel, setPivotHierarchyLevel] = useState<number>(3);
+  const [pivotSearchQuery, setPivotSearchQuery] = useState<string>('');
+  const [pivotCategoryFilter, setPivotCategoryFilter] = useState<'all' | '4' | '5' | '1'>('all');
+  const [pivotExpandedNodes, setPivotExpandedNodes] = useState<Record<string, boolean>>({
+    'pvt-induk-4': true,
+    'pvt-induk-5': true,
+    'pvt-gol-41': true,
+    'pvt-gol-51': true,
+    'pvt-gol-52': true,
+    'pvt-kel-411': true,
+    'pvt-kel-511': true,
+  });
+  const [pivotTableDensity, setPivotTableDensity] = useState<TableDensity>('comfortable');
+  const [pivotExpandPosisiAwal, setPivotExpandPosisiAwal] = useState<boolean>(false);
+  const [pivotExpandPosisiAkhir, setPivotExpandPosisiAkhir] = useState<boolean>(false);
+
+  const samplePivotCoaData = [
+    {
+      id: 'pvt-induk-4',
+      nomor_akun: '40000',
+      nama_akun: 'PENERIMAAN KAS & INFAQ MASJID',
+      isInduk: true,
+      saldoAwal: 0,
+      months: [42500000, 38000000, 56000000, 68000000, 49000000, 45000000, 52000000, 47000000, 51000000, 64000000, 58000000, 75000000],
+      golongans: [
+        {
+          id: 'pvt-gol-41',
+          nomor_akun: '41',
+          nama_akun: 'Penerimaan Infaq, Wakaf & Donasi',
+          isGol: true,
+          months: [41000000, 36500000, 54200000, 66000000, 47500000, 43200000, 50100000, 45500000, 49200000, 62000000, 56200000, 72800000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-411',
+              nomor_akun: '41100',
+              nama_akun: 'Infaq Kotak Jumat & Harian',
+              isKel: true,
+              months: [28000000, 25000000, 36000000, 44000000, 31000000, 29000000, 33000000, 30000000, 32000000, 41000000, 37000000, 48000000],
+              anaks: [
+                { id: 'pvt-anak-41101', nomor_akun: '41100.01', nama_akun: 'Infaq Kotak Sholat Jumat Utama', months: [20000000, 18000000, 26000000, 32000000, 22000000, 21000000, 24000000, 22000000, 23000000, 30000000, 27000000, 35000000] },
+                { id: 'pvt-anak-41102', nomor_akun: '41100.02', nama_akun: 'Infaq Kotak Harian & Jamaah Wanita', months: [8000000, 7000000, 10000000, 12000000, 9000000, 8000000, 9000000, 8000000, 9000000, 11000000, 10000000, 13000000] },
+              ]
+            },
+            {
+              id: 'pvt-kel-412',
+              nomor_akun: '41200',
+              nama_akun: 'Donasi Non-Tunai & QRIS',
+              isKel: true,
+              months: [13000000, 11500000, 18200000, 22000000, 16500000, 14200000, 17100000, 15500000, 17200000, 21000000, 19200000, 24800000],
+              anaks: [
+                { id: 'pvt-anak-41201', nomor_akun: '41200.01', nama_akun: 'QRIS Dinamis Masjid (BSI & BNI)', months: [13000000, 11500000, 18200000, 22000000, 16500000, 14200000, 17100000, 15500000, 17200000, 21000000, 19200000, 24800000] },
+              ]
+            }
+          ]
+        },
+        {
+          id: 'pvt-gol-43',
+          nomor_akun: '43',
+          nama_akun: 'Penerimaan Bagi Hasil & Jasa Giro Bank',
+          isGol: true,
+          months: [1500000, 1500000, 1800000, 2000000, 1500000, 1800000, 1900000, 1500000, 1800000, 2000000, 1800000, 2200000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-431',
+              nomor_akun: '43100',
+              nama_akun: 'Bagi Hasil Tabungan Syariah (BSI)',
+              isKel: true,
+              months: [1500000, 1500000, 1800000, 2000000, 1500000, 1800000, 1900000, 1500000, 1800000, 2000000, 1800000, 2200000],
+              anaks: []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'pvt-induk-5',
+      nomor_akun: '50000',
+      nama_akun: 'BEBAN OPERASIONAL & REALISASI MAK',
+      isInduk: true,
+      saldoAwal: 0,
+      months: [32000000, 34500000, 48000000, 52000000, 39500000, 38000000, 41000000, 43500000, 42000000, 47000000, 46000000, 58000000],
+      golongans: [
+        {
+          id: 'pvt-gol-51',
+          nomor_akun: '51',
+          nama_akun: 'Bisyaroh & Tunjangan Petugas',
+          isGol: true,
+          months: [18000000, 18000000, 22000000, 24000000, 18000000, 18000000, 18000000, 18000000, 18000000, 21000000, 19000000, 24000000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-511',
+              nomor_akun: '51100',
+              nama_akun: 'Bisyaroh Imam Rawatib, Muadzin & Marbot',
+              isKel: true,
+              months: [12000000, 12000000, 15000000, 16000000, 12000000, 12000000, 12000000, 12000000, 12000000, 14000000, 13000000, 16000000],
+              anaks: [
+                { id: 'pvt-anak-51101', nomor_akun: '51100.01', nama_akun: 'Honor Imam Rawatib 5 Waktu', months: [7000000, 7000000, 8500000, 9000000, 7000000, 7000000, 7000000, 7000000, 7000000, 8000000, 7500000, 9000000] },
+                { id: 'pvt-anak-51102', nomor_akun: '51100.02', nama_akun: 'Honor Muadzin & Petugas Marbot', months: [5000000, 5000000, 6500000, 7000000, 5000000, 5000000, 5000000, 5000000, 5000000, 6000000, 5500000, 7000000] },
+              ]
+            },
+            {
+              id: 'pvt-kel-512',
+              nomor_akun: '51200',
+              nama_akun: 'Bisyaroh Penceramah & Khatib Jumat',
+              isKel: true,
+              months: [6000000, 6000000, 7000000, 8000000, 6000000, 6000000, 6000000, 6000000, 6000000, 7000000, 6000000, 8000000],
+              anaks: []
+            }
+          ]
+        },
+        {
+          id: 'pvt-gol-52',
+          nomor_akun: '52',
+          nama_akun: 'Kerumahtanggaan, Konsumsi & Operasional',
+          isGol: true,
+          months: [9000000, 10500000, 16000000, 18000000, 12500000, 11000000, 13000000, 14500000, 13500000, 15000000, 16000000, 19000000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-521',
+              nomor_akun: '52100',
+              nama_akun: 'Alat Kebersihan, Pewangi & Operasional Sanitasi',
+              isKel: true,
+              months: [4000000, 4500000, 6000000, 7000000, 5000000, 4500000, 5000000, 5500000, 5000000, 6000000, 6000000, 7500000],
+              anaks: []
+            },
+            {
+              id: 'pvt-kel-522',
+              nomor_akun: '52200',
+              nama_akun: 'Konsumsi Kajian Rutin, Rapat & Buka Puasa',
+              isKel: true,
+              months: [5000000, 6000000, 10000000, 11000000, 7500000, 6500000, 8000000, 9000000, 8500000, 9000000, 10000000, 11500000],
+              anaks: []
+            }
+          ]
+        },
+        {
+          id: 'pvt-gol-53',
+          nomor_akun: '53',
+          nama_akun: 'Pemeliharaan Gedung, AC & Sound System',
+          isGol: true,
+          months: [5000000, 6000000, 10000000, 10000000, 9000000, 9000000, 10000000, 11000000, 10500000, 11000000, 11000000, 15000000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-531',
+              nomor_akun: '53100',
+              nama_akun: 'Servis AC Central & Peremajaan Sound System',
+              isKel: true,
+              months: [5000000, 6000000, 10000000, 10000000, 9000000, 9000000, 10000000, 11000000, 10500000, 11000000, 11000000, 15000000],
+              anaks: []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'pvt-induk-1',
+      nomor_akun: '10000',
+      nama_akun: 'KAS & SETARA KAS (SALDO MUTASI)',
+      isInduk: true,
+      saldoAwal: 245000000,
+      months: [12000000, 15000000, 18000000, 14000000, 16000000, 17500000, 19000000, 16500000, 18500000, 20000000, 19500000, 22000000],
+      golongans: [
+        {
+          id: 'pvt-gol-11',
+          nomor_akun: '11',
+          nama_akun: 'Kas & Rekening Operasional Bank',
+          isGol: true,
+          months: [12000000, 15000000, 18000000, 14000000, 16000000, 17500000, 19000000, 16500000, 18500000, 20000000, 19500000, 22000000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-111',
+              nomor_akun: '11110',
+              nama_akun: 'Mutasi Kas Operasional Tunai',
+              isKel: true,
+              months: [4000000, 5000000, 6000000, 4500000, 5000000, 5500000, 6000000, 5000000, 6000000, 7000000, 6500000, 7000000],
+              anaks: []
+            },
+            {
+              id: 'pvt-kel-112',
+              nomor_akun: '11120',
+              nama_akun: 'Mutasi Rekening Giro Utama (BSI & BNI)',
+              isKel: true,
+              months: [8000000, 10000000, 12000000, 9500000, 11000000, 12000000, 13000000, 11500000, 12500000, 13000000, 13000000, 15000000],
+              anaks: []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: 'pvt-induk-9',
+      nomor_akun: '90000',
+      nama_akun: 'KOREKSI & PENYESUAIAN REKENING BANK',
+      isInduk: true,
+      saldoAwal: 0,
+      months: [500000, 0, 750000, 0, 300000, 0, 450000, 0, 0, 600000, 0, 250000],
+      golongans: [
+        {
+          id: 'pvt-gol-91',
+          nomor_akun: '91',
+          nama_akun: 'Koreksi Selisih Kas & Kliring Bank',
+          isGol: true,
+          months: [500000, 0, 750000, 0, 300000, 0, 450000, 0, 0, 600000, 0, 250000],
+          kelompoks: [
+            {
+              id: 'pvt-kel-911',
+              nomor_akun: '91100',
+              nama_akun: 'Penyesuaian Bunga / Biaya Administrasi Giro',
+              isKel: true,
+              months: [500000, 0, 750000, 0, 300000, 0, 450000, 0, 0, 600000, 0, 250000],
+              anaks: []
+            }
+          ]
+        }
+      ]
+    }
+  ];
+
+  const samplePivotRekeningSaldo = [
+    { id: 'rek-bsi', nama: 'BSI Giro Operasional (Rek. 7001234567)', awal: 145000000, saldos: [155500000, 159000000, 167000000, 183000000, 192500000, 199500000, 210500000, 214000000, 223000000, 240000000, 252000000, 269000000] },
+    { id: 'rek-bni', nama: 'BNI Giro Masjid (Rek. 0123456789)', awal: 85000000, saldos: [85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000, 85000000] },
+    { id: 'rek-kas', nama: 'Kas Tunai Bendahara', awal: 15000000, saldos: [15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000, 15000000] },
+  ];
+
+  const setPivotHierarchyTo = (lvl: number) => {
+    setPivotHierarchyLevel(lvl);
+    const newMap: Record<string, boolean> = {};
+    samplePivotCoaData.forEach((induk) => {
+      newMap[induk.id] = lvl >= 2;
+      induk.golongans.forEach((gol) => {
+        newMap[gol.id] = lvl >= 3;
+        gol.kelompoks.forEach((kel) => {
+          newMap[kel.id] = lvl >= 4;
+        });
+      });
+    });
+    setPivotExpandedNodes(newMap);
+  };
+
+  const togglePivotNode = (id: string, defaultExpanded: boolean) => {
+    setPivotExpandedNodes(prev => ({
+      ...prev,
+      [id]: prev[id] !== undefined ? !prev[id] : !defaultExpanded
+    }));
+  };
+
+  const filteredPivotData = useMemo(() => {
+    const q = pivotSearchQuery.toLowerCase().trim();
+    return samplePivotCoaData.filter((induk) => {
+      if (pivotCategoryFilter !== 'all') {
+        if (!induk.nomor_akun.startsWith(pivotCategoryFilter)) return false;
+      }
+      return true;
+    }).map((induk) => {
+      if (!q) return induk;
+      const filteredGols = induk.golongans.map((g) => {
+        const filteredKels = g.kelompoks.map((k) => {
+          const matchAnaks = k.anaks.filter(a => a.nomor_akun.includes(q) || a.nama_akun.toLowerCase().includes(q));
+          const matchKel = k.nomor_akun.includes(q) || k.nama_akun.toLowerCase().includes(q);
+          return { ...k, anaks: matchAnaks, _matched: matchKel || matchAnaks.length > 0 };
+        }).filter(k => (k as any)._matched);
+
+        const matchGol = g.nomor_akun.includes(q) || g.nama_akun.toLowerCase().includes(q);
+        return { ...g, kelompoks: filteredKels, _matched: matchGol || filteredKels.length > 0 };
+      }).filter(g => (g as any)._matched);
+
+      return { ...induk, golongans: filteredGols };
+    });
+  }, [pivotCategoryFilter, pivotSearchQuery]);
 
   // Tree View State & Sample Data
   const [treeTab, setTreeTab] = useState<'unit' | 'akun'>('unit');
@@ -1240,45 +1862,239 @@ export default function DesignSystemPage() {
             </div>
           </div>
 
-          {/* Card: Rentang Tanggal + Jam (Poin 2) */}
+          {/* Card 1: Filter Rentang Tanggal & Bulan Laporan (Poin 2A - Tanpa Jam & Murni Bulan) */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase">
-                  Poin 2
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
+                  Poin 2A • Filter Laporan
                 </span>
                 <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                  Rentang Tanggal & Jam Laporan (Unified Popover dengan Jam)
+                  Filter Rentang Tanggal &amp; Bulan Laporan (Tanpa Jam, 1x Klik Preset)
                 </h2>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Komponen <code className="text-blue-600 font-bold">&lt;DateRangePicker showTime /&gt;</code> menyajikan tanggal awal & akhir beserta <strong>jam mulai & jam selesai</strong> dalam satu popover terpadu (1x klik).
+                Katalog baku pemilih rentang waktu untuk <strong>filter tabel data, query laporan, dan monitoring</strong>. Tersedia dalam dua mode baku: <strong>Rentang Tanggal Harian</strong> (<code className="text-blue-600 font-bold">&lt;DateRangePicker showTime=&#123;false&#125; /&gt;</code>) dan <strong>Rentang Bulan Murni Tanpa Tanggal</strong> (<code className="text-indigo-600 font-bold">&lt;MonthRangePicker /&gt;</code>).
               </p>
             </div>
 
-            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <DateRangePicker
-                  label="Rentang Tanggal & Jam Lengkap (1x Klik)"
-                  value={dateRange}
-                  onChange={setDateRange}
-                  showTime={true}
-                />
-                <span className="text-[10px] text-gray-400 mt-1 block">
-                  Aktif: {dateRange.startDate} ({dateRange.startTime}) s/d {dateRange.endDate} ({dateRange.endTime})
+            {/* Sub-Card 1: DateRangePicker (Rentang Tanggal Harian - Tanpa Jam) */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-200/70">
+                <span className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-blue-600" />
+                  1. DateRangePicker (Rentang Tanggal Harian — Tanpa Jam)
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200/70">
+                  Format: YYYY-MM-DD
                 </span>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  Tanggal & Jam Tunggal
-                </label>
-                <input
-                  type="datetime-local"
-                  value={dateTimeVal}
-                  onChange={(e) => setDateTimeVal(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium text-gray-800"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div className="md:col-span-2">
+                  <DateRangePicker
+                    label="Filter Rentang Tanggal (1x Klik)"
+                    value={dateRangeFilter}
+                    onChange={setDateRangeFilter}
+                    showTime={false}
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] font-bold text-gray-500">Rentang Aktif:</span>
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 font-mono font-bold text-[11px] border border-blue-200">
+                      {dateRangeFilter.startDate} s/d {dateRangeFilter.endDate}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-gray-200/80 space-y-1.5 text-xs">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">Karakteristik Komponen:</span>
+                  <ul className="text-gray-600 text-[11px] space-y-1 list-disc list-inside">
+                    <li>Preset 1-klik: Hari Ini, 7 Hari, 30 Hari, Bulan Ini, Bulan Lalu</li>
+                    <li>Pemilih Cepat Per Bulan &amp; Tahun (Jan - Des)</li>
+                    <li>Digunakan pada: <strong>Rekap Transfer, Jurnal Kas, Laporan Realisasi</strong></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-Card 2: MonthRangePicker (Rentang Bulan Murni - Tanpa Menampilkan Tanggal) */}
+            <div className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-indigo-200/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-indigo-600" />
+                    2. MonthRangePicker (Rentang Bulan Murni — Tanpa Menampilkan Tanggal)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[9px] font-black uppercase">
+                    Komponen Baru
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-bold bg-indigo-100/80 text-indigo-800 px-2 py-0.5 rounded border border-indigo-200/70">
+                  Format: YYYY-MM
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div className="md:col-span-2 space-y-2.5">
+                  <MonthRangePicker
+                    label="Pilih Rentang Bulan Laporan (Murni Bulan)"
+                    value={monthRangeFilter}
+                    onChange={setMonthRangeFilter}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[11px] font-bold text-gray-500">Rentang Bulan Terpilih:</span>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-indigo-600 text-white font-black text-[11px] shadow-2xs">
+                      {monthRangeFilter.startMonth} s/d {monthRangeFilter.endMonth}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-white text-indigo-900 font-mono text-[10.5px] font-bold border border-indigo-200">
+                      Query Database: {monthRangeFilter.startDate} s/d {monthRangeFilter.endDate}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-indigo-200/80 space-y-1.5 text-xs shadow-2xs">
+                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-wider block">Karakteristik MonthRangePicker:</span>
+                  <ul className="text-gray-600 text-[11px] space-y-1 list-disc list-inside">
+                    <li><strong>Murni Bulan:</strong> Hanya memilih bulan &amp; tahun, angka tanggal hari tidak ditampilkan.</li>
+                    <li><strong>Visual Highlight:</strong> Sorotan kontinu dari bulan awal sampai bulan akhir.</li>
+                    <li><strong>Preset 1-Klik:</strong> Bulan Ini, Q1-Q4 (Triwulan), Semester 1 &amp; 2, Tahun Penuh (12 Bulan).</li>
+                    <li><strong>Output Otomatis:</strong> Langsung menyertakan rentang tanggal lengkap (YYYY-MM-01 s/d YYYY-MM-lastDay) untuk filter SQL/API.</li>
+                    <li>Cocok untuk: <strong>Laporan Keuangan Bulanan, Bagan Akun Standar (COA), Rekapitulasi Tahunan</strong>.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Input Tanggal & Jam Data Transaksi (Poin 2B - Form Input) */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider">
+                  Poin 2B • Input Formulir
+                </span>
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                  Input Tanggal &amp; Jam Transaksi (Form Input Data, Bukan Filter)
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Komponen input tanggal dan waktu yang digunakan untuk <strong>pengisian form transaksi, jadwal kegiatan, dan approval bukti transfer</strong> (bukan untuk filter laporan).
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                
+                {/* 1. Input Tanggal & Jam Pelaksanaan Tunggal */}
+                <div className="bg-white p-4 rounded-xl border border-gray-200/80 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock size={13} className="text-emerald-600" />
+                      1. Waktu Transaksi Tunggal (Datetime)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const y = now.getFullYear();
+                        const m = String(now.getMonth() + 1).padStart(2, '0');
+                        const d = String(now.getDate()).padStart(2, '0');
+                        const h = String(now.getHours()).padStart(2, '0');
+                        const min = String(now.getMinutes()).padStart(2, '0');
+                        setDateTimeVal(`${y}-${m}-${d}T${h}:${min}`);
+                      }}
+                      className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200 transition-colors cursor-pointer"
+                    >
+                      Set Sekarang
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                      Tanggal &amp; Jam Pelaksanaan:
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={dateTimeVal}
+                      onChange={(e) => setDateTimeVal(e.target.value)}
+                      className="w-full h-9 px-3 text-xs bg-slate-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-semibold text-gray-800 cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="p-2.5 bg-emerald-50/60 rounded-lg border border-emerald-100 text-[11px] text-emerald-900 font-mono">
+                    <strong>Payload Form:</strong> {`{ waktu_eksekusi: "${dateTimeVal}:00+07:00" }`}
+                  </div>
+                </div>
+
+                {/* 2. Input Rentang Jam Kegiatan (Tanggal + Jam Mulai s.d Selesai) */}
+                <div className="bg-white p-4 rounded-xl border border-gray-200/80 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar size={13} className="text-indigo-600" />
+                      2. Jadwal Acara (Tanggal + Rentang Jam)
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { setFormStartTime('08:00'); setFormEndTime('16:00'); }}
+                        className="px-1.5 py-0.5 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-gray-600 text-[9.5px] font-bold rounded transition-colors cursor-pointer"
+                      >
+                        08-16
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setFormStartTime('13:00'); setFormEndTime('17:00'); }}
+                        className="px-1.5 py-0.5 bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-gray-600 text-[9.5px] font-bold rounded transition-colors cursor-pointer"
+                      >
+                        13-17
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Tanggal Kegiatan:
+                      </label>
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-800 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Jam Mulai:
+                      </label>
+                      <input
+                        type="time"
+                        value={formStartTime}
+                        onChange={(e) => setFormStartTime(e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-800 cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                        Jam Selesai:
+                      </label>
+                      <input
+                        type="time"
+                        value={formEndTime}
+                        onChange={(e) => setFormEndTime(e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs bg-slate-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold text-gray-800 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-indigo-50/60 rounded-lg border border-indigo-100 text-[11px] text-indigo-900 font-mono">
+                    <strong>Payload Form:</strong> {`{ tanggal: "${formDate}", jam: "${formStartTime} - ${formEndTime}" }`}
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
@@ -1486,6 +2302,396 @@ export default function DesignSystemPage() {
                   }}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Card 4: Pedoman Standar Paste Zone (Bulk Import Clipboard Excel dengan Keterangan Format Data) */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
+                    Poin 2D • Standar Excel / TSV Paste Zone
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                    Pedoman Standar Paste Zone (Import Massal Clipboard Excel dengan Keterangan Data)
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Format baku kotak input salin-tempel (<em>copy-paste</em>) massal dari Microsoft Excel atau Google Sheets. Memungkinkan penginputan puluhan hingga ribuan baris data transaksi anggaran secara instan tanpa perlu repot menyimpan file CSV manual.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleCopy(
+                    `<div className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-200/90 shadow-2xs flex flex-col md:flex-row items-center gap-3">\n  <div className="min-w-[130px] flex flex-col items-center justify-center p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">\n    <FileSpreadsheet size={24} className="mb-1 text-indigo-600" />\n    <p className="text-[10px] font-bold uppercase tracking-wider">Paste Zone</p>\n    <span className="text-[9px] text-indigo-500 font-medium">Excel Clipboard</span>\n  </div>\n  <div className="flex-1 w-full">\n    <textarea\n      onPaste={handleExcelPaste}\n      placeholder="COPY baris dari EXCEL lalu PASTE di sini...\\nFormat: [1] ID DB [TAB] [2] Nama Unit [TAB] [3] Tahun [TAB] [4] Nominal [TAB] [5] Sumber Dana [TAB] [6] Keterangan [TAB] [7] Status Pagu [TAB] [8] Jenis Anggaran"\n      className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl py-2.5 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 resize-none h-20 shadow-2xs"\n    />\n  </div>\n</div>`,
+                    'paste-zone-code'
+                  )
+                }
+                className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+              >
+                {copiedCode === 'paste-zone-code' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                <span>{copiedCode === 'paste-zone-code' ? 'Tersalin!' : 'Salin Kode Paste Zone'}</span>
+              </button>
+            </div>
+
+            {/* TABEL KETERANGAN FORMAT DATA YANG DI-PASTE-KAN */}
+            <div className="p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200/70">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+                    <FileSpreadsheet size={15} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                      Tabel Keterangan Spesifikasi Kolom Data (8 Kolom Baku)
+                    </h3>
+                    <p className="text-[11px] text-gray-500">
+                      Pastikan susunan kolom sel di spreadsheet Excel sesuai urutan header baku dari kiri ke kanan.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText("[1] ID DB\t[2] Nama Unit\t[3] Tahun\t[4] Nominal\t[5] Sumber Dana\t[6] Keterangan\t[7] Status Pagu\t[8] Jenis Anggaran");
+                    triggerToast('info', 'Header Excel Disalin', 'Header 8-kolom baku siap di-paste ke baris 1 spreadsheet Excel Anda.');
+                  }}
+                  className="h-7 px-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs shrink-0"
+                >
+                  <Copy size={11} />
+                  <span>Salin Header Kolom Excel (8 Kolom)</span>
+                </button>
+              </div>
+
+              {/* Quick Header Ribbon */}
+              <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white rounded-xl border border-gray-200/80">
+                <span className="text-[10px] font-black uppercase text-gray-400 mr-1">Urutan Header:</span>
+                {[
+                  '[1] ID DB',
+                  '[2] Nama Unit',
+                  '[3] Tahun',
+                  '[4] Nominal',
+                  '[5] Sumber Dana',
+                  '[6] Keterangan',
+                  '[7] Status Pagu',
+                  '[8] Jenis Anggaran'
+                ].map((colName, cIdx) => (
+                  <span key={cIdx} className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-mono font-bold">
+                    {colName}
+                  </span>
+                ))}
+              </div>
+
+              {/* Data Spec Table */}
+              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3 text-center w-14">Kolom</th>
+                      <th className="py-2.5 px-3 w-40">Nama Field Header</th>
+                      <th className="py-2.5 px-3 w-36">Tipe &amp; Format</th>
+                      <th className="py-2.5 px-3 text-center w-24">Kewajiban</th>
+                      <th className="py-2.5 px-3">Keterangan &amp; Ketentuan Baku</th>
+                      <th className="py-2.5 px-3 w-48 font-mono">Contoh Isi Sel</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[
+                      {
+                        col: 'A (1)',
+                        field: '[1] ID DB',
+                        type: 'String / Angka',
+                        badge: 'ID Referensi / PK',
+                        required: false,
+                        desc: 'ID unik baris pada database. Jika diisi sistem akan melakukan sinkronisasi/update baris lama; jika kosong akan otomatis di-generate sebagai entri baru.',
+                        example: '101'
+                      },
+                      {
+                        col: 'B (2)',
+                        field: '[2] Nama Unit',
+                        type: 'Teks (String)',
+                        badge: 'Unit Kerja / Fakultas',
+                        required: true,
+                        desc: 'Nama fakultas, direktorat, lembaga, departemen, atau unit kerja penanggung jawab alokasi anggaran.',
+                        example: 'Fakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan'
+                      },
+                      {
+                        col: 'C (3)',
+                        field: '[3] Tahun',
+                        type: 'Angka (4 Digit)',
+                        badge: 'YYYY (Tahun Anggaran)',
+                        required: true,
+                        desc: 'Tahun anggaran belanja atau penetapan pagu (misal: 2026, 2025, 2024).',
+                        example: '2026'
+                      },
+                      {
+                        col: 'D (4)',
+                        field: '[4] Nominal',
+                        type: 'Angka (Numeric)',
+                        badge: 'Rupiah Bersih',
+                        required: true,
+                        desc: 'Nilai alokasi anggaran dalam Rupiah. Simbol "Rp", pemisah titik ribuan, atau koma desimal otomatis dibersihkan.',
+                        example: '1850000000'
+                      },
+                      {
+                        col: 'E (5)',
+                        field: '[5] Sumber Dana',
+                        type: 'Pilihan (Enum)',
+                        badge: 'BOPTN / RKAT / APBN / PNBP',
+                        required: true,
+                        desc: 'Asal pembiayaan anggaran (contoh: BOPTN, RKAT-UGM, APBN, PNBP, Hibah Penelitian).',
+                        example: 'BOPTN'
+                      },
+                      {
+                        col: 'F (6)',
+                        field: '[6] Keterangan',
+                        type: 'Teks Bebas',
+                        badge: 'Maks. 500 Karakter',
+                        required: false,
+                        desc: 'Uraian rincian peruntukan pengadaan, catatan kegiatan, atau deskripsi kebutuhan anggaran belanja.',
+                        example: 'Operasional Lab Biomedis & Riset Terpadu'
+                      },
+                      {
+                        col: 'G (7)',
+                        field: '[7] Status Pagu',
+                        type: 'Pilihan (Enum)',
+                        badge: 'Disetujui / Usulan / Revisi',
+                        required: false,
+                        desc: 'Status verifikasi pagu anggaran di sistem ("Disetujui", "Usulan", "Revisi", "Draft"). Default: Disetujui.',
+                        example: 'Disetujui'
+                      },
+                      {
+                        col: 'H (8)',
+                        field: '[8] Jenis Anggaran',
+                        type: 'Pilihan (Enum)',
+                        badge: 'Barang / Modal / Operasional',
+                        required: false,
+                        desc: 'Klasifikasi pos belanja ("Belanja Barang", "Belanja Modal", "Operasional", "Gaji & Tunjangan"). Default: Belanja Barang.',
+                        example: 'Belanja Barang'
+                      },
+                    ].map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-gray-500 text-[11px]">
+                          {row.col}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-gray-900 font-mono text-xs">
+                          {row.field}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
+                            {row.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            row.required ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {row.required ? 'Wajib' : 'Opsional'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600 text-[11px]">
+                          {row.desc}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-indigo-700 font-semibold">
+                          {row.example}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Ketentuan Cerdas Sistem */}
+              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900 text-xs space-y-1">
+                <span className="font-bold flex items-center gap-1.5 text-amber-800">
+                  <Info size={14} className="text-amber-600" /> Aturan Pintar Parser Paste Zone:
+                </span>
+                <ul className="text-[11px] list-disc list-inside space-y-0.5 text-amber-800/90 pl-1">
+                  <li><strong>Header Otomatis Dieliminasi:</strong> Jika baris pertama berisi kata kunci &quot;ID DB&quot;, &quot;[1]&quot;, &quot;Nama Unit&quot;, atau &quot;Tahun&quot;, sistem tidak akan memasukkannya sebagai baris data.</li>
+                  <li><strong>Normalisasi Format Uang:</strong> Teks seperti &quot;Rp 1.850.000.000,00&quot; atau &quot;1850000000&quot; otomatis dikonversi ke nilai angka murni.</li>
+                  <li><strong>Pemisah Tabulator Baku (TSV):</strong> Mendukung salin sel multi-baris langsung dari Microsoft Excel desktop, Office 365, maupun Google Sheets via tombol keyboard <strong>Ctrl + C</strong> lalu <strong>Ctrl + V</strong>.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* LIVE INTERACTIVE PASTE ZONE BOX */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <ClipboardPaste size={14} className="text-indigo-600" />
+                  Area Uji Coba Paste Zone Interaktif
+                </span>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDemoPasteText(sampleTSVRows);
+                      triggerToast('success', 'Contoh Data Dimuat', '4 baris data pagu unit UGM berhasil diisikan ke Paste Zone.');
+                    }}
+                    className="h-8 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-indigo-200 shadow-2xs"
+                  >
+                    <Sparkles size={13} className="text-indigo-600" />
+                    <span>✨ Isi Contoh Format TSV (8 Kolom)</span>
+                  </button>
+
+                  {demoPasteText && (
+                    <button
+                      type="button"
+                      onClick={() => setDemoPasteText('')}
+                      className="h-8 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <X size={13} />
+                      <span>Bersihkan</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Paste Zone Component Layout */}
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-indigo-200/90 shadow-2xs flex flex-col md:flex-row items-stretch gap-3.5 bg-gradient-to-br from-white via-indigo-50/15 to-blue-50/20">
+                <div className="min-w-[130px] flex flex-col items-center justify-center p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">
+                  <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-xs mb-2">
+                    <FileSpreadsheet size={22} />
+                  </div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-indigo-900 leading-tight">Paste Zone</p>
+                  <span className="text-[9px] text-indigo-600 font-semibold mt-0.5">Excel Clipboard</span>
+                  <span className="text-[8.5px] px-1.5 py-0.5 mt-2 rounded bg-indigo-100/80 text-indigo-700 font-mono font-bold">
+                    8 Kolom TSV
+                  </span>
+                </div>
+
+                <div className="flex-1 w-full space-y-1.5">
+                  <textarea
+                    rows={4}
+                    value={demoPasteText}
+                    onChange={(e) => setDemoPasteText(e.target.value)}
+                    placeholder="COPY data baris tabel dari EXCEL (blok beberapa baris lalu Ctrl+C), kemudian PASTE (Ctrl+V) di sini...&#10;Format urutan kolom: [1] ID DB [TAB] [2] Nama Unit [TAB] [3] Tahun [TAB] [4] Nominal [TAB] [5] Sumber Dana [TAB] [6] Keterangan [TAB] [7] Status Pagu [TAB] [8] Jenis Anggaran"
+                    className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl p-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 placeholder:font-sans resize-none min-h-[105px] shadow-2xs leading-relaxed"
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium px-1">
+                    <span>Tekan <strong>Ctrl + V</strong> di dalam kotak untuk menempelkan data dari Excel</span>
+                    <span className="font-mono">{demoPasteText.length} karakter • {parsedPasteRows.length} baris valid</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* REAL-TIME PREVIEW & VALIDATION SUMMARY */}
+              {parsedPasteRows.length > 0 && (
+                <div className="space-y-3 pt-2 animate-in fade-in duration-200">
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 rounded-xl bg-white border border-gray-200 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Total Baris</span>
+                      <span className="text-base font-black text-gray-900 font-mono">{parsedPasteRows.length} Baris</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold text-emerald-700 block mb-0.5">Lolos Validasi</span>
+                      <span className="text-base font-black text-emerald-800 font-mono">
+                        {parsedPasteRows.filter(r => r.isValid).length} Baris
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold text-amber-700 block mb-0.5">Perlu Koreksi</span>
+                      <span className="text-base font-black text-amber-800 font-mono">
+                        {parsedPasteRows.filter(r => !r.isValid).length} Baris
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold text-indigo-700 block mb-0.5">Total Nilai Pagu</span>
+                      <span className="text-base font-black text-indigo-900 font-mono">
+                        Rp {parsedPasteRows.reduce((s, r) => s + r.nominal, 0).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Realtime Table Preview */}
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+                    <div className="p-3 px-4 bg-gray-50/80 border-b border-gray-200 flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-900">
+                        Pratinjau Hasil Pembacaan Data ({parsedPasteRows.length} Baris Terurai dengan 8 Kolom Baku)
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        Siap Di-commit ke Database
+                      </span>
+                    </div>
+
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                          <th className="py-2.5 px-3 text-center w-10">No</th>
+                          <th className="py-2.5 px-3 w-16 text-center">Status</th>
+                          <th className="py-2.5 px-3 w-20 font-mono">[1] ID DB</th>
+                          <th className="py-2.5 px-3 font-mono">[2] Nama Unit</th>
+                          <th className="py-2.5 px-3 w-16 font-mono text-center">[3] Tahun</th>
+                          <th className="py-2.5 px-3 text-right w-36 font-mono">[4] Nominal</th>
+                          <th className="py-2.5 px-3 w-28 font-mono">[5] Sumber Dana</th>
+                          <th className="py-2.5 px-3 font-mono">[6] Keterangan</th>
+                          <th className="py-2.5 px-3 text-center w-24 font-mono">[7] Status Pagu</th>
+                          <th className="py-2.5 px-3 text-center w-28 font-mono">[8] Jenis Anggaran</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {parsedPasteRows.map((row) => (
+                          <tr key={row.id} className={row.isValid ? "hover:bg-indigo-50/20" : "bg-rose-50/40"}>
+                            <td className="py-2 px-3 text-center font-mono font-bold text-gray-400 text-xs">
+                              {row.lineNum}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {row.isValid ? (
+                                <span className="inline-flex items-center gap-0.5 text-emerald-700 text-[10px] font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  <CheckCircle2 size={11} /> Valid
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 text-rose-700 text-[10px] font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200" title={row.issues || ''}>
+                                  <AlertCircle size={11} /> Cek
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 font-mono text-gray-500 text-[11px]">
+                              {row.idDb}
+                            </td>
+                            <td className="py-2 px-3 font-semibold text-gray-900">
+                              {row.namaUnit}
+                            </td>
+                            <td className="py-2 px-3 font-mono text-center text-gray-700 text-xs font-bold">
+                              {row.tahun}
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono font-bold text-indigo-700 text-xs">
+                              Rp {row.nominal.toLocaleString('id-ID')}
+                            </td>
+                            <td className="py-2 px-3">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                                {row.sumberDana}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-gray-600 text-[11px] max-w-[200px] truncate" title={row.keterangan}>
+                              {row.keterangan}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {row.statusPagu}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                {row.jenisAnggaran}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2005,6 +3211,7 @@ export default function DesignSystemPage() {
               </div>
             </div>
           </div>
+
         </div>
       )}
 
@@ -2849,72 +4056,918 @@ export default function DesignSystemPage() {
       )}
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* TAB 6: EDITOR & STANDAR UKURAN GAMBAR                                     */}
       {/* ========================================================================= */}
       {activeTab === 'editor' && (
-        <div className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-              Template Editor Dokumen & Standar Ukuran Menampilkan Gambar
-            </h2>
+        <div className="space-y-6">
+          {/* BAGIAN 1: TEMPLATE EDITOR DOKUMEN & NASKAH DINAS RESMI */}
+          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <FileText size={17} className="text-blue-600" />
+                  <span>Template Editor Dokumen &amp; Naskah Dinas Keuangan</span>
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Toolbar komponen penulisan naskah dinas, dokumen SPJ, tabel perincian anggaran, daftar bullet &amp; nomor, serta checklist verifikasi.
+                </p>
+              </div>
 
+              {/* Mode Switcher: Raw Editor vs Rich Document Preview */}
+              <div className="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200 shadow-2xs self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setEditorMode('edit')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    editorMode === 'edit'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Pencil size={13} />
+                  <span>Mode Editor</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorMode('preview')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    editorMode === 'preview'
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                  }`}
+                >
+                  <Eye size={13} />
+                  <span>Pratinjau Naskah Dinas</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Editor Container */}
             <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
-              <div className="bg-slate-50 border-b border-gray-200 p-2 flex items-center gap-1 flex-wrap select-none">
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Undo"><Undo2 size={14} /></button>
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Redo"><Redo2 size={14} /></button>
+              {/* Rich Format Toolbar */}
+              <div className="bg-slate-50/95 border-b border-gray-200 p-2.5 flex items-center gap-1 flex-wrap select-none">
+                {/* 1. History Group */}
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Undo (Batalkan)"><Undo2 size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Redo (Ulangi)"><Redo2 size={14} /></button>
+                </div>
+
                 <div className="w-px h-4 bg-gray-300 mx-1" />
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 font-bold cursor-pointer" title="Bold"><Bold size={14} /></button>
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 italic cursor-pointer" title="Italic"><Italic size={14} /></button>
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 underline cursor-pointer" title="Underline"><Underline size={14} /></button>
+
+                {/* 2. Text Formatting Group */}
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-800 font-black cursor-pointer transition-colors" title="Tebal (Bold)"><Bold size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 italic cursor-pointer transition-colors" title="Miring (Italic)"><Italic size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 underline cursor-pointer transition-colors" title="Garis Bawah (Underline)"><Underline size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Coret Teks (Strikethrough)"><Strikethrough size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-indigo-700 cursor-pointer transition-colors font-mono" title="Kode / Format Akun Monospace"><Code size={14} /></button>
+                </div>
+
                 <div className="w-px h-4 bg-gray-300 mx-1" />
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Rata Kiri"><AlignLeft size={14} /></button>
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Rata Tengah"><AlignCenter size={14} /></button>
-                <button type="button" className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-700 cursor-pointer" title="Rata Kanan"><AlignRight size={14} /></button>
+
+                {/* 3. Heading & Typography Group */}
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Judul Utama (H1)"><Heading1 size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Sub Judul (H2)"><Heading2 size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Teks Normal / Paragraf"><Type size={14} /></button>
+                </div>
+
+                <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                {/* 4. Lists & Checkbox Group (Sesuai Permintaan User: Bullet & List) */}
+                <div className="flex items-center gap-0.5">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n• Poin Ketentuan Baru: Verifikasi kelengkapan bukti transaksi');
+                      triggerToast('info', 'Editor Dokumen', 'Poin Bullet disisipkan');
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-blue-700 font-bold cursor-pointer transition-colors flex items-center gap-1" 
+                    title="Daftar Poin (Bullet List)"
+                  >
+                    <List size={15} />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n1. Tahap Pertama: Pengajuan nota dinas oleh unit pemohon\n2. Tahap Kedua: Verifikasi kelayakan oleh tim anggaran');
+                      triggerToast('info', 'Editor Dokumen', 'Daftar Nomor disisipkan');
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-indigo-700 font-bold cursor-pointer transition-colors" 
+                    title="Daftar Nomor (Numbered List)"
+                  >
+                    <ListOrdered size={15} />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n[x] Kelengkapan Surat Tugas (SPT)\n[x] Kuitansi asli bertanda tangan bendahara\n[ ] Bukti potong pajak PPh');
+                      triggerToast('info', 'Editor Dokumen', 'Daftar Ceklis disisipkan');
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-emerald-700 cursor-pointer transition-colors" 
+                    title="Daftar Ceklis / Tugas (Checklist)"
+                  >
+                    <CheckSquare size={14} />
+                  </button>
+                </div>
+
+                <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                {/* 5. Table & Structured Elements Group (Sesuai Permintaan User: Table) */}
+                <div className="flex items-center gap-0.5">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n| Kode MAK | Uraian Mata Anggaran | Pagu (Rp) | Realisasi (Rp) |\n| 521211 | Belanja Bahan Praktikum | 450.000.000 | 310.000.000 |\n| 521213 | Honorarium Narasumber | 180.000.000 | 120.000.000 |');
+                      triggerToast('info', 'Editor Dokumen', 'Template Tabel Anggaran disisipkan');
+                    }}
+                    className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs cursor-pointer transition-colors flex items-center gap-1 shadow-2xs" 
+                    title="Sisipkan Tabel Data Keuangan"
+                  >
+                    <TableIcon size={14} className="text-emerald-700" />
+                    <span className="hidden md:inline text-[11px]">Tabel</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n> "Catatan Verifikator: Seluruh dokumen pendukung telah diperiksa dan disetujui sesuai pagu DIPA."');
+                      triggerToast('info', 'Editor Dokumen', 'Kutipan Catatan disisipkan');
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-amber-700 cursor-pointer transition-colors" 
+                    title="Kutipan / Catatan Khusus (Blockquote)"
+                  >
+                    <Quote size={14} />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setEditorContent(prev => prev + '\n\n---\n');
+                      triggerToast('info', 'Editor Dokumen', 'Garis Pemisah disisipkan');
+                    }}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-600 cursor-pointer transition-colors" 
+                    title="Garis Pemisah Horisontal"
+                  >
+                    <Minus size={14} />
+                  </button>
+                </div>
+
+                <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                {/* 6. Alignment Group */}
+                <div className="flex items-center gap-0.5">
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Rata Kiri"><AlignLeft size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Rata Tengah"><AlignCenter size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Rata Kanan"><AlignRight size={14} /></button>
+                  <button type="button" className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" title="Rata Kanan-Kiri (Justify)"><AlignJustify size={14} /></button>
+                </div>
+
+                <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                {/* 7. Media, Lampiran & Highlight */}
+                <div className="flex items-center gap-0.5">
+                  <button 
+                    type="button" 
+                    onClick={() => triggerToast('info', 'Media', 'Dialog unggah gambar/nota disimulasikan')}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" 
+                    title="Sisipkan Foto / Nota Transaksi"
+                  >
+                    <ImageIcon size={14} />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => triggerToast('info', 'Tautan', 'Dialog sisipkan link dokumen')}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-blue-700 cursor-pointer transition-colors" 
+                    title="Sisipkan Tautan (Link)"
+                  >
+                    <LinkIcon size={14} />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => triggerToast('info', 'Lampiran', 'Dialog sisipkan berkas SPJ')}
+                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-700 cursor-pointer transition-colors" 
+                    title="Lampirkan Dokumen Pendukung"
+                  >
+                    <Paperclip size={14} />
+                  </button>
+                  <button 
+                    type="button" 
+                    className="p-1.5 rounded-lg hover:bg-amber-100 text-amber-700 cursor-pointer transition-colors" 
+                    title="Sorotan Stabilo Kuning (Highlight)"
+                  >
+                    <Highlighter size={14} />
+                  </button>
+                </div>
+
+                {/* Status Indicator */}
                 <div className="ml-auto flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     Auto-Save On
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 md:p-6 bg-slate-100/60 min-h-[160px] flex justify-center">
-                <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-xl p-5 shadow-xs">
-                  <textarea
-                    rows={5}
-                    value={editorContent}
-                    onChange={(e) => setEditorContent(e.target.value)}
-                    className="w-full text-xs text-gray-800 leading-relaxed font-sans focus:outline-none resize-none"
-                  />
+              {/* Quick Template Injection Pills */}
+              <div className="bg-slate-100/70 px-4 py-2 border-b border-gray-200 flex items-center gap-1.5 overflow-x-auto text-[11px]">
+                <span className="text-gray-400 font-bold shrink-0 text-[10px] uppercase tracking-wider mr-1">Template Cepat:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContent(prev => prev + '\n\n| No | Kode MAK | Uraian Kegiatan Belanja | Pagu (Rp) | Realisasi (Rp) | Status |\n| 1 | 521211 | Belanja Bahan Kimia Praktikum | 450.000.000 | 310.000.000 | Disetujui |\n| 2 | 521213 | Honor Narasumber Seminar & Reviewer | 180.000.000 | 120.000.000 | Proses |');
+                    triggerToast('success', 'Tabel Disisipkan', 'Format tabel perincian anggaran telah ditambahkan ke dokumen.');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                >
+                  <TableIcon size={12} className="text-emerald-700" />
+                  <span>+ Tabel Anggaran MAK</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContent(prev => prev + '\n\n• Poin 1: Wajib melampirkan kuitansi dan faktur pajak PPh 21/23\n• Poin 2: Verifikasi bukti transfer bank rekening penyedia\n• Poin 3: Berita acara serah terima pekerjaan (BAST) bertanda tangan');
+                    triggerToast('success', 'Bullet Disisipkan', 'Daftar poin ketentuan telah ditambahkan.');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-800 border border-blue-200 font-bold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                >
+                  <List size={12} className="text-blue-700" />
+                  <span>+ Poin Ketentuan (Bullet)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContent(prev => prev + '\n\n1. Pemohon mengajukan berkas usulan melalui portal verifikasi\n2. Verifikator memeriksa kelengkapan SPJ dalam 2 hari kerja\n3. Bendahara memproses pemindahbukuan ke rekening bank');
+                    triggerToast('success', 'Nomor Disisipkan', 'Tahapan nomor terurut telah ditambahkan.');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-200 font-bold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                >
+                  <ListOrdered size={12} className="text-indigo-700" />
+                  <span>+ Urutan Tahapan (Numbered)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContent(prev => prev + '\n\n[x] Surat Perintah Kerja (SPK) Nomor: 042/FT/2026\n[x] Faktur Pajak Elektronik e-Faktur tervalidasi\n[ ] Berita Acara Pemeriksaan Barang (BAPB)\n[ ] Foto dokumentasi fisik serah terima alat');
+                    triggerToast('success', 'Ceklis Disisipkan', 'Daftar ceklis verifikasi telah ditambahkan.');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-purple-50 text-purple-800 border border-purple-200 font-bold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                >
+                  <CheckSquare size={12} className="text-purple-700" />
+                  <span>+ Ceklis Kelengkapan SPJ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditorContent(prev => prev + '\n\n> "PERHATIAN: Pengeluaran di atas Rp 100.000.000,- wajib melalui penelaahan PPK dan Pejabat Pengadaan Barang/Jasa."');
+                    triggerToast('success', 'Kutipan Disisipkan', 'Callout catatan penting telah ditambahkan.');
+                  }}
+                  className="px-2.5 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 font-bold rounded-lg transition-colors shrink-0 shadow-2xs cursor-pointer flex items-center gap-1"
+                >
+                  <Quote size={12} className="text-amber-700" />
+                  <span>+ Catatan Disposisi (Quote)</span>
+                </button>
+              </div>
+
+              {/* Editor Workspace View */}
+              {editorMode === 'edit' ? (
+                <div className="p-4 md:p-6 bg-slate-100/70 min-h-[280px] flex justify-center">
+                  <div className="w-full max-w-3xl bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-3">
+                    <textarea
+                      rows={12}
+                      value={editorContent}
+                      onChange={(e) => setEditorContent(e.target.value)}
+                      placeholder="Ketik isi naskah dinas, dokumen usulan anggaran, atau catatan verifikasi di sini..."
+                      className="w-full text-xs text-gray-800 leading-relaxed font-sans focus:outline-none resize-y min-h-[220px]"
+                    />
+                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400 font-semibold">
+                      <div>
+                        <span>{editorContent.length} Karakter</span> &bull; <span>{editorContent.trim().split(/\s+/).filter(Boolean).length} Kata</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(editorContent);
+                            triggerToast('success', 'Disalin', 'Seluruh teks dokumen berhasil disalin ke clipboard.');
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-bold cursor-pointer transition-colors"
+                        >
+                          Salin Naskah
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                /* Mode Pratinjau Naskah Dinas Resmi (Letterhead Preview) */
+                <div className="p-4 md:p-8 bg-slate-100/80 min-h-[360px] flex justify-center">
+                  <div className="w-full max-w-3xl bg-white border border-gray-300 rounded-xl p-8 shadow-md space-y-6 font-sans text-xs text-gray-900">
+                    {/* Kop Surat Resmi Universitas Gadjah Mada */}
+                    <div className="border-b-2 border-black pb-3 text-center space-y-1">
+                      <div className="text-[11px] font-bold text-gray-700 tracking-wider">KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI</div>
+                      <div className="text-base font-black text-black tracking-wide">UNIVERSITAS GADJAH MADA</div>
+                      <div className="text-xs font-bold text-gray-900">DIREKTORAT KEUANGAN</div>
+                      <div className="text-[10px] text-gray-600">Gedung Pusat Sayap Selatan Bulaksumur Yogyakarta 55281 | Telepon: (0274) 588688 | Laman: www.ugm.ac.id</div>
+                      <div className="w-full border-t border-black mt-2 pt-0.5"></div>
+                    </div>
+
+                    {/* Metadata Naskah */}
+                    <div className="flex justify-between items-start text-xs">
+                      <div className="space-y-1 font-medium">
+                        <div><span className="font-bold w-20 inline-block">Nomor</span>: 1420/UN1.P.IV/DIR-KEU/2026</div>
+                        <div><span className="font-bold w-20 inline-block">Sifat</span>: Penting &amp; Segera</div>
+                        <div><span className="font-bold w-20 inline-block">Lampiran</span>: 1 (satu) Berkas Rincian MAK</div>
+                        <div><span className="font-bold w-20 inline-block">Hal</span>: Petunjuk Pelaksanaan Realisasi Belanja &amp; Verifikasi SPJ</div>
+                      </div>
+                      <div className="text-right text-gray-600">
+                        Yogyakarta, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </div>
+                    </div>
+
+                    {/* Alamat Penerima */}
+                    <div className="space-y-0.5">
+                      <p className="font-medium">Yth. Pimpinan Fakultas, Sekolah, dan Unit Kerja</p>
+                      <p className="font-medium">Di Lingkungan Universitas Gadjah Mada</p>
+                      <p className="font-medium">Yogyakarta</p>
+                    </div>
+
+                    {/* Isi Dokumen Terformat */}
+                    <div className="space-y-3.5 leading-relaxed text-justify">
+                      <p>
+                        Bersama ini kami sampaikan petunjuk teknis penyesuaian usulan pagu anggaran serta mekanisme verifikasi pertanggungjawaban belanja semester berjalan bagi seluruh unit kerja di lingkungan Universitas Gadjah Mada.
+                      </p>
+
+                      {/* Contoh Bullet List Terformat */}
+                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-1.5">
+                        <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider block">Ketentuan Utama Pelaksanaan Belanja:</span>
+                        <ul className="space-y-1 text-slate-700 pl-4 list-disc">
+                          <li>Seluruh transaksi belanja wajib mencantumkan kode Mata Anggaran Kegiatan (MAK) yang valid dan sesuai peruntukan.</li>
+                          <li>Pembayaran di atas Rp 50.000.000,- wajib melampirkan berkas SPK dan berita acara serah terima (BAST) fisik.</li>
+                          <li>Pengajuan verifikasi SPJ selambat-lambatnya diajukan pada tanggal 25 setiap bulannya ke loket Direktorat Keuangan.</li>
+                        </ul>
+                      </div>
+
+                      {/* Contoh Tabel Rincian Data Keuangan */}
+                      <div className="space-y-1">
+                        <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider block">Tabel Ringkasan Alokasi Pagu MAK Prioritas:</span>
+                        <div className="overflow-x-auto rounded-xl border border-gray-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-100 border-b border-gray-200 text-slate-700 font-bold text-[11px]">
+                                <th className="py-2 px-3">Kode MAK</th>
+                                <th className="py-2 px-3">Uraian Mata Anggaran Kegiatan</th>
+                                <th className="py-2 px-3 text-right">Pagu (Rp)</th>
+                                <th className="py-2 px-3 text-right">Realisasi (Rp)</th>
+                                <th className="py-2 px-3 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              <tr>
+                                <td className="py-2 px-3 font-mono font-bold text-indigo-700">521211</td>
+                                <td className="py-2 px-3">Belanja Bahan Praktikum Laboratorium &amp; Kimia</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">Rp 450.000.000</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">Rp 310.000.000</td>
+                                <td className="py-2 px-3 text-center"><StatusBadge status="disetujui" /></td>
+                              </tr>
+                              <tr className="bg-slate-50/50">
+                                <td className="py-2 px-3 font-mono font-bold text-indigo-700">521213</td>
+                                <td className="py-2 px-3">Honorarium Narasumber Seminar &amp; Reviewer Paper</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">Rp 180.000.000</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">Rp 120.000.000</td>
+                                <td className="py-2 px-3 text-center"><StatusBadge status="proses" /></td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-3 font-mono font-bold text-indigo-700">532111</td>
+                                <td className="py-2 px-3">Pengadaan Spektrofotometer Dual-Beam Presisi</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-slate-800">Rp 850.000.000</td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">Rp 850.000.000</td>
+                                <td className="py-2 px-3 text-center"><StatusBadge status="disetujui" /></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Contoh Callout / Catatan Disposisi (Blockquote) */}
+                      <blockquote className="p-3 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl text-amber-950 font-medium italic flex items-start gap-2">
+                        <Quote size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          &quot;Catatan Khusus: Pastikan seluruh bukti kuitansi bertanda tangan basah dan telah divalidasi oleh Pejabat Pembuat Komitmen (PPK) sebelum diajukan ke bendahara pengeluaran.&quot;
+                        </span>
+                      </blockquote>
+
+                      <p>
+                        Demikian petunjuk pelaksanaan ini kami sampaikan untuk menjadi pedoman bersama. Atas perhatian dan kerja sama yang baik, kami ucapkan terima kasih.
+                      </p>
+                    </div>
+
+                    {/* Tanda Tangan Resmi */}
+                    <div className="pt-6 flex justify-end">
+                      <div className="text-center w-64 space-y-14">
+                        <div>
+                          <p className="font-bold">Direktur Keuangan</p>
+                          <p className="text-[10px] text-gray-500">Universitas Gadjah Mada</p>
+                        </div>
+                        <div>
+                          <p className="font-bold underline text-black">Prof. Dr. Ir. Syaiful Anwar, M.Si.</p>
+                          <p className="text-[10px] text-gray-600 font-mono">NIP 19680312 199303 1 002</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* BAGIAN 2: STANDAR SPEKTRUM UKURAN AVATAR / PIC (7 TINGKATAN: XS s/d 3XL TERMASUK UKURAN BESAR & EKSTRA BESAR) */}
+          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                  <Users size={17} className="text-indigo-600" />
+                  <span>Spektrum Standar Ukuran Avatar / PIC Pengguna &amp; Verifikator</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Standar dimensi visual foto profil pengguna, verifikator, dan PIC kegiatan mulai dari ukuran terkecil di tabel hingga ukuran ekstra besar (ID card &amp; SK).
+                </p>
+              </div>
+
+              {/* Avatar Shape Toggle: Circle vs Squircle */}
+              <div className="inline-flex rounded-xl p-0.5 bg-slate-100 border border-slate-200 shadow-2xs self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveAvatarShape('circle')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    activeAvatarShape === 'circle' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Bulat (Circle)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveAvatarShape('square')}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    activeAvatarShape === 'square' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Squircle (Rounded-2xl)
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-slate-50/70 rounded-2xl border border-slate-200/80">
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center space-y-1">
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 mx-auto flex items-center justify-center font-bold text-xs">40px</div>
-                <span className="block text-xs font-bold text-gray-800">Avatar / PIC</span>
-                <span className="text-[10px] text-gray-400">40 x 40 px (1:1)</span>
+            {/* Grid 7 Ukuran Avatar Komprehensif (Termasuk Ukuran Besar & Ekstra Besar) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3.5 pt-2">
+              {/* 1. XS (24px) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-slate-100/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                  XS (24px)
+                </span>
+                <div className={`w-6 h-6 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-md'} bg-blue-600 text-white flex items-center justify-center font-bold text-[9px] shadow-2xs relative`}>
+                  <span>BW</span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-white"></span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-800">24 &times; 24 px</span>
+                  <span className="text-[10px] text-slate-500 leading-tight block mt-0.5">Tabel Baris, Audit Log, Tag Komentar</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-6 h-6</code>
               </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center space-y-1">
-                <div className="w-16 h-16 rounded-xl bg-indigo-50 border border-indigo-200 mx-auto flex items-center justify-center text-indigo-700 text-xs font-bold">64px</div>
-                <span className="block text-xs font-bold text-gray-800">Bukti Struk Kas</span>
-                <span className="text-[10px] text-gray-400">64 x 64 px (1:1)</span>
+
+              {/* 2. SM (32px) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-slate-100/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                  SM (32px)
+                </span>
+                <div className={`w-8 h-8 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-lg'} bg-indigo-600 text-white flex items-center justify-center font-bold text-[11px] shadow-2xs relative`}>
+                  <span>BW</span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-800">32 &times; 32 px</span>
+                  <span className="text-[10px] text-slate-500 leading-tight block mt-0.5">Header Topbar, Dropdown User, Chat</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-8 h-8</code>
               </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center space-y-1">
-                <div className="w-32 h-16 rounded-xl bg-emerald-50 border border-emerald-200 mx-auto flex items-center justify-center text-emerald-700 text-xs font-bold">160 x 80</div>
-                <span className="block text-xs font-bold text-gray-800">Kartu Preview Surat</span>
-                <span className="text-[10px] text-gray-400">16:9 Aspect Ratio</span>
+
+              {/* 3. MD (40px) - Standar */}
+              <div className="bg-blue-50/40 p-3.5 rounded-2xl border border-blue-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-blue-50/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-blue-800 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-full shadow-2xs">
+                  MD (40px) &bull; Standar
+                </span>
+                <div className={`w-10 h-10 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-xl'} bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-xs relative`}>
+                  <span>BW</span>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"></span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-900">40 &times; 40 px</span>
+                  <span className="text-[10px] text-slate-600 leading-tight block mt-0.5">Kartu PIC, Form Usulan, List Verifikator</span>
+                </div>
+                <code className="text-[9px] font-mono text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">w-10 h-10</code>
               </div>
-              <div className="bg-white p-3.5 rounded-xl border border-gray-200 text-center space-y-1">
+
+              {/* 4. LG (56px) - Sedang */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-slate-100/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                  LG (56px)
+                </span>
+                <div className={`w-14 h-14 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-xl'} bg-purple-600 text-white flex items-center justify-center font-black text-sm shadow-xs relative`}>
+                  <span>BW</span>
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white"></span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-800">56 &times; 56 px</span>
+                  <span className="text-[10px] text-slate-500 leading-tight block mt-0.5">Modal Dialog Approval, Drawer Detail</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-14 h-14</code>
+              </div>
+
+              {/* 5. XL (72px) - Agak Besar */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-slate-100/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  XL (72px)
+                </span>
+                <div className={`w-[72px] h-[72px] ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-2xl'} bg-gradient-to-tr from-amber-600 to-orange-600 text-white flex items-center justify-center font-black text-lg shadow-sm relative`}>
+                  <span>BW</span>
+                  <span className="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white"></span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-slate-800">72 &times; 72 px</span>
+                  <span className="text-[10px] text-slate-500 leading-tight block mt-0.5">Ringkasan Profil Pengguna, Card Tim</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-[72px] h-[72px]</code>
+              </div>
+
+              {/* 6. 2XL (96px) - Ukuran Besar (Requested!) */}
+              <div className="bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-emerald-50/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full shadow-2xs">
+                  2XL (96px) &bull; Besar
+                </span>
+                <div className={`w-24 h-24 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-2xl'} bg-gradient-to-tr from-emerald-600 to-teal-700 text-white flex items-center justify-center font-black text-2xl shadow-md relative`}>
+                  <span>BW</span>
+                  <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-400 border-2 border-white flex items-center justify-center">
+                    <Check size={11} className="text-white font-bold" />
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-emerald-950">96 &times; 96 px</span>
+                  <span className="text-[10px] text-slate-600 leading-tight block mt-0.5">Halaman Akun Pengguna (/users), ID Card</span>
+                </div>
+                <code className="text-[9px] font-mono text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-200">w-24 h-24</code>
+              </div>
+
+              {/* 7. 3XL (128px) - Ukuran Ekstra Besar (Requested!) */}
+              <div className="bg-indigo-50/40 p-3.5 rounded-2xl border border-indigo-200 flex flex-col items-center justify-between text-center gap-2 hover:bg-indigo-50/70 transition-colors">
+                <span className="text-[10px] font-black uppercase text-indigo-900 bg-indigo-100 border border-indigo-300 px-2 py-0.5 rounded-full shadow-2xs">
+                  3XL (128px) &bull; Ekstra Besar
+                </span>
+                <div className={`w-32 h-32 ${activeAvatarShape === 'circle' ? 'rounded-full' : 'rounded-3xl'} bg-gradient-to-tr from-slate-900 via-indigo-950 to-blue-900 text-white flex flex-col items-center justify-center shadow-lg relative border-2 border-indigo-300/50`}>
+                  <span className="text-3xl font-black tracking-wider">BW</span>
+                  <span className="text-[9px] uppercase tracking-widest text-indigo-200 font-bold mt-0.5">Verifikator</span>
+                  <span className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-xs">
+                    <ShieldCheck size={14} className="text-white" />
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-xs font-black text-indigo-950">128 &times; 128 px</span>
+                  <span className="text-[10px] text-slate-600 leading-tight block mt-0.5">Pasfoto SK Rektor, Biodata Resmi, Cetak ID</span>
+                </div>
+                <code className="text-[9px] font-mono text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-indigo-200">w-32 h-32</code>
+              </div>
+            </div>
+          </div>
+
+          {/* BAGIAN 3: STANDAR UKURAN GAMBAR BUKTI TRANSAKSI, NOTA, DOKUMEN & SPANDUK */}
+          <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon size={17} className="text-emerald-600" />
+                <span>Standar Ukuran Menampilkan Bukti Transaksi, Nota &amp; Dokumen</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Rasio aspek standar untuk foto kuitansi kasir, struk transfer ATM, berkas lembar SPJ A4, dan dokumentasi foto kegiatan.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+              {/* 1. Thumbnail Mini Bukti (64x64) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Rasio 1:1
+                </span>
+                <div className="w-16 h-16 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-col items-center justify-center text-indigo-700 shadow-2xs p-1">
+                  <FileText size={20} className="mb-0.5" />
+                  <span className="text-[10px] font-black font-mono">64 &times; 64</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-800">Thumbnail Struk</span>
+                  <span className="text-[10px] text-gray-500">Tabel Mutasi &amp; Buku Kas</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-16 h-16</code>
+              </div>
+
+              {/* 2. Thumbnail Sedang Nota (96x96) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Rasio 1:1
+                </span>
+                <div className="w-24 h-24 rounded-xl bg-blue-50 border border-blue-200 flex flex-col items-center justify-center text-blue-700 shadow-2xs p-1">
+                  <Camera size={24} className="mb-1 text-blue-600" />
+                  <span className="text-[10px] font-black font-mono">96 &times; 96</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-800">Preview Nota</span>
+                  <span className="text-[10px] text-gray-500">Drawer Rincian SPJ</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-24 h-24</code>
+              </div>
+
+              {/* 3. Struk & Nota Vertikal (120x160 - Rasio 3:4) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Rasio 3:4 (Thermal)
+                </span>
+                <div className="w-28 h-36 rounded-xl bg-white border border-gray-300 flex flex-col items-center justify-between p-2 shadow-2xs text-gray-600 font-mono text-[9px]">
+                  <div className="border-b border-gray-200 w-full pb-1 text-center font-bold text-gray-800">STRUK KASIR</div>
+                  <div className="space-y-0.5 w-full text-left text-[8px] text-gray-500">
+                    <div>TRX: #84920</div>
+                    <div>Item: Reagen x3</div>
+                    <div className="font-bold text-gray-800">Rp 125.000.000</div>
+                  </div>
+                  <div className="border-t border-dashed border-gray-300 w-full pt-1 text-[8px] text-center text-gray-400">LUNAS BANK</div>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-800">Struk ATM / EDC</span>
+                  <span className="text-[10px] text-gray-500">Bukti Transfer Kasir</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-28 h-36</code>
+              </div>
+
+              {/* 4. Berkas Surat & SPJ (140x190 - Rasio A4) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Rasio A4 (1:1.41)
+                </span>
+                <div className="w-32 h-44 rounded-xl bg-white border-2 border-indigo-200 flex flex-col items-center justify-between p-2.5 shadow-2xs text-gray-700">
+                  <div className="w-full text-center border-b border-gray-200 pb-1">
+                    <span className="font-bold text-[9px] text-indigo-900 block">SURAT TUGAS</span>
+                    <span className="text-[7.5px] text-gray-400">No. 102/UN1/2026</span>
+                  </div>
+                  <div className="w-full space-y-1 py-1">
+                    <div className="h-1 bg-gray-200 rounded w-full"></div>
+                    <div className="h-1 bg-gray-200 rounded w-4/5"></div>
+                    <div className="h-1 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                  <div className="w-full flex justify-end">
+                    <div className="w-10 h-3 bg-indigo-50 border border-indigo-200 rounded text-[7px] text-center text-indigo-700 font-bold">TTD BASAH</div>
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-800">Berkas Surat &amp; SPJ</span>
+                  <span className="text-[10px] text-gray-500">Miniatur Lembar Dokumen</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-32 h-44</code>
+              </div>
+
+              {/* 5. Foto Kegiatan / Banner (240x135 - Rasio 16:9 Lanskap) */}
+              <div className="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200 shadow-2xs">
+                  Rasio 16:9 (Lanskap)
+                </span>
+                <div className="w-44 h-24 rounded-xl bg-gradient-to-tr from-slate-800 via-indigo-950 to-blue-900 border border-slate-700 flex flex-col items-center justify-center p-2 shadow-2xs text-white">
+                  <ImageIcon size={22} className="text-blue-400 mb-1" />
+                  <span className="text-[10px] font-bold text-center">Dokumentasi Lapangan</span>
+                  <span className="text-[8px] text-blue-200">Workshop &amp; Pelatihan CNC</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-800">Foto Kegiatan</span>
+                  <span className="text-[10px] text-gray-500">Arsip Foto &amp; Spanduk</span>
+                </div>
+                <code className="text-[9px] font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">w-44 h-24</code>
+              </div>
+
+              {/* 6. Modal Lightbox Fullscreen Simulation */}
+              <div className="bg-blue-50/50 p-3.5 rounded-2xl border border-blue-200 flex flex-col items-center justify-between text-center gap-2">
+                <span className="text-[10px] font-black uppercase text-blue-800 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md shadow-2xs">
+                  Resolusi Penuh (90vh)
+                </span>
                 <button
                   type="button"
-                  onClick={() => alert('Simulasi Lightbox Resolusi Penuh!')}
-                  className="w-32 h-16 rounded-xl bg-blue-600 text-white mx-auto flex items-center justify-center text-xs font-bold shadow-xs hover:bg-blue-700 cursor-pointer"
+                  onClick={() => setShowLightboxModal(true)}
+                  className="w-40 h-24 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex flex-col items-center justify-center p-2 shadow-sm hover:from-blue-700 hover:to-indigo-800 transition-all cursor-pointer group"
                 >
-                  <ZoomIn size={14} className="mr-1" /> Zoom Full
+                  <ZoomIn size={22} className="mb-1 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-black">Buka Lightbox</span>
+                  <span className="text-[9px] text-blue-100">Klik untuk Simulasi</span>
                 </button>
-                <span className="block text-xs font-bold text-gray-800">Modal Lightbox</span>
-                <span className="text-[10px] text-gray-400">Max 90vh (Fit Screen)</span>
+                <div>
+                  <span className="block text-xs font-bold text-gray-900">Modal Lightbox</span>
+                  <span className="text-[10px] text-gray-500">Zoom In/Out, Rotate, Download</span>
+                </div>
+                <code className="text-[9px] font-mono text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200">Max 90vh Screen</code>
+              </div>
+            </div>
+          </div>
+
+          {/* SIMULASI MODAL LIGHTBOX INTERAKTIF */}
+          {showLightboxModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-slate-700 text-white rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl space-y-0">
+                {/* Modal Header */}
+                <div className="p-4 px-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+                  <div className="flex items-center gap-2.5">
+                    <FileText size={18} className="text-blue-400" />
+                    <div>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider">{lightboxImageTitle}</h4>
+                      <p className="text-[10px] text-slate-400">Format: Bukti Kuitansi Asli &bull; Resolusi 1920 &times; 1080 px &bull; Ukuran 1.4 MB</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => triggerToast('info', 'Unduh Berkas', 'Mengunduh salinan berkas bukti...')}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+                      title="Unduh Berkas"
+                    >
+                      Unduh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowLightboxModal(false)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      title="Tutup Modal"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Image Viewport */}
+                <div className="p-8 flex items-center justify-center bg-black/60 min-h-[380px] max-h-[70vh] overflow-auto">
+                  <div className="max-w-md w-full bg-white text-gray-900 p-6 rounded-xl border border-gray-300 shadow-xl space-y-4 font-mono text-xs">
+                    <div className="text-center border-b-2 border-black pb-2">
+                      <div className="font-bold text-sm">PT DUTA SARANA LAB INSTRUMENTS</div>
+                      <div className="text-[10px] text-gray-600">Jl. Kaliurang KM 9.5 Sleman Yogyakarta</div>
+                      <div className="text-[11px] font-black mt-1">KUITANSI PEMBAYARAN RESMI</div>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between"><span>No Bukti</span><span className="font-bold">KW-2026/04/0081</span></div>
+                      <div className="flex justify-between"><span>Tanggal</span><span>18 Mei 2026</span></div>
+                      <div className="flex justify-between"><span>Diterima Dari</span><span className="font-bold">Fakultas Teknik UGM</span></div>
+                      <div className="flex justify-between"><span>Untuk Belanja</span><span>Spektrofotometer Shimadzu</span></div>
+                      <div className="flex justify-between"><span>Mata Anggaran</span><span className="font-bold text-blue-700">MAK 532111</span></div>
+                    </div>
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 font-black text-sm flex justify-between items-center">
+                      <span>JUMLAH TOTAL</span>
+                      <span>Rp 780.000.000,-</span>
+                    </div>
+                    <div className="pt-2 flex justify-between items-end text-[10px] text-gray-600 font-sans">
+                      <div>
+                        <span className="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">LUNAS BANK TRANSFER</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="h-10 border-b border-gray-400 w-28"></div>
+                        <span>Cap &amp; Tanda Tangan Kasir</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer Controls */}
+                <div className="p-3 px-5 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-xs text-slate-400">
+                  <span>Gunakan roda mouse untuk zoom in/out atau geser untuk memeriksa keaslian bukti</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLightboxModal(false)}
+                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                  >
+                    Tutup Preview
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BAGIAN 5: TEMPLATE PRATINJAU GALERI INTERAKTIF & LIGHTBOX */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 text-[10px] font-black uppercase">
+                    Komponen Standar
+                  </span>
+                  <h2 className="text-sm font-black text-gray-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                    <ImageIcon size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    Template Pratinjau Galeri Interaktif & Lightbox (Full Interactive Lightbox)
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Komponen lightbox interaktif untuk pemeriksaan bukti transaksi kas, nota belanja, dan berkas transfer. Dilengkapi kontrol zoom mendalam, navigasi beruntun, serta proxy bypass ISP Indihome.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDemoGalleryOpen(true)}
+                  className="h-8 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Eye size={13} />
+                  <span>Buka Demo Galeri Interaktif</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopy(
+                      `import GalleryLightbox, { GalleryItem } from '@/components/shared/GalleryLightbox';\n\n// Buka galeri di halaman Anda:\n<GalleryLightbox\n  isOpen={isOpen}\n  items={galleryItems}\n  currentIndex={activeIndex}\n  title="Pengajuan Transfer Dana"\n  subtitle="Rp 3.500.000 • 2026-10-03"\n  onClose={() => setIsOpen(false)}\n  onIndexChange={(idx) => setActiveIndex(idx)}\n/>`,
+                      'gallery-lightbox-code'
+                    )
+                  }
+                  className="h-8 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copiedCode === 'gallery-lightbox-code' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  <span>{copiedCode === 'gallery-lightbox-code' ? 'Tersalin!' : 'Salin Kode'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 6 Fitur Utama Kartu Spesifikasi */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">Fitur 1</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Zoom In & Zoom Out (50% - 400%)</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Mendukung pembesaran presisi melalui tombol (+ / -), roda gulir mouse (mouse wheel), serta double-click cepat.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">Fitur 2</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Geser / Pan & Drag</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Ketika gambar diperbesar di atas 100%, kursor otomatis berubah menjadi grab/grabbing untuk menggeser dokumen ke seluruh sudut.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">Fitur 3</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Rotasi 90° Searah Jarum Jam</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Memutar foto nota atau kuitansi yang terunggah terbalik atau menyamping (shortcut keyboard huruf 'R').
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">Fitur 4</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Navigasi Next / Prev</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Tombol panah circular melayang serta shortcut keyboard (Panah Kiri & Kanan) untuk memeriksa banyak berkas berurutan.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">Fitur 5</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Strip Thumbnail Bawah</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Pratinjau strip foto mini di bagian bawah dengan highlight aktif ring-amber untuk melompat ke berkas mana saja dengan 1 klik.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-1">
+                <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 block">Fitur 6</span>
+                <h4 className="text-xs font-bold text-gray-900 dark:text-slate-100">Bypass ISP Indihome</h4>
+                <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-relaxed">
+                  Deteksi otomatis domain eksternal dan Google Drive untuk dialirkan via proxy gambar internal ('/api/image-cors') tanpa terblokir.
+                </p>
+              </div>
+            </div>
+
+            {/* Thumbnail Pratinjau Demo Interaktif */}
+            <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800/40 border border-gray-200/80 dark:border-slate-800">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                Klik salah satu sampel berkas berikut untuk menguji langsung:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {sampleGalleryItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setDemoGalleryIndex(idx);
+                      setIsDemoGalleryOpen(true);
+                    }}
+                    className="group relative h-24 rounded-xl overflow-hidden cursor-pointer border border-gray-200 dark:border-slate-700 bg-white shadow-2xs hover:border-indigo-400 transition-all hover:scale-105 active:scale-95"
+                  >
+                    <img src={item.src} alt={item.label} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-indigo-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-1 text-center text-white">
+                      <Eye size={16} className="mb-0.5" />
+                      <span className="text-[9px] font-bold leading-tight">{item.label}</span>
+                    </div>
+                    <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] font-bold text-white text-center truncate px-1 py-0.5">
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -3354,384 +5407,1156 @@ export default function DesignSystemPage() {
               </div>
 
               {/* ========================================================================= */}
-              {/* SUB-SECTION 2: TEMPLATE MULTI-LEVEL GROUP ROW HIERARKI (PUNYA ANAK-ANAK) */}
+              {/* SUB-SECTION 2: TEMPLATE MULTI-LEVEL GROUP ROW HIERARKI (PUNYA ANAK-ANAK & CUCU) */}
               {/* ========================================================================= */}
-              <div className="pt-6 border-t border-gray-200/80 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                      <FolderTree size={16} className="text-emerald-600" />
-                      <span>Template 3: Multi-Level Group Row (Parent Group Memiliki Anak-Anak)</span>
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Pola pengelompokan data bertingkat (Grouping) berdasarkan Fakultas / Unit Induk dengan subtotal otomatis dan baris anak (departemen/sub-unit).
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={toggleAllGroupRows}
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-xl border border-emerald-200 text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
-                    >
-                      {isAllGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      <span>{isAllGroupExpanded ? 'Tutup Semua Group' : 'Buka Semua Group'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
-                        <th className="w-10 text-center py-3 px-2">
+              {(() => {
+                const groupInfo = getGroupRowsButtonInfo();
+                return (
+                  <div className="pt-6 border-t border-gray-200/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                          <FolderTree size={16} className="text-emerald-600" />
+                          <span>Template 3: Multi-Level Group Row (Parent Group Memiliki Anak &amp; Cucu)</span>
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Pola pengelompokan data bertingkat (Grouping) berdasarkan Fakultas / Unit Induk dengan baris anak (departemen) dan cucu (laboratorium/sub-kegiatan) dengan tombol buka/tutup perjenjang.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Smart Segmented Level & Stepper Bar */}
+                        <div className="inline-flex items-center rounded-xl p-0.5 bg-slate-100 border border-slate-200/90 shadow-2xs">
                           <button
                             type="button"
-                            onClick={toggleAllGroupRows}
-                            className="p-1 rounded-md text-slate-400 hover:text-emerald-700 hover:bg-slate-200/60 transition-colors"
-                            title={isAllGroupExpanded ? "Tutup Semua Group" : "Buka Semua Group"}
+                            onClick={() => setGroupRowsTo(1)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              groupInfo.level === 1
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 1: Tampilkan hanya Induk"
                           >
-                            {isAllGroupExpanded ? <ChevronUp size={15} className="text-emerald-700 font-bold" /> : <ChevronDown size={15} />}
+                            Induk
                           </button>
-                        </th>
-                        <th className="py-3 px-3">Nama Group Unit Kerja / Departemen</th>
-                        <th className="py-3 px-3">Klaster / Penanggung Jawab (PIC)</th>
-                        <th className="text-right py-3 px-3">Subtotal Pagu (Rp)</th>
-                        <th className="text-right py-3 px-3">Subtotal Realisasi (Rp)</th>
-                        <th className="text-center py-3 px-3">Status</th>
-                        <th className="text-center w-24 py-3 px-3">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {sampleGroupRowsData.map((group) => {
-                        const isGroupOpen = !!expandedGroupRows[group.groupId];
-                        const persentase = Math.round((group.totalRealisasi / group.totalPagu) * 100);
+                          <button
+                            type="button"
+                            onClick={() => setGroupRowsTo(2)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              groupInfo.level === 2
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 2: Buka sampai Anak (Departemen)"
+                          >
+                            +Anak
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGroupRowsTo(3)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              groupInfo.level === 3
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 3: Buka semua sampai Cucu (Laboratorium)"
+                          >
+                            +Cucu
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                        return (
-                          <React.Fragment key={group.groupId}>
-                            {/* Baris Header Group (Parent) */}
-                            <tr
-                              onClick={() => setExpandedGroupRows(prev => ({ ...prev, [group.groupId]: !prev[group.groupId] }))}
-                              className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
-                            >
-                              <td className="text-center py-3 px-2">
-                                <button className="p-1 rounded-md text-emerald-700 hover:bg-emerald-100 transition-colors">
-                                  {isGroupOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                </button>
-                              </td>
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-2">
-                                  {isGroupOpen ? (
-                                    <FolderOpen size={16} className="text-emerald-600 shrink-0" />
-                                  ) : (
-                                    <Folder size={16} className="text-emerald-600 shrink-0" />
-                                  )}
-                                  <span className="font-black text-slate-900 text-xs">{group.groupName}</span>
-                                  <span className="text-[10px] font-bold bg-white text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs">
-                                    {group.children.length} Anak Unit
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
-                                <span className="bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                  {group.cluster}
-                                </span>
-                              </td>
-                              <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
-                                Rp {group.totalPagu.toLocaleString('id-ID')}
-                              </td>
-                              <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
-                                <div>Rp {group.totalRealisasi.toLocaleString('id-ID')}</div>
-                                <div className="text-[10px] text-emerald-600 font-sans font-bold">{persentase}% Serapan</div>
-                              </td>
-                              <td className="text-center py-3 px-3">
-                                <StatusBadge status={group.status} />
-                              </td>
-                              <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                                <span className="text-[10px] text-slate-400 font-bold">Parent Group</span>
-                              </td>
-                            </tr>
+                    <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                            <th className="w-10 text-center py-3 px-2">
+                              <span className="text-slate-400 font-bold text-xs">#</span>
+                            </th>
+                            <th className="py-3 px-3">Nama Group Unit Kerja / Departemen / Lab</th>
+                            <th className="py-3 px-3">Klaster / PIC</th>
+                            <th className="text-right py-3 px-3">Subtotal Pagu (Rp)</th>
+                            <th className="text-right py-3 px-3">Subtotal Realisasi (Rp)</th>
+                            <th className="text-center py-3 px-3">Status</th>
+                            <th className="text-center w-28 py-3 px-3">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {sampleGroupRowsData.map((group) => {
+                            const isGroupOpen = !!expandedGroupRows[group.groupId];
+                            const persentase = Math.round((group.totalRealisasi / group.totalPagu) * 100);
 
-                            {/* Baris Anak-anak (Children Rows) */}
-                            {isGroupOpen && (
-                              group.children.map((child, cIdx) => (
+                            return (
+                              <React.Fragment key={group.groupId}>
+                                {/* Baris Header Group (Parent) */}
                                 <tr
-                                  key={child.id}
-                                  className="hover:bg-emerald-50/40 bg-white transition-colors text-xs border-b border-slate-100"
+                                  onClick={() => setExpandedGroupRows(prev => ({ ...prev, [group.groupId]: !prev[group.groupId] }))}
+                                  className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
                                 >
-                                  <td className="text-center py-2.5 px-2 text-slate-300 font-mono text-[11px]">
-                                    {cIdx + 1}
+                                  <td className="text-center py-3 px-2">
+                                    <button className="p-1 rounded-md text-emerald-700 hover:bg-emerald-100 transition-colors">
+                                      {isGroupOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                    </button>
                                   </td>
-                                  <td className="py-2.5 px-3 pl-8">
+                                  <td className="py-3 px-3">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-slate-300 font-mono">↳</span>
-                                      <div>
-                                        <div className="font-bold text-slate-800">{child.nama}</div>
-                                        <div className="font-mono text-[10px] text-indigo-600 font-bold">Kode: {child.kode}</div>
-                                      </div>
+                                      {isGroupOpen ? (
+                                        <FolderOpen size={16} className="text-emerald-600 shrink-0" />
+                                      ) : (
+                                        <Folder size={16} className="text-emerald-600 shrink-0" />
+                                      )}
+                                      <span className="font-black text-slate-900 text-xs">{group.groupName}</span>
+                                      <span className="text-[10px] font-bold bg-white text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs">
+                                        {group.children.length} Anak Unit
+                                      </span>
                                     </div>
                                   </td>
-                                  <td className="py-2.5 px-3 text-slate-600 text-xs">
-                                    👤 {child.pic}
+                                  <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
+                                    <span className="bg-slate-200/70 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                      {group.cluster}
+                                    </span>
                                   </td>
-                                  <td className="text-right font-mono font-bold text-slate-700 text-xs py-2.5 px-3">
-                                    Rp {child.pagu.toLocaleString('id-ID')}
+                                  <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
+                                    Rp {group.totalPagu.toLocaleString('id-ID')}
                                   </td>
-                                  <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2.5 px-3">
-                                    Rp {child.realisasi.toLocaleString('id-ID')}
+                                  <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
+                                    <div>Rp {group.totalRealisasi.toLocaleString('id-ID')}</div>
+                                    <div className="text-[10px] text-emerald-600 font-sans font-bold">{persentase}% Serapan</div>
                                   </td>
-                                  <td className="text-center py-2.5 px-3">
-                                    <StatusBadge status={child.status} />
+                                  <td className="text-center py-3 px-3">
+                                    <StatusBadge status={group.status} />
                                   </td>
-                                  <td className="text-center py-2.5 px-3">
-                                    <TableActionGroup>
-                                      <TableActionButton 
-                                        icon={Eye} 
-                                        variant="primary" 
-                                        title="Lihat Rincian Unit" 
-                                        size="xs" 
-                                        onClick={() => triggerToast('info', 'Unit Kerja', `Membuka detail ${child.nama}`)}
-                                      />
-                                      <TableActionButton 
-                                        icon={Pencil} 
-                                        variant="warning" 
-                                        title="Edit Unit Kerja" 
-                                        size="xs" 
-                                        onClick={() => triggerToast('warning', 'Edit Unit', `Mengedit unit ${child.nama}`)}
-                                      />
-                                    </TableActionGroup>
+                                  <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                    <span className="text-[10px] text-slate-400 font-bold">Parent Group</span>
                                   </td>
                                 </tr>
-                              ))
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+
+                                {/* Baris Anak-anak (Children Rows) */}
+                                {isGroupOpen && (
+                                  group.children.map((child, cIdx) => {
+                                    const isSubOpen = !!expandedGroupSubRows[child.id];
+                                    const hasCucu = child.grandChildren && child.grandChildren.length > 0;
+
+                                    return (
+                                      <React.Fragment key={child.id}>
+                                        <tr
+                                          onClick={hasCucu ? () => setExpandedGroupSubRows(prev => ({ ...prev, [child.id]: !prev[child.id] })) : undefined}
+                                          className={`hover:bg-emerald-50/40 bg-white transition-colors text-xs border-b border-slate-100 ${hasCucu ? 'cursor-pointer' : ''}`}
+                                        >
+                                          <td className="text-center py-2.5 px-2">
+                                            {hasCucu ? (
+                                              <button 
+                                                type="button" 
+                                                onClick={(e) => { e.stopPropagation(); setExpandedGroupSubRows(prev => ({ ...prev, [child.id]: !prev[child.id] })); }}
+                                                className="p-1 rounded-md text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                              >
+                                                {isSubOpen ? <ChevronUp size={13} className="text-emerald-700 font-bold" /> : <ChevronDown size={13} />}
+                                              </button>
+                                            ) : (
+                                              <span className="text-slate-300 font-mono text-[11px]">{cIdx + 1}</span>
+                                            )}
+                                          </td>
+                                          <td className="py-2.5 px-3 pl-8">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-emerald-500 font-mono">↳</span>
+                                              <Building2 size={14} className="text-emerald-700 shrink-0" />
+                                              <div>
+                                                <div className="font-bold text-slate-800">{child.nama}</div>
+                                                <div className="font-mono text-[10px] text-indigo-600 font-bold">Kode: {child.kode}</div>
+                                              </div>
+                                              {hasCucu && (
+                                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded-full shadow-2xs ml-1">
+                                                  Level 2 ({child.grandChildren.length} Lab/Cucu)
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-slate-600 text-xs">
+                                            👤 {child.pic}
+                                          </td>
+                                          <td className="text-right font-mono font-bold text-slate-700 text-xs py-2.5 px-3">
+                                            Rp {child.pagu.toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2.5 px-3">
+                                            Rp {child.realisasi.toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="text-center py-2.5 px-3">
+                                            <StatusBadge status={child.status} />
+                                          </td>
+                                          <td className="text-center py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                              {hasCucu && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => setExpandedGroupSubRows(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
+                                                  className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer"
+                                                >
+                                                  {isSubOpen ? 'Tutup Cucu' : 'Buka Cucu'}
+                                                </button>
+                                              )}
+                                              <TableActionButton 
+                                                icon={Eye} 
+                                                variant="primary" 
+                                                title="Lihat Rincian Unit" 
+                                                size="xs" 
+                                                onClick={() => triggerToast('info', 'Unit Kerja', `Membuka detail ${child.nama}`)}
+                                              />
+                                            </div>
+                                          </td>
+                                        </tr>
+
+                                        {/* Baris Cucu (GrandChildren Rows) */}
+                                        {isSubOpen && hasCucu && child.grandChildren.map((gc: any, gIdx: number) => (
+                                          <tr
+                                            key={gc.id}
+                                            className="hover:bg-slate-50/80 bg-slate-50/40 transition-colors text-xs border-b border-slate-100"
+                                          >
+                                            <td className="text-center py-2 px-2 text-slate-300 font-mono text-[10px]">
+                                              {gIdx + 1}
+                                            </td>
+                                            <td className="py-2 px-3 pl-16">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-slate-300 font-mono text-xs">↳ ↳</span>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                                <div>
+                                                  <div className="font-medium text-slate-800 text-xs">{gc.nama}</div>
+                                                  <div className="text-[10px] text-slate-400">Level 3 (Rincian Unit / Lab)</div>
+                                                </div>
+                                              </div>
+                                            </td>
+                                            <td className="py-2 px-3 text-xs text-slate-600">
+                                              <div className="font-mono text-[10px] font-bold text-slate-600">{gc.kode}</div>
+                                              <div className="text-[10px] text-slate-500">👤 {gc.pic}</div>
+                                            </td>
+                                            <td className="text-right font-mono font-medium text-slate-700 text-xs py-2 px-3">
+                                              Rp {gc.pagu.toLocaleString('id-ID')}
+                                            </td>
+                                            <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2 px-3">
+                                              Rp {gc.realisasi.toLocaleString('id-ID')}
+                                            </td>
+                                            <td className="text-center py-2 px-3">
+                                              <StatusBadge status={gc.status} />
+                                            </td>
+                                            <td className="text-center py-2 px-3">
+                                              <span className="text-[10px] text-slate-400 font-bold">Cucu</span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </React.Fragment>
+                                    );
+                                  })
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ========================================================================= */}
               {/* SUB-SECTION 3: TEMPLATE 3-LEVEL NESTED HIERARCHY (ANAK MEMILIKI ANAK LAGI) */}
               {/* ========================================================================= */}
-              <div className="pt-6 border-t border-gray-200/80 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                      <Layers size={16} className="text-violet-600" />
-                      <span>Template 4: 3-Level Nested Collapse Hierarchy (Induk &rarr; Anak &rarr; Cucu)</span>
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      Hierarki bertingkat 3 level: Baris Induk (Fakultas) dapat di-collapse, dan baris Anak (Departemen) juga memiliki tombol collapse tersendiri untuk membuka/menutup rincian Cucu (Laboratorium / Sub-Kegiatan).
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={toggleAllThreeLevels}
-                      className="px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-800 font-bold rounded-xl border border-violet-200 text-xs transition-colors flex items-center gap-1.5 shadow-2xs"
-                    >
-                      {isAllThreeLevelExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      <span>{isAllThreeLevelExpanded ? 'Tutup Semua Level' : 'Buka Semua Level'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Level Legends */}
-                <div className="flex flex-wrap items-center gap-2 py-1">
-                  <span className="text-[11px] font-bold text-gray-400">Tingkatan Hierarki:</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
-                    <Folder size={11} className="text-slate-600" /> Level 1: Unit Induk (Fakultas)
-                  </span>
-                  <span className="text-gray-300 text-xs">&rarr;</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                    <Building2 size={11} className="text-indigo-600" /> Level 2: Sub-Unit (Departemen) - Expandable
-                  </span>
-                  <span className="text-gray-300 text-xs">&rarr;</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Level 3: Rincian Kegiatan / Lab (Cucu)
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
-                        <th className="w-10 text-center py-3 px-2">
+              {(() => {
+                const threeInfo = getThreeLevelButtonInfo();
+                return (
+                  <div className="pt-6 border-t border-gray-200/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                          <Layers size={16} className="text-violet-600" />
+                          <span>Template 4: 3-Level Nested Collapse Hierarchy (Induk &rarr; Anak &rarr; Cucu)</span>
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Hierarki bertingkat 3 level: Baris Induk (Fakultas), Anak (Departemen), dan Cucu (Laboratorium) dengan tombol buka/tutup perjenjang bertahap.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Smart Segmented Level & Stepper Bar */}
+                        <div className="inline-flex items-center rounded-xl p-0.5 bg-slate-100 border border-slate-200/90 shadow-2xs">
                           <button
                             type="button"
-                            onClick={toggleAllThreeLevels}
-                            className="p-1 rounded-md text-slate-400 hover:text-violet-700 hover:bg-slate-200/60 transition-colors"
-                            title={isAllThreeLevelExpanded ? "Tutup Semua Level" : "Buka Semua Level"}
+                            onClick={() => setThreeLevelTo(1)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              threeInfo.level === 1
+                                ? 'bg-violet-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 1: Tampilkan hanya Induk"
                           >
-                            {isAllThreeLevelExpanded ? <ChevronUp size={15} className="text-violet-700 font-bold" /> : <ChevronDown size={15} />}
+                            Induk
                           </button>
-                        </th>
-                        <th className="py-3 px-3">Struktur Hierarki Unit / Sub-Unit / Lab</th>
-                        <th className="py-3 px-3">Kode & PIC</th>
-                        <th className="text-right py-3 px-3">Pagu (Rp)</th>
-                        <th className="text-right py-3 px-3">Realisasi (Rp)</th>
-                        <th className="text-center py-3 px-3">Status</th>
-                        <th className="text-center w-24 py-3 px-3">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {sampleThreeLevelData.map((parent) => {
-                        const isParentOpen = !!expandedThreeLevelParent[parent.id];
-                        const parentPercent = Math.round((parent.totalRealisasi / parent.totalPagu) * 100);
+                          <button
+                            type="button"
+                            onClick={() => setThreeLevelTo(2)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              threeInfo.level === 2
+                                ? 'bg-violet-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 2: Buka sampai Anak (Departemen)"
+                          >
+                            +Anak
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setThreeLevelTo(3)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                              threeInfo.level === 3
+                                ? 'bg-violet-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                            }`}
+                            title="Tingkat 3: Buka semua sampai Cucu (Laboratorium)"
+                          >
+                            +Cucu
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                        return (
-                          <React.Fragment key={parent.id}>
-                            {/* LEVEL 1: Baris Induk (Fakultas / Unit Utama) */}
-                            <tr
-                              onClick={() => setExpandedThreeLevelParent(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))}
-                              className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
+                    {/* Level Legends */}
+                    <div className="flex flex-wrap items-center gap-2 py-1">
+                      <span className="text-[11px] font-bold text-gray-400">Tingkatan Hierarki:</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+                        <Folder size={11} className="text-slate-600" /> Level 1: Unit Induk (Fakultas)
+                      </span>
+                      <span className="text-gray-300 text-xs">&rarr;</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                        <Building2 size={11} className="text-indigo-600" /> Level 2: Sub-Unit (Departemen) - Expandable
+                      </span>
+                      <span className="text-gray-300 text-xs">&rarr;</span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Level 3: Rincian Kegiatan / Lab (Cucu)
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-2xs bg-white">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 text-[11px] font-black uppercase tracking-wider">
+                            <th className="w-10 text-center py-3 px-2">
+                              <span className="text-slate-400 font-bold text-xs">#</span>
+                            </th>
+                            <th className="py-3 px-3">Struktur Hierarki Unit / Sub-Unit / Lab</th>
+                            <th className="py-3 px-3">Kode & PIC</th>
+                            <th className="text-right py-3 px-3">Pagu (Rp)</th>
+                            <th className="text-right py-3 px-3">Realisasi (Rp)</th>
+                            <th className="text-center py-3 px-3">Status</th>
+                            <th className="text-center w-24 py-3 px-3">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {sampleThreeLevelData.map((parent) => {
+                            const isParentOpen = !!expandedThreeLevelParent[parent.id];
+                            const parentPercent = Math.round((parent.totalRealisasi / parent.totalPagu) * 100);
+
+                            return (
+                              <React.Fragment key={parent.id}>
+                                {/* LEVEL 1: Baris Induk (Fakultas / Unit Utama) */}
+                                <tr
+                                  onClick={() => setExpandedThreeLevelParent(prev => ({ ...prev, [parent.id]: !prev[parent.id] }))}
+                                  className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer border-b border-slate-200 font-bold transition-colors"
+                                >
+                                  <td className="text-center py-3 px-2">
+                                    <button className="p-1 rounded-md text-slate-700 hover:bg-slate-200 transition-colors">
+                                      {isParentOpen ? <ChevronUp size={16} className="text-slate-800 font-bold" /> : <ChevronDown size={16} />}
+                                    </button>
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-2">
+                                      {isParentOpen ? (
+                                        <FolderOpen size={17} className="text-amber-600 shrink-0" />
+                                      ) : (
+                                        <Folder size={17} className="text-amber-600 shrink-0" />
+                                      )}
+                                      <span className="font-black text-slate-900 text-xs">{parent.name}</span>
+                                      <span className="text-[10px] font-bold bg-white text-slate-800 border border-slate-300 px-2 py-0.5 rounded-full shadow-2xs">
+                                        Level 1 ({parent.children.length} Departemen)
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
+                                    <span className="font-mono text-[11px] font-bold text-slate-700 mr-2">{parent.code}</span>
+                                    <span className="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                                      {parent.cluster}
+                                    </span>
+                                  </td>
+                                  <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
+                                    Rp {parent.totalPagu.toLocaleString('id-ID')}
+                                  </td>
+                                  <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
+                                    <div>Rp {parent.totalRealisasi.toLocaleString('id-ID')}</div>
+                                    <div className="text-[10px] text-emerald-600 font-sans font-bold">{parentPercent}% Serapan</div>
+                                  </td>
+                                  <td className="text-center py-3 px-3">
+                                    <StatusBadge status={parent.status} />
+                                  </td>
+                                  <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
+                                    <span className="text-[10px] text-slate-400 font-bold">Induk</span>
+                                  </td>
+                                </tr>
+
+                                {/* LEVEL 2: Baris Anak (Departemen) */}
+                                {isParentOpen && parent.children.map((child) => {
+                                  const isChildOpen = !!expandedThreeLevelChild[child.id];
+                                  const childPercent = Math.round((child.realisasi / child.pagu) * 100);
+
+                                  return (
+                                    <React.Fragment key={child.id}>
+                                      <tr
+                                        onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
+                                        className={`cursor-pointer transition-colors border-b border-indigo-100/70 ${
+                                          isChildOpen ? 'bg-indigo-50/70 hover:bg-indigo-100/50' : 'bg-indigo-50/30 hover:bg-indigo-50/60'
+                                        }`}
+                                      >
+                                        <td className="text-center py-2.5 px-2">
+                                          <button className="p-1 rounded-md text-indigo-700 hover:bg-indigo-200/60 transition-colors ml-2 cursor-pointer">
+                                            {isChildOpen ? <ChevronUp size={14} className="text-indigo-700 font-bold" /> : <ChevronDown size={14} />}
+                                          </button>
+                                        </td>
+                                        <td className="py-2.5 px-3 pl-8">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-indigo-400 font-mono">↳</span>
+                                            <Building2 size={15} className="text-indigo-600 shrink-0" />
+                                            <span className="font-bold text-indigo-950 text-xs">{child.name}</span>
+                                            <span className="text-[10px] font-bold bg-white text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">
+                                              Level 2 ({child.grandChildren.length} Lab/Cucu)
+                                            </span>
+                                          </div>
+                                        </td>
+                                        <td className="py-2.5 px-3 text-xs text-slate-600">
+                                          <div className="font-mono text-[11px] font-bold text-indigo-700">{child.code}</div>
+                                          <div className="text-[10px] text-slate-500">PIC: {child.pic}</div>
+                                        </td>
+                                        <td className="text-right font-mono font-bold text-slate-800 text-xs py-2.5 px-3">
+                                          Rp {child.pagu.toLocaleString('id-ID')}
+                                        </td>
+                                        <td className="text-right font-mono font-bold text-emerald-700 text-xs py-2.5 px-3">
+                                          <div>Rp {child.realisasi.toLocaleString('id-ID')}</div>
+                                          <div className="text-[10px] text-emerald-600 font-sans">{childPercent}% Serapan</div>
+                                        </td>
+                                        <td className="text-center py-2.5 px-3">
+                                          <StatusBadge status={child.status} />
+                                        </td>
+                                        <td className="text-center py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
+                                            className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2 py-0.5 rounded-md hover:bg-indigo-50 transition-colors shadow-2xs cursor-pointer"
+                                          >
+                                            {isChildOpen ? 'Tutup Cucu' : 'Buka Cucu'}
+                                          </button>
+                                        </td>
+                                      </tr>
+
+                                      {/* LEVEL 3: Baris Cucu (Laboratorium / Sub-Kegiatan) */}
+                                      {isChildOpen && child.grandChildren.map((grandChild, gIdx) => (
+                                        <tr
+                                          key={grandChild.id}
+                                          className="bg-white hover:bg-slate-50/80 transition-colors text-xs border-b border-slate-100"
+                                        >
+                                          <td className="text-center py-2 px-2 text-slate-300 font-mono text-[10px]">
+                                            {gIdx + 1}
+                                          </td>
+                                          <td className="py-2 px-3 pl-16">
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-slate-300 font-mono text-xs">↳ ↳</span>
+                                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                                              <div>
+                                                <div className="font-medium text-slate-800 text-xs">{grandChild.nama}</div>
+                                                <div className="text-[10px] text-slate-400">Level 3 (Grandchild Unit)</div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                          <td className="py-2 px-3 text-xs text-slate-600">
+                                            <div className="font-mono text-[10px] font-bold text-slate-600">{grandChild.kode}</div>
+                                            <div className="text-[10px] text-slate-500">👤 {grandChild.pic}</div>
+                                          </td>
+                                          <td className="text-right font-mono font-medium text-slate-700 text-xs py-2 px-3">
+                                            Rp {grandChild.pagu.toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2 px-3">
+                                            Rp {grandChild.realisasi.toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="text-center py-2 px-3">
+                                            <StatusBadge status={grandChild.status} />
+                                          </td>
+                                          <td className="text-center py-2 px-3">
+                                            <TableActionGroup>
+                                              <TableActionButton icon={Eye} variant="primary" title="Lihat Rincian" size="xs" onClick={() => triggerToast('info', 'Rincian Akun', `Melihat rincian ${grandChild.nama}`)} />
+                                              <TableActionButton icon={Pencil} variant="warning" title="Edit" size="xs" onClick={() => triggerToast('warning', 'Edit Akun', `Mengedit ${grandChild.nama}`)} />
+                                            </TableActionGroup>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ========================================================================= */}
+              {/* SUB-SECTION 4: TEMPLATE 5 - PIVOT MATRIX BAGAN AKUN STANDAR (COA) 12-BULAN */}
+              {/* ========================================================================= */}
+              {(() => {
+                const BULAN_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                const padClass = pivotTableDensity === 'compact' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2.5 text-xs';
+                const headPad = pivotTableDensity === 'compact' ? 'px-2.5 py-2 text-[11px]' : 'px-3.5 py-3 text-xs';
+                const fmt = (num: number) => (num !== undefined && num !== null) ? num.toLocaleString('id-ID') : '0';
+
+                // Hitung total penerimaan, total beban, dan surplus per bulan
+                const monthlyPenerimaan = BULAN_NAMES.map((_, i) => {
+                  const induk4 = samplePivotCoaData.find(d => d.nomor_akun.startsWith('4'));
+                  return induk4?.months[i] || 0;
+                });
+                const monthlyBeban = BULAN_NAMES.map((_, i) => {
+                  const induk5 = samplePivotCoaData.find(d => d.nomor_akun.startsWith('5'));
+                  return induk5?.months[i] || 0;
+                });
+                const totalPenerimaanSetahun = monthlyPenerimaan.reduce((a, b) => a + b, 0);
+                const totalBebanSetahun = monthlyBeban.reduce((a, b) => a + b, 0);
+
+                const saldoAwalTotal = samplePivotRekeningSaldo.reduce((acc, r) => acc + r.awal, 0);
+                // Running saldo per bulan
+                const monthlyNetto = monthlyPenerimaan.map((p, i) => p - monthlyBeban[i]);
+                const runningSaldo = monthlyNetto.reduce((acc: number[], curr: number, idx: number) => {
+                  const prev = idx === 0 ? saldoAwalTotal : acc[idx - 1];
+                  acc.push(prev + curr);
+                  return acc;
+                }, []);
+                const saldoAkhirTotal = runningSaldo[11] || saldoAwalTotal;
+
+                return (
+                  <div className="pt-6 border-t border-gray-200/80 space-y-4">
+                    {/* Header Template 5 */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            Template 5
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-500">
+                            Matrix Pivot Finansial &amp; Akuntansi
+                          </span>
+                        </div>
+                        <h3 className="text-base font-black text-gray-900 tracking-tight mt-0.5 flex items-center gap-2">
+                          <span>Pivot Matrix Bagan Akun Standar (COA) — Mutasi 12-Bulan</span>
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Tabel multi-periode dengan <strong>Dual Sticky Solid Column</strong> (Akun kiri + Total kanan 100% kedap), selektor jenjang hierarki, dan rincian saldo rekening terintegrasi.
+                        </p>
+                      </div>
+
+                      {/* Controls Toolbar: Jenjang Pills + Density Toggle */}
+                      <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        {/* Selector Jenjang Hierarki Bertahap */}
+                        <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 shadow-inner">
+                          {[
+                            { lvl: 1, label: 'Induk', title: 'Level 1: Tampilkan Akun Induk Saja' },
+                            { lvl: 2, label: '+Golongan', title: 'Level 2: Buka Hingga Golongan (41, 51, dst)' },
+                            { lvl: 3, label: '+Kelompok', title: 'Level 3: Buka Hingga Kelompok Sub-Akun' },
+                            { lvl: 4, label: '+Detail', title: 'Level 4: Buka Seluruh Anak Rekening Detail' },
+                          ].map((item) => (
+                            <button
+                              key={item.lvl}
+                              type="button"
+                              onClick={() => setPivotHierarchyTo(item.lvl)}
+                              title={item.title}
+                              className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                                pivotHierarchyLevel === item.lvl
+                                  ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200/60 font-black'
+                                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                              }`}
                             >
-                              <td className="text-center py-3 px-2">
-                                <button className="p-1 rounded-md text-slate-700 hover:bg-slate-200 transition-colors">
-                                  {isParentOpen ? <ChevronUp size={16} className="text-slate-800 font-bold" /> : <ChevronDown size={16} />}
-                                </button>
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Density Toggle Luwes / Rapat */}
+                        <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setPivotTableDensity('comfortable')}
+                            className={`px-2 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1 ${
+                              pivotTableDensity === 'comfortable'
+                                ? 'bg-white text-slate-800 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                            title="Format Luwes (Comfortable Pad)"
+                          >
+                            <Rows size={12} />
+                            <span>Luwes</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPivotTableDensity('compact')}
+                            className={`px-2 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1 ${
+                              pivotTableDensity === 'compact'
+                                ? 'bg-white text-slate-800 shadow-xs'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                            title="Format Rapat (Compact Pad)"
+                          >
+                            <AlignJustify size={12} />
+                            <span>Rapat</span>
+                          </button>
+                        </div>
+
+                        {/* Copy Code */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`// Dual Sticky Pivot Matrix COA (Zero-Bleed Solid Columns)\n// sticky left-0: bg-white | bg-indigo-50\n// sticky right-0: bg-indigo-100 (Induk) | bg-slate-100 (Gol) | bg-white (Kel/Detail)\n// shadow-[-5px_0_12px_rgba(0,0,0,0.06)]`);
+                            triggerToast('success', 'Kode Disalin', 'Pola CSS Dual Sticky Solid berhasil disalin ke clipboard');
+                          }}
+                          className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-xs flex items-center gap-1"
+                        >
+                          <Copy size={12} />
+                          <span>Salin Pola</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter Bar: Quick Category Chips & Live Search */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 mr-1 flex items-center gap-1">
+                          <Filter size={12} />
+                          Filter:
+                        </span>
+                        {[
+                          { id: 'all', label: 'Semua Akun' },
+                          { id: '4', label: '4xxxx Penerimaan' },
+                          { id: '5', label: '5xxxx Beban & Realisasi' },
+                          { id: '1', label: '1xxxx Kas & Bank' },
+                          { id: '9', label: '9xxxx Koreksi' },
+                        ].map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setPivotCategoryFilter(c.id as any)}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-full transition-all border ${
+                              pivotCategoryFilter === c.id
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-100/60'
+                            }`}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="relative w-full sm:w-64">
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={pivotSearchQuery}
+                          onChange={(e) => setPivotSearchQuery(e.target.value)}
+                          placeholder="Cari kode atau uraian akun..."
+                          className="w-full pl-8 pr-7 py-1 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                        {pivotSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setPivotSearchQuery('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Matrix Pivot Table (Dual Sticky Solid) */}
+                    <div className="border border-slate-200/90 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="overflow-x-auto max-h-[580px] overflow-y-auto">
+                        <table className="text-left border-separate border-spacing-0 min-w-full">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-800 uppercase tracking-tight sticky top-0 z-[60]">
+                              {/* Sticky Kolom Kiri: Akun Hirarki */}
+                              <th className={`${headPad} border-r border-slate-200 bg-slate-100 sticky left-0 z-[70] min-w-[280px] font-black text-slate-800`}>
+                                Akun Hirarki
+                              </th>
+                              <th className={`${headPad} border-r border-slate-200 text-right bg-slate-100 font-bold min-w-[110px]`}>
+                                Saldo Awal
+                              </th>
+                              {BULAN_NAMES.map((m, idx) => (
+                                <th key={idx} className={`${headPad} border-r border-slate-200 text-right bg-slate-100 font-bold min-w-[92px]`}>
+                                  {m}
+                                </th>
+                              ))}
+                              {/* Sticky Kolom Kanan: Total Setahun (Solid 100% Opaque Bebas Tembus) */}
+                              <th className={`${headPad} text-right bg-indigo-100 sticky right-0 z-[70] border-l border-indigo-200 font-black min-w-[130px] text-indigo-950 shadow-[-5px_0_15px_rgba(0,0,0,0.08)]`}>
+                                Total Setahun
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                            {/* ============================================================ */}
+                            {/* BARIS STICKY: TOTAL POSISI AWAL (WARNA SOFT INDIGO)          */}
+                            {/* ============================================================ */}
+                            <tr
+                              className="bg-[#e0e7ff] text-indigo-950 font-black cursor-pointer group sticky top-[37px] z-[50] border-b border-indigo-200/80 shadow-xs"
+                              onClick={() => setPivotExpandPosisiAwal(!pivotExpandPosisiAwal)}
+                            >
+                              <td className={`${padClass} sticky left-0 bg-[#e0e7ff] text-indigo-950 z-[55] border-r border-indigo-200 flex items-center gap-2 group-hover:bg-[#c7d2fe] transition-colors font-sans font-black`}>
+                                {pivotExpandPosisiAwal ? <ChevronDown size={14} className="text-indigo-700" /> : <ChevronRight size={14} className="text-indigo-600" />}
+                                <span className="text-indigo-600 font-bold">▶</span> TOTAL POSISI AWAL
                               </td>
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-2">
-                                  {isParentOpen ? (
-                                    <FolderOpen size={17} className="text-amber-600 shrink-0" />
-                                  ) : (
-                                    <Folder size={17} className="text-amber-600 shrink-0" />
-                                  )}
-                                  <span className="font-black text-slate-900 text-xs">{parent.name}</span>
-                                  <span className="text-[10px] font-bold bg-white text-slate-800 border border-slate-300 px-2 py-0.5 rounded-full shadow-2xs">
-                                    Level 1 ({parent.children.length} Departemen)
-                                  </span>
-                                </div>
+                              <td className={`${padClass} text-right border-r border-indigo-200 text-indigo-950 bg-[#e0e7ff] font-bold`}>
+                                {fmt(saldoAwalTotal)}
                               </td>
-                              <td className="py-3 px-3 text-xs text-slate-600 font-semibold">
-                                <span className="font-mono text-[11px] font-bold text-slate-700 mr-2">{parent.code}</span>
-                                <span className="bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                                  {parent.cluster}
-                                </span>
-                              </td>
-                              <td className="text-right font-mono font-black text-slate-900 text-xs py-3 px-3">
-                                Rp {parent.totalPagu.toLocaleString('id-ID')}
-                              </td>
-                              <td className="text-right font-mono font-black text-emerald-800 text-xs py-3 px-3">
-                                <div>Rp {parent.totalRealisasi.toLocaleString('id-ID')}</div>
-                                <div className="text-[10px] text-emerald-600 font-sans font-bold">{parentPercent}% Serapan</div>
-                              </td>
-                              <td className="text-center py-3 px-3">
-                                <StatusBadge status={parent.status} />
-                              </td>
-                              <td className="text-center py-3 px-3" onClick={(e) => e.stopPropagation()}>
-                                <span className="text-[10px] text-slate-400 font-bold">Induk</span>
+                              {BULAN_NAMES.map((_, idx) => {
+                                const prevSaldo = idx === 0 ? saldoAwalTotal : runningSaldo[idx - 1];
+                                return (
+                                  <td key={idx} className={`${padClass} text-right border-r border-indigo-200 bg-[#e0e7ff] text-indigo-950 font-bold`}>
+                                    {fmt(prevSaldo)}
+                                  </td>
+                                );
+                              })}
+                              <td className={`${padClass} text-right bg-[#c7d2fe] font-black sticky right-0 z-[55] border-l border-indigo-300 text-indigo-950 shadow-[-4px_0_12px_rgba(0,0,0,0.06)]`}>
+                                {fmt(saldoAwalTotal)}
                               </td>
                             </tr>
 
-                            {/* LEVEL 2: Baris Anak (Departemen) */}
-                            {isParentOpen && parent.children.map((child) => {
-                              const isChildOpen = !!expandedThreeLevelChild[child.id];
-                              const childPercent = Math.round((child.realisasi / child.pagu) * 100);
+                            {/* RINCIAN POSISI AWAL PER REKENING (EXPANDABLE) */}
+                            {pivotExpandPosisiAwal && samplePivotRekeningSaldo.map((rek) => (
+                              <tr key={`pvt-awal-${rek.id}`} className="bg-indigo-50/40 text-slate-600 italic">
+                                <td className={`${padClass} pl-8 border-r border-slate-100 sticky left-0 bg-white z-[40] truncate max-w-[260px] font-sans font-medium`}>
+                                  ↳ {rek.nama}
+                                </td>
+                                <td className={`${padClass} text-right border-r border-slate-100 bg-slate-50 font-medium`}>
+                                  {fmt(rek.awal)}
+                                </td>
+                                {BULAN_NAMES.map((_, idx) => (
+                                  <td key={idx} className={`${padClass} text-right border-r border-slate-100 opacity-70`}>
+                                    {fmt(rek.awal)}
+                                  </td>
+                                ))}
+                                <td className={`${padClass} text-right bg-white text-indigo-800 border-l border-indigo-200 sticky right-0 z-[40] font-bold shadow-[-5px_0_10px_rgba(0,0,0,0.05)]`}>
+                                  {fmt(rek.awal)}
+                                </td>
+                              </tr>
+                            ))}
+
+                            {/* ============================================================ */}
+                            {/* DATA TABEL COA (INDUK -> GOLONGAN -> KELOMPOK -> DETAIL)     */}
+                            {/* ============================================================ */}
+                            {filteredPivotData.map((induk) => {
+                              const isIndukExpanded = pivotExpandedNodes[induk.id] ?? (pivotHierarchyLevel >= 2);
+                              const totalInduk = induk.months.reduce((a, b) => a + b, 0);
+                              const accPrefix = String(induk.nomor_akun).charAt(0);
+                              const isPenerimaan = accPrefix === '4';
+                              const isBeban = accPrefix === '5';
+                              const isKas = accPrefix === '1';
+                              const isKoreksi = accPrefix === '9' || induk.nama_akun.toLowerCase().includes('koreksi');
+
+                              // Theme Gradasi Soft Berjenjang: Induk ➔ Golongan ➔ Kelompok ➔ Anak
+                              // Penerimaan: Hijau, Beban: Merah, Kas: Ungu, Koreksi: Kuning, Lainnya: Biru
+                              const theme = isPenerimaan ? {
+                                // 4xxxx Penerimaan: Gradasi Hijau / Emerald Soft
+                                induk: {
+                                  row: 'bg-[#a7f3d0] text-emerald-950 font-black border-t-2 border-emerald-400',
+                                  stickyLeft: 'bg-[#a7f3d0] text-emerald-950 border-r border-emerald-300',
+                                  monthCell: 'bg-[#a7f3d0] text-emerald-950 font-bold border-r border-emerald-300/80',
+                                  stickyRight: 'bg-[#86efac] text-emerald-950 font-black border-l border-emerald-300 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-emerald-950 font-black',
+                                  chevron: 'text-emerald-900',
+                                },
+                                gol: {
+                                  row: 'bg-[#d1fae5] text-emerald-950 font-extrabold hover:bg-[#bbf7d0] transition-colors',
+                                  stickyLeft: 'bg-[#d1fae5] text-emerald-950 border-r border-emerald-200',
+                                  monthCell: 'bg-[#d1fae5] text-emerald-950 font-bold border-r border-emerald-200/80',
+                                  stickyRight: 'bg-[#bbf7d0] text-emerald-950 font-extrabold border-l border-emerald-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-emerald-900 font-extrabold',
+                                  chevron: 'text-emerald-800',
+                                },
+                                kel: {
+                                  row: 'bg-[#ecfdf5] text-emerald-900 font-semibold hover:bg-[#d1fae5] transition-colors',
+                                  stickyLeft: 'bg-[#ecfdf5] text-emerald-900 border-r border-emerald-100',
+                                  monthCell: 'bg-[#ecfdf5] text-emerald-800 font-medium border-r border-emerald-100/70',
+                                  stickyRight: 'bg-[#d1fae5] text-emerald-900 font-bold border-l border-emerald-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-emerald-800 font-bold',
+                                  chevron: 'text-emerald-700',
+                                },
+                                anak: {
+                                  row: 'bg-white hover:bg-emerald-50/40 text-slate-700 transition-colors',
+                                  stickyLeft: 'bg-white text-slate-700 border-r border-slate-100',
+                                  monthCell: 'bg-white text-slate-600 border-r border-slate-100',
+                                  stickyRight: 'bg-white text-emerald-700 font-medium border-l border-emerald-100 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                }
+                              } : isBeban ? {
+                                // 5xxxx Beban & Realisasi: Gradasi Merah Soft (Rose / Red Soft)
+                                induk: {
+                                  row: 'bg-[#fecdd3] text-rose-950 font-black border-t-2 border-rose-400',
+                                  stickyLeft: 'bg-[#fecdd3] text-rose-950 border-r border-rose-300',
+                                  monthCell: 'bg-[#fecdd3] text-rose-950 font-bold border-r border-rose-300/80',
+                                  stickyRight: 'bg-[#fda4af] text-rose-950 font-black border-l border-rose-300 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-rose-950 font-black',
+                                  chevron: 'text-rose-900',
+                                },
+                                gol: {
+                                  row: 'bg-[#ffe4e6] text-rose-950 font-extrabold hover:bg-[#fecdd3] transition-colors',
+                                  stickyLeft: 'bg-[#ffe4e6] text-rose-950 border-r border-rose-200',
+                                  monthCell: 'bg-[#ffe4e6] text-rose-950 font-bold border-r border-rose-200/80',
+                                  stickyRight: 'bg-[#fecdd3] text-rose-950 font-extrabold border-l border-rose-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-rose-900 font-extrabold',
+                                  chevron: 'text-rose-800',
+                                },
+                                kel: {
+                                  row: 'bg-[#fff1f2] text-rose-900 font-semibold hover:bg-[#ffe4e6] transition-colors',
+                                  stickyLeft: 'bg-[#fff1f2] text-rose-900 border-r border-rose-100',
+                                  monthCell: 'bg-[#fff1f2] text-rose-800 font-medium border-r border-rose-100/70',
+                                  stickyRight: 'bg-[#ffe4e6] text-rose-900 font-bold border-l border-rose-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-rose-800 font-bold',
+                                  chevron: 'text-rose-700',
+                                },
+                                anak: {
+                                  row: 'bg-white hover:bg-rose-50/40 text-slate-700 transition-colors',
+                                  stickyLeft: 'bg-white text-slate-700 border-r border-slate-100',
+                                  monthCell: 'bg-white text-slate-600 border-r border-slate-100',
+                                  stickyRight: 'bg-white text-rose-700 font-medium border-l border-rose-100 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                }
+                              } : isKas ? {
+                                // 1xxxx Kas & Bank: Gradasi Ungu Soft (Purple / Violet)
+                                induk: {
+                                  row: 'bg-[#e9d5ff] text-purple-950 font-black border-t-2 border-purple-400',
+                                  stickyLeft: 'bg-[#e9d5ff] text-purple-950 border-r border-purple-300',
+                                  monthCell: 'bg-[#e9d5ff] text-purple-950 font-bold border-r border-purple-300/80',
+                                  stickyRight: 'bg-[#d8b4fe] text-purple-950 font-black border-l border-purple-300 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-purple-950 font-black',
+                                  chevron: 'text-purple-900',
+                                },
+                                gol: {
+                                  row: 'bg-[#f3e8ff] text-purple-950 font-extrabold hover:bg-[#e9d5ff] transition-colors',
+                                  stickyLeft: 'bg-[#f3e8ff] text-purple-950 border-r border-purple-200',
+                                  monthCell: 'bg-[#f3e8ff] text-purple-950 font-bold border-r border-purple-200/80',
+                                  stickyRight: 'bg-[#e9d5ff] text-purple-950 font-extrabold border-l border-purple-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-purple-900 font-extrabold',
+                                  chevron: 'text-purple-800',
+                                },
+                                kel: {
+                                  row: 'bg-[#faf5ff] text-purple-900 font-semibold hover:bg-[#f3e8ff] transition-colors',
+                                  stickyLeft: 'bg-[#faf5ff] text-purple-900 border-r border-purple-100',
+                                  monthCell: 'bg-[#faf5ff] text-purple-800 font-medium border-r border-purple-100/70',
+                                  stickyRight: 'bg-[#f3e8ff] text-purple-900 font-bold border-l border-purple-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-purple-800 font-bold',
+                                  chevron: 'text-purple-700',
+                                },
+                                anak: {
+                                  row: 'bg-white hover:bg-purple-50/40 text-slate-700 transition-colors',
+                                  stickyLeft: 'bg-white text-slate-700 border-r border-slate-100',
+                                  monthCell: 'bg-white text-slate-600 border-r border-slate-100',
+                                  stickyRight: 'bg-white text-purple-700 font-medium border-l border-purple-100 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                }
+                              } : isKoreksi ? {
+                                // 9xxxx Koreksi: Gradasi Kuning Soft (Amber / Yellow)
+                                induk: {
+                                  row: 'bg-[#fef08a] text-amber-950 font-black border-t-2 border-amber-400',
+                                  stickyLeft: 'bg-[#fef08a] text-amber-950 border-r border-amber-300',
+                                  monthCell: 'bg-[#fef08a] text-amber-950 font-bold border-r border-amber-300/80',
+                                  stickyRight: 'bg-[#fde047] text-amber-950 font-black border-l border-amber-300 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-amber-950 font-black',
+                                  chevron: 'text-amber-900',
+                                },
+                                gol: {
+                                  row: 'bg-[#fef9c3] text-amber-950 font-extrabold hover:bg-[#fef08a] transition-colors',
+                                  stickyLeft: 'bg-[#fef9c3] text-amber-950 border-r border-amber-200',
+                                  monthCell: 'bg-[#fef9c3] text-amber-950 font-bold border-r border-amber-200/80',
+                                  stickyRight: 'bg-[#fef08a] text-amber-950 font-extrabold border-l border-amber-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-amber-900 font-extrabold',
+                                  chevron: 'text-amber-800',
+                                },
+                                kel: {
+                                  row: 'bg-[#fefce8] text-amber-900 font-semibold hover:bg-[#fef9c3] transition-colors',
+                                  stickyLeft: 'bg-[#fefce8] text-amber-900 border-r border-amber-100',
+                                  monthCell: 'bg-[#fefce8] text-amber-800 font-medium border-r border-amber-100/70',
+                                  stickyRight: 'bg-[#fef9c3] text-amber-900 font-bold border-l border-amber-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-amber-800 font-bold',
+                                  chevron: 'text-amber-700',
+                                },
+                                anak: {
+                                  row: 'bg-white hover:bg-amber-50/40 text-slate-700 transition-colors',
+                                  stickyLeft: 'bg-white text-slate-700 border-r border-slate-100',
+                                  monthCell: 'bg-white text-slate-600 border-r border-slate-100',
+                                  stickyRight: 'bg-white text-amber-700 font-medium border-l border-amber-100 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                }
+                              } : {
+                                // Kategori Lainnya (Biru / Sky Soft)
+                                induk: {
+                                  row: 'bg-[#bae6fd] text-sky-950 font-black border-t-2 border-sky-400',
+                                  stickyLeft: 'bg-[#bae6fd] text-sky-950 border-r border-sky-300',
+                                  monthCell: 'bg-[#bae6fd] text-sky-950 font-bold border-r border-sky-300/80',
+                                  stickyRight: 'bg-[#7dd3fc] text-sky-950 font-black border-l border-sky-300 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-sky-950 font-black',
+                                  chevron: 'text-sky-900',
+                                },
+                                gol: {
+                                  row: 'bg-[#e0f2fe] text-sky-950 font-extrabold hover:bg-[#bae6fd] transition-colors',
+                                  stickyLeft: 'bg-[#e0f2fe] text-sky-950 border-r border-sky-200',
+                                  monthCell: 'bg-[#e0f2fe] text-sky-950 font-bold border-r border-sky-200/80',
+                                  stickyRight: 'bg-[#bae6fd] text-sky-950 font-extrabold border-l border-sky-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-sky-900 font-extrabold',
+                                  chevron: 'text-sky-800',
+                                },
+                                kel: {
+                                  row: 'bg-[#f0f9ff] text-sky-900 font-semibold hover:bg-[#e0f2fe] transition-colors',
+                                  stickyLeft: 'bg-[#f0f9ff] text-sky-900 border-r border-sky-100',
+                                  monthCell: 'bg-[#f0f9ff] text-sky-800 font-medium border-r border-sky-100/70',
+                                  stickyRight: 'bg-[#e0f2fe] text-sky-900 font-bold border-l border-sky-200 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                  badge: 'text-sky-800 font-bold',
+                                  chevron: 'text-sky-700',
+                                },
+                                anak: {
+                                  row: 'bg-white hover:bg-sky-50/40 text-slate-700 transition-colors',
+                                  stickyLeft: 'bg-white text-slate-700 border-r border-slate-100',
+                                  monthCell: 'bg-white text-slate-600 border-r border-slate-100',
+                                  stickyRight: 'bg-white text-sky-700 font-medium border-l border-sky-100 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]',
+                                }
+                              };
 
                               return (
-                                <React.Fragment key={child.id}>
-                                  <tr
-                                    onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
-                                    className={`cursor-pointer transition-colors border-b border-indigo-100/70 ${
-                                      isChildOpen ? 'bg-indigo-50/70 hover:bg-indigo-100/50' : 'bg-indigo-50/30 hover:bg-indigo-50/60'
-                                    }`}
-                                  >
-                                    <td className="text-center py-2.5 px-2">
-                                      <button className="p-1 rounded-md text-indigo-700 hover:bg-indigo-200/60 transition-colors ml-2">
-                                        {isChildOpen ? <ChevronUp size={14} className="text-indigo-700 font-bold" /> : <ChevronDown size={14} />}
-                                      </button>
-                                    </td>
-                                    <td className="py-2.5 px-3 pl-8">
+                                <React.Fragment key={induk.id}>
+                                  {/* ROW INDUK (LEVEL 1 - SUM UTAMA / TUA SOFT) */}
+                                  <tr className={theme.induk.row}>
+                                    <td
+                                      className={`${padClass} ${theme.induk.stickyLeft} sticky left-0 z-20 font-sans cursor-pointer select-none`}
+                                      onClick={() => togglePivotNode(induk.id, true)}
+                                    >
                                       <div className="flex items-center gap-2">
-                                        <span className="text-indigo-400 font-mono">↳</span>
-                                        <Building2 size={15} className="text-indigo-600 shrink-0" />
-                                        <span className="font-bold text-indigo-950 text-xs">{child.name}</span>
-                                        <span className="text-[10px] font-bold bg-white text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded-full shadow-2xs">
-                                          Level 2 ({child.grandChildren.length} Lab/Cucu)
-                                        </span>
+                                        {isIndukExpanded ? <ChevronDown size={14} className={`${theme.induk.chevron} shrink-0`} /> : <ChevronRight size={14} className={`${theme.induk.chevron} shrink-0`} />}
+                                        <span className={`font-mono text-xs font-black ${theme.induk.badge}`}>{induk.nomor_akun}</span>
+                                        <span className="text-xs font-black uppercase tracking-tight">{induk.nama_akun}</span>
                                       </div>
                                     </td>
-                                    <td className="py-2.5 px-3 text-xs text-slate-600">
-                                      <div className="font-mono text-[11px] font-bold text-indigo-700">{child.code}</div>
-                                      <div className="text-[10px] text-slate-500">PIC: {child.pic}</div>
+                                    <td className={`${padClass} text-right ${theme.induk.monthCell} opacity-60`}>
+                                      -
                                     </td>
-                                    <td className="text-right font-mono font-bold text-slate-800 text-xs py-2.5 px-3">
-                                      Rp {child.pagu.toLocaleString('id-ID')}
-                                    </td>
-                                    <td className="text-right font-mono font-bold text-emerald-700 text-xs py-2.5 px-3">
-                                      <div>Rp {child.realisasi.toLocaleString('id-ID')}</div>
-                                      <div className="text-[10px] text-emerald-600 font-sans">{childPercent}% Serapan</div>
-                                    </td>
-                                    <td className="text-center py-2.5 px-3">
-                                      <StatusBadge status={child.status} />
-                                    </td>
-                                    <td className="text-center py-2.5 px-3" onClick={(e) => e.stopPropagation()}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setExpandedThreeLevelChild(prev => ({ ...prev, [child.id]: !prev[child.id] }))}
-                                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-2 py-0.5 rounded-md hover:bg-indigo-50 transition-colors shadow-2xs"
-                                      >
-                                        {isChildOpen ? 'Tutup Cucu' : 'Buka Cucu'}
-                                      </button>
+                                    {induk.months.map((val, mIdx) => (
+                                      <td key={mIdx} className={`${padClass} text-right ${theme.induk.monthCell}`}>
+                                        {fmt(val)}
+                                      </td>
+                                    ))}
+                                    {/* Total Setahun Induk (Solid Bebas Tembus) */}
+                                    <td className={`${padClass} text-right font-black sticky right-0 z-20 ${theme.induk.stickyRight}`}>
+                                      {fmt(totalInduk)}
                                     </td>
                                   </tr>
 
-                                  {/* LEVEL 3: Baris Cucu (Laboratorium / Sub-Kegiatan) */}
-                                  {isChildOpen && child.grandChildren.map((grandChild, gIdx) => (
-                                    <tr
-                                      key={grandChild.id}
-                                      className="bg-white hover:bg-slate-50/80 transition-colors text-xs border-b border-slate-100"
-                                    >
-                                      <td className="text-center py-2 px-2 text-slate-300 font-mono text-[10px]">
-                                        {gIdx + 1}
-                                      </td>
-                                      <td className="py-2 px-3 pl-16">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-slate-300 font-mono text-xs">↳ ↳</span>
-                                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
-                                          <div>
-                                            <div className="font-medium text-slate-800 text-xs">{grandChild.nama}</div>
-                                            <div className="text-[10px] text-slate-400">Level 3 (Grandchild Unit)</div>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="py-2 px-3 text-xs text-slate-600">
-                                        <div className="font-mono text-[10px] font-bold text-slate-600">{grandChild.kode}</div>
-                                        <div className="text-[10px] text-slate-500">👤 {grandChild.pic}</div>
-                                      </td>
-                                      <td className="text-right font-mono font-medium text-slate-700 text-xs py-2 px-3">
-                                        Rp {grandChild.pagu.toLocaleString('id-ID')}
-                                      </td>
-                                      <td className="text-right font-mono font-semibold text-emerald-700 text-xs py-2 px-3">
-                                        Rp {grandChild.realisasi.toLocaleString('id-ID')}
-                                      </td>
-                                      <td className="text-center py-2 px-3">
-                                        <StatusBadge status={grandChild.status} />
-                                      </td>
-                                      <td className="text-center py-2 px-3">
-                                        <TableActionGroup>
-                                          <TableActionButton icon={Eye} variant="primary" title="Lihat Rincian" size="xs" onClick={() => triggerToast('info', 'Rincian Akun', `Melihat rincian ${grandChild.nama}`)} />
-                                          <TableActionButton icon={Pencil} variant="warning" title="Edit" size="xs" onClick={() => triggerToast('warning', 'Edit Akun', `Mengedit ${grandChild.nama}`)} />
-                                        </TableActionGroup>
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {/* ROW GOLONGAN (LEVEL 2 - SUM GOLONGAN / AGAK MUDA SOFT) */}
+                                  {isIndukExpanded && induk.golongans.map((gol) => {
+                                    const isGolExpanded = pivotExpandedNodes[gol.id] ?? (pivotHierarchyLevel >= 3);
+                                    const totalGol = gol.months.reduce((a, b) => a + b, 0);
+
+                                    return (
+                                      <React.Fragment key={gol.id}>
+                                        <tr className={theme.gol.row}>
+                                          <td
+                                            className={`${padClass} pl-7 ${theme.gol.stickyLeft} sticky left-0 z-10 font-sans cursor-pointer select-none`}
+                                            onClick={() => togglePivotNode(gol.id, true)}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {isGolExpanded ? <ChevronDown size={13} className={`${theme.gol.chevron} shrink-0`} /> : <ChevronRight size={13} className={`${theme.gol.chevron} shrink-0`} />}
+                                              <span className={`font-mono text-[11px] font-bold ${theme.gol.badge}`}>{gol.nomor_akun}</span>
+                                              <span className="text-xs font-bold">{gol.nama_akun}</span>
+                                            </div>
+                                          </td>
+                                          <td className={`${padClass} text-right ${theme.gol.monthCell} opacity-50`}>
+                                            -
+                                          </td>
+                                          {gol.months.map((val, mIdx) => (
+                                            <td key={mIdx} className={`${padClass} text-right ${theme.gol.monthCell}`}>
+                                              {fmt(val)}
+                                            </td>
+                                          ))}
+                                          {/* Total Setahun Golongan (Solid Bebas Tembus) */}
+                                          <td className={`${padClass} text-right font-extrabold sticky right-0 z-10 ${theme.gol.stickyRight}`}>
+                                            {fmt(totalGol)}
+                                          </td>
+                                        </tr>
+
+                                        {/* ROW KELOMPOK (LEVEL 3 - SUM KELOMPOK / MUDA SOFT) */}
+                                        {isGolExpanded && gol.kelompoks.map((kel) => {
+                                          const isKelExpanded = pivotExpandedNodes[kel.id] ?? (pivotHierarchyLevel >= 4);
+                                          const totalKel = kel.months.reduce((a, b) => a + b, 0);
+                                          const hasChildren = kel.anaks && kel.anaks.length > 0;
+
+                                          return (
+                                            <React.Fragment key={kel.id}>
+                                              <tr className={theme.kel.row}>
+                                                <td
+                                                  className={`${padClass} pl-12 ${theme.kel.stickyLeft} sticky left-0 z-10 font-sans ${hasChildren ? 'cursor-pointer select-none' : ''}`}
+                                                  onClick={hasChildren ? () => togglePivotNode(kel.id, false) : undefined}
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    {hasChildren ? (
+                                                      isKelExpanded ? <ChevronDown size={12} className={`${theme.kel.chevron} shrink-0`} /> : <ChevronRight size={12} className={`${theme.kel.chevron} shrink-0`} />
+                                                    ) : <div className="w-3 shrink-0" />}
+                                                    <span className={`font-mono text-[11px] font-bold ${theme.kel.badge}`}>{kel.nomor_akun}</span>
+                                                    <span className="text-xs font-semibold">{kel.nama_akun}</span>
+                                                  </div>
+                                                </td>
+                                                <td className={`${padClass} text-right ${theme.kel.monthCell} opacity-40`}>
+                                                  -
+                                                </td>
+                                                {kel.months.map((val, mIdx) => (
+                                                  <td key={mIdx} className={`${padClass} text-right ${theme.kel.monthCell}`}>
+                                                    {val > 0 ? fmt(val) : '-'}
+                                                  </td>
+                                                ))}
+                                                {/* Total Setahun Kelompok (Solid Bebas Tembus) */}
+                                                <td className={`${padClass} text-right font-bold sticky right-0 z-10 ${theme.kel.stickyRight}`}>
+                                                  {fmt(totalKel)}
+                                                </td>
+                                              </tr>
+
+                                              {/* ROW DETAIL / ANAK (LEVEL 4 - RINCIAN TRANSAKSI / PUTIH BERSIH) */}
+                                              {isKelExpanded && kel.anaks.map((anak) => {
+                                                const totalAnak = anak.months.reduce((a, b) => a + b, 0);
+
+                                                return (
+                                                  <tr key={anak.id} className={theme.anak.row}>
+                                                    <td className={`${padClass} pl-16 ${theme.anak.stickyLeft} sticky left-0 z-10 font-sans`}>
+                                                      <div className="flex items-center gap-2">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                                                        <span className="font-mono text-[10px] text-slate-400">{anak.nomor_akun}</span>
+                                                        <span className="text-[11px] text-slate-700 truncate max-w-[220px]" title={anak.nama_akun}>
+                                                          {anak.nama_akun}
+                                                        </span>
+                                                      </div>
+                                                    </td>
+                                                    <td className={`${padClass} text-right ${theme.anak.monthCell} text-slate-300`}>
+                                                      -
+                                                    </td>
+                                                    {anak.months.map((val, mIdx) => (
+                                                      <td key={mIdx} className={`${padClass} text-right ${theme.anak.monthCell}`}>
+                                                        {val > 0 ? fmt(val) : '-'}
+                                                      </td>
+                                                    ))}
+                                                    {/* Total Setahun Detail (Solid Putih Bebas Tembus) */}
+                                                    <td className={`${padClass} text-right font-medium sticky right-0 z-10 ${theme.anak.stickyRight}`}>
+                                                      {fmt(totalAnak)}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    );
+                                  })}
                                 </React.Fragment>
                               );
                             })}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+
+                            {/* ============================================================ */}
+                            {/* BARIS SURPLUS / DEFISIT BERJALAN BULANAN                     */}
+                            {/* ============================================================ */}
+                            <tr className="bg-slate-100 font-black border-t-2 border-slate-300">
+                              <td className={`${padClass} border-r border-slate-200 sticky left-0 z-20 bg-slate-100 font-sans uppercase text-slate-800`}>
+                                ⚖ SURPLUS / (DEFISIT) NETTO
+                              </td>
+                              <td className={`${padClass} text-right bg-slate-100 border-r border-slate-200 text-slate-400`}>
+                                -
+                              </td>
+                              {monthlyNetto.map((diff, mIdx) => (
+                                <td
+                                  key={mIdx}
+                                  className={`${padClass} text-right border-r border-slate-200 font-bold ${
+                                    diff > 0 ? 'text-emerald-700' : diff < 0 ? 'text-rose-700' : 'text-slate-400'
+                                  }`}
+                                >
+                                  {diff !== 0 ? fmt(diff) : '-'}
+                                </td>
+                              ))}
+                              <td className={`${padClass} text-right font-black border-l border-indigo-200 sticky right-0 z-20 bg-indigo-100 text-indigo-950 shadow-[-5px_0_12px_rgba(0,0,0,0.06)]`}>
+                                {fmt(totalPenerimaanSetahun - totalBebanSetahun)}
+                              </td>
+                            </tr>
+
+                            {/* ============================================================ */}
+                            {/* BARIS STICKY: TOTAL POSISI AKHIR (SERAGAM DENGAN POSISI AWAL)*/}
+                            {/* ============================================================ */}
+                            <tr
+                              className="bg-[#e0e7ff] text-indigo-950 font-black cursor-pointer group sticky bottom-0 z-[60] shadow-[0_-6px_16px_rgba(0,0,0,0.08)] border-t-2 border-indigo-300"
+                              onClick={() => setPivotExpandPosisiAkhir(!pivotExpandPosisiAkhir)}
+                            >
+                              <td className={`${padClass} border-r border-indigo-200 sticky left-0 bg-[#e0e7ff] text-indigo-950 z-[65] flex items-center gap-2 uppercase group-hover:bg-[#c7d2fe] transition-colors font-sans`}>
+                                {pivotExpandPosisiAkhir ? <ChevronDown size={14} className="text-indigo-700" /> : <ChevronRight size={14} className="text-indigo-600" />}
+                                <span className="text-indigo-600 font-bold">▶</span> TOTAL POSISI AKHIR
+                              </td>
+                              <td className={`${padClass} text-right border-r border-indigo-200 text-slate-400 bg-[#e0e7ff]`}>
+                                -
+                              </td>
+                              {runningSaldo.map((saldo, idx) => (
+                                <td key={idx} className={`${padClass} text-right border-r border-indigo-200 bg-[#e0e7ff] text-indigo-950 font-bold`}>
+                                  {fmt(saldo)}
+                                </td>
+                              ))}
+                              {/* Total Posisi Akhir (Solid Soft Indigo-200 Bebas Tembus) */}
+                              <td className={`${padClass} text-right bg-[#c7d2fe] sticky right-0 z-[65] border-l border-indigo-300 text-indigo-950 font-black shadow-[-4px_0_15px_rgba(0,0,0,0.08)]`}>
+                                {fmt(saldoAkhirTotal)}
+                              </td>
+                            </tr>
+
+                            {/* RINCIAN POSISI AKHIR PER REKENING (EXPANDABLE) */}
+                            {pivotExpandPosisiAkhir && samplePivotRekeningSaldo.map((rek) => (
+                              <tr key={`pvt-akhir-${rek.id}`} className="bg-slate-50 text-slate-600 italic">
+                                <td className={`${padClass} pl-8 border-r border-slate-100 sticky left-0 bg-white z-[40] truncate max-w-[260px] font-sans font-medium`}>
+                                  ↳ {rek.nama}
+                                </td>
+                                <td className={`${padClass} text-right border-r border-slate-100 bg-slate-50 opacity-40`}>
+                                  -
+                                </td>
+                                {rek.saldos.map((s, idx) => (
+                                  <td key={idx} className={`${padClass} text-right border-r border-slate-100 opacity-70`}>
+                                    {fmt(s)}
+                                  </td>
+                                ))}
+                                <td className={`${padClass} text-right bg-white border-l border-indigo-200 sticky right-0 z-[40] font-black text-indigo-800 shadow-[-5px_0_10px_rgba(0,0,0,0.05)]`}>
+                                  {fmt(rek.saldos[11])}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Technical Guideline Card: Solusi 100% Solid Opaque Sticky Right */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50/70 via-blue-50/50 to-slate-50 border border-indigo-100 flex items-start gap-3 text-xs text-slate-700">
+                      <div className="p-2 rounded-lg bg-indigo-600 text-white shrink-0 mt-0.5 shadow-xs">
+                        <ShieldCheck size={16} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="font-bold text-indigo-950 flex items-center gap-2">
+                          <span>Standar Dual Sticky Solid: Zero Background Bleed-Through</span>
+                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                            Fixed &amp; Verified
+                          </span>
+                        </div>
+                        <p className="text-slate-600 leading-relaxed text-[11px]">
+                          Pada tabel pivot multi-bulan horizontal dengan scroll ganda, kolom sticky kanan (<strong>Total Setahun</strong>) wajib menggunakan background solid 100% tanpa alpha opacity (contoh: soft <code>bg-[#c7d2fe]</code> untuk Posisi Awal, <code>bg-indigo-100</code> untuk Induk, <code>bg-slate-100</code> untuk Golongan, <code>bg-white</code> untuk Kelompok/Detail, dan soft <code>bg-[#cbd5e1]</code> untuk Posisi Akhir) serta dilengkapi drop shadow ke kiri (<code>shadow-[-5px_0_12px_rgba(0,0,0,0.06)]</code>). Menghilangkan penggunaan class transparan menjamin angka bulanan yang melintas di baliknya <strong>tidak terlihat mendobel</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ========================================================================= */}
-              {/* SUB-SECTION 4: STANDARISASI TEMPLATE KOLOM AKSI (ACTION COLUMNS CATALOG)  */}
+              {/* SUB-SECTION 5: STANDARISASI TEMPLATE KOLOM AKSI (ACTION COLUMNS CATALOG)  */}
               {/* ========================================================================= */}
               <div className="pt-6 border-t border-gray-200/80 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -4382,6 +7207,17 @@ triggerToast('error', 'Gagal Memproses Permintaan', 'Koneksi database timeout.')
           </div>
         </div>
       )}
+
+      {/* Lightbox Demo Interaktif */}
+      <GalleryLightbox
+        isOpen={isDemoGalleryOpen}
+        items={sampleGalleryItems}
+        currentIndex={demoGalleryIndex}
+        title="Pratinjau Bukti & Lampiran Transaksi Keuangan"
+        subtitle="Dokumen Verifikasi Belanja Kas & Bank • Demo Interaktif"
+        onClose={() => setIsDemoGalleryOpen(false)}
+        onIndexChange={(idx) => setDemoGalleryIndex(idx)}
+      />
     </div>
   );
 }

@@ -4,8 +4,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   CreditCard, Search, Download, Users, UserCheck, 
-  Wallet, RefreshCw, Calendar, ChevronLeft, ChevronRight 
+  Wallet, RefreshCw, Calendar, ChevronLeft, ChevronRight, Calculator 
 } from 'lucide-react';
+import StatCard from '@/components/shared/StatCard';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import TablePagination from '@/components/shared/TablePagination';
 
 const KONSTANTA = {
   TAHUN_REFERENSI: 2026,
@@ -69,7 +72,8 @@ export default function GajiPnsTab() {
   const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [tableDensity, setTableDensity] = useState<TableDensity>('comfortable');
 
   const fetchGajiData = async () => {
     setIsLoading(true);
@@ -382,19 +386,19 @@ export default function GajiPnsTab() {
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
       {/* SLIM & UNIFIED TOP TOOLBAR */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+          <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2.5 rounded-xl text-white shadow-2xs">
             <CreditCard size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Anggaran Gaji PNS & PPPK</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Anggaran Gaji PNS &amp; PPPK</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 TA {KONSTANTA.TAHUN_REFERENSI}
               </span>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Kalkulasi rincian komponen gaji pokok & tunjangan melekat (termasuk THR & Gaji 13)</p>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Kalkulasi rincian komponen gaji pokok &amp; tunjangan melekat (termasuk THR &amp; Gaji 13)</p>
           </div>
         </div>
 
@@ -406,14 +410,19 @@ export default function GajiPnsTab() {
               placeholder="Cari Nama / NIP..." 
               value={searchTerm} 
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+              className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs"
             />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
+            <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
           </div>
 
           <button
             onClick={fetchGajiData}
             disabled={isLoading}
-            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
             title="Muat Ulang Data"
           >
             <RefreshCw size={14} className={isLoading ? 'animate-spin text-indigo-600' : 'text-gray-500'} />
@@ -422,7 +431,7 @@ export default function GajiPnsTab() {
           <button 
             onClick={handleExportExcel}
             disabled={isExporting || isLoading}
-            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+            className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer disabled:opacity-50"
           >
             <Download size={14} />
             <span>{isExporting ? 'Mengekspor...' : 'Export Excel'}</span>
@@ -430,55 +439,105 @@ export default function GajiPnsTab() {
         </div>
       </div>
 
-      {/* KPI SUMMARY CARDS */}
+      {/* 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
       {!isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Total Keseluruhan */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-             <div>
-               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Anggaran Gaji</p>
-               <h3 className="text-base font-black text-gray-900 mt-0.5 font-mono truncate" title={formatRupiah(stats.total)}>
-                 {formatRupiah(stats.total).replace(',00', '')}
-               </h3>
-               <span className="text-[10px] font-semibold text-indigo-600">{filteredData.length} Pegawai PNS & PPPK</span>
-             </div>
-             <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-               <Users size={20} />
-             </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* CARD 1: TOTAL */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div className="pr-2">
+                <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-indigo-600">
+                  TOTAL ANGGARAN GAJI
+                </span>
+                <div className="text-xl font-black font-mono tracking-tight text-gray-900">
+                  {formatRupiah(stats.total).replace(',00', '')}
+                </div>
+              </div>
+              <div className="p-2 rounded-xl shrink-0 bg-indigo-50 text-indigo-600 border border-indigo-100">
+                <CreditCard size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-gray-100 pt-2 text-gray-500">
+              <span>{filteredData.length} Pegawai PNS & PPPK</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-indigo-50 text-indigo-700">
+                14 Bulan (THR+G13)
+              </span>
+            </div>
           </div>
 
-          {/* Kelompok PNS */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-             <div>
-               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kelompok PNS</p>
-               <h3 className="text-base font-black text-blue-700 mt-0.5 font-mono truncate" title={formatRupiah(stats.totalPNS)}>
-                 {formatRupiah(stats.totalPNS).replace(',00', '')}
-               </h3>
-               <span className="text-[10px] font-semibold text-blue-600">{stats.countPNS} Pegawai PNS</span>
-             </div>
-             <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-               <UserCheck size={20} />
-             </div>
+          {/* CARD 2: PNS */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div className="pr-2">
+                <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-blue-600">
+                  KELOMPOK PNS
+                </span>
+                <div className="text-xl font-black font-mono tracking-tight text-blue-700">
+                  {formatRupiah(stats.totalPNS).replace(',00', '')}
+                </div>
+              </div>
+              <div className="p-2 rounded-xl shrink-0 bg-blue-50 text-blue-600 border border-blue-100">
+                <UserCheck size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-blue-100/60 pt-2 text-blue-700">
+              <span>{stats.countPNS} Pegawai PNS</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-blue-50 text-blue-700">
+                {stats.total > 0 ? ((stats.totalPNS / stats.total) * 100).toFixed(1) : 0}% Porsi
+              </span>
+            </div>
           </div>
 
-          {/* Kelompok PPPK */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs flex items-center justify-between">
-             <div>
-               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Kelompok PPPK</p>
-               <h3 className="text-base font-black text-emerald-700 mt-0.5 font-mono truncate" title={formatRupiah(stats.totalPPPK)}>
-                 {formatRupiah(stats.totalPPPK).replace(',00', '')}
-               </h3>
-               <span className="text-[10px] font-semibold text-emerald-600">{stats.countPPPK} Pegawai PPPK</span>
-             </div>
-             <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-               <Wallet size={20} />
-             </div>
+          {/* CARD 3: PPPK */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div className="pr-2">
+                <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-emerald-600">
+                  KELOMPOK PPPK
+                </span>
+                <div className="text-xl font-black font-mono tracking-tight text-emerald-700">
+                  {formatRupiah(stats.totalPPPK).replace(',00', '')}
+                </div>
+              </div>
+              <div className="p-2 rounded-xl shrink-0 bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <Wallet size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-emerald-100/60 pt-2 text-emerald-700">
+              <span>{stats.countPPPK} Pegawai PPPK</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700">
+                {stats.total > 0 ? ((stats.totalPPPK / stats.total) * 100).toFixed(1) : 0}% Porsi
+              </span>
+            </div>
+          </div>
+
+          {/* CARD 4: RATA-RATA GAJI / BULAN */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-start justify-between">
+              <div className="pr-2">
+                <span className="text-[10px] font-black uppercase tracking-wider block mb-1 text-amber-600">
+                  RATA-RATA GAJI / BULAN
+                </span>
+                <div className="text-xl font-black font-mono tracking-tight text-amber-700">
+                  {formatRupiah(Math.round(stats.total / 14)).replace(',00', '')}
+                </div>
+              </div>
+              <div className="p-2 rounded-xl shrink-0 bg-amber-50 text-amber-600 border border-amber-100">
+                <Calculator size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-amber-100/60 pt-2 text-amber-700">
+              <span>Gapok + Tunjangan Melekat</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-700">
+                Estimasi Bulanan
+              </span>
+            </div>
           </div>
         </div>
       )}
 
       {/* TABLE DATA */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
         <div className="p-3.5 px-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
           <h3 className="font-bold text-gray-900 text-xs">
             Daftar Anggaran Gaji Pegawai
@@ -492,15 +551,15 @@ export default function GajiPnsTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                <th className="py-3 px-4 text-center w-14">No</th>
-                <th className="py-3 px-4">Profil Pegawai</th>
-                <th className="py-3 px-3 text-right">Gapok</th>
-                <th className="py-3 px-3 text-right">T.Istri</th>
-                <th className="py-3 px-3 text-right">T.Anak</th>
-                <th className="py-3 px-3 text-right">Lainnya</th>
-                <th className="py-3 px-3 text-right font-black text-indigo-700 bg-indigo-50/30">Total/Bln</th>
-                <th className="py-3 px-3 text-center w-16">Bln</th>
-                <th className="py-3 px-4 text-right w-40">Total Setahun</th>
+                <th className={`text-center w-14 ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3 px-4'}`}>No</th>
+                <th className={`${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3 px-4'}`}>Profil Pegawai</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>Gapok</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>T.Istri</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>T.Anak</th>
+                <th className={`text-right ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>Lainnya</th>
+                <th className={`text-right font-black text-indigo-700 bg-indigo-50/30 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>Total/Bln</th>
+                <th className={`text-center w-16 ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-3 px-3'}`}>Bln</th>
+                <th className={`text-right w-40 ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-3 px-4'}`}>Total Setahun</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -520,10 +579,10 @@ export default function GajiPnsTab() {
               ) : (
                 currentItems.map((item) => (
                   <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors">
-                    <td className="py-2.5 px-4 text-center font-mono font-bold text-gray-400 text-xs align-top">
+                    <td className={`text-center font-mono font-bold text-gray-400 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
                       {item.no}
                     </td>
-                    <td className="py-2.5 px-4 align-top">
+                    <td className={`align-top ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
                       <div className="flex flex-col gap-1">
                         <div className="font-bold text-xs text-gray-900">{item.nama_pegawai}</div>
                         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -553,25 +612,25 @@ export default function GajiPnsTab() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-600 text-xs align-top">
+                    <td className={`text-right font-mono text-gray-600 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {formatRupiah(item.komponen.gajipokok).replace('Rp', '').replace(',00', '')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-400 text-xs align-top">
+                    <td className={`text-right font-mono text-gray-400 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {formatRupiah(item.komponen.tunj_istri).replace('Rp', '').replace(',00', '')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-400 text-xs align-top">
+                    <td className={`text-right font-mono text-gray-400 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {formatRupiah(item.komponen.tunj_anak).replace('Rp', '').replace(',00', '')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-gray-400 text-xs align-top">
+                    <td className={`text-right font-mono text-gray-400 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {formatRupiah(item.komponen.tunj_upns + item.komponen.tunj_struk + item.komponen.tunj_fungs + item.komponen.tunj_beras + item.komponen.tunj_pph).replace('Rp', '').replace(',00', '')}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700 bg-indigo-50/20 text-xs align-top">
+                    <td className={`text-right font-mono font-bold text-indigo-700 bg-indigo-50/20 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {formatRupiah(item.totalPerBulan).replace('Rp', '').replace(',00', '')}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold text-gray-700 text-xs align-top">
+                    <td className={`text-center font-mono font-bold text-gray-700 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>
                       {item.info.totalBulanBayar} bln
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-gray-900 text-xs align-top">
+                    <td className={`text-right font-mono font-bold text-gray-900 text-xs align-top ${tableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
                       {formatRupiah(item.totalSetahun).replace(',00', '')}
                     </td>
                   </tr>
@@ -581,30 +640,17 @@ export default function GajiPnsTab() {
           </table>
         </div>
         
-        {/* Pagination Footer */}
-        {!isLoading && totalPages > 1 && (
-          <div className="p-3 px-5 bg-gray-50/80 border-t border-gray-200 flex justify-between items-center">
-            <span className="text-[11px] font-semibold text-gray-500">
-              Halaman {currentPage} dari {totalPages}
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button 
-                onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo(0,0); }} 
-                disabled={currentPage === 1} 
-                className="h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-all flex items-center gap-1 shadow-2xs"
-              >
-                <ChevronLeft size={14} /> Sebelumnya
-              </button>
-              <button 
-                onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0,0); }} 
-                disabled={currentPage === totalPages} 
-                className="h-8 px-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-all flex items-center gap-1 shadow-2xs"
-              >
-                Selanjutnya <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* STANDARISASI TABEL DATA, PAGING */}
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredData.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onItemsPerPageChange={(size) => { setItemsPerPage(size); setCurrentPage(1); }}
+          pageSizeOptions={[10, 25, 50, 100]}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

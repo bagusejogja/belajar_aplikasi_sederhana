@@ -270,24 +270,101 @@ export default function BankTransaksiPage() {
             </div>
          </div>
 
-         {/* PASTE ZONE */}
-         <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200/80 shadow-xs flex flex-col md:flex-row items-center gap-4">
-            <div className="md:w-56 space-y-1">
-               <div className="inline-flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 text-[10px] font-bold text-indigo-700">
-                  <Zap size={11} />
-                  <span>Excel Paste Zone</span>
+         {/* PASTE ZONE STANDAR DESIGN SYSTEM TAB 01 */}
+         <div className="bg-white rounded-2xl p-5 border border-gray-200/90 shadow-2xs space-y-4">
+            {/* Header Pedoman Paste Zone */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+               <div>
+                  <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                     <FileSpreadsheet size={16} className="text-indigo-600" />
+                     Standar Excel / TSV Paste Zone Impor Rekening Koran
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                     Salin (Copy) baris data dari Excel/Spreadsheet, lalu tempel (Paste / Ctrl+V) ke dalam kotak area bawah. Parser otomatis memetakan 8 kolom baku.
+                  </p>
                </div>
-               <h2 className="text-sm font-black text-gray-900">Salin dari Excel</h2>
-               <p className="text-[10px] text-gray-500">Blok kolom tabel rekening koran dari Excel, lalu tempel (Ctrl+V) di samping.</p>
+               {parsedData.length > 0 && (
+                  <button
+                     type="button"
+                     onClick={() => setParsedData([])}
+                     className="px-3 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all cursor-pointer self-start sm:self-auto"
+                  >
+                     Bersihkan Tempelan
+                  </button>
+               )}
             </div>
-            <div className="flex-1 w-full">
-               <textarea 
-                  onPaste={handlePasteData} 
-                  placeholder="Klik dan tekan Ctrl + V di sini untuk menempel tabel data rekening koran..." 
-                  className="w-full bg-gray-50/80 hover:bg-white border border-gray-200 rounded-xl p-3 h-20 outline-none focus:ring-2 ring-indigo-500/20 focus:bg-white font-medium text-xs text-gray-700 placeholder:text-gray-400 transition-all resize-none" 
-               />
-               {message && <div className={`mt-1.5 p-1.5 rounded-lg text-center text-[10px] font-bold ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>{message.text}</div>}
+
+            {/* Tabel Spesifikasi 8 Kolom Baku */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200/80 bg-slate-50/50 p-3">
+               <span className="text-[10px] font-black uppercase text-gray-400 block mb-1.5">
+                  Tabel Spesifikasi Kolom Data Baku (8 Kolom Tab Delimited):
+               </span>
+               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-[10px] font-medium">
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[1] Waktu</span>
+                     <span className="text-gray-500">YYYY-MM-DD / Tgl</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[2] ID Rekening</span>
+                     <span className="text-gray-500">Nomor / ID Bank</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[3] Kode Akun</span>
+                     <span className="text-gray-500">Ref. COA (5xxxx)</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[4] NoRef Bank</span>
+                     <span className="text-gray-500">Referensi Transaksi</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[5] Uraian</span>
+                     <span className="text-gray-500">Keterangan / Deskripsi</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-rose-600 block">[6] Debet (-)</span>
+                     <span className="text-gray-500">Uang Keluar (Rp)</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-emerald-600 block">[7] Kredit (+)</span>
+                     <span className="text-gray-500">Uang Masuk (Rp)</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-2xs">
+                     <span className="font-bold text-indigo-600 block">[8] Saldo Riil</span>
+                     <span className="text-gray-500">Saldo Akhir Bank</span>
+                  </div>
+               </div>
             </div>
+
+            {/* Input Box Paste Zone Layout */}
+            <div className="flex flex-col md:flex-row items-stretch gap-3">
+               <div className="min-w-[150px] flex flex-col items-center justify-center p-4 bg-indigo-50/80 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">
+                  <FileSpreadsheet size={28} className="mb-1 text-indigo-600" />
+                  <p className="text-xs font-black uppercase tracking-wider">Paste Zone</p>
+                  <span className="text-[10px] text-indigo-500 font-medium">Excel Clipboard</span>
+               </div>
+               <div className="flex-1 w-full relative">
+                  <textarea
+                     onPaste={handlePasteData}
+                     placeholder="COPY baris dari EXCEL lalu PASTE (Ctrl + V) di sini...
+Format Baku: [1] Waktu [TAB] [2] ID Rekening [TAB] [3] Kode Akun [TAB] [4] NoRef Bank [TAB] [5] Deskripsi [TAB] [6] Debet [TAB] [7] Kredit [TAB] [8] Saldo Riil"
+                     className="w-full bg-gray-50 border border-gray-200 focus:border-indigo-500 focus:bg-white rounded-xl py-3 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 resize-none h-24 shadow-2xs"
+                  />
+                  {parsedData.length > 0 && (
+                     <div className="absolute right-3 bottom-3 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold border border-emerald-300">
+                        {parsedData.length} Baris Terdeteksi
+                     </div>
+                  )}
+               </div>
+            </div>
+            {message && (
+               <div className={`p-2.5 rounded-xl text-center text-xs font-bold shadow-2xs ${
+                  message.type === 'success' 
+                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                     : 'bg-rose-50 text-rose-800 border border-rose-200'
+               }`}>
+                  {message.text}
+               </div>
+            )}
          </div>
 
          {/* FILTER TOOLBAR */}

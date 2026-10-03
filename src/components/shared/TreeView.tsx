@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ChevronRight,
   ChevronDown,
@@ -37,6 +37,9 @@ interface TreeViewProps {
   searchable?: boolean;
   showExpandCollapseAll?: boolean;
   className?: string;
+  renderNodeActions?: (node: TreeNodeItem) => React.ReactNode;
+  maxHeight?: string;
+  showFullExpandButtons?: boolean;
 }
 
 export default function TreeView({
@@ -46,12 +49,38 @@ export default function TreeView({
   defaultExpandedIds = [],
   searchable = true,
   showExpandCollapseAll = true,
+  showFullExpandButtons = true,
   className = '',
+  renderNodeActions,
+  maxHeight = 'max-h-[650px]',
 }: TreeViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(defaultExpandedIds));
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set(defaultExpandedIds));
+  const [activeLevel, setActiveLevel] = useState<number | null>(2);
+  const hasInitializedRef = React.useRef(false);
+  const defaultExpandedKey = (defaultExpandedIds || []).join(',');
 
-  // Kumpulkan seluruh ID untuk tombol Expand All
+  // Level 1: Root items yang memiliki anak
+  const level1Ids = useMemo(() => {
+    return data.filter((d) => d.children && d.children.length > 0).map((d) => d.id);
+  }, [data]);
+
+  // Level 2: Child items (anak) yang memiliki anak lagi (cucu)
+  const level2Ids = useMemo(() => {
+    const ids: string[] = [];
+    data.forEach((root) => {
+      if (root.children) {
+        root.children.forEach((child) => {
+          if (child.children && child.children.length > 0) {
+            ids.push(child.id);
+          }
+        });
+      }
+    });
+    return ids;
+  }, [data]);
+
+  // Kumpulkan seluruh ID yang memiliki anak (untuk Expand All)
   const allIds = useMemo(() => {
     const ids: string[] = [];
     const traverse = (items: TreeNodeItem[]) => {
@@ -66,8 +95,24 @@ export default function TreeView({
     return ids;
   }, [data]);
 
+  // Sync expandedIds sekali saat data pertama kali tersedia tanpa memicu re-render tak hingga
+  useEffect(() => {
+    if (data.length > 0 && !hasInitializedRef.current) {
+      if (defaultExpandedIds && defaultExpandedIds.length > 0) {
+        setExpandedIds(new Set(defaultExpandedIds));
+        setActiveLevel(null);
+      } else {
+        // Default: buka Level 1 (Induk) sehingga Anak langsung terlihat rapi
+        setExpandedIds(new Set(level1Ids));
+        setActiveLevel(2);
+      }
+      hasInitializedRef.current = true;
+    }
+  }, [data.length, defaultExpandedKey, level1Ids]);
+
   const handleToggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setActiveLevel(null);
     setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -79,12 +124,28 @@ export default function TreeView({
     });
   };
 
+  const handleSetLevel = (level: 1 | 2 | 3) => {
+    setActiveLevel(level);
+    if (level === 1) {
+      // Level 1: Tampilkan hanya Induk (tutup semua anak)
+      setExpandedIds(new Set());
+    } else if (level === 2) {
+      // Level 2: Buka Induk sehingga Anak terlihat
+      setExpandedIds(new Set(level1Ids));
+    } else if (level === 3) {
+      // Level 3: Buka Induk & Anak sehingga Cucu (ujung/leaf) terlihat
+      setExpandedIds(new Set([...level1Ids, ...level2Ids]));
+    }
+  };
+
   const handleExpandAll = () => {
     setExpandedIds(new Set(allIds));
+    setActiveLevel(3);
   };
 
   const handleCollapseAll = () => {
     setExpandedIds(new Set());
+    setActiveLevel(1);
   };
 
   // Filter tree berdasarkan kata kunci pencarian
@@ -251,6 +312,15 @@ export default function TreeView({
                 {node.children.length}
               </span>
             )}
+
+            {renderNodeActions && (
+              <div 
+                className="flex items-center gap-1 ml-1" 
+                onClick={(e) => e.stopPropagation()}
+              >
+                {renderNodeActions(node)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -285,31 +355,76 @@ export default function TreeView({
         )}
 
         {showExpandCollapseAll && (
-          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
-            <button
-              type="button"
-              onClick={handleExpandAll}
-              className="px-2.5 py-1 text-[11px] font-bold text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-              title="Buka seluruh cabang pohon"
-            >
-              <Expand size={12} />
-              <span>Buka Semua</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCollapseAll}
-              className="px-2.5 py-1 text-[11px] font-bold text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-              title="Tutup seluruh cabang pohon"
-            >
-              <Minimize2 size={12} />
-              <span>Tutup Semua</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto shrink-0">
+            {/* Smart Segmented Level & Stepper Bar (Induk -> +Anak -> +Cucu) */}
+            <div className="inline-flex items-center rounded-xl p-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200/90 dark:border-slate-700 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleSetLevel(1)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  activeLevel === 1
+                    ? 'bg-violet-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 1: Tampilkan hanya Induk"
+              >
+                Induk
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLevel(2)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  activeLevel === 2
+                    ? 'bg-violet-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 2: Buka sampai Anak"
+              >
+                +Anak
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetLevel(3)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  activeLevel === 3
+                    ? 'bg-violet-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700'
+                }`}
+                title="Tingkat 3: Buka semua sampai Cucu (Rincian/Leaf)"
+              >
+                +Cucu
+              </button>
+            </div>
+
+            {/* Quick Action Buttons */}
+            {showFullExpandButtons && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleExpandAll}
+                  className="px-2 py-1 text-[11px] font-bold text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Buka seluruh cabang pohon"
+                >
+                  <Expand size={11} />
+                  <span className="hidden sm:inline">Buka Semua</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCollapseAll}
+                  className="px-2 py-1 text-[11px] font-bold text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Tutup seluruh cabang pohon"
+                >
+                  <Minimize2 size={11} />
+                  <span className="hidden sm:inline">Tutup Semua</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Tree Content List */}
-      <div className="mt-3 overflow-y-auto max-h-[460px] pr-1 space-y-0.5">
+      <div className={`mt-3 overflow-y-auto ${maxHeight} pr-1 space-y-0.5`}>
         {filteredData.length > 0 ? (
           filteredData.map((node) => renderTreeNode(node))
         ) : (

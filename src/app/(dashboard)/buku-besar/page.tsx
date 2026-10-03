@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   BookOpen, 
-  Calendar as CalendarIcon, 
   ArrowDownRight, 
   ArrowUpRight, 
   Search, 
@@ -18,9 +17,11 @@ import {
   Loader2, 
   Building2,
   FileSpreadsheet,
-  Printer
+  Printer,
+  Landmark,
+  FolderTree,
+  X
 } from 'lucide-react';
-import Select from 'react-select';
 import * as XLSX from 'xlsx';
 
 import PageHeader from '@/components/shared/PageHeader';
@@ -29,8 +30,19 @@ import TablePagination from '@/components/shared/TablePagination';
 import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
 import ExportButtons from '@/components/shared/ExportButtons';
 import EmptyState from '@/components/shared/EmptyState';
+import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
+import AutocompleteCombobox, { ComboboxOption } from '@/components/shared/AutocompleteCombobox';
 
-const fmt = (n: number) => Math.abs(n).toLocaleString('id-ID', { minimumFractionDigits: 2 });
+// Format Rupiah tanpa desimal sen sesuai Design System
+const fmt = (n: number) => Math.round(Math.abs(n)).toLocaleString('id-ID');
+
+const formatDateId = (dateStr: string) => {
+  if (!dateStr) return '-';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const cleanNum = (val: any): number => {
   if (typeof val === 'number') return val;
@@ -71,11 +83,30 @@ export default function BukuBesarPage() {
   const [allAkun, setAllAkun] = useState<any[]>([]);
   const [allRekening, setAllRekening] = useState<any[]>([]);
 
-  // Filters
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-  const [startDate, setStartDate] = useState(firstDay.toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
+  // Helper: Tanggal awal bulan & hari ini (waktu lokal)
+  const getLocalMonthStart = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}-01`;
+  };
+
+  const getLocalToday = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Filters (DateRangePicker 1x Klik standar Design System)
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: getLocalMonthStart(),
+    endDate: getLocalToday()
+  });
+  const startDate = dateRange.startDate;
+  const endDate = dateRange.endDate;
+
   const [selectedRekening, setSelectedRekening] = useState<string>('all');
   const [selectedAkun, setSelectedAkun] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -208,6 +239,39 @@ export default function BukuBesarPage() {
     return options;
   }, [unifiedData, allAkun]);
 
+  const rekeningComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    const opts: ComboboxOption[] = [
+      { value: 'all', label: 'Semua Rekening & Kas', badge: 'Semua' },
+      { value: 'kas', label: 'Kas Tunai / Kas Kecil', badge: 'Kas' },
+    ];
+    allRekening.forEach(r => {
+      const bankName = r.nama_bank || 'Bank';
+      const noRek = r.nomor_rekening || r.no_rekening ? ` - ${r.nomor_rekening || r.no_rekening}` : '';
+      opts.push({
+        value: String(r.id),
+        label: `${bankName}${noRek}`,
+        badge: bankName,
+        subtext: r.nomor_rekening || r.no_rekening ? `No. Rek: ${r.nomor_rekening || r.no_rekening}` : undefined
+      });
+    });
+    return opts;
+  }, [allRekening]);
+
+  const akunComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    const opts: ComboboxOption[] = [
+      { value: 'all', label: 'Semua Akun Anggaran (MAK)', badge: 'Semua' }
+    ];
+    activeAkunOptions.forEach(a => {
+      opts.push({
+        value: a.id,
+        label: `${a.nomor} - ${a.nama}`,
+        badge: a.nomor,
+        subtext: a.nama
+      });
+    });
+    return opts;
+  }, [activeAkunOptions]);
+
   // Calculate Ledger Data with Filters
   const ledgerData = useMemo(() => {
     if (!startDate || !endDate) return { rows: [], finalSaldo: 0, totalDebit: 0, totalKredit: 0 };
@@ -309,8 +373,10 @@ export default function BukuBesarPage() {
   };
 
   const resetFilters = () => {
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
+    setDateRange({
+      startDate: getLocalMonthStart(),
+      endDate: getLocalToday()
+    });
     setSelectedRekening('all');
     setSelectedAkun('all');
     setSearchQuery('');
@@ -363,168 +429,128 @@ export default function BukuBesarPage() {
         />
       </div>
 
-      {/* 2. STATCARDS KPI METRICS (DESIGN SYSTEM) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 print-hidden">
+      {/* 2. STATCARDS KPI METRICS (4 MODERN KPI SUMMARY CARDS SESUAI DESIGN SYSTEM) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 print-hidden">
         <StatCard
-          title="Total Masuk / Debit (+)"
+          title="TOTAL MASUK / DEBIT (+)"
           value={`Rp ${fmt(ledgerData.totalDebit)}`}
           subtitle="Pemasukan & Pemindahbukuan"
           icon={TrendingUp}
+          trend={{ value: 'Kas Masuk', isUp: true, isGood: true }}
           variant="emerald"
+          lightBg={true}
         />
         <StatCard
-          title="Total Keluar / Kredit (-)"
+          title="TOTAL KELUAR / KREDIT (-)"
           value={`Rp ${fmt(ledgerData.totalKredit)}`}
           subtitle="Pengeluaran Beban & Mutasi"
           icon={TrendingDown}
+          trend={{ value: 'Kas Keluar', isUp: false, isGood: false }}
           variant="rose"
+          lightBg={true}
         />
         <StatCard
-          title="Total Saldo Periode"
+          title="TOTAL SALDO PERIODE"
           value={`Rp ${fmt(ledgerData.finalSaldo)}`}
           subtitle="Akumulasi Selisih Periode"
           icon={Scale}
+          trend={{
+            value: `${ledgerData.finalSaldo >= 0 ? '+' : ''}Rp ${fmt(ledgerData.finalSaldo)}`,
+            isUp: ledgerData.finalSaldo >= 0,
+            isGood: ledgerData.finalSaldo >= 0
+          }}
           variant="indigo"
+          lightBg={true}
         />
         <StatCard
-          title="Volume Transaksi"
+          title="VOLUME TRANSAKSI"
           value={`${ledgerData.rows.length} Data`}
-          subtitle={`Periode ${new Date(startDate).toLocaleDateString('id-ID')} s/d ${new Date(endDate).toLocaleDateString('id-ID')}`}
-          icon={Coins}
+          subtitle={`Periode ${formatDateId(dateRange.startDate)} s/d ${formatDateId(dateRange.endDate)}`}
+          icon={BookOpen}
           variant="blue"
+          lightBg={true}
         />
       </div>
 
-      {/* 3. INTERACTIVE FILTER CONSOLE (DESIGN SYSTEM) */}
-      <div className="print-hidden bg-white/95 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Filter size={15} className="text-blue-600" />
-            <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
-              Filter Parameter Buku Besar
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
-              <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
-            </div>
-
-            {(searchQuery || selectedRekening !== 'all' || selectedAkun !== 'all') && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
-                title="Reset Semua Filter"
-              >
-                <RotateCcw size={12} />
-                <span>Reset Filter</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Quick Search */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-              Pencarian Cepat
-            </label>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cari uraian / kode akun..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 text-xs font-semibold bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-              Rentang Tanggal
-            </label>
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9">
-              <CalendarIcon size={13} className="text-gray-400 shrink-0" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-full"
-              />
-              <span className="text-gray-300">-</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="bg-transparent text-xs font-semibold outline-none text-gray-700 w-full"
-              />
-            </div>
-          </div>
-
-          {/* Rekening Filter */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-              Sumber Dana / Kas
-            </label>
-            <select
-              value={selectedRekening}
-              onChange={e => setSelectedRekening(e.target.value)}
-              className="w-full h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all"
-            >
-              <option value="all">Semua Rekening & Kas</option>
-              <option value="kas">Kas Kecil (KK1)</option>
-              <option value="bank">Semua Bank Saja</option>
-              {allRekening.map(r => (
-                <option key={r.id} value={String(r.id)}>
-                  {r.nama_rekening || r.nama || (r.no_rekening ? `Rek. ${r.no_rekening}` : `Bank ${r.id}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Akun Anggaran Selector */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">
-              Akun Anggaran (MAK)
-            </label>
-            <Select 
-              options={[
-                { value: 'all', label: 'Semua Akun (Gabungan)' }, 
-                ...activeAkunOptions.map(a => ({ value: a.id, label: `${a.nomor} - ${a.nama}` }))
-              ]}
-              value={
-                selectedAkun === 'all' 
-                  ? { value: 'all', label: 'Semua Akun (Gabungan)' } 
-                  : { 
-                      value: selectedAkun, 
-                      label: activeAkunOptions.find(a => a.id === selectedAkun) 
-                        ? `${activeAkunOptions.find(a => a.id === selectedAkun)?.nomor} - ${activeAkunOptions.find(a => a.id === selectedAkun)?.nama}` 
-                        : 'Pilih Akun' 
-                    }
-              }
-              onChange={(val: any) => setSelectedAkun(val?.value || 'all')}
-              styles={{
-                control: (b) => ({ 
-                  ...b, 
-                  minHeight: '36px', 
-                  height: '36px', 
-                  borderRadius: '0.75rem', 
-                  border: '1px solid #e5e7eb', 
-                  backgroundColor: '#f9fafb', 
-                  fontSize: '12px', 
-                  fontWeight: 600,
-                  boxShadow: 'none'
-                }),
-                valueContainer: (b) => ({ ...b, padding: '0 8px' }),
-                menu: (b) => ({ ...b, zIndex: 50, fontSize: '12px', borderRadius: '0.75rem' }),
-              }}
+      {/* 3. FILTER TOOLBAR: DATE RANGE PICKER + REKENING + AKUN MAK + SEARCH BAR (STANDAR DESIGN SYSTEM) */}
+      <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/90 shadow-2xs print-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          
+          {/* 1. Filter Rentang Tanggal */}
+          <div className="lg:col-span-3 w-full">
+            <DateRangePicker
+              label="Filter Rentang Tanggal (1x Klik)"
+              value={dateRange}
+              onChange={setDateRange}
+              showTime={false}
             />
           </div>
+
+          {/* 2. Filter Sumber Rekening */}
+          <div className="lg:col-span-3 w-full">
+            <AutocompleteCombobox
+              label="Sumber Rekening"
+              icon={Landmark}
+              placeholder="Pilih rekening kas / bank..."
+              options={rekeningComboboxOptions}
+              value={selectedRekening}
+              onChange={(val) => setSelectedRekening(val || 'all')}
+            />
+          </div>
+
+          {/* 3. Filter Akun MAK */}
+          <div className="lg:col-span-3 w-full">
+            <AutocompleteCombobox
+              label="Akun Anggaran (MAK)"
+              icon={FolderTree}
+              placeholder="Pilih akun atau ketik kode..."
+              options={akunComboboxOptions}
+              value={selectedAkun}
+              onChange={(val) => setSelectedAkun(val || 'all')}
+            />
+          </div>
+
+          {/* 4. Pencarian Cepat */}
+          <div className="lg:col-span-2 w-full">
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Search size={11} className="text-gray-400 shrink-0" />
+              <span>Pencarian Cepat</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Cari uraian, kode..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-3.5 pr-8 text-xs bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-gray-800 transition-all shadow-2xs placeholder:text-gray-400 placeholder:font-bold"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+                  title="Hapus kata kunci"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 5. Tombol Reset Filter */}
+          <div className="lg:col-span-1 w-full flex justify-end">
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={selectedRekening === 'all' && selectedAkun === 'all' && !searchQuery && dateRange.startDate === getLocalMonthStart() && dateRange.endDate === getLocalToday()}
+              className="w-full h-10 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 disabled:pointer-events-none text-xs font-bold rounded-2xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Reset semua filter"
+            >
+              <RotateCcw size={13} />
+              <span className="hidden sm:inline lg:hidden xl:inline">Reset</span>
+            </button>
+          </div>
+
         </div>
       </div>
 
@@ -532,7 +558,7 @@ export default function BukuBesarPage() {
       <div className="hidden print-header">
         <h1 className="text-xl font-black uppercase tracking-widest text-gray-900">BUKU BESAR (GENERAL LEDGER)</h1>
         <p className="text-xs font-semibold mt-1 text-gray-600">
-          Periode: {new Date(startDate).toLocaleDateString('id-ID')} s/d {new Date(endDate).toLocaleDateString('id-ID')}
+          Periode: {formatDateId(dateRange.startDate)} s/d {formatDateId(dateRange.endDate)}
         </p>
         <p className="text-xs font-medium text-gray-600">
           Sumber Dana: {selectedRekening === 'all' ? 'Semua Rekening & Kas' : selectedRekening === 'kas' ? 'Kas Kecil (KK1)' : allRekening.find(r => String(r.id) === selectedRekening)?.nama_rekening || 'Bank'} | Akun: {selectedAkun === 'all' ? 'Semua Akun' : activeAkunOptions.find(a => a.id === selectedAkun)?.nama || '-'}
@@ -541,6 +567,20 @@ export default function BukuBesarPage() {
 
       {/* 4. TABLE VIEW (DESIGN SYSTEM) */}
       <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+        {/* Table Top Bar with Density Toggle */}
+        <div className="p-3.5 px-5 bg-gray-50/70 border-b border-gray-200/80 flex items-center justify-between gap-3 print-hidden">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+              Daftar Transaksi Buku Besar
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-gray-200/80 text-gray-700 text-[10px] font-bold">
+              {ledgerData.rows.length} Transaksi
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <TableDensityToggle density={tableDensity} onChange={setTableDensity} />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>

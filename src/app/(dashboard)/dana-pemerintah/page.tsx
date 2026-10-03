@@ -26,7 +26,7 @@ const GajiPnsTab = dynamic(() => import('@/components/dana-pemerintah/GajiPnsTab
 
 function TabLoading() {
   return (
-    <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-gray-200/80 shadow-xs text-gray-400">
+    <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-gray-200/90 shadow-2xs text-gray-400">
       <Loader2 size={32} className="animate-spin mb-2 text-indigo-600" />
       <p className="text-xs font-semibold">Memuat data modul...</p>
     </div>
@@ -116,12 +116,12 @@ function DanaPemerintahContent() {
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4 font-sans text-gray-900">
       
-      {/* UNIFIED TOP BANNER & TABS */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+      {/* UNIFIED TOP BANNER & TABS (DESIGN SYSTEM STANDARDS) */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-4">
         {/* Header Title */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-3.5">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-indigo-600 via-sky-600 to-emerald-600 p-2.5 rounded-xl text-white shadow-xs">
+            <div className="bg-gradient-to-br from-indigo-600 via-sky-600 to-emerald-600 p-2.5 rounded-xl text-white shadow-2xs">
               <Landmark size={22} />
             </div>
             <div>
@@ -140,8 +140,8 @@ function DanaPemerintahContent() {
           </div>
         </div>
 
-        {/* TAB BUTTONS */}
-        <div className="flex items-center gap-1.5 p-1 bg-gray-100/80 rounded-xl overflow-x-auto no-scrollbar">
+        {/* TAB NAVIGATION: GAYA 4 MASTER SUITE 4-COLUMN NAVIGATION CARD (DESIGN SYSTEM) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -150,19 +150,27 @@ function DanaPemerintahContent() {
                 key={tab.id}
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg font-bold text-xs whitespace-nowrap transition-all flex-1 justify-center ${
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-xs select-none border min-h-[48px] transition-all cursor-pointer text-left ${
                   isActive 
-                    ? tab.activeColor 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                    ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/70 border-blue-500 ring-1 ring-blue-500/40 scale-[1.01]' 
+                    : 'bg-white text-slate-700 border-slate-200/90 hover:border-blue-300 hover:bg-slate-50/80 shadow-2xs'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-white' : tab.iconColor} />
-                <span>{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-gray-200/70 text-gray-500'
+                <div className={`p-2 rounded-lg shrink-0 ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'
                 }`}>
-                  {tab.badge}
-                </span>
+                  <Icon size={16} />
+                </div>
+                <div className="flex flex-col items-start min-w-0 pr-1 gap-0.5">
+                  <span className="line-clamp-1 font-bold tracking-tight text-[12px] leading-tight">
+                    {tab.label}
+                  </span>
+                  <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider leading-none ${
+                    isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                </div>
               </button>
             );
           })}
