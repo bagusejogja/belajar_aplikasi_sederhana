@@ -1357,6 +1357,7 @@ export default function RkaLaporanPage() {
   const [rekapGroupFilter, setRekapGroupFilter] = useState<string>('Fakultas');
   const [rekapFormat, setRekapFormat] = useState<'fakultas' | 'fakultas_alokasi' | 'pusdi' | 'upu' | 'kptu'>('fakultas');
   const [paguAwalList, setPaguAwalList] = useState<any[]>([]);
+  const [isExportingKertasKerja, setIsExportingKertasKerja] = useState(false);
 
   // Konfigurasi Template Susunan Slide PPT RKAT (Bisa disesuaikan lewat UI Modal, mendukung 3 jenjang)
   const [pptTemplate, setPptTemplate] = useState<PptTemplateConfig>(() => {
@@ -3588,31 +3589,42 @@ export default function RkaLaporanPage() {
     return { anggaran, totalItems };
   }, [groupedData]);
 
-  // Export Excel Rekap Unit Kerja (Menggunakan ExcelJS: Format Rapi, Berwarna, Border, Currency Format, Siap Tayang / Print)
-  const handleExportExcelUnitRekap = async () => {
-    if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
+  // =========================================================================
+  // HELPER EXCEL BUILDERS (UNTUK KERTAS KERJA LENGKAP & EXPORT EXCEL SATUAN)
+  // =========================================================================
 
-    try {
-      const wb = new ExcelJS.Workbook();
-      wb.creator = 'Universitas Gadjah Mada';
-      wb.lastModifiedBy = 'RKAT Online';
-      wb.created = new Date();
+  // Helper 1: Build Sheet Rekap Unit Kerja (Fakultas, Alokasi, PUSDI, UPU, KPTU)
+  const buildRekapWorksheet = (
+    wb: ExcelJS.Workbook,
+    sheetName: string,
+    format: 'fakultas' | 'fakultas_alokasi' | 'pusdi' | 'upu' | 'kptu',
+    targetGroups: typeof groupedByOrg,
+    subTitleOverride?: string
+  ) => {
+    const isPusdi = format === 'pusdi';
+    const isUpu = format === 'upu';
+    const isKptu = format === 'kptu';
+    const isFakultasAlokasi = format === 'fakultas_alokasi';
+    const formatTag = isKptu 
+      ? 'Format KPTU 9 Kolom' 
+      : isUpu 
+      ? 'Format UPU 10 Kolom' 
+      : isPusdi 
+      ? 'Format PUSDI 9 Kolom' 
+      : isFakultasAlokasi 
+      ? 'Format Fakultas (Alokasi) 11 Kolom' 
+      : 'Format Fakultas 11 Kolom';
 
-      const isPusdi = rekapFormat === 'pusdi';
-      const isUpu = rekapFormat === 'upu';
-      const isKptu = rekapFormat === 'kptu';
-      const isFakultasAlokasi = rekapFormat === 'fakultas_alokasi';
-      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : isFakultasAlokasi ? 'Format Fakultas (Alokasi) 11 Kolom' : 'Format Fakultas 11 Kolom';
-      const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : isFakultasAlokasi ? 'Rekap_Fakultas_Alokasi' : 'Rekap_Fakultas';
-      const ws = wb.addWorksheet(sheetName, {
-        views: [{ showGridLines: true }]
-      });
+    const ws = wb.addWorksheet(sheetName, {
+      views: [{ showGridLines: true }]
+    });
 
-      // 1. Title Banner
-      const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
-      titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
-      
-      const subTitleText = isKptu
+    // 1. Title Banner
+    const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+    titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+
+    const subTitleText = subTitleOverride || (
+      isKptu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KANTOR PUSAT / KPTU (9 KOLOM) TA ${tahunFilter}`
         : isUpu
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT UNIT PENUNJANG UNIVERSITAS (UPU) (10 KOLOM) TA ${tahunFilter}`
@@ -3620,480 +3632,374 @@ export default function RkaLaporanPage() {
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT PUSAT STUDI / PUSDI (9 KOLOM) TA ${tahunFilter}`
         : isFakultasAlokasi
         ? `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (ALOKASI) (11 KOLOM) TA ${tahunFilter}`
-        : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`;
-      const subTitleRow = ws.addRow([subTitleText]);
-      subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
+        : `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT FAKULTAS (11 KOLOM) TA ${tahunFilter}`
+    );
+    const subTitleRow = ws.addRow([subTitleText]);
+    subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
 
-      const filterParts: string[] = [
-        `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-        `Tahun: ${tahunFilter === 'ALL' ? 'Semua Tahun' : `TA ${tahunFilter}`}`,
-        `Format: ${formatTag}`,
-        `Group: ${rekapGroupFilter === 'ALL' ? 'Semua Group' : rekapGroupFilter}`
-      ];
-      if (unitFilter !== 'ALL') filterParts.push(`Unit: ${unitFilter}`);
-      if (search) filterParts.push(`Pencarian: "${search}"`);
+    const filterParts: string[] = [
+      `Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+      `Tahun: ${tahunFilter === 'ALL' ? 'Semua Tahun' : `TA ${tahunFilter}`}`,
+      `Versi: ${versiFilter.toUpperCase()}`,
+      `Format: ${formatTag}`
+    ];
+    if (unitFilter !== 'ALL') filterParts.push(`Unit: ${unitFilter}`);
 
-      const infoRow = ws.addRow([filterParts.join('  |  ')]);
-      infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+    const infoRow = ws.addRow([filterParts.join('  |  ')]);
+    infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
 
-      ws.addRow([]); // Blank spacer
+    ws.addRow([]); // Blank spacer
 
-      // 2. Table Headers
-      const headers = isKptu
-        ? [
-            'NO',
-            'GROUP',
-            '0. UNIT KERJA',
-            '1. PAGU (RP)',
-            '2. KERJASAMA (RP)',
-            '3. JUMLAH (1+2+3) (RP)',
-            '4. PENGELUARAN OPERASIONAL (RP)',
-            '5. INVESTASI (BELANJA MODAL) (RP)',
-            '6. TOTAL PENGELUARAN (4+5) (RP)',
-            '7. SURPLUS / (DEFISIT) OPS (3-5) (RP)',
-            '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
-          ]
-        : isUpu
-        ? [
-            'NO',
-            'GROUP',
-            '0. UNIT KERJA',
-            '1. SUBSIDI (RP)',
-            '2. PENERIMAAN (RP)',
-            '3. LUNCURAN (RP)',
-            '4. JML SUMBER PEMBIAYAAN (1+2+3) (RP)',
-            '5. PENGELUARAN OPERASIONAL (RP)',
-            '6. INVESTASI (BELANJA MODAL) (RP)',
-            '7. TOTAL PENGELUARAN (5+6) (RP)',
-            '8. SURPLUS / (DEFISIT) OPS (1+2-5) (RP)',
-            '9. SURPLUS / (DEFISIT) ANGGARAN (RP)'
-          ]
-        : isPusdi
-        ? [
-            'NO',
-            'GROUP',
-            '0. UNIT KERJA',
-            '1. PENERIMAAN (RP)',
-            '2. LUNCURAN (RP)',
-            '3. JML SUMBER PEMBIAYAAN (1+2) (RP)',
-            '4. PENGELUARAN OPERASIONAL (RP)',
-            '5. INVESTASI (BELANJA MODAL) (RP)',
-            '6. TOTAL PENGELUARAN (4+5) (RP)',
-            '7. SURPLUS / (DEFISIT) OPS (1-4) (RP)',
-            '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
-          ]
-        : isFakultasAlokasi
-        ? [
-            'NO',
-            'GROUP',
-            '0. UNIT KERJA',
-            '1. PENERIMAAN PENDIDIKAN (ALOKASI) (RP)',
-            '2. PENERIMAAN NON PENDIDIKAN (ALOKASI) (RP)',
-            '3. JUMLAH PENERIMAAN (1+2) (RP)',
-            '4. LUNCURAN / SURPLUS TA LALU (RP)',
-            '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
-            '6. PENGELUARAN OPERASIONAL (RP)',
-            '7. INVESTASI (BELANJA MODAL) (RP)',
-            '8. TOTAL PENGELUARAN (6+7) (RP)',
-            '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)',
-            '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
-          ]
-        : [
-            'NO',
-            'GROUP',
-            '0. UNIT KERJA',
-            '1. PENERIMAAN PENDIDIKAN (RP)',
-            '2. PENERIMAAN NON PENDIDIKAN (RP)',
-            '3. JUMLAH PENERIMAAN (1+2) (RP)',
-            '4. LUNCURAN / SURPLUS TA LALU (RP)',
-            '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
-            '6. PENGELUARAN OPERASIONAL (RP)',
-            '7. INVESTASI (BELANJA MODAL) (RP)',
-            '8. TOTAL PENGELUARAN (6+7) (RP)',
-            '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)',
-            '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
-          ];
+    // 2. Table Headers
+    const headers = isKptu
+      ? [
+          'NO', 'GROUP', '0. UNIT KERJA', '1. PAGU (RP)', '2. KERJASAMA (RP)', '3. JUMLAH (1+2+3) (RP)',
+          '4. PENGELUARAN OPERASIONAL (RP)', '5. INVESTASI (BELANJA MODAL) (RP)', '6. TOTAL PENGELUARAN (4+5) (RP)',
+          '7. SURPLUS / (DEFISIT) OPS (3-5) (RP)', '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+        ]
+      : isUpu
+      ? [
+          'NO', 'GROUP', '0. UNIT KERJA', '1. SUBSIDI (RP)', '2. PENERIMAAN (RP)', '3. LUNCURAN (RP)',
+          '4. JML SUMBER PEMBIAYAAN (1+2+3) (RP)', '5. PENGELUARAN OPERASIONAL (RP)', '6. INVESTASI (BELANJA MODAL) (RP)',
+          '7. TOTAL PENGELUARAN (5+6) (RP)', '8. SURPLUS / (DEFISIT) OPS (1+2-5) (RP)', '9. SURPLUS / (DEFISIT) ANGGARAN (RP)'
+        ]
+      : isPusdi
+      ? [
+          'NO', 'GROUP', '0. UNIT KERJA', '1. PENERIMAAN (RP)', '2. LUNCURAN (RP)', '3. JML SUMBER PEMBIAYAAN (1+2) (RP)',
+          '4. PENGELUARAN OPERASIONAL (RP)', '5. INVESTASI (BELANJA MODAL) (RP)', '6. TOTAL PENGELUARAN (4+5) (RP)',
+          '7. SURPLUS / (DEFISIT) OPS (1-4) (RP)', '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+        ]
+      : isFakultasAlokasi
+      ? [
+          'NO', 'GROUP', '0. UNIT KERJA', '1. PENERIMAAN PENDIDIKAN (ALOKASI) (RP)', '2. PENERIMAAN NON PENDIDIKAN (ALOKASI) (RP)',
+          '3. JUMLAH PENERIMAAN (1+2) (RP)', '4. LUNCURAN / SURPLUS TA LALU (RP)', '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
+          '6. PENGELUARAN OPERASIONAL (RP)', '7. INVESTASI (BELANJA MODAL) (RP)', '8. TOTAL PENGELUARAN (6+7) (RP)',
+          '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)', '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
+        ]
+      : [
+          'NO', 'GROUP', '0. UNIT KERJA', '1. PENERIMAAN PENDIDIKAN (RP)', '2. PENERIMAAN NON PENDIDIKAN (RP)',
+          '3. JUMLAH PENERIMAAN (1+2) (RP)', '4. LUNCURAN / SURPLUS TA LALU (RP)', '5. JML SUMBER PEMBIAYAAN (3+4) (RP)',
+          '6. PENGELUARAN OPERASIONAL (RP)', '7. INVESTASI (BELANJA MODAL) (RP)', '8. TOTAL PENGELUARAN (6+7) (RP)',
+          '9. SURPLUS / (DEFISIT) OPS (3-6) (RP)', '10. SURPLUS / (DEFISIT) ANGGARAN (3+4-8) (RP)'
+        ];
 
-      const headerRow = ws.addRow(headers);
-      headerRow.height = 28;
-      headerRow.eachCell((cell) => {
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0F172A' } // Dark Slate Navy
+      };
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
+
+    // Column number indicators row
+    const colIndicators = isKptu
+      ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
+      : isUpu
+      ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
+      : isPusdi
+      ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
+      : ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
+
+    const indicatorRow = ws.addRow(colIndicators);
+    indicatorRow.height = 18;
+    indicatorRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF334155' }
+      };
+      cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFE2E8F0' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
+
+    const displayGroups = targetGroups.filter(g => g.units && g.units.length > 0);
+    const numCols = headers.length;
+    let rowNum = 1;
+
+    if (displayGroups.length === 0) {
+      const emptyRow = ws.addRow(['-', '-', `Belum ada data unit kerja untuk kelompok ini pada TA ${tahunFilter}`, ...Array(numCols - 3).fill(0)]);
+      emptyRow.height = 22;
+      emptyRow.eachCell((cell, colIndex) => {
+        cell.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF64748B' } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        if (colIndex > 3) {
+          cell.numFmt = '#,##0';
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        }
+      });
+    }
+
+    // Grand total accumulator
+    const grandTotal = {
+      pagu: 0,
+      kerjasama: 0,
+      jumlahKptu: 0,
+      subsidi: 0,
+      pendidikan: 0,
+      pendidikanAlokasi: 0,
+      nonPendidikan: 0,
+      nonPendidikanAlokasi: 0,
+      jumlahPenerimaan: 0,
+      jumlahPenerimaanAlokasi: 0,
+      luncuran: 0,
+      sumberPembiayaan: 0,
+      sumberPembiayaanAlokasi: 0,
+      sumberPembiayaanUpu: 0,
+      operasional: 0,
+      modal: 0,
+      totalPengeluaran: 0,
+      surplusDefisitOperasional: 0,
+      surplusDefisitOperasionalAlokasi: 0,
+      surplusDefisitOperasionalUpu: 0,
+      surplusDefisitOperasionalKptu: 0,
+      surplusDefisitAnggaran: 0,
+      surplusDefisitAnggaranAlokasi: 0,
+      surplusDefisitAnggaranUpu: 0,
+      surplusDefisitAnggaranKptu: 0,
+      totalUnits: 0
+    };
+
+    displayGroups.forEach(group => {
+      grandTotal.totalUnits += group.units.length;
+
+      // Group Header Banner
+      const groupTitle = `GROUP ORGANISASI: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`;
+      const grpRow = ws.addRow(['', group.groupOrg.toUpperCase(), groupTitle, ...Array(numCols - 3).fill('')]);
+      grpRow.height = 24;
+      grpRow.eachCell((cell) => {
         cell.fill = {
           type: 'pattern',
           pattern: 'solid',
-          fgColor: { argb: 'FF0F172A' } // Dark Slate Navy
+          fgColor: { argb: 'FFEEF2FF' } // Indigo 50
         };
-        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF312E81' } };
         cell.border = {
-          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          left: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+          top: { style: 'medium', color: { argb: 'FF818CF8' } },
+          bottom: { style: 'thin', color: { argb: 'FFC7D2FE' } }
         };
       });
 
-      // Column number indicators row
-      const colIndicators = isKptu
-        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
-        : isUpu
-        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)']
-        : isPusdi
-        ? ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)']
-        : ['#', '', '(0)', '(1)', '(2)', '(3)', '(4)', '(5)', '(6)', '(7)', '(8)', '(9)', '(10)'];
+      // Unit rows
+      group.units.forEach(u => {
+        grandTotal.pagu += (u.pagu || 0);
+        grandTotal.kerjasama += (u.kerjasama || 0);
+        grandTotal.jumlahKptu += (u.jumlahKptu || 0);
+        grandTotal.subsidi += (u.subsidi ?? u.pagu ?? 0);
+        grandTotal.pendidikan += (u.pendidikan || 0);
+        grandTotal.pendidikanAlokasi += (u.pendidikanAlokasi || 0);
+        grandTotal.nonPendidikan += (u.nonPendidikan || 0);
+        grandTotal.nonPendidikanAlokasi += (u.nonPendidikanAlokasi || 0);
+        grandTotal.jumlahPenerimaan += (u.jumlahPenerimaan || 0);
+        grandTotal.jumlahPenerimaanAlokasi += (u.jumlahPenerimaanAlokasi || 0);
+        grandTotal.luncuran += (u.luncuran || 0);
+        grandTotal.sumberPembiayaan += (u.sumberPembiayaan || 0);
+        grandTotal.sumberPembiayaanAlokasi += (u.sumberPembiayaanAlokasi || 0);
+        grandTotal.sumberPembiayaanUpu += (u.sumberPembiayaanUpu || 0);
+        grandTotal.operasional += (u.operasional || 0);
+        grandTotal.modal += (u.modal || 0);
+        grandTotal.totalPengeluaran += (u.totalPengeluaran || 0);
+        grandTotal.surplusDefisitOperasional += (u.surplusDefisitOperasional || 0);
+        grandTotal.surplusDefisitOperasionalAlokasi += (u.surplusDefisitOperasionalAlokasi || 0);
+        grandTotal.surplusDefisitOperasionalUpu += (u.surplusDefisitOperasionalUpu || 0);
+        grandTotal.surplusDefisitOperasionalKptu += (u.surplusDefisitOperasionalKptu || 0);
+        grandTotal.surplusDefisitAnggaran += (u.surplusDefisitAnggaran || 0);
+        grandTotal.surplusDefisitAnggaranAlokasi += (u.surplusDefisitAnggaranAlokasi || 0);
+        grandTotal.surplusDefisitAnggaranUpu += (u.surplusDefisitAnggaranUpu || 0);
+        grandTotal.surplusDefisitAnggaranKptu += (u.surplusDefisitAnggaranKptu || 0);
 
-      const indicatorRow = ws.addRow(colIndicators);
-      indicatorRow.height = 18;
-      indicatorRow.eachCell((cell) => {
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF334155' }
-        };
-        cell.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FFE2E8F0' } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          left: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
-          right: { style: 'thin', color: { argb: 'FF94A3B8' } }
-        };
-      });
-
-      // Filter group jika rekapGroupFilter aktif dan abaikan group yang tidak memiliki unit kerja sesuai filter
-      const displayGroups = (rekapGroupFilter === 'ALL' 
-        ? groupedByOrg 
-        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase())
-      ).filter(g => g.units.length > 0);
-
-      if (displayGroups.length === 0) {
-        return toast.error('Tidak ada data unit kerja yang sesuai filter untuk diexport');
-      }
-
-      const numCols = headers.length;
-      let rowNum = 1;
-
-      displayGroups.forEach(group => {
-        // Group Header Banner
-        const groupTitle = `GROUP ORGANISASI: ${group.groupOrg.toUpperCase()} (${group.units.length} UNIT KERJA)`;
-        const grpRow = ws.addRow(['', group.groupOrg.toUpperCase(), groupTitle, ...Array(numCols - 3).fill('')]);
-        grpRow.height = 24;
-        grpRow.eachCell((cell) => {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFEEF2FF' } // Indigo 50
-          };
-          cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF312E81' } };
-          cell.border = {
-            top: { style: 'medium', color: { argb: 'FF818CF8' } },
-            bottom: { style: 'thin', color: { argb: 'FFC7D2FE' } }
-          };
-        });
-
-        // Unit rows
-        group.units.forEach(u => {
-          const rowValues = isKptu
-            ? [
-                rowNum++,
-                group.groupOrg,
-                u.unit,
-                u.pagu || 0,
-                u.kerjasama || 0,
-                u.jumlahKptu || 0,
-                u.operasional,
-                u.modal,
-                u.totalPengeluaran,
-                u.surplusDefisitOperasionalKptu || 0,
-                u.surplusDefisitAnggaranKptu || 0
-              ]
-            : isUpu
-            ? [
-                rowNum++,
-                group.groupOrg,
-                u.unit,
-                u.subsidi ?? u.pagu ?? 0,
-                u.jumlahPenerimaan,
-                u.luncuran,
-                u.sumberPembiayaanUpu,
-                u.operasional,
-                u.modal,
-                u.totalPengeluaran,
-                u.surplusDefisitOperasionalUpu,
-                u.surplusDefisitAnggaranUpu
-              ]
-            : isPusdi
-            ? [
-                rowNum++,
-                group.groupOrg,
-                u.unit,
-                u.jumlahPenerimaan,
-                u.luncuran,
-                u.sumberPembiayaan,
-                u.operasional,
-                u.modal,
-                u.totalPengeluaran,
-                u.surplusDefisitOperasional,
-                u.surplusDefisitAnggaran
-              ]
-            : isFakultasAlokasi
-            ? [
-                rowNum++,
-                group.groupOrg,
-                u.unit,
-                u.pendidikanAlokasi,
-                u.nonPendidikanAlokasi,
-                u.jumlahPenerimaanAlokasi,
-                u.luncuran,
-                u.sumberPembiayaanAlokasi,
-                u.operasional,
-                u.modal,
-                u.totalPengeluaran,
-                u.surplusDefisitOperasionalAlokasi,
-                u.surplusDefisitAnggaranAlokasi
-              ]
-            : [
-                rowNum++,
-                group.groupOrg,
-                u.unit,
-                u.pendidikan,
-                u.nonPendidikan,
-                u.jumlahPenerimaan,
-                u.luncuran,
-                u.sumberPembiayaan,
-                u.operasional,
-                u.modal,
-                u.totalPengeluaran,
-                u.surplusDefisitOperasional,
-                u.surplusDefisitAnggaran
-              ];
-
-          const dataRow = ws.addRow(rowValues);
-          dataRow.height = 20;
-          dataRow.eachCell((cell, colIndex) => {
-            cell.font = { name: 'Calibri', size: 9.5 };
-            cell.border = {
-              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-              right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
-            };
-
-            if (colIndex === 1) {
-              cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            } else if (colIndex === 2) {
-              cell.alignment = { horizontal: 'left', vertical: 'middle' };
-            } else if (colIndex === 3) {
-              cell.alignment = { horizontal: 'left', vertical: 'middle' };
-              cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
-            } else {
-              // Numerical columns
-              cell.alignment = { horizontal: 'right', vertical: 'middle' };
-              cell.numFmt = '#,##0';
-              if (isKptu) {
-                if (colIndex === 4 || colIndex === 5 || colIndex === 6) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
-                } else if (colIndex === 9) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
-                }
-              } else if (isUpu) {
-                if (colIndex === 5 || colIndex === 7) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
-                } else if (colIndex === 10) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
-                }
-              } else if (isPusdi) {
-                if (colIndex === 4 || colIndex === 6) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
-                } else if (colIndex === 9) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
-                }
-              } else {
-                if (colIndex === 6 || colIndex === 8) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } }; // Soft green
-                } else if (colIndex === 11) {
-                  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } }; // Soft purple
-                }
-              }
-            }
-          });
-        });
-
-        // Group Subtotal row
-        const subtotalValues = isKptu
+        const rowValues = isKptu
           ? [
-              '',
-              `SUBTOTAL ${group.groupOrg}`,
-              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              group.totalPagu || 0,
-              group.totalKerjasama || 0,
-              group.totalJumlahKptu || 0,
-              group.totalOperasional,
-              group.totalModal,
-              group.totalPengeluaran,
-              group.totalSurplusDefisitOperasionalKptu || 0,
-              group.totalSurplusDefisitAnggaranKptu || 0
+              rowNum++, group.groupOrg, u.unit, u.pagu || 0, u.kerjasama || 0, u.jumlahKptu || 0,
+              u.operasional, u.modal, u.totalPengeluaran, u.surplusDefisitOperasionalKptu || 0, u.surplusDefisitAnggaranKptu || 0
             ]
           : isUpu
           ? [
-              '',
-              `SUBTOTAL ${group.groupOrg}`,
-              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              group.totalSubsidi || group.totalPagu || 0,
-              group.totalJumlahPenerimaan,
-              group.totalLuncuran,
-              group.totalSumberPembiayaanUpu,
-              group.totalOperasional,
-              group.totalModal,
-              group.totalPengeluaran,
-              group.totalSurplusDefisitOperasionalUpu,
-              group.totalSurplusDefisitAnggaranUpu
+              rowNum++, group.groupOrg, u.unit, u.subsidi ?? u.pagu ?? 0, u.jumlahPenerimaan, u.luncuran,
+              u.sumberPembiayaanUpu, u.operasional, u.modal, u.totalPengeluaran, u.surplusDefisitOperasionalUpu, u.surplusDefisitAnggaranUpu
             ]
           : isPusdi
           ? [
-              '',
-              `SUBTOTAL ${group.groupOrg}`,
-              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              group.totalJumlahPenerimaan,
-              group.totalLuncuran,
-              group.totalSumberPembiayaan,
-              group.totalOperasional,
-              group.totalModal,
-              group.totalPengeluaran,
-              group.totalSurplusDefisitOperasional,
-              group.totalSurplusDefisitAnggaran
+              rowNum++, group.groupOrg, u.unit, u.jumlahPenerimaan, u.luncuran, u.sumberPembiayaan,
+              u.operasional, u.modal, u.totalPengeluaran, u.surplusDefisitOperasional, u.surplusDefisitAnggaran
             ]
           : isFakultasAlokasi
           ? [
-              '',
-              `SUBTOTAL ${group.groupOrg}`,
-              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              group.totalPendidikanAlokasi,
-              group.totalNonPendidikanAlokasi,
-              group.totalJumlahPenerimaanAlokasi,
-              group.totalLuncuran,
-              group.totalSumberPembiayaanAlokasi,
-              group.totalOperasional,
-              group.totalModal,
-              group.totalPengeluaran,
-              group.totalSurplusDefisitOperasionalAlokasi,
-              group.totalSurplusDefisitAnggaranAlokasi
+              rowNum++, group.groupOrg, u.unit, u.pendidikanAlokasi, u.nonPendidikanAlokasi, u.jumlahPenerimaanAlokasi,
+              u.luncuran, u.sumberPembiayaanAlokasi, u.operasional, u.modal, u.totalPengeluaran,
+              u.surplusDefisitOperasionalAlokasi, u.surplusDefisitAnggaranAlokasi
             ]
           : [
-              '',
-              `SUBTOTAL ${group.groupOrg}`,
-              `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
-              group.totalPendidikan,
-              group.totalNonPendidikan,
-              group.totalJumlahPenerimaan,
-              group.totalLuncuran,
-              group.totalSumberPembiayaan,
-              group.totalOperasional,
-              group.totalModal,
-              group.totalPengeluaran,
-              group.totalSurplusDefisitOperasional,
-              group.totalSurplusDefisitAnggaran
+              rowNum++, group.groupOrg, u.unit, u.pendidikan, u.nonPendidikan, u.jumlahPenerimaan,
+              u.luncuran, u.sumberPembiayaan, u.operasional, u.modal, u.totalPengeluaran,
+              u.surplusDefisitOperasional, u.surplusDefisitAnggaran
             ];
 
-        const subRow = ws.addRow(subtotalValues);
-        subRow.height = 22;
-        subRow.eachCell((cell, colIndex) => {
-          cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFF1F5F9' } // Slate 100
-          };
-          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+        const dataRow = ws.addRow(rowValues);
+        dataRow.height = 20;
+        dataRow.eachCell((cell, colIndex) => {
+          cell.font = { name: 'Calibri', size: 9.5 };
           cell.border = {
-            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-            bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
             right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
           };
-          if (colIndex <= 3) {
-            cell.alignment = { horizontal: colIndex === 3 ? 'right' : 'left', vertical: 'middle' };
+
+          if (colIndex === 1) {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          } else if (colIndex === 2) {
+            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          } else if (colIndex === 3) {
+            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+            cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
           } else {
             cell.alignment = { horizontal: 'right', vertical: 'middle' };
             cell.numFmt = '#,##0';
+            if (isKptu) {
+              if (colIndex === 4 || colIndex === 5 || colIndex === 6) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+              } else if (colIndex === 9) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } };
+              }
+            } else if (isUpu) {
+              if (colIndex === 5 || colIndex === 7) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+              } else if (colIndex === 10) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } };
+              }
+            } else if (isPusdi) {
+              if (colIndex === 4 || colIndex === 6) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+              } else if (colIndex === 9) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } };
+              }
+            } else {
+              if (colIndex === 6 || colIndex === 8) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+              } else if (colIndex === 11) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAF5FF' } };
+              }
+            }
           }
         });
-
-        ws.addRow([]); // Blank spacer between groups
       });
 
-      // Grand Total Row
-      const grandTotalValues = isKptu
+      // Group Subtotal Row
+      const subtotalValues = isKptu
         ? [
-            '',
-            'TOTAL KESELURUHAN',
-            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            displayedRekapTotals.pagu || 0,
-            displayedRekapTotals.kerjasama || 0,
-            displayedRekapTotals.jumlahKptu || 0,
-            displayedRekapTotals.operasional,
-            displayedRekapTotals.modal,
-            displayedRekapTotals.totalPengeluaran,
-            displayedRekapTotals.surplusDefisitOperasionalKptu || 0,
-            displayedRekapTotals.surplusDefisitAnggaranKptu || 0
+            '', `SUBTOTAL ${group.groupOrg}`, `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+            group.totalPagu || 0, group.totalKerjasama || 0, group.totalJumlahKptu || 0,
+            group.totalOperasional, group.totalModal, group.totalPengeluaran,
+            group.totalSurplusDefisitOperasionalKptu || 0, group.totalSurplusDefisitAnggaranKptu || 0
           ]
         : isUpu
         ? [
-            '',
-            'TOTAL KESELURUHAN',
-            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            displayedRekapTotals.subsidi || displayedRekapTotals.pagu || 0,
-            displayedRekapTotals.jumlahPenerimaan,
-            displayedRekapTotals.luncuran,
-            displayedRekapTotals.sumberPembiayaanUpu,
-            displayedRekapTotals.operasional,
-            displayedRekapTotals.modal,
-            displayedRekapTotals.totalPengeluaran,
-            displayedRekapTotals.surplusDefisitOperasionalUpu,
-            displayedRekapTotals.surplusDefisitAnggaranUpu
+            '', `SUBTOTAL ${group.groupOrg}`, `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+            group.totalSubsidi || group.totalPagu || 0, group.totalJumlahPenerimaan, group.totalLuncuran,
+            group.totalSumberPembiayaanUpu, group.totalOperasional, group.totalModal, group.totalPengeluaran,
+            group.totalSurplusDefisitOperasionalUpu, group.totalSurplusDefisitAnggaranUpu
           ]
         : isPusdi
         ? [
-            '',
-            'TOTAL KESELURUHAN',
-            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            displayedRekapTotals.jumlahPenerimaan,
-            displayedRekapTotals.luncuran,
-            displayedRekapTotals.sumberPembiayaan,
-            displayedRekapTotals.operasional,
-            displayedRekapTotals.modal,
-            displayedRekapTotals.totalPengeluaran,
-            displayedRekapTotals.surplusDefisitOperasional,
-            displayedRekapTotals.surplusDefisitAnggaran
+            '', `SUBTOTAL ${group.groupOrg}`, `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+            group.totalJumlahPenerimaan, group.totalLuncuran, group.totalSumberPembiayaan,
+            group.totalOperasional, group.totalModal, group.totalPengeluaran,
+            group.totalSurplusDefisitOperasional, group.totalSurplusDefisitAnggaran
           ]
         : isFakultasAlokasi
         ? [
-            '',
-            'TOTAL KESELURUHAN',
-            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            displayedRekapTotals.pendidikanAlokasi,
-            displayedRekapTotals.nonPendidikanAlokasi,
-            displayedRekapTotals.jumlahPenerimaanAlokasi,
-            displayedRekapTotals.luncuran,
-            displayedRekapTotals.sumberPembiayaanAlokasi,
-            displayedRekapTotals.operasional,
-            displayedRekapTotals.modal,
-            displayedRekapTotals.totalPengeluaran,
-            displayedRekapTotals.surplusDefisitOperasionalAlokasi,
-            displayedRekapTotals.surplusDefisitAnggaranAlokasi
+            '', `SUBTOTAL ${group.groupOrg}`, `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+            group.totalPendidikanAlokasi, group.totalNonPendidikanAlokasi, group.totalJumlahPenerimaanAlokasi,
+            group.totalLuncuran, group.totalSumberPembiayaanAlokasi, group.totalOperasional, group.totalModal, group.totalPengeluaran,
+            group.totalSurplusDefisitOperasionalAlokasi, group.totalSurplusDefisitAnggaranAlokasi
           ]
         : [
-            '',
-            'TOTAL KESELURUHAN',
-            `TOTAL (${displayedRekapTotals.totalUnits} UNIT KERJA)`,
-            displayedRekapTotals.pendidikan,
-            displayedRekapTotals.nonPendidikan,
-            displayedRekapTotals.jumlahPenerimaan,
-            displayedRekapTotals.luncuran,
-            displayedRekapTotals.sumberPembiayaan,
-            displayedRekapTotals.operasional,
-            displayedRekapTotals.modal,
-            displayedRekapTotals.totalPengeluaran,
-            displayedRekapTotals.surplusDefisitOperasional,
-            displayedRekapTotals.surplusDefisitAnggaran
+            '', `SUBTOTAL ${group.groupOrg}`, `TOTAL ${group.groupOrg.toUpperCase()} (${group.units.length} Unit)`,
+            group.totalPendidikan, group.totalNonPendidikan, group.totalJumlahPenerimaan,
+            group.totalLuncuran, group.totalSumberPembiayaan, group.totalOperasional, group.totalModal, group.totalPengeluaran,
+            group.totalSurplusDefisitOperasional, group.totalSurplusDefisitAnggaran
+          ];
+
+      const subRow = ws.addRow(subtotalValues);
+      subRow.height = 22;
+      subRow.eachCell((cell, colIndex) => {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF1F5F9' } // Slate 100
+        };
+        cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        if (colIndex <= 3) {
+          cell.alignment = { horizontal: colIndex === 3 ? 'right' : 'left', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+        }
+      });
+
+      ws.addRow([]); // Blank spacer between groups
+    });
+
+    // Grand Total Row
+    if (displayGroups.length > 0) {
+      const grandTotalValues = isKptu
+        ? [
+            '', 'TOTAL KESELURUHAN', `TOTAL (${grandTotal.totalUnits} UNIT KERJA)`,
+            grandTotal.pagu, grandTotal.kerjasama, grandTotal.jumlahKptu,
+            grandTotal.operasional, grandTotal.modal, grandTotal.totalPengeluaran,
+            grandTotal.surplusDefisitOperasionalKptu, grandTotal.surplusDefisitAnggaranKptu
+          ]
+        : isUpu
+        ? [
+            '', 'TOTAL KESELURUHAN', `TOTAL (${grandTotal.totalUnits} UNIT KERJA)`,
+            grandTotal.subsidi, grandTotal.jumlahPenerimaan, grandTotal.luncuran,
+            grandTotal.sumberPembiayaanUpu, grandTotal.operasional, grandTotal.modal, grandTotal.totalPengeluaran,
+            grandTotal.surplusDefisitOperasionalUpu, grandTotal.surplusDefisitAnggaranUpu
+          ]
+        : isPusdi
+        ? [
+            '', 'TOTAL KESELURUHAN', `TOTAL (${grandTotal.totalUnits} UNIT KERJA)`,
+            grandTotal.jumlahPenerimaan, grandTotal.luncuran, grandTotal.sumberPembiayaan,
+            grandTotal.operasional, grandTotal.modal, grandTotal.totalPengeluaran,
+            grandTotal.surplusDefisitOperasional, grandTotal.surplusDefisitAnggaran
+          ]
+        : isFakultasAlokasi
+        ? [
+            '', 'TOTAL KESELURUHAN', `TOTAL (${grandTotal.totalUnits} UNIT KERJA)`,
+            grandTotal.pendidikanAlokasi, grandTotal.nonPendidikanAlokasi, grandTotal.jumlahPenerimaanAlokasi,
+            grandTotal.luncuran, grandTotal.sumberPembiayaanAlokasi, grandTotal.operasional, grandTotal.modal, grandTotal.totalPengeluaran,
+            grandTotal.surplusDefisitOperasionalAlokasi, grandTotal.surplusDefisitAnggaranAlokasi
+          ]
+        : [
+            '', 'TOTAL KESELURUHAN', `TOTAL (${grandTotal.totalUnits} UNIT KERJA)`,
+            grandTotal.pendidikan, grandTotal.nonPendidikan, grandTotal.jumlahPenerimaan,
+            grandTotal.luncuran, grandTotal.sumberPembiayaan, grandTotal.operasional, grandTotal.modal, grandTotal.totalPengeluaran,
+            grandTotal.surplusDefisitOperasional, grandTotal.surplusDefisitAnggaran
           ];
 
       const grandRow = ws.addRow(grandTotalValues);
@@ -4118,70 +4024,606 @@ export default function RkaLaporanPage() {
           cell.numFmt = '#,##0';
         }
       });
+    }
 
-      // Column widths
-      if (isKptu) {
-        ws.columns = [
-          { width: 6 },  // NO
-          { width: 18 }, // GROUP
-          { width: 45 }, // 0. UNIT KERJA
-          { width: 22 }, // 1. PAGU
-          { width: 22 }, // 2. KERJASAMA
-          { width: 25 }, // 3. JUMLAH (1+2+3)
-          { width: 25 }, // 4. PENGELUARAN OPERASIONAL
-          { width: 24 }, // 5. INVESTASI (MODAL)
-          { width: 27 }, // 6. TOTAL PENGELUARAN
-          { width: 28 }, // 7. SURPLUS/DEFISIT OPS
-          { width: 28 }  // 8. SURPLUS/DEFISIT ANGGARAN
-        ];
-      } else if (isUpu) {
-        ws.columns = [
-          { width: 6 },  // NO
-          { width: 18 }, // GROUP
-          { width: 45 }, // 0. UNIT KERJA
-          { width: 16 }, // 1. SUBSIDI
-          { width: 25 }, // 2. PENERIMAAN
-          { width: 23 }, // 3. LUNCURAN
-          { width: 27 }, // 4. JML SUMBER PEMBIAYAAN
-          { width: 25 }, // 5. PENGELUARAN OPERASIONAL
-          { width: 24 }, // 6. INVESTASI (MODAL)
-          { width: 27 }, // 7. TOTAL PENGELUARAN
-          { width: 28 }, // 8. SURPLUS/DEFISIT OPS
-          { width: 28 }  // 9. SURPLUS/DEFISIT ANGGARAN
-        ];
-      } else if (isPusdi) {
-        ws.columns = [
-          { width: 6 },  // NO
-          { width: 18 }, // GROUP
-          { width: 45 }, // 0. UNIT KERJA
-          { width: 25 }, // 1. PENERIMAAN
-          { width: 23 }, // 2. LUNCURAN
-          { width: 27 }, // 3. JML SUMBER PEMBIAYAAN
-          { width: 25 }, // 4. PENGELUARAN OPERASIONAL
-          { width: 24 }, // 5. INVESTASI (MODAL)
-          { width: 27 }, // 6. TOTAL PENGELUARAN
-          { width: 28 }, // 7. SURPLUS/DEFISIT OPS
-          { width: 28 }  // 8. SURPLUS/DEFISIT ANGGARAN
-        ];
+    // Column widths
+    if (isKptu) {
+      ws.columns = [
+        { width: 6 }, { width: 18 }, { width: 45 }, { width: 22 }, { width: 22 }, { width: 25 },
+        { width: 25 }, { width: 24 }, { width: 27 }, { width: 28 }, { width: 28 }
+      ];
+    } else if (isUpu) {
+      ws.columns = [
+        { width: 6 }, { width: 18 }, { width: 45 }, { width: 16 }, { width: 25 }, { width: 23 },
+        { width: 27 }, { width: 25 }, { width: 24 }, { width: 27 }, { width: 28 }, { width: 28 }
+      ];
+    } else if (isPusdi) {
+      ws.columns = [
+        { width: 6 }, { width: 18 }, { width: 45 }, { width: 25 }, { width: 23 }, { width: 27 },
+        { width: 25 }, { width: 24 }, { width: 27 }, { width: 28 }, { width: 28 }
+      ];
+    } else {
+      ws.columns = [
+        { width: 6 }, { width: 18 }, { width: 45 }, { width: 25 }, { width: 25 }, { width: 27 },
+        { width: 24 }, { width: 27 }, { width: 25 }, { width: 24 }, { width: 27 }, { width: 28 }, { width: 28 }
+      ];
+    }
+  };
+
+  // Helper 2: Build Sheet Ringkasan Usulan (Format PPT Proposal RKAT)
+  const buildRingkasanUsulanWorksheet = (wb: ExcelJS.Workbook) => {
+    const ws = wb.addWorksheet('Ringkasan Usulan', {
+      views: [{ showGridLines: true }]
+    });
+
+    const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+    titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+
+    const subTitleRow = ws.addRow([`RINGKASAN USULAN PROPOSAL RKAT TAHUN ANGGARAN ${tahunFilter}`]);
+    subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF334155' } };
+
+    const infoRow = ws.addRow([
+      `Standar Presentasi Eksekutif / Slide PPT  |  Tahun: TA ${tahunFilter}  |  Versi: ${versiFilter.toUpperCase()}  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    ]);
+    infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+
+    ws.addRow([]); // Blank spacer
+
+    const headers = ['URAIAN PROPOSAL RKAT', 'JUMLAH DATA', 'PAGU USULAN (RP)', '% PROPORSI'];
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0F172A' }
+      };
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
+
+    const styleRow = (row: ExcelJS.Row, isBold = false, isZebra = false, isRightNumber = true) => {
+      row.height = 20;
+      row.eachCell((cell, colIndex) => {
+        cell.font = { name: 'Calibri', size: 9.5, bold: isBold };
+        if (isZebra) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        if (colIndex === 1) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        } else if (colIndex === 2 || colIndex === 4) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colIndex === 3) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          if (isRightNumber && typeof cell.value === 'number') {
+            cell.numFmt = '#,##0';
+          }
+        }
+      });
+    };
+
+    // 1. BAGIAN PENERIMAAN
+    const penHeaderRow = ws.addRow([pptProposalData.penerimaan.title || 'PENERIMAAN', '', '', '']);
+    penHeaderRow.height = 24;
+    penHeaderRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF1E3A8A' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF818CF8' } }, bottom: { style: 'thin', color: { argb: 'FFC7D2FE' } } };
+    });
+
+    (pptProposalData.penerimaan.sections || []).forEach(sec => {
+      const secPct = pptProposalData.penerimaan.totalPenerimaan > 0 
+        ? ((sec.subtotal / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%' 
+        : '0%';
+      const secRow = ws.addRow([sec.title + ' (Sub Total)', sec.count > 0 ? `${sec.count} Akun` : '', sec.subtotal, secPct]);
+      styleRow(secRow, true, true);
+      secRow.getCell(1).font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+
+      sec.items.forEach(item => {
+        const itemPct = pptProposalData.penerimaan.totalPenerimaan > 0
+          ? ((item.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+          : '0%';
+        if (item.is_sum && item.subItems && item.subItems.length > 0) {
+          const itemRow = ws.addRow(['   ' + item.label + ' (Sub Total Pos)', item.count > 0 ? `${item.count} Akun` : '', item.totalPagu, itemPct]);
+          styleRow(itemRow, true, false);
+          item.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.penerimaan.totalPenerimaan > 0
+              ? ((sub.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+              : '0%';
+            const subRow = ws.addRow(['      ↳ ' + sub.label, sub.count > 0 ? `${sub.count} Akun` : '', sub.totalPagu, subPct]);
+            styleRow(subRow, false, false);
+          });
+        } else {
+          const itemRow = ws.addRow(['   ' + item.label, item.count > 0 ? `${item.count} Akun` : '', item.totalPagu, itemPct]);
+          styleRow(itemRow, false, false);
+        }
+      });
+    });
+
+    if (pptProposalData.penerimaan.lainnya.totalPagu > 0) {
+      const lPct = pptProposalData.penerimaan.totalPenerimaan > 0
+        ? ((pptProposalData.penerimaan.lainnya.totalPagu / pptProposalData.penerimaan.totalPenerimaan) * 100).toFixed(1) + '%'
+        : '0%';
+      const lRow = ws.addRow(['   ' + pptProposalData.penerimaan.lainnya.label, `${pptProposalData.penerimaan.lainnya.count} Akun`, pptProposalData.penerimaan.lainnya.totalPagu, lPct]);
+      styleRow(lRow, false, false);
+    }
+
+    // JUMLAH PENERIMAAN
+    const totPenRow = ws.addRow(['JUMLAH PENERIMAAN', '', pptProposalData.penerimaan.totalPenerimaan, '100%']);
+    totPenRow.height = 26;
+    totPenRow.eachCell((cell, colIndex) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF065F46' } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF059669' } },
+        bottom: { style: 'double', color: { argb: 'FF065F46' } },
+        left: { style: 'thin', color: { argb: 'FFA7F3D0' } },
+        right: { style: 'thin', color: { argb: 'FFA7F3D0' } }
+      };
+      if (colIndex === 1) cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      else if (colIndex === 3) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.numFmt = '#,##0';
       } else {
-        ws.columns = [
-          { width: 6 },  // NO
-          { width: 18 }, // GROUP
-          { width: 45 }, // 0. UNIT KERJA
-          { width: 25 }, // 1. PENERIMAAN PENDIDIKAN
-          { width: 25 }, // 2. PENERIMAAN NON PENDIDIKAN
-          { width: 27 }, // 3. JUMLAH PENERIMAAN
-          { width: 24 }, // 4. LUNCURAN
-          { width: 27 }, // 5. JML SUMBER PEMBIAYAAN
-          { width: 25 }, // 6. PENGELUARAN OPERASIONAL
-          { width: 24 }, // 7. INVESTASI (MODAL)
-          { width: 27 }, // 8. TOTAL PENGELUARAN
-          { width: 28 }, // 9. SURPLUS/DEFISIT OPS
-          { width: 28 }  // 10. SURPLUS/DEFISIT ANGGARAN
-        ];
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    ws.addRow([]); // Blank spacer
+
+    // 2. BAGIAN PENGELUARAN
+    const pengHeaderRow = ws.addRow([pptProposalData.pengeluaran.title || 'PENGELUARAN', '', '', '']);
+    pengHeaderRow.height = 24;
+    pengHeaderRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEF2FF' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF1E3A8A' } };
+      cell.border = { top: { style: 'medium', color: { argb: 'FF818CF8' } }, bottom: { style: 'thin', color: { argb: 'FFC7D2FE' } } };
+    });
+
+    (pptProposalData.pengeluaran.sections || []).forEach(sec => {
+      const secPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+        ? ((sec.subtotal / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+        : '0%';
+      const secRow = ws.addRow([sec.title + ' (Sub Total)', sec.count > 0 ? `${sec.count} Baris` : '', sec.subtotal, secPct]);
+      styleRow(secRow, true, true);
+      secRow.getCell(1).font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+
+      sec.items.forEach(item => {
+        const itemPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+          ? ((item.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+          : '0%';
+        if (item.is_sum && item.subItems && item.subItems.length > 0) {
+          const itemRow = ws.addRow(['   ' + item.label + ' (Sub Total Pos)', item.count > 0 ? `${item.count} Baris` : '', item.totalAnggaran, itemPct]);
+          styleRow(itemRow, true, false);
+          item.subItems.forEach((sub: any) => {
+            const subPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+              ? ((sub.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+              : '0%';
+            const subRow = ws.addRow(['      ↳ ' + sub.label, sub.count > 0 ? `${sub.count} Baris` : '', sub.totalAnggaran, subPct]);
+            styleRow(subRow, false, false);
+          });
+        } else {
+          const itemRow = ws.addRow(['   ' + item.label, item.count > 0 ? `${item.count} Baris` : '', item.totalAnggaran, itemPct]);
+          styleRow(itemRow, false, false);
+        }
+      });
+    });
+
+    if (pptProposalData.pengeluaran.lainnya.totalAnggaran > 0) {
+      const lPct = pptProposalData.pengeluaran.totalPengeluaran > 0
+        ? ((pptProposalData.pengeluaran.lainnya.totalAnggaran / pptProposalData.pengeluaran.totalPengeluaran) * 100).toFixed(1) + '%'
+        : '0%';
+      const lRow = ws.addRow(['   ' + pptProposalData.pengeluaran.lainnya.label, `${pptProposalData.pengeluaran.lainnya.count} Baris`, pptProposalData.pengeluaran.lainnya.totalAnggaran, lPct]);
+      styleRow(lRow, false, false);
+    }
+
+    // JUMLAH PENGELUARAN
+    const totPengRow = ws.addRow(['JUMLAH PENGELUARAN', '', pptProposalData.pengeluaran.totalPengeluaran, '100%']);
+    totPengRow.height = 26;
+    totPengRow.eachCell((cell, colIndex) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF3730A3' } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF6366F1' } },
+        bottom: { style: 'double', color: { argb: 'FF3730A3' } },
+        left: { style: 'thin', color: { argb: 'FFC7D2FE' } },
+        right: { style: 'thin', color: { argb: 'FFC7D2FE' } }
+      };
+      if (colIndex === 1) cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      else if (colIndex === 3) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.numFmt = '#,##0';
+      } else {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    ws.addRow([]); // Blank spacer
+
+    // 3. SURPLUS / DEFISIT ANGGARAN
+    const isSurplus = pptProposalData.surplusDefisit >= 0;
+    const surplusRow = ws.addRow([
+      isSurplus ? 'SURPLUS ANGGARAN' : 'DEFISIT ANGGARAN',
+      isSurplus ? 'SURPLUS' : 'DEFISIT',
+      pptProposalData.surplusDefisit,
+      ''
+    ]);
+    surplusRow.height = 26;
+    surplusRow.eachCell((cell, colIndex) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: isSurplus ? 'FFCCFBF1' : 'FFFFE4E6' }
+      };
+      cell.font = {
+        name: 'Calibri',
+        size: 11,
+        bold: true,
+        color: { argb: isSurplus ? 'FF115E59' : 'FF9F1239' }
+      };
+      cell.border = {
+        top: { style: 'medium', color: { argb: isSurplus ? 'FF14B8A6' : 'FFF43F5E' } },
+        bottom: { style: 'double', color: { argb: isSurplus ? 'FF115E59' : 'FF9F1239' } },
+        left: { style: 'thin', color: { argb: isSurplus ? 'FF99F6E4' : 'FFFECDD3' } },
+        right: { style: 'thin', color: { argb: isSurplus ? 'FF99F6E4' : 'FFFECDD3' } }
+      };
+      if (colIndex === 1) cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      else if (colIndex === 3) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.numFmt = '#,##0';
+      } else {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    });
+
+    ws.columns = [
+      { width: 56 }, // URAIAN
+      { width: 18 }, // JUMLAH DATA
+      { width: 28 }, // PAGU USULAN
+      { width: 16 }  // % PROPORSI
+    ];
+  };
+
+  // Helper 3: Build Sheet RKAT Penerimaan (Raw DB Source)
+  const buildPenerimaanRawWorksheet = (wb: ExcelJS.Workbook) => {
+    const ws = wb.addWorksheet('RKAT Penerimaan', {
+      views: [{ showGridLines: true }]
+    });
+
+    const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+    titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+
+    const subTitleRow = ws.addRow([`DATABASE SUMBER RKAT PENERIMAAN TA ${tahunFilter}`]);
+    subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF065F46' } };
+
+    const countRows = allDetailPenerimaanRows.length;
+    const infoRow = ws.addRow([
+      `Sumber Data: Database rkat_penerimaan  |  Tahun: TA ${tahunFilter}  |  Versi: ${versiFilter.toUpperCase()}  |  Total: ${countRows.toLocaleString('id-ID')} Baris Data  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    ]);
+    infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+
+    ws.addRow([]); // Blank spacer
+
+    const headers = [
+      'NO',
+      'UNIT KERJA',
+      'KODE / NAMA AKUN',
+      'KELOMPOK PENERIMAAN',
+      'KETERANGAN / RINCIAN',
+      'VOLUME',
+      'TARIF (RP)',
+      'SUMBER DANA',
+      '% ALOKASI UNIT',
+      'STATUS',
+      'TAHUN',
+      'PAGU PENERIMAAN (RP)'
+    ];
+
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF065F46' }
+      };
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
+
+    let totalPaguPenerimaan = 0;
+    allDetailPenerimaanRows.forEach((r, idx) => {
+      const pagu = Number(r.renterima_pagu) || 0;
+      const tarif = Number(r.renterima_tarif) || 0;
+      const vol = Number(r.renterima_volume) || 0;
+      totalPaguPenerimaan += pagu;
+
+      const rowProp = r.prop_alokasi_prosentase_unit ?? r.propAlokasiProsentaseUnit;
+      let propStr = '-';
+      if (rowProp !== undefined && rowProp !== null && rowProp !== '') {
+        propStr = String(rowProp).includes('%') ? String(rowProp) : `${rowProp}%`;
       }
 
-      // Trigger download
+      const dataRow = ws.addRow([
+        idx + 1,
+        r.unit_kerja || '-',
+        r.nama_akun_penerimaan || r.akun || '-',
+        r.kelompok_penerimaan || r.format_proposal || '-',
+        r.keterangan || '-',
+        vol,
+        tarif,
+        r.sumber_dana || 'Dana Masyarakat',
+        propStr,
+        r.status || 'Aktif',
+        r.tahun || tahunFilter || '-',
+        pagu
+      ]);
+
+      dataRow.height = 20;
+      const isZebra = idx % 2 === 1;
+      dataRow.eachCell((cell, colIndex) => {
+        cell.font = { name: 'Calibri', size: 9.5 };
+        if (isZebra) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0FDF4' } };
+        }
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+
+        if (colIndex === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colIndex === 2) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF065F46' } };
+        } else if (colIndex === 6 || colIndex === 7) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+        } else if (colIndex === 9 || colIndex === 10 || colIndex === 11) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colIndex === 12) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF065F46' } };
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        }
+      });
+    });
+
+    // Total Row Penerimaan
+    const totalRow = ws.addRow([
+      '', 'TOTAL KESELURUHAN PENERIMAAN', '', '', '', '', '', '',
+      `TOTAL (${allDetailPenerimaanRows.length.toLocaleString('id-ID')} BARIS DATA)`,
+      '', '', totalPaguPenerimaan
+    ]);
+    totalRow.height = 26;
+    totalRow.eachCell((cell, colIndex) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF065F46' } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF059669' } },
+        bottom: { style: 'double', color: { argb: 'FF065F46' } },
+        left: { style: 'thin', color: { argb: 'FFA7F3D0' } },
+        right: { style: 'thin', color: { argb: 'FFA7F3D0' } }
+      };
+      if (colIndex === 12) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.numFmt = '#,##0';
+      } else {
+        cell.alignment = { horizontal: colIndex === 9 ? 'right' : 'left', vertical: 'middle' };
+      }
+    });
+
+    ws.columns = [
+      { width: 6 }, { width: 35 }, { width: 30 }, { width: 28 }, { width: 40 },
+      { width: 14 }, { width: 18 }, { width: 22 }, { width: 16 }, { width: 12 }, { width: 10 }, { width: 25 }
+    ];
+  };
+
+  // Helper 4: Build Sheet RKAT Pengeluaran (Raw DB Source)
+  const buildPengeluaranRawWorksheet = (wb: ExcelJS.Workbook) => {
+    const ws = wb.addWorksheet('RKAT Pengeluaran', {
+      views: [{ showGridLines: true }]
+    });
+
+    const titleRow = ws.addRow(['UNIVERSITAS GADJAH MADA']);
+    titleRow.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } };
+
+    const subTitleRow = ws.addRow([`DATABASE SUMBER RKAT PENGELUARAN TA ${tahunFilter}`]);
+    subTitleRow.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1E293B' } };
+
+    const rowsToExport = (() => {
+      const list = [...dataList];
+      if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+        penyesuaianData.list.forEach(adj => {
+          if (adj.modul !== 'pengeluaran') return;
+          const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+          list.push({
+            id: `adj-peng-${adj.id}`,
+            kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+            lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+            uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+            akun_detail: adj.nama_akun || 'Penyesuaian Belanja',
+            unit: adj.unit_kerja || 'Direktorat Keuangan',
+            anggaran: val,
+            tahun_anggaran: adj.tahun_anggaran,
+            is_penyesuaian: true
+          });
+        });
+      }
+      return list;
+    })();
+
+    const infoRow = ws.addRow([
+      `Sumber Data: Database rkat_pengeluaran  |  Tahun: TA ${tahunFilter}  |  Versi: ${versiFilter.toUpperCase()}  |  Total: ${rowsToExport.length.toLocaleString('id-ID')} Baris Data  |  Tanggal Unduh: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`
+    ]);
+    infoRow.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } };
+
+    ws.addRow([]); // Blank spacer
+
+    const headers = [
+      'NO',
+      'UNIT KERJA',
+      'KODE / NAMA AKUN',
+      'KLASIFIKASI / FORMAT PROPOSAL',
+      'PROGRAM',
+      'KEGIATAN',
+      'LINGKUP KEGIATAN',
+      'URAIAN BELANJA',
+      'PRIORITAS',
+      'TAHUN',
+      'PAGU ANGGARAN (RP)'
+    ];
+
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 28;
+    headerRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1E293B' }
+      };
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        left: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        bottom: { style: 'thin', color: { argb: 'FF94A3B8' } },
+        right: { style: 'thin', color: { argb: 'FF94A3B8' } }
+      };
+    });
+
+    let totalPaguBelanja = 0;
+    rowsToExport.forEach((r, idx) => {
+      const pagu = Number(r.anggaran) || 0;
+      totalPaguBelanja += pagu;
+      const classification = getRowClassification(r, modeLaporan) || 'Belum Terpetakan';
+      const namaAkun = (r.akun_detail || r.nama_akun || r.akun || '-').trim();
+
+      const dataRow = ws.addRow([
+        idx + 1,
+        r.unit || '-',
+        namaAkun,
+        classification,
+        r.program || '-',
+        r.kegiatan || '-',
+        r.lingkup_kegiatan || '-',
+        r.uraian_belanja || '-',
+        r.prioritas || '-',
+        r.tahun_anggaran || tahunFilter || '-',
+        pagu
+      ]);
+
+      dataRow.height = 20;
+      const isZebra = idx % 2 === 1;
+      dataRow.eachCell((cell, colIndex) => {
+        cell.font = { name: 'Calibri', size: 9.5 };
+        if (isZebra) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+
+        if (colIndex === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colIndex === 2) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+        } else if (colIndex === 9 || colIndex === 10) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colIndex === 11) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+          cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        }
+      });
+    });
+
+    // Total Row Belanja
+    const totalRow = ws.addRow([
+      '', 'TOTAL KESELURUHAN BELANJA', '', '', '', '', '',
+      `TOTAL (${rowsToExport.length.toLocaleString('id-ID')} BARIS DATA)`,
+      '', '', totalPaguBelanja
+    ]);
+    totalRow.height = 26;
+    totalRow.eachCell((cell, colIndex) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+      cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FF0F172A' } };
+      cell.border = {
+        top: { style: 'medium', color: { argb: 'FF64748B' } },
+        bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+      };
+      if (colIndex === 11) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        cell.numFmt = '#,##0';
+      } else {
+        cell.alignment = { horizontal: colIndex === 8 ? 'right' : 'left', vertical: 'middle' };
+      }
+    });
+
+    ws.columns = [
+      { width: 6 }, { width: 35 }, { width: 30 }, { width: 28 }, { width: 25 },
+      { width: 30 }, { width: 25 }, { width: 45 }, { width: 14 }, { width: 10 }, { width: 25 }
+    ];
+  };
+
+  // Export Excel Rekap Unit Kerja Satuan (Menggunakan ExcelJS)
+  const handleExportExcelUnitRekap = async () => {
+    if (unitRekapData.length === 0) return toast.error('Tidak ada data untuk diexport');
+
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Universitas Gadjah Mada';
+      wb.lastModifiedBy = 'RKAT Online';
+      wb.created = new Date();
+
+      const isPusdi = rekapFormat === 'pusdi';
+      const isUpu = rekapFormat === 'upu';
+      const isKptu = rekapFormat === 'kptu';
+      const isFakultasAlokasi = rekapFormat === 'fakultas_alokasi';
+      const formatTag = isKptu ? 'Format KPTU 9 Kolom' : isUpu ? 'Format UPU 10 Kolom' : isPusdi ? 'Format PUSDI 9 Kolom' : isFakultasAlokasi ? 'Format Fakultas (Alokasi) 11 Kolom' : 'Format Fakultas 11 Kolom';
+      const sheetName = isKptu ? 'Rekap_KPTU' : isUpu ? 'Rekap_UPU' : isPusdi ? 'Rekap_PUSDI' : isFakultasAlokasi ? 'Rekap_Fakultas_Alokasi' : 'Rekap_Fakultas';
+
+      const displayGroups = (rekapGroupFilter === 'ALL' 
+        ? groupedByOrg 
+        : groupedByOrg.filter(g => g.groupOrg.toLowerCase() === rekapGroupFilter.toLowerCase())
+      ).filter(g => g.units.length > 0);
+
+      if (displayGroups.length === 0) {
+        return toast.error('Tidak ada data unit kerja yang sesuai filter untuk diexport');
+      }
+
+      buildRekapWorksheet(wb, sheetName, rekapFormat, displayGroups);
+
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
@@ -4205,6 +4647,109 @@ export default function RkaLaporanPage() {
     } catch (err: any) {
       console.error('Export Excel error:', err);
       toast.error('Gagal export Excel: ' + err.message);
+    }
+  };
+
+  // Export Excel Kertas Kerja Lengkap Proposal RKAT (8 Sheet Lengkap Sesuai Permintaan)
+  const handleExportKertasKerjaLengkap = async () => {
+    if (dataList.length === 0 && penerimaanList.length === 0) {
+      return toast.error('Data anggaran belum termuat. Silakan tunggu atau klik Refresh.');
+    }
+
+    setIsExportingKertasKerja(true);
+    const toastId = toast.loading('Menyusun Kertas Kerja Lengkap (8 Sheet)...');
+
+    try {
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'Universitas Gadjah Mada';
+      wb.lastModifiedBy = 'RKAT Online';
+      wb.created = new Date();
+
+      // Sheet 1: RKAT Penerimaan (DB)
+      buildPenerimaanRawWorksheet(wb);
+
+      // Sheet 2: RKAT Pengeluaran (DB)
+      buildPengeluaranRawWorksheet(wb);
+
+      // Sheet 3: Ringkasan Usulan
+      buildRingkasanUsulanWorksheet(wb);
+
+      // Filter grup-grup unit kerja dari groupedByOrg
+      const fakultasGroups = groupedByOrg.filter(g => 
+        g.groupOrg.toLowerCase() === 'fakultas' || g.groupOrg.toLowerCase() === 'sekolah' || g.groupOrg.toLowerCase().includes('fakultas')
+      );
+      const pusdiGroups = groupedByOrg.filter(g => 
+        g.groupOrg.toLowerCase().includes('pusat studi') || g.groupOrg.toLowerCase().includes('pusdi')
+      );
+      const upuGroups = groupedByOrg.filter(g => 
+        g.groupOrg.toLowerCase().includes('penunjang') || g.groupOrg.toLowerCase().includes('upu')
+      );
+      const kptuGroups = groupedByOrg.filter(g => 
+        g.groupOrg.toLowerCase().includes('kptu') || g.groupOrg.toLowerCase() === 'kptu'
+      );
+
+      // Sheet 4: Khusus Fakultas
+      buildRekapWorksheet(
+        wb,
+        'Khusus Fakultas',
+        'fakultas',
+        fakultasGroups,
+        `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KHUSUS FAKULTAS (11 KOLOM) TA ${tahunFilter}`
+      );
+
+      // Sheet 5: Khusus Fakultas (Alokasi)
+      buildRekapWorksheet(
+        wb,
+        'Khusus Fakultas (Alokasi)',
+        'fakultas_alokasi',
+        fakultasGroups,
+        `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KHUSUS FAKULTAS (ALOKASI) (11 KOLOM) TA ${tahunFilter}`
+      );
+
+      // Sheet 6: Khusus PUSDI
+      buildRekapWorksheet(
+        wb,
+        'Khusus PUSDI',
+        'pusdi',
+        pusdiGroups,
+        `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KHUSUS PUSDI (9 KOLOM) TA ${tahunFilter}`
+      );
+
+      // Sheet 7: Khusus UPU
+      buildRekapWorksheet(
+        wb,
+        'Khusus UPU',
+        'upu',
+        upuGroups,
+        `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KHUSUS UPU (10 KOLOM) TA ${tahunFilter}`
+      );
+
+      // Sheet 8: Khusus KPTU
+      buildRekapWorksheet(
+        wb,
+        'Khusus KPTU',
+        'kptu',
+        kptuGroups,
+        `REKAPITULASI USULAN PROPOSAL RKAT - FORMAT KHUSUS KPTU (9 KOLOM) TA ${tahunFilter}`
+      );
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Kertas_Kerja_Lengkap_Proposal_RKAT_TA${tahunFilter}_${versiFilter.toUpperCase()}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss(toastId);
+      toast.success('Kertas Kerja Lengkap Proposal RKAT (8 Sheet) berhasil diexport!');
+    } catch (err: any) {
+      console.error('Export Kertas Kerja error:', err);
+      toast.dismiss(toastId);
+      toast.error('Gagal export Kertas Kerja: ' + (err.message || 'Terjadi kesalahan'));
+    } finally {
+      setIsExportingKertasKerja(false);
     }
   };
 
@@ -5346,6 +5891,25 @@ export default function RkaLaporanPage() {
             <span>Export Excel</span>
           </Button>
 
+          {/* Tombol Export Kertas Kerja Lengkap 8 Sheet */}
+          <Button
+            size="sm"
+            onClick={handleExportKertasKerjaLengkap}
+            disabled={isExportingKertasKerja || loading}
+            className="h-9 px-3.5 bg-gradient-to-r from-blue-700 via-indigo-600 to-indigo-700 hover:from-blue-800 hover:to-indigo-800 text-white rounded-xl text-xs font-black gap-1.5 shadow-sm cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+            title="Export Excel Kertas Kerja Lengkap Proposal RKAT (8 Sheet: DB Penerimaan, DB Pengeluaran, Ringkasan Usulan, & 5 Format Rekap Unit)"
+          >
+            {isExportingKertasKerja ? (
+              <RefreshCw className="animate-spin" size={14} />
+            ) : (
+              <FileSpreadsheet size={14} className="text-white" />
+            )}
+            <span>Kertas Kerja Lengkap</span>
+            <Badge className="bg-white/20 text-white border-0 text-[10px] px-1.5 py-0 h-4 font-mono font-bold">
+              8 Sheet
+            </Badge>
+          </Button>
+
 
           <Button
             variant="outline"
@@ -5770,6 +6334,17 @@ export default function RkaLaporanPage() {
                       >
                         <Settings2 size={13} className="text-indigo-600" />
                         <span>Atur Susunan Slide</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportKertasKerjaLengkap}
+                        disabled={isExportingKertasKerja}
+                        className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                        title="Export Excel Kertas Kerja Lengkap (8 Sheet)"
+                      >
+                        <FileSpreadsheet size={13} className="text-blue-600" />
+                        <span>Kertas Kerja (8 Sheet)</span>
                       </Button>
                     </div>
                   </CardHeader>
@@ -6874,6 +7449,19 @@ export default function RkaLaporanPage() {
                 >
                   <FileText size={13} className="text-sky-600" />
                   <span>Word</span>
+                </Button>
+
+                {/* Export Kertas Kerja Lengkap 8 Sheet Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportKertasKerjaLengkap}
+                  disabled={isExportingKertasKerja}
+                  className="h-8 px-2.5 rounded-xl border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100 shadow-2xs cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                  title="Export Excel Kertas Kerja Lengkap (Semua DB & 5 Format Rekap Unit)"
+                >
+                  <FileSpreadsheet size={13} className="text-indigo-600" />
+                  <span>Kertas Kerja (8 Sheet)</span>
                 </Button>
 
                 <Badge variant="outline" className="text-xs font-bold font-mono bg-white">
