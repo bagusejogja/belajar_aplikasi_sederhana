@@ -17,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
+import RkaHelpModal from '@/components/rka/RkaHelpModal';
 
 // Autocomplete Filter Unit Kerja (dengan Navigasi Keyboard ↑ ↓ + Enter)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -65,16 +67,16 @@ function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: stri
   };
 
   return (
-    <div className="relative inline-block text-left" onKeyDown={handleKeyDown}>
+    <div className="relative w-full text-left" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 min-w-[210px]"
+        className="w-full h-9 px-3 rounded-xl bg-white border border-gray-300 text-xs font-bold text-gray-800 shadow-2xs flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 truncate"
       >
         <span className="truncate">
           {selectedUnit === 'ALL' ? `🏢 Semua Fakultas/Unit (${units.length})` : selectedUnit}
         </span>
-        <span className="text-[10px] opacity-60">▼</span>
+        <span className="text-[10px] opacity-60 shrink-0">▼</span>
       </button>
 
       {isOpen && (
@@ -135,6 +137,7 @@ export default function RkaPengeluaranPage() {
   const [loading, setLoading] = useState(true);
 
   // Filters State
+  const [versiFilter, setVersiFilter] = useState<string>('v1');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [kelompokFilter, setKelompokFilter] = useState<string>('ALL');
@@ -200,7 +203,7 @@ export default function RkaPengeluaranPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}`;
+      let url = `/api/rka/pengeluaran?tahun=${tahunFilter}&versi=${encodeURIComponent(versiFilter)}`;
       if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
 
       const res = await fetch(url);
@@ -222,7 +225,7 @@ export default function RkaPengeluaranPage() {
 
   useEffect(() => {
     fetchData();
-  }, [tahunFilter, unitFilter]);
+  }, [tahunFilter, unitFilter, versiFilter]);
 
   const [masterUnits, setMasterUnits] = useState<string[]>([]);
 
@@ -549,7 +552,8 @@ export default function RkaPengeluaranPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             rawText: chunkText,
-            isHeaderless: true
+            isHeaderless: true,
+            versi_anggaran: versiFilter
           })
         });
 
@@ -612,6 +616,7 @@ export default function RkaPengeluaranPage() {
     try {
       const payload = {
         ...newRow,
+        versi_anggaran: versiFilter,
         tahun_anggaran: parseInt(newRow.tahun_anggaran) || 2027,
         anggaran: parseFloat(newRow.anggaran) || 0,
         realisasi: parseFloat(newRow.realisasi) || 0,
@@ -736,6 +741,9 @@ export default function RkaPengeluaranPage() {
                 <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold uppercase">
                   TA {tahunFilter}
                 </Badge>
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-bold uppercase font-mono">
+                  {versiFilter.toUpperCase()}
+                </Badge>
               </div>
               <p className="text-xs text-gray-500 font-medium">
                 Satu Field Rincian Belanja • Anggaran &amp; Realisasi • Identifikasi Laporan Kementerian &amp; Webometrics
@@ -745,6 +753,17 @@ export default function RkaPengeluaranPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Bantuan & Alur Bisnis */}
+          <RkaHelpModal currentPage="pengeluaran" />
+
+          {/* Selector Versi Anggaran Multi-Version */}
+          <VersiAnggaranSelector
+            selectedVersi={versiFilter}
+            onSelectVersi={setVersiFilter}
+            tahun={tahunFilter}
+            modul="pengeluaran"
+          />
+
           <Button
             variant="outline"
             size="sm"
@@ -1073,38 +1092,53 @@ export default function RkaPengeluaranPage() {
       <Card className="rounded-2xl border-gray-200/80 shadow-xs">
         <CardContent className="p-4 sm:p-5 space-y-4">
           
-          {/* Baris 1: Dropdown Target Format Laporan, Sub-filter Kondisional, & Tombol Reset */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5 shrink-0">
+          {/* Baris 1: Mode Filter Format Laporan (Pills Tab Modern) & Status Versi / Reset */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+            {/* Kiri: Tab Pilihan Format Belanja */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1.5 shrink-0">
                 <Layers size={14} className="text-indigo-600" />
-                <span>Filter Format / Status:</span>
-              </label>
-              <select
-                value={activeTab}
-                onChange={e => {
-                  setActiveTab(e.target.value as any);
-                  setKategoriProposalFilter('ALL');
-                  setKategoriKemenFilter('ALL');
-                  setKategoriWeboFilter('ALL');
-                }}
-                className="h-9 bg-indigo-50/60 border border-indigo-200 text-indigo-950 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs min-w-[220px]"
-              >
-                <option value="semua">📋 Semua Belanja</option>
-                <option value="proposal_rkat">📊 Proposal RKAT</option>
-                <option value="unmapped">⚠️ Belum Teridentifikasi</option>
-                <option value="kementerian">🏛️ Laporan Kementerian</option>
-                <option value="webometrics">🌐 Laporan Webometrics</option>
-              </select>
+                <span>Format:</span>
+              </span>
+
+              {([
+                { id: 'semua', label: 'Semua Belanja', icon: '📋' },
+                { id: 'proposal_rkat', label: 'Proposal RKAT', icon: '📊' },
+                { id: 'kementerian', label: 'Laporan Kementerian', icon: '🏛️' },
+                { id: 'webometrics', label: 'Laporan Webometrics', icon: '🌐' },
+                { id: 'unmapped', label: 'Belum Teridentifikasi', icon: '⚠️' }
+              ] as const).map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setKategoriProposalFilter('ALL');
+                      setKategoriKemenFilter('ALL');
+                      setKategoriWeboFilter('ALL');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-xs font-black'
+                        : 'bg-gray-100/80 text-gray-600 hover:text-gray-900 hover:bg-gray-200/80 border border-gray-200/60'
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
 
               {/* Sub-Filter Kondisional HANYA jika format terkait aktif & memiliki data */}
               {activeTab === 'proposal_rkat' && proposalOptions.length > 0 && (
-                <div className="flex items-center gap-1.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 ml-1 animate-in fade-in">
                   <span className="text-xs text-gray-400 font-bold">›</span>
                   <select
                     value={kategoriProposalFilter}
                     onChange={e => setKategoriProposalFilter(e.target.value)}
-                    className="h-9 bg-indigo-100/70 border border-indigo-300 text-indigo-950 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs max-w-[240px]"
+                    className="h-8.5 bg-indigo-50 border border-indigo-300 text-indigo-950 text-xs font-bold rounded-xl px-2.5 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs max-w-[220px]"
                   >
                     <option value="ALL">Semua Format Proposal ({proposalOptions.length})</option>
                     {proposalOptions.map(p => (
@@ -1115,12 +1149,12 @@ export default function RkaPengeluaranPage() {
               )}
 
               {activeTab === 'kementerian' && kemenOptions.length > 0 && (
-                <div className="flex items-center gap-1.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 ml-1 animate-in fade-in">
                   <span className="text-xs text-gray-400 font-bold">›</span>
                   <select
                     value={kategoriKemenFilter}
                     onChange={e => setKategoriKemenFilter(e.target.value)}
-                    className="h-9 bg-blue-100/70 border border-blue-300 text-blue-950 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer shadow-2xs max-w-[240px]"
+                    className="h-8.5 bg-blue-50 border border-blue-300 text-blue-950 text-xs font-bold rounded-xl px-2.5 outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer shadow-2xs max-w-[220px]"
                   >
                     <option value="ALL">Semua Format Kementerian ({kemenOptions.length})</option>
                     {kemenOptions.map(k => (
@@ -1131,12 +1165,12 @@ export default function RkaPengeluaranPage() {
               )}
 
               {activeTab === 'webometrics' && weboOptions.length > 0 && (
-                <div className="flex items-center gap-1.5 animate-in fade-in">
+                <div className="flex items-center gap-1.5 ml-1 animate-in fade-in">
                   <span className="text-xs text-gray-400 font-bold">›</span>
                   <select
                     value={kategoriWeboFilter}
                     onChange={e => setKategoriWeboFilter(e.target.value)}
-                    className="h-9 bg-emerald-100/70 border border-emerald-300 text-emerald-950 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-2xs max-w-[240px]"
+                    className="h-8.5 bg-emerald-50 border border-emerald-300 text-emerald-950 text-xs font-bold rounded-xl px-2.5 outline-none focus:ring-2 focus:ring-emerald-600 cursor-pointer shadow-2xs max-w-[220px]"
                   >
                     <option value="ALL">Semua Format Webometrics ({weboOptions.length})</option>
                     {weboOptions.map(w => (
@@ -1147,11 +1181,18 @@ export default function RkaPengeluaranPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-2 justify-end">
+            {/* Kanan: Badge Basis Versi Aktif & Tombol Reset */}
+            <div className="flex items-center gap-2 justify-end shrink-0">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 border border-purple-200 rounded-xl text-xs font-bold text-purple-800">
+                <span className="text-[10px] text-purple-600 uppercase tracking-wider">Basis Data:</span>
+                <span className="font-black font-mono">{versiFilter.toUpperCase()}</span>
+              </div>
+
               {hasActiveFilters && (
                 <button
+                  type="button"
                   onClick={handleResetFilters}
-                  className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                  className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 px-2.5 py-1 rounded-xl hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer"
                 >
                   <RotateCcw size={12} />
                   <span>Reset Filter</span>
@@ -1160,11 +1201,11 @@ export default function RkaPengeluaranPage() {
             </div>
           </div>
 
-          {/* Baris 2: Filter dari Masing-Masing Field & Urutan */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          {/* Baris 2: Filter dari Masing-Masing Field (5 Kolom Proporsional & Rapi) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* 1. Filter Tahun Anggaran */}
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Tahun Anggaran
               </label>
               <select
@@ -1181,7 +1222,7 @@ export default function RkaPengeluaranPage() {
 
             {/* 2. Filter Fakultas / Unit Kerja (Autocomplete) */}
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Fakultas / Unit Kerja
               </label>
               <UnitAutocompleteFilter
@@ -1193,7 +1234,7 @@ export default function RkaPengeluaranPage() {
 
             {/* 3. Filter Kelompok Indikator Program */}
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Kelompok Indikator
               </label>
               <select
@@ -1210,7 +1251,7 @@ export default function RkaPengeluaranPage() {
 
             {/* 4. Filter Akun Detail */}
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Akun Detail Belanja
               </label>
               <select
@@ -1227,7 +1268,7 @@ export default function RkaPengeluaranPage() {
 
             {/* 5. Urutkan Data */}
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Urutkan Data
               </label>
               <select
@@ -1243,7 +1284,7 @@ export default function RkaPengeluaranPage() {
           </div>
 
           {/* Baris 3: Search Box & Pagination Sizer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-100">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2.5 border-t border-gray-100">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
               <input
@@ -1255,6 +1296,7 @@ export default function RkaPengeluaranPage() {
               />
               {search && (
                 <button
+                  type="button"
                   onClick={() => setSearch('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
@@ -1264,7 +1306,7 @@ export default function RkaPengeluaranPage() {
             </div>
 
             <div className="flex items-center gap-2 text-xs text-gray-500 font-medium shrink-0">
-              <span>Tampilkan:</span>
+              <span className="text-[11px] font-bold text-gray-500">Tampilkan:</span>
               <select
                 value={pageSize}
                 onChange={e => {

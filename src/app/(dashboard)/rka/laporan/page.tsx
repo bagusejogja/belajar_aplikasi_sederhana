@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,10 +24,12 @@ import {
 } from 'docx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
+import RkaHelpModal from '@/components/rka/RkaHelpModal';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
 // Definisi Struktur Template Slide / PPT Proposal RKAT (3 Jenjang: 1. Subtotal Kelompok, 2. Pos / Subtotal Anaknya, 3. Rincian Data)
-export interface PptTemplateItem {
+interface PptTemplateItem {
   id: string;
   label: string;
   matchKeys?: string[];
@@ -35,13 +37,13 @@ export interface PptTemplateItem {
   subItems?: PptTemplateItem[];
 }
 
-export interface PptTemplateSection {
+interface PptTemplateSection {
   id: string;
   title: string;
   items: PptTemplateItem[];
 }
 
-export interface PptTemplateConfig {
+interface PptTemplateConfig {
   penerimaanTitle: string;
   penerimaanSections: PptTemplateSection[];
   penerimaanLainnyaLabel: string;
@@ -378,14 +380,14 @@ function UnitAutocompleteFilter({
 }
 
 // Definisi Tipe dan Komponen Struktur 3-Level Hierarkis Murni (Tabel Tanpa Kotak-Kotak Sesuai /review)
-export interface DetailGroupUnit {
+interface DetailGroupUnit {
   unit: string;
   totalPagu: number;
   count: number;
   rows: any[];
 }
 
-export interface DetailGroupAkun {
+interface DetailGroupAkun {
   namaAkun: string;
   totalPagu: number;
   totalUnits: number;
@@ -783,6 +785,35 @@ function HierarchicalInlineTable({
   );
 }
 
+// Helper filter penerimaan global
+const isLuncuranPenerimaan = (r: any) => {
+  const akun = String(r.nama_akun_penerimaan || r.akun || r.kode_akun || '').trim();
+  const fp = (r.format_proposal || '').toLowerCase();
+  const ket = (r.keterangan || '').toLowerCase();
+  return akun.startsWith('40101') || fp.includes('surplus') || fp.includes('luncuran') || ket.includes('surplus anggaran tahun sebelumnya');
+};
+
+const isPendidikanPenerimaan = (r: any) => {
+  if (isLuncuranPenerimaan(r)) return false;
+  const rawAkun = String(r.nama_akun_penerimaan || r.akun || r.kode_akun || '').trim();
+  const codeOnly = String(r.akun || r.kode_akun || '').trim();
+  const uraian = String(r.uraian_penerimaan || r.uraian || '').toLowerCase();
+  return (
+    rawAkun.startsWith('411') || rawAkun.startsWith('412') ||
+    codeOnly.startsWith('411') || codeOnly.startsWith('412') ||
+    rawAkun.toLowerCase().includes('pendidikan') ||
+    uraian.includes('pendidikan') || uraian.includes('s1') || uraian.includes('s2') || uraian.includes('s3') || uraian.includes('ukt')
+  );
+};
+
+// Helper filter belanja global
+const isModalBelanja = (r: any, modeLaporan: string = 'proposal rkat') => {
+  const akun = String(r.akun_detail || r.kode_akun || r.nama_akun || '').trim();
+  const tagsVal = (r.tags && r.tags[modeLaporan]) || r.identifikasi_lain || r.kategori_belanja || '';
+  const val = (typeof tagsVal === 'string' ? tagsVal : '').toLowerCase();
+  return akun.startsWith('55') || val.includes('modal');
+};
+
 // Komponen Tabel Hierarki Rincian Berdasarkan Header Pos untuk Tab Rekap Group Unit Kerja
 function UnitDetailHierarchyTable({
   unitData,
@@ -804,32 +835,6 @@ function UnitDetailHierarchyTable({
   const sections = useMemo(() => {
     const penRows: any[] = unitData.penerimaanRows || [];
     const belRows: any[] = unitData.belanjaRows || [];
-
-    // Helper filter penerimaan
-    const isLuncuranPenerimaan = (r: any) => {
-      const akun = (r.nama_akun_penerimaan || '').trim();
-      const fp = (r.format_proposal || '').toLowerCase();
-      const ket = (r.keterangan || '').toLowerCase();
-      return akun.startsWith('40101') || fp.includes('surplus') || fp.includes('luncuran') || ket.includes('surplus anggaran tahun sebelumnya');
-    };
-
-    const isPendidikanPenerimaan = (r: any) => {
-      if (isLuncuranPenerimaan(r)) return false;
-      const rawAkun = String(r.nama_akun_penerimaan || r.akun || r.kode_akun || '').trim();
-      const codeOnly = String(r.akun || r.kode_akun || '').trim();
-      return (
-        rawAkun.startsWith('411') || rawAkun.startsWith('412') ||
-        codeOnly.startsWith('411') || codeOnly.startsWith('412')
-      );
-    };
-
-    // Helper filter belanja
-    const isModalBelanja = (r: any) => {
-      const akun = (r.akun_detail || '').trim();
-      const tagsVal = (r.tags && r.tags[modeLaporan]) || r.identifikasi_lain || r.kategori_belanja || '';
-      const val = (typeof tagsVal === 'string' ? tagsVal : '').toLowerCase();
-      return akun.startsWith('55') || val.includes('modal');
-    };
 
     // Helper kelompokkan baris berdasarkan Akun
     const groupRowsByAkun = (rows: any[], type: 'penerimaan' | 'belanja') => {
@@ -1324,11 +1329,24 @@ export default function RkaLaporanPage() {
   const [isRunningEngine, setIsRunningEngine] = useState(false);
 
   // Filter States
+  const [versiFilter, setVersiFilter] = useState<string>('v1');
   const [modeLaporan, setModeLaporan] = useState<string>('proposal rkat');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [kategoriFilter, setKategoriFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
+  
+  // Data Penyesuaian Anggaran
+  const [penyesuaianData, setPenyesuaianData] = useState<{
+    list: any[];
+    totalPenyesuaianPengeluaran: number;
+    totalPenyesuaianPenerimaan: number;
+  }>({
+    list: [],
+    totalPenyesuaianPengeluaran: 0,
+    totalPenyesuaianPenerimaan: 0
+  });
+  const [sertakanPenyesuaian, setSertakanPenyesuaian] = useState<boolean>(true);
   
   // Tampilan Tabel Seragam (Summary vs Rekap Unit vs Detail)
   const [activeViewTab, setActiveViewTab] = useState<'summary' | 'rekap_unit' | 'detail'>('summary');
@@ -1411,25 +1429,31 @@ export default function RkaLaporanPage() {
     setLoading(true);
     try {
       // 1. Query Pengeluaran / Belanja
-      let urlPengeluaran = `/api/rka/pengeluaran?tahun=${tahunFilter}&only_classified=true&format=${encodeURIComponent(modeLaporan)}`;
+      let urlPengeluaran = `/api/rka/pengeluaran?tahun=${tahunFilter}&versi=${encodeURIComponent(versiFilter)}&only_classified=true&format=${encodeURIComponent(modeLaporan)}`;
       if (unitFilter !== 'ALL') urlPengeluaran += `&unit=${encodeURIComponent(unitFilter)}`;
 
       // 2. Query Penerimaan / Pendapatan
-      let urlPenerimaan = `/api/rka/penerimaan?tahun=${tahunFilter}`;
+      let urlPenerimaan = `/api/rka/penerimaan?tahun=${tahunFilter}&versi=${encodeURIComponent(versiFilter)}`;
       if (unitFilter !== 'ALL') urlPenerimaan += `&unit=${encodeURIComponent(unitFilter)}`;
 
       // 3. Query Pagu Awal dari gov_pagu_anggaran
       let urlPagu = `/api/rka/pagu?tahun=${tahunFilter}`;
 
-      const [resPeng, resPen, resPagu] = await Promise.all([
+      // 4. Query Penyesuaian Anggaran (+/-)
+      let urlPenyesuaian = `/api/rka/penyesuaian?tahun=${tahunFilter}&versi=${encodeURIComponent(versiFilter)}`;
+      if (unitFilter !== 'ALL') urlPenyesuaian += `&unit=${encodeURIComponent(unitFilter)}`;
+
+      const [resPeng, resPen, resPagu, resPenyesuaian] = await Promise.all([
         fetch(urlPengeluaran),
         fetch(urlPenerimaan),
-        fetch(urlPagu)
+        fetch(urlPagu),
+        fetch(urlPenyesuaian).catch(() => null)
       ]);
-      const [jsonPeng, jsonPen, jsonPagu] = await Promise.all([
+      const [jsonPeng, jsonPen, jsonPagu, jsonPenyesuaian] = await Promise.all([
         resPeng.json(),
         resPen.json(),
-        resPagu.json()
+        resPagu.json(),
+        resPenyesuaian ? resPenyesuaian.json().catch(() => null) : null
       ]);
 
       if (jsonPeng.success) {
@@ -1445,6 +1469,25 @@ export default function RkaLaporanPage() {
       if (jsonPagu.success) {
         setPaguAwalList(jsonPagu.data || []);
       }
+
+      if (jsonPenyesuaian && jsonPenyesuaian.success && Array.isArray(jsonPenyesuaian.data)) {
+        let adjPeng = 0;
+        let adjPen = 0;
+        jsonPenyesuaian.data.forEach((item: any) => {
+          const nom = Math.abs(parseFloat(item.nilai_penyesuaian) || 0);
+          const factor = item.jenis_penyesuaian === 'kurang' ? -1 : 1;
+          if (item.modul === 'pengeluaran') {
+            adjPeng += factor * nom;
+          } else if (item.modul === 'penerimaan') {
+            adjPen += factor * nom;
+          }
+        });
+        setPenyesuaianData({
+          list: jsonPenyesuaian.data,
+          totalPenyesuaianPengeluaran: adjPeng,
+          totalPenyesuaianPenerimaan: adjPen
+        });
+      }
     } catch (e: any) {
       toast.error('Error: ' + e.message);
     } finally {
@@ -1459,7 +1502,7 @@ export default function RkaLaporanPage() {
 
   useEffect(() => {
     fetchData();
-  }, [tahunFilter, unitFilter, modeLaporan]);
+  }, [tahunFilter, unitFilter, modeLaporan, versiFilter]);
 
   // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
   const getRowClassification = (row: any, targetKey: string) => {
@@ -1544,12 +1587,12 @@ export default function RkaLaporanPage() {
   // Handle Jalankan Rule Engine Langsung dari Halaman Laporan (Clean Sync)
   const handleRunRuleEngine = async () => {
     setIsRunningEngine(true);
-    const toastId = toast.loading('Membersihkan data lama & menjalankan Rule Engine...');
+    const toastId = toast.loading(`Membersihkan data lama & menjalankan Rule Engine (${versiFilter.toUpperCase()})...`);
     try {
       const res = await fetch('/api/rka/rules', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetYear: tahunFilter, cleanSync: true })
+        body: JSON.stringify({ targetYear: tahunFilter, cleanSync: true, targetVersi: versiFilter })
       });
       const json = await res.json();
       if (json.success) {
@@ -1568,13 +1611,13 @@ export default function RkaLaporanPage() {
 
   // Handle Bersihkan Seluruh Riwayat Klasifikasi Belanja
   const handleCleanOldClassifications = async () => {
-    if (!confirm('Bersihkan seluruh riwayat penandaan lama pada data belanja RKAT?\n\nSetelah dibersihkan, seluruh data belanja akan kembali kosong dari klasifikasi, lalu Anda dapat menjalankan Rule Engine kembali agar hanya aturan aktif yang tampil.')) return;
+    if (!confirm(`Bersihkan seluruh riwayat penandaan lama pada data belanja RKAT versi ${versiFilter.toUpperCase()}?\n\nSetelah dibersihkan, seluruh data belanja versi ini akan kembali kosong dari klasifikasi, lalu Anda dapat menjalankan Rule Engine kembali agar hanya aturan aktif yang tampil.`)) return;
     const toastId = toast.loading('Membersihkan data belanja...');
     try {
       const res = await fetch('/api/rka/rules', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'reset_classification', targetFormat: 'ALL', targetYear: tahunFilter })
+        body: JSON.stringify({ action: 'reset_classification', targetFormat: 'ALL', targetYear: tahunFilter, targetVersi: versiFilter })
       });
       const json = await res.json();
       if (json.success) {
@@ -1632,8 +1675,54 @@ export default function RkaLaporanPage() {
       groups[label].totalVolume += Number(row.renterima_volume) || 0;
     });
 
+    // Masukkan data penyesuaian penerimaan jika opsi penyesuaian aktif
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (adj.modul !== 'penerimaan') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        if (search) {
+          const lower = search.toLowerCase();
+          const match = (adj.unit_kerja && adj.unit_kerja.toLowerCase().includes(lower)) ||
+            (adj.nama_akun && adj.nama_akun.toLowerCase().includes(lower)) ||
+            (adj.uraian && adj.uraian.toLowerCase().includes(lower)) ||
+            (adj.keterangan && adj.keterangan.toLowerCase().includes(lower));
+          if (!match) return;
+        }
+
+        const label = (adj.nama_akun || adj.uraian || 'Penyesuaian Penerimaan').trim();
+        if (!groups[label]) {
+          groups[label] = {
+            label,
+            rows: [],
+            totalPagu: 0,
+            totalVolume: 0
+          };
+        }
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        groups[label].rows.push({
+          id: `adj-pen-${adj.id}`,
+          keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+          nama_akun_penerimaan: adj.nama_akun || label,
+          unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+          renterima_pagu: val,
+          renterima_volume: 1,
+          renterima_tarif: Math.abs(val),
+          sumber_dana: 'Penyesuaian SK',
+          status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+          tahun: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+        groups[label].totalPagu += val;
+        groups[label].totalVolume += 1;
+      });
+    }
+
     return Object.values(groups).sort((a, b) => b.totalPagu - a.totalPagu);
-  }, [penerimaanList, search]);
+  }, [penerimaanList, search, sertakanPenyesuaian, penyesuaianData, unitFilter, modeLaporan]);
 
   const grandTotalPenerimaan = useMemo(() => {
     const totalPagu = groupedPenerimaan.reduce((acc, g) => acc + g.totalPagu, 0);
@@ -1663,6 +1752,7 @@ export default function RkaLaporanPage() {
     });
 
     const usedPKeys = new Set<string>();
+    const usedAdjPenIds = new Set<any>();
 
     const computedSections = (pptTemplate.penerimaanSections || []).map(sec => {
       let secSubtotal = 0;
@@ -1692,6 +1782,42 @@ export default function RkaLaporanPage() {
               }
             });
 
+            // Map penyesuaian penerimaan ke sub-item
+            if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+              penyesuaianData.list.forEach(adj => {
+                if (usedAdjPenIds.has(adj.id)) return;
+                if (adj.modul !== 'penerimaan') return;
+                const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+                if (!isTargetMatch) return;
+                const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+                if (!isUnitMatch) return;
+
+                const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === sub.label.toLowerCase().trim()) ||
+                  (adj.uraian && adj.uraian.toLowerCase().trim() === sub.label.toLowerCase().trim()) ||
+                  isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, sub.matchKeys || []);
+
+                if (isMatch) {
+                  const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                  subTotal += val;
+                  subCount += 1;
+                  subRows.push({
+                    id: `adj-pen-${adj.id}`,
+                    keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+                    nama_akun_penerimaan: adj.nama_akun || sub.label,
+                    unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+                    renterima_pagu: val,
+                    renterima_volume: 1,
+                    renterima_tarif: Math.abs(val),
+                    sumber_dana: 'Penyesuaian SK',
+                    status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+                    tahun: adj.tahun_anggaran,
+                    is_penyesuaian: true
+                  });
+                  usedAdjPenIds.add(adj.id);
+                }
+              });
+            }
+
             itemTotal += subTotal;
             itemCount += subCount;
             itemRows.push(...subRows);
@@ -1716,6 +1842,42 @@ export default function RkaLaporanPage() {
               usedPKeys.add(k);
             }
           });
+
+          // Map penyesuaian penerimaan ke item langsung (misal: Penerimaan Gaji dan Tunjangan PNS)
+          if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+            penyesuaianData.list.forEach(adj => {
+              if (usedAdjPenIds.has(adj.id)) return;
+              if (adj.modul !== 'penerimaan') return;
+              const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+              if (!isTargetMatch) return;
+              const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+              if (!isUnitMatch) return;
+
+              const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === item.label.toLowerCase().trim()) ||
+                (adj.uraian && adj.uraian.toLowerCase().trim() === item.label.toLowerCase().trim()) ||
+                isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, item.matchKeys || []);
+
+              if (isMatch) {
+                const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                itemTotal += val;
+                itemCount += 1;
+                itemRows.push({
+                  id: `adj-pen-${adj.id}`,
+                  keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+                  nama_akun_penerimaan: adj.nama_akun || item.label,
+                  unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+                  renterima_pagu: val,
+                  renterima_volume: 1,
+                  renterima_tarif: Math.abs(val),
+                  sumber_dana: 'Penyesuaian SK',
+                  status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+                  tahun: adj.tahun_anggaran,
+                  is_penyesuaian: true
+                });
+                usedAdjPenIds.add(adj.id);
+              }
+            });
+          }
         }
         
         secSubtotal += itemTotal;
@@ -1753,6 +1915,36 @@ export default function RkaLaporanPage() {
       }
     });
 
+    // Penyesuaian penerimaan yang belum terpetakan ke section/pos manapun dimasukkan ke Penerimaan Lainnya
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (usedAdjPenIds.has(adj.id)) return;
+        if (adj.modul !== 'penerimaan') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        pLainnyaTotal += val;
+        pLainnyaCount += 1;
+        pLainnyaRows.push({
+          id: `adj-pen-${adj.id}`,
+          keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+          nama_akun_penerimaan: adj.nama_akun || 'Penyesuaian Penerimaan',
+          unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+          renterima_pagu: val,
+          renterima_volume: 1,
+          renterima_tarif: Math.abs(val),
+          sumber_dana: 'Penyesuaian SK',
+          status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+          tahun: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+        usedAdjPenIds.add(adj.id);
+      });
+    }
+
     const totalPenerimaan = computedSections.reduce((acc, s) => acc + s.subtotal, 0) + pLainnyaTotal;
 
     // 2. Data Pengeluaran / Belanja
@@ -1778,6 +1970,7 @@ export default function RkaLaporanPage() {
     });
 
     const usedBKeys = new Set<string>();
+    const usedAdjBelIds = new Set<any>();
 
     const effectivePengeluaranSections = (pptTemplate.pengeluaranSections && pptTemplate.pengeluaranSections.length > 0)
       ? pptTemplate.pengeluaranSections
@@ -1817,6 +2010,40 @@ export default function RkaLaporanPage() {
               }
             });
 
+            // Map penyesuaian belanja ke sub-item
+            if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+              penyesuaianData.list.forEach(adj => {
+                if (usedAdjBelIds.has(adj.id)) return;
+                if (adj.modul !== 'pengeluaran') return;
+                const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+                if (!isTargetMatch) return;
+                const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+                if (!isUnitMatch) return;
+
+                const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === sub.label.toLowerCase().trim()) ||
+                  (adj.uraian && adj.uraian.toLowerCase().trim() === sub.label.toLowerCase().trim()) ||
+                  isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, sub.matchKeys || []);
+
+                if (isMatch) {
+                  const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                  subTotal += val;
+                  subCount += 1;
+                  subRows.push({
+                    id: `adj-peng-${adj.id}`,
+                    kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+                    lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+                    uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+                    akun_detail: adj.nama_akun || sub.label,
+                    unit: adj.unit_kerja || 'Direktorat Keuangan',
+                    anggaran: val,
+                    tahun_anggaran: adj.tahun_anggaran,
+                    is_penyesuaian: true
+                  });
+                  usedAdjBelIds.add(adj.id);
+                }
+              });
+            }
+
             itemTotal += subTotal;
             itemCount += subCount;
             itemRows.push(...subRows);
@@ -1841,6 +2068,40 @@ export default function RkaLaporanPage() {
               usedBKeys.add(k);
             }
           });
+
+          // Map penyesuaian belanja ke item langsung
+          if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+            penyesuaianData.list.forEach(adj => {
+              if (usedAdjBelIds.has(adj.id)) return;
+              if (adj.modul !== 'pengeluaran') return;
+              const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+              if (!isTargetMatch) return;
+              const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+              if (!isUnitMatch) return;
+
+              const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === item.label.toLowerCase().trim()) ||
+                (adj.uraian && adj.uraian.toLowerCase().trim() === item.label.toLowerCase().trim()) ||
+                isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, item.matchKeys || []);
+
+              if (isMatch) {
+                const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                itemTotal += val;
+                itemCount += 1;
+                itemRows.push({
+                  id: `adj-peng-${adj.id}`,
+                  kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+                  lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+                  uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+                  akun_detail: adj.nama_akun || item.label,
+                  unit: adj.unit_kerja || 'Direktorat Keuangan',
+                  anggaran: val,
+                  tahun_anggaran: adj.tahun_anggaran,
+                  is_penyesuaian: true
+                });
+                usedAdjBelIds.add(adj.id);
+              }
+            });
+          }
         }
 
         secSubtotal += itemTotal;
@@ -1879,6 +2140,34 @@ export default function RkaLaporanPage() {
       }
     });
 
+    // Penyesuaian belanja yang belum terpetakan ke section/pos manapun dimasukkan ke Belanja Lainnya
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (usedAdjBelIds.has(adj.id)) return;
+        if (adj.modul !== 'pengeluaran') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        bLainnyaTotal += val;
+        bLainnyaCount += 1;
+        bLainnyaRows.push({
+          id: `adj-peng-${adj.id}`,
+          kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+          lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+          uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+          akun_detail: adj.nama_akun || 'Penyesuaian Belanja',
+          unit: adj.unit_kerja || 'Direktorat Keuangan',
+          anggaran: val,
+          tahun_anggaran: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+        usedAdjBelIds.add(adj.id);
+      });
+    }
+
     const totalPengeluaran = computedPengeluaranSections.reduce((acc, s) => acc + s.subtotal, 0) + bLainnyaTotal;
     const surplusDefisit = totalPenerimaan - totalPengeluaran;
     const allPengeluaranItems = computedPengeluaranSections.flatMap(s => s.items);
@@ -1909,7 +2198,7 @@ export default function RkaLaporanPage() {
       },
       surplusDefisit
     };
-  }, [penerimaanList, dataList, unitFilter, kategoriFilter, search, pptTemplate]);
+  }, [penerimaanList, dataList, unitFilter, kategoriFilter, search, pptTemplate, sertakanPenyesuaian, penyesuaianData, modeLaporan]);
 
   // Struktur Hierarki Baris Slide Format Proposal PPT (Dihitung Bottom-Up Sesuai Komparasi Laporan & Screenshot)
   const computedTreeData = useMemo(() => {
@@ -1933,6 +2222,39 @@ export default function RkaLaporanPage() {
             return isPptKeyMatch(text, item.matchKeys);
           });
           pagu = matchingRows.reduce((acc, r) => acc + (Number(r.renterima_pagu || r.anggaran || r.pagu) || 0), 0);
+
+          // Masukkan penyesuaian penerimaan
+          if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+            penyesuaianData.list.forEach(adj => {
+              if (adj.modul !== 'penerimaan') return;
+              const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+              if (!isTargetMatch) return;
+              const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+              if (!isUnitMatch) return;
+
+              const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === item.keterangan.toLowerCase().trim()) ||
+                (adj.uraian && adj.uraian.toLowerCase().trim() === item.keterangan.toLowerCase().trim()) ||
+                isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, item.matchKeys || []);
+
+              if (isMatch) {
+                const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                pagu += val;
+                matchingRows.push({
+                  id: `adj-pen-${adj.id}`,
+                  keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+                  nama_akun_penerimaan: adj.nama_akun || item.keterangan,
+                  unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+                  renterima_pagu: val,
+                  renterima_volume: 1,
+                  renterima_tarif: Math.abs(val),
+                  sumber_dana: 'Penyesuaian SK',
+                  status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+                  tahun: adj.tahun_anggaran,
+                  is_penyesuaian: true
+                });
+              }
+            });
+          }
         } else if (item.type === 'pengeluaran') {
           matchingRows = dataList.filter(row => {
             if (unitFilter !== 'ALL' && unitFilter !== '*' && (row.unit || row.unit_kerja || '') !== unitFilter) return false;
@@ -1948,6 +2270,37 @@ export default function RkaLaporanPage() {
             return isPptKeyMatch(text, item.matchKeys);
           });
           pagu = matchingRows.reduce((acc, r) => acc + (Number(r.anggaran) || 0), 0);
+
+          // Masukkan penyesuaian belanja
+          if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+            penyesuaianData.list.forEach(adj => {
+              if (adj.modul !== 'pengeluaran') return;
+              const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+              if (!isTargetMatch) return;
+              const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+              if (!isUnitMatch) return;
+
+              const isMatch = (adj.nama_akun && adj.nama_akun.toLowerCase().trim() === item.keterangan.toLowerCase().trim()) ||
+                (adj.uraian && adj.uraian.toLowerCase().trim() === item.keterangan.toLowerCase().trim()) ||
+                isPptKeyMatch(`${adj.nama_akun || ''} ${adj.uraian || ''} ${adj.kode_akun || ''} ${adj.keterangan || ''}`, item.matchKeys || []);
+
+              if (isMatch) {
+                const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+                pagu += val;
+                matchingRows.push({
+                  id: `adj-peng-${adj.id}`,
+                  kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+                  lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+                  uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+                  akun_detail: adj.nama_akun || item.keterangan,
+                  unit: adj.unit_kerja || 'Direktorat Keuangan',
+                  anggaran: val,
+                  tahun_anggaran: adj.tahun_anggaran,
+                  is_penyesuaian: true
+                });
+              }
+            });
+          }
         }
       }
 
@@ -2030,7 +2383,7 @@ export default function RkaLaporanPage() {
       totalPengeluaran,
       surplusDefisit: totalPenerimaan - totalPengeluaran
     };
-  }, [pptTreeTemplate, penerimaanList, dataList, unitFilter, tahunFilter, kategoriFilter]);
+  }, [pptTreeTemplate, penerimaanList, dataList, unitFilter, tahunFilter, kategoriFilter, sertakanPenyesuaian, penyesuaianData, modeLaporan]);
 
   const toggleExpandTreeRow = (id: string) => {
     setExpandedTreeRows(prev => {
@@ -2120,8 +2473,51 @@ export default function RkaLaporanPage() {
       groups[label].totalRealisasi += Number(row.realisasi) || 0;
     });
 
+    // Masukkan data penyesuaian belanja jika opsi penyesuaian aktif
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (adj.modul !== 'pengeluaran') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        if (search) {
+          const lower = search.toLowerCase();
+          const match = (adj.unit_kerja && adj.unit_kerja.toLowerCase().includes(lower)) ||
+            (adj.nama_akun && adj.nama_akun.toLowerCase().includes(lower)) ||
+            (adj.uraian && adj.uraian.toLowerCase().includes(lower)) ||
+            (adj.keterangan && adj.keterangan.toLowerCase().includes(lower));
+          if (!match) return;
+        }
+
+        const label = (adj.nama_akun || adj.uraian || 'Penyesuaian Belanja').trim();
+        if (!groups[label]) {
+          groups[label] = {
+            label,
+            rows: [],
+            totalAnggaran: 0,
+            totalRealisasi: 0
+          };
+        }
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        groups[label].rows.push({
+          id: `adj-peng-${adj.id}`,
+          kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+          lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+          uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+          akun_detail: adj.nama_akun || label,
+          unit: adj.unit_kerja || 'Direktorat Keuangan',
+          anggaran: val,
+          tahun_anggaran: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+        groups[label].totalAnggaran += val;
+      });
+    }
+
     return Object.values(groups).sort((a, b) => b.totalAnggaran - a.totalAnggaran);
-  }, [dataList, modeLaporan, search]);
+  }, [dataList, modeLaporan, search, sertakanPenyesuaian, penyesuaianData, unitFilter]);
 
   // Daftar opsi kategori untuk filter dropdown
   const categoryOptions = useMemo(() => {
@@ -2130,7 +2526,7 @@ export default function RkaLaporanPage() {
 
   // Semua baris belanja valid yang terklasifikasi sesuai filter
   const allDetailRows = useMemo(() => {
-    return dataList.filter(d => {
+    const list = dataList.filter(d => {
       const val = getRowClassification(d, modeLaporan);
       if (!val || val.trim() === '') return false;
       if (kategoriFilter !== 'ALL' && val !== kategoriFilter) return false;
@@ -2147,11 +2543,36 @@ export default function RkaLaporanPage() {
       }
       return true;
     });
-  }, [dataList, modeLaporan, kategoriFilter, search]);
+
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (adj.modul !== 'pengeluaran') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        list.push({
+          id: `adj-peng-${adj.id}`,
+          kegiatan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}]`,
+          lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+          uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+          akun_detail: adj.nama_akun || 'Penyesuaian Belanja',
+          unit: adj.unit_kerja || 'Direktorat Keuangan',
+          anggaran: val,
+          tahun_anggaran: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+      });
+    }
+
+    return list;
+  }, [dataList, modeLaporan, kategoriFilter, search, sertakanPenyesuaian, penyesuaianData, unitFilter]);
 
   // Semua baris penerimaan valid sesuai filter
   const allDetailPenerimaanRows = useMemo(() => {
-    return penerimaanList.filter(d => {
+    const list = penerimaanList.filter(d => {
       if (search) {
         const lower = search.toLowerCase();
         return (
@@ -2165,7 +2586,34 @@ export default function RkaLaporanPage() {
       }
       return true;
     });
-  }, [penerimaanList, search]);
+
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (adj.modul !== 'penerimaan') return;
+        const isTargetMatch = !adj.target_laporan || adj.target_laporan === 'semua' || adj.target_laporan.toLowerCase().trim() === modeLaporan.toLowerCase().trim();
+        if (!isTargetMatch) return;
+        const isUnitMatch = unitFilter === 'ALL' || unitFilter === '*' || !adj.unit_kerja || adj.unit_kerja === 'ALL' || adj.unit_kerja === unitFilter || adj.unit_kerja.includes(unitFilter) || unitFilter.includes(adj.unit_kerja);
+        if (!isUnitMatch) return;
+
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+        list.push({
+          id: `adj-pen-${adj.id}`,
+          keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+          nama_akun_penerimaan: adj.nama_akun || 'Penyesuaian Penerimaan',
+          unit_kerja: adj.unit_kerja || 'Direktorat Keuangan',
+          renterima_pagu: val,
+          renterima_volume: 1,
+          renterima_tarif: Math.abs(val),
+          sumber_dana: 'Penyesuaian SK',
+          status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+          tahun: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+      });
+    }
+
+    return list;
+  }, [penerimaanList, search, sertakanPenyesuaian, penyesuaianData, unitFilter, modeLaporan]);
 
   // Kelompokkan Detail Belanja Secara Hirarkis: Akun (Anak 1) -> Unit (Anak 2) -> Detail Rows (Anak 3)
   const groupedDetailBelanja = useMemo(() => {
@@ -2671,6 +3119,64 @@ export default function RkaLaporanPage() {
       getOrCreateUnit(formattedName);
     });
 
+    // Akumulasi Penyesuaian Anggaran per Unit
+    if (sertakanPenyesuaian && penyesuaianData.list && penyesuaianData.list.length > 0) {
+      penyesuaianData.list.forEach(adj => {
+        if (adj.target_laporan && adj.target_laporan !== 'semua' && adj.target_laporan !== modeLaporan) return;
+        const u = (adj.unit_kerja || '010802 Direktorat Keuangan').trim();
+        if (unitFilter !== 'ALL' && unitFilter !== '*' && u !== unitFilter && !u.includes(unitFilter)) return;
+        if (search && !u.toLowerCase().includes(search.toLowerCase())) return;
+
+        const item = getOrCreateUnit(u);
+        const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+
+        if (adj.modul === 'penerimaan') {
+          item.penerimaanCount += 1;
+          const isPend = isPendidikanPenerimaan({ nama_akun_penerimaan: adj.nama_akun, uraian_penerimaan: adj.uraian });
+          if (isPend) {
+            item.pendidikan += val;
+            item.pendidikanAlokasi += val;
+          } else {
+            item.nonPendidikan += val;
+            item.nonPendidikanAlokasi += val;
+          }
+          item.penerimaanRows.push({
+            id: `adj-pen-${adj.id}`,
+            keterangan: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-) KURANG' : '(+) TAMBAH'}] ${adj.keterangan || adj.uraian || adj.nama_akun}`,
+            nama_akun_penerimaan: adj.nama_akun,
+            unit_kerja: u,
+            renterima_pagu: val,
+            renterima_volume: 1,
+            renterima_tarif: Math.abs(val),
+            sumber_dana: 'Penyesuaian SK',
+            status: adj.jenis_penyesuaian === 'kurang' ? 'Kurang' : 'Tambah',
+            tahun: adj.tahun_anggaran,
+            is_penyesuaian: true
+          });
+        } else if (adj.modul === 'pengeluaran') {
+          item.count += 1;
+          const isModal = (adj.nama_akun || '').toLowerCase().includes('modal') || (adj.uraian || '').toLowerCase().includes('modal');
+          if (isModal) {
+            item.modal += val;
+          } else {
+            item.operasional += val;
+            item.breakdown.lainnya += val;
+          }
+          item.belanjaRows.push({
+            id: `adj-peng-${adj.id}`,
+            kegiatan: `[PENYESUAIAN]`,
+            lingkup_kegiatan: adj.no_sk || 'SK Pimpinan',
+            uraian_belanja: adj.keterangan || adj.uraian || adj.nama_akun,
+            akun_detail: adj.nama_akun,
+            unit: u,
+            anggaran: val,
+            tahun_anggaran: adj.tahun_anggaran,
+            is_penyesuaian: true
+          });
+        }
+      });
+    }
+
     // 3. Kalkulasi Posisi Aritmetika Standar Fakultas & KPTU & UPU
     Object.values(unitMap).forEach(u => {
       u.jumlahPenerimaan = u.pendidikan + u.nonPendidikan;              // (3) = (1) + (2)
@@ -2712,7 +3218,7 @@ export default function RkaLaporanPage() {
 
     // Diurutkan A-Z berdasarkan KODE & NAMA UNIT KERJA
     return Object.values(unitMap).sort((a, b) => a.unit.localeCompare(b.unit, 'id', { numeric: true, sensitivity: 'base' }));
-  }, [penerimaanList, dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList, paguAwalList]);
+  }, [penerimaanList, dataList, modeLaporan, unitFilter, kategoriFilter, search, govUnitsList, paguAwalList, sertakanPenyesuaian, penyesuaianData]);
 
   // Data Rekapitulasi Dikelompokkan per Group Org dari master gov_units
   const groupedByOrg = useMemo(() => {
@@ -4760,6 +5266,9 @@ export default function RkaLaporanPage() {
               <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold uppercase">
                 REKAP RKA
               </Badge>
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-bold uppercase font-mono">
+                {versiFilter.toUpperCase()}
+              </Badge>
             </div>
             <p className="text-xs text-gray-500 font-medium">
               Akumulasi Pagu Anggaran &amp; Realisasi Belanja RKAT Berdasarkan Format Pelaporan Resmi
@@ -4769,7 +5278,40 @@ export default function RkaLaporanPage() {
 
         {/* Action Buttons Top Bar */}
         <div className="flex flex-wrap items-center gap-2">
-          
+          {/* Bantuan '?' Saja */}
+          <RkaHelpModal currentPage="laporan" />
+
+          {/* Selector Versi Anggaran Multi-Version */}
+          <VersiAnggaranSelector
+            selectedVersi={versiFilter}
+            onSelectVersi={setVersiFilter}
+            tahun={tahunFilter}
+            modul="all"
+          />
+
+          {/* Toggle Sertakan Penyesuaian Anggaran */}
+          <button
+            type="button"
+            onClick={() => {
+              setSertakanPenyesuaian(!sertakanPenyesuaian);
+              toast.success(!sertakanPenyesuaian ? 'Penyesuaian anggaran disertakan' : 'Penyesuaian anggaran dinonaktifkan');
+            }}
+            className={`h-9 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+              sertakanPenyesuaian 
+                ? 'bg-blue-50 border-blue-300 text-blue-800 shadow-2xs' 
+                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+            title="Sertakan mutasi penyesuaian anggaran di laporan"
+          >
+            <Edit3 size={13} className={sertakanPenyesuaian ? 'text-blue-600' : 'text-gray-400'} />
+            <span>Penyesuaian: {sertakanPenyesuaian ? 'Aktif' : 'Off'}</span>
+            {penyesuaianData.list.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-bold">
+                {penyesuaianData.list.length}
+              </span>
+            )}
+          </button>
+
           {/* Tombol Jalankan Rule Engine */}
           <Button
             size="sm"
@@ -4836,6 +5378,14 @@ export default function RkaLaporanPage() {
             <div className="text-xl sm:text-2xl font-black font-mono text-emerald-950">
               Rp {formatRp(unitRekapTotals.grandTotalPenerimaan)}
             </div>
+            {sertakanPenyesuaian && penyesuaianData.totalPenyesuaianPenerimaan !== 0 && (
+              <div className="flex items-center justify-between text-[10px] font-bold text-emerald-800 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                <span>Penyesuaian:</span>
+                <span className="font-mono">
+                  {penyesuaianData.totalPenyesuaianPenerimaan >= 0 ? '+' : ''}Rp {formatRp(penyesuaianData.totalPenyesuaianPenerimaan)}
+                </span>
+              </div>
+            )}
             <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-emerald-200/60 text-emerald-800">
               <span>{grandTotalPenerimaan.totalItems.toLocaleString('id-ID')} Rincian Akun</span>
               <span className="text-[10px] font-mono font-bold">Pagu Penerimaan</span>
@@ -4858,6 +5408,14 @@ export default function RkaLaporanPage() {
             <div className="text-xl sm:text-2xl font-black font-mono text-indigo-950">
               Rp {formatRp(unitRekapTotals.grandTotalPengeluaran)}
             </div>
+            {sertakanPenyesuaian && penyesuaianData.totalPenyesuaianPengeluaran !== 0 && (
+              <div className="flex items-center justify-between text-[10px] font-bold text-indigo-800 bg-indigo-100/70 px-2 py-0.5 rounded-md">
+                <span>Penyesuaian:</span>
+                <span className="font-mono">
+                  {penyesuaianData.totalPenyesuaianPengeluaran >= 0 ? '+' : ''}Rp {formatRp(penyesuaianData.totalPenyesuaianPengeluaran)}
+                </span>
+              </div>
+            )}
             <div className="text-xs font-semibold flex items-center justify-between pt-1 border-t border-indigo-200/60 text-indigo-800">
               <span>{grandTotal.totalItems.toLocaleString('id-ID')} Rincian Belanja</span>
               <span className="text-[10px] font-mono font-bold">Pagu Belanja</span>
@@ -5027,28 +5585,41 @@ export default function RkaLaporanPage() {
             )}
           </div>
 
-          {/* Baris 3: Filter Tahun, Fakultas Autocomplete, dan Search Bar */}
+          {/* Baris 3: Filter Versi, Tahun, Fakultas Autocomplete, dan Search Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             
-            {/* Filter Tahun */}
+            {/* Filter Versi Anggaran */}
             <div className="sm:col-span-3">
+              <label className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block mb-1">
+                Versi Anggaran
+              </label>
+              <VersiAnggaranSelector
+                selectedVersi={versiFilter}
+                onSelectVersi={setVersiFilter}
+                tahun={tahunFilter}
+                modul="all"
+              />
+            </div>
+
+            {/* Filter Tahun */}
+            <div className="sm:col-span-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                Tahun Anggaran
+                Tahun
               </label>
               <select
                 value={tahunFilter}
                 onChange={e => setTahunFilter(e.target.value)}
-                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-3 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-2 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
               >
                 <option value="2027">TA 2027</option>
                 <option value="2026">TA 2026</option>
                 <option value="2025">TA 2025</option>
-                <option value="ALL">Semua Tahun</option>
+                <option value="ALL">Semua</option>
               </select>
             </div>
 
             {/* Filter Fakultas Autocomplete (Seragam dengan tambah-pagu) */}
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-3">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
                 Fakultas / Unit Kerja
               </label>
@@ -5060,7 +5631,7 @@ export default function RkaLaporanPage() {
             </div>
 
             {/* Search Box */}
-            <div className="sm:col-span-5">
+            <div className="sm:col-span-4">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
                 Pencarian Data
               </label>

@@ -33,7 +33,7 @@ function TabLoading() {
   );
 }
 
-export type TabKey = 'uang-makan' | 'guru-besar' | 'serdos' | 'fungsional' | 'gaji-pns';
+type TabKey = 'uang-makan' | 'guru-besar' | 'serdos' | 'fungsional' | 'gaji-pns';
 
 interface TabItem {
   id: TabKey;

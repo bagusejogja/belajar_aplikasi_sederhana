@@ -13,16 +13,32 @@ export async function GET(request: Request) {
     const kategoriLaporan = searchParams.get('kategori'); // 'kementerian' | 'webometrics' | 'semua'
     const onlyClassified = searchParams.get('only_classified'); // 'true' | 'false'
     const targetFormat = searchParams.get('format');
+    const versiParam = searchParams.get('versi') || 'v1';
     
-    // Probe apakah kolom db_id sudah ada di schema Supabase
-    let selectFields = 'id, db_id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
+    // Probe apakah kolom db_id dan versi_anggaran sudah ada di schema Supabase
+    let selectFields = 'id, db_id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama, versi_anggaran';
     let hasDbIdColumn = true;
+    let hasVersiColumn = true;
 
-    const probe = await supabaseAdmin.from('rkat_pengeluaran').select('id, db_id').limit(1);
-    if (probe.error && probe.error.message.includes('db_id')) {
-      selectFields = 'id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama';
-      hasDbIdColumn = false;
+    const probe = await supabaseAdmin.from('rkat_pengeluaran').select('id, db_id, versi_anggaran').limit(1);
+    if (probe.error) {
+      if (probe.error.message.includes('versi_anggaran')) {
+        hasVersiColumn = false;
+        selectFields = selectFields.replace(', versi_anggaran', '');
+      }
+      if (probe.error.message.includes('db_id')) {
+        hasDbIdColumn = false;
+        selectFields = selectFields.replace('db_id, ', '');
+      }
     }
+
+    const applyVersiFilter = (query: any) => {
+      if (!hasVersiColumn || !versiParam || versiParam === 'ALL') return query;
+      if (versiParam === 'v1') {
+        return query.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+      }
+      return query.eq('versi_anggaran', versiParam);
+    };
 
     // 1. Pencarian Cepat Teroptimasi (jika ada parameter search)
     if (search && search.trim()) {
@@ -41,6 +57,8 @@ export async function GET(request: Request) {
         query = query.ilike('unit', `%${unit}%`);
       }
 
+      query = applyVersiFilter(query);
+
       if (hasDbIdColumn) {
         query = query.or(`uraian_belanja.ilike.%${qText}%,kegiatan.ilike.%${qText}%,akun_detail.ilike.%${qText}%,db_id.ilike.%${qText}%`);
       } else {
@@ -49,7 +67,7 @@ export async function GET(request: Request) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return NextResponse.json({ success: true, data: data || [], hasDbIdColumn });
+      return NextResponse.json({ success: true, data: data || [], hasDbIdColumn, hasVersiColumn, currentVersi: versiParam });
     }
 
     // 2. Fetch seluruh baris data menggunakan ID-cursor pagination (Sangat cepat, hemat resource, bebas timeout)
@@ -66,6 +84,7 @@ export async function GET(request: Request) {
       if (unit && unit !== 'ALL' && unit !== '*') {
         q = q.ilike('unit', `%${unit}%`);
       }
+      q = applyVersiFilter(q);
       if (onlyClassified === 'true') {
         if (targetFormat === 'laporan_kementerian') {
           q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
@@ -112,9 +131,12 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
   let dbIdMissing = initialDbIdMissing;
 
   if (dbIdMissing) {
-    const stripped = chunk.map(({ db_id, ...rest }: any) => rest);
-    const { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
-    if (error) throw error;
+    const stripped = chunk.map(({ db_id, versi_anggaran, ...rest }: any) => rest);
+    let { error } = await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
+    if (error) {
+      const retry = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
+      if (retry.error) throw retry.error;
+    }
     return { inserted: chunk.length, updated: 0, dbIdMissing: true };
   }
 
@@ -129,9 +151,9 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
       .in('db_id', chunkDbIds);
 
     if (findErr) {
-      if (findErr.message?.includes('db_id')) {
+      if (findErr.message?.includes('db_id') || findErr.message?.includes('versi_anggaran')) {
         dbIdMissing = true;
-        const stripped = chunk.map(({ db_id, ...rest }: any) => rest);
+        const stripped = chunk.map(({ db_id, versi_anggaran, ...rest }: any) => rest);
         const { error: insErr } = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
         if (insErr) throw insErr;
         return { inserted: chunk.length, updated: 0, dbIdMissing: true };
@@ -154,9 +176,9 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
   if (toInsert.length > 0) {
     let { error: insErr } = await supabaseAdmin.from('rkat_pengeluaran').insert(toInsert);
     if (insErr) {
-      if (insErr.message?.includes('db_id')) {
+      if (insErr.message?.includes('db_id') || insErr.message?.includes('versi_anggaran')) {
         dbIdMissing = true;
-        const stripped = toInsert.map(({ db_id, ...rest }: any) => rest);
+        const stripped = toInsert.map(({ db_id, versi_anggaran, ...rest }: any) => rest);
         const retryRes = await supabaseAdmin.from('rkat_pengeluaran').insert(stripped);
         if (retryRes.error) throw retryRes.error;
         return { inserted: toInsert.length, updated: 0, dbIdMissing: true };
@@ -271,7 +293,8 @@ export async function POST(request: Request) {
           db_id: dbIdVal,
           laporan_kementerian: is22Cols ? null : (cols[21] && cols[21] !== dbIdVal ? cols[21] : null),
           laporan_webometrics: is22Cols ? null : (cols[22] && cols[22] !== dbIdVal ? cols[22] : null),
-          identifikasi_lain: is22Cols ? null : (cols[23] && cols[23] !== dbIdVal ? cols[23] : null)
+          identifikasi_lain: is22Cols ? null : (cols[23] && cols[23] !== dbIdVal ? cols[23] : null),
+          versi_anggaran: body.versi_anggaran || body.versi || 'v1'
         };
 
         rowsToInsert.push(row);
@@ -353,13 +376,17 @@ export async function POST(request: Request) {
       }
     }
 
+    if (!body.versi_anggaran) {
+      body.versi_anggaran = 'v1';
+    }
+
     let { data, error } = await supabaseAdmin
       .from('rkat_pengeluaran')
       .insert([body])
       .select();
 
-    if (error && error.message.includes('db_id')) {
-      const { db_id, ...rest } = body;
+    if (error && (error.message.includes('db_id') || error.message.includes('versi_anggaran'))) {
+      const { db_id, versi_anggaran, ...rest } = body;
       const retry = await supabaseAdmin
         .from('rkat_pengeluaran')
         .insert([rest])

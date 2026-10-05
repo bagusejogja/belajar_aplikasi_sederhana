@@ -109,6 +109,7 @@ export const menuList: MenuItem[] = [
   // --- RKA ---
   { title: 'RKA Penerimaan', path: '/rka/penerimaan', icon: 'Wallet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'RKA' },
   { title: 'RKA Pengeluaran', path: '/rka/pengeluaran', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'RKA' },
+  { title: 'Penyesuaian Anggaran', path: '/rka/penyesuaian', icon: 'ArrowUpDown', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'RKA' },
   { title: 'Klasifikasi & Rules RKA', path: '/rka/rules', icon: 'Wand2', roles: ['ADMIN', 'MANAGER'], group: 'RKA' },
   { title: 'Rekap Laporan RKA', path: '/rka/laporan', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'RKA' },
   { title: 'Komparasi Laporan', path: '/komparasi-laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'RKA' },

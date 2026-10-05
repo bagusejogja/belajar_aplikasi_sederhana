@@ -42,7 +42,8 @@ import {
   Star,
   Palette,
   ChevronsUp,
-  ChevronsDown
+  ChevronsDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { 
   getFavoriteUserKey, 
@@ -87,7 +88,9 @@ const iconMap: Record<string, any> = {
   Calendar,
   FolderTree,
   BarChart4,
-  Palette
+  Palette,
+  Wallet,
+  ArrowUpDown
 };
 
 const groupIconMap: Record<string, any> = {

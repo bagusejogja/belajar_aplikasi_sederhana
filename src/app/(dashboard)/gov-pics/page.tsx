@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 import MasterUnitTabs from '@/components/MasterUnitTabs';
 import Link from 'next/link';
 
-export interface GovPic {
+interface GovPic {
   id: number;
   user_id?: string | null;
   nama: string;

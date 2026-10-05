@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import RkaHelpModal from '@/components/rka/RkaHelpModal';
 
 // Autocomplete Filter Unit Kerja (Navigasi Keyboard ↑ ↓ + Enter, Terurut A-Z)
 function UnitAutocompleteFilter({ units, selectedUnit, onSelect }: { units: string[], selectedUnit: string, onSelect: (unit: string) => void }) {
@@ -767,6 +768,9 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Bantuan & Alur Bisnis */}
+          <RkaHelpModal currentPage="penerimaan" />
+
           <Button
             variant="outline"
             size="sm"

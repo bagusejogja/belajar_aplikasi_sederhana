@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import AutocompleteCombobox, { ComboboxOption } from '@/components/shared/AutocompleteCombobox';
 
 // TIPE ATURAN PEMBEBANAN ANGGARAN (DAPAT BERLAKU SEMUA SURAT ATAU SURAT TERTENTU)
-export interface PembebananConfig {
+interface PembebananConfig {
   sourceUnitId: number;
   sourceUnitName?: string;
   targetUnitId: number;

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dialog";
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
+import RkaHelpModal from '@/components/rka/RkaHelpModal';
 
 // Definisi Preset Format Laporan (Proposal RKAT & RKA Kementrian)
 const PRESET_TARGETS = [
@@ -329,6 +331,7 @@ export default function RkaRulesPage() {
   const [isApplying, setIsApplying] = useState(false);
 
   // Filter & Search
+  const [selectedVersi, setSelectedVersi] = useState<string>('v1');
   const [search, setSearch] = useState('');
   const [filterTarget, setFilterTarget] = useState<string>('ALL');
   const [filterUnit, setFilterUnit] = useState<string>('*');
@@ -633,7 +636,10 @@ export default function RkaRulesPage() {
 
     setIsApplying(true);
     try {
-      const payload: any = { modul: activeModul };
+      const payload: any = { 
+        modul: activeModul,
+        targetVersi: selectedVersi
+      };
       if (isSpecificFormat) {
         payload.targetFormat = filterTarget;
       } else {
@@ -855,7 +861,20 @@ export default function RkaRulesPage() {
 
         {/* Action Buttons Top Bar */}
         <div className="flex flex-wrap items-center gap-2">
-          
+          {/* Bantuan & Alur Bisnis */}
+          <RkaHelpModal currentPage="rules" />
+
+          {/* Selector Target Versi Basis Data */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-1 rounded-xl">
+            <span className="text-[11px] font-bold text-gray-500 whitespace-nowrap">Target Data:</span>
+            <VersiAnggaranSelector
+              selectedVersi={selectedVersi}
+              onSelectVersi={setSelectedVersi}
+              tahun="2027"
+              modul={activeModul}
+            />
+          </div>
+
           {/* Tombol Jalankan Rule Engine */}
           <Button
             size="sm"
@@ -868,10 +887,10 @@ export default function RkaRulesPage() {
               {isApplying 
                 ? 'Memproses Data...' 
                 : isTargetFiltered 
-                  ? `Jalankan Rule (${filterTarget})` 
+                  ? `Jalankan Rule (${filterTarget} - ${selectedVersi.toUpperCase()})` 
                   : activeModul === 'penerimaan' 
-                    ? 'Jalankan Rule Penerimaan' 
-                    : 'Jalankan Rule Pengeluaran'}
+                    ? `Jalankan Rule Penerimaan (${selectedVersi.toUpperCase()})` 
+                    : `Jalankan Rule Pengeluaran (${selectedVersi.toUpperCase()})`}
             </span>
           </Button>
 

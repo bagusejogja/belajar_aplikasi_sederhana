@@ -10,6 +10,22 @@ export async function GET(request: Request) {
     const unit = searchParams.get('unit');
     const search = searchParams.get('search');
     const status = searchParams.get('status');
+    const versiParam = searchParams.get('versi') || 'v1';
+
+    // Probe apakah kolom versi_anggaran sudah ada di schema rkat_penerimaan
+    let hasVersiColumn = true;
+    const probe = await supabaseAdmin.from('rkat_penerimaan').select('versi_anggaran').limit(1);
+    if (probe.error && probe.error.message.includes('versi_anggaran')) {
+      hasVersiColumn = false;
+    }
+
+    const applyVersiFilter = (query: any) => {
+      if (!hasVersiColumn || !versiParam || versiParam === 'ALL') return query;
+      if (versiParam === 'v1') {
+        return query.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+      }
+      return query.eq('versi_anggaran', versiParam);
+    };
 
     let allData: any[] = [];
     const pageSize = 1000;
@@ -27,6 +43,7 @@ export async function GET(request: Request) {
       if (status && status !== 'ALL') {
         q = q.eq('status', status);
       }
+      q = applyVersiFilter(q);
       if (search && search.trim()) {
         const qText = search.trim();
         q = q.or(`keterangan.ilike.%${qText}%,nama_akun_penerimaan.ilike.%${qText}%,unit_kerja.ilike.%${qText}%,sumber_dana.ilike.%${qText}%`);
@@ -64,7 +81,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, data: allData });
+    return NextResponse.json({ success: true, data: allData, hasVersiColumn, currentVersi: versiParam });
   } catch (error: any) {
     console.error('Error fetching rkat_penerimaan:', error);
     return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });

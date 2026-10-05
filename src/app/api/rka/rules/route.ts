@@ -266,7 +266,7 @@ export async function PUT(request: Request) {
     }
 
     // 5. Jalankan Rule Engine (Direct DB Execution - Super Cepat 50x)
-    const { ruleId, targetYear, cleanSync = true, modul = 'all', targetFormat } = body;
+    const { ruleId, targetYear, cleanSync = true, modul = 'all', targetFormat, targetVersi } = body;
 
     async function executePenerimaanRules() {
       let rulesQuery = supabaseAdmin.from('rka_rules').select('*').eq('modul', 'penerimaan').order('priority', { ascending: false }).order('id', { ascending: true });
@@ -300,6 +300,13 @@ export async function PUT(request: Request) {
         if (targetYear && targetYear !== 'ALL') {
           resetQ = resetQ.eq('tahun', parseInt(targetYear));
         }
+        if (targetVersi && targetVersi !== 'ALL') {
+          if (targetVersi === 'v1') {
+            resetQ = resetQ.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+          } else {
+            resetQ = resetQ.eq('versi_anggaran', targetVersi);
+          }
+        }
         await resetQ;
       }
 
@@ -323,6 +330,13 @@ export async function PUT(request: Request) {
 
         if (targetYear && targetYear !== 'ALL') {
           updateQuery = updateQuery.eq('tahun', parseInt(targetYear));
+        }
+        if (targetVersi && targetVersi !== 'ALL') {
+          if (targetVersi === 'v1') {
+            updateQuery = updateQuery.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+          } else {
+            updateQuery = updateQuery.eq('versi_anggaran', targetVersi);
+          }
         }
 
         if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
@@ -419,6 +433,13 @@ export async function PUT(request: Request) {
           if (targetYear && targetYear !== 'ALL') {
             resetQ = resetQ.eq('tahun_anggaran', parseInt(targetYear));
           }
+          if (targetVersi && targetVersi !== 'ALL') {
+            if (targetVersi === 'v1') {
+              resetQ = resetQ.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+            } else {
+              resetQ = resetQ.eq('versi_anggaran', targetVersi);
+            }
+          }
 
           await resetQ;
         }
@@ -460,6 +481,13 @@ export async function PUT(request: Request) {
 
           if (targetYear && targetYear !== 'ALL') {
             chunkQ = chunkQ.eq('tahun_anggaran', parseInt(targetYear));
+          }
+          if (targetVersi && targetVersi !== 'ALL') {
+            if (targetVersi === 'v1') {
+              chunkQ = chunkQ.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+            } else {
+              chunkQ = chunkQ.eq('versi_anggaran', targetVersi);
+            }
           }
 
           if (rule.unit && rule.unit !== '*' && rule.unit !== 'ALL') {
