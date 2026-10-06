@@ -39,10 +39,10 @@ export default function GovInputPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  const sample8ColTSV = `101\tFakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t2026\t1850000000\tBOPTN\tOperasional Lab Biomedis & Riset Terpadu\tDisetujui\tBelanja Barang
-102\tFakultas Teknik\t2026\t2450000000\tRKAT-UGM\tPemeliharaan Fasilitas Laboratorium Terpadu\tDisetujui\tBelanja Modal
+  const sample8ColTSV = `101\tFakultas Kedokteran, Kesehatan Masyarakat, dan Keperawatan\t2026-03-15\t1850000000\tBOPTN\tOperasional Lab Biomedis & Riset Terpadu\tDisetujui\tBelanja Barang
+102\tFakultas Teknik\t2026-05-20\t2450000000\tRKAT-UGM\tPemeliharaan Fasilitas Laboratorium Terpadu\tDisetujui\tBelanja Modal
 103\tDirektorat Sistem & Sumber Daya Informasi (DSSDI)\t2026\t950000000\tAPBN\tUpgrade Infrastruktur Jaringan & Server Kampus\tUsulan\tBelanja Modal
-104\tPerpustakaan Pusat UGM\t2026\t620000000\tPNBP\tLangganan Basis Data Jurnal Ilmiah Internasional\tDisetujui\tOperasional`;
+104\tPerpustakaan Pusat UGM\t12/08/2026\t620000000\tPNBP\tLangganan Basis Data Jurnal Ilmiah Internasional\tDisetujui\tOperasional`;
 
   const fetchData = async () => {
     const { data: mMap, error: eMap } = await supabase.from('ref_mapping_unit').select('nama_sumber, unit_id');
@@ -102,8 +102,23 @@ export default function GovInputPage() {
       if (is8Col && parts.length >= 3) {
         idDb = parts[0] || `auto-${idx + 1}`;
         namaUnit = parts[1] || '';
-        tahun = parts[2] || `${new Date().getFullYear()}`;
-        tgl = `${tahun}-01-01`;
+        const rawDate = parts[2] || `${new Date().getFullYear()}`;
+        if (rawDate.includes('-')) {
+          tgl = rawDate;
+          tahun = rawDate.split('-')[0];
+        } else if (rawDate.includes('/')) {
+          const [d, m, y] = rawDate.split('/');
+          if (d && m && y) {
+            tgl = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+            tahun = y;
+          } else {
+            tahun = rawDate;
+            tgl = `${tahun}-01-01`;
+          }
+        } else {
+          tahun = rawDate;
+          tgl = `${tahun}-01-01`;
+        }
         const rawNominal = (parts[3] || '0').replace(/[^0-9.-]+/g, '');
         nominal = parseFloat(rawNominal) || 0;
         sumberDana = parts[4] || 'BOPTN';
@@ -344,7 +359,7 @@ export default function GovInputPage() {
             <button
               type="button"
               onClick={() => {
-                navigator.clipboard.writeText("[1] ID DB\t[2] Nama Unit\t[3] Tahun\t[4] Nominal\t[5] Sumber Dana\t[6] Keterangan\t[7] Status Pagu\t[8] Jenis Anggaran");
+                navigator.clipboard.writeText("[1] ID DB\t[2] Nama Unit\t[3] Tanggal\t[4] Nominal\t[5] Sumber Dana\t[6] Keterangan\t[7] Status Pagu\t[8] Jenis Anggaran");
                 setCopiedHeader(true);
                 setTimeout(() => setCopiedHeader(false), 2000);
               }}
@@ -371,7 +386,7 @@ export default function GovInputPage() {
           {[
             '[1] ID DB',
             '[2] Nama Unit',
-            '[3] Tahun',
+            '[3] Tanggal',
             '[4] Nominal',
             '[5] Sumber Dana',
             '[6] Keterangan',
@@ -393,7 +408,7 @@ export default function GovInputPage() {
           <div className="flex-1 w-full space-y-1">
             <textarea 
               onPaste={handleExcelPaste}
-              placeholder="COPY data baris tabel dari EXCEL (blok baris lalu Ctrl+C), kemudian PASTE (Ctrl+V) di sini...&#10;Format urutan kolom: [1] ID DB [TAB] [2] Nama Unit [TAB] [3] Tahun [TAB] [4] Nominal [TAB] [5] Sumber Dana [TAB] [6] Keterangan [TAB] [7] Status Pagu [TAB] [8] Jenis Anggaran"
+              placeholder="COPY data baris tabel dari EXCEL (blok baris lalu Ctrl+C), kemudian PASTE (Ctrl+V) di sini...&#10;Format urutan kolom: [1] ID DB [TAB] [2] Nama Unit [TAB] [3] Tanggal [TAB] [4] Nominal [TAB] [5] Sumber Dana [TAB] [6] Keterangan [TAB] [7] Status Pagu [TAB] [8] Jenis Anggaran"
               className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl py-2.5 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 placeholder:font-sans resize-none h-20 shadow-2xs leading-relaxed"
             />
             <div className="flex justify-between items-center text-[10px] text-gray-400 font-medium px-1">
@@ -428,7 +443,7 @@ export default function GovInputPage() {
                     <th className="py-2.5 px-3 text-center w-12">Status</th>
                     <th className="py-2.5 px-3 w-16 font-mono">[1] ID DB</th>
                     <th className="py-2.5 px-3 font-mono">[2] Nama Unit (Pemetaan)</th>
-                    <th className="py-2.5 px-3 w-16 font-mono text-center">[3] Tahun</th>
+                    <th className="py-2.5 px-3 w-20 font-mono text-center">[3] Tanggal</th>
                     <th className="py-2.5 px-3 text-right w-36 font-mono">[4] Nominal</th>
                     <th className="py-2.5 px-3 w-24 font-mono">[5] Sumber Dana</th>
                     <th className="py-2.5 px-3 font-mono">[6] Keterangan</th>
@@ -458,7 +473,7 @@ export default function GovInputPage() {
                           <span className="text-[10px] text-gray-400 font-mono mt-0.5">{row.unitCode} {row.namaUnit && row.namaUnit !== row.unitName ? `• Ref: "${row.namaUnit}"` : ''}</span>
                         </div>
                       </td>
-                      <td className="py-2 px-3 font-mono text-center text-gray-700 text-xs font-bold">{row.tahun}</td>
+                      <td className="py-2 px-3 font-mono text-center text-gray-700 text-xs font-bold">{row.tanggal}</td>
                       <td className="py-2 px-3 text-right font-mono font-bold text-indigo-700 text-xs">
                         Rp {row.nominal.toLocaleString('id-ID')}
                       </td>
