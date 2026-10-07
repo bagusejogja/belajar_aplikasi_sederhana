@@ -6,8 +6,9 @@ import {
   FileText, CheckCircle2, Clock, Loader2, Search, 
   Download, Mail, ExternalLink, RefreshCw, ClipboardList,
   Filter, Calendar, BarChart3, Database, Building2, Eye,
-  Users, UserCheck, Award, Zap, TrendingUp, ArrowRight,
-  RotateCcw, Sparkles, Check, ChevronDown, ChevronUp, AlertCircle,
+  Users, UserCheck, Award, Zap, TrendingUp, TrendingDown, ArrowRight,
+  RotateCcw, Sparkles, Check, CheckCheck, Copy, ChevronDown, ChevronUp, AlertCircle,
+  FileSpreadsheet, Layers, DollarSign, Info, X,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -131,6 +132,70 @@ export default function MonitoringMakPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Modal RKA Selisih & Copy State
+  const [selectedRkaData, setSelectedRkaData] = useState<{ submission: any; rka: any } | null>(null);
+  const [copiedMakKey, setCopiedMakKey] = useState<string | null>(null);
+  const [modalShowOnlyDiff, setModalShowOnlyDiff] = useState(true);
+
+  const getRkaData = (row: any) => {
+    if (row?.rka_selisih_data) return row.rka_selisih_data;
+    if (Array.isArray(row?.lampiran_catatan)) {
+      const found = row.lampiran_catatan.find((n: any) => n.type === 'rka_selisih_data');
+      if (found?.data) return found.data;
+    }
+    return null;
+  };
+
+  const extractUnitCode = (unitStr: string) => {
+    if (!unitStr) return '';
+    const match = unitStr.match(/^([0-9A-Za-z.]+)\s*[-:]/);
+    if (match) return match[1].trim();
+    const numMatch = unitStr.match(/^(\d+)/);
+    if (numMatch) return numMatch[1].trim();
+    const parts = unitStr.split('-');
+    if (parts.length > 1 && parts[0].trim().length > 0) return parts[0].trim();
+    return unitStr.trim();
+  };
+
+  const extractKegiatanCode = (kegStr: string) => {
+    if (!kegStr) return '';
+    const match = kegStr.match(/^([0-9]+(?:\.[0-9A-Za-z]+)+)/);
+    if (match) return match[1].trim();
+    const matchHyphen = kegStr.match(/^([0-9A-Za-z.]+)\s*[-:]/);
+    if (matchHyphen) return matchHyphen[1].trim();
+    const firstWord = kegStr.trim().split(/\s+/)[0];
+    if (firstWord && /\d/.test(firstWord)) return firstWord;
+    return kegStr.trim();
+  };
+
+  const copyRkaToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMakKey(key);
+      setTimeout(() => setCopiedMakKey(null), 2000);
+    } catch (err) {
+      console.error('Gagal menyalin:', err);
+    }
+  };
+
+  const handleCopySingleItem = (item: any, key: string) => {
+    const text = `${item.mak}\t${item.uraian}\t${item.semulaN}\t${item.menjadiR}\t${item.selisih}`;
+    copyRkaToClipboard(text, key);
+  };
+
+  const handleCopyAllItems = (rka: any) => {
+    if (!rka) return;
+    const items = modalShowOnlyDiff 
+      ? (rka.allItemsWithDiff || rka.itemsWithDiff || [])
+      : (rka.allItems || rka.items || []);
+    const header = "No\tKegiatan\tLingkup Kegiatan\tMAK\tRincian Belanja\tSemula (Kolom N)\tMenjadi (Kolom R)\tSelisih";
+    const rows = items.map((it: any, idx: number) => 
+      `${idx + 1}\t${it.kegiatan || '-'}\t${it.lingkupKegiatan || '-'}\t${it.mak}\t${it.uraian}\t${it.semulaN}\t${it.menjadiR}\t${it.selisih}`
+    );
+    const tsv = [header, ...rows].join('\n');
+    copyRkaToClipboard(tsv, 'all-modal');
+  };
 
   useEffect(() => { fetchData(); }, []);
 
@@ -1519,19 +1584,37 @@ export default function MonitoringMakPage() {
                         </div>
                       </td>
 
-                      {/* LAMPIRAN DOKUMEN */}
+                      {/* LAMPIRAN DOKUMEN & TOMBOL SELISIH MAK */}
                       <td className="px-4 py-3.5 align-top pt-3.5">
-                        {renderFileLinks(
-                          [
-                            ...(row.lampiran_excel ? [{ 
-                              url: row.lampiran_excel, 
-                              name: `Excel_Semula_Menjadi.${(row.lampiran_excel.split('?')[0].split('.').pop() || 'xlsx').toLowerCase()}` 
-                            }] : []),
-                            ...(Array.isArray(catatan) ? catatan : [])
-                          ], 
-                          row.unit, 
-                          row.created_at
-                        )}
+                        <div className="flex flex-col gap-1.5 items-start">
+                          {(() => {
+                            const rkaData = getRkaData(row);
+                            if (!rkaData) return null;
+                            const diffCount = rkaData.allItemsWithDiff?.length ?? rkaData.itemsWithDiff?.length ?? 0;
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRkaData({ submission: row, rka: rkaData })}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black rounded-lg border bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900 border-amber-300 hover:from-amber-100 hover:to-orange-100 shadow-2xs transition-all cursor-pointer"
+                                title="Klik untuk lihat rincian selisih MAK dan salin data"
+                              >
+                                <Sparkles size={11} className="text-amber-600" />
+                                <span>Selisih MAK ({diffCount})</span>
+                              </button>
+                            );
+                          })()}
+                          {renderFileLinks(
+                            [
+                              ...(row.lampiran_excel ? [{ 
+                                url: row.lampiran_excel, 
+                                name: `Excel_Semula_Menjadi.${(row.lampiran_excel.split('?')[0].split('.').pop() || 'xlsx').toLowerCase()}` 
+                              }] : []),
+                              ...(Array.isArray(catatan) ? catatan.filter((c: any) => c.type !== 'rka_selisih_data') : [])
+                            ], 
+                            row.unit, 
+                            row.created_at
+                          )}
+                        </div>
                       </td>
 
                       {/* STATUS & AKSI (DIGABUNG: JIKA SELESAI -> TUNTAS, JIKA PROSES -> TOMBOL PROSES) */}
@@ -1738,6 +1821,389 @@ export default function MonitoringMakPage() {
             <ExternalLink size={14} />
             <span>Buka Resolusi Penuh</span>
           </a>
+        </div>
+      )}
+      {/* MODAL POP-UP DETAIL SELISIH RKA & TOMBOL COPY PER BARIS */}
+      {selectedRkaData && (
+        <div className="fixed inset-0 z-[65] bg-gray-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
+            {/* Modal Header */}
+            <div className="p-4 px-6 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-xl shadow-xs">
+                  <FileSpreadsheet size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-gray-900 text-base">
+                      Rincian Selisih Perubahan MAK
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                      {selectedRkaData.submission.unit} ({selectedRkaData.submission.tahun})
+                    </span>
+                  </div>
+                  <p className="text-gray-500 text-xs font-medium mt-0.5">
+                    Berkas: {selectedRkaData.rka.fileName || 'RKA Usulan Excel'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyAllItems(selectedRkaData.rka)}
+                  className="h-8 px-3 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  title="Salin seluruh baris tabel ini ke clipboard agar bisa langsung di-paste ke Excel"
+                >
+                  {copiedMakKey === 'all-modal' ? <CheckCheck size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                  <span>{copiedMakKey === 'all-modal' ? 'Tersalin ke Clipboard!' : 'Salin Semua (Format Excel)'}</span>
+                </button>
+                <button 
+                  onClick={() => setSelectedRkaData(null)} 
+                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Header Box: Unit & Sumber Dana */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* 1. Unit Kerja (dengan Tombol Salin Kode Saja / ID nya) */}
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                      <Building2 size={12} className="text-indigo-500" /> 1. Unit Kerja (Header Excel)
+                    </span>
+                    {(() => {
+                      const rawUnit = selectedRkaData.rka.unitKerja || selectedRkaData.submission.unit || '';
+                      const unitCode = extractUnitCode(rawUnit);
+                      const isCopied = copiedMakKey === 'unit-code';
+                      if (!unitCode) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => copyRkaToClipboard(unitCode, 'unit-code')}
+                          className={`h-6 px-2 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                            isCopied 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                              : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                          }`}
+                          title={`Salin Kode Unit Saja (${unitCode})`}
+                        >
+                          {isCopied ? <CheckCheck size={11} /> : <Copy size={11} />}
+                          <span>{isCopied ? 'Kode Tersalin!' : `Copy Kode (${unitCode})`}</span>
+                        </button>
+                      );
+                    })()}
+                  </div>
+                  <p className="font-bold text-gray-900 text-sm leading-snug">{selectedRkaData.rka.unitKerja || selectedRkaData.submission.unit}</p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                    <DollarSign size={12} className="text-emerald-500" /> 2. Sumber Dana
+                  </span>
+                  <p className="font-bold text-emerald-800 text-sm">{selectedRkaData.rka.sumberDana || '-'}</p>
+                </div>
+              </div>
+
+              {/* Stat Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Semula (Kolom N)</span>
+                  <p className="text-sm font-black font-mono text-gray-800 mt-1 whitespace-nowrap">
+                    Rp {(selectedRkaData.rka.totalSemulaN || 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+                <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100">
+                  <span className="text-[10px] font-bold text-indigo-700 uppercase">Menjadi (Kolom R)</span>
+                  <p className="text-sm font-black font-mono text-indigo-800 mt-1 whitespace-nowrap">
+                    Rp {(selectedRkaData.rka.totalMenjadiR || 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+                <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Net Selisih (R - N)</span>
+                  <p className={`text-sm font-black font-mono mt-1 whitespace-nowrap ${
+                    (selectedRkaData.rka.totalNetSelisih || 0) > 0 ? 'text-emerald-600' :
+                    (selectedRkaData.rka.totalNetSelisih || 0) < 0 ? 'text-rose-600' : 'text-gray-600'
+                  }`}>
+                    {(selectedRkaData.rka.totalNetSelisih || 0) > 0 ? '+' : ''}
+                    Rp {(selectedRkaData.rka.totalNetSelisih || 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+                <div className="p-3.5 bg-amber-50/60 rounded-xl border border-amber-200">
+                  <span className="text-[10px] font-bold text-amber-800 uppercase">Item Berselisih</span>
+                  <p className="text-sm font-black text-amber-900 mt-1">
+                    {(selectedRkaData.rka.allItemsWithDiff?.length || selectedRkaData.rka.itemsWithDiff?.length || 0)} Item MAK
+                  </p>
+                </div>
+              </div>
+
+              {/* Filter Switch */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <span className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Daftar MAK Berdasarkan Kegiatan &amp; Lingkup
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModalShowOnlyDiff(!modalShowOnlyDiff)}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <Filter size={12} />
+                  {modalShowOnlyDiff ? 'Tampilkan Semua Item' : 'Hanya Item Berselisih'}
+                </button>
+              </div>
+
+              {/* Rincian per Kegiatan & Lingkup */}
+              {Array.isArray(selectedRkaData.rka.kegiatanList) && selectedRkaData.rka.kegiatanList.length > 0 ? (
+                <div className="space-y-4">
+                  {(() => {
+                    const displayedKegiatanList = selectedRkaData.rka.kegiatanList.filter((keg: any) => {
+                      if (!modalShowOnlyDiff) return true;
+                      return keg.lingkupList?.some((lingk: any) => lingk.itemsWithDiff && lingk.itemsWithDiff.length > 0);
+                    });
+
+                    if (displayedKegiatanList.length === 0) {
+                      return (
+                        <div className="text-center py-8 px-4 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                          <CheckCheck className="mx-auto text-emerald-500 mb-2" size={28} />
+                          <p className="text-xs font-bold text-gray-700">Tidak ada kegiatan atau MAK yang mengalami perubahan/selisih.</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">Semua nilai Semula (N) dan Menjadi (R) identik.</p>
+                        </div>
+                      );
+                    }
+
+                    return displayedKegiatanList.map((keg: any, kIdx: number) => {
+                      const kegCode = extractKegiatanCode(keg.namaKegiatan);
+                      const isKegCopied = copiedMakKey === `keg-${kIdx}`;
+
+                      return (
+                        <div key={kIdx} className="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50/50 p-4 space-y-3">
+                        {/* 2. Kegiatan Header dengan Tombol Copy Kodenya Saja */}
+                        <div className="flex items-center justify-between gap-3 bg-indigo-50/80 p-3 rounded-xl border border-indigo-100">
+                          <div className="flex items-start gap-2 flex-1">
+                            <Layers size={16} className="text-indigo-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-[10px] font-extrabold text-indigo-700 uppercase tracking-wider block">
+                                Kegiatan {kIdx + 1}
+                              </span>
+                              <p className="text-sm font-bold text-gray-900 leading-snug">{keg.namaKegiatan}</p>
+                            </div>
+                          </div>
+                          {kegCode && (
+                            <button
+                              type="button"
+                              onClick={() => copyRkaToClipboard(kegCode, `keg-${kIdx}`)}
+                              className={`h-7 px-2.5 rounded-lg border text-xs font-bold inline-flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-2xs ${
+                                isKegCopied 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                                  : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300'
+                              }`}
+                              title={`Salin Kode Kegiatan Saja: ${kegCode}`}
+                            >
+                              {isKegCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
+                              <span>{isKegCopied ? 'Kode Tersalin!' : `Copy Kode (${kegCode})`}</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {keg.lingkupList?.map((lingk: any, lIdx: number) => {
+                          const items = modalShowOnlyDiff ? lingk.itemsWithDiff : lingk.items;
+                          if (!items || items.length === 0) return null;
+                          const isLingkCopied = copiedMakKey === `lingk-${kIdx}-${lIdx}`;
+
+                          return (
+                            <div key={lIdx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-2xs space-y-2 p-3.5">
+                              {/* 3. Lingkup Header dengan Tombol Copy Semuanya & Subtotal Sejajar */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-gray-100 pb-2.5">
+                                <div className="flex items-start gap-2 flex-1">
+                                  <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block">
+                                      Lingkup {kIdx + 1}.{lIdx + 1}
+                                    </span>
+                                    <p className="text-xs font-bold text-gray-800 leading-snug">{lingk.namaLingkup}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => copyRkaToClipboard(lingk.namaLingkup, `lingk-${kIdx}-${lIdx}`)}
+                                    className={`h-7 px-2.5 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                                      isLingkCopied 
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                                        : 'bg-white text-amber-800 border-amber-300 hover:bg-amber-50'
+                                    }`}
+                                    title="Salin seluruh teks lingkup ini"
+                                  >
+                                    {isLingkCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                    <span>{isLingkCopied ? 'Tersalin!' : 'Copy Lingkup'}</span>
+                                  </button>
+                                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                                    <span className="text-[10px] text-gray-500 font-bold whitespace-nowrap">Subtotal Selisih:</span>
+                                    <span className={`text-xs font-mono font-bold whitespace-nowrap ${
+                                      lingk.subtotalSelisih > 0 ? 'text-emerald-600' :
+                                      lingk.subtotalSelisih < 0 ? 'text-rose-600' : 'text-gray-600'
+                                    }`}>
+                                      {lingk.subtotalSelisih > 0 ? '+' : ''}
+                                      Rp {(lingk.subtotalSelisih || 0).toLocaleString('id-ID')}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* TABEL SELISIH: SEJAJAR BUKAN ATAS BAWAH */}
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                                      <th className="py-2.5 px-2 text-center w-8">No</th>
+                                      <th className="py-2.5 px-3 w-36 whitespace-nowrap">MAK</th>
+                                      <th className="py-2.5 px-3 min-w-[200px]">Rincian Belanja</th>
+                                      <th className="py-2.5 px-3 text-right w-36 font-mono whitespace-nowrap">Semula (N)</th>
+                                      <th className="py-2.5 px-3 text-right w-36 font-mono whitespace-nowrap">Menjadi (R)</th>
+                                      <th className="py-2.5 px-3 text-right w-44 font-mono whitespace-nowrap">Selisih</th>
+                                      <th className="py-2.5 px-2 text-center w-20 whitespace-nowrap">Salin</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100">
+                                    {items.map((item: any, iIdx: number) => {
+                                      const rowKey = `mak-row-${kIdx}-${lIdx}-${iIdx}`;
+                                      const isCopied = copiedMakKey === rowKey;
+                                      return (
+                                        <tr key={iIdx} className={item.hasDiff ? 'bg-amber-50/20 hover:bg-amber-50/40' : 'hover:bg-gray-50/50'}>
+                                          <td className="py-2.5 px-2 text-center text-gray-400 font-mono text-[10px]">{iIdx + 1}</td>
+                                          <td className="py-2.5 px-3 font-semibold text-gray-800 text-[11px] whitespace-nowrap">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] mr-1.5">{item.mak?.slice(0, 5)}</span>
+                                            <span>{item.mak?.slice(5).trim() || item.mak}</span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-gray-700 text-xs">{item.uraian}</td>
+                                          <td className="py-2.5 px-3 text-right font-mono font-medium text-gray-600 text-xs whitespace-nowrap">
+                                            Rp {(item.semulaN || 0).toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700 text-xs whitespace-nowrap">
+                                            Rp {(item.menjadiR || 0).toLocaleString('id-ID')}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-right font-mono text-xs font-bold whitespace-nowrap">
+                                            {item.selisih === 0 ? (
+                                              <span className="text-gray-400">Rp 0</span>
+                                            ) : item.selisih > 0 ? (
+                                              <span className="inline-flex items-center justify-end gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold whitespace-nowrap">
+                                                <TrendingUp size={12} className="shrink-0" />
+                                                <span>+Rp {item.selisih.toLocaleString('id-ID')}</span>
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center justify-end gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold whitespace-nowrap">
+                                                <TrendingDown size={12} className="shrink-0" />
+                                                <span>-Rp {Math.abs(item.selisih).toLocaleString('id-ID')}</span>
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopySingleItem(item, rowKey)}
+                                              className={`h-7 px-2.5 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer ${
+                                                isCopied 
+                                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                                                  : 'bg-white text-gray-600 border-gray-200 hover:text-indigo-600 hover:bg-indigo-50'
+                                              }`}
+                                              title="Salin baris ini"
+                                            >
+                                              {isCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                              <span>{isCopied ? 'Tersalin' : 'Copy'}</span>
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+                })()}
+                </div>
+              ) : (
+                /* Fallback flat table if kegiatanList is not present */
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                        <th className="py-2.5 px-3 text-center w-10">No</th>
+                        <th className="py-2.5 px-3 w-40 whitespace-nowrap">MAK</th>
+                        <th className="py-2.5 px-3 min-w-[200px]">Rincian Belanja</th>
+                        <th className="py-2.5 px-3 text-right w-36 font-mono whitespace-nowrap">Semula (N)</th>
+                        <th className="py-2.5 px-3 text-right w-36 font-mono whitespace-nowrap">Menjadi (R)</th>
+                        <th className="py-2.5 px-3 text-right w-44 font-mono whitespace-nowrap">Selisih</th>
+                        <th className="py-2.5 px-3 text-center w-20 whitespace-nowrap">Salin</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {(modalShowOnlyDiff ? (selectedRkaData.rka.allItemsWithDiff || selectedRkaData.rka.itemsWithDiff || []) : (selectedRkaData.rka.allItems || selectedRkaData.rka.items || [])).map((item: any, idx: number) => {
+                        const rowKey = `flat-${idx}`;
+                        const isCopied = copiedMakKey === rowKey;
+                        return (
+                          <tr key={idx} className={item.hasDiff ? 'bg-amber-50/20' : ''}>
+                            <td className="py-2.5 px-3 text-center text-gray-400 font-mono">{idx + 1}</td>
+                            <td className="py-2.5 px-3 font-bold text-gray-900 whitespace-nowrap">{item.mak}</td>
+                            <td className="py-2.5 px-3 text-gray-700">{item.uraian}</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-medium whitespace-nowrap">Rp {(item.semulaN || 0).toLocaleString('id-ID')}</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700 whitespace-nowrap">Rp {(item.menjadiR || 0).toLocaleString('id-ID')}</td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
+                              {item.selisih === 0 ? (
+                                <span className="text-gray-400">Rp 0</span>
+                              ) : item.selisih > 0 ? (
+                                <span className="inline-flex items-center justify-end gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold whitespace-nowrap">
+                                  <TrendingUp size={12} className="shrink-0" />
+                                  <span>+Rp {item.selisih.toLocaleString('id-ID')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-end gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold whitespace-nowrap">
+                                  <TrendingDown size={12} className="shrink-0" />
+                                  <span>-Rp {Math.abs(item.selisih).toLocaleString('id-ID')}</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleCopySingleItem(item, rowKey)}
+                                className={`h-7 px-2.5 rounded-lg border text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer ${
+                                  isCopied ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-white text-gray-600 border-gray-200 hover:text-indigo-600'
+                                }`}
+                              >
+                                {isCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                <span>{isCopied ? 'Tersalin' : 'Copy'}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 bg-gray-50 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedRkaData(null)}
+                className="px-5 py-2.5 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Tutup Pop-up
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

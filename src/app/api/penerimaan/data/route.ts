@@ -54,17 +54,59 @@ export async function POST(req: NextRequest) {
     const isManual = data_penerimaan.every((d: any) => d.trx_id === 'MANUAL');
 
     if (isManual && data_penerimaan.length > 0) {
-      // Hapus data manual yang sudah ada untuk bulan, tahun, dan tipe data ini
       const sample = data_penerimaan[0];
-      await supabase
+      // Cari data yang sudah ada untuk bulan, tahun, dan tipe data ini
+      const { data: existingRows } = await supabase
         .from('data_penerimaan')
-        .delete()
+        .select('id, jenis_penerimaan_id, nominal')
         .match({ 
           tahun: sample.tahun, 
           bulan: sample.bulan, 
-          tipe_data: sample.tipe_data, 
-          trx_id: 'MANUAL' 
+          tipe_data: sample.tipe_data 
         });
+
+      const existingMap = new Map();
+      (existingRows || []).forEach(r => existingMap.set(Number(r.jenis_penerimaan_id), r));
+
+      const toInsert: any[] = [];
+      const updatedIds: number[] = [];
+
+      for (const item of data_penerimaan) {
+        const jId = Number(item.jenis_penerimaan_id);
+        const existing = existingMap.get(jId);
+
+        if (existing) {
+          // Jika sudah ada dan nominal berubah, lakukan UPDATE (jangan pernah re-input/duplikasi)
+          if (Number(existing.nominal) !== Number(item.nominal)) {
+            await supabase
+              .from('data_penerimaan')
+              .update({ 
+                nominal: Number(item.nominal), 
+                updated_at: new Date().toISOString() 
+              })
+              .eq('id', existing.id);
+            updatedIds.push(existing.id);
+          }
+        } else if (Number(item.nominal) > 0) {
+          // Hanya insert jika belum pernah ada dan nominal > 0
+          toInsert.push({
+            ...item,
+            nominal: Number(item.nominal),
+            bulan: Number(item.bulan)
+          });
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await supabase.from('data_penerimaan').insert(toInsert);
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Data berhasil diperbarui (update data lama & simpan data baru)',
+        updatedCount: updatedIds.length,
+        insertedCount: toInsert.length 
+      });
     }
 
     // Eksekusi insert (baik untuk manual maupun dari paste zone) dengan Chunking

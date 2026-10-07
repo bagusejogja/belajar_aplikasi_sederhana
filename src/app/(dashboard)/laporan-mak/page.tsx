@@ -733,8 +733,8 @@ export default function LaporanMakPage() {
             });
 
             kel.anaks.forEach((anak: any) => {
-              if (anak.masuk === 0 && anak.keluar === 0) return;
               const anakNominal = isPengeluaran ? anak.keluar : anak.masuk;
+              if (anakNominal === 0) return;
               const pctAnak = baseTotal > 0 ? `${((anakNominal / baseTotal) * 100).toFixed(1)}%` : '0.0%';
 
               rows.push({
@@ -1291,7 +1291,11 @@ export default function LaporanMakPage() {
                                 {/* BARIS TINGKAT 3: KELOMPOK AKUN */}
                                 {isGolExpanded && gol.kelompoks.map((kel: any) => {
                                   const isKelExpanded = expandedNodes[kel.id] ?? (hierarchyLevel >= 4);
-                                  const hasAnak = kel.anaks && kel.anaks.length > 0;
+                                  const visibleAnaks = (kel.anaks || []).filter((anak: any) => {
+                                    const anakNominal = isPengeluaran ? anak.keluar : anak.masuk;
+                                    return anakNominal !== 0;
+                                  });
+                                  const hasAnak = visibleAnaks.length > 0;
                                   const kelNominal = isPengeluaran ? kel.keluar : kel.masuk;
                                   const pctKel = baseTotal > 0 ? ((kelNominal / baseTotal) * 100).toFixed(1) : '0.0';
 
@@ -1318,8 +1322,8 @@ export default function LaporanMakPage() {
                                         </td>
                                       </tr>
 
-                                      {/* BARIS TINGKAT 4: RINCIAN ANAK */}
-                                      {isKelExpanded && kel.anaks.map((anak: any) => {
+                                      {/* BARIS TINGKAT 4: RINCIAN ANAK (MAK TERKECIL NOMINAL 0 TIDAK DITAMPILKAN) */}
+                                      {isKelExpanded && visibleAnaks.map((anak: any) => {
                                         const anakNominal = isPengeluaran ? anak.keluar : anak.masuk;
                                         const pctAnak = baseTotal > 0 ? ((anakNominal / baseTotal) * 100).toFixed(1) : '0.0';
 

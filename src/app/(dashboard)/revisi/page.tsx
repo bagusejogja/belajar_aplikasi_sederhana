@@ -70,6 +70,7 @@ export default function RevisiPage() {
   // Filter States (Disederhanakan: tanpa dropdown Tipe Kas & DateRange)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusChip, setSelectedStatusChip] = useState<string>('all');
+  const [showDitolak, setShowDitolak] = useState<boolean>(false);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -167,10 +168,10 @@ export default function RevisiPage() {
 
   // Stats Counters
   const stats = useMemo(() => {
-    const totalCount = transactions.length;
     const revisiCount = transactions.filter(t => t.disetujui === 'Revisi').length;
     const menungguCount = transactions.filter(t => t.disetujui === 'Menunggu').length;
     const ditolakCount = transactions.filter(t => t.disetujui === 'Ditolak').length;
+    const activeCount = revisiCount + menungguCount;
 
     const totalNominal = transactions.reduce((acc, curr) => {
       return acc + (Number(curr.uang_masuk) || Number(curr.uang_keluar) || 0);
@@ -184,23 +185,32 @@ export default function RevisiPage() {
       .filter(t => t.disetujui === 'Menunggu')
       .reduce((acc, curr) => acc + (Number(curr.uang_masuk) || Number(curr.uang_keluar) || 0), 0);
 
+    const nominalDitolak = transactions
+      .filter(t => t.disetujui === 'Ditolak')
+      .reduce((acc, curr) => acc + (Number(curr.uang_masuk) || Number(curr.uang_keluar) || 0), 0);
+
+    const totalActiveNominal = nominalRevisi + nominalMenunggu;
+
     return {
-      totalCount,
+      activeCount,
       revisiCount,
       menungguCount,
       ditolakCount,
-      totalNominal,
+      totalCount: transactions.length,
       nominalRevisi,
-      nominalMenunggu
+      nominalMenunggu,
+      nominalDitolak,
+      totalActiveNominal,
+      totalNominal
     };
   }, [transactions]);
 
-  // Filter Chips Configuration
+  // Filter Chips Configuration (Hanya untuk Perlu Revisi & Menunggu Verifikasi)
   const filterChips: FilterChip[] = useMemo(() => [
     {
       id: 'all',
-      label: 'Semua Belum Disetujui',
-      count: stats.totalCount,
+      label: 'Semua (Revisi & Menunggu)',
+      count: stats.activeCount,
       icon: <Layers size={13} />
     },
     {
@@ -216,22 +226,20 @@ export default function RevisiPage() {
       count: stats.menungguCount,
       variant: 'blue',
       icon: <Clock size={13} className="text-indigo-500" />
-    },
-    {
-      id: 'Ditolak',
-      label: 'Ditolak (Lihat Saja)',
-      count: stats.ditolakCount,
-      variant: 'rose',
-      icon: <XCircle size={13} className="text-rose-500" />
     }
   ], [stats]);
 
   // Filtered Transactions
   const filteredTrx = useMemo(() => {
     const list = transactions.filter(trx => {
-      // 1. Status Filter
-      if (selectedStatusChip !== 'all' && trx.disetujui !== selectedStatusChip) {
-        return false;
+      // 1. Status Filter: Mode Ditolak terpisah dari potret Revisi & Menunggu
+      if (showDitolak) {
+        if (trx.disetujui !== 'Ditolak') return false;
+      } else {
+        if (trx.disetujui !== 'Revisi' && trx.disetujui !== 'Menunggu') return false;
+        if (selectedStatusChip !== 'all' && trx.disetujui !== selectedStatusChip) {
+          return false;
+        }
       }
 
       // 2. Search Query
@@ -268,7 +276,7 @@ export default function RevisiPage() {
       if (pA !== pB) return pA - pB;
       return (b.id || 0) - (a.id || 0);
     });
-  }, [transactions, selectedStatusChip, searchQuery, usersMap]);
+  }, [transactions, showDitolak, selectedStatusChip, searchQuery, usersMap]);
 
   // Paginated Transactions
   const totalPages = Math.ceil(filteredTrx.length / itemsPerPage);
@@ -280,6 +288,7 @@ export default function RevisiPage() {
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedStatusChip('all');
+    setShowDitolak(false);
     setCurrentPage(1);
   };
 
@@ -561,8 +570,10 @@ export default function RevisiPage() {
           { label: 'Revisi Transaksi' }
         ]}
         badge={{
-          text: `${stats.totalCount} Transaksi Belum Disetujui`,
-          variant: stats.revisiCount > 0 ? 'warning' : 'info'
+          text: showDitolak
+            ? `${stats.ditolakCount} Transaksi Ditolak`
+            : `${stats.activeCount} Transaksi Perlu Tindakan`,
+          variant: showDitolak ? 'purple' : (stats.revisiCount > 0 ? 'warning' : 'info')
         }}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -590,38 +601,77 @@ export default function RevisiPage() {
 
       {/* 2. STAT CARDS SUMMARY (Standar Light Design System) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <StatCard
-          title="Total Belum Disetujui"
-          value={stats.totalCount}
-          subtitle="Semua transaksi yang belum dibayar / di-ACC"
-          icon={Layers}
-          variant="blue"
-          lightBg={true}
-        />
-        <StatCard
-          title="Perlu Revisi Segera"
-          value={stats.revisiCount}
-          subtitle={`Rp ${fmtRp(stats.nominalRevisi)} • Catatan Verifikator`}
-          icon={AlertCircle}
-          variant="amber"
-          lightBg={true}
-        />
-        <StatCard
-          title="Antrean Verifikasi"
-          value={stats.menungguCount}
-          subtitle={`Rp ${fmtRp(stats.nominalMenunggu)} • Menunggu persetujuan`}
-          icon={Clock}
-          variant="indigo"
-          lightBg={true}
-        />
-        <StatCard
-          title="Total Nilai Tertunda"
-          value={`Rp ${fmtRp(stats.totalNominal)}`}
-          subtitle="Akumulasi nominal transaksi belum selesai"
-          icon={Coins}
-          variant="emerald"
-          lightBg={true}
-        />
+        {!showDitolak ? (
+          <>
+            <StatCard
+              title="Total Perlu Tindakan"
+              value={stats.activeCount}
+              subtitle="Revisi segera & antrean verifikasi"
+              icon={Layers}
+              variant="blue"
+              lightBg={true}
+            />
+            <StatCard
+              title="Perlu Revisi Segera"
+              value={stats.revisiCount}
+              subtitle={`Rp ${fmtRp(stats.nominalRevisi)} • Catatan Verifikator`}
+              icon={AlertCircle}
+              variant="amber"
+              lightBg={true}
+            />
+            <StatCard
+              title="Antrean Verifikasi"
+              value={stats.menungguCount}
+              subtitle={`Rp ${fmtRp(stats.nominalMenunggu)} • Menunggu persetujuan`}
+              icon={Clock}
+              variant="indigo"
+              lightBg={true}
+            />
+            <StatCard
+              title="Total Nilai Tertunda"
+              value={`Rp ${fmtRp(stats.totalActiveNominal)}`}
+              subtitle="Akumulasi nominal transaksi aktif"
+              icon={Coins}
+              variant="emerald"
+              lightBg={true}
+            />
+          </>
+        ) : (
+          <>
+            <StatCard
+              title="Total Data Ditolak"
+              value={stats.ditolakCount}
+              subtitle="Ditolak oleh verifikator kas"
+              icon={XCircle}
+              variant="rose"
+              lightBg={true}
+            />
+            <StatCard
+              title="Mode Tampilan"
+              value="View Only"
+              subtitle="Data arsip tolakan (tidak dapat diedit)"
+              icon={Layers}
+              variant="indigo"
+              lightBg={true}
+            />
+            <StatCard
+              title="Total Nilai Ditolak"
+              value={`Rp ${fmtRp(stats.nominalDitolak)}`}
+              subtitle="Akumulasi nominal transaksi ditolak"
+              icon={Coins}
+              variant="amber"
+              lightBg={true}
+            />
+            <StatCard
+              title="Transaksi Aktif Lainnya"
+              value={stats.activeCount}
+              subtitle={`${stats.revisiCount} revisi, ${stats.menungguCount} menunggu`}
+              icon={AlertCircle}
+              variant="blue"
+              lightBg={true}
+            />
+          </>
+        )}
       </div>
 
       {/* 3. TOOLBAR CONTROLS (Dibersihkan: Dropdown Tipe Kas & Tanggal Dihapus) */}
@@ -701,16 +751,45 @@ export default function RevisiPage() {
           </div>
         </div>
 
-        {/* Row 2: Quick Filter Chips */}
-        <div className="pt-2 border-t border-gray-100">
-          <QuickFilterChips
-            chips={filterChips}
-            selectedChipId={selectedStatusChip}
-            onSelect={(id) => {
-              setSelectedStatusChip(id);
+        {/* Row 2: Quick Filter Chips & Tombol Terpisah Ditolak */}
+        <div className="pt-2 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex-1 overflow-x-auto pb-1 sm:pb-0">
+            {!showDitolak ? (
+              <QuickFilterChips
+                chips={filterChips}
+                selectedChipId={selectedStatusChip}
+                onSelect={(id) => {
+                  setSelectedStatusChip(id);
+                  setCurrentPage(1);
+                }}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
+                  <XCircle size={14} className="text-rose-500" />
+                  Sedang Menampilkan Arsip Transaksi Ditolak ({stats.ditolakCount})
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Tombol Terpisah untuk Melihat Transaksi Ditolak */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowDitolak(prev => !prev);
+              setSelectedStatusChip('all');
               setCurrentPage(1);
             }}
-          />
+            className={`h-8 px-3 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              showDitolak
+                ? 'bg-rose-600 text-white border-rose-600 shadow-2xs hover:bg-rose-700'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+            }`}
+          >
+            <XCircle size={14} className={showDitolak ? 'text-white' : 'text-rose-500'} />
+            <span>{showDitolak ? 'Kembali ke Revisi & Menunggu' : `Lihat Data Ditolak (${stats.ditolakCount})`}</span>
+          </button>
         </div>
       </div>
 

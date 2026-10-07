@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Save, ClipboardPaste, AlertCircle, Info, 
   ListFilter, FileEdit, CheckCircle2, RefreshCw, 
-  Calendar, Layers, Sparkles
+  Calendar, Layers, Sparkles, FileSpreadsheet,
+  Copy, Check, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,6 +17,7 @@ export default function InputPenerimaan() {
   const [bulan, setBulan] = useState((new Date().getMonth() + 1).toString());
   const [tipeInput, setTipeInput] = useState<'RENCANA' | 'REALISASI'>('REALISASI');
   const [pasteData, setPasteData] = useState('');
+  const [copiedHeader, setCopiedHeader] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -34,19 +36,23 @@ export default function InputPenerimaan() {
       const existingData = jsonData.data || [];
 
       // 3. Merge untuk form berdasarkan Tipe Input & Bulan Terpilih
+      // Jika sudah ada yang terisi di database, ambil akumulasi nominalnya agar tidak re-input / duplikasi
       const merged = masters.map((master: any) => {
-        const ext = existingData.find((d: any) => 
-          d.jenis_penerimaan_id === master.id && 
+        const extList = existingData.filter((d: any) => 
+          Number(d.jenis_penerimaan_id) === Number(master.id) && 
           d.bulan.toString() === bulan &&
           d.tipe_data === tipeInput
         );
+        const existingNominal = extList.reduce((sum: number, d: any) => sum + (Number(d.nominal) || 0), 0);
+
         return {
           jenis_penerimaan_id: master.id,
           id: master.id,
           nama: master.nama_penerimaan,
           tahun: tahun,
           bulan: bulan,
-          nominal: ext ? ext.nominal : 0,
+          nominal: existingNominal,
+          hasExisting: existingNominal > 0,
         };
       });
 
@@ -322,7 +328,20 @@ export default function InputPenerimaan() {
                 dataInput.map((row) => (
                   <tr key={row.jenis_penerimaan_id} className="even:bg-slate-50/80 odd:bg-white hover:bg-indigo-50/60 transition-colors">
                     <td className="py-2 px-4 font-mono font-bold text-gray-500 text-xs text-center">{row.id}</td>
-                    <td className="py-2 px-4 font-bold text-gray-800 text-xs">{row.nama}</td>
+                    <td className="py-2 px-4 font-bold text-gray-800 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span>{row.nama}</span>
+                        {row.hasExisting ? (
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                            Tersimpan
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 border border-gray-200 text-[9px] font-medium">
+                            Nol / Belum Diisi
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-2 px-4">
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Rp</span>
@@ -348,7 +367,7 @@ export default function InputPenerimaan() {
         {dataInput.length > 0 && (
           <div className="p-3 px-5 bg-gray-50/80 border-t border-gray-200 flex justify-between items-center">
             <span className="text-[11px] text-gray-500 font-medium">
-              *Klik Simpan untuk menyimpan seluruh perubahan form di atas ke database.
+              *Klik Simpan untuk memperbarui nilai. Data yang sudah tersimpan akan di-update (tidak akan terduplikasi).
             </span>
             <button 
               onClick={handleSaveAll} 
@@ -364,42 +383,107 @@ export default function InputPenerimaan() {
         )}
       </div>
 
-      {/* BULK UPLOAD MULTI-BULAN PASTE ZONE CARD */}
-      <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs p-4 space-y-3">
-         <div className="flex items-center gap-2 text-indigo-800">
-           <div className="p-1 bg-indigo-50 text-indigo-600 rounded-md">
-             <ClipboardPaste size={16} />
-           </div>
-           <div>
-             <h3 className="font-bold text-gray-900 text-xs">Bulk Upload Multi-Bulan (Paste Zone)</h3>
-             <p className="text-[11px] text-gray-500">Impor data sekaligus dengan copy-paste tabel Excel langsung ke kolom di bawah.</p>
-           </div>
-         </div>
+      {/* BULK UPLOAD MULTI-BULAN PASTE ZONE CARD (STANDAR DESIGN SYSTEM) */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-indigo-200/90 shadow-2xs space-y-3 bg-gradient-to-br from-white via-indigo-50/15 to-blue-50/20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider">
+              Paste Zone Standar
+            </span>
+            <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+              Bulk Upload Multi-Bulan (Paste Zone 10 Kolom)
+            </h2>
+          </div>
 
-         <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-900 font-medium flex items-start gap-2">
-           <Info size={15} className="text-indigo-600 shrink-0 mt-0.5" />
-           <div>
-             Format Excel (10 kolom dipisahkan Tab): <span className="font-mono font-bold">ID PENERIMAAN | TIPE | TAHUN | BULAN | NOMINAL | NAMA UNIT | KODE UNIT | TGL BAYAR | TRX ID | PAYMENT CODE</span>.
-             <span className="text-indigo-600 block mt-0.5">Contoh: <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-[10px]">1  REALISASI  2024  1  45000000</span></span>
-           </div>
-         </div>
-         
-         <div className="flex flex-col sm:flex-row gap-3">
-            <textarea 
-               value={pasteData}
-               onChange={(e) => setPasteData(e.target.value)}
-               placeholder="Paste baris Excel Anda di sini..."
-               className="flex-1 bg-gray-50/50 border border-gray-200 rounded-xl p-3 font-mono text-xs focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 min-h-[90px] resize-none"
-            />
-            <button 
-              onClick={handlePasteProcess} 
-              disabled={!pasteData.trim() || loading} 
-              className="h-auto sm:w-36 bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs flex sm:flex-col items-center justify-center gap-1.5 p-3 shrink-0"
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText("[1] ID\t[2] TIPE\t[3] TAHUN\t[4] BULAN\t[5] NOMINAL\t[6] NAMA UNIT\t[7] KODE UNIT\t[8] TGL BAYAR\t[9] TRX ID\t[10] PAYMENT CODE");
+                setCopiedHeader(true);
+                setTimeout(() => setCopiedHeader(false), 2000);
+              }}
+              className="h-7 px-2.5 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
             >
-               <ClipboardPaste size={18}/>
-               <span>Simpan Paste</span>
+              {copiedHeader ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+              <span>{copiedHeader ? 'Header Disalin!' : 'Salin Header 10 Kolom'}</span>
             </button>
-         </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const sampleRow = `1\tREALISASI\t${tahun}\t${bulan}\t45000000\tFakultas Biologi\t02000010\t${tahun}-01-15\tTRX-001\t90005434`;
+                setPasteData(sampleRow);
+                toast.success('Contoh format TSV 10 kolom dimuat ke Paste Zone!');
+              }}
+              className="h-7 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+            >
+              <Sparkles size={11} className="text-indigo-600" />
+              <span>✨ Isi Contoh TSV</span>
+            </button>
+
+            {pasteData && (
+              <button
+                type="button"
+                onClick={() => setPasteData('')}
+                className="h-7 px-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <X size={11} />
+                <span>Bersihkan</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Header Ribbon 10 Kolom Baku */}
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white/80 rounded-xl border border-gray-200/80">
+          <span className="text-[10px] font-black uppercase text-gray-400 mr-1">Urutan Header TSV:</span>
+          {[
+            '[1] ID Penerimaan',
+            '[2] Tipe Data',
+            '[3] Tahun',
+            '[4] Bulan (1-12)',
+            '[5] Nominal',
+            '[6] Nama Unit',
+            '[7] Kode Unit',
+            '[8] Tgl Bayar',
+            '[9] Trx ID',
+            '[10] Payment Code'
+          ].map((colName, cIdx) => (
+            <span key={cIdx} className="px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-mono font-bold">
+              {colName}
+            </span>
+          ))}
+        </div>
+
+        {/* Textarea Paste Zone dengan Visual Box Standar */}
+        <div className="flex flex-col md:flex-row items-stretch gap-3">
+          <div className="min-w-[130px] flex flex-col items-center justify-center p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-indigo-700 text-center shrink-0">
+            <FileSpreadsheet size={24} className="mb-1 text-indigo-600" />
+            <p className="text-[10px] font-bold uppercase tracking-wider">Paste Zone</p>
+            <span className="text-[9px] text-indigo-600 font-semibold">10 Kolom TSV</span>
+          </div>
+          <div className="flex-1 w-full space-y-1">
+            <textarea 
+              value={pasteData}
+              onChange={(e) => setPasteData(e.target.value)}
+              placeholder="COPY baris dari EXCEL (blok baris lalu Ctrl+C), kemudian PASTE (Ctrl+V) di sini...&#10;Format: [1] ID Penerimaan [TAB] [2] Tipe [TAB] [3] Tahun [TAB] [4] Bulan [TAB] [5] Nominal [TAB] [6] Nama Unit [TAB] [7] Kode Unit [TAB] [8] Tgl Bayar [TAB] [9] Trx ID [TAB] [10] Payment Code"
+              className="w-full bg-white border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl py-2.5 px-3.5 outline-none transition-all font-mono text-xs text-gray-800 placeholder:text-gray-400 placeholder:font-sans resize-none h-24 shadow-2xs leading-relaxed"
+            />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] text-gray-400 font-medium px-1 gap-1">
+              <span>Tekan <strong>Ctrl + V</strong> di dalam kotak lalu klik Simpan Paste untuk memproses data massal</span>
+              <span className="font-mono text-indigo-600 font-bold">Deduplikasi &amp; Multi-Bulan Supported</span>
+            </div>
+          </div>
+          <button 
+            onClick={handlePasteProcess} 
+            disabled={!pasteData.trim() || loading} 
+            className="h-auto md:w-36 bg-indigo-600 disabled:bg-indigo-300 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs flex md:flex-col items-center justify-center gap-1.5 p-3 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ClipboardPaste size={18}/>
+            <span>Simpan Paste</span>
+          </button>
+        </div>
       </div>
     </div>
   );

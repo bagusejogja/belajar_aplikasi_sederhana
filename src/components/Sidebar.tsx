@@ -97,6 +97,7 @@ const groupIconMap: Record<string, any> = {
   'Utama': Sparkles,
   'Masjid': Building2,
   'Dana Pemerintah': Landmark,
+  'DIPA Rupiah Murni': Landmark,
   'Penerimaan': Wallet,
   'Persuratan': Mail,
   'Master': Database,

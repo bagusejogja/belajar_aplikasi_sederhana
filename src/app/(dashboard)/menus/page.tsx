@@ -26,6 +26,7 @@ export default function MenusPage() {
   const [rolePermissions, setRolePermissions] = useState<Record<string, any>>({});
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [isSuiteExpanded, setIsSuiteExpanded] = useState<boolean>(false);
+  const [isSuratSuiteExpanded, setIsSuratSuiteExpanded] = useState<boolean>(false);
   const [hierarchyLevel, setHierarchyLevel] = useState<1 | 2 | 3>(2);
 
   // Kelompokkan menu berdasarkan grup
@@ -49,6 +50,7 @@ export default function MenusPage() {
     if (allGroupNames.length > 0 && expandedGroups.length === 0 && hierarchyLevel === 2) {
       setExpandedGroups(allGroupNames);
       setIsSuiteExpanded(false);
+      setIsSuratSuiteExpanded(false);
     }
   }, [allGroupNames]);
 
@@ -59,14 +61,17 @@ export default function MenusPage() {
       // Level 1: Hanya Induk (semua grup tertutup)
       setExpandedGroups([]);
       setIsSuiteExpanded(false);
+      setIsSuratSuiteExpanded(false);
     } else if (lvl === 2) {
       // Level 2: +Anak (semua grup terbuka, sub-suite ditutup)
       setExpandedGroups(allGroupNames);
       setIsSuiteExpanded(false);
+      setIsSuratSuiteExpanded(false);
     } else if (lvl === 3) {
       // Level 3: +Cucu (semua grup dan sub-suite terbuka lengkap)
       setExpandedGroups(allGroupNames);
       setIsSuiteExpanded(true);
+      setIsSuratSuiteExpanded(true);
     }
   };
 
@@ -607,12 +612,16 @@ export default function MenusPage() {
                     {isExpanded && (
                       <div className="p-3 px-4 bg-gray-50/30 space-y-1.5 border-t border-gray-50">
                         {filteredGroupMenus.filter((m: any) => {
-                          if (!menuSearch && ['/gov-pics', '/gov-mapping', '/units'].includes(m.path)) return false;
+                          if (!menuSearch && [
+                            '/gov-pics', '/gov-mapping', '/units',
+                            '/surat/tambah', '/surat/convert-ai', '/surat/editor-html', '/anggaran/laporan-surat'
+                          ].includes(m.path)) return false;
                           return true;
                         }).map((menu: any, mIdx: number) => {
                           const perms = rolePermissions[menu.path] || { can_view: false, can_create: false, can_edit: false, can_delete: false };
                           const isFull = perms.can_view && perms.can_create && perms.can_edit && perms.can_delete;
                           const isGovUnits = menu.path === '/gov-units';
+                          const isDokumenSuite = menu.path === '/dokumen';
 
                           return (
                             <React.Fragment key={menu.path}>
@@ -650,6 +659,29 @@ export default function MenusPage() {
                                           >
                                             {isSuiteExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                             <span>{isSuiteExpanded ? 'Tutup Sub-Suite (3)' : 'Buka Sub-Suite (3)'}</span>
+                                          </button>
+                                        </div>
+                                      )}
+                                      {isDokumenSuite && (
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            Induk Suite Persuratan
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setIsSuratSuiteExpanded(prev => !prev);
+                                            }}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border cursor-pointer ${
+                                              isSuratSuiteExpanded 
+                                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs' 
+                                                : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                                            }`}
+                                            title={isSuratSuiteExpanded ? 'Tutup 4 Sub-Menu Suite' : 'Buka 4 Sub-Menu Suite'}
+                                          >
+                                            {isSuratSuiteExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                            <span>{isSuratSuiteExpanded ? 'Tutup Sub-Suite (4)' : 'Buka Sub-Suite (4)'}</span>
                                           </button>
                                         </div>
                                       )}
@@ -755,6 +787,112 @@ export default function MenusPage() {
                                               <p className="text-xs font-bold text-gray-900 truncate">{child.title}</p>
                                               <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-mono">
                                                 Sub-Unit
+                                              </span>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{child.path}</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 justify-end mt-2 sm:mt-0 shrink-0">
+                                          <PermissionToggle 
+                                            active={childPerms.can_view} 
+                                            onClick={() => togglePermission(child.path, 'can_view')} 
+                                            icon={<Eye size={12}/>} 
+                                            title="Lihat"
+                                            color="indigo" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_create} 
+                                            onClick={() => togglePermission(child.path, 'can_create')} 
+                                            icon={<PlusCircle size={12}/>} 
+                                            title="Tambah"
+                                            color="emerald" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_edit} 
+                                            onClick={() => togglePermission(child.path, 'can_edit')} 
+                                            icon={<Edit3 size={12}/>} 
+                                            title="Ubah"
+                                            color="amber" 
+                                          />
+                                          <PermissionToggle 
+                                            active={childPerms.can_delete} 
+                                            onClick={() => togglePermission(child.path, 'can_delete')} 
+                                            icon={<Trash2 size={12}/>} 
+                                            title="Hapus"
+                                            color="rose" 
+                                          />
+                                          <button 
+                                            type="button"
+                                            onClick={() => {
+                                              setRolePermissions(prev => ({
+                                                ...prev,
+                                                [child.path]: {
+                                                  can_view: !isChildFull,
+                                                  can_create: !isChildFull,
+                                                  can_edit: !isChildFull,
+                                                  can_delete: !isChildFull
+                                                }
+                                              }));
+                                            }}
+                                            className={`h-7 px-2 rounded-lg text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer active:scale-95 ${
+                                              isChildFull 
+                                                ? 'bg-purple-600 border-purple-600 text-white shadow-2xs' 
+                                                : 'bg-white border-gray-200 text-gray-400 hover:text-purple-600 hover:border-purple-300'
+                                            }`}
+                                            title="Toggle Full Akses untuk Sub-Menu Ini"
+                                          >
+                                            <Check size={11} strokeWidth={3} />
+                                            <span>Full</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Nested Sub-Menu Suite Persuratan directly under Dokumen (/dokumen) */}
+                              {isDokumenSuite && (isSuratSuiteExpanded || !!menuSearch) && (
+                                <div className="pl-6 border-l-2 border-indigo-200/80 ml-4 space-y-1.5 my-1.5 pt-1.5 border-t border-dashed border-indigo-100">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/80">
+                                      ↳ Sub-Menu Suite Persuratan (Tingkat Cucu)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsSuratSuiteExpanded(false)}
+                                      className="text-[10px] text-gray-400 hover:text-indigo-600 underline cursor-pointer"
+                                    >
+                                      Tutup Sub-Suite
+                                    </button>
+                                  </div>
+                                  {[
+                                    { title: 'Input Surat Baru', path: '/surat/tambah' },
+                                    { title: 'AI Convert Surat', path: '/surat/convert-ai' },
+                                    { title: 'Editor HTML Surat', path: '/surat/editor-html' },
+                                    { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat' }
+                                  ].map((child) => {
+                                    const childPerms = rolePermissions[child.path] || { can_view: false, can_create: false, can_edit: false, can_delete: false };
+                                    const isChildFull = childPerms.can_view && childPerms.can_create && childPerms.can_edit && childPerms.can_delete;
+
+                                    return (
+                                      <div 
+                                        key={child.path} 
+                                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-2.5 px-3 rounded-xl transition-all border ${
+                                          childPerms.can_view 
+                                            ? 'bg-white border-indigo-100 shadow-2xs hover:border-indigo-200' 
+                                            : 'bg-white/60 border-gray-200/60 opacity-70 hover:opacity-100'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+                                          <CornerDownRight size={14} className="text-indigo-400 shrink-0 ml-1" />
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${childPerms.can_view ? 'bg-indigo-600' : 'bg-gray-300'}`} />
+                                              <p className="text-xs font-bold text-gray-900 truncate">{child.title}</p>
+                                              <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded font-mono">
+                                                Sub-Surat
                                               </span>
                                             </div>
                                             <p className="text-[10px] text-gray-400 font-mono truncate pl-3.5">{child.path}</p>

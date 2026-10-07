@@ -43,12 +43,12 @@ export const menuList: MenuItem[] = [
   { title: 'Analisis Pivot', path: '/pivot', icon: 'LayoutGrid', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
   { title: 'Rekap Aset', path: '/rekap-aset', icon: 'Box', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   
-  // --- DANA PEMERINTAH ---
-  { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Perbandingan Anggaran', path: '/usulan-anggaran', icon: 'Scale', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Gaji & Tunjangan Pegawai', path: '/dana-pemerintah', icon: 'Database', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'Dana Pemerintah' },
-  { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'Dana Pemerintah' },
+  // --- DIPA RUPIAH MURNI ---
+  { title: 'Dashboard Govt', path: '/gov-dashboard', icon: 'LayoutDashboard', roles: ['ADMIN'], group: 'DIPA Rupiah Murni' },
+  { title: 'Input Belanja Gaji', path: '/gov-input', icon: 'Layers', roles: ['ADMIN'], group: 'DIPA Rupiah Murni' },
+  { title: 'Perbandingan Anggaran', path: '/usulan-anggaran', icon: 'Scale', roles: ['ADMIN'], group: 'DIPA Rupiah Murni' },
+  { title: 'Gaji & Tunjangan Pegawai', path: '/dana-pemerintah', icon: 'Database', roles: ['ADMIN'], group: 'DIPA Rupiah Murni' },
+  { title: 'Pagu & Realisasi', path: '/gov-reports', icon: 'PieChart', roles: ['ADMIN'], group: 'DIPA Rupiah Murni', hiddenInSidebar: true },
 
   // --- REVIEW ANGGARAN ---
   { title: 'Review Detail Anggaran', path: '/review', icon: 'CheckSquare', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Review Anggaran' },
@@ -64,10 +64,10 @@ export const menuList: MenuItem[] = [
 
   // --- PERSURATAN ---
   { title: 'Dokumen', path: '/dokumen', icon: 'FileText', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
-  { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
-  { title: 'AI Convert Surat', path: '/surat/convert-ai', icon: 'Wand2', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
-  { title: 'Editor HTML Surat', path: '/surat/editor-html', icon: 'FileCode', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan' },
-  { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Persuratan' },
+  { title: 'Input Surat Baru', path: '/surat/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF'], group: 'Persuratan', hiddenInSidebar: true },
+  { title: 'AI Convert Surat', path: '/surat/convert-ai', icon: 'Wand2', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan', hiddenInSidebar: true },
+  { title: 'Editor HTML Surat', path: '/surat/editor-html', icon: 'FileCode', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan', hiddenInSidebar: true },
+  { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Persuratan', hiddenInSidebar: true },
   
   // --- MASTER & PENGATURAN ---
   { title: 'Monitoring Aktivitas User', path: '/monitoring-user', icon: 'Activity', roles: ['ADMIN', 'MANAGER'], group: 'Master' },
@@ -75,10 +75,10 @@ export const menuList: MenuItem[] = [
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Master Unit Kerja', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Master PIC & Email', path: '/gov-pics', icon: 'Users', roles: ['ADMIN'], group: 'Master', hiddenInSidebar: true },
-  { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN'], group: 'Master', hiddenInSidebar: true },
-  { title: 'Manajemen Unit', path: '/units', icon: 'Building2', roles: ['ADMIN'], group: 'Master', hiddenInSidebar: true },
+  { title: 'Master Unit Kerja', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master' },
+  { title: 'Master PIC & Email', path: '/gov-pics', icon: 'Users', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
+  { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
+  { title: 'Manajemen Unit', path: '/units', icon: 'Building2', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
   { title: 'Standar UI / UX', path: '/design-system', icon: 'Palette', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Master' },

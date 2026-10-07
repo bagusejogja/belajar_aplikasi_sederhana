@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, PieChart, TrendingDown, TrendingUp, Filter, Loader2, Download, 
   ChevronRight, ArrowUpRight, ArrowDownRight, Wallet, Activity, CreditCard, 
-  Scale, Percent, Landmark, RefreshCw, Layers, Calendar, ChevronDown
+  Scale, Percent, Landmark, RefreshCw, Layers, Calendar, ChevronDown, Search
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -12,10 +12,13 @@ import {
   Cell, AreaChart, Area, ComposedChart, Legend, Line 
 } from 'recharts';
 import StatCard from '@/components/shared/StatCard';
+import ExcelJS from 'exceljs';
+import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensityToggle';
+import TablePagination from '@/components/shared/TablePagination';
 
 export default function GovDashboardPage() {
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(2025);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [selectedAccount, setSelectedAccount] = useState('all');
   
@@ -31,6 +34,12 @@ export default function GovDashboardPage() {
   const [stats, setStats] = useState({ totalPagu: 0, totalSpent: 0, balance: 0, percent: 0 });
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [pivotData, setPivotData] = useState<any[]>([]);
+
+  // States for embedded Pagu & Realisasi per Unit Kerja table
+  const [unitSearchTerm, setUnitSearchTerm] = useState('');
+  const [unitCurrentPage, setUnitCurrentPage] = useState(1);
+  const [unitItemsPerPage, setUnitItemsPerPage] = useState(25);
+  const [unitTableDensity, setUnitTableDensity] = useState<TableDensity>('comfortable');
 
   const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -142,16 +151,191 @@ export default function GovDashboardPage() {
     fetchData();
   }, [selectedYear, selectedUnit, selectedAccount, isCumulative, refMonth]);
 
-  const handleExport = () => {
-    const headers = ['Kode Akun', 'Nama Akun', 'Pagu Tahunan', 'Total Realisasi', 'Sisa Pagu', '%'];
-    const rows = pivotData.map(d => [
-      `"${d.account_code}"`, `"${d.account_name}"`, d.totalPagu, d.totalSpent, d.balance, d.percent.toFixed(2) + '%'
-    ]);
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
+  const unitReportData = useMemo(() => {
+    return units.map(unit => {
+      const unitTrxs = transactions.filter(t => t.unit_id === unit.id);
+      const pagu = unitTrxs.filter(t => 
+         t.jenis === 'pagu awal' || t.jenis === 'tambah pagu' || t.jenis === 'realokasi tambah'
+      ).reduce((sum, t) => sum + Number(t.nominal), 0) - 
+      unitTrxs.filter(t => 
+         t.jenis === 'pengurangan pagu' || t.jenis === 'realokasi kurang'
+      ).reduce((sum, t) => sum + Number(t.nominal), 0);
+
+      const spent = unitTrxs.filter(t => t.jenis === 'realisasi').reduce((sum, t) => sum + Number(t.nominal), 0);
+      
+      return {
+        ...unit,
+        pagu,
+        spent,
+        balance: pagu - spent,
+        percent: pagu > 0 ? (spent / pagu) * 100 : 0
+      };
+    });
+  }, [units, transactions]);
+
+  const filteredUnitReport = useMemo(() => {
+    return unitReportData.filter(d => 
+      (selectedUnit === 'all' || String(d.id) === selectedUnit) &&
+      (
+        (d.nama_unit || '').toLowerCase().includes(unitSearchTerm.toLowerCase()) || 
+        (d.kode_unit || '').toLowerCase().includes(unitSearchTerm.toLowerCase()) ||
+        (d.group_org && d.group_org.toLowerCase().includes(unitSearchTerm.toLowerCase()))
+      )
+    );
+  }, [unitReportData, selectedUnit, unitSearchTerm]);
+
+  const totalUnitPages = Math.max(1, Math.ceil(filteredUnitReport.length / unitItemsPerPage));
+  const currentUnitItems = useMemo(() => {
+    const start = (unitCurrentPage - 1) * unitItemsPerPage;
+    return filteredUnitReport.slice(start, start + unitItemsPerPage);
+  }, [filteredUnitReport, unitCurrentPage, unitItemsPerPage]);
+
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Gov Dashboard';
+    workbook.created = new Date();
+
+    // --- Helper label for active filters ---
+    const unitLabel = selectedUnit === 'all' ? 'Semua Unit' : (units.find(u => String(u.id) === selectedUnit)?.nama_unit ?? selectedUnit);
+    const accountLabel = selectedAccount === 'all' ? 'Semua Akun' : (accounts.find(a => String(a.id) === selectedAccount)?.account_name ?? selectedAccount);
+
+    // =================== SHEET 1: RINGKASAN BULANAN ===================
+    const ws1 = workbook.addWorksheet(`Bulanan ${selectedYear}`);
+    ws1.mergeCells('A1:F1');
+    ws1.getCell('A1').value = `Ringkasan Serapan Bulanan TA ${selectedYear} | Unit: ${unitLabel} | Akun: ${accountLabel}`;
+    ws1.getCell('A1').font = { bold: true, size: 12 };
+    ws1.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+    ws1.getCell('A1').font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    ws1.getCell('A1').alignment = { horizontal: 'center' };
+
+    const h1 = ws1.addRow(['Bulan', 'Pagu Moving (Rp)', 'Realisasi Bulanan (Rp)', 'Realisasi Kumulatif (Rp)', '% Realisasi', 'Sisa Pagu (Rp)']);
+    h1.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FF1E1B4B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+    monthlyData.forEach(d => {
+      ws1.addRow([d.name, d.pagu, d.spent, d.cumulative, parseFloat(d.percent.toFixed(2)), d.balance]);
+    });
+    ws1.columns = [
+      { width: 14 }, { width: 22 }, { width: 24 }, { width: 26 }, { width: 14 }, { width: 22 }
+    ];
+    ws1.eachRow((row, rowNumber) => {
+      if (rowNumber > 2) {
+        [2, 3, 4, 6].forEach(col => {
+          row.getCell(col).numFmt = '#,##0';
+          row.getCell(col).alignment = { horizontal: 'right' };
+        });
+        row.getCell(5).numFmt = '0.00"%"';
+        row.getCell(5).alignment = { horizontal: 'center' };
+      }
+    });
+
+    // =================== SHEET 2: PIVOT BULANAN PER AKUN ===================
+    const ws2 = workbook.addWorksheet(`Pivot ${selectedYear}`);
+    ws2.mergeCells(`A1:${String.fromCharCode(65 + 1 + months.length + 1)}1`);
+    ws2.getCell('A1').value = `Penggunaan Pagu per Akun TA ${selectedYear} | Unit: ${unitLabel} | Akun: ${accountLabel} | ${isCumulative ? 'Kumulatif' : 'Per Bulan'}`;
+    ws2.getCell('A1').font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    ws2.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    ws2.getCell('A1').alignment = { horizontal: 'center' };
+
+    const pivotHeader = ['Kode Akun', 'Nama Akun', ...months, 'Total Realisasi', 'Total Pagu'];
+    const h2 = ws2.addRow(pivotHeader);
+    h2.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FF1E1B4B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+    pivotData.forEach(d => {
+      const row = ws2.addRow([d.account_code, d.account_name, ...d.monthlyRealization, d.totalSpent, d.totalPagu]);
+      for (let c = 3; c <= pivotHeader.length; c++) {
+        row.getCell(c).numFmt = '#,##0';
+        row.getCell(c).alignment = { horizontal: 'right' };
+      }
+    });
+    ws2.getColumn(1).width = 14;
+    ws2.getColumn(2).width = 32;
+    for (let i = 3; i <= pivotHeader.length; i++) {
+      ws2.getColumn(i).width = 18;
+    }
+
+    // =================== SHEET 3: ANALISIS AKHIR PER AKUN ===================
+    const ws3 = workbook.addWorksheet(`Analisis ${selectedYear}`);
+    const analysisHeaders = analysisMode === 'budget'
+      ? ['Kode Akun', 'Nama Akun', 'Pagu (Rp)', 'Realisasi (Rp)', '% Serap', 'Sisa Pagu (Rp)']
+      : ['Kode Akun', 'Nama Akun', 'Pagu (Rp)', 'Realisasi (Rp)', '% Serap', `Real. ${months[refMonth-1]} (Rp)`, `Kebutuhan x${12-refMonth} bln (Rp)`, 'Perkiraan Posisi Akhir (Rp)'];
+
+    ws3.mergeCells(`A1:${String.fromCharCode(64 + analysisHeaders.length)}1`);
+    ws3.getCell('A1').value = `Analisis Akhir Per Akun TA ${selectedYear} | Unit: ${unitLabel} | Akun: ${accountLabel} | Mode: ${analysisMode === 'budget' ? 'Anggaran' : 'Perkiraan'}`;
+    ws3.getCell('A1').font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    ws3.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+    ws3.getCell('A1').alignment = { horizontal: 'center' };
+
+    const h3 = ws3.addRow(analysisHeaders);
+    h3.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FF064E3B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+    pivotData.forEach(d => {
+      const rowData = analysisMode === 'budget'
+        ? [d.account_code, d.account_name, d.totalPagu, d.totalSpent, parseFloat(d.percent.toFixed(2)), d.balance]
+        : [d.account_code, d.account_name, d.totalPagu, d.totalSpent, parseFloat(d.percent.toFixed(2)), d.refRealization, d.kebutuhan, d.perkiraanPosisiAkhir];
+      const row = ws3.addRow(rowData);
+      for (let c = 3; c <= analysisHeaders.length; c++) {
+        if (c === 5) {
+          row.getCell(c).numFmt = '0.00"%"';
+          row.getCell(c).alignment = { horizontal: 'center' };
+        } else {
+          row.getCell(c).numFmt = '#,##0';
+          row.getCell(c).alignment = { horizontal: 'right' };
+        }
+      }
+    });
+    ws3.getColumn(1).width = 14;
+    ws3.getColumn(2).width = 36;
+    for (let i = 3; i <= analysisHeaders.length; i++) ws3.getColumn(i).width = 22;
+
+    // =================== SHEET 4: PAGU & REALISASI PER UNIT ===================
+    const ws4 = workbook.addWorksheet(`Per Unit ${selectedYear}`);
+    const unitHeaders = ['Kode Unit', 'Nama Unit', 'Grup Organisasi', 'Alokasi Pagu (Rp)', 'Realisasi (Rp)', 'Sisa Saldo (Rp)', '% Serapan'];
+    ws4.mergeCells('A1:G1');
+    ws4.getCell('A1').value = `Pagu & Realisasi per Unit Kerja TA ${selectedYear} | Unit: ${unitLabel}`;
+    ws4.getCell('A1').font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    ws4.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4338CA' } };
+    ws4.getCell('A1').alignment = { horizontal: 'center' };
+
+    const h4 = ws4.addRow(unitHeaders);
+    h4.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FF1E1B4B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+      cell.alignment = { horizontal: 'center' };
+    });
+    filteredUnitReport.forEach(d => {
+      const row = ws4.addRow([d.kode_unit, d.nama_unit, d.group_org || '', d.pagu, d.spent, d.balance, parseFloat(d.percent.toFixed(2))]);
+      row.getCell(4).numFmt = '#,##0';
+      row.getCell(4).alignment = { horizontal: 'right' };
+      row.getCell(5).numFmt = '#,##0';
+      row.getCell(5).alignment = { horizontal: 'right' };
+      row.getCell(6).numFmt = '#,##0';
+      row.getCell(6).alignment = { horizontal: 'right' };
+      row.getCell(7).numFmt = '0.00"%"';
+      row.getCell(7).alignment = { horizontal: 'center' };
+    });
+    ws4.getColumn(1).width = 16;
+    ws4.getColumn(2).width = 36;
+    ws4.getColumn(3).width = 24;
+    ws4.getColumn(4).width = 22;
+    ws4.getColumn(5).width = 22;
+    ws4.getColumn(6).width = 22;
+    ws4.getColumn(7).width = 14;
+
+    // =================== DOWNLOAD ===================
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `Laporan_Govt_${selectedYear}.csv`);
+    link.setAttribute('download', `Laporan_Dana_Pemerintah_${selectedYear}_${unitLabel.replace(/\s+/g,'_')}.xlsx`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -169,12 +353,27 @@ export default function GovDashboardPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Dashboard Dana Pemerintah</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Dashboard DIPA Rupiah Murni</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 TA {selectedYear}
               </span>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Monitoring serapan pagu belanja gaji, tunjangan, dan operasional pemerintah</p>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Monitoring serapan pagu belanja gaji, tunjangan, dan operasional DIPA rupiah murni</p>
+            {(selectedUnit !== 'all' || selectedAccount !== 'all') && (
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <Filter size={10} className="text-indigo-400" />
+                {selectedUnit !== 'all' && (
+                  <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-bold truncate max-w-[160px]">
+                    Unit: {units.find(u => String(u.id) === selectedUnit)?.nama_unit ?? selectedUnit}
+                  </span>
+                )}
+                {selectedAccount !== 'all' && (
+                  <span className="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 text-[9px] font-bold truncate max-w-[160px]">
+                    Akun: {accounts.find(a => String(a.id) === selectedAccount)?.account_name ?? selectedAccount}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -187,9 +386,9 @@ export default function GovDashboardPage() {
               onChange={e => setSelectedYear(Number(e.target.value))}
               className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
             >
-              <option value={2024}>2024</option>
-              <option value={2025}>2025</option>
-              <option value={2026}>2026</option>
+              {Array.from({ length: new Date().getFullYear() - 2022 }, (_, i) => 2023 + i).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
 
@@ -375,7 +574,7 @@ export default function GovDashboardPage() {
                  onClick={handleExport} 
                  className="h-8 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs"
                >
-                  <Download size={13} /> <span>Export CSV</span>
+                  <Download size={13} /> <span>Export Excel</span>
                </button>
             </div>
          </div>
@@ -566,6 +765,132 @@ export default function GovDashboardPage() {
                </tbody>
             </table>
          </div>
+      </div>
+
+      {/* SECTION: RINCIAN PAGU & REALISASI PER UNIT KERJA (PENGGABUNGAN GOV-REPORTS) */}
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-2xs overflow-hidden">
+        <div className="p-4 px-5 border-b border-gray-200 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+              <PieChart size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 text-sm">
+                  Rincian Pagu &amp; Realisasi per Unit Kerja
+                </h3>
+                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+                  Hal {unitCurrentPage} dari {totalUnitPages}
+                </span>
+              </div>
+              <p className="text-gray-500 font-medium text-[11px] mt-0.5">Monitoring serapan pagu dana pemerintah berdasarkan unit kerja dan fakultas</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+            {/* Search Box */}
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input 
+                type="text" 
+                placeholder="Cari unit / kode..." 
+                value={unitSearchTerm} 
+                onChange={e => { setUnitSearchTerm(e.target.value); setUnitCurrentPage(1); }}
+                className="w-full h-8 pl-9 pr-3 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs"
+              />
+            </div>
+
+            {/* Density Toggle */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-gray-500 hidden sm:inline">Kerapatan:</span>
+              <TableDensityToggle density={unitTableDensity} onChange={setUnitTableDensity} />
+            </div>
+
+            <span className="text-[11px] font-mono font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg">
+              {filteredUnitReport.length} Unit
+            </span>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                <th className={`${unitTableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'}`}>Unit Kerja / Organisasi</th>
+                <th className={`${unitTableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44`}>Alokasi Pagu</th>
+                <th className={`${unitTableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44 text-rose-600`}>Realisasi</th>
+                <th className={`${unitTableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-right w-44 text-emerald-700 bg-emerald-50/20`}>Sisa Saldo</th>
+                <th className={`${unitTableDensity === 'compact' ? 'py-2 px-3' : 'py-3 px-4'} text-left w-48`}>% Serapan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-gray-400 text-xs">
+                    <RefreshCw size={20} className="animate-spin inline-block text-indigo-600 mr-2" />
+                    Menghitung pagu &amp; realisasi unit...
+                  </td>
+                </tr>
+              ) : filteredUnitReport.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-gray-400 text-xs italic">
+                    Tidak ditemukan data unit kerja yang sesuai filter.
+                  </td>
+                </tr>
+              ) : (
+                currentUnitItems.map((row) => (
+                  <tr key={row.id} className="hover:bg-indigo-50/20 transition-colors">
+                    <td className={`${unitTableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
+                          <Building2 size={16} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-xs text-gray-900 leading-tight">{row.nama_unit}</span>
+                          <span className="text-[10px] font-medium text-gray-400 font-mono mt-0.5">{row.kode_unit} {row.group_org ? `• ${row.group_org}` : ''}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={`${unitTableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-gray-800 text-xs`}>
+                      {row.pagu > 0 ? `Rp ${formatIDR(row.pagu)}` : '-'}
+                    </td>
+                    <td className={`${unitTableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-rose-600 text-xs`}>
+                      {row.spent > 0 ? `Rp ${formatIDR(row.spent)}` : '-'}
+                    </td>
+                    <td className={`${unitTableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'} text-right font-mono font-bold text-emerald-700 bg-emerald-50/20 text-xs`}>
+                      {row.balance !== 0 ? `Rp ${formatIDR(row.balance)}` : '-'}
+                    </td>
+                    <td className={`${unitTableDensity === 'compact' ? 'py-1.5 px-3' : 'py-2.5 px-4'}`}>
+                      <div className="space-y-1">
+                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-500 rounded-full ${row.percent > 90 ? 'bg-rose-500' : 'bg-indigo-600'}`} 
+                            style={{ width: `${Math.min(row.percent, 100)}%` }} 
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-gray-500">
+                          {row.percent.toFixed(1)}% Terpakai
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* PAGING UNIT */}
+        <TablePagination
+          currentPage={unitCurrentPage}
+          totalPages={totalUnitPages}
+          totalItems={filteredUnitReport.length}
+          itemsPerPage={unitItemsPerPage}
+          onPageChange={(p) => setUnitCurrentPage(p)}
+          onItemsPerPageChange={(size) => { setUnitItemsPerPage(size); setUnitCurrentPage(1); }}
+          pageSizeOptions={[10, 25, 50, 100]}
+          isLoading={loading}
+        />
       </div>
     </div>
   );
