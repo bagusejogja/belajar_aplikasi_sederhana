@@ -2391,12 +2391,52 @@ export function computeLampiranRka(
     return { ...it, isLeaf };
   });
 
-  const findBestMatch = (rawQuery: string): LampiranRkaRow | null => {
+  const detectBlockFromRow = (row: any): string | null => {
+    const sd = (row?.sumber_dana_nama || '').toLowerCase();
+    if (sd.includes('masyarakat') || sd.includes('selain apbn') || sd.includes('ukt') || sd.includes('mandiri')) {
+      return 'SELAIN APBN';
+    }
+    if (sd.includes('bpptnbh') || sd.includes('ptn badan hukum') || sd.includes('bantuan pendanaan')) {
+      return 'BPPTNBH';
+    }
+    if (sd.includes('rupiah murni') || sd.includes('rm') || sd.includes('gaji')) {
+      return 'RUPIAH MURNI (RM)';
+    }
+    return null;
+  };
+
+  const findBestMatch = (rawQuery: string, sourceRow?: any): LampiranRkaRow | null => {
     if (!rawQuery || !rawQuery.trim()) return null;
     const q = rawQuery.trim().toLowerCase();
     const qClean = q.replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
 
-    const leafCandidates = templateWithInfo.filter(c => c.isLeaf);
+    const expectedBlock = detectBlockFromRow(sourceRow);
+
+    // Kasus Khusus: Jika kata kunci adalah INVESTASI atau MODAL dan sumber dana adalah SELAIN APBN (Dana Masyarakat)
+    if (expectedBlock === 'SELAIN APBN' && (qClean.includes('investasi') || qClean.includes('modal'))) {
+      // 1. Cek apakah ada kesesuaian dengan Tujuan Universitas di bawah IV. INVESTASI (SELAIN APBN)
+      if (sourceRow && sourceRow.tujuan) {
+        const cleanTujuan = String(sourceRow.tujuan).toLowerCase().trim();
+        const subMatch = templateWithInfo.find(t => {
+          if (t.block !== 'SELAIN APBN' || t.romawi !== 'IV' || t.level !== 2) return false;
+          const uClean = t.uraian.toLowerCase().replace(/^[-•\d.A-Z\s]+/, '').trim();
+          return cleanTujuan.includes(uClean.slice(0, 25)) || uClean.includes(cleanTujuan.slice(0, 25));
+        });
+        if (subMatch) return subMatch;
+      }
+      // 2. Jika tidak ada sub-tujuan, arahkan langsung ke lrka_120 (IV. INVESTASI di SELAIN APBN)
+      const inv120 = templateWithInfo.find(t => t.id === 'lrka_120');
+      if (inv120) return inv120;
+    }
+
+    // Filter kandidat sesuai expectedBlock jika ada
+    let pool = templateWithInfo;
+    if (expectedBlock) {
+      const blockPool = templateWithInfo.filter(t => t.block === expectedBlock);
+      if (blockPool.length > 0) pool = blockPool;
+    }
+
+    const leafCandidates = pool.filter(c => c.isLeaf);
     
     // 1a. Cek matchKeys pada leaf
     let match = leafCandidates.find(c => c.matchKeys && c.matchKeys.includes(qClean));
@@ -2445,7 +2485,14 @@ export function computeLampiranRka(
       if (match) return match;
     }
 
-    // Prioritas 2: Fallback ke seluruh kandidat jika tidak ditemukan pada leaf
+    // Prioritas 2: Fallback ke seluruh pool (termasuk parent)
+    match = pool.find(c => {
+      const cClean = c.uraian.toLowerCase().replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
+      return cClean === qClean;
+    });
+    if (match) return match;
+
+    // Prioritas 3: Fallback ke global pool
     match = templateWithInfo.find(c => {
       const cClean = c.uraian.toLowerCase().replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
       return cClean === qClean;
@@ -2463,7 +2510,7 @@ export function computeLampiranRka(
     
     if (!rawVal || !String(rawVal).trim()) return;
 
-    const match = findBestMatch(String(rawVal));
+    const match = findBestMatch(String(rawVal), row);
 
     if (match) {
       const entry = directMap.get(match.id)!;
@@ -2483,7 +2530,7 @@ export function computeLampiranRka(
     if (!pagu) return;
 
     const rawUraian = String(adj.uraian || adj.nama_akun || '');
-    const match = findBestMatch(rawUraian);
+    const match = findBestMatch(rawUraian, adj);
 
     const adjRow = {
       id: `adj_${adj.id}`,
