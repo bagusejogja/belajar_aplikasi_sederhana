@@ -207,7 +207,7 @@ const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
       id: 'belanja_modal_investasi',
       title: 'II. Belanja Modal / Investasi',
       items: [
-        { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal'], is_sum: false, subItems: [] },
+        { id: 'modal', label: 'Belanja Modal', matchKeys: ['modal', 'investasi', 'biaya investasi', 'aset tetap', '55'], is_sum: false, subItems: [] },
         { id: 'antar_unit', label: 'Belanja Transfer Antar Unit', matchKeys: ['antar unit', 'transfer'], is_sum: false, subItems: [] },
       ]
     },
@@ -3095,8 +3095,8 @@ export default function RkaLaporanPage() {
       const akun = (row.akun_detail || '').trim();
       const val = (getRowClassification(row, modeLaporan) || '').toLowerCase();
 
-      // (7) Investasi (Belanja Modal): Akun 55* atau label mengandung 'modal'
-      const isModal = akun.startsWith('55') || val.includes('modal');
+      // (7) Investasi (Belanja Modal): Akun 55* atau label/uraian mengandung 'modal' atau 'investasi'
+      const isModal = akun.startsWith('55') || val.includes('modal') || val.includes('investasi') || akun.toLowerCase().includes('investasi');
 
       item.count += 1;
       item.belanjaRows.push(row);
@@ -3163,7 +3163,11 @@ export default function RkaLaporanPage() {
           });
         } else if (adj.modul === 'pengeluaran') {
           item.count += 1;
-          const isModal = (adj.nama_akun || '').toLowerCase().includes('modal') || (adj.uraian || '').toLowerCase().includes('modal');
+          const isModal = (adj.kode_akun || '').startsWith('55') ||
+            (adj.nama_akun || '').toLowerCase().includes('modal') || 
+            (adj.nama_akun || '').toLowerCase().includes('investasi') ||
+            (adj.uraian || '').toLowerCase().includes('modal') || 
+            (adj.uraian || '').toLowerCase().includes('investasi');
           if (isModal) {
             item.modal += val;
           } else {
