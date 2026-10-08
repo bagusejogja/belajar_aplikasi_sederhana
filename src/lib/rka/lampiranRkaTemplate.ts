@@ -2391,51 +2391,49 @@ export function computeLampiranRka(
     return { ...it, isLeaf };
   });
 
-  const detectBlockFromRow = (row: any): string | null => {
-    const sd = (row?.sumber_dana_nama || '').toLowerCase();
-    if (sd.includes('masyarakat') || sd.includes('selain apbn') || sd.includes('ukt') || sd.includes('mandiri')) {
-      return 'SELAIN APBN';
-    }
-    if (sd.includes('bpptnbh') || sd.includes('ptn badan hukum') || sd.includes('bantuan pendanaan')) {
-      return 'BPPTNBH';
-    }
-    if (sd.includes('rupiah murni') || sd.includes('rm') || sd.includes('gaji')) {
-      return 'RUPIAH MURNI (RM)';
-    }
-    return null;
-  };
 
   const findBestMatch = (rawQuery: string, sourceRow?: any): LampiranRkaRow | null => {
     if (!rawQuery || !rawQuery.trim()) return null;
     const q = rawQuery.trim().toLowerCase();
     const qClean = q.replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
 
-    const expectedBlock = detectBlockFromRow(sourceRow);
+    const akun = String(sourceRow?.akun_detail || sourceRow?.kode_akun || sourceRow?.akun_utama || '').trim();
+    const isInvestasiOr55 = akun.startsWith('55') || 
+                            qClean.includes('investasi') || 
+                            qClean.includes('modal') ||
+                            akun.toLowerCase().includes('modal') ||
+                            akun.toLowerCase().includes('investasi');
 
-    // Kasus Khusus: Jika kata kunci adalah INVESTASI atau MODAL dan sumber dana adalah SELAIN APBN (Dana Masyarakat)
-    if (expectedBlock === 'SELAIN APBN' && (qClean.includes('investasi') || qClean.includes('modal'))) {
-      // 1. Cek apakah ada kesesuaian dengan Tujuan Universitas di bawah IV. INVESTASI (SELAIN APBN)
-      if (sourceRow && sourceRow.tujuan) {
-        const cleanTujuan = String(sourceRow.tujuan).toLowerCase().trim();
-        const subMatch = templateWithInfo.find(t => {
-          if (t.block !== 'SELAIN APBN' || t.romawi !== 'IV' || t.level !== 2) return false;
-          const uClean = t.uraian.toLowerCase().replace(/^[-•\d.A-Z\s]+/, '').trim();
-          return cleanTujuan.includes(uClean.slice(0, 25)) || uClean.includes(cleanTujuan.slice(0, 25));
-        });
-        if (subMatch) return subMatch;
+    // Kasus Khusus: INVESTASI di SELAIN APBN (Kode MAK 55xxx / Belanja Modal)
+    // Dipetakan ke sub-tujuan IV.A - IV.E berdasarkan digit awal kode_kegiatan (1 s/d 5) atau tujuan
+    if (isInvestasiOr55) {
+      const kegStr = String(sourceRow?.kode_kegiatan || sourceRow?.kegiatan || sourceRow?.program || '').trim();
+      const prefixMatch = kegStr.match(/^([1-5])/);
+      const prefix = prefixMatch ? prefixMatch[1] : null;
+
+      if (prefix === '1') return templateWithInfo.find(t => t.id === 'lrka_121') || null;
+      if (prefix === '2') return templateWithInfo.find(t => t.id === 'lrka_122') || null;
+      if (prefix === '3') return templateWithInfo.find(t => t.id === 'lrka_123') || null;
+      if (prefix === '4') return templateWithInfo.find(t => t.id === 'lrka_124') || null;
+      if (prefix === '5') return templateWithInfo.find(t => t.id === 'lrka_125') || null;
+
+      // Fallback periksa teks tujuan universitas
+      const tujuanStr = String(sourceRow?.tujuan || '').toLowerCase();
+      if (tujuanStr.includes('pendidikan')) return templateWithInfo.find(t => t.id === 'lrka_121') || null;
+      if (tujuanStr.includes('penelitian') || tujuanStr.includes('reputasi')) return templateWithInfo.find(t => t.id === 'lrka_122') || null;
+      if (tujuanStr.includes('pengabdian')) return templateWithInfo.find(t => t.id === 'lrka_123') || null;
+      if (tujuanStr.includes('tata kelola')) return templateWithInfo.find(t => t.id === 'lrka_124') || null;
+      if (tujuanStr.includes('atmosfer') || tujuanStr.includes('ramah') || tujuanStr.includes('sehat')) {
+        return templateWithInfo.find(t => t.id === 'lrka_125') || null;
       }
-      // 2. Jika tidak ada sub-tujuan, arahkan langsung ke lrka_120 (IV. INVESTASI di SELAIN APBN)
+
+      // Default ke pos induk IV. INVESTASI di SELAIN APBN jika sub-tujuan tidak terdeteksi
       const inv120 = templateWithInfo.find(t => t.id === 'lrka_120');
       if (inv120) return inv120;
     }
 
-    // Filter kandidat sesuai expectedBlock jika ada
-    let pool = templateWithInfo;
-    if (expectedBlock) {
-      const blockPool = templateWithInfo.filter(t => t.block === expectedBlock);
-      if (blockPool.length > 0) pool = blockPool;
-    }
-
+    // Untuk pos selain belanja modal, cari di seluruh template tanpa dibatasi sumber dana
+    const pool = templateWithInfo;
     const leafCandidates = pool.filter(c => c.isLeaf);
     
     // 1a. Cek matchKeys pada leaf
