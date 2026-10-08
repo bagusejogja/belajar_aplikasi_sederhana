@@ -27,6 +27,7 @@ import Link from 'next/link';
 import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
 import RkaHelpModal from '@/components/rka/RkaHelpModal';
 import LampiranRkaView from '@/components/rka/LampiranRkaView';
+import SarprasRkaView from '@/components/rka/SarprasRkaView';
 import { computeLampiranRka, LampiranRkaResult } from '@/lib/rka/lampiranRkaTemplate';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
@@ -6132,7 +6133,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <FileSpreadsheet size={14} className="text-indigo-600" />
-                <span>Ringkasan Usulan</span>
+                <span>{isKemen ? '10. Lampiran RKA' : 'Ringkasan Usulan'}</span>
               </button>
               <button
                 type="button"
@@ -6144,7 +6145,7 @@ export default function RkaLaporanPage() {
                 }`}
               >
                 <Building2 size={14} className="text-indigo-600" />
-                <span>Rekap Group Unit Kerja</span>
+                <span>{isKemen ? 'Sarpras' : 'Rekap Group Unit Kerja'}</span>
               </button>
               <button
                 type="button"
@@ -7358,8 +7359,16 @@ export default function RkaLaporanPage() {
           </div>
         ) : activeViewTab === 'rekap_unit' ? (
           /* ======================================================== */
-          /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA (FORMAT FAKULTAS) */
+          /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA / SARPRAS      */
           /* ======================================================== */
+          isKemen ? (
+            <SarprasRkaView
+              dataList={dataList}
+              tahunFilter={tahunFilter}
+              versiFilter={versiFilter}
+              formatRp={formatRp}
+            />
+          ) : (
           <Card className="rounded-2xl border-gray-200/80 shadow-xs overflow-hidden">
             <CardHeader className="bg-gray-50/60 p-4 sm:p-5 border-b border-gray-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
               <div>
@@ -8642,6 +8651,7 @@ export default function RkaLaporanPage() {
               </Table>
             </CardContent>
           </Card>
+          )
         ) : (
           /* ======================================================== */
           /* TAB VIEW 3: HIRARKI 3-LEVEL COLLAPSIBLE (AKUN > UNIT > DETAIL) */

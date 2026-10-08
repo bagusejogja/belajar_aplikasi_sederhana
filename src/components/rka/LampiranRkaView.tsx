@@ -320,7 +320,7 @@ export default function LampiranRkaView({
                         <TableCell className="text-center text-slate-300 text-xs">-</TableCell>
                         <TableCell className="text-right text-slate-300 text-xs">-</TableCell>
                         <TableCell className="text-right pr-4 font-mono font-black text-sm text-emerald-400">
-                          {item.totalPagu > 0 ? `Rp ${formatRp(item.totalPagu)}` : (item.targetBiaya ? `Rp ${formatRp(item.targetBiaya)}` : 'Rp 0')}
+                          {item.totalPagu > 0 ? `Rp ${formatRp(item.totalPagu)}` : 'Rp 0'}
                         </TableCell>
                         <TableCell className="text-center text-slate-400 text-xs">-</TableCell>
                       </TableRow>
@@ -339,21 +339,19 @@ export default function LampiranRkaView({
                             {item.uraian}
                           </TableCell>
                           <TableCell className="text-center text-xs font-bold font-mono text-slate-700">
-                            {item.volume ?? '-'}
+                            {item.totalCount > 0 && item.volume !== null ? item.volume : '-'}
                           </TableCell>
                           <TableCell className="text-center text-xs font-medium text-slate-700">
-                            {item.satuan || '-'}
+                            {item.totalCount > 0 ? item.satuan || '-' : '-'}
                           </TableCell>
                           <TableCell className="text-right text-xs font-mono text-slate-700">
-                            {item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
+                            {item.totalCount > 0 && item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-black text-xs text-slate-950">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-black">Rp {formatRp(item.totalPagu)}</span>
-                            ) : item.targetBiaya !== null ? (
-                              <span className="text-slate-500 font-medium">Rp {formatRp(item.targetBiaya)}</span>
+                              <span className="text-indigo-900 font-black">Rp ${formatRp(item.totalPagu)}</span>
                             ) : (
-                              '-'
+                              <span className="text-slate-300 font-normal">-</span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">
@@ -398,21 +396,19 @@ export default function LampiranRkaView({
                             {item.uraian}
                           </TableCell>
                           <TableCell className="text-center text-xs font-mono text-slate-600">
-                            {item.volume ?? '-'}
+                            {item.totalCount > 0 && item.volume !== null ? item.volume : '-'}
                           </TableCell>
                           <TableCell className="text-center text-xs font-medium text-slate-600">
-                            {item.satuan || '-'}
+                            {item.totalCount > 0 ? item.satuan || '-' : '-'}
                           </TableCell>
                           <TableCell className="text-right text-xs font-mono text-slate-600">
-                            {item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
+                            {item.totalCount > 0 && item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-bold text-xs text-slate-900">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-bold">Rp {formatRp(item.totalPagu)}</span>
-                            ) : item.targetBiaya !== null ? (
-                              <span className="text-slate-500 font-normal">Rp {formatRp(item.targetBiaya)}</span>
+                              <span className="text-indigo-900 font-bold">Rp ${formatRp(item.totalPagu)}</span>
                             ) : (
-                              '-'
+                              <span className="text-slate-300 font-normal">-</span>
                             )}
                           </TableCell>
                           <TableCell className="text-center">
@@ -465,19 +461,17 @@ export default function LampiranRkaView({
                           </div>
                         </TableCell>
                         <TableCell className="text-center text-xs font-mono text-slate-600">
-                          {item.volume !== null ? item.volume : '-'}
+                          {hasDirect && item.volume !== null ? item.volume : '-'}
                         </TableCell>
                         <TableCell className="text-center text-xs text-slate-600">
-                          {item.satuan || '-'}
+                          {hasDirect ? item.satuan || '-' : '-'}
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono text-slate-600">
-                          {item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
+                          {hasDirect && item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
                         </TableCell>
                         <TableCell className="text-right pr-4 font-mono text-xs">
                           {item.directPagu > 0 ? (
-                            <span className="font-bold text-indigo-900">Rp {formatRp(item.directPagu)}</span>
-                          ) : item.targetBiaya !== null ? (
-                            <span className="text-slate-400">Rp {formatRp(item.targetBiaya)}</span>
+                            <span className="font-bold text-indigo-900">Rp ${formatRp(item.directPagu)}</span>
                           ) : (
                             <span className="text-slate-300">-</span>
                           )}
