@@ -440,17 +440,49 @@ export default function LampiranRkaView({
                     );
                   }
 
-                  // Styling Level 3 & 4: Sub-kegiatan dan Rincian Belanja
-                  const indentClass = item.level === 4 ? 'pl-14 text-slate-600' : 'pl-10 text-slate-800';
-                  const hasDirect = item.directCount > 0;
+                  // Styling Level 3: Induk Sub-kegiatan (SUM / Total dari anak-anaknya)
+                  if (item.level === 3) {
+                    return (
+                      <React.Fragment key={item.id}>
+                        <TableRow className="bg-slate-50/80 font-bold border-b border-slate-200 hover:bg-slate-100/60 transition-colors">
+                          <TableCell className="text-center font-mono text-slate-600 text-xs py-2">
+                            {item.no || '-'}
+                          </TableCell>
+                          <TableCell className="text-xs pl-10 font-bold text-slate-900">
+                            <div className="flex items-center gap-1.5">
+                              <span>{item.uraian}</span>
+                              {item.totalCount > 0 && (
+                                <span className="px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded-md text-[9px] font-bold font-mono">
+                                  {item.totalCount} rincian
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center text-xs font-mono text-slate-400">-</TableCell>
+                          <TableCell className="text-center text-xs text-slate-400">-</TableCell>
+                          <TableCell className="text-right text-xs font-mono text-slate-400">-</TableCell>
+                          <TableCell className="text-right pr-4 font-mono text-xs">
+                            {item.totalPagu > 0 ? (
+                              <span className="font-black text-indigo-950">Rp {formatRp(item.totalPagu)}</span>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center text-slate-300 text-xs">-</TableCell>
+                        </TableRow>
+                      </React.Fragment>
+                    );
+                  }
 
+                  // Styling Level 4: Rincian Belanja Anak (Transaksi Langsung)
+                  const hasDirect = item.directCount > 0;
                   return (
                     <React.Fragment key={item.id}>
                       <TableRow className={`border-b border-slate-100 transition-colors ${hasDirect ? 'bg-indigo-50/30 hover:bg-indigo-50/60' : 'hover:bg-slate-50'}`}>
                         <TableCell className="text-center font-mono text-slate-500 text-xs py-1.5">
                           {item.no || '-'}
                         </TableCell>
-                        <TableCell className={`text-xs ${indentClass} ${hasDirect ? 'font-bold text-indigo-950' : 'font-normal'}`}>
+                        <TableCell className={`text-xs pl-14 ${hasDirect ? 'font-medium text-slate-800' : 'font-normal text-slate-600'}`}>
                           <div className="flex items-center gap-1.5">
                             <span>{item.uraian}</span>
                             {hasDirect && (
@@ -461,13 +493,13 @@ export default function LampiranRkaView({
                           </div>
                         </TableCell>
                         <TableCell className="text-center text-xs font-mono text-slate-600">
-                          {hasDirect && item.volume !== null ? item.volume : '-'}
+                          {hasDirect && item.volume !== null ? item.volume : (item.volume !== null ? item.volume : '-')}
                         </TableCell>
                         <TableCell className="text-center text-xs text-slate-600">
-                          {hasDirect ? item.satuan || '-' : '-'}
+                          {item.satuan || '-'}
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono text-slate-600">
-                          {hasDirect && item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-'}
+                          {item.directPagu > 0 ? `Rp ${formatRp(item.directPagu)}` : (item.tarif !== null ? `Rp ${formatRp(item.tarif)}` : '-')}
                         </TableCell>
                         <TableCell className="text-right pr-4 font-mono text-xs">
                           {item.directPagu > 0 ? (

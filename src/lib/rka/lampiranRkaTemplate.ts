@@ -2384,6 +2384,77 @@ export function computeLampiranRka(
     });
   });
 
+  // Tandai elemen mana yang merupakan node daun (leaf) vs parent/induk
+  const templateWithInfo = LAMPIRAN_RKA_TEMPLATE.map((it, idx, arr) => {
+    const next = arr[idx + 1];
+    const isLeaf = !next || next.level <= it.level;
+    return { ...it, isLeaf };
+  });
+
+  const findBestMatch = (rawQuery: string): LampiranRkaRow | null => {
+    if (!rawQuery || !rawQuery.trim()) return null;
+    const q = rawQuery.trim().toLowerCase();
+    const qClean = q.replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
+
+    const leafCandidates = templateWithInfo.filter(c => c.isLeaf);
+    
+    // 1a. Cek matchKeys pada leaf
+    let match = leafCandidates.find(c => c.matchKeys && c.matchKeys.includes(qClean));
+    if (match) return match;
+
+    // 1b. Cek exact match uraian leaf (setelah dibersihkan strip "- ")
+    match = leafCandidates.find(c => {
+      const cClean = c.uraian.toLowerCase().replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
+      return cClean === qClean;
+    });
+    if (match) return match;
+
+    // 1c. Cek normalisasi singkatan (tunj. -> tunjangan)
+    const normalize = (s: string) => s.replace(/tunj\./g, 'tunjangan ').replace(/\s+/g, ' ').replace(/\.\s*/g, ' ').trim();
+    const normQ = normalize(qClean);
+    match = leafCandidates.find(c => {
+      const normC = normalize(c.uraian.toLowerCase().replace(/^[-•\s]+/, ''));
+      return normC === normQ;
+    });
+    if (match) return match;
+
+    // 1d. Pemisahan khusus gaji 13 dan 14
+    const isGaji13 = qClean.includes('gaji ke 13') || qClean.includes('ke-13');
+    const isGaji14 = qClean.includes('gaji ke 14') || qClean.includes('ke-14');
+    
+    if (isGaji13 || isGaji14) {
+      const filteredLeaf = leafCandidates.filter(c => {
+        const cLower = c.uraian.toLowerCase();
+        if (isGaji13) return cLower.includes('13');
+        if (isGaji14) return cLower.includes('14');
+        return false;
+      });
+      match = filteredLeaf.find(c => {
+        const cClean = c.uraian.toLowerCase().replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
+        const baseQ = qClean.replace(/\(gaji ke 1[34]\)/, '').trim();
+        const baseC = cClean.replace(/\(gaji ke 1[34]\)/, '').trim();
+        return normalize(baseC).includes(normalize(baseQ)) || normalize(baseQ).includes(normalize(baseC));
+      });
+      if (match) return match;
+    } else {
+      const nonGaji1314 = leafCandidates.filter(c => !c.uraian.includes('13') && !c.uraian.includes('14'));
+      match = nonGaji1314.find(c => {
+        const normC = normalize(c.uraian.toLowerCase().replace(/^[-•\s]+/, ''));
+        return normC.includes(normQ) || normQ.includes(normC);
+      });
+      if (match) return match;
+    }
+
+    // Prioritas 2: Fallback ke seluruh kandidat jika tidak ditemukan pada leaf
+    match = templateWithInfo.find(c => {
+      const cClean = c.uraian.toLowerCase().replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
+      return cClean === qClean;
+    });
+    if (match) return match;
+
+    return null;
+  };
+
   // 1. Petakan baris belanja langsung ke template berdasarkan klasifikasi
   (dataList || []).forEach(row => {
     const rawVal = getRowClassification 
@@ -2391,21 +2462,8 @@ export function computeLampiranRka(
       : (row.tags?.['RKA Kementrian'] || row.tags?.['rka kementrian'] || row.laporan_kementerian || '');
     
     if (!rawVal || !String(rawVal).trim()) return;
-    const clean = String(rawVal).trim().toLowerCase();
 
-    // Prioritas 1: Exact match dengan uraian atau matchKeys
-    let match = LAMPIRAN_RKA_TEMPLATE.find(t => 
-      t.uraian.toLowerCase().trim() === clean || 
-      t.matchKeys.includes(clean)
-    );
-
-    // Prioritas 2: Partial match jika belum ketemu
-    if (!match) {
-      match = LAMPIRAN_RKA_TEMPLATE.find(t => {
-        const uClean = t.uraian.toLowerCase().replace(/^[-•\d.]+\s*/, '').trim();
-        return uClean === clean || uClean.includes(clean) || clean.includes(uClean);
-      });
-    }
+    const match = findBestMatch(String(rawVal));
 
     if (match) {
       const entry = directMap.get(match.id)!;
@@ -2418,14 +2476,15 @@ export function computeLampiranRka(
     }
   });
 
-  // 1.b. Petakan baris penyesuaian belanja ke template (misal: Gaji dan Tunjangan PNS / Rupiah Murni)
+  // 1.b. Petakan baris penyesuaian belanja ke template (prioritaskan anak leaf)
   (penyesuaianList || []).forEach(adj => {
     const factor = adj.jenis_penyesuaian === 'kurang' ? -1 : 1;
     const pagu = factor * (Number(adj.nilai_penyesuaian) || 0);
     if (!pagu) return;
 
-    const rawUraian = String(adj.uraian || adj.nama_akun || '').trim().toLowerCase();
-    
+    const rawUraian = String(adj.uraian || adj.nama_akun || '');
+    const match = findBestMatch(rawUraian);
+
     const adjRow = {
       id: `adj_${adj.id}`,
       unit: adj.unit_kerja,
@@ -2438,20 +2497,6 @@ export function computeLampiranRka(
       tanggal_sk: adj.tanggal_sk,
       keterangan: adj.keterangan
     };
-
-    // Prioritas 1: Exact match dengan uraian atau matchKeys
-    let match = LAMPIRAN_RKA_TEMPLATE.find(t => 
-      t.uraian.toLowerCase().trim() === rawUraian || 
-      t.matchKeys.includes(rawUraian)
-    );
-
-    // Prioritas 2: Partial match
-    if (!match) {
-      match = LAMPIRAN_RKA_TEMPLATE.find(t => {
-        const uClean = t.uraian.toLowerCase().replace(/^[-•\d.]+\s*/, '').trim();
-        return uClean === rawUraian || uClean.includes(rawUraian) || rawUraian.includes(uClean);
-      });
-    }
 
     if (match) {
       const entry = directMap.get(match.id)!;
