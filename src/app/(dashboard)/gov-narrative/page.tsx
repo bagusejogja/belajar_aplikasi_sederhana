@@ -186,13 +186,36 @@ Terima kasih..`;
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                      Nama PIC Tujuan
                   </label>
-                  <input 
-                     type="text" 
-                     value={picOverride} 
-                     onChange={e => setPicOverride(e.target.value)} 
-                     className="w-full h-9.5 px-3.5 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
-                     placeholder="Nama penerima pesan..." 
-                  />
+                  <div className="flex items-center gap-2">
+                     <input 
+                        type="text" 
+                        value={picOverride} 
+                        onChange={e => setPicOverride(e.target.value)} 
+                        className="flex-1 h-9.5 px-3.5 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" 
+                        placeholder="Nama penerima pesan..." 
+                     />
+                     <button
+                        type="button"
+                        disabled={!picOverride.trim()}
+                        onClick={() => {
+                           if (!picOverride.trim()) return;
+                           navigator.clipboard.writeText(picOverride.trim()).then(() => {
+                              setCopied('pic');
+                              toast.success('Nama PIC tersalin!');
+                              setTimeout(() => setCopied(prev => prev === 'pic' ? null : prev), 2000);
+                           });
+                        }}
+                        className={`h-9 px-3 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shrink-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                           copied === 'pic'
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs'
+                              : 'bg-white border-gray-200 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300'
+                        }`}
+                        title="Salin Nama PIC"
+                     >
+                        {copied === 'pic' ? <Check size={13} /> : <Copy size={13} />}
+                        <span>{copied === 'pic' ? 'Tersalin' : 'Salin'}</span>
+                     </button>
+                  </div>
                </div>
             </div>
 
