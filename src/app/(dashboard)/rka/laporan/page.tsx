@@ -26,6 +26,8 @@ import toast from 'react-hot-toast';
 import Link from 'next/link';
 import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
 import RkaHelpModal from '@/components/rka/RkaHelpModal';
+import LampiranRkaView from '@/components/rka/LampiranRkaView';
+import { computeLampiranRka, LampiranRkaResult } from '@/lib/rka/lampiranRkaTemplate';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
 // Definisi Struktur Template Slide / PPT Proposal RKAT (3 Jenjang: 1. Subtotal Kelompok, 2. Pos / Subtotal Anaknya, 3. Rincian Data)
@@ -1508,17 +1510,21 @@ export default function RkaLaporanPage() {
   // Helper membaca nilai klasifikasi laporan dari setiap baris belanja
   const getRowClassification = (row: any, targetKey: string) => {
     if (!row) return null;
-    if (targetKey === 'proposal rkat') {
+    const lowerKey = (targetKey || '').toLowerCase().trim();
+    if (lowerKey === 'proposal rkat') {
       return (row.tags && row.tags['proposal rkat']) || row.identifikasi_lain || row.kategori_belanja || null;
     }
+    if (lowerKey === 'laporan_kementerian' || lowerKey === 'rka kementrian' || lowerKey.includes('kementr') || lowerKey.includes('kementer')) {
+      return (row.tags && (row.tags['RKA Kementrian'] || row.tags['rka kementrian'])) || row.laporan_kementerian || null;
+    }
+    if (lowerKey === 'laporan_webometrics' || lowerKey.includes('webo')) {
+      return (row.tags && row.tags['laporan_webometrics']) || row.laporan_webometrics || null;
+    }
     if (targetKey === 'kategori_belanja') return row.kategori_belanja;
-    if (targetKey === 'laporan_kementerian') return row.laporan_kementerian;
-    if (targetKey === 'laporan_webometrics') return row.laporan_webometrics;
-    if (targetKey === 'identifikasi_lain') return row.identifikasi_lain;
     if (row.tags && typeof row.tags === 'object' && row.tags[targetKey]) {
       return row.tags[targetKey];
     }
-    if (row.identifikasi_lain) return row.identifikasi_lain;
+    if (row.identifikasi_lain && !lowerKey.includes('kementr')) return row.identifikasi_lain;
     if (row[targetKey]) return row[targetKey];
     return null;
   };
@@ -5792,7 +5798,40 @@ export default function RkaLaporanPage() {
   };
 
   const activeTabObj = availableTabs.find(t => t.id === modeLaporan) || availableTabs[0];
-  const isKemen = modeLaporan === 'laporan_kementerian';
+  const isKemen = modeLaporan === 'laporan_kementerian' || modeLaporan === 'RKA Kementrian' || modeLaporan.toLowerCase().includes('kementr') || modeLaporan.toLowerCase().includes('kementer');
+
+  // Komputasi Struktur & Nilai Lampiran RKA Kementerian (Hierarkis sesuai template excel)
+  const lampiranRkaData: LampiranRkaResult | null = useMemo(() => {
+    if (!isKemen) return null;
+    return computeLampiranRka(dataList, getRowClassification);
+  }, [isKemen, dataList]);
+
+  // Handle Export Excel Baku Lampiran RKA Kementerian
+  const handleExportLampiranRka = () => {
+    if (!lampiranRkaData) return;
+    const excelRows = lampiranRkaData.items.map(it => ({
+      'No.': it.no || '',
+      'Kegiatan/Sub  Kegiatan/Belanja/Detil Belanja': it.uraian,
+      'Volume': it.volume !== null && it.volume !== undefined ? it.volume : '',
+      'Satuan': it.satuan || '',
+      'Harga Satuan': it.tarif !== null && it.tarif !== undefined ? it.tarif : '',
+      'Jumlah Biaya': it.totalPagu > 0 ? it.totalPagu : (it.targetBiaya !== null ? it.targetBiaya : 0)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(excelRows);
+    ws['!cols'] = [
+      { wch: 8 },
+      { wch: 60 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 18 },
+      { wch: 22 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, `Lampiran_RKA_Kementerian_${tahunFilter}_${versiFilter.toUpperCase()}.xlsx`);
+    toast.success('File Excel Lampiran RKA Kementerian berhasil diexport!');
+  };
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-300">
@@ -6263,9 +6302,19 @@ export default function RkaLaporanPage() {
           /* TAB VIEW 1: RINGKASAN FORMAT LAPORAN (PPT VS STANDAR)   */
           /* ======================================================== */
           <div className="space-y-6">
-            
-            {/* SWITCHER TAMPILAN KHUSUS PROPOSAL RKAT */}
-            {modeLaporan === 'proposal rkat' && (
+            {isKemen ? (
+              <LampiranRkaView
+                data={lampiranRkaData}
+                tahunFilter={tahunFilter}
+                versiFilter={versiFilter}
+                formatRp={formatRp}
+                onExportExcel={handleExportLampiranRka}
+                totalDataCount={dataList.length}
+              />
+            ) : (
+              <>
+                {/* SWITCHER TAMPILAN KHUSUS PROPOSAL RKAT */}
+                {modeLaporan === 'proposal rkat' && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-blue-200 shadow-2xs">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs font-bold font-mono">
@@ -7301,6 +7350,8 @@ export default function RkaLaporanPage() {
                     </Table>
                   </CardContent>
                 </Card>
+              </>
+            )}
               </>
             )}
 

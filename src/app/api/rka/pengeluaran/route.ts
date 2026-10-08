@@ -86,9 +86,10 @@ export async function GET(request: Request) {
       }
       q = applyVersiFilter(q);
       if (onlyClassified === 'true') {
-        if (targetFormat === 'laporan_kementerian') {
+        const tfLower = (targetFormat || '').toLowerCase().trim();
+        if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
           q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-        } else if (targetFormat === 'laporan_webometrics') {
+        } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
           q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
         } else if (targetFormat && targetFormat !== 'ALL') {
           q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');

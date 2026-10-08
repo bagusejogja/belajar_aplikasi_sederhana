@@ -503,9 +503,10 @@ export async function PUT(request: Request) {
           if (rule.akun && rule.akun !== '*' && rule.akun !== 'ALL') {
             const akuns = rule.akun.split(/[,|]/).map((a: string) => a.replace(/\*/g, '').trim()).filter(Boolean);
             if (akuns.length === 1) {
-              chunkQ = chunkQ.ilike('akun_detail', `${akuns[0]}%`);
+              const a = akuns[0];
+              chunkQ = chunkQ.or(`akun_detail.ilike.${a}%,akun_utama.ilike.${a}%,sub_akun.ilike.${a}%`);
             } else if (akuns.length > 1) {
-              const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%`).join(',');
+              const akunConds = akuns.map((a: string) => `akun_detail.ilike.${a}%,akun_utama.ilike.${a}%,sub_akun.ilike.${a}%`).join(',');
               chunkQ = chunkQ.or(akunConds);
             }
           }

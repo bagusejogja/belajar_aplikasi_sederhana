@@ -205,15 +205,14 @@ Terima kasih..`;
                               setTimeout(() => setCopied(prev => prev === 'pic' ? null : prev), 2000);
                            });
                         }}
-                        className={`h-9 px-3 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shrink-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                        className={`w-9 h-9.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center shrink-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
                            copied === 'pic'
                               ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs'
                               : 'bg-white border-gray-200 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300'
                         }`}
-                        title="Salin Nama PIC"
+                        title={copied === 'pic' ? 'Nama PIC tersalin' : 'Salin Nama PIC'}
                      >
-                        {copied === 'pic' ? <Check size={13} /> : <Copy size={13} />}
-                        <span>{copied === 'pic' ? 'Tersalin' : 'Salin'}</span>
+                        {copied === 'pic' ? <Check size={15} /> : <Copy size={15} />}
                      </button>
                   </div>
                </div>
