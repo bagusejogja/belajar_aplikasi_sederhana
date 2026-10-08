@@ -2398,38 +2398,81 @@ export function computeLampiranRka(
     const qClean = q.replace(/^[-•\s]+/, '').replace(/\s+/g, ' ');
 
     const akun = String(sourceRow?.akun_detail || sourceRow?.kode_akun || sourceRow?.akun_utama || '').trim();
-    const isInvestasiOr55 = akun.startsWith('55') || 
-                            qClean.includes('investasi') || 
-                            qClean.includes('modal') ||
-                            akun.toLowerCase().includes('modal') ||
-                            akun.toLowerCase().includes('investasi');
+    const akunLower = akun.toLowerCase();
+    const uraianLower = String(sourceRow?.uraian_belanja || '').toLowerCase();
+    const kegLower = String(sourceRow?.kegiatan || sourceRow?.nama_kegiatan || '').toLowerCase();
 
-    // Kasus Khusus: INVESTASI di SELAIN APBN (Kode MAK 55xxx / Belanja Modal)
-    // Dipetakan ke sub-tujuan IV.A - IV.E berdasarkan digit awal kode_kegiatan (1 s/d 5) atau tujuan
-    if (isInvestasiOr55) {
+    // Helper untuk mendeteksi digit awal kode_kegiatan (1 s/d 5) atau teks sasaran strategis/tujuan
+    const getTujuanPrefix = (): string | null => {
       const kegStr = String(sourceRow?.kode_kegiatan || sourceRow?.kegiatan || sourceRow?.program || '').trim();
       const prefixMatch = kegStr.match(/^([1-5])/);
-      const prefix = prefixMatch ? prefixMatch[1] : null;
+      if (prefixMatch) return prefixMatch[1];
 
-      if (prefix === '1') return templateWithInfo.find(t => t.id === 'lrka_121') || null;
-      if (prefix === '2') return templateWithInfo.find(t => t.id === 'lrka_122') || null;
-      if (prefix === '3') return templateWithInfo.find(t => t.id === 'lrka_123') || null;
-      if (prefix === '4') return templateWithInfo.find(t => t.id === 'lrka_124') || null;
-      if (prefix === '5') return templateWithInfo.find(t => t.id === 'lrka_125') || null;
-
-      // Fallback periksa teks tujuan universitas
       const tujuanStr = String(sourceRow?.tujuan || '').toLowerCase();
-      if (tujuanStr.includes('pendidikan')) return templateWithInfo.find(t => t.id === 'lrka_121') || null;
-      if (tujuanStr.includes('penelitian') || tujuanStr.includes('reputasi')) return templateWithInfo.find(t => t.id === 'lrka_122') || null;
-      if (tujuanStr.includes('pengabdian')) return templateWithInfo.find(t => t.id === 'lrka_123') || null;
-      if (tujuanStr.includes('tata kelola')) return templateWithInfo.find(t => t.id === 'lrka_124') || null;
-      if (tujuanStr.includes('atmosfer') || tujuanStr.includes('ramah') || tujuanStr.includes('sehat')) {
-        return templateWithInfo.find(t => t.id === 'lrka_125') || null;
-      }
+      if (tujuanStr.includes('pendidikan')) return '1';
+      if (tujuanStr.includes('penelitian') || tujuanStr.includes('reputasi')) return '2';
+      if (tujuanStr.includes('pengabdian')) return '3';
+      if (tujuanStr.includes('tata kelola')) return '4';
+      if (tujuanStr.includes('atmosfer') || tujuanStr.includes('ramah') || tujuanStr.includes('sehat')) return '5';
+      return null;
+    };
 
-      // Default ke pos induk IV. INVESTASI di SELAIN APBN jika sub-tujuan tidak terdeteksi
+    // 1. Kasus Khusus: INVESTASI di SELAIN APBN (Kode MAK 55xxx / Belanja Modal / Tag INVESTASI)
+    const isInvestasiOr55 = akun.startsWith('55') || 
+                            qClean === 'investasi' || 
+                            qClean === 'modal' ||
+                            akunLower.includes('modal') ||
+                            akunLower.includes('investasi');
+    if (isInvestasiOr55) {
+      const p = getTujuanPrefix();
+      if (p === '1') return templateWithInfo.find(t => t.id === 'lrka_121') || null;
+      if (p === '2') return templateWithInfo.find(t => t.id === 'lrka_122') || null;
+      if (p === '3') return templateWithInfo.find(t => t.id === 'lrka_123') || null;
+      if (p === '4') return templateWithInfo.find(t => t.id === 'lrka_124') || null;
+      if (p === '5') return templateWithInfo.find(t => t.id === 'lrka_125') || null;
+
       const inv120 = templateWithInfo.find(t => t.id === 'lrka_120');
       if (inv120) return inv120;
+    }
+
+    // 2. Kasus Khusus: REMUNERASI di SELAIN APBN (Insentif, Tunjangan, atau Tag REMUNERASI)
+    const isRemunerasi = qClean === 'remunerasi' || 
+                         qClean.includes('remunerasi') ||
+                         akunLower.includes('insentif') ||
+                         akunLower.includes('tunjangan') ||
+                         uraianLower.includes('insentif');
+    // Pastikan bukan belanja gaji PNS (yang masuk pos RM)
+    const isGajiPns = akunLower.includes('gaji pokok') || uraianLower.includes('pns') || uraianLower.includes('pppk');
+    if (isRemunerasi && !isGajiPns) {
+      const p = getTujuanPrefix();
+      if (p === '1') return templateWithInfo.find(t => t.id === 'lrka_133') || null;
+      if (p === '2') return templateWithInfo.find(t => t.id === 'lrka_134') || null;
+      if (p === '3') return templateWithInfo.find(t => t.id === 'lrka_135') || null;
+      if (p === '4') return templateWithInfo.find(t => t.id === 'lrka_136') || null;
+      if (p === '5') return templateWithInfo.find(t => t.id === 'lrka_137') || null;
+
+      const rem132 = templateWithInfo.find(t => t.id === 'lrka_132');
+      if (rem132) return rem132;
+    }
+
+    // 3. Kasus Khusus: PENGEMBANGAN di SELAIN APBN (Kegiatan Pengembangan, Beasiswa, Bantuan Tridharma, atau Tag PENGEMBANGAN)
+    const isPengembangan = qClean === 'pengembangan' || 
+                           qClean.includes('pengembangan') ||
+                           kegLower.includes('pengembangan') ||
+                           akunLower.includes('beasiswa') ||
+                           akunLower.includes('bantuan tridharma') ||
+                           uraianLower.includes('beasiswa') ||
+                           uraianLower.includes('bantuan tridharma');
+    if (isPengembangan) {
+      const p = getTujuanPrefix();
+      if (p === '1') return templateWithInfo.find(t => t.id === 'lrka_127') || null;
+      if (p === '2') return templateWithInfo.find(t => t.id === 'lrka_128') || null;
+      if (p === '3') return templateWithInfo.find(t => t.id === 'lrka_129') || null;
+      if (p === '4') return templateWithInfo.find(t => t.id === 'lrka_130') || null;
+      if (p === '5') return templateWithInfo.find(t => t.id === 'lrka_131') || null;
+
+      const dev126 = templateWithInfo.find(t => t.id === 'lrka_126');
+      if (dev126) return dev126;
     }
 
     // Untuk pos selain belanja modal, cari di seluruh template tanpa dibatasi sumber dana
