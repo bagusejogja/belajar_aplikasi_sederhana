@@ -1,7 +1,0 @@
-feat: lampiran rka kementerian format, fix rule flagging rka kementrian, copy icon pic gov-narrative
-
-- gov-narrative: Tombol copy Nama PIC Tujuan diubah menjadi icon saja tanpa teks
-- api/rka/pengeluaran & api/rka/rules: Perbaiki filter format RKA Kementrian dan pengecekan akun hierarki
-- rka/laporan: Perbaiki getRowClassification untuk RKA Kementrian agar membaca laporan_kementerian tanpa tertimpa proposal rkat
-- rka/laporan: Tab 1 RKA Kementrian menampilkan format baku Lampiran RKA sesuai tempalte lamproran.xlsx lengkap dengan rollup hierarki, rincian transaksi belanja, dan export Excel
-- Proposal RKAT tetap 100% utuh tanpa perubahan bisnis proses maupun tampilannya
