@@ -5804,8 +5804,11 @@ export default function RkaLaporanPage() {
   // Komputasi Struktur & Nilai Lampiran RKA Kementerian (Hierarkis sesuai template excel)
   const lampiranRkaData: LampiranRkaResult | null = useMemo(() => {
     if (!isKemen) return null;
-    return computeLampiranRka(dataList, getRowClassification);
-  }, [isKemen, dataList]);
+    const penyesuaianBelanja = (sertakanPenyesuaian && penyesuaianData.list)
+      ? penyesuaianData.list.filter(p => p.modul === 'pengeluaran')
+      : [];
+    return computeLampiranRka(dataList, getRowClassification, penyesuaianBelanja);
+  }, [isKemen, dataList, sertakanPenyesuaian, penyesuaianData]);
 
   // Handle Export Excel Baku Lampiran RKA Kementerian
   const handleExportLampiranRka = () => {

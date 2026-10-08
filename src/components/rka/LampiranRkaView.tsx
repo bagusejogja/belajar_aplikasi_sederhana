@@ -349,7 +349,7 @@ export default function LampiranRkaView({
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-black text-xs text-slate-950">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-black">Rp ${formatRp(item.totalPagu)}</span>
+                              <span className="text-indigo-900 font-black">Rp {formatRp(item.totalPagu)}</span>
                             ) : (
                               <span className="text-slate-300 font-normal">-</span>
                             )}
@@ -406,7 +406,7 @@ export default function LampiranRkaView({
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-bold text-xs text-slate-900">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-bold">Rp ${formatRp(item.totalPagu)}</span>
+                              <span className="text-indigo-900 font-bold">Rp {formatRp(item.totalPagu)}</span>
                             ) : (
                               <span className="text-slate-300 font-normal">-</span>
                             )}
@@ -471,7 +471,7 @@ export default function LampiranRkaView({
                         </TableCell>
                         <TableCell className="text-right pr-4 font-mono text-xs">
                           {item.directPagu > 0 ? (
-                            <span className="font-bold text-indigo-900">Rp ${formatRp(item.directPagu)}</span>
+                            <span className="font-bold text-indigo-900">Rp {formatRp(item.directPagu)}</span>
                           ) : (
                             <span className="text-slate-300">-</span>
                           )}

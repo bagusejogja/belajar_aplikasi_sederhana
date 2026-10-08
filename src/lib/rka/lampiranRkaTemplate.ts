@@ -2418,6 +2418,51 @@ export function computeLampiranRka(
     }
   });
 
+  // 1.b. Petakan baris penyesuaian belanja ke template (misal: Gaji dan Tunjangan PNS / Rupiah Murni)
+  (penyesuaianList || []).forEach(adj => {
+    const factor = adj.jenis_penyesuaian === 'kurang' ? -1 : 1;
+    const pagu = factor * (Number(adj.nilai_penyesuaian) || 0);
+    if (!pagu) return;
+
+    const rawUraian = String(adj.uraian || adj.nama_akun || '').trim().toLowerCase();
+    
+    const adjRow = {
+      id: `adj_${adj.id}`,
+      unit: adj.unit_kerja,
+      uraian_belanja: `[PENYESUAIAN ${adj.jenis_penyesuaian === 'kurang' ? '(-)' : '(+)'}] ${adj.uraian || adj.nama_akun}`,
+      anggaran: pagu,
+      sumber_dana_nama: 'Rupiah Murni (RM)',
+      akun_detail: adj.nama_akun,
+      is_penyesuaian: true,
+      no_sk: adj.no_sk,
+      tanggal_sk: adj.tanggal_sk,
+      keterangan: adj.keterangan
+    };
+
+    // Prioritas 1: Exact match dengan uraian atau matchKeys
+    let match = LAMPIRAN_RKA_TEMPLATE.find(t => 
+      t.uraian.toLowerCase().trim() === rawUraian || 
+      t.matchKeys.includes(rawUraian)
+    );
+
+    // Prioritas 2: Partial match
+    if (!match) {
+      match = LAMPIRAN_RKA_TEMPLATE.find(t => {
+        const uClean = t.uraian.toLowerCase().replace(/^[-•\d.]+\s*/, '').trim();
+        return uClean === rawUraian || uClean.includes(rawUraian) || rawUraian.includes(uClean);
+      });
+    }
+
+    if (match) {
+      const entry = directMap.get(match.id)!;
+      entry.directPagu += pagu;
+      entry.directCount += 1;
+      entry.directRows.push(adjRow);
+    } else {
+      unmappedRows.push(adjRow);
+    }
+  });
+
   const items = Array.from(directMap.values());
 
   // Inisialisasi totalPagu awal dengan directPagu
