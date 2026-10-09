@@ -269,7 +269,7 @@ export async function PUT(request: Request) {
     const { ruleId, targetYear, cleanSync = true, modul = 'all', targetFormat, targetVersi } = body;
 
     async function executePenerimaanRules() {
-      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').eq('modul', 'penerimaan').order('priority', { ascending: true }).order('id', { ascending: true });
+      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').eq('modul', 'penerimaan').order('priority', { ascending: false }).order('id', { ascending: true });
       if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
       if (targetFormat && targetFormat !== 'ALL') {
         rulesQuery = rulesQuery.ilike('target_field', `%${targetFormat}%`);
@@ -382,7 +382,7 @@ export async function PUT(request: Request) {
     }
 
     async function executePengeluaranRules() {
-      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').or('modul.eq.pengeluaran,modul.is.null').order('priority', { ascending: true }).order('id', { ascending: true });
+      let rulesQuery = supabaseAdmin.from('rka_rules').select('*').or('modul.eq.pengeluaran,modul.is.null').order('priority', { ascending: false }).order('id', { ascending: true });
       if (ruleId) rulesQuery = rulesQuery.eq('id', ruleId);
       if (targetFormat && targetFormat !== 'ALL') {
         const tfLower = targetFormat.toLowerCase().trim();
