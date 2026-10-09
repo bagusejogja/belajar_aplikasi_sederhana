@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
 import RkaHelpModal from '@/components/rka/RkaHelpModal';
 import LampiranRkaView from '@/components/rka/LampiranRkaView';
 import SarprasRkaView from '@/components/rka/SarprasRkaView';
+import TemplateLaporan2View from '@/components/rka/TemplateLaporan2View';
 import { computeLampiranRka, LampiranRkaResult } from '@/lib/rka/lampiranRkaTemplate';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
@@ -1351,8 +1352,8 @@ export default function RkaLaporanPage() {
   });
   const [sertakanPenyesuaian, setSertakanPenyesuaian] = useState<boolean>(true);
   
-  // Tampilan Tabel Seragam (Summary vs Rekap Unit vs Detail)
-  const [activeViewTab, setActiveViewTab] = useState<'summary' | 'rekap_unit' | 'detail'>('summary');
+  // Tampilan Tabel Seragam (Summary vs Template 2 vs Rekap Unit vs Detail)
+  const [activeViewTab, setActiveViewTab] = useState<'summary' | 'template2' | 'rekap_unit' | 'detail'>('summary');
   const [activeDetailSubtab, setActiveDetailSubtab] = useState<'belanja' | 'penerimaan'>('belanja');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
@@ -6138,6 +6139,20 @@ export default function RkaLaporanPage() {
                 <FileSpreadsheet size={14} className="text-indigo-600" />
                 <span>{isKemen ? '10. Lampiran RKA' : 'Ringkasan Usulan'}</span>
               </button>
+              {isKemen && (
+                <button
+                  type="button"
+                  onClick={() => setActiveViewTab('template2')}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeViewTab === 'template2'
+                      ? 'bg-white text-gray-900 shadow-xs font-black'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  }`}
+                >
+                  <Landmark size={14} className="text-indigo-600" />
+                  <span>Pelaporan PTN-BH (Template 2)</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setActiveViewTab('rekap_unit')}
@@ -7360,6 +7375,17 @@ export default function RkaLaporanPage() {
             )}
 
           </div>
+        ) : activeViewTab === 'template2' && isKemen ? (
+          /* ======================================================== */
+          /* TAB VIEW: PELAPORAN PTN-BH KEMENTERIAN (TEMPLATE 2)      */
+          /* ======================================================== */
+          <TemplateLaporan2View
+            dataList={dataList}
+            penyesuaianList={penyesuaianData.list || []}
+            tahunFilter={tahunFilter}
+            versiFilter={versiFilter}
+            formatRp={formatRp}
+          />
         ) : activeViewTab === 'rekap_unit' ? (
           /* ======================================================== */
           /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA / SARPRAS      */
