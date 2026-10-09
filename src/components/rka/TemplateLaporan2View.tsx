@@ -5,7 +5,7 @@ import {
   Building2, FileSpreadsheet, Eye, EyeOff, Filter, 
   Search, ArrowUpDown, Layers, CheckCircle2, ChevronDown, ChevronRight,
   Download, FileText, Landmark, Wallet, DollarSign, Database, Copy, Check,
-  RefreshCw, Server, AlertCircle, Info
+  RefreshCw, Server, AlertCircle, Info, Save, Edit3, RotateCcw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell 
 } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { 
@@ -57,6 +58,39 @@ CREATE INDEX IF NOT EXISTS idx_rkat_realisasi_tahun_jenis ON public.rkat_realisa
 CREATE INDEX IF NOT EXISTS idx_rkat_realisasi_sheet_kategori ON public.rkat_realisasi_tahunan(sheet_no, kategori);
 NOTIFY pgrst, 'reload schema';`;
 
+// Template master pos untuk form input
+const INITIAL_SHEET3_ITEMS = [
+  { no: 1, key: 'operasional', label: 'Biaya Operasional', defN2: 1850000000000, defN1: 1980000000000 },
+  { no: 2, key: 'dosen_pns', label: 'Biaya Dosen PNS (gaji & tunjangan melekat)', defN2: 245000000000, defN1: 250000000000 },
+  { no: 3, key: 'tendik_pns', label: 'Biaya Tenaga Kependidikan PNS (gaji & tunjangan melekat)', defN2: 238000000000, defN1: 244508254000 },
+  { no: 4, key: 'dosen_non_pns', label: 'Biaya Dosen Non PNS (gaji & tunjangan melekat)', defN2: 95000000000, defN1: 105000000000 },
+  { no: 5, key: 'tendik_non_pns', label: 'Biaya Tenaga Kependidikan Non PNS (gaji & tunjangan melekat)', defN2: 140000000000, defN1: 152000000000 },
+  { no: 6, key: 'remunerasi', label: 'Remunerasi / Imbal Jasa / Insentif', defN2: 320000000000, defN1: 345000000000 },
+  { no: 7, key: 'investasi', label: 'Biaya Investasi (Prasarana & Sarana)', defN2: 285000000000, defN1: 310000000000 },
+  { no: 8, key: 'pengembangan', label: 'Biaya Pengembangan (Tridharma & Riset)', defN2: 110000000000, defN1: 125000000000 }
+];
+
+const INITIAL_SHEET4_ITEMS = [
+  { no: 1, key: 'dukman', label: '(7734) Dukungan Manajemen Ditjen Dikti', kategori: 'APBN', defN2: 483000000000, defN1: 494508254000 },
+  { no: 2, key: 'bpptnbh', label: 'Alokasi BPPTNBH', kategori: 'APBN', defN2: 165000000000, defN1: 172942300000 },
+  { no: 3, key: 'iku', label: 'Bantuan Pendanaan Berbasis IKU', kategori: 'APBN', defN2: 22000000000, defN1: 25000000000 },
+  { no: 4, key: 'puapt', label: 'PUAPT / PRPTNBH', kategori: 'APBN', defN2: 0, defN1: 0 },
+  { no: 5, key: 'pln_hln', label: 'PLN / HLN / RMP / SBSN / KPBU', kategori: 'APBN', defN2: 45000000000, defN1: 48070000000 },
+  { no: 6, key: 'dikti_lain', label: 'Pendanaan Lainnya dari Ditjen Dikti', kategori: 'APBN', defN2: 115000000000, defN1: 129713907730 },
+  { no: 7, key: 'eselon_lain', label: 'Pendanaan Unit Eselon I Kemendikbudristek selain Ditjen Dikti', kategori: 'APBN', defN2: 0, defN1: 0 },
+  { no: 8, key: 'kl_lain', label: 'Pendanaan dari K/L Lain (termasuk LPDP)', kategori: 'APBN', defN2: 72000000000, defN1: 77200000000 },
+
+  { no: 9, key: 'dana_masyarakat', label: 'Dana Masyarakat', kategori: 'SELAIN APBN', defN2: 2150000000000, defN1: 2280000000000 },
+  { no: 10, key: 'biaya_pendidikan', label: 'Biaya Pendidikan (UKT, IPI)', kategori: 'SELAIN APBN', defN2: 1620000000000, defN1: 1710000000000 },
+  { no: 11, key: 'dana_abadi', label: 'Pengelolaan Dana Abadi', kategori: 'SELAIN APBN', defN2: 28000000000, defN1: 32000000000 },
+  { no: 12, key: 'usaha_ptnbh', label: 'Usaha PTN Badan Hukum', kategori: 'SELAIN APBN', defN2: 85000000000, defN1: 95000000000 },
+  { no: 13, key: 'kerjasama', label: 'Kerjasama Tridharma Perguruan Tinggi', kategori: 'SELAIN APBN', defN2: 380000000000, defN1: 410000000000 },
+  { no: 14, key: 'kekayaan_ptnbh', label: 'Pengelolaan Kekayaan PTN Badan Hukum', kategori: 'SELAIN APBN', defN2: 22000000000, defN1: 25000000000 },
+  { no: 15, key: 'apbd', label: 'APBD', kategori: 'SELAIN APBN', defN2: 0, defN1: 0 },
+  { no: 16, key: 'pinjaman', label: 'Pinjaman', kategori: 'SELAIN APBN', defN2: 0, defN1: 0 },
+  { no: 17, key: 'saldo_kas', label: 'Saldo Kas', kategori: 'SELAIN APBN', defN2: 120000000000, defN1: 150000000000 }
+];
+
 export default function TemplateLaporan2View({
   dataList,
   penyesuaianList,
@@ -64,7 +98,7 @@ export default function TemplateLaporan2View({
   versiFilter,
   formatRp
 }: TemplateLaporan2ViewProps) {
-  // Pilihan Sheet Aktif: 'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber'
+  // Pilihan Sheet Aktif di Halaman Utama
   const [activeSheet, setActiveSheet] = useState<
     'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber'
   >('pengesahan');
@@ -73,10 +107,20 @@ export default function TemplateLaporan2View({
   const [showDbModal, setShowDbModal] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
 
+  // Tab di dalam Modal: 'input_editor' | 'db_info'
+  const [modalTab, setModalTab] = useState<'input_editor' | 'db_info'>('input_editor');
+  // Sub-sheet di dalam editor: 'sheet3' | 'sheet4'
+  const [editorSubSheet, setEditorSubSheet] = useState<'sheet3' | 'sheet4'>('sheet3');
+
   // State sinkronisasi database rkat_realisasi_tahunan
   const [realisasiTahunanList, setRealisasiTahunanList] = useState<any[]>([]);
   const [isTableCreated, setIsTableCreated] = useState<boolean>(true);
   const [loadingRealisasi, setLoadingRealisasi] = useState<boolean>(false);
+  const [savingRealisasi, setSavingRealisasi] = useState<boolean>(false);
+
+  // State nilai input di editor
+  const [formSheet3, setFormSheet3] = useState<{ [key: string]: { n2: number; n1: number } }>({});
+  const [formSheet4, setFormSheet4] = useState<{ [key: string]: { n2: number; n1: number } }>({});
 
   // Fetch data realisasi tahunan dari database Supabase melalui API Route
   const fetchRealisasiData = async () => {
@@ -87,6 +131,7 @@ export default function TemplateLaporan2View({
       if (json.success) {
         setRealisasiTahunanList(json.data || []);
         setIsTableCreated(json.isTableCreated ?? true);
+        initFormValues(json.data || []);
       }
     } catch (err) {
       console.error('Fetch rkat_realisasi_tahunan error:', err);
@@ -95,9 +140,147 @@ export default function TemplateLaporan2View({
     }
   };
 
+  // Inisialisasi nilai form dari data DB (atau fallback ke default)
+  const initFormValues = (dbData: any[]) => {
+    const s3State: { [key: string]: { n2: number; n1: number } } = {};
+    INITIAL_SHEET3_ITEMS.forEach(it => {
+      const rowN2 = dbData.find(r => String(r.sheet_no) === '3' && r.kode_pos === it.key && Number(r.tahun) === 2024);
+      const rowN1 = dbData.find(r => String(r.sheet_no) === '3' && r.kode_pos === it.key && Number(r.tahun) === 2025);
+      s3State[it.key] = {
+        n2: rowN2 ? Number(rowN2.nilai) : it.defN2,
+        n1: rowN1 ? Number(rowN1.nilai) : it.defN1
+      };
+    });
+    setFormSheet3(s3State);
+
+    const s4State: { [key: string]: { n2: number; n1: number } } = {};
+    INITIAL_SHEET4_ITEMS.forEach(it => {
+      const rowN2 = dbData.find(r => String(r.sheet_no) === '4' && r.kode_pos === it.key && Number(r.tahun) === 2024);
+      const rowN1 = dbData.find(r => String(r.sheet_no) === '4' && r.kode_pos === it.key && Number(r.tahun) === 2025);
+      s4State[it.key] = {
+        n2: rowN2 ? Number(rowN2.nilai) : it.defN2,
+        n1: rowN1 ? Number(rowN1.nilai) : it.defN1
+      };
+    });
+    setFormSheet4(s4State);
+  };
+
   useEffect(() => {
     fetchRealisasiData();
   }, [tahunFilter]);
+
+  // Handle perubahan input pada form editor
+  const handleInputChange = (
+    sheet: 'sheet3' | 'sheet4',
+    key: string,
+    field: 'n2' | 'n1',
+    val: string
+  ) => {
+    // Bersihkan karakter non-digit kecuali tanda minus
+    const cleanNum = Number(val.replace(/[^0-9.-]+/g, '')) || 0;
+    if (sheet === 'sheet3') {
+      setFormSheet3(prev => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          [field]: cleanNum
+        }
+      }));
+    } else {
+      setFormSheet4(prev => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          [field]: cleanNum
+        }
+      }));
+    }
+  };
+
+  // Simpan data input form ke database Supabase via POST /api/rka/realisasi-tahunan
+  const handleSaveToSupabase = async () => {
+    setSavingRealisasi(true);
+    try {
+      const rowsToSave: any[] = [];
+
+      // Susun rows Sheet 3
+      INITIAL_SHEET3_ITEMS.forEach(it => {
+        const valObj = formSheet3[it.key] || { n2: it.defN2, n1: it.defN1 };
+        rowsToSave.push({
+          tahun: 2024,
+          jenis: 'realisasi',
+          kategori: 'komponen_biaya',
+          sheet_no: '3',
+          kode_pos: it.key,
+          nama_pos: it.label,
+          sub_pos: '',
+          sumber_dana: 'ALL',
+          nilai: valObj.n2,
+          keterangan: `Realisasi TA 2024 - ${it.label}`
+        });
+        rowsToSave.push({
+          tahun: 2025,
+          jenis: 'anggaran',
+          kategori: 'komponen_biaya',
+          sheet_no: '3',
+          kode_pos: it.key,
+          nama_pos: it.label,
+          sub_pos: '',
+          sumber_dana: 'ALL',
+          nilai: valObj.n1,
+          keterangan: `Anggaran TA 2025 - ${it.label}`
+        });
+      });
+
+      // Susun rows Sheet 4
+      INITIAL_SHEET4_ITEMS.forEach(it => {
+        const valObj = formSheet4[it.key] || { n2: it.defN2, n1: it.defN1 };
+        rowsToSave.push({
+          tahun: 2024,
+          jenis: 'realisasi',
+          kategori: 'sumber_pembiayaan',
+          sheet_no: '4',
+          kode_pos: it.key,
+          nama_pos: it.label,
+          sub_pos: '',
+          sumber_dana: it.kategori,
+          nilai: valObj.n2,
+          keterangan: `Realisasi TA 2024 - ${it.label}`
+        });
+        rowsToSave.push({
+          tahun: 2025,
+          jenis: 'anggaran',
+          kategori: 'sumber_pembiayaan',
+          sheet_no: '4',
+          kode_pos: it.key,
+          nama_pos: it.label,
+          sub_pos: '',
+          sumber_dana: it.kategori,
+          nilai: valObj.n1,
+          keterangan: `Anggaran TA 2025 - ${it.label}`
+        });
+      });
+
+      const res = await fetch('/api/rka/realisasi-tahunan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bulk: true, rows: rowsToSave })
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal menyimpan ke database');
+      }
+
+      toast.success('Data Realisasi N-2 & Anggaran N-1 berhasil disimpan ke database Supabase!');
+      await fetchRealisasiData();
+    } catch (err: any) {
+      console.error('Save to Supabase error:', err);
+      toast.error('Gagal menyimpan: ' + err.message);
+    } finally {
+      setSavingRealisasi(false);
+    }
+  };
 
   // Komputasi data untuk seluruh 5 sheet dengan memasukkan realisasiTahunanList dari database
   const template2Data: TemplateLaporan2Data = useMemo(() => {
@@ -281,11 +464,14 @@ export default function TemplateLaporan2View({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setShowDbModal(true)}
-              className="h-9 px-3 text-xs font-bold text-indigo-700 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-xl shadow-2xs gap-1.5 cursor-pointer"
+              onClick={() => {
+                setShowDbModal(true);
+                setModalTab('input_editor');
+              }}
+              className="h-9 px-3.5 text-xs font-bold text-indigo-700 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-xl shadow-2xs gap-1.5 cursor-pointer"
             >
-              <Database size={14} className="text-indigo-600" />
-              <span>Database Realisasi</span>
+              <Edit3 size={14} className="text-indigo-600" />
+              <span>Input &amp; Kelola Realisasi</span>
             </Button>
 
             <Button
@@ -623,75 +809,285 @@ export default function TemplateLaporan2View({
         </CardContent>
       </Card>
 
-      {/* 3. DIALOG MODAL: DATABASE REALISASI TAHUNAN & SQL MIGRATION */}
+      {/* 3. DIALOG MODAL: INPUT & EDIT REALISASI TAHUNAN */}
       <Dialog open={showDbModal} onOpenChange={setShowDbModal}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
-                  <Database size={20} />
+            <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
+                  <Database size={22} />
                 </div>
                 <div>
                   <DialogTitle className="text-base font-black text-gray-900">
-                    Database Supabase: <span className="text-indigo-600 font-mono">rkat_realisasi_tahunan</span>
+                    Input &amp; Pengelolaan Realisasi Tahunan (Supabase)
                   </DialogTitle>
                   <DialogDescription className="text-xs text-gray-500 font-medium">
-                    Tabel penyimpan data makro Realisasi Tahunan (N-2) &amp; Anggaran (N-1) Pelaporan PTN-BH
+                    Tabel <code className="text-indigo-600 font-bold">public.rkat_realisasi_tahunan</code> untuk kolom Realisasi N-2 dan Anggaran N-1
                   </DialogDescription>
                 </div>
               </div>
               <Badge className={isTableCreated ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}>
-                {isTableCreated ? 'Tabel Ditemukan' : 'Perlu Migrasi SQL'}
+                {isTableCreated ? 'Tabel Terhubung' : 'Perlu Migrasi SQL'}
               </Badge>
             </div>
           </DialogHeader>
 
-          <div className="space-y-4 pt-2">
-            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
-              <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold">Struktur Database Tabel <code className="font-mono bg-blue-100 px-1 py-0.5 rounded">rkat_realisasi_tahunan</code>:</p>
-                <p className="text-[11px] text-blue-800">
-                  Kolom: <code>id</code>, <code>tahun</code>, <code>jenis</code>, <code>kategori</code>, <code>sheet_no</code>, <code>kode_pos</code>, <code>nama_pos</code>, <code>sub_pos</code>, <code>sumber_dana</code>, <code>nilai</code>, <code>proporsi</code>, <code>keterangan</code>.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-700">Script SQL Migration Lengkap:</span>
-                <span className="text-[11px] text-gray-500 font-mono">File: supabase_rkat_realisasi_tahunan_migration.sql</span>
-              </div>
-              <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-xl overflow-x-auto max-h-52 border border-slate-800 shadow-inner">
-                <pre>{SQL_MIGRATION_TEXT}</pre>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={fetchRealisasiData}
-                disabled={loadingRealisasi}
-                className="h-8 rounded-xl text-xs font-bold gap-1.5 cursor-pointer"
-              >
-                <RefreshCw size={13} className={loadingRealisasi ? 'animate-spin' : ''} />
-                <span>Cek Ulang Status Koneksi</span>
-              </Button>
-
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleCopySql}
-                className="h-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-xs cursor-pointer"
-              >
-                {copiedSql ? <Check size={13} /> : <Copy size={13} />}
-                <span>{copiedSql ? 'Tersalin!' : 'Salin Script SQL Lengkap'}</span>
-              </Button>
-            </div>
+          {/* TAB PILIHAN MODAL: INPUT EDITOR vs DB INFO */}
+          <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setModalTab('input_editor')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                modalTab === 'input_editor'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <Edit3 size={13} />
+              <span>Form Input / Edit Angka</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setModalTab('db_info')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                modalTab === 'db_info'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <Server size={13} />
+              <span>Info Struktur &amp; Script SQL</span>
+            </button>
           </div>
+
+          {/* KONTEN TAB 1: FORM INPUT EDITOR */}
+          {modalTab === 'input_editor' && (
+            <div className="space-y-4 pt-1">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setEditorSubSheet('sheet3')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      editorSubSheet === 'sheet3' ? 'bg-white text-indigo-700 shadow-xs font-black' : 'text-gray-600'
+                    }`}
+                  >
+                    Sheet 3: 8 Komponen Biaya
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditorSubSheet('sheet4')}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                      editorSubSheet === 'sheet4' ? 'bg-white text-indigo-700 shadow-xs font-black' : 'text-gray-600'
+                    }`}
+                  >
+                    Sheet 4: Sumber Pembiayaan
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => initFormValues(realisasiTahunanList)}
+                    className="h-8 rounded-xl text-xs font-bold text-gray-600 gap-1 cursor-pointer"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Reset</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveToSupabase}
+                    disabled={savingRealisasi}
+                    className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    {savingRealisasi ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                    <span>{savingRealisasi ? 'Menyimpan...' : 'Simpan ke Supabase'}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* TABEL INPUT SHEET 3 */}
+              {editorSubSheet === 'sheet3' && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className="bg-slate-800 text-white px-3 py-2 text-xs font-bold flex items-center justify-between">
+                    <span>EDIT REALISASI &amp; ANGGARAN: 8 KOMPONEN BIAYA (SHEET 3)</span>
+                    <span className="text-[11px] text-slate-300 font-mono">Simpan langsung ke Supabase</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-100 text-[11px] font-black text-slate-800">
+                        <TableHead className="w-10 text-center">No</TableHead>
+                        <TableHead className="w-64">Komponen Biaya</TableHead>
+                        <TableHead className="w-56 text-right">Realisasi 2024 (N-2) (Rp)</TableHead>
+                        <TableHead className="w-56 text-right">Anggaran 2025 (N-1) (Rp)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="text-xs divide-y divide-gray-100">
+                      {INITIAL_SHEET3_ITEMS.map((item) => {
+                        const curVal = formSheet3[item.key] || { n2: item.defN2, n1: item.defN1 };
+                        return (
+                          <TableRow key={item.key} className="hover:bg-gray-50/60">
+                            <TableCell className="text-center font-bold text-gray-500">{item.no}</TableCell>
+                            <TableCell className="font-semibold text-gray-900">{item.label}</TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                value={curVal.n2}
+                                onChange={(e) => handleInputChange('sheet3', item.key, 'n2', e.target.value)}
+                                className="h-8 text-right font-mono font-bold text-xs"
+                              />
+                              <div className="text-[10px] text-gray-500 font-mono text-right mt-0.5">
+                                Rp {formatRp(curVal.n2)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                value={curVal.n1}
+                                onChange={(e) => handleInputChange('sheet3', item.key, 'n1', e.target.value)}
+                                className="h-8 text-right font-mono font-bold text-xs"
+                              />
+                              <div className="text-[10px] text-gray-500 font-mono text-right mt-0.5">
+                                Rp {formatRp(curVal.n1)}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* TABEL INPUT SHEET 4 */}
+              {editorSubSheet === 'sheet4' && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className="bg-slate-800 text-white px-3 py-2 text-xs font-bold flex items-center justify-between">
+                    <span>EDIT REALISASI &amp; ANGGARAN: SUMBER PEMBIAYAAN (SHEET 4)</span>
+                    <span className="text-[11px] text-slate-300 font-mono">APBN &amp; Selain APBN</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-100 text-[11px] font-black text-slate-800">
+                        <TableHead className="w-10 text-center">No</TableHead>
+                        <TableHead className="w-64">Sumber Pembiayaan</TableHead>
+                        <TableHead className="w-24 text-center">Kategori</TableHead>
+                        <TableHead className="w-52 text-right">Realisasi 2024 (N-2) (Rp)</TableHead>
+                        <TableHead className="w-52 text-right">Anggaran 2025 (N-1) (Rp)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="text-xs divide-y divide-gray-100">
+                      {INITIAL_SHEET4_ITEMS.map((item) => {
+                        const curVal = formSheet4[item.key] || { n2: item.defN2, n1: item.defN1 };
+                        return (
+                          <TableRow key={item.key} className="hover:bg-gray-50/60">
+                            <TableCell className="text-center font-bold text-gray-500">{item.no}</TableCell>
+                            <TableCell className="font-semibold text-gray-900">{item.label}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={`text-[9px] font-bold ${item.kategori === 'APBN' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                                {item.kategori}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                value={curVal.n2}
+                                onChange={(e) => handleInputChange('sheet4', item.key, 'n2', e.target.value)}
+                                className="h-8 text-right font-mono font-bold text-xs"
+                              />
+                              <div className="text-[10px] text-gray-500 font-mono text-right mt-0.5">
+                                Rp {formatRp(curVal.n2)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                value={curVal.n1}
+                                onChange={(e) => handleInputChange('sheet4', item.key, 'n1', e.target.value)}
+                                className="h-8 text-right font-mono font-bold text-xs"
+                              />
+                              <div className="text-[10px] text-gray-500 font-mono text-right mt-0.5">
+                                Rp {formatRp(curVal.n1)}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <span className="text-[11px] text-gray-500 font-medium italic">
+                  💡 Angka yang disimpan akan langsung mengupdate tampilan Sheet 3, 4, 6, dan 7 secara real-time.
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSaveToSupabase}
+                  disabled={savingRealisasi}
+                  className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
+                >
+                  {savingRealisasi ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
+                  <span>Simpan Semua Perubahan</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* KONTEN TAB 2: DB INFO & SCRIPT SQL */}
+          {modalTab === 'db_info' && (
+            <div className="space-y-4 pt-1">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
+                <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-semibold">Informasi Tabel Database <code className="font-mono bg-blue-100 px-1 py-0.5 rounded">rkat_realisasi_tahunan</code>:</p>
+                  <p className="text-[11px] text-blue-800">
+                    Menyimpan angka agregat makro Realisasi Tahunan (N-2) dan Anggaran Tahunan (N-1). Tabel ini telah aktif di Supabase Anda dan terhubung secara otomatis ke modul evaluasi laporan kementerian.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700">Script SQL Migration Lengkap:</span>
+                  <span className="text-[11px] text-gray-500 font-mono">File: supabase_rkat_realisasi_tahunan_migration.sql</span>
+                </div>
+                <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-xl overflow-x-auto max-h-52 border border-slate-800 shadow-inner">
+                  <pre>{SQL_MIGRATION_TEXT}</pre>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchRealisasiData}
+                  disabled={loadingRealisasi}
+                  className="h-8 rounded-xl text-xs font-bold gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw size={13} className={loadingRealisasi ? 'animate-spin' : ''} />
+                  <span>Cek Ulang Status Koneksi</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCopySql}
+                  className="h-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-xs cursor-pointer"
+                >
+                  {copiedSql ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedSql ? 'Tersalin!' : 'Salin Script SQL Lengkap'}</span>
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
