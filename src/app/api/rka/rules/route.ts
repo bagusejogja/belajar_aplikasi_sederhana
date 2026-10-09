@@ -505,11 +505,11 @@ export async function PUT(request: Request) {
             if (akuns.length === 1) {
               const a = akuns[0];
               const pat = /^\d+$/.test(a) ? `${a}%` : `%${a}%`;
-              chunkQ = chunkQ.or(`akun_detail.ilike.${pat},akun_utama.ilike.${pat},sub_akun.ilike.${pat}`);
+              chunkQ = chunkQ.ilike('akun_detail', pat);
             } else if (akuns.length > 1) {
               const akunConds = akuns.map((a: string) => {
                 const pat = /^\d+$/.test(a) ? `${a}%` : `%${a}%`;
-                return `akun_detail.ilike.${pat},akun_utama.ilike.${pat},sub_akun.ilike.${pat}`;
+                return `akun_detail.ilike.${pat}`;
               }).join(',');
               chunkQ = chunkQ.or(akunConds);
             }
@@ -519,9 +519,9 @@ export async function PUT(request: Request) {
             const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
             if (kws.length === 1) {
               const kw = kws[0];
-              chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%,akun_detail.ilike.%${kw}%`);
+              chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%`);
             } else if (kws.length > 1) {
-              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%,akun_detail.ilike.%${kw}%`).join(',');
+              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%`).join(',');
               chunkQ = chunkQ.or(orConds);
             }
           }

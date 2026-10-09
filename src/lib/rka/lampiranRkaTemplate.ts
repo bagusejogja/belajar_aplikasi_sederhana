@@ -1466,7 +1466,10 @@ export const LAMPIRAN_RKA_TEMPLATE: LampiranRkaRow[] = [
     "isHeader": false,
     "matchKeys": [
       "gaji dan tunjangan",
-      "1. gaji dan tunjangan"
+      "1. gaji dan tunjangan",
+      "gaji dosen tetap fakultas",
+      "gaji dosen non asn",
+      "1. gaji dan tunjangan dosen"
     ]
   },
   {
