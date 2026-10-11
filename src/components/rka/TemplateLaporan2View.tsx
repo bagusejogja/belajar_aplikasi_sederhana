@@ -5,7 +5,8 @@ import {
   Building2, FileSpreadsheet, Eye, EyeOff, Filter, 
   Search, ArrowUpDown, Layers, CheckCircle2, ChevronDown, ChevronRight,
   Download, FileText, Landmark, Wallet, DollarSign, Database, Copy, Check,
-  RefreshCw, Server, AlertCircle, Info, Save, Edit3, RotateCcw
+  RefreshCw, Server, AlertCircle, Info, Save, Edit3, RotateCcw,
+  ArrowLeft, X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1006,10 +1007,21 @@ export default function TemplateLaporan2View({
       <Dialog open={showDbModal} onOpenChange={setShowDbModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3 flex-wrap">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl">
-                  <Database size={22} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDbModal(false)}
+                  className="h-8.5 px-3 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                  title="Kembali ke Laporan"
+                >
+                  <ArrowLeft size={14} />
+                  <span>Kembali</span>
+                </Button>
+                <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
+                  <Database size={20} />
                 </div>
                 <div>
                   <DialogTitle className="text-base font-black text-gray-900">
@@ -1020,9 +1032,21 @@ export default function TemplateLaporan2View({
                   </DialogDescription>
                 </div>
               </div>
-              <Badge className={isTableCreated ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}>
-                {isTableCreated ? 'Tabel Terhubung' : 'Perlu Migrasi SQL'}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={isTableCreated ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}>
+                  {isTableCreated ? 'Tabel Terhubung' : 'Perlu Migrasi SQL'}
+                </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowDbModal(false)}
+                  className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X size={16} />
+                </Button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -1215,16 +1239,28 @@ export default function TemplateLaporan2View({
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                <span className="text-[11px] text-gray-500 font-medium italic">
-                  💡 Angka yang disimpan akan langsung mengupdate tampilan Sheet 3, 4, 6, dan 7 secara real-time.
-                </span>
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDbModal(false)}
+                    className="h-8.5 px-3.5 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <ArrowLeft size={13} />
+                    <span>Kembali ke Laporan</span>
+                  </Button>
+                  <span className="text-[11px] text-gray-500 font-medium italic hidden md:inline">
+                    💡 Angka yang disimpan akan langsung mengupdate tampilan Sheet 3, 4, 6, dan 7 secara real-time.
+                  </span>
+                </div>
                 <Button
                   type="button"
                   size="sm"
                   onClick={handleSaveToSupabase}
                   disabled={savingRealisasi}
-                  className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
+                  className="h-8.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1.5 shadow-xs cursor-pointer"
                 >
                   {savingRealisasi ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
                   <span>Simpan Semua Perubahan</span>
@@ -1256,28 +1292,41 @@ export default function TemplateLaporan2View({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-100 flex-wrap">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={fetchRealisasiData}
-                  disabled={loadingRealisasi}
-                  className="h-8 rounded-xl text-xs font-bold gap-1.5 cursor-pointer"
+                  onClick={() => setShowDbModal(false)}
+                  className="h-8.5 px-3.5 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs gap-1.5 cursor-pointer shadow-2xs"
                 >
-                  <RefreshCw size={13} className={loadingRealisasi ? 'animate-spin' : ''} />
-                  <span>Cek Ulang Status Koneksi</span>
+                  <ArrowLeft size={13} />
+                  <span>Kembali ke Laporan</span>
                 </Button>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleCopySql}
-                  className="h-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-xs cursor-pointer"
-                >
-                  {copiedSql ? <Check size={13} /> : <Copy size={13} />}
-                  <span>{copiedSql ? 'Tersalin!' : 'Salin Script SQL Lengkap'}</span>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRealisasiData}
+                    disabled={loadingRealisasi}
+                    className="h-8.5 rounded-xl text-xs font-bold gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw size={13} className={loadingRealisasi ? 'animate-spin' : ''} />
+                    <span>Cek Ulang Status Koneksi</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCopySql}
+                    className="h-8.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    {copiedSql ? <Check size={13} /> : <Copy size={13} />}
+                    <span>{copiedSql ? 'Tersalin!' : 'Salin Script SQL Lengkap'}</span>
+                  </Button>
+                </div>
               </div>
             </div>
           )}

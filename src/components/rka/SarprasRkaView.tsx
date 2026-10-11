@@ -68,19 +68,12 @@ export default function SarprasRkaView({
     return lower.includes('fakultas') || lower.includes('sekolah pascasarjana') || lower.includes('sekolah vokasi');
   };
 
-  // Proses dan kelompokkan seluruh data akun 551*
+  // Proses dan kelompokkan seluruh data akun 551* (Termasuk Tanah 55101)
   const groupedSarpras: SarprasGroupItem[] = useMemo(() => {
     const rows551 = (dataList || []).filter(r => {
       const akunD = (r.akun_detail || '').trim();
       const subA = (r.sub_akun || '').trim();
-      const is55 = akunD.startsWith('551') || subA.startsWith('551') || akunD.startsWith('55');
-      if (!is55) return false;
-
-      // Filter: Tidak menampilkan akun 55101 (Biaya Modal Tanah)
-      if (akunD.startsWith('55101') || subA.startsWith('55101') || akunD.toLowerCase().includes('tanah')) {
-        return false;
-      }
-      return true;
+      return akunD.startsWith('551') || subA.startsWith('551') || akunD.startsWith('55');
     });
 
     const map: Record<string, SarprasGroupItem> = {};
@@ -94,11 +87,6 @@ export default function SarprasRkaView({
       const sarprasName = prefix + targetUnit;
       const kategori: 'Fakultas' | 'Non-Fakultas (UGM)' = isFak ? 'Fakultas' : 'Non-Fakultas (UGM)';
       const akunDetail = row.akun_detail || row.sub_akun || '551 Belanja Modal';
-
-      // Jangan masukkan jika akun tanah
-      if (akunDetail.startsWith('55101') || sarprasName.toLowerCase().includes('tanah')) {
-        return;
-      }
 
       const key = `${akunDetail}__${targetUnit}`;
       if (!map[key]) {
@@ -120,9 +108,7 @@ export default function SarprasRkaView({
       map[key].rows.push(row);
     });
 
-    const list = Object.values(map).filter(
-      item => !item.akunDetail.startsWith('55101') && !item.sarprasName.toLowerCase().includes('tanah')
-    );
+    const list = Object.values(map);
 
     // Urutkan berdasarkan MAK (kode akun detail) baru Unit
     list.sort((a, b) => {
@@ -397,11 +383,7 @@ export default function SarprasRkaView({
                         </TableCell>
                         <TableCell className="text-xs font-bold text-slate-900 py-2.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span>{isFak ? '🏛️' : '🏢'}</span>
-                            <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 shrink-0">
-                              {item.akunDetail}
-                            </span>
-                            <span className="text-slate-900">{item.sarprasName}</span>
+                            <span className="text-slate-900 font-semibold">{item.sarprasName}</span>
                             <Badge 
                               variant="secondary" 
                               className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200/80 px-2 py-0.5 rounded-md"
