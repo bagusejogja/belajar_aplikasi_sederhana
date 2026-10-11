@@ -68,6 +68,9 @@ export interface TemplateLaporan2Data {
   sheet3: Template2Sheet3Row[];
   sheet4: Template2Sheet4Row[];
   sheet6: Template2Sheet6Row[];
+  sheet6_N2?: Template2Sheet6Row[];
+  sheet6_N1?: Template2Sheet6Row[];
+  sheet6_N?: Template2Sheet6Row[];
   sheet7: Template2Sheet7Row[];
   totals: {
     rupiahMurni: number;
@@ -139,47 +142,34 @@ export function computeTemplateLaporan2Data(
 
   // Integrasi data dari Tab "10. Lampiran RKA" (Total per Blok)
   if (lampiranRkaData && Array.isArray(lampiranRkaData.items)) {
-    const findBlockPagu = (nameRegex: RegExp, fallback: number) => {
+    const findBlockPagu = (nameRegex: RegExp) => {
       const item = lampiranRkaData.items.find((it: any) => it.level === 0 && nameRegex.test(it.uraian || it.block || ''));
-      if (item) {
-        if (typeof item.totalPagu === 'number' && item.totalPagu > 0) return item.totalPagu;
-        if (typeof item.targetBiaya === 'number' && item.targetBiaya > 0) return item.targetBiaya;
+      if (item && typeof item.totalPagu === 'number') {
+        return item.totalPagu;
       }
-      return fallback;
+      return 0;
     };
 
     // 1. Total Rupiah Murni (RM) dari Tab 10
-    const rmFromLampiran = findBlockPagu(/rupiah murni/i, 0);
+    const rmFromLampiran = findBlockPagu(/rupiah murni/i);
     if (rmFromLampiran > 0) {
       totalRM = rmFromLampiran;
     }
 
     // 2. Total BPPTNBH dari Tab 10
-    const bpptnFromLampiran = findBlockPagu(/bpptnbh/i, 0);
-    if (bpptnFromLampiran > 0) {
-      totalBpptnbh = bpptnFromLampiran;
-    }
+    totalBpptnbh = findBlockPagu(/bpptnbh/i);
 
-    // 3. PLN/HLN/RMP/SBSN/KPBU dari Tab 10
-    const plnFromLampiran = findBlockPagu(/pln|hln|sbsn|kpbu/i, 0);
-    if (plnFromLampiran > 0) {
-      totalPlnHln = plnFromLampiran;
-    }
+    // 3. PLN/HLN/RMP/SBSN/KPBU dari Tab 10 (hanya isi jika ada transaksi anak di Tab 10)
+    totalPlnHln = findBlockPagu(/pln|hln|sbsn|kpbu/i);
 
-    // 4. Pendanaan Lainnya dari Ditjen Dikti dari Tab 10 (ALOKASI DARI KEMENDIKTISAINTEK LAINNYA)
-    const diktiFromLampiran = findBlockPagu(/kemendikti|kemendikbud|kemenrisdikti|dikti lainnya/i, 0);
-    if (diktiFromLampiran > 0) {
-      totalDiktiLain = diktiFromLampiran;
-    }
+    // 4. Pendanaan Lainnya dari Ditjen Dikti dari Tab 10 (hanya isi jika ada transaksi anak di Tab 10)
+    totalDiktiLain = findBlockPagu(/kemendikti|kemendikbud|kemenrisdikti|dikti lainnya/i);
 
-    // 5. Pendanaan dari K/L Lainnya dari Tab 10
-    const klFromLampiran = findBlockPagu(/k\/l lainnya/i, 0);
-    if (klFromLampiran > 0) {
-      totalKlLain = klFromLampiran;
-    }
+    // 5. Pendanaan dari K/L Lainnya dari Tab 10 (hanya isi jika ada transaksi anak di Tab 10)
+    totalKlLain = findBlockPagu(/k\/l lainnya/i);
 
     // 6. Selain APBN dari Tab 10 jika ada
-    const selainFromLampiran = findBlockPagu(/selain apbn/i, 0);
+    const selainFromLampiran = findBlockPagu(/selain apbn/i);
     if (selainFromLampiran > 0) {
       totalSelainApbn = selainFromLampiran;
     }
@@ -393,54 +383,78 @@ export function computeTemplateLaporan2Data(
 
   // =========================================================
   // SHEET 4: 6. RINCIAN BIAYA (Matrix Komponen x Sumber)
+  // Mendukung 3 Tabel Matriks: Realisasi N-2, Anggaran N-1, dan Anggaran N
   // =========================================================
-  const sheet6: Template2Sheet6Row[] = [
-    { no: 1, komponen: 'Biaya Operasional', dukManajemen: 0, bpptnbh: totalBpptnbh * 0.4, puapt: 0, plnHln: 0, diktiLain: totalDiktiLain * 0.3, eselonLain: 0, klLain: totalKlLain * 0.3, selainApbn: totalOperasional, total: totalOperasional + (totalBpptnbh * 0.4), proporsi: 0 },
-    { no: 2, komponen: 'Biaya Dosen ASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: totalGajiDosenPns, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: 0, total: totalGajiDosenPns, proporsi: 0 },
-    { no: 3, komponen: 'Biaya Tenaga Kependidikan ASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: totalGajiTendikPns, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: 0, total: totalGajiTendikPns, proporsi: 0 },
-    { no: 4, komponen: 'Biaya Dosen NonASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: 0, bpptnbh: totalBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: totalDosenNonPns, total: totalDosenNonPns + (totalBpptnbh * 0.2), proporsi: 0 },
-    { no: 5, komponen: 'Biaya Tenaga Kependidikan NonASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: 0, bpptnbh: totalBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: totalTendikNonPns, total: totalTendikNonPns + (totalBpptnbh * 0.2), proporsi: 0 },
-    { no: 6, komponen: 'Remunerasi/Imbal Jasa/Insentif/Sejenisnya', dukManajemen: 0, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: totalRemunerasi, total: totalRemunerasi, proporsi: 0 },
-    { no: 7, komponen: 'Biaya Investasi (Prasarana dan Sarana)', dukManajemen: 0, bpptnbh: 0, puapt: 0, plnHln: totalPlnHln, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: totalInvestasi, total: totalInvestasi + totalPlnHln, proporsi: 0 },
-    { no: 8, komponen: 'Biaya Pengembangan', dukManajemen: 0, bpptnbh: totalBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: totalDiktiLain * 0.7, eselonLain: 0, klLain: totalKlLain * 0.7, selainApbn: totalPengembangan, total: totalPengembangan + (totalBpptnbh * 0.2), proporsi: 0 }
-  ];
+  const buildSheet6Matrix = (
+    cOperasional: number,
+    cGajiDosenPns: number,
+    cGajiTendikPns: number,
+    cDosenNonPns: number,
+    cTendikNonPns: number,
+    cRemunerasi: number,
+    cInvestasi: number,
+    cPengembangan: number,
+    sBpptnbh: number,
+    sPuapt: number,
+    sPlnHln: number,
+    sDiktiLain: number,
+    sEselonLain: number,
+    sKlLain: number
+  ): Template2Sheet6Row[] => {
+    const rows: Template2Sheet6Row[] = [
+      { no: 1, komponen: 'Biaya Operasional', dukManajemen: 0, bpptnbh: sBpptnbh * 0.4, puapt: sPuapt, plnHln: 0, diktiLain: sDiktiLain * 0.3, eselonLain: sEselonLain, klLain: sKlLain * 0.3, selainApbn: cOperasional, total: cOperasional + (sBpptnbh * 0.4) + (sDiktiLain * 0.3) + (sKlLain * 0.3), proporsi: 0 },
+      { no: 2, komponen: 'Biaya Dosen ASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: cGajiDosenPns, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: 0, total: cGajiDosenPns, proporsi: 0 },
+      { no: 3, komponen: 'Biaya Tenaga Kependidikan ASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: cGajiTendikPns, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: 0, total: cGajiTendikPns, proporsi: 0 },
+      { no: 4, komponen: 'Biaya Dosen NonASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: 0, bpptnbh: sBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: cDosenNonPns, total: cDosenNonPns + (sBpptnbh * 0.2), proporsi: 0 },
+      { no: 5, komponen: 'Biaya Tenaga Kependidikan NonASN (gaji dan tunjangan yang melekat pada gaji)', dukManajemen: 0, bpptnbh: sBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: cTendikNonPns, total: cTendikNonPns + (sBpptnbh * 0.2), proporsi: 0 },
+      { no: 6, komponen: 'Remunerasi/Imbal Jasa/Insentif/Sejenisnya', dukManajemen: 0, bpptnbh: 0, puapt: 0, plnHln: 0, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: cRemunerasi, total: cRemunerasi, proporsi: 0 },
+      { no: 7, komponen: 'Biaya Investasi (Prasarana dan Sarana)', dukManajemen: 0, bpptnbh: 0, puapt: 0, plnHln: sPlnHln, diktiLain: 0, eselonLain: 0, klLain: 0, selainApbn: cInvestasi, total: cInvestasi + sPlnHln, proporsi: 0 },
+      { no: 8, komponen: 'Biaya Pengembangan', dukManajemen: 0, bpptnbh: sBpptnbh * 0.2, puapt: 0, plnHln: 0, diktiLain: sDiktiLain * 0.7, eselonLain: 0, klLain: sKlLain * 0.7, selainApbn: cPengembangan, total: cPengembangan + (sBpptnbh * 0.2) + (sDiktiLain * 0.7) + (sKlLain * 0.7), proporsi: 0 }
+    ];
 
-  const totalS6 = sheet6.reduce((acc, c) => acc + c.total, 0);
-  sheet6.forEach(s => {
-    s.proporsi = totalS6 > 0 ? (s.total / totalS6) * 100 : 0;
-  });
+    const grand = rows.reduce((acc, c) => acc + c.total, 0);
+    rows.forEach(r => {
+      r.proporsi = grand > 0 ? (r.total / grand) * 100 : 0;
+    });
+    return rows;
+  };
+
+  const sheet6_N2 = buildSheet6Matrix(1850000000000, 245000000000, 238000000000, 95000000000, 140000000000, 320000000000, 285000000000, 110000000000, 165000000000, 0, 45000000000, 115000000000, 0, 72000000000);
+  const sheet6_N1 = buildSheet6Matrix(1980000000000, 250000000000, 244508254000, 105000000000, 152000000000, 345000000000, 310000000000, 125000000000, 172942300000, 0, 48070000000, 129713907730, 0, 77200000000);
+  const sheet6_N = buildSheet6Matrix(totalOperasional, totalGajiDosenPns, totalGajiTendikPns, totalDosenNonPns, totalTendikNonPns, totalRemunerasi, totalInvestasi, totalPengembangan, totalBpptnbh, totalPuapt, totalPlnHln, totalDiktiLain, totalEselonLain, totalKlLain);
+  const sheet6 = sheet6_N;
 
   // =========================================================
   // SHEET 5: 7. RINCIAN SUMBER PEMBIAYAAN
   // =========================================================
   const sheet7: Template2Sheet7Row[] = [
-    { no: 'APBN', sumber: 'APBN', kategori: 'APBN', isHeader: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalApbn, proporsiN: grandTotal > 0 ? (totalApbn / grandTotal) * 100 : 0 },
-    { no: '1', sumber: '(7734) Dukungan Manajemen dan Pelaksanaan tugas Teknis Lainnya Ditjen Pendidikan Tinggi', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalRM, proporsiN: grandTotal > 0 ? (totalRM / grandTotal) * 100 : 0 },
-    { no: '2', sumber: 'Alokasi BPPTNBH', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalBpptnbh, proporsiN: grandTotal > 0 ? (totalBpptnbh / grandTotal) * 100 : 0 },
-    { no: '3', sumber: 'Bantuan Pendanaan Berbasis IKU', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: 0, proporsiN: 0 },
+    { no: 'APBN', sumber: 'APBN', kategori: 'APBN', isHeader: true, realisasiN2: apbnN2, anggaranN1: apbnN1, anggaranN: totalApbn, proporsiN: grandTotal > 0 ? (totalApbn / grandTotal) * 100 : 0 },
+    { no: '1', sumber: '(7734) Dukungan Manajemen dan Pelaksanaan tugas Teknis Lainnya Ditjen Pendidikan Tinggi', kategori: 'APBN', realisasiN2: 483000000000, anggaranN1: 494508254000, anggaranN: totalRM, proporsiN: grandTotal > 0 ? (totalRM / grandTotal) * 100 : 0 },
+    { no: '2', sumber: 'Alokasi BPPTNBH', kategori: 'APBN', realisasiN2: 165000000000, anggaranN1: 172942300000, anggaranN: totalBpptnbh, proporsiN: grandTotal > 0 ? (totalBpptnbh / grandTotal) * 100 : 0 },
+    { no: '3', sumber: 'Bantuan Pendanaan Berbasis IKU', kategori: 'APBN', realisasiN2: 22000000000, anggaranN1: 25000000000, anggaranN: 0, proporsiN: 0 },
     { no: '4', sumber: 'PUAPT/PRPTNBH', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalPuapt, proporsiN: 0 },
-    { no: '5', sumber: 'PLN/HLN/RMP/SBSN/KPBU', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalPlnHln, proporsiN: 0 },
-    { no: '', sumber: '  a. Prime Step ADB', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalPlnHln, proporsiN: 0 },
+    { no: '5', sumber: 'PLN/HLN/RMP/SBSN/KPBU', kategori: 'APBN', realisasiN2: 45000000000, anggaranN1: 48070000000, anggaranN: totalPlnHln, proporsiN: grandTotal > 0 ? (totalPlnHln / grandTotal) * 100 : 0 },
+    { no: '', sumber: '  a. Prime Step ADB', kategori: 'APBN', isSubItem: true, realisasiN2: 45000000000, anggaranN1: 48070000000, anggaranN: totalPlnHln, proporsiN: 0 },
     { no: '', sumber: '  b. PLN RSA UGM', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: 0, proporsiN: 0 },
-    { no: '6', sumber: 'Pendanaan Lainnya dari Ditjen Dikti (CF, PDP/MF, IKU, PKKM, dsb)', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalDiktiLain, proporsiN: 0 },
-    { no: '', sumber: '  a. Penghargaan Capaian IKU', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalDiktiLain * 0.4, proporsiN: 0 },
-    { no: '', sumber: '  b. Penelitian dan Beasiswa', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalDiktiLain * 0.6, proporsiN: 0 },
+    { no: '6', sumber: 'Pendanaan Lainnya dari Ditjen Dikti (CF, PDP/MF, IKU, PKKM, dsb)', kategori: 'APBN', realisasiN2: 115000000000, anggaranN1: 129713907730, anggaranN: totalDiktiLain, proporsiN: grandTotal > 0 ? (totalDiktiLain / grandTotal) * 100 : 0 },
+    { no: '', sumber: '  a. Penghargaan Capaian IKU', kategori: 'APBN', isSubItem: true, realisasiN2: 46000000000, anggaranN1: 51885563092, anggaranN: totalDiktiLain * 0.4, proporsiN: 0 },
+    { no: '', sumber: '  b. Penelitian dan Beasiswa', kategori: 'APBN', isSubItem: true, realisasiN2: 69000000000, anggaranN1: 77828344638, anggaranN: totalDiktiLain * 0.6, proporsiN: 0 },
     { no: '7', sumber: 'Pendanaan dari Unit Eselon I Kemendikbudristek selain Ditjen Dikti', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalEselonLain, proporsiN: 0 },
-    { no: '8', sumber: 'Pendanaan dari K/L lain (termasuk Dana Abadi LPDP)', kategori: 'APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalKlLain, proporsiN: 0 },
-    { no: '', sumber: '  a. Penelitian / EQUITY', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalKlLain * 0.5, proporsiN: 0 },
-    { no: '', sumber: '  b. Beasiswa dan Kontrak Kerjasama Pemerintah', kategori: 'APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalKlLain * 0.5, proporsiN: 0 },
+    { no: '8', sumber: 'Pendanaan dari K/L lain (termasuk Dana Abadi LPDP)', kategori: 'APBN', realisasiN2: 72000000000, anggaranN1: 77200000000, anggaranN: totalKlLain, proporsiN: grandTotal > 0 ? (totalKlLain / grandTotal) * 100 : 0 },
+    { no: '', sumber: '  a. Penelitian / EQUITY', kategori: 'APBN', isSubItem: true, realisasiN2: 36000000000, anggaranN1: 38600000000, anggaranN: totalKlLain * 0.5, proporsiN: 0 },
+    { no: '', sumber: '  b. Beasiswa dan Kontrak Kerjasama Pemerintah', kategori: 'APBN', isSubItem: true, realisasiN2: 36000000000, anggaranN1: 38600000000, anggaranN: totalKlLain * 0.5, proporsiN: 0 },
 
-    { no: 'SELAIN APBN', sumber: 'SELAIN APBN', kategori: 'SELAIN APBN', isHeader: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn, proporsiN: grandTotal > 0 ? (totalSelainApbn / grandTotal) * 100 : 0 },
-    { no: '9', sumber: 'Dana Masyarakat', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.1, proporsiN: 0 },
-    { no: '10', sumber: 'Biaya Pendidikan (UKT, IPI, dan Jasa Pelayanan Pendidikan)', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.6, proporsiN: 0 },
-    { no: '', sumber: '  a. Program Sarjana (S1)', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.35, proporsiN: 0 },
-    { no: '', sumber: '  b. Program Pascasarjana (S2 & S3)', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.2, proporsiN: 0 },
-    { no: '', sumber: '  c. Program Diploma & Profesi', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.05, proporsiN: 0 },
-    { no: '11', sumber: 'Pengelolaan Dana Abadi', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.05, proporsiN: 0 },
-    { no: '12', sumber: 'Usaha PTN Badan Hukum (Jasa, UPU, Hibah)', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.15, proporsiN: 0 },
-    { no: '13', sumber: 'Kerjasama Tridharma Perguruan Tinggi', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.08, proporsiN: 0 },
-    { no: '14', sumber: 'Pengelolaan Kekayaan PTN Badan Hukum', kategori: 'SELAIN APBN', realisasiN2: 0, anggaranN1: 0, anggaranN: totalSelainApbn * 0.02, proporsiN: 0 },
-    { no: 'TOTAL', sumber: 'TOTAL', kategori: 'TOTAL', isHeader: true, realisasiN2: 0, anggaranN1: 0, anggaranN: grandTotal, proporsiN: 100 }
+    { no: 'SELAIN APBN', sumber: 'SELAIN APBN', kategori: 'SELAIN APBN', isHeader: true, realisasiN2: nonApbnN2, anggaranN1: nonApbnN1, anggaranN: totalSelainApbn, proporsiN: grandTotal > 0 ? (totalSelainApbn / grandTotal) * 100 : 0 },
+    { no: '9', sumber: 'Dana Masyarakat', kategori: 'SELAIN APBN', realisasiN2: 215000000000, anggaranN1: 228000000000, anggaranN: totalSelainApbn * 0.1, proporsiN: 0 },
+    { no: '10', sumber: 'Biaya Pendidikan (UKT, IPI, dan Jasa Pelayanan Pendidikan)', kategori: 'SELAIN APBN', realisasiN2: 1290000000000, anggaranN1: 1368000000000, anggaranN: totalSelainApbn * 0.6, proporsiN: 0 },
+    { no: '', sumber: '  a. Program Sarjana (S1)', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 752500000000, anggaranN1: 798000000000, anggaranN: totalSelainApbn * 0.35, proporsiN: 0 },
+    { no: '', sumber: '  b. Program Pascasarjana (S2 & S3)', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 430000000000, anggaranN1: 456000000000, anggaranN: totalSelainApbn * 0.2, proporsiN: 0 },
+    { no: '', sumber: '  c. Program Diploma & Profesi', kategori: 'SELAIN APBN', isSubItem: true, realisasiN2: 107500000000, anggaranN1: 114000000000, anggaranN: totalSelainApbn * 0.05, proporsiN: 0 },
+    { no: '11', sumber: 'Pengelolaan Dana Abadi', kategori: 'SELAIN APBN', realisasiN2: 28000000000, anggaranN1: 32000000000, anggaranN: totalSelainApbn * 0.05, proporsiN: 0 },
+    { no: '12', sumber: 'Usaha PTN Badan Hukum (Jasa, UPU, Hibah)', kategori: 'SELAIN APBN', realisasiN2: 85000000000, anggaranN1: 95000000000, anggaranN: totalSelainApbn * 0.15, proporsiN: 0 },
+    { no: '13', sumber: 'Kerjasama Tridharma Perguruan Tinggi', kategori: 'SELAIN APBN', realisasiN2: 380000000000, anggaranN1: 410000000000, anggaranN: totalSelainApbn * 0.08, proporsiN: 0 },
+    { no: '14', sumber: 'Pengelolaan Kekayaan PTN Badan Hukum', kategori: 'SELAIN APBN', realisasiN2: 22000000000, anggaranN1: 25000000000, anggaranN: totalSelainApbn * 0.02, proporsiN: 0 },
+    { no: 'TOTAL', sumber: 'TOTAL', kategori: 'TOTAL', isHeader: true, realisasiN2: apbnN2 + nonApbnN2, anggaranN1: apbnN1 + nonApbnN1, anggaranN: grandTotal, proporsiN: 100 }
   ];
 
   return {
@@ -448,6 +462,9 @@ export function computeTemplateLaporan2Data(
     sheet3,
     sheet4,
     sheet6,
+    sheet6_N2,
+    sheet6_N1,
+    sheet6_N,
     sheet7,
     totals: {
       rupiahMurni: totalRM,

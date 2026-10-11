@@ -466,7 +466,7 @@ export default function LampiranRkaView({
                         <TableCell className="text-center text-slate-300 text-xs">-</TableCell>
                         <TableCell className="text-right text-slate-300 text-xs">-</TableCell>
                         <TableCell className="text-right pr-4 font-mono font-black text-sm text-emerald-400">
-                          {item.totalPagu > 0 ? `Rp ${formatRp(item.totalPagu)}` : (item.targetBiaya ? `Rp ${formatRp(item.targetBiaya)}` : 'Rp 0')}
+                          {item.totalPagu > 0 ? `Rp ${formatRp(item.totalPagu)}` : 'Rp 0'}
                         </TableCell>
                         <TableCell className="text-center text-slate-400 text-xs">-</TableCell>
                       </TableRow>
@@ -516,7 +516,7 @@ export default function LampiranRkaView({
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-black text-xs text-slate-950">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-black">Rp ${formatRp(item.totalPagu)}</span>
+                              <span className="text-indigo-900 font-black">Rp {formatRp(item.totalPagu)}</span>
                             ) : (
                               <span className="text-slate-300 font-normal">-</span>
                             )}
@@ -594,7 +594,7 @@ export default function LampiranRkaView({
                           </TableCell>
                           <TableCell className="text-right pr-4 font-mono font-bold text-xs text-slate-900">
                             {item.totalPagu > 0 ? (
-                              <span className="text-indigo-900 font-bold">Rp ${formatRp(item.totalPagu)}</span>
+                              <span className="text-indigo-900 font-bold">Rp {formatRp(item.totalPagu)}</span>
                             ) : (
                               <span className="text-slate-300 font-normal">-</span>
                             )}

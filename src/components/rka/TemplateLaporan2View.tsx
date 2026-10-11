@@ -19,6 +19,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { 
   TemplateLaporan2Data,
+  Template2Sheet6Row,
   computeTemplateLaporan2Data 
 } from '@/lib/rka/templateLaporan2Data';
 
@@ -95,6 +96,104 @@ const INITIAL_SHEET4_ITEMS = [
   { no: 17, key: 'saldo_kas', label: 'Saldo Kas', kategori: 'SELAIN APBN', defN2: 120000000000, defN1: 150000000000 }
 ];
 
+// Sub-komponen Tabel Matriks 8 Komponen Biaya per Sumber Pembiayaan (Sheet 6)
+function MatrixRincianBiayaTable({
+  title,
+  subtitle,
+  badgeText,
+  badgeColor,
+  rows,
+  formatRp
+}: {
+  title: string;
+  subtitle: string;
+  badgeText: string;
+  badgeColor: string;
+  rows: Template2Sheet6Row[];
+  formatRp: (val: number) => string;
+}) {
+  const sumDukman = rows.reduce((acc, r) => acc + (r.dukManajemen || 0), 0);
+  const sumBpptnbh = rows.reduce((acc, r) => acc + (r.bpptnbh || 0), 0);
+  const sumPuapt = rows.reduce((acc, r) => acc + (r.puapt || 0), 0);
+  const sumPlnHln = rows.reduce((acc, r) => acc + (r.plnHln || 0), 0);
+  const sumDiktiLain = rows.reduce((acc, r) => acc + (r.diktiLain || 0), 0);
+  const sumKlLain = rows.reduce((acc, r) => acc + (r.klLain || 0), 0);
+  const sumSelainApbn = rows.reduce((acc, r) => acc + (r.selainApbn || 0), 0);
+  const sumTotal = rows.reduce((acc, r) => acc + (r.total || 0), 0);
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs bg-white">
+      <div className="bg-slate-800 text-white px-4 py-3 font-bold text-xs flex items-center justify-between min-w-[1000px]">
+        <div className="flex items-center gap-2">
+          <span>{title}</span>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${badgeColor}`}>
+            {badgeText}
+          </span>
+        </div>
+        <span className="text-[11px] text-slate-300 font-mono">{subtitle}</span>
+      </div>
+      <Table className="min-w-[1000px]">
+        <TableHeader>
+          <TableRow className="bg-slate-100 hover:bg-slate-100 text-[10px] font-black text-slate-800 divide-x divide-gray-200">
+            <TableHead className="w-10 text-center">No</TableHead>
+            <TableHead className="w-60">Komponen Biaya</TableHead>
+            <TableHead className="text-right w-32">(7734) Dukman</TableHead>
+            <TableHead className="text-right w-32">BPPTNBH</TableHead>
+            <TableHead className="text-right w-24">PUAPT</TableHead>
+            <TableHead className="text-right w-32">PLN / HLN</TableHead>
+            <TableHead className="text-right w-32">Dikti Lainnya</TableHead>
+            <TableHead className="text-right w-32">K/L Lainnya</TableHead>
+            <TableHead className="text-right w-36">Selain APBN</TableHead>
+            <TableHead className="text-right w-36 bg-indigo-50 font-black">TOTAL</TableHead>
+            <TableHead className="text-right w-20">Proporsi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="text-xs divide-y divide-gray-100">
+          {rows.map((r, idx) => (
+            <TableRow key={idx} className="hover:bg-gray-50/80 divide-x divide-gray-100">
+              <TableCell className="text-center font-bold text-gray-500">{r.no}</TableCell>
+              <TableCell className="font-semibold text-gray-900">{r.komponen}</TableCell>
+              <TableCell className="text-right font-mono text-blue-900 font-semibold">{r.dukManajemen > 0 ? formatRp(r.dukManajemen) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-indigo-900 font-semibold">{r.bpptnbh > 0 ? formatRp(r.bpptnbh) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-gray-400">{r.puapt > 0 ? formatRp(r.puapt) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-teal-900 font-semibold">{r.plnHln > 0 ? formatRp(r.plnHln) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-orange-900 font-semibold">{r.diktiLain > 0 ? formatRp(r.diktiLain) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-amber-900 font-semibold">{r.klLain > 0 ? formatRp(r.klLain) : '-'}</TableCell>
+              <TableCell className="text-right font-mono text-emerald-900 font-semibold">{r.selainApbn > 0 ? formatRp(r.selainApbn) : '-'}</TableCell>
+              <TableCell className="text-right font-mono font-black text-indigo-950 bg-indigo-50/50">
+                Rp {formatRp(r.total)}
+              </TableCell>
+              <TableCell className="text-right font-mono font-bold text-indigo-700">
+                {r.proporsi.toFixed(2)}%
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <tfoot className="bg-slate-100/90 font-black text-xs border-t-2 border-slate-300 divide-x divide-gray-200">
+          <tr>
+            <td colSpan={2} className="p-3 text-slate-900 uppercase">
+              JUMLAH ANGGARAN
+            </td>
+            <td className="p-3 text-right font-mono text-blue-950">{sumDukman > 0 ? formatRp(sumDukman) : '-'}</td>
+            <td className="p-3 text-right font-mono text-indigo-950">{sumBpptnbh > 0 ? formatRp(sumBpptnbh) : '-'}</td>
+            <td className="p-3 text-right font-mono text-gray-400">{sumPuapt > 0 ? formatRp(sumPuapt) : '-'}</td>
+            <td className="p-3 text-right font-mono text-teal-950">{sumPlnHln > 0 ? formatRp(sumPlnHln) : '-'}</td>
+            <td className="p-3 text-right font-mono text-orange-950">{sumDiktiLain > 0 ? formatRp(sumDiktiLain) : '-'}</td>
+            <td className="p-3 text-right font-mono text-amber-950">{sumKlLain > 0 ? formatRp(sumKlLain) : '-'}</td>
+            <td className="p-3 text-right font-mono text-emerald-950">{sumSelainApbn > 0 ? formatRp(sumSelainApbn) : '-'}</td>
+            <td className="p-3 text-right font-mono text-indigo-950 bg-indigo-100/60 font-black">
+              Rp {formatRp(sumTotal)}
+            </td>
+            <td className="p-3 text-right font-mono font-black text-indigo-800">
+              100.00%
+            </td>
+          </tr>
+        </tfoot>
+      </Table>
+    </div>
+  );
+}
+
 export default function TemplateLaporan2View({
   dataList,
   penyesuaianList,
@@ -106,6 +205,17 @@ export default function TemplateLaporan2View({
   onSheetChange,
   hideSubTabs
 }: TemplateLaporan2ViewProps) {
+  // Parsing tahun N, N-1, N-2
+  const tahunN = parseInt(tahunFilter) || 2026;
+  const tahunN1 = tahunN - 1;
+  const tahunN2 = tahunN - 2;
+
+  // Kontrol sub-tab internal agar tidak duplikat dengan tab navigasi atas
+  const showSubTabs = !hideSubTabs && !controlledSheet;
+
+  // Mode tampilan 3 tabel matriks Sheet 6
+  const [sheet6TableMode, setSheet6TableMode] = useState<'all' | 'n2' | 'n1' | 'n'>('all');
+
   // Pilihan Sheet Aktif di Halaman Utama
   const [activeSheet, setActiveSheet] = useState<
     'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber'
@@ -228,7 +338,7 @@ export default function TemplateLaporan2View({
       INITIAL_SHEET3_ITEMS.forEach(it => {
         const valObj = formSheet3[it.key] || { n2: it.defN2, n1: it.defN1 };
         rowsToSave.push({
-          tahun: 2024,
+          tahun: tahunN2,
           jenis: 'realisasi',
           kategori: 'komponen_biaya',
           sheet_no: '3',
@@ -237,10 +347,10 @@ export default function TemplateLaporan2View({
           sub_pos: '',
           sumber_dana: 'ALL',
           nilai: valObj.n2,
-          keterangan: `Realisasi TA 2024 - ${it.label}`
+          keterangan: `Realisasi TA ${tahunN2} - ${it.label}`
         });
         rowsToSave.push({
-          tahun: 2025,
+          tahun: tahunN1,
           jenis: 'anggaran',
           kategori: 'komponen_biaya',
           sheet_no: '3',
@@ -249,7 +359,7 @@ export default function TemplateLaporan2View({
           sub_pos: '',
           sumber_dana: 'ALL',
           nilai: valObj.n1,
-          keterangan: `Anggaran TA 2025 - ${it.label}`
+          keterangan: `Anggaran TA ${tahunN1} - ${it.label}`
         });
       });
 
@@ -257,7 +367,7 @@ export default function TemplateLaporan2View({
       INITIAL_SHEET4_ITEMS.forEach(it => {
         const valObj = formSheet4[it.key] || { n2: it.defN2, n1: it.defN1 };
         rowsToSave.push({
-          tahun: 2024,
+          tahun: tahunN2,
           jenis: 'realisasi',
           kategori: 'sumber_pembiayaan',
           sheet_no: '4',
@@ -266,10 +376,10 @@ export default function TemplateLaporan2View({
           sub_pos: '',
           sumber_dana: it.kategori,
           nilai: valObj.n2,
-          keterangan: `Realisasi TA 2024 - ${it.label}`
+          keterangan: `Realisasi TA ${tahunN2} - ${it.label}`
         });
         rowsToSave.push({
-          tahun: 2025,
+          tahun: tahunN1,
           jenis: 'anggaran',
           kategori: 'sumber_pembiayaan',
           sheet_no: '4',
@@ -278,7 +388,7 @@ export default function TemplateLaporan2View({
           sub_pos: '',
           sumber_dana: it.kategori,
           nilai: valObj.n1,
-          keterangan: `Anggaran TA 2025 - ${it.label}`
+          keterangan: `Anggaran TA ${tahunN1} - ${it.label}`
         });
       });
 
@@ -293,7 +403,7 @@ export default function TemplateLaporan2View({
         throw new Error(json.error || 'Gagal menyimpan ke database');
       }
 
-      toast.success('Data Realisasi N-2 & Anggaran N-1 berhasil disimpan ke database Supabase!');
+      toast.success(`Data Realisasi ${tahunN2} & Anggaran ${tahunN1} berhasil disimpan ke database Supabase!`);
       await fetchRealisasiData();
     } catch (err: any) {
       console.error('Save to Supabase error:', err);
@@ -322,9 +432,9 @@ export default function TemplateLaporan2View({
 
       // 1. Sheet Pengesahan
       const s1Rows: any[] = [
-        ['Tabel Pengesahan'],
+        ['Tabel Pengesahan Evaluasi Anggaran PTN-BH'],
         [],
-        ['No', 'Sumber Pembiayaan', `Anggaran ${parseInt(tahunFilter) - 1 || 'N-1'}`, `Anggaran ${tahunFilter || 'N'}`]
+        ['No', 'Sumber Pembiayaan', `Anggaran ${tahunN1}`, `Anggaran ${tahunN}`]
       ];
       template2Data.sheet1.forEach(r => {
         s1Rows.push([r.no, r.sumber, r.anggaranN1, r.anggaranN]);
@@ -334,9 +444,9 @@ export default function TemplateLaporan2View({
 
       // 2. Sheet 3. Ringkasan Biaya
       const s3Rows: any[] = [
-        ['Ringkasan Biaya'],
+        ['Ringkasan 8 Komponen Biaya PTN-BH'],
         [],
-        ['No', 'Komponen Biaya', 'Realisasi N-2', 'Anggaran N-1', `Anggaran ${tahunFilter || 'N'}`, `Proporsi Anggaran ${tahunFilter || 'N'}`]
+        ['No', 'Komponen Biaya', `Realisasi ${tahunN2}`, `Anggaran ${tahunN1}`, `Anggaran ${tahunN}`, `Proporsi ${tahunN} (%)`]
       ];
       template2Data.sheet3.forEach(r => {
         s3Rows.push([r.no, r.komponen, r.realisasiN2, r.anggaranN1, r.anggaranN, `${r.proporsiN.toFixed(2)}%`]);
@@ -346,9 +456,9 @@ export default function TemplateLaporan2View({
 
       // 3. Sheet 4. Ringkasan Sumber Pembiayaan
       const s4Rows: any[] = [
-        ['Ringkasan Sumber Pembiayaan'],
+        ['Ringkasan Sumber Pembiayaan (APBN vs Selain APBN)'],
         [],
-        ['No', 'Sumber Pembiayaan', 'Realisasi N-2', 'Anggaran N-1', `Anggaran ${tahunFilter || 'N'}`, `Proporsi Anggaran ${tahunFilter || 'N'}`]
+        ['No', 'Sumber Pembiayaan', `Realisasi ${tahunN2}`, `Anggaran ${tahunN1}`, `Anggaran ${tahunN}`, `Proporsi ${tahunN} (%)`]
       ];
       template2Data.sheet4.forEach(r => {
         s4Rows.push([r.no, r.sumber, r.realisasiN2, r.anggaranN1, r.anggaranN, r.proporsiN ? `${r.proporsiN.toFixed(2)}%` : '']);
@@ -356,27 +466,28 @@ export default function TemplateLaporan2View({
       const ws4 = XLSX.utils.aoa_to_sheet(s4Rows);
       XLSX.utils.book_append_sheet(wb, ws4, '4. Ringkasan Sumber Pembiayaan');
 
-      // 4. Sheet 6. Rincian Biaya
+      // 4. Sheet 6. Rincian Biaya (3 Tabel: Realisasi N-2, Anggaran N-1, Anggaran N)
       const s6Rows: any[] = [
-        ['Rincian Biaya'],
+        [`TABEL 1: REALISASI TAHUN ${tahunN2}`],
         [],
-        ['No', 'Komponen Biaya', '(7734) Dukungan Manajemen', 'Alokasi BPPTNBH', 'PUAPT/PRPTNBH', 'PLN/HLN/RMP/SBSN/KPBU', 'Ditjen Dikti Lainnya', 'Unit Eselon I Lain', 'K/L Lain', 'Selain APBN', 'Total', 'Proporsi']
+        ['No', 'Komponen Biaya', '(7734) Dukungan Manajemen', 'Alokasi BPPTNBH', 'PUAPT/PRPTNBH', 'PLN/HLN/RMP/SBSN/KPBU', 'Ditjen Dikti Lainnya', 'Unit Eselon I Lain', 'K/L Lain', 'Selain APBN', 'Total', 'Proporsi (%)']
       ];
-      template2Data.sheet6.forEach(r => {
-        s6Rows.push([
-          r.no,
-          r.komponen,
-          r.dukManajemen,
-          r.bpptnbh,
-          r.puapt,
-          r.plnHln,
-          r.diktiLain,
-          r.eselonLain,
-          r.klLain,
-          r.selainApbn,
-          r.total,
-          `${r.proporsi.toFixed(2)}%`
-        ]);
+      (template2Data.sheet6_N2 || []).forEach(r => {
+        s6Rows.push([r.no, r.komponen, r.dukManajemen, r.bpptnbh, r.puapt, r.plnHln, r.diktiLain, r.eselonLain, r.klLain, r.selainApbn, r.total, `${r.proporsi.toFixed(2)}%`]);
+      });
+      s6Rows.push([]);
+      s6Rows.push([`TABEL 2: ANGGARAN TAHUN ${tahunN1}`]);
+      s6Rows.push([]);
+      s6Rows.push(['No', 'Komponen Biaya', '(7734) Dukungan Manajemen', 'Alokasi BPPTNBH', 'PUAPT/PRPTNBH', 'PLN/HLN/RMP/SBSN/KPBU', 'Ditjen Dikti Lainnya', 'Unit Eselon I Lain', 'K/L Lain', 'Selain APBN', 'Total', 'Proporsi (%)']);
+      (template2Data.sheet6_N1 || []).forEach(r => {
+        s6Rows.push([r.no, r.komponen, r.dukManajemen, r.bpptnbh, r.puapt, r.plnHln, r.diktiLain, r.eselonLain, r.klLain, r.selainApbn, r.total, `${r.proporsi.toFixed(2)}%`]);
+      });
+      s6Rows.push([]);
+      s6Rows.push([`TABEL 3: ANGGARAN TAHUN ${tahunN}`]);
+      s6Rows.push([]);
+      s6Rows.push(['No', 'Komponen Biaya', '(7734) Dukungan Manajemen', 'Alokasi BPPTNBH', 'PUAPT/PRPTNBH', 'PLN/HLN/RMP/SBSN/KPBU', 'Ditjen Dikti Lainnya', 'Unit Eselon I Lain', 'K/L Lain', 'Selain APBN', 'Total', 'Proporsi (%)']);
+      (template2Data.sheet6_N || template2Data.sheet6 || []).forEach(r => {
+        s6Rows.push([r.no, r.komponen, r.dukManajemen, r.bpptnbh, r.puapt, r.plnHln, r.diktiLain, r.eselonLain, r.klLain, r.selainApbn, r.total, `${r.proporsi.toFixed(2)}%`]);
       });
       const ws6 = XLSX.utils.aoa_to_sheet(s6Rows);
       XLSX.utils.book_append_sheet(wb, ws6, '6. Rincian Biaya');
@@ -385,7 +496,7 @@ export default function TemplateLaporan2View({
       const s7Rows: any[] = [
         ['Rincian Sumber Pembiayaan'],
         [],
-        ['No', 'Sumber Pembiayaan', 'Realisasi N-2', 'Anggaran N-1', `Anggaran ${tahunFilter || 'N'}`, 'Proporsi']
+        ['No', 'Sumber Pembiayaan', `Realisasi ${tahunN2}`, `Anggaran ${tahunN1}`, `Anggaran ${tahunN}`, `Proporsi ${tahunN} (%)`]
       ];
       template2Data.sheet7.forEach(r => {
         s7Rows.push([r.no, r.sumber, r.realisasiN2, r.anggaranN1, r.anggaranN, r.proporsiN ? `${r.proporsiN.toFixed(2)}%` : '']);
@@ -507,8 +618,8 @@ export default function TemplateLaporan2View({
         </CardHeader>
 
         <CardContent className="p-4 sm:p-5 space-y-4">
-          {/* SHEET TAB BUTTONS */}
-          {!hideSubTabs && (
+          {/* SHEET TAB BUTTONS (Hanya jika tidak dikontrol oleh navigasi atas atau jika hideSubTabs bernilai false) */}
+          {showSubTabs && (
             <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 p-1.5 rounded-xl border border-gray-200 text-xs font-bold overflow-x-auto">
               <button
                 type="button"
@@ -589,8 +700,8 @@ export default function TemplateLaporan2View({
                   <TableRow className="bg-slate-100 hover:bg-slate-100 text-[11px] font-black text-slate-800">
                     <TableHead className="w-16 text-center">No</TableHead>
                     <TableHead>Sumber Pembiayaan</TableHead>
-                    <TableHead className="text-right w-56">Anggaran {parseInt(tahunFilter) - 1 || 'N-1'}</TableHead>
-                    <TableHead className="text-right w-56">Anggaran {tahunFilter || 'N'}</TableHead>
+                    <TableHead className="text-right w-56">Anggaran {tahunN1}</TableHead>
+                    <TableHead className="text-right w-56">Anggaran {tahunN}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs divide-y divide-gray-100">
@@ -629,10 +740,10 @@ export default function TemplateLaporan2View({
                   <TableRow className="bg-slate-100 hover:bg-slate-100 text-[11px] font-black text-slate-800">
                     <TableHead className="w-12 text-center">No</TableHead>
                     <TableHead>Komponen Biaya</TableHead>
-                    <TableHead className="text-right w-44">Realisasi 2024 (N-2)</TableHead>
-                    <TableHead className="text-right w-44">Anggaran 2025 (N-1)</TableHead>
-                    <TableHead className="text-right w-52">Anggaran N (TA {tahunFilter})</TableHead>
-                    <TableHead className="text-right w-32">Proporsi (%)</TableHead>
+                    <TableHead className="text-right w-44">Realisasi {tahunN2}</TableHead>
+                    <TableHead className="text-right w-44">Anggaran {tahunN1}</TableHead>
+                    <TableHead className="text-right w-52">Anggaran {tahunN}</TableHead>
+                    <TableHead className="text-right w-32">Proporsi {tahunN} (%)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs divide-y divide-gray-100">
@@ -677,10 +788,10 @@ export default function TemplateLaporan2View({
                   <TableRow className="bg-slate-100 hover:bg-slate-100 text-[11px] font-black text-slate-800">
                     <TableHead className="w-12 text-center">No</TableHead>
                     <TableHead>Sumber Pembiayaan</TableHead>
-                    <TableHead className="text-right w-44">Realisasi N-2</TableHead>
-                    <TableHead className="text-right w-44">Anggaran N-1</TableHead>
-                    <TableHead className="text-right w-52">Anggaran N (TA {tahunFilter})</TableHead>
-                    <TableHead className="text-right w-32">Proporsi (%)</TableHead>
+                    <TableHead className="text-right w-44">Realisasi {tahunN2}</TableHead>
+                    <TableHead className="text-right w-44">Anggaran {tahunN1}</TableHead>
+                    <TableHead className="text-right w-52">Anggaran {tahunN}</TableHead>
+                    <TableHead className="text-right w-32">Proporsi {tahunN} (%)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs divide-y divide-gray-100">
@@ -722,51 +833,80 @@ export default function TemplateLaporan2View({
             </div>
           )}
 
-          {/* TABEL SHEET 4: 6. RINCIAN BIAYA (MATRIX) */}
+          {/* TABEL SHEET 4: 6. RINCIAN BIAYA (3 TABEL MATRIX) */}
           {activeSheet === 'rincian_biaya' && (
-            <div className="border border-gray-200 rounded-xl overflow-x-auto shadow-2xs">
-              <div className="bg-slate-800 text-white px-4 py-3 font-bold text-xs flex items-center justify-between min-w-[1000px]">
-                <span>RINCIAN 8 KOMPONEN BIAYA PER SUMBER PEMBIAYAAN</span>
-                <span className="text-[11px] text-slate-300 font-mono">Matriks Alokasi Dana</span>
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700">Tampilkan Tabel:</span>
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setSheet6TableMode('all')}
+                      className={`px-3 py-1 rounded-md cursor-pointer transition-all ${sheet6TableMode === 'all' ? 'bg-white text-indigo-700 shadow-2xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Semua 3 Tabel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSheet6TableMode('n2')}
+                      className={`px-3 py-1 rounded-md cursor-pointer transition-all ${sheet6TableMode === 'n2' ? 'bg-white text-blue-700 shadow-2xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Realisasi {tahunN2}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSheet6TableMode('n1')}
+                      className={`px-3 py-1 rounded-md cursor-pointer transition-all ${sheet6TableMode === 'n1' ? 'bg-white text-purple-700 shadow-2xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Anggaran {tahunN1}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSheet6TableMode('n')}
+                      className={`px-3 py-1 rounded-md cursor-pointer transition-all ${sheet6TableMode === 'n' ? 'bg-white text-indigo-700 shadow-2xs font-black' : 'text-slate-600 hover:text-slate-900'}`}
+                    >
+                      Anggaran {tahunN}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Matriks 8 Komponen Biaya per Sumber Pembiayaan
+                </div>
               </div>
-              <Table className="min-w-[1000px]">
-                <TableHeader>
-                  <TableRow className="bg-slate-100 hover:bg-slate-100 text-[10px] font-black text-slate-800 divide-x divide-gray-200">
-                    <TableHead className="w-10 text-center">No</TableHead>
-                    <TableHead className="w-60">Komponen Biaya</TableHead>
-                    <TableHead className="text-right w-32">(7734) Dukman</TableHead>
-                    <TableHead className="text-right w-32">BPPTNBH</TableHead>
-                    <TableHead className="text-right w-24">PUAPT</TableHead>
-                    <TableHead className="text-right w-32">PLN / HLN</TableHead>
-                    <TableHead className="text-right w-32">Dikti Lainnya</TableHead>
-                    <TableHead className="text-right w-32">K/L Lainnya</TableHead>
-                    <TableHead className="text-right w-36">Selain APBN</TableHead>
-                    <TableHead className="text-right w-36 bg-indigo-50 font-black">TOTAL</TableHead>
-                    <TableHead className="text-right w-20">Proporsi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="text-xs divide-y divide-gray-100">
-                  {template2Data.sheet6.map((r, idx) => (
-                    <TableRow key={idx} className="hover:bg-gray-50/80 divide-x divide-gray-100">
-                      <TableCell className="text-center font-bold text-gray-500">{r.no}</TableCell>
-                      <TableCell className="font-semibold text-gray-900">{r.komponen}</TableCell>
-                      <TableCell className="text-right font-mono text-blue-900 font-semibold">{r.dukManajemen > 0 ? formatRp(r.dukManajemen) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-indigo-900 font-semibold">{r.bpptnbh > 0 ? formatRp(r.bpptnbh) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-gray-400">{r.puapt > 0 ? formatRp(r.puapt) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-teal-900 font-semibold">{r.plnHln > 0 ? formatRp(r.plnHln) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-orange-900 font-semibold">{r.diktiLain > 0 ? formatRp(r.diktiLain) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-amber-900 font-semibold">{r.klLain > 0 ? formatRp(r.klLain) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono text-emerald-900 font-semibold">{r.selainApbn > 0 ? formatRp(r.selainApbn) : '-'}</TableCell>
-                      <TableCell className="text-right font-mono font-black text-indigo-950 bg-indigo-50/50">
-                        Rp {formatRp(r.total)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-bold text-indigo-700">
-                        {r.proporsi.toFixed(2)}%
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+
+              {(sheet6TableMode === 'all' || sheet6TableMode === 'n2') && (
+                <MatrixRincianBiayaTable
+                  title={`TABEL 1: REALISASI TAHUN ${tahunN2}`}
+                  subtitle={`Evaluasi Realisasi Belanja Tahun ${tahunN2}`}
+                  badgeText={`Realisasi ${tahunN2}`}
+                  badgeColor="bg-blue-100 text-blue-800"
+                  rows={template2Data.sheet6_N2 || []}
+                  formatRp={formatRp}
+                />
+              )}
+
+              {(sheet6TableMode === 'all' || sheet6TableMode === 'n1') && (
+                <MatrixRincianBiayaTable
+                  title={`TABEL 2: ANGGARAN TAHUN ${tahunN1}`}
+                  subtitle={`Evaluasi Anggaran Belanja Tahun ${tahunN1}`}
+                  badgeText={`Anggaran ${tahunN1}`}
+                  badgeColor="bg-purple-100 text-purple-800"
+                  rows={template2Data.sheet6_N1 || []}
+                  formatRp={formatRp}
+                />
+              )}
+
+              {(sheet6TableMode === 'all' || sheet6TableMode === 'n') && (
+                <MatrixRincianBiayaTable
+                  title={`TABEL 3: ANGGARAN TAHUN ${tahunN}`}
+                  subtitle={`Matriks Alokasi RKA RKAT Tahun ${tahunN}`}
+                  badgeText={`Anggaran ${tahunN}`}
+                  badgeColor="bg-indigo-100 text-indigo-800"
+                  rows={template2Data.sheet6_N || template2Data.sheet6 || []}
+                  formatRp={formatRp}
+                />
+              )}
             </div>
           )}
 
@@ -782,10 +922,10 @@ export default function TemplateLaporan2View({
                   <TableRow className="bg-slate-100 hover:bg-slate-100 text-[11px] font-black text-slate-800">
                     <TableHead className="w-12 text-center">No</TableHead>
                     <TableHead>Sumber Pembiayaan &amp; Sub-Item</TableHead>
-                    <TableHead className="text-right w-44">Realisasi N-2</TableHead>
-                    <TableHead className="text-right w-44">Anggaran N-1</TableHead>
-                    <TableHead className="text-right w-52">Anggaran N (TA {tahunFilter})</TableHead>
-                    <TableHead className="text-right w-28">Proporsi</TableHead>
+                    <TableHead className="text-right w-44">Realisasi {tahunN2}</TableHead>
+                    <TableHead className="text-right w-44">Anggaran {tahunN1}</TableHead>
+                    <TableHead className="text-right w-52">Anggaran {tahunN}</TableHead>
+                    <TableHead className="text-right w-28">Proporsi {tahunN} (%)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody className="text-xs divide-y divide-gray-100">
@@ -846,7 +986,7 @@ export default function TemplateLaporan2View({
                     Input &amp; Pengelolaan Realisasi Tahunan (Supabase)
                   </DialogTitle>
                   <DialogDescription className="text-xs text-gray-500 font-medium">
-                    Tabel <code className="text-indigo-600 font-bold">public.rkat_realisasi_tahunan</code> untuk kolom Realisasi N-2 dan Anggaran N-1
+                    Tabel <code className="text-indigo-600 font-bold">public.rkat_realisasi_tahunan</code> untuk kolom Realisasi {tahunN2} dan Anggaran {tahunN1}
                   </DialogDescription>
                 </div>
               </div>
@@ -945,8 +1085,8 @@ export default function TemplateLaporan2View({
                       <TableRow className="bg-slate-100 text-[11px] font-black text-slate-800">
                         <TableHead className="w-10 text-center">No</TableHead>
                         <TableHead className="w-64">Komponen Biaya</TableHead>
-                        <TableHead className="w-56 text-right">Realisasi 2024 (N-2) (Rp)</TableHead>
-                        <TableHead className="w-56 text-right">Anggaran 2025 (N-1) (Rp)</TableHead>
+                        <TableHead className="w-56 text-right">Realisasi {tahunN2} (Rp)</TableHead>
+                        <TableHead className="w-56 text-right">Anggaran {tahunN1} (Rp)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody className="text-xs divide-y divide-gray-100">
@@ -999,8 +1139,8 @@ export default function TemplateLaporan2View({
                         <TableHead className="w-10 text-center">No</TableHead>
                         <TableHead className="w-64">Sumber Pembiayaan</TableHead>
                         <TableHead className="w-24 text-center">Kategori</TableHead>
-                        <TableHead className="w-52 text-right">Realisasi 2024 (N-2) (Rp)</TableHead>
-                        <TableHead className="w-52 text-right">Anggaran 2025 (N-1) (Rp)</TableHead>
+                        <TableHead className="w-52 text-right">Realisasi {tahunN2} (Rp)</TableHead>
+                        <TableHead className="w-52 text-right">Anggaran {tahunN1} (Rp)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody className="text-xs divide-y divide-gray-100">

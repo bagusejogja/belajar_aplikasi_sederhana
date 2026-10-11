@@ -86,8 +86,9 @@ export default function SarprasRkaView({
       const prefix = getSarprasPrefix(row.akun_detail);
       const sarprasName = prefix + targetUnit;
       const kategori: 'Fakultas' | 'Non-Fakultas (UGM)' = isFak ? 'Fakultas' : 'Non-Fakultas (UGM)';
+      const akunDetail = row.akun_detail || row.sub_akun || '551 Belanja Modal';
 
-      const key = `${kategori}__${sarprasName}`;
+      const key = `${akunDetail}__${targetUnit}`;
       if (!map[key]) {
         map[key] = {
           id: key.replace(/[^a-zA-Z0-9_]/g, '_'),
@@ -95,7 +96,7 @@ export default function SarprasRkaView({
           kategori,
           unitTarget: targetUnit,
           rawUnit: isFak ? unitClean : 'Universitas Gadjah Mada (UGM)',
-          akunDetail: row.akun_detail || '551 Belanja Modal',
+          akunDetail,
           count: 0,
           totalAnggaran: 0,
           rows: []
@@ -109,12 +110,22 @@ export default function SarprasRkaView({
 
     const list = Object.values(map);
 
-    // Urutkan: Fakultas terlebih dahulu (alfabetik), lalu Non-Fakultas (UGM)
+    // Urutkan berdasarkan MAK (kode akun detail) baru Unit
     list.sort((a, b) => {
-      if (a.kategori !== b.kategori) {
-        return a.kategori === 'Fakultas' ? -1 : 1;
-      }
-      return a.sarprasName.localeCompare(b.sarprasName, 'id', { sensitivity: 'base' });
+      const makA = (a.akunDetail || '').trim();
+      const makB = (b.akunDetail || '').trim();
+      const cmpMak = makA.localeCompare(makB, 'id', { numeric: true });
+      if (cmpMak !== 0) return cmpMak;
+      return a.unitTarget.localeCompare(b.unitTarget, 'id', { numeric: true });
+    });
+
+    // Urutkan transaksi internal per item
+    list.forEach(item => {
+      item.rows.sort((r1, r2) => {
+        const c1 = (r1.akun_detail || '').localeCompare(r2.akun_detail || '', 'id', { numeric: true });
+        if (c1 !== 0) return c1;
+        return (r1.unit || '').localeCompare(r2.unit || '', 'id');
+      });
     });
 
     return list;
@@ -157,6 +168,7 @@ export default function SarprasRkaView({
   const handleExportExcel = () => {
     const exportRows = filteredList.map((item, idx) => ({
       'Nomor': idx + 1,
+      'Kode Akun / MAK': item.akunDetail,
       'Sarana/Prasarana': item.sarprasName,
       'Kelompok Unit': item.kategori,
       'Unit Kerja': item.unitTarget,
@@ -167,6 +179,7 @@ export default function SarprasRkaView({
     const ws = XLSX.utils.json_to_sheet(exportRows);
     ws['!cols'] = [
       { wch: 8 },
+      { wch: 22 },
       { wch: 65 },
       { wch: 22 },
       { wch: 35 },
@@ -377,6 +390,9 @@ export default function SarprasRkaView({
                         <TableCell className="text-xs font-bold text-slate-900 py-2">
                           <div className="flex items-center gap-2">
                             <span>{isFak ? '🏛️' : '🏢'}</span>
+                            <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 shrink-0">
+                              {item.akunDetail}
+                            </span>
                             <span>{item.sarprasName}</span>
                           </div>
                         </TableCell>

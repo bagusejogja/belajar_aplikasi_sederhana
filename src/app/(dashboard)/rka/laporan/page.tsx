@@ -7485,6 +7485,7 @@ export default function RkaLaporanPage() {
             versiFilter={versiFilter}
             formatRp={formatRp}
             lampiranRkaData={lampiranRkaData}
+            hideSubTabs={true}
             controlledSheet={
               activeViewTab === 't2_ringkasan_biaya' ? 'ringkasan_biaya' :
               activeViewTab === 't2_ringkasan_sumber' ? 'ringkasan_sumber' :
