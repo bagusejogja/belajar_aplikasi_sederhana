@@ -28,6 +28,10 @@ interface TemplateLaporan2ViewProps {
   tahunFilter: string;
   versiFilter: string;
   formatRp: (val: number) => string;
+  lampiranRkaData?: any;
+  controlledSheet?: 'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber';
+  onSheetChange?: (sheet: 'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber') => void;
+  hideSubTabs?: boolean;
 }
 
 const SQL_MIGRATION_TEXT = `-- SQL MIGRATION SUPABASE: rkat_realisasi_tahunan
@@ -96,12 +100,29 @@ export default function TemplateLaporan2View({
   penyesuaianList,
   tahunFilter,
   versiFilter,
-  formatRp
+  formatRp,
+  lampiranRkaData,
+  controlledSheet,
+  onSheetChange,
+  hideSubTabs
 }: TemplateLaporan2ViewProps) {
   // Pilihan Sheet Aktif di Halaman Utama
   const [activeSheet, setActiveSheet] = useState<
     'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber'
-  >('pengesahan');
+  >(controlledSheet || 'pengesahan');
+
+  useEffect(() => {
+    if (controlledSheet) {
+      setActiveSheet(controlledSheet);
+    }
+  }, [controlledSheet]);
+
+  const handleSelectSheet = (sheet: 'pengesahan' | 'ringkasan_biaya' | 'ringkasan_sumber' | 'rincian_biaya' | 'rincian_sumber') => {
+    setActiveSheet(sheet);
+    if (onSheetChange) {
+      onSheetChange(sheet);
+    }
+  };
 
   const [search, setSearch] = useState<string>('');
   const [showDbModal, setShowDbModal] = useState<boolean>(false);
@@ -282,10 +303,10 @@ export default function TemplateLaporan2View({
     }
   };
 
-  // Komputasi data untuk seluruh 5 sheet dengan memasukkan realisasiTahunanList dari database
+  // Komputasi data untuk seluruh 5 sheet dengan memasukkan realisasiTahunanList dari database & data Tab 10 Lampiran RKA
   const template2Data: TemplateLaporan2Data = useMemo(() => {
-    return computeTemplateLaporan2Data(dataList, penyesuaianList, realisasiTahunanList);
-  }, [dataList, penyesuaianList, realisasiTahunanList]);
+    return computeTemplateLaporan2Data(dataList, penyesuaianList, realisasiTahunanList, lampiranRkaData);
+  }, [dataList, penyesuaianList, realisasiTahunanList, lampiranRkaData]);
 
   const handleCopySql = () => {
     navigator.clipboard.writeText(SQL_MIGRATION_TEXT);
@@ -487,72 +508,74 @@ export default function TemplateLaporan2View({
 
         <CardContent className="p-4 sm:p-5 space-y-4">
           {/* SHEET TAB BUTTONS */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 p-1.5 rounded-xl border border-gray-200 text-xs font-bold overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setActiveSheet('pengesahan')}
-              className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeSheet === 'pengesahan'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-            >
-              <FileText size={14} className={activeSheet === 'pengesahan' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>1. Pengesahan</span>
-            </button>
+          {!hideSubTabs && (
+            <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 p-1.5 rounded-xl border border-gray-200 text-xs font-bold overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => handleSelectSheet('pengesahan')}
+                className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSheet === 'pengesahan'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <FileText size={14} className={activeSheet === 'pengesahan' ? 'text-indigo-600' : 'text-gray-400'} />
+                <span>1. Pengesahan</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSheet('ringkasan_biaya')}
-              className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeSheet === 'ringkasan_biaya'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-            >
-              <Layers size={14} className={activeSheet === 'ringkasan_biaya' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>3. Ringkasan Biaya</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleSelectSheet('ringkasan_biaya')}
+                className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSheet === 'ringkasan_biaya'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <Layers size={14} className={activeSheet === 'ringkasan_biaya' ? 'text-indigo-600' : 'text-gray-400'} />
+                <span>3. Ringkasan Biaya</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSheet('ringkasan_sumber')}
-              className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeSheet === 'ringkasan_sumber'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-            >
-              <Wallet size={14} className={activeSheet === 'ringkasan_sumber' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>4. Ringkasan Sumber Pembiayaan</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleSelectSheet('ringkasan_sumber')}
+                className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSheet === 'ringkasan_sumber'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <Wallet size={14} className={activeSheet === 'ringkasan_sumber' ? 'text-indigo-600' : 'text-gray-400'} />
+                <span>4. Ringkasan Sumber Pembiayaan</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSheet('rincian_biaya')}
-              className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeSheet === 'rincian_biaya'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-            >
-              <DollarSign size={14} className={activeSheet === 'rincian_biaya' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>6. Rincian Biaya</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => handleSelectSheet('rincian_biaya')}
+                className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSheet === 'rincian_biaya'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <DollarSign size={14} className={activeSheet === 'rincian_biaya' ? 'text-indigo-600' : 'text-gray-400'} />
+                <span>6. Rincian Biaya</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSheet('rincian_sumber')}
-              className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                activeSheet === 'rincian_sumber'
-                  ? 'bg-white text-indigo-700 shadow-xs font-black'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-              }`}
-            >
-              <Building2 size={14} className={activeSheet === 'rincian_sumber' ? 'text-indigo-600' : 'text-gray-400'} />
-              <span>7. Rincian Sumber Pembiayaan</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => handleSelectSheet('rincian_sumber')}
+                className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  activeSheet === 'rincian_sumber'
+                    ? 'bg-white text-indigo-700 shadow-xs font-black'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                }`}
+              >
+                <Building2 size={14} className={activeSheet === 'rincian_sumber' ? 'text-indigo-600' : 'text-gray-400'} />
+                <span>7. Rincian Sumber Pembiayaan</span>
+              </button>
+            </div>
+          )}
 
           {/* TABEL SHEET 1: 1. PENGESAHAN */}
           {activeSheet === 'pengesahan' && (

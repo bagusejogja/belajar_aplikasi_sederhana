@@ -80,7 +80,8 @@ export interface TemplateLaporan2Data {
 export function computeTemplateLaporan2Data(
   dataList: any[],
   penyesuaianList: any[] = [],
-  realisasiTahunanList: any[] = []
+  realisasiTahunanList: any[] = [],
+  lampiranRkaData?: any
 ): TemplateLaporan2Data {
   // Helper pencari nilai dari rkat_realisasi_tahunan
   const getRealisasiVal = (sheetNo: string, kodePos: string, tahun: number, fallback: number = 0) => {
@@ -128,13 +129,61 @@ export function computeTemplateLaporan2Data(
   let totalPengembangan = 0;
   let totalSelainApbn = 0;
 
-  // Variabel untuk Alokasi BPPTNBH
-  let totalBpptnbh = 172942300000; // Standar UGM
-  const totalPuapt = 0;
-  const totalPlnHln = 48070000000; // Prime Step ADB
-  const totalDiktiLain = 129713907730;
-  const totalEselonLain = 0;
-  const totalKlLain = 77200000000;
+  // Variabel untuk Alokasi APBN & Sumber Lain (diambil dari tab 10. Lampiran RKA jika tersedia)
+  let totalBpptnbh = 172942300000; // Standar UGM BPPTNBH
+  let totalPuapt = 0;
+  let totalPlnHln = 48070000000; // Prime Step ADB
+  let totalDiktiLain = 129713907730; // Pendanaan Ditjen Dikti lainnya
+  let totalEselonLain = 0;
+  let totalKlLain = 77200000000; // Pendanaan K/L lainnya
+
+  // Integrasi data dari Tab "10. Lampiran RKA" (Total per Blok)
+  if (lampiranRkaData && Array.isArray(lampiranRkaData.items)) {
+    const findBlockPagu = (nameRegex: RegExp, fallback: number) => {
+      const item = lampiranRkaData.items.find((it: any) => it.level === 0 && nameRegex.test(it.uraian || it.block || ''));
+      if (item) {
+        if (typeof item.totalPagu === 'number' && item.totalPagu > 0) return item.totalPagu;
+        if (typeof item.targetBiaya === 'number' && item.targetBiaya > 0) return item.targetBiaya;
+      }
+      return fallback;
+    };
+
+    // 1. Total Rupiah Murni (RM) dari Tab 10
+    const rmFromLampiran = findBlockPagu(/rupiah murni/i, 0);
+    if (rmFromLampiran > 0) {
+      totalRM = rmFromLampiran;
+    }
+
+    // 2. Total BPPTNBH dari Tab 10
+    const bpptnFromLampiran = findBlockPagu(/bpptnbh/i, 0);
+    if (bpptnFromLampiran > 0) {
+      totalBpptnbh = bpptnFromLampiran;
+    }
+
+    // 3. PLN/HLN/RMP/SBSN/KPBU dari Tab 10
+    const plnFromLampiran = findBlockPagu(/pln|hln|sbsn|kpbu/i, 0);
+    if (plnFromLampiran > 0) {
+      totalPlnHln = plnFromLampiran;
+    }
+
+    // 4. Pendanaan Lainnya dari Ditjen Dikti dari Tab 10 (ALOKASI DARI KEMENDIKTISAINTEK LAINNYA)
+    const diktiFromLampiran = findBlockPagu(/kemendikti|kemendikbud|kemenrisdikti|dikti lainnya/i, 0);
+    if (diktiFromLampiran > 0) {
+      totalDiktiLain = diktiFromLampiran;
+    }
+
+    // 5. Pendanaan dari K/L Lainnya dari Tab 10
+    const klFromLampiran = findBlockPagu(/k\/l lainnya/i, 0);
+    if (klFromLampiran > 0) {
+      totalKlLain = klFromLampiran;
+    }
+
+    // 6. Selain APBN dari Tab 10 jika ada
+    const selainFromLampiran = findBlockPagu(/selain apbn/i, 0);
+    if (selainFromLampiran > 0) {
+      totalSelainApbn = selainFromLampiran;
+    }
+  }
 
   (dataList || []).forEach(row => {
     const pagu = Number(row.anggaran) || 0;

@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark, DollarSign
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1352,8 +1352,11 @@ export default function RkaLaporanPage() {
   });
   const [sertakanPenyesuaian, setSertakanPenyesuaian] = useState<boolean>(true);
   
-  // Tampilan Tabel Seragam (Summary vs Template 2 vs Rekap Unit vs Detail)
-  const [activeViewTab, setActiveViewTab] = useState<'summary' | 'template2' | 'rekap_unit' | 'detail'>('summary');
+  // Tampilan Tabel Seragam (Summary vs Template 2 Sheets vs Rekap Unit / Sarpras vs Detail)
+  const [activeViewTab, setActiveViewTab] = useState<
+    'summary' | 'template2' | 'rekap_unit' | 'detail' |
+    't2_pengesahan' | 't2_ringkasan_biaya' | 't2_ringkasan_sumber' | 't2_rincian_biaya' | 't2_rincian_sumber' | 'sarpras'
+  >('summary');
   const [activeDetailSubtab, setActiveDetailSubtab] = useState<'belanja' | 'penerimaan'>('belanja');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number | 'ALL'>(50);
@@ -5762,7 +5765,7 @@ export default function RkaLaporanPage() {
 
   // Export Excel (Switchable based on active view)
   const handleExportExcel = () => {
-    if (activeViewTab === 'rekap_unit') {
+    if (activeViewTab === 'rekap_unit' || activeViewTab === 'sarpras') {
       return handleExportExcelUnitRekap();
     }
     if (activeViewTab === 'detail') {
@@ -6127,56 +6130,152 @@ export default function RkaLaporanPage() {
           {/* Baris 2: Pilihan Tampilan Tabel (Seragam dengan Menu Lain) */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
             <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl w-max border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setActiveViewTab('summary')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeViewTab === 'summary'
-                    ? 'bg-white text-gray-900 shadow-xs font-black'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }`}
-              >
-                <FileSpreadsheet size={14} className="text-indigo-600" />
-                <span>{isKemen ? '10. Lampiran RKA' : 'Ringkasan Usulan'}</span>
-              </button>
-              {isKemen && (
-                <button
-                  type="button"
-                  onClick={() => setActiveViewTab('template2')}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                    activeViewTab === 'template2'
-                      ? 'bg-white text-gray-900 shadow-xs font-black'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                  }`}
-                >
-                  <Landmark size={14} className="text-indigo-600" />
-                  <span>Pelaporan PTN-BH (Template 2)</span>
-                </button>
+              {isKemen ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('t2_pengesahan')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_pengesahan' || activeViewTab === 'template2'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <FileText size={14} className="text-indigo-600" />
+                    <span>1. Pengesahan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('t2_ringkasan_biaya')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_ringkasan_biaya'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Layers size={14} className="text-indigo-600" />
+                    <span>3. Ringkasan Biaya</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('t2_ringkasan_sumber')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_ringkasan_sumber'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Wallet size={14} className="text-indigo-600" />
+                    <span>4. Ringkasan Sumber Pembiayaan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('t2_rincian_biaya')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_rincian_biaya'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <DollarSign size={14} className="text-indigo-600" />
+                    <span>6. Rincian Biaya</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('t2_rincian_sumber')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_rincian_sumber'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Landmark size={14} className="text-indigo-600" />
+                    <span>7. Rincian Sumber Pembiayaan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('sarpras')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'sarpras' || activeViewTab === 'rekap_unit'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Building2 size={14} className="text-indigo-600" />
+                    <span>8. Sarana &amp; Prasarana</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('summary')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'summary'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <FileSpreadsheet size={14} className="text-indigo-600" />
+                    <span>10. Lampiran RKA</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('detail')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'detail'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <BookOpen size={14} className="text-indigo-600" />
+                    <span>Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('summary')}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'summary'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <FileSpreadsheet size={14} className="text-indigo-600" />
+                    <span>Ringkasan Usulan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('rekap_unit')}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'rekap_unit' || activeViewTab === 'sarpras'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Building2 size={14} className="text-indigo-600" />
+                    <span>Rekap Group Unit Kerja</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveViewTab('detail')}
+                    className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 'detail'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <BookOpen size={14} className="text-indigo-600" />
+                    <span>Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
+                  </button>
+                </>
               )}
-              <button
-                type="button"
-                onClick={() => setActiveViewTab('rekap_unit')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeViewTab === 'rekap_unit'
-                    ? 'bg-white text-gray-900 shadow-xs font-black'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }`}
-              >
-                <Building2 size={14} className="text-indigo-600" />
-                <span>{isKemen ? 'Sarpras' : 'Rekap Group Unit Kerja'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveViewTab('detail')}
-                className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeViewTab === 'detail'
-                    ? 'bg-white text-gray-900 shadow-xs font-black'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
-                }`}
-              >
-                <BookOpen size={14} className="text-indigo-600" />
-                <span>Tabel Rincian Data ({allDetailRows.length.toLocaleString('id-ID')})</span>
-              </button>
             </div>
 
             {/* Filter Group Belanja Khusus Tab Detail */}
@@ -7375,7 +7474,7 @@ export default function RkaLaporanPage() {
             )}
 
           </div>
-        ) : activeViewTab === 'template2' && isKemen ? (
+        ) : (activeViewTab === 'template2' || activeViewTab.startsWith('t2_')) && isKemen ? (
           /* ======================================================== */
           /* TAB VIEW: PELAPORAN PTN-BH KEMENTERIAN (TEMPLATE 2)      */
           /* ======================================================== */
@@ -7385,8 +7484,17 @@ export default function RkaLaporanPage() {
             tahunFilter={tahunFilter}
             versiFilter={versiFilter}
             formatRp={formatRp}
+            lampiranRkaData={lampiranRkaData}
+            controlledSheet={
+              activeViewTab === 't2_ringkasan_biaya' ? 'ringkasan_biaya' :
+              activeViewTab === 't2_ringkasan_sumber' ? 'ringkasan_sumber' :
+              activeViewTab === 't2_rincian_biaya' ? 'rincian_biaya' :
+              activeViewTab === 't2_rincian_sumber' ? 'rincian_sumber' :
+              'pengesahan'
+            }
+            onSheetChange={(s) => setActiveViewTab(`t2_${s}` as any)}
           />
-        ) : activeViewTab === 'rekap_unit' ? (
+        ) : (activeViewTab === 'rekap_unit' || activeViewTab === 'sarpras') ? (
           /* ======================================================== */
           /* TAB VIEW 2: TABEL REKAPITULASI UNIT KERJA / SARPRAS      */
           /* ======================================================== */
