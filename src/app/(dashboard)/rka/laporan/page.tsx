@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark, DollarSign
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark, DollarSign, Target
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ import RkaHelpModal from '@/components/rka/RkaHelpModal';
 import LampiranRkaView from '@/components/rka/LampiranRkaView';
 import SarprasRkaView from '@/components/rka/SarprasRkaView';
 import TemplateLaporan2View from '@/components/rka/TemplateLaporan2View';
+import KinerjaRkaView from '@/components/rka/KinerjaRkaView';
 import { computeLampiranRka, LampiranRkaResult } from '@/lib/rka/lampiranRkaTemplate';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
@@ -1355,7 +1356,7 @@ export default function RkaLaporanPage() {
   // Tampilan Tabel Seragam (Summary vs Template 2 Sheets vs Rekap Unit / Sarpras vs Detail)
   const [activeViewTab, setActiveViewTab] = useState<
     'summary' | 'template2' | 'rekap_unit' | 'detail' |
-    't2_pengesahan' | 't2_ringkasan_biaya' | 't2_ringkasan_sumber' | 't2_rincian_biaya' | 't2_rincian_sumber' | 'sarpras'
+    't2_pengesahan' | 't2_kinerja' | 't2_ringkasan_biaya' | 't2_ringkasan_sumber' | 't2_rincian_biaya' | 't2_rincian_sumber' | 'sarpras'
   >('summary');
   const [activeDetailSubtab, setActiveDetailSubtab] = useState<'belanja' | 'penerimaan'>('belanja');
   const [currentPage, setCurrentPage] = useState(1);
@@ -6147,6 +6148,19 @@ export default function RkaLaporanPage() {
 
                   <button
                     type="button"
+                    onClick={() => setActiveViewTab('t2_kinerja')}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      activeViewTab === 't2_kinerja'
+                        ? 'bg-white text-gray-900 shadow-xs font-black'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                    }`}
+                  >
+                    <Target size={14} className="text-indigo-600" />
+                    <span>2. Kinerja</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setActiveViewTab('t2_ringkasan_biaya')}
                     className={`px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                       activeViewTab === 't2_ringkasan_biaya'
@@ -7474,6 +7488,14 @@ export default function RkaLaporanPage() {
             )}
 
           </div>
+        ) : activeViewTab === 't2_kinerja' && isKemen ? (
+          /* ======================================================== */
+          /* TAB VIEW: 2. KINERJA PTN BADAN HUKUM (IKU)               */
+          /* ======================================================== */
+          <KinerjaRkaView
+            tahunFilter={tahunFilter}
+            versiFilter={versiFilter}
+          />
         ) : (activeViewTab === 'template2' || activeViewTab.startsWith('t2_')) && isKemen ? (
           /* ======================================================== */
           /* TAB VIEW: PELAPORAN PTN-BH KEMENTERIAN (TEMPLATE 2)      */

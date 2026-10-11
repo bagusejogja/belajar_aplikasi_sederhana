@@ -71,9 +71,16 @@ export default function SarprasRkaView({
   // Proses dan kelompokkan seluruh data akun 551*
   const groupedSarpras: SarprasGroupItem[] = useMemo(() => {
     const rows551 = (dataList || []).filter(r => {
-      const akunD = r.akun_detail || '';
-      const subA = r.sub_akun || '';
-      return akunD.startsWith('551') || subA.startsWith('551') || akunD.startsWith('55');
+      const akunD = (r.akun_detail || '').trim();
+      const subA = (r.sub_akun || '').trim();
+      const is55 = akunD.startsWith('551') || subA.startsWith('551') || akunD.startsWith('55');
+      if (!is55) return false;
+
+      // Filter: Tidak menampilkan akun 55101 (Biaya Modal Tanah)
+      if (akunD.startsWith('55101') || subA.startsWith('55101') || akunD.toLowerCase().includes('tanah')) {
+        return false;
+      }
+      return true;
     });
 
     const map: Record<string, SarprasGroupItem> = {};
@@ -87,6 +94,11 @@ export default function SarprasRkaView({
       const sarprasName = prefix + targetUnit;
       const kategori: 'Fakultas' | 'Non-Fakultas (UGM)' = isFak ? 'Fakultas' : 'Non-Fakultas (UGM)';
       const akunDetail = row.akun_detail || row.sub_akun || '551 Belanja Modal';
+
+      // Jangan masukkan jika akun tanah
+      if (akunDetail.startsWith('55101') || sarprasName.toLowerCase().includes('tanah')) {
+        return;
+      }
 
       const key = `${akunDetail}__${targetUnit}`;
       if (!map[key]) {
@@ -108,7 +120,9 @@ export default function SarprasRkaView({
       map[key].rows.push(row);
     });
 
-    const list = Object.values(map);
+    const list = Object.values(map).filter(
+      item => !item.akunDetail.startsWith('55101') && !item.sarprasName.toLowerCase().includes('tanah')
+    );
 
     // Urutkan berdasarkan MAK (kode akun detail) baru Unit
     list.sort((a, b) => {
@@ -348,17 +362,11 @@ export default function SarprasRkaView({
           <Table>
             <TableHeader className="bg-slate-100 border-b-2 border-slate-300 text-slate-800 font-black uppercase text-[10px] tracking-wider">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-16 text-center text-slate-900 text-xs uppercase font-black py-2.5">
+                <TableHead className="w-14 text-center text-slate-900 text-xs uppercase font-black py-2.5">
                   Nomor
                 </TableHead>
                 <TableHead className="text-slate-900 text-xs uppercase font-black min-w-[380px]">
                   Sarana / Prasarana
-                </TableHead>
-                <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-36">
-                  Kelompok Unit
-                </TableHead>
-                <TableHead className="text-center text-slate-900 text-xs uppercase font-black w-32">
-                  Jumlah Transaksi
                 </TableHead>
                 <TableHead className="text-right text-slate-900 text-xs uppercase font-black min-w-[200px] pr-4">
                   Total Anggaran (Rp)
@@ -372,8 +380,8 @@ export default function SarprasRkaView({
             <TableBody>
               {filteredList.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-gray-400 font-medium">
-                    Tidak ada data akun 551* yang sesuai kriteria filter.
+                  <TableCell colSpan={4} className="text-center py-12 text-gray-400 font-medium">
+                    Tidak ada data belanja modal sarpras yang sesuai kriteria filter.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -387,26 +395,20 @@ export default function SarprasRkaView({
                         <TableCell className="text-center font-mono font-bold text-slate-600 text-xs py-2">
                           {idx + 1}
                         </TableCell>
-                        <TableCell className="text-xs font-bold text-slate-900 py-2">
-                          <div className="flex items-center gap-2">
+                        <TableCell className="text-xs font-bold text-slate-900 py-2.5">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span>{isFak ? '🏛️' : '🏢'}</span>
                             <span className="font-mono text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 shrink-0">
                               {item.akunDetail}
                             </span>
-                            <span>{item.sarprasName}</span>
+                            <span className="text-slate-900">{item.sarprasName}</span>
+                            <Badge 
+                              variant="secondary" 
+                              className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200/80 px-2 py-0.5 rounded-md"
+                            >
+                              {item.count.toLocaleString('id-ID')} transaksi
+                            </Badge>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                            isFak 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            {item.kategori}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center font-mono text-xs font-bold text-slate-700">
-                          {item.count.toLocaleString('id-ID')} baris
                         </TableCell>
                         <TableCell className="text-right pr-4 font-mono font-black text-xs text-indigo-950">
                           Rp {formatRp(item.totalAnggaran)}
@@ -432,7 +434,7 @@ export default function SarprasRkaView({
                       {/* INLINE EXPANDED TRANSACTIONS */}
                       {isExpanded && item.rows.length > 0 && (
                         <TableRow className="bg-indigo-50/20 border-b border-indigo-100 p-0">
-                          <TableCell colSpan={6} className="p-3">
+                          <TableCell colSpan={4} className="p-3">
                             <SarprasTransactionList rows={item.rows} formatRp={formatRp} />
                           </TableCell>
                         </TableRow>
@@ -446,11 +448,16 @@ export default function SarprasRkaView({
             {/* Total Footer */}
             <tfoot className="bg-slate-800 text-white font-bold border-t-2 border-slate-700">
               <tr>
-                <td colSpan={3} className="p-4 text-xs font-black uppercase tracking-wider text-white">
-                  TOTAL RENCANA PEMBANGUNAN DAN PENGADAAN ({filteredList.length} POS SARPRAS)
-                </td>
-                <td className="p-4 text-center text-xs font-black font-mono text-slate-300">
-                  {grandTotalCount.toLocaleString('id-ID')} Baris
+                <td colSpan={2} className="p-4 text-xs font-black uppercase tracking-wider text-white">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>TOTAL RENCANA PEMBANGUNAN DAN PENGADAAN</span>
+                    <Badge variant="outline" className="text-[10px] font-mono font-bold bg-slate-700 text-slate-200 border-slate-600">
+                      {filteredList.length} POS SARPRAS
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] font-mono font-bold bg-slate-700 text-slate-200 border-slate-600">
+                      {grandTotalCount.toLocaleString('id-ID')} TRANSAKSI
+                    </Badge>
+                  </div>
                 </td>
                 <td className="p-4 text-right pr-4 text-sm font-black font-mono text-emerald-300">
                   Rp {formatRp(grandTotalAnggaran)}

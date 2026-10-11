@@ -731,9 +731,24 @@ export default function TemplateLaporan2View({
           {/* TABEL SHEET 2: 3. RINGKASAN BIAYA */}
           {activeSheet === 'ringkasan_biaya' && (
             <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-              <div className="bg-slate-800 text-white px-4 py-3 font-bold text-xs flex items-center justify-between">
+              <div className="bg-slate-800 text-white px-4 py-2.5 font-bold text-xs flex items-center justify-between flex-wrap gap-2">
                 <span>RINGKASAN 8 KOMPONEN BIAYA PTN-BH</span>
-                <span className="text-[11px] text-slate-300 font-mono">Evaluasi Komponen Biaya</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setShowDbModal(true);
+                      setModalTab('input_editor');
+                      setEditorSubSheet('sheet3');
+                    }}
+                    className="h-6 px-2.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-md gap-1 cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    <span>Edit Realisasi {tahunN2} &amp; Anggaran {tahunN1}</span>
+                  </Button>
+                  <span className="text-[11px] text-slate-300 font-mono hidden sm:inline">Evaluasi Komponen Biaya</span>
+                </div>
               </div>
               <Table>
                 <TableHeader>
@@ -779,9 +794,24 @@ export default function TemplateLaporan2View({
           {/* TABEL SHEET 3: 4. RINGKASAN SUMBER PEMBIAYAAN */}
           {activeSheet === 'ringkasan_sumber' && (
             <div className="border border-gray-200 rounded-xl overflow-hidden shadow-2xs">
-              <div className="bg-slate-800 text-white px-4 py-3 font-bold text-xs flex items-center justify-between">
+              <div className="bg-slate-800 text-white px-4 py-2.5 font-bold text-xs flex items-center justify-between flex-wrap gap-2">
                 <span>RINGKASAN SUMBER PEMBIAYAAN (APBN VS SELAIN APBN)</span>
-                <span className="text-[11px] text-slate-300 font-mono">Evaluasi Sumber Dana</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setShowDbModal(true);
+                      setModalTab('input_editor');
+                      setEditorSubSheet('sheet4');
+                    }}
+                    className="h-6 px-2.5 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white rounded-md gap-1 cursor-pointer"
+                  >
+                    <Edit3 size={11} />
+                    <span>Edit Realisasi {tahunN2} &amp; Anggaran {tahunN1}</span>
+                  </Button>
+                  <span className="text-[11px] text-slate-300 font-mono hidden sm:inline">Evaluasi Sumber Dana</span>
+                </div>
               </div>
               <Table>
                 <TableHeader>
