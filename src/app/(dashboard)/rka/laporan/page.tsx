@@ -115,7 +115,7 @@ const DEFAULT_PPT_TREE: PptSlideRow[] = [
   { id: 'peng_pemeliharaan', keterangan: 'Belanja Perbaikan dan Pemeliharaan', level: 1, is_sum: false, is_bold: true, matchKeys: ['pemeliharaan', 'perbaikan', 'gedung', 'peralatan'], type: 'pengeluaran' },
   { id: 'peng_perjalanan', keterangan: 'Belanja Perjalanan', level: 1, is_sum: false, is_bold: true, matchKeys: ['perjalanan', 'dinas'], type: 'pengeluaran' },
   { id: 'peng_modal', keterangan: 'Belanja Modal', level: 1, is_sum: false, is_bold: true, matchKeys: ['modal', 'investasi', 'aset tetap'], type: 'pengeluaran' },
-  { id: 'peng_stp', keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, matchKeys: ['techno', 'adb', 'stp'], type: 'pengeluaran' },
+  { id: 'peng_stp', keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, matchKeys: ['science techno park', 'techno', 'adb', 'stp'], type: 'pengeluaran' },
   { id: 'peng_puapt', keterangan: 'Belanja PUAPT', level: 1, is_sum: false, is_bold: false, matchKeys: ['puapt'], type: 'pengeluaran' },
   { id: 'peng_revitalisasi', keterangan: 'Belanja Pendamping Program Revitalisasi PTN 2024', level: 1, is_sum: false, is_bold: false, matchKeys: ['revitalisasi'], type: 'pengeluaran' },
   { id: 'peng_equity', keterangan: 'Belanja EQUITY', level: 1, is_sum: false, is_bold: false, matchKeys: ['equity'], type: 'pengeluaran' },
@@ -217,7 +217,7 @@ const DEFAULT_PPT_TEMPLATE: PptTemplateConfig = {
       id: 'program_khusus',
       title: 'III. Program Strategis & Khusus',
       items: [
-        { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK - ADB', matchKeys: ['techno', 'adb'], is_sum: false, subItems: [] },
+        { id: 'techno_park', label: 'Belanja SCIENCE TECHNO PARK - ADB', matchKeys: ['science techno park', 'techno', 'adb', 'stp'], is_sum: false, subItems: [] },
         { id: 'puapt', label: 'Belanja PUAPT', matchKeys: ['puapt'], is_sum: false, subItems: [] },
         { id: 'equity', label: 'EQUITY', matchKeys: ['equity'], is_sum: false, subItems: [] },
       ]

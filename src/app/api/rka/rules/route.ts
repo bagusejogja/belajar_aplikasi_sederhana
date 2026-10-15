@@ -519,9 +519,9 @@ export async function PUT(request: Request) {
             const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
             if (kws.length === 1) {
               const kw = kws[0];
-              chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%`);
+              chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
             } else if (kws.length > 1) {
-              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%`).join(',');
+              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
               chunkQ = chunkQ.or(orConds);
             }
           }

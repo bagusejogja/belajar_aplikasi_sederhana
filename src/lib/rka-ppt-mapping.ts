@@ -52,7 +52,7 @@ export const MASTER_PPT_ACCOUNTS: MasterAkunMapping[] = [
   { keterangan: 'Belanja Perbaikan dan Pemeliharaan', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['pemeliharaan', 'perbaikan'], kode_sistem: 'PENG_PEMEL' },
   { keterangan: 'Belanja Perjalanan', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['perjalanan'], kode_sistem: 'PENG_PERJ' },
   { keterangan: 'Belanja Modal', level: 1, is_sum: false, is_bold: true, type: 'pengeluaran', matchKeys: ['modal'], kode_sistem: 'PENG_MODAL' },
-  { keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['techno', 'adb', 'stp'], kode_sistem: 'PENG_STP' },
+  { keterangan: 'Belanja SCIENCE TECHNO PARK -ADB', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['science techno park', 'techno', 'adb', 'stp'], kode_sistem: 'PENG_STP' },
   { keterangan: 'Belanja PUAPT', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['puapt'] },
   { keterangan: 'Belanja Pendamping Program Revitalisasi PTN 2024', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['revitalisasi'] },
   { keterangan: 'Belanja EQUITY', level: 1, is_sum: false, is_bold: false, type: 'pengeluaran', matchKeys: ['equity'], kode_sistem: 'PENG_EQ' },
