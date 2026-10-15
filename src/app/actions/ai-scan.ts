@@ -4,6 +4,36 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
+/**
+ * Helper untuk memanggil Google Gemini dengan fallback model otomatis jika terkena batas kuota (429/quota),
+ * server sibuk (503), atau model deprecation (404).
+ */
+async function generateContentWithFallback(request: any, preferredModel?: string) {
+  const models = [
+    preferredModel || "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.5-flash"
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastError: any = null;
+
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(request);
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[AI Gemini] Model ${modelName} gagal (${err.message}). Mencoba model alternatif berikutnya...`);
+    }
+  }
+
+  if (lastError?.message?.includes('429') || lastError?.message?.includes('quota') || lastError?.message?.includes('Quota')) {
+    throw new Error(`[Batas Kuota AI Tercapai]: Kuota request gratis Gemini API (Free Tier) telah habis untuk model yang dicoba. Silakan tunggu beberapa saat atau periksa kuota di Google AI Studio. Detail: ${lastError.message}`);
+  }
+  throw lastError;
+}
+
 export async function scanSuratWithAI(formData: FormData) {
   try {
     const file = formData.get('file') as File;
@@ -13,10 +43,7 @@ export async function scanSuratWithAI(formData: FormData) {
     const bytes = await file.arrayBuffer();
     const base64Data = Buffer.from(bytes).toString('base64');
 
-    // 2. Inisialisasi Model Gemini Flash (Versi Paling Stabil)
-    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-
-    // 3. Siapkan Prompt yang Sangat Spesifik
+    // 2. Siapkan Prompt yang Sangat Spesifik
     const prompt = `
       Tugas Anda adalah mengekstrak informasi dari gambar/PDF surat resmi pemerintah/universitas Indonesia berikut.
       Berikan hasil dalam format JSON murni (tanpa markdown, tanpa teks tambahan) dengan kunci berikut:
@@ -32,31 +59,16 @@ export async function scanSuratWithAI(formData: FormData) {
       PENTING: Hanya berikan JSON saja.
     `;
 
-    // 4. Kirim ke Gemini dengan mode JSON (dengan fallback jika 503)
+    // 3. Kirim ke Gemini dengan mode JSON dan fallback
     const request = {
       contents: [{ role: "user", parts: [ { text: prompt }, { inlineData: { data: base64Data, mimeType: file.type } } ] }],
       generationConfig: { responseMimeType: "application/json" }
     };
     
-    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-    
-    // Retry mechanism untuk 503
-    let result;
-    try {
-      result = await model.generateContent(request);
-    } catch (e: any) {
-      if (e.message?.includes('503') || e.message?.includes('high demand')) {
-        console.log("Retry AI Generation due to 503...");
-        await new Promise(r => setTimeout(r, 2000));
-        result = await model.generateContent(request);
-      } else {
-        throw e;
-      }
-    }
-
+    const result = await generateContentWithFallback(request);
     const responseText = result.response.text();
     
-    // 5. Bersihkan hasil (kadang AI memberikan markdown block)
+    // 4. Bersihkan hasil
     const jsonString = responseText.replace(/```json|```/g, "").trim();
     const extractedData = JSON.parse(jsonString);
 
@@ -78,10 +90,7 @@ export async function summarizeSubstanceWithAI(fileUrl: string) {
     const base64Data = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = response.headers.get('content-type') || 'application/pdf';
 
-    // 2. Inisialisasi Model
-    var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-
-    // 3. Prompt untuk Ringkasan Substansi
+    // 2. Prompt untuk Ringkasan Substansi
     const prompt = `
       Anda adalah asisten ahli keuangan pemerintah. Analisis dokumen usulan anggaran berikut.
       Berikan ringkasan substansi dalam MAKSIMAL 2 kalimat yang menjelaskan:
@@ -92,8 +101,8 @@ export async function summarizeSubstanceWithAI(fileUrl: string) {
       LANGSUNG berikan ringkasannya saja tanpa kata pengantar.
     `;
 
-    // 4. Kirim ke Gemini
-    const result = await model.generateContent([
+    // 3. Kirim ke Gemini
+    const result = await generateContentWithFallback([
       prompt,
       {
         inlineData: {
@@ -149,14 +158,7 @@ export async function generateRingkasanFromText(ocrText: string, contextArsip?: 
     `;
 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-    let result;
-    try {
-      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await model.generateContent(request);
-    } catch (err) {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await fallbackModel.generateContent(request);
-    }
+    const result = await generateContentWithFallback(request);
     
     let ringkasan = result.response.text().replace(/```html|```/g, "").trim();
     return { success: true, data: { ringkasan_html: ringkasan } };
@@ -187,14 +189,7 @@ export async function generateAnalysisFromText(ocrText: string) {
     `;
 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-    let result;
-    try {
-      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await model.generateContent(request);
-    } catch (err) {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await fallbackModel.generateContent(request);
-    }
+    const result = await generateContentWithFallback(request);
     
     let rekomendasi = result.response.text().replace(/```html|```/g, "").trim();
     return { success: true, data: { rekomendasi_html: rekomendasi } };
@@ -259,14 +254,7 @@ export async function convertSuratToTextWithAI(formData: FormData) {
       generationConfig: { responseMimeType: "application/json" }
     };
     
-    let result;
-    try {
-       var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-       result = await model.generateContent(request);
-    } catch (err) {
-       const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-       result = await fallbackModel.generateContent(request);
-    }
+    const result = await generateContentWithFallback(request);
 
     const responseText = result.response.text();
     const jsonString = responseText.replace(/```json|```/g, "").trim();
@@ -300,14 +288,7 @@ export async function extractTanggapanFromText(ocrText: string) {
     `;
 
     const request = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-    let result;
-    try {
-      var model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await model.generateContent(request);
-    } catch (err) {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      result = await fallbackModel.generateContent(request);
-    }
+    const result = await generateContentWithFallback(request);
     
     let jsonText = result.response.text().replace(/```json|```/g, "").trim();
     const data = JSON.parse(jsonText);

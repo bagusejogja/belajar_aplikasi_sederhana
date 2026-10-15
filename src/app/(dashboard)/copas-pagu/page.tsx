@@ -38,10 +38,13 @@ const JENIS_ANGGARAN_OPTIONS = [
   'Pagu Awal',
   'Tambah',
   'Kurang',
-  'Tambah Pagu - Penugasan',
+  'Tambahan Pagu - Inisiatif',
+  'Tambahan Pagu - Penugasan',
   'Tambah Pagu - Inisiatif',
+  'Tambah Pagu - Penugasan',
   'Efisiensi',
-  'Talangan'
+  'Talangan',
+  'Rutin'
 ];
 
 const STATUS_PAGU_OPTIONS = [
@@ -291,20 +294,32 @@ export default function CopasPaguPage() {
   };
 
   // Exact/Strict matcher for Jenis Anggaran
-  const matchJenisAnggaran = (val: string): string | null => {
+  const matchJenisAnggaran = (val: string, nominal?: number): string | null => {
     if (!val) return null;
     const v = val.trim().toLowerCase();
     
-    const exact = JENIS_ANGGARAN_OPTIONS.find(opt => opt.toLowerCase() === v);
-    if (exact) return exact;
+    // 1. Inisiatif: "inisiatif unit", "inisiatif", "tambah inisiatif", "tambahan pagu inisiatif", dll. -> "Tambahan Pagu - Inisiatif"
+    if (v.includes('inisiatif')) return 'Tambahan Pagu - Inisiatif';
+
+    // 2. Penugasan: "penugasan", "tambah penugasan", "tambahan pagu penugasan", dll. -> "Tambahan Pagu - Penugasan"
+    if (v.includes('penugasan')) return 'Tambahan Pagu - Penugasan';
+
+    // 3. Pengalihan: jika nominal >= 0 -> "Tambah", jika nominal < 0 -> "Kurang"
+    if (v.includes('pengalihan') || v.includes('alihkan')) {
+      if (nominal !== undefined && nominal < 0) {
+        return 'Kurang';
+      }
+      return 'Tambah';
+    }
 
     if (v === 'kurang' || v === 'kurang pagu' || v === 'pengurangan' || v === 'kurang alokasi') return 'Kurang';
     if (v === 'tambah' || v === 'tambah pagu' || v === 'penambahan' || v === 'tambah alokasi') return 'Tambah';
-    if (v === 'inisiatif' || v === 'tambah inisiatif' || v === 'tambah pagu inisiatif' || v === 'tambah pagu - inisiatif') return 'Tambah Pagu - Inisiatif';
-    if (v === 'penugasan' || v === 'tambah penugasan' || v === 'tambah pagu penugasan' || v === 'tambah pagu - penugasan') return 'Tambah Pagu - Penugasan';
     if (v === 'pagu awal' || v === 'awal' || v === 'rutin') return 'Pagu Awal';
     if (v === 'efisiensi') return 'Efisiensi';
     if (v === 'talangan') return 'Talangan';
+
+    const exact = JENIS_ANGGARAN_OPTIONS.find(opt => opt.toLowerCase() === v);
+    if (exact) return exact;
 
     return null;
   };
@@ -400,10 +415,10 @@ export default function CopasPaguPage() {
       if (remaining.length >= 3) {
         keterangan = remaining[0] || '-';
         statusPagu = matchStatusPagu(remaining[1]);
-        jenisAnggaran = matchJenisAnggaran(remaining[2]) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+        jenisAnggaran = matchJenisAnggaran(remaining[2], parsedNominal) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
       } else if (remaining.length === 2) {
-        const matchedSecondJenis = matchJenisAnggaran(remaining[1]);
-        const matchedFirstJenis = matchJenisAnggaran(remaining[0]);
+        const matchedSecondJenis = matchJenisAnggaran(remaining[1], parsedNominal);
+        const matchedFirstJenis = matchJenisAnggaran(remaining[0], parsedNominal);
 
         if (matchedSecondJenis) {
           keterangan = remaining[0] || '-';
@@ -416,12 +431,12 @@ export default function CopasPaguPage() {
         } else {
           keterangan = remaining[0] || '-';
           statusPagu = 'Bukan Pagu Awal';
-          jenisAnggaran = remaining[1] || (parsedNominal < 0 ? 'Kurang' : 'Pagu Awal');
+          jenisAnggaran = remaining[1] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
         }
       } else if (remaining.length === 1) {
         keterangan = remaining[0] || '-';
         statusPagu = 'Bukan Pagu Awal';
-        jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
+        jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Tambah';
       }
 
       const matched = matchUnit(unitInput);
@@ -758,7 +773,7 @@ export default function CopasPaguPage() {
           <div className="bg-white p-2 rounded-xl border border-amber-200 shadow-2xs">
             <span className="text-[9px] font-black text-amber-600 block uppercase">Kolom 8</span>
             <strong className="text-gray-900 block truncate">Jenis Anggaran</strong>
-            <span className="text-[10px] text-gray-400">Kurang / Tambah</span>
+            <span className="text-[10px] text-gray-400">Inisiatif / Penugasan / Tambah / Kurang</span>
           </div>
         </div>
       </div>

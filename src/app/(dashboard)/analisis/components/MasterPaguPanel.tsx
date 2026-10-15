@@ -39,10 +39,13 @@ const JENIS_ANGGARAN_OPTIONS = [
   'Pagu Awal',
   'Tambah',
   'Kurang',
-  'Tambah Pagu - Penugasan',
+  'Tambahan Pagu - Inisiatif',
+  'Tambahan Pagu - Penugasan',
   'Tambah Pagu - Inisiatif',
+  'Tambah Pagu - Penugasan',
   'Efisiensi',
-  'Talangan'
+  'Talangan',
+  'Rutin'
 ];
 
 const STATUS_PAGU_OPTIONS = [

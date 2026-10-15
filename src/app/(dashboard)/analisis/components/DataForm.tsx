@@ -111,7 +111,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           .from('gov_pagu_anggaran')
           .select('id, id_db, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
-          .eq('jenis_anggaran', 'Tambah Pagu - Inisiatif')
+          .in('jenis_anggaran', ['Tambah Pagu - Inisiatif', 'Tambahan Pagu - Inisiatif'])
           .eq('tahun_anggaran', '2026')
           .order('tahun_anggaran', { ascending: false });
           
@@ -125,7 +125,7 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           .from('gov_pagu_anggaran')
           .select('id, id_db, keterangan, nominal, status_pagu, tahun_anggaran, created_at')
           .eq('unit_id', unitId)
-          .eq('jenis_anggaran', 'Tambah Pagu - Penugasan')
+          .in('jenis_anggaran', ['Tambah Pagu - Penugasan', 'Tambahan Pagu - Penugasan'])
           .eq('tahun_anggaran', '2026')
           .order('tahun_anggaran', { ascending: false });
         if (penugasanData) setDetailPenugasan(penugasanData.filter(d => !d.created_at || new Date(d.created_at).getTime() <= maxTime));
