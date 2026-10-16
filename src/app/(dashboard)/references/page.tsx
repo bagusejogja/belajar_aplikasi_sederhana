@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Database, Plus, Tags, Users, Loader2, Trash2, ShoppingBag, X, Save, 
   Edit, Folder, Layers, ChevronDown, ChevronRight, Search, RefreshCw, Check, AlertTriangle,
-  FolderTree, Tag, Info, ShieldCheck, CheckCircle2
+  FolderTree, Tag, Info, ShieldCheck, CheckCircle2, UserCheck, UserX, ChevronUp
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { RefAkun, RefPersonel, RefJenisBelanja } from '@/types';
@@ -33,6 +33,17 @@ export default function ReferencesPage() {
       (p.nama_orang || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [listPersonel, searchTerm]);
+
+  // Pisahkan Personel Aktif vs Tidak Aktif (Sesuai Permintaan User: Tidak Aktif di-collapse)
+  const activePersonel = useMemo(() => {
+    return filteredPersonel.filter(p => p.status === 'Aktif');
+  }, [filteredPersonel]);
+
+  const inactivePersonel = useMemo(() => {
+    return filteredPersonel.filter(p => p.status !== 'Aktif');
+  }, [filteredPersonel]);
+
+  const [isInactivePersonelOpen, setIsInactivePersonelOpen] = useState(false);
 
   const filteredBelanja = useMemo(() => {
     return listBelanja.filter(b => 
@@ -336,46 +347,223 @@ export default function ReferencesPage() {
                   )}
 
                   {/* TAB 2: PERSONEL */}
+                  {/* TAB 2: PERSONEL (BEAUTIFIED & COLLAPSIBLE TIDAK AKTIF) */}
                   {activeTab === 'personel' && (
-                     <div className="bg-white border rounded-2xl border-gray-200/80 overflow-hidden shadow-xs w-full">
-                        <table className="w-full text-left border-collapse text-xs">
-                           <thead className="bg-gray-50/80 text-gray-400 text-[10px] uppercase tracking-wider font-black border-b border-gray-200">
-                              <tr>
-                                 <th className="p-3.5 px-5">Nama Lengkap Personel</th>
-                                 <th className="p-3.5 px-5 text-center w-32">Status</th>
-                                 <th className="p-3.5 px-5 text-center w-28">Aksi</th>
-                              </tr>
-                           </thead>
-                           <tbody className="divide-y divide-gray-100">
-                              {filteredPersonel.map((p, i) => (
-                                 <tr key={p.id || i} className="hover:bg-gray-50/70 transition-colors">
-                                    <td className="p-3.5 px-5 font-bold text-gray-900 text-xs md:text-sm">{p.nama_orang}</td>
-                                    <td className="p-3.5 px-5 text-center">
-                                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${
-                                         p.status === 'Aktif' 
-                                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                           : 'bg-rose-50 text-rose-700 border-rose-200'
-                                       }`}>
-                                         {p.status}
-                                       </span>
-                                    </td>
-                                    <td className="p-3.5 px-5 text-center">
-                                       <div className="flex items-center justify-center gap-1.5">
-                                          <button onClick={() => openModal(p)} className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors" title="Edit"><Edit size={12}/></button>
-                                          <button onClick={() => handleDelete(p.id, 'ref_personel')} className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors" title="Hapus"><Trash2 size={12}/></button>
-                                       </div>
-                                    </td>
+                     <div className="space-y-4 w-full">
+                        {/* Subheader Deskripsi & Ringkasan */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                           <div>
+                              <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                                <Users size={16} className="text-indigo-600" />
+                                Daftar Referensi Personel &amp; Pengaju
+                              </h2>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Master nama pengaju kuitansi dan personel otorisasi SPJ belanja.
+                              </p>
+                           </div>
+                           <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-gray-600 bg-gray-100 border border-gray-200/80 px-2.5 py-1 rounded-lg">
+                                {listPersonel.length} Total Personel
+                              </span>
+                              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                <UserCheck size={12} /> {activePersonel.length} Aktif
+                              </span>
+                              <span className="text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                                <UserX size={12} /> {inactivePersonel.length} Tidak Aktif
+                              </span>
+                           </div>
+                        </div>
+
+                        {/* SECTION 1: PERSONEL AKTIF (DEFAULT TERBUKA) */}
+                        <div className="bg-white border rounded-2xl border-gray-200/90 overflow-hidden shadow-2xs">
+                           <div className="p-3.5 px-5 bg-gradient-to-r from-emerald-50/50 via-white to-white border-b border-gray-200/80 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100" />
+                                 <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                                    Personel Berstatus Aktif
+                                 </h3>
+                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                    {activePersonel.length} Orang
+                                 </span>
+                              </div>
+                              <span className="text-[11px] text-gray-400 font-semibold hidden sm:inline">
+                                Siap dipilih di form pengajuan &amp; kuitansi
+                              </span>
+                           </div>
+
+                           <table className="w-full text-left border-collapse text-xs">
+                              <thead className="bg-gray-50/80 text-gray-500 text-[10px] uppercase tracking-wider font-black border-b border-gray-200">
+                                 <tr>
+                                    <th className="p-3 px-5 w-12 text-center">#</th>
+                                    <th className="p-3 px-5">Nama Lengkap Personel</th>
+                                    <th className="p-3 px-5 text-center w-32">Status</th>
+                                    <th className="p-3 px-5 text-center w-28">Aksi</th>
                                  </tr>
-                              ))}
-                              {filteredPersonel.length === 0 && (
-                                <tr>
-                                  <td colSpan={3} className="p-8 text-center text-gray-400 font-bold">
-                                    Tidak ada data personel yang cocok dengan pencarian.
-                                  </td>
-                                </tr>
-                              )}
-                           </tbody>
-                        </table>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                 {activePersonel.map((p, i) => (
+                                    <tr key={p.id || i} className="hover:bg-emerald-50/20 transition-colors group">
+                                       <td className="p-3 px-5 text-center font-mono font-bold text-gray-400">
+                                          {i + 1}
+                                       </td>
+                                       <td className="p-3 px-5">
+                                          <div className="flex items-center gap-3">
+                                             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs shrink-0">
+                                                {(p.nama_orang || 'P').charAt(0).toUpperCase()}
+                                             </div>
+                                             <div>
+                                                <span className="font-bold text-gray-900 text-xs md:text-sm block">
+                                                   {p.nama_orang}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400 font-mono">
+                                                   ID: #{p.id}
+                                                </span>
+                                             </div>
+                                          </div>
+                                       </td>
+                                       <td className="p-3 px-5 text-center">
+                                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black border bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs inline-flex items-center gap-1">
+                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                             <span>Aktif</span>
+                                          </span>
+                                       </td>
+                                       <td className="p-3 px-5 text-center">
+                                          <div className="flex items-center justify-center gap-1.5">
+                                             <button 
+                                                onClick={() => openModal(p)} 
+                                                className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors cursor-pointer" 
+                                                title="Edit Data Personel"
+                                             >
+                                                <Edit size={12}/>
+                                             </button>
+                                             <button 
+                                                onClick={() => handleDelete(p.id, 'ref_personel')} 
+                                                className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer" 
+                                                title="Hapus Personel"
+                                             >
+                                                <Trash2 size={12}/>
+                                             </button>
+                                          </div>
+                                       </td>
+                                    </tr>
+                                 ))}
+                                 {activePersonel.length === 0 && (
+                                   <tr>
+                                     <td colSpan={4} className="p-8 text-center text-gray-400 font-bold">
+                                       Tidak ada data personel aktif yang cocok dengan pencarian.
+                                     </td>
+                                   </tr>
+                                 )}
+                              </tbody>
+                           </table>
+                        </div>
+
+                        {/* SECTION 2: PERSONEL TIDAK AKTIF (DEFAULT COLLAPSED / TERTUTUP) */}
+                        <div className="bg-white border rounded-2xl border-rose-200/80 overflow-hidden shadow-2xs">
+                           <div 
+                              onClick={() => setIsInactivePersonelOpen(!isInactivePersonelOpen)}
+                              className="p-3.5 px-5 bg-gradient-to-r from-rose-50/70 via-white to-white hover:bg-rose-50/90 cursor-pointer flex items-center justify-between transition-all select-none"
+                           >
+                              <div className="flex items-center gap-2.5">
+                                 <div className="p-1.5 rounded-lg bg-rose-100 text-rose-700">
+                                    <UserX size={15} />
+                                 </div>
+                                 <div>
+                                    <div className="flex items-center gap-2">
+                                       <h3 className="text-xs font-black text-rose-950 uppercase tracking-wider">
+                                          Personel Tidak Aktif (Arsip)
+                                       </h3>
+                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                                          {inactivePersonel.length} Orang
+                                       </span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                       Personel yang telah dinonaktifkan (klik untuk {isInactivePersonelOpen ? 'menutup' : 'melihat'})
+                                    </p>
+                                 </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                 <span className="text-[10px] font-bold text-rose-700 bg-white border border-rose-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                                    {isInactivePersonelOpen ? 'Tutup Daftar' : 'Buka Daftar'}
+                                 </span>
+                                 <div className="p-1 rounded-lg text-rose-600 hover:bg-rose-100/60 transition-colors">
+                                    {isInactivePersonelOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                 </div>
+                              </div>
+                           </div>
+
+                           {/* Konten Terbuka Hanya Jika Di-Klik */}
+                           {isInactivePersonelOpen && (
+                              <div className="border-t border-rose-100 animate-in fade-in slide-in-from-top-2 duration-200">
+                                 <table className="w-full text-left border-collapse text-xs">
+                                    <thead className="bg-gray-50 text-gray-500 text-[10px] uppercase tracking-wider font-black border-b border-gray-200">
+                                       <tr>
+                                          <th className="p-3 px-5 w-12 text-center">#</th>
+                                          <th className="p-3 px-5">Nama Lengkap Personel</th>
+                                          <th className="p-3 px-5 text-center w-32">Status</th>
+                                          <th className="p-3 px-5 text-center w-28">Aksi</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                       {inactivePersonel.map((p, i) => (
+                                          <tr key={p.id || i} className="hover:bg-rose-50/20 transition-colors opacity-75 hover:opacity-100">
+                                             <td className="p-3 px-5 text-center font-mono font-bold text-gray-400">
+                                                {i + 1}
+                                             </td>
+                                             <td className="p-3 px-5">
+                                                <div className="flex items-center gap-3">
+                                                   <div className="w-8 h-8 rounded-xl bg-gray-200 text-gray-600 font-black text-xs flex items-center justify-center shrink-0">
+                                                      {(p.nama_orang || 'P').charAt(0).toUpperCase()}
+                                                   </div>
+                                                   <div>
+                                                      <span className="font-bold text-gray-700 line-through text-xs md:text-sm block">
+                                                         {p.nama_orang}
+                                                      </span>
+                                                      <span className="text-[10px] text-gray-400 font-mono">
+                                                         ID: #{p.id}
+                                                      </span>
+                                                   </div>
+                                                </div>
+                                             </td>
+                                             <td className="p-3 px-5 text-center">
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black border bg-rose-50 text-rose-700 border-rose-200 shadow-2xs inline-flex items-center gap-1">
+                                                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                                   <span>Tidak Aktif</span>
+                                                </span>
+                                             </td>
+                                             <td className="p-3 px-5 text-center">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                   <button 
+                                                      onClick={() => openModal(p)} 
+                                                      className="p-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors cursor-pointer" 
+                                                      title="Edit / Aktifkan Kembali"
+                                                   >
+                                                      <Edit size={12}/>
+                                                   </button>
+                                                   <button 
+                                                      onClick={() => handleDelete(p.id, 'ref_personel')} 
+                                                      className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors cursor-pointer" 
+                                                      title="Hapus Permanen"
+                                                   >
+                                                      <Trash2 size={12}/>
+                                                   </button>
+                                                </div>
+                                             </td>
+                                          </tr>
+                                       ))}
+                                       {inactivePersonel.length === 0 && (
+                                         <tr>
+                                           <td colSpan={4} className="p-6 text-center text-gray-400 font-semibold italic">
+                                             Tidak ada personel yang berstatus tidak aktif.
+                                           </td>
+                                         </tr>
+                                       )}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+                        </div>
                      </div>
                   )}
 

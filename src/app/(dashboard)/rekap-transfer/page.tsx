@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import { getSafeFileUrl } from '@/lib/fileHelper';
 import StatCard from '@/components/shared/StatCard';
+import MonthRangePicker, { MonthRange } from '@/components/shared/MonthRangePicker';
 import GalleryLightbox, { GalleryItem, getSafeImageUrl } from '@/components/shared/GalleryLightbox';
 import { TableActionButton, TableActionGroup } from '@/components/shared/ActionButtons';
 
@@ -36,9 +37,17 @@ export default function RekapTransferPage() {
   };
 
   // Date Filters
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [dateFilterField, setDateFilterField] = useState<'tanggal_pengajuan' | 'tanggal_transfer'>('tanggal_pengajuan');
   const [startDate, setStartDate] = useState(getLocalMonthStart);
   const [endDate, setEndDate] = useState(getLocalToday);
+  const [monthRange, setMonthRange] = useState<MonthRange>({
+    startMonth: currentMonthStr,
+    endMonth: currentMonthStr,
+    startDate: getLocalMonthStart(),
+    endDate: getLocalToday()
+  });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -493,33 +502,20 @@ export default function RekapTransferPage() {
       </div>
 
       {/* FILTER DATE & SEARCH BAR */}
-      <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-        {/* Unified Filter Group (Selalu Berdampingan Horizontal, Bebas Wrap) */}
-        <div className="flex items-center gap-2.5 flex-nowrap overflow-x-auto pb-1 xl:pb-0 shrink-0">
-          {/* Rentang Tanggal Input: Tgl Awal s.d. Tgl Akhir */}
-          <div className="flex items-center gap-1.5 bg-gray-50/90 p-1 rounded-xl border border-gray-200/80 shadow-2xs shrink-0">
-            <div className="flex items-center gap-1 pl-2 text-gray-500">
-              <Calendar size={13} className="text-indigo-600 shrink-0" />
-            </div>
-            <div className="relative">
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={e => setStartDate(e.target.value)} 
-                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 ring-indigo-500/20 text-xs font-bold text-gray-800 cursor-pointer shadow-2xs" 
-                title={dateFilterField === 'tanggal_pengajuan' ? 'Tanggal Awal Pengajuan' : 'Tanggal Awal Transfer'}
-              />
-            </div>
-            <span className="text-gray-400 font-bold text-xs px-0.5">s/d</span>
-            <div className="relative">
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={e => setEndDate(e.target.value)} 
-                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg outline-none focus:ring-2 ring-indigo-500/20 text-xs font-bold text-gray-800 cursor-pointer shadow-2xs" 
-                title={dateFilterField === 'tanggal_pengajuan' ? 'Tanggal Akhir Pengajuan' : 'Tanggal Akhir Transfer'}
-              />
-            </div>
+      <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 relative z-30">
+        {/* Unified Filter Group */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {/* MonthRangePicker Standard Design System */}
+          <div className="relative z-30">
+            <MonthRangePicker
+              label="Filter Periode Bulan"
+              value={monthRange}
+              onChange={(range) => {
+                setMonthRange(range);
+                if (range.startDate) setStartDate(range.startDate);
+                if (range.endDate) setEndDate(range.endDate);
+              }}
+            />
           </div>
 
           {/* Switch Segmented Control Filter Jenis Tanggal (Persis Sebelah Kanan Tanggal) */}

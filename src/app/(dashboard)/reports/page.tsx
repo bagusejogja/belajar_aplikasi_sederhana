@@ -35,6 +35,7 @@ import TableDensityToggle, { TableDensity } from '@/components/shared/TableDensi
 import ExportButtons from '@/components/shared/ExportButtons';
 import EmptyState from '@/components/shared/EmptyState';
 import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
+import MonthRangePicker, { MonthRange } from '@/components/shared/MonthRangePicker';
 import AutocompleteCombobox, { ComboboxOption } from '@/components/shared/AutocompleteCombobox';
 
 export default function ReportsPage() {
@@ -54,8 +55,16 @@ export default function ReportsPage() {
     return `${y}-${m}-${day}`;
   };
 
-  // State Filter Rentang Tanggal (Standard DateRangePicker 1x Klik)
+  // State Filter Rentang Tanggal & Bulan (Standard MonthRangePicker 1x Klik)
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: getLocalMonthStart(),
+    endDate: getLocalToday()
+  });
+  const [monthRange, setMonthRange] = useState<MonthRange>({
+    startMonth: currentMonthStr,
+    endMonth: currentMonthStr,
     startDate: getLocalMonthStart(),
     endDate: getLocalToday()
   });
@@ -530,13 +539,18 @@ export default function ReportsPage() {
       <div className="bg-white p-4 px-5 rounded-2xl border border-gray-200/90 shadow-2xs print-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
           
-          {/* 1. Filter Rentang Tanggal (DateRangePicker 1x Klik) */}
+          {/* 1. Filter Rentang Bulan (MonthRangePicker Standar Design System) */}
           <div className="lg:col-span-4 w-full">
-            <DateRangePicker
-              label="Filter Rentang Tanggal (1x Klik)"
-              value={dateRange}
-              onChange={setDateRange}
-              showTime={false}
+            <MonthRangePicker
+              label="Filter Rentang Bulan (1x Klik)"
+              value={monthRange}
+              onChange={(range) => {
+                setMonthRange(range);
+                setDateRange({
+                  startDate: range.startDate || `${range.startMonth}-01`,
+                  endDate: range.endDate || `${range.endMonth}-31`
+                });
+              }}
             />
           </div>
 

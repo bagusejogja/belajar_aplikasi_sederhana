@@ -30,6 +30,7 @@ import LampiranRkaView from '@/components/rka/LampiranRkaView';
 import SarprasRkaView from '@/components/rka/SarprasRkaView';
 import TemplateLaporan2View from '@/components/rka/TemplateLaporan2View';
 import KinerjaRkaView from '@/components/rka/KinerjaRkaView';
+import AkunPembentukTooltip from '@/components/rka/AkunPembentukTooltip';
 import { computeLampiranRka, LampiranRkaResult } from '@/lib/rka/lampiranRkaTemplate';
 
 // Definisi Struktur Template Slide / PPT Proposal RKAT
@@ -1412,7 +1413,7 @@ export default function RkaLaporanPage() {
 
   const fetchRules = async () => {
     try {
-      const res = await fetch('/api/rka/rules');
+      const res = await fetch('/api/rka/rules?modul=all');
       const json = await res.json();
       if (json.success) {
         setRulesList(json.data || []);
@@ -1539,10 +1540,11 @@ export default function RkaLaporanPage() {
   const availableTabs = useMemo(() => {
     const tabsMap = new Map<string, { id: string; label: string; icon: string; count: number }>();
 
-    // Tambahkan format unik dari rules aktif terlebih dahulu
+    // Tambahkan format unik dari rules belanja/pengeluaran aktif terlebih dahulu
     rulesList.forEach(r => {
+      if (r.modul && r.modul !== 'pengeluaran' && r.modul !== 'semua') return;
       const tf = r.target_field;
-      if (tf && !tabsMap.has(tf)) {
+      if (tf && tf !== 'format_proposal' && !tabsMap.has(tf)) {
         const pretty = tf
           .replace(/^(laporan_|target_)/, '')
           .replace(/_/g, ' ')
@@ -6320,42 +6322,29 @@ export default function RkaLaporanPage() {
             )}
           </div>
 
-          {/* Baris 3: Filter Versi, Tahun, Fakultas Autocomplete, dan Search Bar */}
+          {/* Baris 3: Filter Tahun, Fakultas Autocomplete, dan Search Bar (Versi Anggaran terpusat di Top Bar) */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             
-            {/* Filter Versi Anggaran */}
-            <div className="sm:col-span-3">
-              <label className="text-[10px] font-bold text-purple-700 uppercase tracking-wider block mb-1">
-                Versi Anggaran
-              </label>
-              <VersiAnggaranSelector
-                selectedVersi={versiFilter}
-                onSelectVersi={setVersiFilter}
-                tahun={tahunFilter}
-                modul="all"
-              />
-            </div>
-
             {/* Filter Tahun */}
             <div className="sm:col-span-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Tahun
               </label>
               <select
                 value={tahunFilter}
                 onChange={e => setTahunFilter(e.target.value)}
-                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-2 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
+                className="w-full h-9 bg-white border border-gray-300 text-gray-800 text-xs font-bold rounded-xl px-2.5 outline-none focus:ring-2 focus:ring-indigo-600 cursor-pointer shadow-2xs"
               >
                 <option value="2027">TA 2027</option>
                 <option value="2026">TA 2026</option>
                 <option value="2025">TA 2025</option>
-                <option value="ALL">Semua</option>
+                <option value="ALL">Semua TA</option>
               </select>
             </div>
 
-            {/* Filter Fakultas Autocomplete (Seragam dengan tambah-pagu) */}
-            <div className="sm:col-span-3">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+            {/* Filter Fakultas Autocomplete (Lebih luas & leluasa) */}
+            <div className="sm:col-span-6">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Fakultas / Unit Kerja
               </label>
               <UnitAutocompleteFilter
@@ -6516,17 +6505,6 @@ export default function RkaLaporanPage() {
                         <Settings2 size={13} className="text-indigo-600" />
                         <span>Atur Susunan Slide</span>
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExportKertasKerjaLengkap}
-                        disabled={isExportingKertasKerja}
-                        className="h-8 rounded-xl border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
-                        title="Export Excel Kertas Kerja Lengkap (8 Sheet)"
-                      >
-                        <FileSpreadsheet size={13} className="text-blue-600" />
-                        <span>Kertas Kerja (8 Sheet)</span>
-                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -6654,6 +6632,7 @@ export default function RkaLaporanPage() {
                                               {isSubExpanded ? <Minus size={10} /> : <Plus size={10} />}
                                             </button>
                                             <span className="text-slate-800 font-medium">{sub.label}</span>
+                                            <AkunPembentukTooltip label={sub.label} rows={sub.rows} rules={rulesList} formatRp={formatRp} type="penerimaan" />
                                           </TableCell>
                                           <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                             {sub.count.toLocaleString('id-ID')} Akun
@@ -6717,6 +6696,7 @@ export default function RkaLaporanPage() {
                                       {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
                                     </button>
                                     <span className="font-semibold text-slate-900">{item.label}</span>
+                                    <AkunPembentukTooltip label={item.label} rows={item.rows} rules={rulesList} formatRp={formatRp} type="penerimaan" />
                                   </TableCell>
                                   <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                     {item.count.toLocaleString('id-ID')} Akun
@@ -6781,6 +6761,13 @@ export default function RkaLaporanPage() {
                                   {isLainnyaOpen ? <Minus size={10} /> : <Plus size={10} />}
                                 </button>
                                 <span>{pptProposalData.penerimaan.lainnya.label}</span>
+                                <AkunPembentukTooltip
+                                  label={pptProposalData.penerimaan.lainnya.label}
+                                  rows={pptProposalData.penerimaan.lainnya.rows}
+                                  rules={rulesList}
+                                  formatRp={formatRp}
+                                  type="penerimaan"
+                                />
                               </TableCell>
                               <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                 {pptProposalData.penerimaan.lainnya.count.toLocaleString('id-ID')} Akun
@@ -6934,6 +6921,7 @@ export default function RkaLaporanPage() {
                                               {isSubExpanded ? <Minus size={10} /> : <Plus size={10} />}
                                             </button>
                                             <span className="text-slate-800 font-medium">{sub.label}</span>
+                                            <AkunPembentukTooltip label={sub.label} rows={sub.rows} rules={rulesList} formatRp={formatRp} type="belanja" />
                                           </TableCell>
                                           <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                             {sub.count.toLocaleString('id-ID')} Baris
@@ -6997,6 +6985,7 @@ export default function RkaLaporanPage() {
                                       {isExpanded ? <Minus size={10} /> : <Plus size={10} />}
                                     </button>
                                     <span>{item.label}</span>
+                                    <AkunPembentukTooltip label={item.label} rows={item.rows} rules={rulesList} formatRp={formatRp} type="belanja" />
                                   </TableCell>
                                   <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                     {item.count.toLocaleString('id-ID')} Baris
@@ -7061,6 +7050,13 @@ export default function RkaLaporanPage() {
                                   {isBLainnyaOpen ? <Minus size={10} /> : <Plus size={10} />}
                                 </button>
                                 <span>{pptProposalData.pengeluaran.lainnya.label}</span>
+                                <AkunPembentukTooltip
+                                  label={pptProposalData.pengeluaran.lainnya.label}
+                                  rows={pptProposalData.pengeluaran.lainnya.rows}
+                                  rules={rulesList}
+                                  formatRp={formatRp}
+                                  type="belanja"
+                                />
                               </TableCell>
                               <TableCell className="py-2 text-center text-xs font-mono text-slate-500">
                                 {pptProposalData.pengeluaran.lainnya.count.toLocaleString('id-ID')} Baris
@@ -7239,6 +7235,7 @@ export default function RkaLaporanPage() {
                                     <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
                                       <span>💰</span>
                                       <span>{group.label}</span>
+                                      <AkunPembentukTooltip label={group.label} rows={group.rows} rules={rulesList} formatRp={formatRp} type="penerimaan" />
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-center">
@@ -7401,6 +7398,7 @@ export default function RkaLaporanPage() {
                                   <div className="font-bold text-gray-900 text-xs sm:text-sm flex items-center gap-2">
                                     <span>🏷️</span>
                                     <span>{group.label}</span>
+                                    <AkunPembentukTooltip label={group.label} rows={group.rows} rules={rulesList} formatRp={formatRp} type="belanja" />
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-center">
@@ -7546,17 +7544,6 @@ export default function RkaLaporanPage() {
                       : 'Rekapitulasi Usulan RKAT per Unit Kerja (Format Fakultas)'}
                   </span>
                 </CardTitle>
-                <CardDescription className="text-xs text-gray-500 font-medium mt-0.5">
-                  {rekapFormat === 'kptu'
-                    ? '9 Kolom Standar KPTU: 0. Unit kerja, 1. Pagu, 2. Kerjasama, 3. Jumlah (1+2+3), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus / Defisit Operasional (3-5), 8. Surplus / Defisit Anggaran (3-6)'
-                    : rekapFormat === 'upu'
-                    ? '10 Kolom Standar UPU: 0. Unit Kerja, 1. Subsidi, 2. Penerimaan, 3. Luncuran, 4. Jml Sumber Pembiayaan (1+2+3), 5. Pengeluaran Operasional, 6. Investasi (Belanja Modal), 7. Total Pengeluaran (5+6), 8. Surplus/Defisit Operasional (1+2-5), 9. Surplus/Defisit Anggaran (4-7)'
-                    : rekapFormat === 'pusdi'
-                    ? '9 Kolom Standar PUSDI: 0. Unit Kerja, 1. Penerimaan, 2. Luncuran, 3. Jml Sumber Pembiayaan (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus/Defisit Operasional (1-4), 8. Surplus/Defisit Anggaran (3-6)'
-                    : rekapFormat === 'fakultas_alokasi'
-                    ? '11 Kolom Standar Fakultas (Dikalikan % Alokasi Unit): 0. Unit Kerja, 1. Pen. Pendidikan (Alokasi), 2. Pen. Non Pendidikan (Alokasi), 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'
-                    : '11 Kolom Standar Fakultas: 0. Unit Kerja, 1. Pen. Pendidikan, 2. Pen. Non Pendidikan, 3. Jml Penerimaan (1+2), 4. Luncuran, 5. Jml Pembiayaan (3+4), 6. Pengeluaran Ops, 7. Investasi (Modal), 8. Total Pengeluaran, 9. Surplus/Defisit Ops, 10. Surplus/Defisit Anggaran'}
-                </CardDescription>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">

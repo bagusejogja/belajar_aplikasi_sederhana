@@ -6,7 +6,7 @@ import {
   RefreshCw, CheckCircle2, ShieldCheck, Database, Layers,
   Building2, ArrowRight, ArrowLeft, Loader2, Sparkles, X, Save,
   FolderTree, BookOpen, AlertCircle, FileSpreadsheet, Check,
-  Copy, Wallet, ChevronDown
+  Copy, Wallet, ChevronDown, RotateCcw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -108,7 +108,7 @@ function UnitAutocompleteFilter({
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder="Ketik cari nama unit..."
-          className="w-full h-8 pl-3 pr-10 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800 font-semibold transition-all shadow-2xs cursor-text placeholder:font-normal placeholder:text-gray-400"
+          className="w-full h-9 pl-3 pr-10 text-xs rounded-xl border border-gray-200 bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800 font-semibold transition-all shadow-2xs cursor-text placeholder:font-normal placeholder:text-gray-400"
         />
         <div className="absolute right-2 flex items-center gap-0.5">
           {(!isAll || query) && (
@@ -865,8 +865,8 @@ export default function RkaRulesPage() {
           <RkaHelpModal currentPage="rules" />
 
           {/* Selector Target Versi Basis Data */}
-          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-1 rounded-xl">
-            <span className="text-[11px] font-bold text-gray-500 whitespace-nowrap">Target Data:</span>
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 p-1 rounded-xl shadow-2xs">
+            <span className="text-[11px] font-bold text-gray-500 pl-1.5 whitespace-nowrap">Target Data:</span>
             <VersiAnggaranSelector
               selectedVersi={selectedVersi}
               onSelectVersi={setSelectedVersi}
@@ -883,14 +883,9 @@ export default function RkaRulesPage() {
             className="h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-black gap-1.5 shadow-sm cursor-pointer active:scale-95 disabled:opacity-50"
           >
             {isApplying ? <RefreshCw className="animate-spin" size={14} /> : <Wand2 size={14} />}
-            <span>
-              {isApplying 
-                ? 'Memproses Data...' 
-                : isTargetFiltered 
-                  ? `Jalankan Rule (${filterTarget} - ${selectedVersi.toUpperCase()})` 
-                  : activeModul === 'penerimaan' 
-                    ? `Jalankan Rule Penerimaan (${selectedVersi.toUpperCase()})` 
-                    : `Jalankan Rule Pengeluaran (${selectedVersi.toUpperCase()})`}
+            <span>{isApplying ? 'Memproses Data...' : 'Jalankan Rule Engine'}</span>
+            <span className="px-1.5 py-0.2 rounded bg-white/20 text-[10px] font-mono font-bold">
+              {selectedVersi.toUpperCase()}
             </span>
           </Button>
 
@@ -899,12 +894,12 @@ export default function RkaRulesPage() {
             variant="outline"
             size="sm"
             onClick={() => setShowInlinePasteZone(!showInlinePasteZone)}
-            className={`h-9 rounded-xl text-xs font-bold gap-1.5 shadow-2xs transition-colors ${
-              showInlinePasteZone ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            className={`h-9 rounded-xl text-xs font-bold gap-1.5 shadow-2xs transition-colors cursor-pointer ${
+              showInlinePasteZone ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'border-gray-300 text-gray-700 hover:bg-gray-50 bg-white'
             }`}
           >
             <FileSpreadsheet size={14} className="text-indigo-600" />
-            <span>{showInlinePasteZone ? 'Sembunyikan Paste Zone' : 'Buka Paste Zone'}</span>
+            <span>{showInlinePasteZone ? 'Tutup Paste Zone' : 'Paste Zone (Excel)'}</span>
           </Button>
 
           {/* Refresh Button */}
@@ -1071,18 +1066,32 @@ export default function RkaRulesPage() {
                 ? 'Siap memindai penerimaan & label'
                 : 'Siap memindai belanja & label'}
             </div>
-            <div className="pt-2 border-t border-indigo-100/80">
-              <Button
-                size="sm"
-                onClick={() => handleApplyRules()}
-                disabled={isApplying}
-                className={`w-full h-7 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer ${
-                  isTargetFiltered ? 'bg-blue-600 hover:bg-blue-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                }`}
-              >
-                {isApplying ? 'Sedang Memindai...' : isTargetFiltered ? `⚡ Jalankan (${filterTarget})` : '⚡ Jalankan Sekarang'}
-              </Button>
-            </div>
+            {isTargetFiltered ? (
+              <div className="pt-2 border-t border-blue-200/80">
+                <Button
+                  size="sm"
+                  onClick={() => handleApplyRules()}
+                  disabled={isApplying}
+                  className="w-full h-7 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer bg-blue-600 hover:bg-blue-700 flex items-center justify-center gap-1.5"
+                >
+                  {isApplying ? (
+                    <RefreshCw className="animate-spin" size={13} />
+                  ) : (
+                    <span>⚡ Jalankan Khusus Format Ini</span>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800 font-semibold">
+                <span className="flex items-center gap-1 text-[10px] text-emerald-700">
+                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                  <span>Siap Eksekusi</span>
+                </span>
+                <span className="text-[10px] text-gray-500 font-normal">
+                  Gunakan tombol di atas
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1477,13 +1486,13 @@ export default function RkaRulesPage() {
 
             {/* Filter Target Format Laporan */}
             <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Target Format
               </label>
               <select
                 value={filterTarget}
                 onChange={e => setFilterTarget(e.target.value)}
-                className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-8 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+                className="bg-white border border-gray-200 text-gray-800 text-xs font-bold rounded-xl px-3 h-9 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
               >
                 <option value="ALL">Semua Format Laporan ({rules.length})</option>
                 {allTargetOptions.map(t => {
@@ -1499,7 +1508,7 @@ export default function RkaRulesPage() {
 
             {/* Search Box */}
             <div className="flex flex-col">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
                 Pencarian
               </label>
               <div className="relative">
@@ -1509,10 +1518,27 @@ export default function RkaRulesPage() {
                   placeholder="Cari kata kunci, label, akun..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-8 outline-none focus:ring-2 focus:ring-blue-500 font-medium focus:bg-white transition-all w-52 sm:w-60"
+                  className="bg-white border border-gray-200 text-gray-900 text-xs rounded-xl pl-8 pr-3 h-9 outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all w-52 sm:w-64 shadow-2xs"
                 />
               </div>
             </div>
+
+            {/* Tombol Reset Filter jika ada filter aktif */}
+            {(filterUnit !== 'ALL' || filterTarget !== 'ALL' || search) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterUnit('ALL');
+                  setFilterTarget('ALL');
+                  setSearch('');
+                }}
+                className="h-9 px-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 hover:text-gray-900 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                title="Reset seluruh filter tabel"
+              >
+                <RotateCcw size={13} className="text-gray-500" />
+                <span>Reset</span>
+              </button>
+            )}
           </div>
         </div>
 

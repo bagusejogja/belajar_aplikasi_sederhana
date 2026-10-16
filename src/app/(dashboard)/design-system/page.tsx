@@ -86,7 +86,10 @@ import {
   ChevronUp,
   ChevronRight,
   Folder,
-  FolderOpen
+  FolderOpen,
+  Wallet,
+  CreditCard,
+  UserCheck
 } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 import TablePagination from '@/components/shared/TablePagination';
@@ -221,6 +224,17 @@ export default function DesignSystemPage() {
     startDate: '2026-03-01',
     endDate: '2026-10-31',
   });
+
+  // Poin 2A: Filter Rentang Tanggal Harian dengan Jam (showTime=true)
+  const [dateTimeRangeFilter, setDateTimeRangeFilter] = useState<DateRange>({
+    startDate: '2026-10-01',
+    endDate: '2026-10-15',
+    startTime: '08:00',
+    endTime: '17:00'
+  });
+
+  // Demo State Rincian Likuiditas Rekening Bank & Kas Kecil
+  const [showDemoKantongBreakdown, setShowDemoKantongBreakdown] = useState<boolean>(true);
 
   // Poin 2B: Input Tanggal & Jam Data Transaksi (Form Input Data, Bukan Filter)
   const [formDate, setFormDate] = useState<string>('2026-10-01');
@@ -1965,6 +1979,55 @@ Atas perhatian dan kerja sama Bapak/Ibu, kami sampaikan terima kasih.`
                 </div>
               </div>
             </div>
+
+            {/* Sub-Card 3: DateRangePicker (Rentang Tanggal Harian — dengan Jam) */}
+            <div className="p-4 bg-amber-50/40 rounded-2xl border border-amber-200/80 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-200/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock size={13} className="text-amber-600" />
+                    3. DateRangePicker (Rentang Tanggal Harian — dengan Jam)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black uppercase">
+                    Presisi Waktu
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono font-bold bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded border border-amber-200/70">
+                  Format: YYYY-MM-DD + HH:mm
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div className="md:col-span-2 space-y-2.5">
+                  <DateRangePicker
+                    label="Filter Rentang Tanggal & Jam (Presisi Menit)"
+                    value={dateTimeRangeFilter}
+                    onChange={setDateTimeRangeFilter}
+                    showTime={true}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className="text-[11px] font-bold text-gray-500">Rentang Waktu Aktif:</span>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-mono font-black text-[11px] shadow-2xs">
+                      {dateTimeRangeFilter.startDate} {dateTimeRangeFilter.startTime || '00:00'} s/d {dateTimeRangeFilter.endDate} {dateTimeRangeFilter.endTime || '23:59'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-white text-amber-900 font-mono text-[10.5px] font-bold border border-amber-200">
+                      Query Timestamp: {dateTimeRangeFilter.startDate}T{dateTimeRangeFilter.startTime || '00:00'}:00 s/d {dateTimeRangeFilter.endDate}T{dateTimeRangeFilter.endTime || '23:59'}:59
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-amber-200/80 space-y-1.5 text-xs shadow-2xs">
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider block">Karakteristik Tanggal + Jam:</span>
+                  <ul className="text-gray-600 text-[11px] space-y-1 list-disc list-inside">
+                    <li><strong>Presisi Tinggi:</strong> Dilengkapi input jam &amp; menit untuk awal dan akhir rentang transaksi.</li>
+                    <li><strong>Audit &amp; Security:</strong> Cocok untuk log aktivitas, audit trail perubahan data, pemantauan transaksi realtime.</li>
+                    <li><strong>Filter Shift Kerja:</strong> Mendukung filtering per jam operasional kasir atau shift loket pelayanan.</li>
+                    <li>Digunakan pada: <strong>Log Audit, Rekapitulasi Presisi Jam, Monitoring Antrian &amp; Verifikasi</strong>.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Card 2: Input Tanggal & Jam Data Transaksi (Poin 2B - Form Input) */}
@@ -3041,7 +3104,285 @@ Atas perhatian dan kerja sama Bapak/Ibu, kami sampaikan terima kasih.`
             </div>
           </div>
 
-          {/* BAGIAN B: TEMPLATE POHON HIERARKIS (TREE VIEW COMPONENT) */}
+          {/* BAGIAN B: RINCIAN LIKUIDITAS REKENING BANK & KAS KECIL (SEPERTI DI /dashboard - KANTONG DANA) */}
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-4 md:p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 text-[10px] font-black uppercase">
+                  Komponen Dashboard
+                </span>
+                <div className="flex items-center gap-2">
+                  <Building2 size={16} className="text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-gray-800 dark:text-slate-200">
+                    Rincian Likuiditas Rekening Bank &amp; Kas Kecil
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[10px] font-bold border border-blue-200 dark:border-blue-800">
+                  2 Kantong Dana (Bank + Kas)
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDemoKantongBreakdown(!showDemoKantongBreakdown)}
+                className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+              >
+                <span>{showDemoKantongBreakdown ? 'Sembunyikan Rincian' : 'Tampilkan Rincian'}</span>
+                {showDemoKantongBreakdown ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </button>
+            </div>
+
+            {showDemoKantongBreakdown && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                {/* Kantong 1: Bank Mandiri */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/60 hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xs transition-all space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate pr-2">
+                      <CreditCard size={15} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <div className="truncate">
+                        <span className="text-xs font-black text-gray-900 dark:text-slate-100 block truncate">
+                          Bank Mandiri Rek Operasional
+                        </span>
+                        <span className="text-[10px] text-gray-500 dark:text-slate-400 font-mono block">
+                          No. Rek: 137-00-1928374-1
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      Bank
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1 text-[11px] font-mono">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Saldo Awal:</span>
+                      <span>Rp 2.450.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>+ Masuk:</span>
+                      <span>Rp 850.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                      <span>- Keluar:</span>
+                      <span>Rp 620.000.000</span>
+                    </div>
+                    <div className="flex justify-between font-black text-gray-900 dark:text-slate-100 pt-1.5 border-t border-slate-200/80 dark:border-slate-700/80">
+                      <span>Saldo Akhir:</span>
+                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">
+                        Rp 2.680.000.000
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kantong 2: Kas Tunai */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/60 hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xs transition-all space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate pr-2">
+                      <Wallet size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div className="truncate">
+                        <span className="text-xs font-black text-gray-900 dark:text-slate-100 block truncate">
+                          Kas Tunai Bendahara Pengeluaran
+                        </span>
+                        <span className="text-[10px] text-gray-500 dark:text-slate-400 font-mono block">
+                          Kas Operasional Harian
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      Kas Tunai
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1 text-[11px] font-mono">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Saldo Awal:</span>
+                      <span>Rp 45.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>+ Masuk:</span>
+                      <span>Rp 15.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                      <span>- Keluar:</span>
+                      <span>Rp 22.500.000</span>
+                    </div>
+                    <div className="flex justify-between font-black text-gray-900 dark:text-slate-100 pt-1.5 border-t border-slate-200/80 dark:border-slate-700/80">
+                      <span>Saldo Akhir:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        Rp 37.500.000
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kantong 3: Bank BNI */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/60 hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xs transition-all space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 truncate pr-2">
+                      <CreditCard size={15} className="text-blue-600 dark:text-blue-400 shrink-0" />
+                      <div className="truncate">
+                        <span className="text-xs font-black text-gray-900 dark:text-slate-100 block truncate">
+                          Bank BNI Penerimaan UPU
+                        </span>
+                        <span className="text-[10px] text-gray-500 dark:text-slate-400 font-mono block">
+                          No. Rek: 028-11-8849201-9
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      Bank
+                    </span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1 text-[11px] font-mono">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Saldo Awal:</span>
+                      <span>Rp 1.120.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>+ Masuk:</span>
+                      <span>Rp 430.000.000</span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                      <span>- Keluar:</span>
+                      <span>Rp 180.000.000</span>
+                    </div>
+                    <div className="flex justify-between font-black text-gray-900 dark:text-slate-100 pt-1.5 border-t border-slate-200/80 dark:border-slate-700/80">
+                      <span>Saldo Akhir:</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-bold">
+                        Rp 1.370.000.000
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* BAGIAN C: MINI SUMMARY TILES & STAT CARDS (SEPERTI DI /gov-dashboard & /users) */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4">
+            <div className="pb-3 border-b border-gray-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300 text-[10px] font-black uppercase">
+                  Mini Cards &amp; Tiles
+                </span>
+                <h2 className="text-sm font-black text-gray-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <Layout size={16} className="text-purple-600 dark:text-purple-400" />
+                  Card Lebih Kecil (Compact Tiles &amp; Gradient KPI)
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                Pilihan kartu berdimensi mini untuk ringkasan cepat pada header tabel (/gov-dashboard &quot;Tabel Akhir Per Akun&quot;) serta kartu indikator pengguna (/users).
+              </p>
+            </div>
+
+            {/* Model 1: Mini Tiles Tabel Akhir Per Akun (/gov-dashboard) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-gray-700 dark:text-slate-300 uppercase tracking-wider">
+                  1. Model Mini Summary Tiles (Contoh: /gov-dashboard Tabel Akhir Per Akun)
+                </span>
+                <span className="text-[10px] font-mono text-gray-400">grid-cols-2 lg:grid-cols-4</span>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-gray-50/50 dark:bg-slate-850/50 p-3 rounded-xl border border-gray-200/70 dark:border-slate-800">
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200/80 dark:border-slate-700 shadow-2xs flex items-center gap-3">
+                  <div className="bg-indigo-50 dark:bg-indigo-950/80 p-2 rounded-lg text-indigo-600 dark:text-indigo-400 shrink-0">
+                    <PieChart size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider truncate">Jumlah Akun</p>
+                    <h5 className="text-sm font-black text-gray-900 dark:text-slate-100 truncate">18 Akun</h5>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200/80 dark:border-slate-700 shadow-2xs flex items-center gap-3">
+                  <div className="bg-blue-50 dark:bg-blue-950/80 p-2 rounded-lg text-blue-600 dark:text-blue-400 shrink-0">
+                    <Activity size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider truncate">Realisasi s/d Acuan</p>
+                    <h5 className="text-sm font-black text-gray-900 dark:text-slate-100 truncate">Rp 14.850.200.000</h5>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200/80 dark:border-slate-700 shadow-2xs flex items-center gap-3">
+                  <div className="bg-emerald-50 dark:bg-emerald-950/80 p-2 rounded-lg text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <TrendingUp size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider truncate">Proyeksi Sisa Bulan</p>
+                    <h5 className="text-sm font-black text-emerald-600 dark:text-emerald-400 truncate">Rp 8.420.000.000</h5>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200/80 dark:border-slate-700 shadow-2xs flex items-center gap-3">
+                  <div className="bg-amber-50 dark:bg-amber-950/80 p-2 rounded-lg text-amber-600 dark:text-amber-400 shrink-0">
+                    <Coins size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-wider truncate">Estimasi Akhir Tahun</p>
+                    <h5 className="text-sm font-black text-amber-700 dark:text-amber-400 truncate">Rp 23.270.200.000</h5>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Model 2: Gradient KPI Stat Cards (/users & /menus) */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-gray-700 dark:text-slate-300 uppercase tracking-wider">
+                  2. Model Gradient KPI Stat Cards (Contoh: /users &amp; /menus)
+                </span>
+                <span className="text-[10px] font-mono text-gray-400">grid-cols-1 sm:grid-cols-3</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border border-indigo-200/80 dark:border-indigo-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-1">
+                      TOTAL USER TERDAFTAR
+                    </span>
+                    <div className="text-2xl font-black text-slate-900 dark:text-slate-100 font-mono tracking-tight">
+                      42 <span className="text-xs text-slate-500 font-sans font-bold">Akun</span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs">
+                    <Users size={20} />
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border border-emerald-200/80 dark:border-emerald-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+                      AKUN AKTIF (BERHAK AKSES)
+                    </span>
+                    <div className="text-2xl font-black text-emerald-950 dark:text-emerald-100 font-mono tracking-tight">
+                      38 <span className="text-xs text-emerald-600 font-sans font-bold">(90%)</span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 shadow-xs">
+                    <UserCheck size={20} />
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-rose-500/10 via-rose-50/40 to-white dark:from-rose-950/30 dark:via-slate-900 dark:to-slate-900 border border-rose-200/80 dark:border-rose-800/60 rounded-2xl p-4 shadow-2xs backdrop-blur-xs flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 block mb-1">
+                      AKUN TERKUNCI / PENDING
+                    </span>
+                    <div className="text-2xl font-black text-rose-950 dark:text-rose-100 font-mono tracking-tight">
+                      4 <span className="text-xs text-rose-600 font-sans font-bold">(10%)</span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-rose-100/80 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/60 shadow-xs">
+                    <ShieldAlert size={20} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* BAGIAN D: TEMPLATE POHON HIERARKIS (TREE VIEW COMPONENT) */}
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-slate-800">
               <div>

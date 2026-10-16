@@ -747,7 +747,7 @@ export default function SuratHtmlEditorPage() {
                 toast.success('Lembar kerja telah dibersihkan!');
               }
             }}
-            className="h-9 px-3 bg-gray-50 hover:bg-rose-50 border border-gray-200 hover:border-rose-200 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            className="h-9 px-3 bg-white hover:bg-rose-50 border border-gray-200 hover:border-rose-300 text-gray-600 hover:text-rose-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
             title="Bersihkan lembar kerja untuk memulai dokumen baru"
           >
             <RotateCcw size={13} />
@@ -765,25 +765,31 @@ export default function SuratHtmlEditorPage() {
             <span>{isWordConverting ? 'Mengonversi...' : 'Upload Word (.docx)'}</span>
           </button>
 
+          {/* Tombol Cetak / PDF */}
           <button 
             onClick={handlePrintPreview}
-            className="h-9 px-3.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            className="h-9 px-3.5 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            title="Cetak atau simpan dokumen sebagai PDF"
           >
             <Printer size={13} />
             <span>Cetak / PDF</span>
           </button>
 
+          {/* Tombol Unduh File HTML */}
           <button 
             onClick={handleDownloadHtml}
             className="h-9 px-3.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            title="Unduh file dokumen dalam format .html"
           >
             <Download size={13} />
             <span>Unduh .html</span>
           </button>
 
+          {/* Tombol Salin Kode HTML */}
           <button 
             onClick={handleCopyHtml}
-            className="h-9 px-4 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            className="h-9 px-4 bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            title="Salin seluruh kode HTML dokumen ke clipboard"
           >
             {copied ? <Check size={14} className="text-emerald-300" /> : <Copy size={14} />}
             <span>{copied ? 'HTML Tersalin!' : 'Salin Kode HTML'}</span>
@@ -798,9 +804,9 @@ export default function SuratHtmlEditorPage() {
             <HelpCircle size={15} />
           </div>
           <div>
-            <span className="font-black text-indigo-900 block">Cara Penggunaan:</span>
+            <span className="font-black text-indigo-900 block">Cara Penggunaan Cepat:</span>
             <span className="text-[11px] text-indigo-800 font-medium">
-              1. Klik tombol biru <strong>"Upload Word (.docx)"</strong> atau pilih <strong>Template</strong> ➔ 2. Tabel (lengkap nomor urut), list, & teks otomatis terformat ➔ 3. Klik <strong>"Salin Kode HTML"</strong> dan paste ke aplikasi kantor!
+              1. Klik tombol biru <strong>"Upload Word (.docx)"</strong> atau pilih <strong>Template Resmi</strong> ➔ 2. Format tabel, nomor urut & teks tersusun rapi ➔ 3. Klik <strong>"Salin Kode HTML"</strong> dan paste ke sistem persuratan.
             </span>
           </div>
         </div>
@@ -840,7 +846,7 @@ export default function SuratHtmlEditorPage() {
             <button
               key={preset.id}
               onClick={() => handleLoadPreset(preset.html)}
-              className="h-8 px-3 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 text-xs font-bold text-gray-700 hover:text-indigo-700 transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+              className="h-8.5 px-3.5 rounded-xl bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-300 text-xs font-bold text-gray-700 hover:text-indigo-700 transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
               title={preset.description}
             >
               <Sparkles size={12} className="text-amber-500" />
@@ -851,119 +857,121 @@ export default function SuratHtmlEditorPage() {
       </div>
 
       {/* 4. QUICK INSERT & FORMATTING TOOLBAR */}
-      <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="bg-white p-3 px-4 rounded-2xl border border-gray-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Format Teks */}
           {editorMode === 'visual' && (
-            <>
-              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg border border-gray-200">
-                <button
-                  onClick={() => execFormat('bold')}
-                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors font-bold cursor-pointer"
-                  title="Tebal (Ctrl+B)"
-                >
-                  <Bold size={13} />
-                </button>
-                <button
-                  onClick={() => execFormat('italic')}
-                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors italic cursor-pointer"
-                  title="Miring (Ctrl+I)"
-                >
-                  <Italic size={13} />
-                </button>
-                <button
-                  onClick={() => execFormat('underline')}
-                  className="p-1.5 hover:bg-white text-gray-700 rounded transition-colors underline cursor-pointer"
-                  title="Garis Bawah (Ctrl+U)"
-                >
-                  <Underline size={13} />
-                </button>
-              </div>
-
-              <div className="h-4 w-[1px] bg-gray-200 mx-1" />
-            </>
+            <div className="flex items-center gap-1 bg-gray-100/90 p-1 rounded-xl border border-gray-200/80 shadow-2xs">
+              <button
+                onClick={() => execFormat('bold')}
+                className="w-7 h-7 flex items-center justify-center hover:bg-white text-gray-700 rounded-lg transition-colors font-bold cursor-pointer"
+                title="Tebal (Ctrl+B)"
+              >
+                <Bold size={13} />
+              </button>
+              <button
+                onClick={() => execFormat('italic')}
+                className="w-7 h-7 flex items-center justify-center hover:bg-white text-gray-700 rounded-lg transition-colors italic cursor-pointer"
+                title="Miring (Ctrl+I)"
+              >
+                <Italic size={13} />
+              </button>
+              <button
+                onClick={() => execFormat('underline')}
+                className="w-7 h-7 flex items-center justify-center hover:bg-white text-gray-700 rounded-lg transition-colors underline cursor-pointer"
+                title="Garis Bawah (Ctrl+U)"
+              >
+                <Underline size={13} />
+              </button>
+            </div>
           )}
 
-          <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 mr-1">Sisipkan:</span>
+          {/* Sisipkan Tabel & Paragraf */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button 
+              onClick={() => setIsTableModalOpen(true)} 
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer active:scale-95"
+              title="Buka Generator Tabel Surat Resmi"
+            >
+              <TableIcon size={13} />
+              <span>+ Tabel Surat</span>
+            </button>
 
-          <button 
-            onClick={() => setIsTableModalOpen(true)} 
-            className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer active:scale-95"
-            title="Buka Generator Tabel Surat Resmi"
-          >
-            <TableIcon size={13} />
-            <span>+ Tabel Surat Resmi</span>
-          </button>
+            <button 
+              onClick={addJustifiedParagraph} 
+              className="h-8 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+              title="Paragraf Rata Kanan-Kiri"
+            >
+              <AlignJustify size={12} className="text-indigo-600" />
+              <span>Justify</span>
+            </button>
 
-          <button 
-            onClick={addJustifiedParagraph} 
-            className="h-7 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Paragraf Rata Kanan-Kiri"
-          >
-            <AlignJustify size={12} className="text-indigo-600" />
-            <span>Paragraf Justify</span>
-          </button>
+            <button 
+              onClick={addIndentedParagraph} 
+              className="h-8 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+              title="Paragraf Menjorok Awal Baris"
+            >
+              <AlignLeft size={12} className="text-indigo-600" />
+              <span>Indent</span>
+            </button>
 
-          <button 
-            onClick={addIndentedParagraph} 
-            className="h-7 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Paragraf Menjorok Awal Baris"
-          >
-            <AlignLeft size={12} className="text-indigo-600" />
-            <span>Menjorok (Indent)</span>
-          </button>
+            <button 
+              onClick={addSubParagraphIndent} 
+              className="h-8 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+              title="Sub-Paragraf dengan Padding Kiri 30pt"
+            >
+              <span>Sub-Indent (30pt)</span>
+            </button>
+          </div>
 
-          <button 
-            onClick={addSubParagraphIndent} 
-            className="h-7 px-2.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Sub-Paragraf dengan Padding Kiri 30pt"
-          >
-            <span>Sub-Indent (30pt)</span>
-          </button>
+          <div className="h-5 w-[1px] bg-gray-200 hidden sm:block" />
 
-          <div className="h-4 w-[1px] bg-gray-200 mx-1" />
+          {/* List Penomoran */}
+          <div className="flex flex-wrap items-center gap-1 bg-purple-50/50 p-0.5 rounded-xl border border-purple-200/60">
+            <button 
+              onClick={addRomanList} 
+              className="h-7 px-2.5 hover:bg-purple-100/70 text-purple-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Penomoran Romawi (I, II, III...)"
+            >
+              <ListOrdered size={12} />
+              <span>Romawi</span>
+            </button>
 
-          <button 
-            onClick={addRomanList} 
-            className="h-7 px-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Penomoran Romawi (I, II, III...)"
-          >
-            <ListOrdered size={12} />
-            <span>Romawi (I, II)</span>
-          </button>
+            <button 
+              onClick={addAlphaList} 
+              className="h-7 px-2.5 hover:bg-purple-100/70 text-purple-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Penomoran Abjad (a, b, c...)"
+            >
+              <ListOrdered size={12} />
+              <span>Abjad</span>
+            </button>
 
-          <button 
-            onClick={addAlphaList} 
-            className="h-7 px-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Penomoran Abjad (a, b, c...)"
-          >
-            <ListOrdered size={12} />
-            <span>Abjad (a, b, c)</span>
-          </button>
-
-          <button 
-            onClick={addDecimalList} 
-            className="h-7 px-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg text-xs font-bold text-purple-700 flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-            title="Penomoran Angka (1, 2, 3...)"
-          >
-            <ListOrdered size={12} />
-            <span>Angka (1, 2, 3)</span>
-          </button>
+            <button 
+              onClick={addDecimalList} 
+              className="h-7 px-2.5 hover:bg-purple-100/70 text-purple-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Penomoran Angka (1, 2, 3...)"
+            >
+              <ListOrdered size={12} />
+              <span>Angka</span>
+            </button>
+          </div>
         </div>
 
+        {/* Font Family & Spacing */}
         <div className="flex items-center gap-2">
           <select 
             value={fontFamily} 
             onChange={(e: any) => setFontFamily(e.target.value)}
-            className="h-7 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none"
+            className="h-8 px-2.5 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none cursor-pointer shadow-2xs"
           >
-            <option value="sans">Font: Sans-Serif (Arial/Segoe)</option>
+            <option value="sans">Font: Sans-Serif (Arial)</option>
             <option value="serif">Font: Serif (Times New Roman)</option>
           </select>
 
           <select 
             value={lineSpacing} 
             onChange={(e: any) => setLineSpacing(e.target.value)}
-            className="h-7 px-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none"
+            className="h-8 px-2.5 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none cursor-pointer shadow-2xs"
           >
             <option value="1.15">Spasi: 1.15</option>
             <option value="1.5">Spasi: 1.5</option>

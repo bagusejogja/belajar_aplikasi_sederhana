@@ -15,6 +15,7 @@ interface TabConfig {
   path: string;
   icon: React.ElementType;
   badge: string;
+  adminOnly?: boolean;
 }
 
 const TABS: TabConfig[] = [
@@ -31,6 +32,7 @@ const TABS: TabConfig[] = [
     path: '/surat/tambah',
     icon: PlusCircle,
     badge: 'Form',
+    adminOnly: true,
   },
   {
     id: 'convert-ai',
@@ -38,6 +40,7 @@ const TABS: TabConfig[] = [
     path: '/surat/convert-ai',
     icon: Wand2,
     badge: 'AI Smart',
+    adminOnly: true,
   },
   {
     id: 'editor-html',
@@ -45,6 +48,7 @@ const TABS: TabConfig[] = [
     path: '/surat/editor-html',
     icon: FileCode,
     badge: 'Template',
+    adminOnly: true,
   },
   {
     id: 'laporan-surat',
@@ -57,7 +61,8 @@ const TABS: TabConfig[] = [
 
 export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
   const pathname = usePathname();
-  const { role } = useUserRole();
+  const { isAdmin, isManager, isPemroses, role, loading } = useUserRole();
+  const canAccessAdminTabs = isAdmin || isManager || isPemroses;
 
   const currentTab = activeTab || (
     pathname === '/dokumen' ? 'dokumen' :
@@ -83,17 +88,32 @@ export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
 
         <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium shrink-0">
           <span className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Hak Akses:</span>
-          <span className="px-2.5 py-0.5 rounded-full font-black uppercase text-[10px] tracking-wide border shadow-2xs bg-blue-50 text-blue-700 border-blue-200">
+          <span className={`px-2.5 py-0.5 rounded-full font-black uppercase text-[10px] tracking-wide border shadow-2xs ${
+            canAccessAdminTabs
+              ? 'bg-blue-50 text-blue-700 border-blue-200'
+              : 'bg-slate-50 text-slate-700 border-slate-200'
+          }`}>
             {role || 'STAFF'}
           </span>
+          {!canAccessAdminTabs && !loading && (
+            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-semibold hidden sm:inline">
+              Mode Lihat Arsip
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Navigation Grid: 4 Kolom Rata & Rapi, Efisien Tempat (Icon Kiri, Judul di Atas, Badge Tepat di Bawah Judul) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+      {/* Navigation Grid: Otomatis Menyesuaikan Kolom Sesuai Tab yang Diizinkan */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
+          const isRestricted = tab.adminOnly && !canAccessAdminTabs && !loading;
+
+          // Sembunyikan tab jika user tidak memiliki hak akses
+          if (isRestricted) {
+            return null;
+          }
 
           return (
             <Link

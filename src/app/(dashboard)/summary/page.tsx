@@ -2,38 +2,47 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { PieChart, Loader2, Calendar, Printer, ChevronDown, ChevronRight, X, AlertCircle, Layers } from 'lucide-react';
-
-const extractGdriveLink = (val: any): string[] => {
-  if (!val) return [];
-  if (Array.isArray(val)) return val.filter(Boolean);
-  if (typeof val === 'string') {
-    return val.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0 && s.startsWith('http'));
-  }
-  return [];
-};
+import { Loader2, Printer, ChevronDown, ChevronRight, AlertCircle, Layers, ZoomIn, Image as ImageIcon } from 'lucide-react';
+import MonthRangePicker, { MonthRange } from '@/components/shared/MonthRangePicker';
+import GalleryLightbox, { GalleryItem, getSafeImageUrl } from '@/components/shared/GalleryLightbox';
 
 export default function SummaryPage() {
-   const d = new Date();
-   const defaultBulan = d.getMonth() + 1;
-   const defaultTahun = d.getFullYear();
-   
-   const [bulanPilih, setBulan] = useState(defaultBulan);
-   const [tahunPilih, setTahun] = useState(defaultTahun);
+   const now = new Date();
+   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+   const lastDayCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+   const [monthRange, setMonthRange] = useState<MonthRange>({
+      startMonth: currentMonthStr,
+      endMonth: currentMonthStr,
+      startDate: `${currentMonthStr}-01`,
+      endDate: `${currentMonthStr}-${String(lastDayCurrentMonth).padStart(2, '0')}`,
+   });
    
    const [summaryData, setSummaryData] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
 
    // State Accordion
-   // Untuk melacak baris mana yang sedang terbuka
    const [expandedGroup2Digit, setExpandedGroup2Digit] = useState<string | null>(null);
    const [expandedGroupAkun, setExpandedGroupAkun] = useState<string | null>(null);
 
-   const [previewImage, setPreviewImage] = useState<string | null>(null);
+   // Gallery Lightbox State
+   const [galleryState, setGalleryState] = useState<{
+      isOpen: boolean;
+      items: GalleryItem[];
+      currentIndex: number;
+      title: string;
+      subtitle: string;
+   }>({
+      isOpen: false,
+      items: [],
+      currentIndex: 0,
+      title: '',
+      subtitle: '',
+   });
 
    useEffect(() => {
       fetchSummary();
-   }, [bulanPilih, tahunPilih]);
+   }, [monthRange.startMonth, monthRange.endMonth]);
 
    const fetchSummary = async () => {
       setLoading(true);
@@ -65,11 +74,14 @@ export default function SummaryPage() {
              }
          }
          
-         // Filter Tanggal menggunakan JavaScript Date agar stabil dari format apapun
+         const startD = monthRange.startDate || `${monthRange.startMonth}-01`;
+         const endD = monthRange.endDate || `${monthRange.endMonth}-31`;
+
+         // Filter Tanggal berdasarkan Rentang Bulan
          const currentMonthData = allTrx.filter(t => {
             if (!t.tanggal) return false;
-            const dt = new Date(t.tanggal);
-            return dt.getFullYear() === tahunPilih && dt.getMonth() + 1 === bulanPilih;
+            const tDate = String(t.tanggal).slice(0, 10);
+            return tDate >= startD && tDate <= endD;
          });
 
          // Struktur Data:
@@ -139,17 +151,26 @@ export default function SummaryPage() {
       }
    };
 
-   // Helper untuk mengambil list link foto
-   const getPhotoList = (str: string | null) => {
-      if (!str) return [];
-      const links = str.split(',').map(s => s.trim()).filter(Boolean);
-      return links.map(lnk => {
-         const match = lnk.match(/\/d\/([a-zA-Z0-9_-]+)/) || lnk.match(/id=([a-zA-Z0-9_-]+)/);
-         if (match && match[1]) {
-            return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w800`;
-         }
-         return lnk;
-      });
+   // Helper untuk ekstraksi dan normalisasi seluruh berkas lampiran transaksi
+   const getItemAttachments = (it: any): GalleryItem[] => {
+      const res: GalleryItem[] = [];
+      const addCategory = (label: string, fieldVal: string | null | undefined) => {
+         if (!fieldVal) return;
+         const links = String(fieldVal).split(',').map((s: string) => s.trim()).filter(Boolean);
+         links.forEach((url) => {
+            res.push({
+               src: getSafeImageUrl(url),
+               original: url,
+               label,
+            });
+         });
+      };
+
+      addCategory('Nota / Kwitansi', it.nota_url || it.foto_nota);
+      addCategory('Foto Kegiatan', it.foto_kegiatan);
+      addCategory('Foto Barang', it.foto_barang);
+      addCategory('Bukti Transfer Bank', it.foto_bukti_transfer);
+      return res;
    };
 
    const totalMasuk = summaryData.reduce((acc, c) => acc + c.masuk, 0);
@@ -160,7 +181,7 @@ export default function SummaryPage() {
          {/* SLIM & UNIFIED TOP TOOLBAR */}
          <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
             <div className="flex items-center gap-3">
-               <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2 rounded-xl text-white shadow-xs">
+               <div className="bg-gradient-to-br from-indigo-600 to-sky-600 p-2.5 rounded-xl text-white shadow-xs">
                   <Layers size={20} />
                </div>
                <div>
@@ -169,7 +190,9 @@ export default function SummaryPage() {
                         Ringkasan Kas Kecil
                      </h1>
                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                        Bulan {bulanPilih} / {tahunPilih}
+                        {monthRange.startMonth === monthRange.endMonth 
+                           ? `Bulan: ${monthRange.startMonth}` 
+                           : `Periode: ${monthRange.startMonth} s/d ${monthRange.endMonth}`}
                      </span>
                   </div>
                   <p className="text-gray-500 font-medium text-[11px] mt-0.5">
@@ -178,24 +201,20 @@ export default function SummaryPage() {
                </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-               <select 
-                  value={bulanPilih} 
-                  onChange={e => setBulan(Number(e.target.value))} 
-                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
-               >
-                  {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>Bulan {i+1}</option>)}
-               </select>
-               <select 
-                  value={tahunPilih} 
-                  onChange={e => setTahun(Number(e.target.value))} 
-                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none cursor-pointer"
-               >
-                  {[2023, 2024, 2025, 2026, 2027].map(t => <option key={t} value={t}>{t}</option>)}
-               </select>
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+               {/* 2. MonthRangePicker (Rentang Bulan Murni Standar Design System) */}
+               <div className="w-full sm:w-auto">
+                  <MonthRangePicker
+                     label="Filter Periode Bulan"
+                     value={monthRange}
+                     onChange={setMonthRange}
+                     align="right"
+                  />
+               </div>
+
                <button 
                   onClick={() => window.print()} 
-                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
                >
                   <Printer size={13}/> <span>Cetak PDF</span>
                </button>
@@ -212,28 +231,27 @@ export default function SummaryPage() {
             ) : summaryData.length === 0 ? (
                <div className="text-center py-16 text-gray-500 font-medium flex flex-col items-center p-8">
                    <AlertCircle size={36} className="mb-2 text-gray-400 opacity-60" />
-                   <p className="text-xs">Tidak ditemukan transaksi pada periode {tahunPilih}-{bulanPilih.toString().padStart(2, '0')}</p>
+                   <p className="text-xs">Tidak ditemukan transaksi pada periode {monthRange.startMonth} s/d {monthRange.endMonth}</p>
                </div>
             ) : (
                <div>
                   <div className="hidden print:block text-center mb-6 border-b border-black pb-3">
                      <h1 className="text-xl font-black tracking-wider uppercase">Laporan Ringkasan Kas Kecil</h1>
-                     <p className="font-bold text-gray-700 text-xs mt-1">Periode: Bulan {bulanPilih} Tahun {tahunPilih}</p>
+                     <p className="text-xs">Periode: {monthRange.startMonth} s/d {monthRange.endMonth}</p>
                   </div>
 
-                  <table className="w-full text-left border-collapse text-xs">
-                     <thead>
-                        <tr className="bg-gray-50/80 border-b border-gray-200 text-[10px] font-black text-gray-400 uppercase tracking-wider">
-                           <th className="py-3 px-4 w-10">{/* Panah Kolaps */}</th>
-                           <th className="py-3 px-4 w-28">Kode Induk</th>
-                           <th className="py-3 px-4">Grup Induk</th>
+                  <table className="w-full text-left border-collapse text-sm">
+                     <thead className="bg-gray-100 text-gray-600 uppercase text-[10px] tracking-wider border-b border-gray-200">
+                        <tr>
+                           <th className="py-3 px-4 w-12 text-center">Detail</th>
+                           <th className="py-3 px-4 w-28">Kode Akun</th>
+                           <th className="py-3 px-4">Uraian Kategori Akun</th>
                            <th className="py-3 px-4 text-right">Total Debit (+)</th>
                            <th className="py-3 px-4 text-right">Total Kredit (-)</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-gray-100 font-medium">
                         {summaryData.map(grp => {
-                           // STATUS LEVEL 1 (2-Digit Group)
                            const isExpand2Digit = expandedGroup2Digit === grp.kode;
                            
                            return (
@@ -265,7 +283,6 @@ export default function SummaryPage() {
                                              
                                              <table className="w-full text-left text-sm border-collapse">
                                                 <tbody className="divide-y divide-gray-100">
-                                                   
                                                    {grp.subGroupsArr.map((sub: any) => {
                                                        const isExpandAkun = expandedGroupAkun === sub.nomor_akun;
 
@@ -283,18 +300,18 @@ export default function SummaryPage() {
                                                                  <td className="p-3 text-right font-bold text-red-500 w-[25%]">{sub.keluar > 0 ? `Rp ${sub.keluar.toLocaleString('id-ID')}` : '-'}</td>
                                                              </tr>
 
-                                                             {/* DATA ANAK LEVEL 3 (Tabel Transaksi & Foto) */}
+                                                             {/* DATA ANAK LEVEL 3 (Tabel Transaksi & Foto Lampiran) */}
                                                              {isExpandAkun && (
                                                                 <tr className="bg-blue-50/20">
                                                                    <td colSpan={5} className="p-0 border-b border-blue-200">
-                                                                      <div className="px-12 py-4 animate-in slide-in-from-top-1 fade-in duration-150">
-                                                                          <table className="w-full text-left text-xs bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-blue-100 overflow-hidden">
+                                                                      <div className="px-6 md:px-12 py-4 animate-in slide-in-from-top-1 fade-in duration-150">
+                                                                          <table className="w-full text-left text-xs bg-white rounded-xl shadow-xs border border-blue-100 overflow-hidden">
                                                                              <thead className="bg-blue-50/50">
                                                                                 <tr className="text-gray-500 uppercase tracking-widest border-b border-blue-100">
                                                                                    <th className="p-3 w-28">Tanggal</th>
                                                                                    <th className="p-3 w-56">Uraian Transaksi</th>
                                                                                    <th className="p-3 w-32">Kreator / Toko</th>
-                                                                                   <th className="p-3 w-40 text-center">Foto Lampiran</th>
+                                                                                   <th className="p-3 w-44 text-center">Foto Lampiran</th>
                                                                                    <th className="p-3 text-right font-bold w-32">Nominal Rp</th>
                                                                                 </tr>
                                                                              </thead>
@@ -302,44 +319,61 @@ export default function SummaryPage() {
                                                                                 {sub.items.map((it: any) => {
                                                                                    const isT_Masuk = Number(it.uang_masuk) > 0;
                                                                                    const valNom = isT_Masuk ? it.uang_masuk : it.uang_keluar;
-                                                                                   
-                                                                                   const allPhotos = [
-                                                                                       ...extractGdriveLink(it.foto_nota), 
-                                                                                       ...extractGdriveLink(it.foto_kegiatan), 
-                                                                                       ...extractGdriveLink(it.foto_barang), 
-                                                                                       ...extractGdriveLink(it.foto_bukti_transfer)
-                                                                                   ];
+                                                                                   const attachments = getItemAttachments(it);
 
                                                                                    return (
                                                                                       <tr key={it.id} className="hover:bg-blue-50/30">
-                                                                                         <td className="p-3 text-gray-500 whitespace-nowrap">{it.tanggal}</td>
+                                                                                         <td className="p-3 text-gray-500 whitespace-nowrap font-mono">{it.tanggal}</td>
                                                                                          <td className="p-3 font-bold text-gray-800 leading-snug">{it.uraian}</td>
                                                                                          <td className="p-3 text-[10px] text-gray-500 leading-tight">
                                                                                             <span className="font-bold text-gray-700">{it.ref_personel?.nama_orang || '?'}</span><br/>
                                                                                             {it.toko || '-'}
                                                                                          </td>
                                                                                          <td className="p-3 text-center">
-                                                                                            <div className="flex flex-wrap gap-1 justify-center max-w-[120px] mx-auto">
-                                                                                               {allPhotos.length === 0 ? (
+                                                                                            <div className="flex flex-wrap gap-1.5 justify-center max-w-[150px] mx-auto">
+                                                                                               {attachments.length === 0 ? (
                                                                                                   <span className="text-[10px] italic text-gray-300">- Kosong -</span>
                                                                                                ) : (
-                                                                                                  allPhotos.map((lnk, ii) => (
-                                                                                                     <img 
-                                                                                                         key={ii} src={lnk} 
-                                                                                                         onClick={(e) => { e.stopPropagation(); setPreviewImage(lnk); }}
-                                                                                                         className="w-10 h-10 object-cover rounded shadow border border-gray-200 cursor-pointer hover:border-black transition-colors bg-white hover:z-10 relative" 
-                                                                                                         title="Klik untuk memperbesar"
-                                                                                                         onError={(e) => (e.target as any).src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png'}
-                                                                                                     />
+                                                                                                  attachments.map((att, ii) => (
+                                                                                                     <div 
+                                                                                                         key={ii}
+                                                                                                         onClick={(e) => { 
+                                                                                                            e.stopPropagation(); 
+                                                                                                            setGalleryState({
+                                                                                                               isOpen: true,
+                                                                                                               items: attachments,
+                                                                                                               currentIndex: ii,
+                                                                                                               title: it.uraian || 'Lampiran Transaksi',
+                                                                                                               subtitle: `Rp ${Number(valNom).toLocaleString('id-ID')} • ${it.tanggal || '-'}`
+                                                                                                            });
+                                                                                                         }}
+                                                                                                         className="group relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200/90 hover:border-indigo-500 shadow-2xs hover:shadow-xs cursor-pointer transition-all bg-gray-50 flex items-center justify-center shrink-0"
+                                                                                                         title={`${att.label} - Klik pratinjau resolusi tinggi`}
+                                                                                                     >
+                                                                                                        <img 
+                                                                                                           src={att.src} 
+                                                                                                           alt={att.label}
+                                                                                                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200" 
+                                                                                                           onError={(e) => {
+                                                                                                              const target = e.target as HTMLImageElement;
+                                                                                                              if (!target.src.includes('/api/image-cors') && att.original.startsWith('http')) {
+                                                                                                                 target.src = `/api/image-cors?url=${encodeURIComponent(att.original)}`;
+                                                                                                              }
+                                                                                                           }}
+                                                                                                        />
+                                                                                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 flex items-center justify-center transition-colors">
+                                                                                                           <ZoomIn size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                                                        </div>
+                                                                                                     </div>
                                                                                                   ))
                                                                                                )}
                                                                                             </div>
                                                                                          </td>
-                                                                                         <td className={`p-3 text-right font-black ${isT_Masuk ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                                         <td className={`p-3 text-right font-black ${isT_Masuk ? 'text-emerald-600' : 'text-red-500'}`}>
                                                                                             {Number(valNom).toLocaleString('id-ID')}
                                                                                          </td>
                                                                                       </tr>
-                                                                                   )
+                                                                                   );
                                                                                 })}
                                                                              </tbody>
                                                                           </table>
@@ -348,7 +382,7 @@ export default function SummaryPage() {
                                                                 </tr>
                                                              )}
                                                           </React.Fragment>
-                                                       )
+                                                       );
                                                    })}
                                                 </tbody>
                                              </table>
@@ -381,17 +415,16 @@ export default function SummaryPage() {
             )}
          </div>
 
-         {/* Modal Pembesaran Gambar (Mengambang di Atas Segalanya) */}
-         {previewImage && (
-            <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
-               <div className="absolute top-6 right-6 p-2 bg-red-600 bg-opacity-30 hover:bg-opacity-100 rounded-full cursor-pointer text-white transition-all shadow-lg ring-2 ring-white/10">
-                  <X size={24} />
-               </div>
-               <img src={previewImage} alt="Preview" className="max-w-[95vw] max-h-[90vh] object-contain rounded-xl shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-white/5" onClick={(e) => e.stopPropagation()} onError={(e) => {
-                  (e.target as any).src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/512px-Google_Drive_icon_%282020%29.svg.png';
-               }} />
-            </div>
-         )}
+         {/* Standard Gallery Lightbox untuk Pratinjau Resolusi Tinggi Foto Lampiran */}
+         <GalleryLightbox
+            isOpen={galleryState.isOpen}
+            items={galleryState.items}
+            currentIndex={galleryState.currentIndex}
+            title={galleryState.title}
+            subtitle={galleryState.subtitle}
+            onClose={() => setGalleryState(prev => ({ ...prev, isOpen: false }))}
+            onIndexChange={(idx) => setGalleryState(prev => ({ ...prev, currentIndex: idx }))}
+         />
       </div>
    );
 }

@@ -647,21 +647,17 @@ export default function GovDashboardPage() {
                </div>
 
                {analysisMode === 'estimation' && (
-                  <select 
-                    value={refMonth} 
-                    onChange={e => setRefMonth(Number(e.target.value))} 
-                    className="h-8 bg-white border border-gray-200 rounded-xl px-2.5 text-xs font-semibold text-gray-800 outline-none cursor-pointer"
-                  >
-                     {months.map((m, idx) => <option key={idx} value={idx + 1}>Acuan: {m}</option>)}
-                  </select>
+                  <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-2.5 h-8 shadow-2xs">
+                     <span className="text-[11px] font-bold text-gray-500 whitespace-nowrap">Bulan Acuan:</span>
+                     <select 
+                       value={refMonth} 
+                       onChange={e => setRefMonth(Number(e.target.value))} 
+                       className="bg-transparent text-xs font-bold text-indigo-700 outline-none cursor-pointer"
+                     >
+                        {months.map((m, idx) => <option key={idx} value={idx + 1}>{m}</option>)}
+                     </select>
+                  </div>
                )}
-
-               <button 
-                 onClick={fetchData} 
-                 className="h-8 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs"
-               >
-                 <TrendingUp size={13} /> <span>Terapkan</span>
-               </button>
             </div>
          </div>
 

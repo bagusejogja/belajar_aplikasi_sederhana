@@ -330,6 +330,74 @@ export default function DaftarSuratPage() {
             </div>
           </div>
         </div>
+
+        {/* Row 2: Grafik Distribusi Surat per Unit Kerja */}
+        <div className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200/80 mb-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                <Building2 size={16} />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                  Distribusi Frekuensi Surat per Unit Kerja (Top 10 Unit)
+                </h3>
+                <p className="text-[11px] text-gray-500 font-medium">
+                  Perbandingan volume dokumen surat berdasarkan unit kerja terdaftar
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+              {unitStatsData.length} Unit Teraktif
+            </span>
+          </div>
+
+          <div className="h-[260px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={unitStatsData} margin={{ top: 10, right: 20, left: 10, bottom: 45 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  interval={0}
+                  angle={-15}
+                  textAnchor="end"
+                  tick={{ fontSize: 9.5, fontWeight: 'bold', fill: '#4b5563' }}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#9ca3af' }}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f0fdf4' }}
+                  content={({ active, payload }: any) => {
+                    if (active && payload && payload.length) {
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-100 text-xs space-y-1">
+                          <p className="font-black text-gray-800">{d.name}</p>
+                          <p className="text-emerald-700 font-bold flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span>Total: {d.count} Dokumen Surat</span>
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={28}>
+                  {unitStatsData.map((_, index) => (
+                    <Cell key={`unit-cell-${index}`} fill={index === 0 ? '#059669' : index < 3 ? '#10b981' : '#34d399'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
         </>
       )}
 

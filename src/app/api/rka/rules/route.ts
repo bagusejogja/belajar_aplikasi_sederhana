@@ -47,6 +47,8 @@ export async function GET(request: Request) {
 
     if (modul === 'penerimaan') {
       query = query.eq('modul', 'penerimaan');
+    } else if (modul === 'all' || modul === 'semua') {
+      // Ambil seluruh aturan baik penerimaan maupun pengeluaran
     } else {
       query = query.or('modul.eq.pengeluaran,modul.is.null');
     }

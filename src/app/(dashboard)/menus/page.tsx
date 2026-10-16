@@ -491,8 +491,33 @@ export default function MenusPage() {
         </div>
       ) : viewMode === 'tree' ? (
         /* ================= TRUE HIERARCHICAL TREE VIEW ================= */
-        <div className={`space-y-4 transition-opacity duration-200 ${isFetching ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-          
+        <div className={`bg-white dark:bg-slate-900 p-5 rounded-2xl border border-gray-200/90 dark:border-slate-800 shadow-2xs space-y-4 transition-opacity duration-200 ${isFetching ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+          {/* Subheader Deskripsi & Ringkasan Standar Design System / References */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100 dark:border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase">
+                  Hierarchical Tree View
+                </span>
+                <h2 className="text-sm font-black text-gray-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <FolderTree size={16} className="text-emerald-600 dark:text-emerald-400" />
+                  Template Struktur Pohon Hierarkis (Hierarchical Tree View)
+                </h2>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                Struktur pohon hierarkis modul & menu sistem per peran (role) <strong>{selectedRole}</strong>. Klik grup atau centang checkbox untuk mengizinkan/mencabut hak akses secara bertingkat.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 border border-gray-200/80 dark:border-slate-700 px-2.5 py-1 rounded-lg">
+                {allGroupNames.length} Grup Modul
+              </span>
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <CheckCircle2 size={12} /> {totalAccessibleMenus} / {menuList.length} Menu Aktif
+              </span>
+            </div>
+          </div>
+
           {/* Tree Root Badge */}
           <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-3 px-5 rounded-2xl shadow-sm border border-indigo-950">
             <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center font-bold text-sm">
