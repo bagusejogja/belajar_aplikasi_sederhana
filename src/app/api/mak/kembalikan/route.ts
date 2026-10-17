@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 import nodemailer from 'nodemailer';
-
-const supabaseAdmin = createClient(
-  (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'),
-  process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder')
-);
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,8 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Data usulan tidak ditemukan' }, { status: 404 });
     }
 
-    // Generate unique revision token
-    const revisiToken = 'rev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9);
+    // Generate unique revision token yang menyertakan ID agar lookup instan
+    const revisiToken = `rev_${id}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`;
 
     // Siapkan lampiran catatan dengan metadata revisi
     const catatanList = Array.isArray(submission.lampiran_catatan) ? [...submission.lampiran_catatan] : [];
@@ -52,7 +47,7 @@ export async function POST(req: NextRequest) {
     };
     filteredCatatan.push(newRevisiMeta);
 
-    // Update status ke "Perlu Revisi"
+    // Update status ke "Perlu Revisi" di database
     const { error: updateError } = await supabaseAdmin
       .from('mak_submissions')
       .update({ 
@@ -76,9 +71,9 @@ export async function POST(req: NextRequest) {
     let emailSent = false;
     let emailError: string | null = null;
 
-    // Kirim email notifikasi ke pengirim jika email tersedia
-    if (submission.email) {
-      try {
+    // Kirim email notifikasi ke pengirim jika email tersedia (dengan timeout agar tidak memblokir respon)
+    if (submission.email && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      const emailSendTask = async () => {
         const transporter = nodemailer.createTransport({
           host: process.env.EMAIL_HOST || 'smtp.gmail.com',
           port: Number(process.env.EMAIL_PORT) || 587,
@@ -87,6 +82,9 @@ export async function POST(req: NextRequest) {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,
           },
+          connectionTimeout: 4000,
+          greetingTimeout: 4000,
+          socketTimeout: 4000,
         });
 
         await transporter.sendMail({
@@ -161,10 +159,18 @@ export async function POST(req: NextRequest) {
             </div>
           `,
         });
+      };
+
+      try {
+        // Berikan waktu toleransi maksimal 2.5 detik untuk pengiriman email
+        await Promise.race([
+          emailSendTask(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Email timeout (background)')), 2500))
+        ]);
         emailSent = true;
       } catch (err: any) {
-        console.error('Gagal mengirim email revisi:', err);
-        emailError = err.message || 'Gagal mengirim email';
+        console.warn('[Kembalikan MAK] Notifikasi email timeout/gagal, namun status dan link revisi tetap berhasil dibuat:', err.message);
+        emailError = err.message;
       }
     }
 

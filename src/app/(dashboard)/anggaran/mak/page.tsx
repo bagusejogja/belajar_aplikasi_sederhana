@@ -8,7 +8,7 @@ import {
   Filter, Calendar, BarChart3, Database, Building2, Eye,
   Users, UserCheck, Award, Zap, TrendingUp, TrendingDown, ArrowRight,
   RotateCcw, Sparkles, Check, CheckCheck, Copy, ChevronDown, ChevronUp, AlertCircle,
-  FileSpreadsheet, Layers, DollarSign, Info, X,
+  FileSpreadsheet, Layers, DollarSign, Info, X, Link2,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -137,6 +137,8 @@ export default function MonitoringMakPage() {
   const [kembalikanModalItem, setKembalikanModalItem] = useState<any | null>(null);
   const [catatanRevisiInput, setCatatanRevisiInput] = useState('');
   const [isSubmittingRevisi, setIsSubmittingRevisi] = useState(false);
+  const [kembalikanSuccessData, setKembalikanSuccessData] = useState<{ revisiUrl: string; emailSent: boolean; emailError?: string } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Modal RKA Selisih & Copy State
   const [selectedRkaData, setSelectedRkaData] = useState<{ submission: any; rka: any } | null>(null);
@@ -262,6 +264,13 @@ export default function MonitoringMakPage() {
     setProcessingId(null);
   };
 
+  const closeKembalikanModal = () => {
+    setKembalikanModalItem(null);
+    setCatatanRevisiInput('');
+    setKembalikanSuccessData(null);
+    setCopiedLink(false);
+  };
+
   const handleKembalikanRevisi = async () => {
     if (!kembalikanModalItem) return;
     if (!catatanRevisiInput.trim()) {
@@ -286,18 +295,17 @@ export default function MonitoringMakPage() {
 
       const json = await res.json();
       if (json.success) {
+        setKembalikanSuccessData({
+          revisiUrl: json.revisiUrl,
+          emailSent: !!json.emailSent,
+          emailError: json.emailError,
+        });
+        fetchData();
         if (json.emailSent) {
-          setSuccessMsg(`Berkas berhasil dikembalikan ke status 'Perlu Revisi'. Email notifikasi dan tautan form revisi telah terkirim ke ${kembalikanModalItem.email}.`);
+          setSuccessMsg(`Berkas berhasil dikembalikan ke status 'Perlu Revisi'. Email notifikasi telah terkirim.`);
         } else {
           setSuccessMsg(`Berkas berhasil dikembalikan ke status 'Perlu Revisi'. Catatan revisi tersimpan.`);
-          if (json.emailError) {
-            setErrorMsg('Catatan tersimpan, namun pengiriman email gagal: ' + json.emailError);
-          }
         }
-        setKembalikanModalItem(null);
-        setCatatanRevisiInput('');
-        fetchData();
-        setTimeout(() => { setSuccessMsg(''); setErrorMsg(''); }, 10000);
       } else {
         setErrorMsg(json.error || 'Gagal mengembalikan berkas.');
       }
@@ -1759,9 +1767,26 @@ export default function MonitoringMakPage() {
                       {/* STATUS & AKSI */}
                       <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap text-center">
                         {row.status === 'Selesai' ? (
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl font-black text-xs border border-emerald-200 shadow-2xs">
-                            <CheckCircle2 size={13} className="text-emerald-600" />
-                            <span>Tuntas</span>
+                          <div className="flex flex-col gap-1.5 items-center w-28 mx-auto">
+                            <div className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-xl font-black text-xs border border-emerald-200 shadow-2xs">
+                              <CheckCircle2 size={13} className="text-emerald-600" />
+                              <span>Tuntas</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setKembalikanModalItem(row);
+                                const existingCatatan = getRevisiCatatan(row);
+                                setCatatanRevisiInput(existingCatatan || '');
+                                setKembalikanSuccessData(null);
+                                setCopiedLink(false);
+                              }}
+                              className="text-[10px] text-amber-700 hover:text-amber-900 font-extrabold hover:underline flex items-center justify-center gap-1 cursor-pointer py-0.5"
+                              title="Kembalikan berkas ini ke pengirim jika ada yang perlu direvisi/diperbaiki"
+                            >
+                              <RotateCcw size={10} className="shrink-0" />
+                              <span>Kembalikan</span>
+                            </button>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1.5 items-center w-28 mx-auto">
@@ -1781,6 +1806,8 @@ export default function MonitoringMakPage() {
                                 setKembalikanModalItem(row);
                                 const existingCatatan = getRevisiCatatan(row);
                                 setCatatanRevisiInput(existingCatatan || '');
+                                setKembalikanSuccessData(null);
+                                setCopiedLink(false);
                               }}
                               className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-2xs active:scale-95 cursor-pointer"
                               title="Kembalikan berkas ke pengirim (unit) untuk diperbaiki tanpa perlu login"
@@ -2391,83 +2418,168 @@ export default function MonitoringMakPage() {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {/* Unit Info Box */}
-              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 font-bold">Unit Kerja:</span>
-                  <span className="font-black text-gray-900 text-right">{kembalikanModalItem.unit}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 font-bold">Tahun Anggaran:</span>
-                  <span className="font-mono font-bold text-gray-900">{kembalikanModalItem.tahun}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 font-bold">Email Pengirim:</span>
-                  <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
-                    {kembalikanModalItem.email || '⚠️ Tidak ada email tercatat'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Catatan Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-wider text-gray-700 block">
-                  Catatan Kekurangan / Arahan Perbaikan <span className="text-rose-500">*</span>
-                </label>
-                <textarea
-                  rows={4}
-                  value={catatanRevisiInput}
-                  onChange={(e) => setCatatanRevisiInput(e.target.value)}
-                  placeholder="Contoh: Rincian belanja MAK 521211 pada file Excel belum seimbang. Mohon lampirkan SPTJM bertandatangan pimpinan dan perbaiki selisih semula-menjadi..."
-                  className="w-full p-3 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 focus:border-amber-400 rounded-2xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-3 focus:ring-amber-200/50 transition-all leading-relaxed"
-                />
-                <span className="text-[11px] text-gray-400 block">
-                  Catatan ini akan tampil di bagian atas formulir <strong>/input-mak</strong> saat pengirim membuka tautan revisi.
-                </span>
-              </div>
-
-              {/* Magic Link Notice */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-900">
-                <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="font-black text-blue-950">Alur Otomatis Tanpa Login:</div>
-                  <p className="text-[11px] text-blue-800 leading-relaxed font-normal">
-                    Setelah tombol diklik, status berubah menjadi <strong>Perlu Revisi</strong> dan email notifikasi dikirimkan ke <strong>{kembalikanModalItem.email || 'pengirim'}</strong>. Pengirim cukup mengklik tautan aman untuk mengunggah berkas pengganti tanpa perlu login.
+            {kembalikanSuccessData ? (
+              <div className="p-6 space-y-5">
+                <div className="text-center space-y-2 pt-2">
+                  <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs border border-emerald-200">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <h3 className="text-base font-black text-gray-900 tracking-tight">
+                    Berkas Berhasil Dikembalikan untuk Revisi!
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium max-w-sm mx-auto leading-relaxed">
+                    Status usulan <strong>{kembalikanModalItem.unit}</strong> telah diubah menjadi <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">Perlu Revisi</span>.
                   </p>
                 </div>
-              </div>
-            </div>
 
-            {/* Footer */}
-            <div className="p-4 px-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setKembalikanModalItem(null)}
-                disabled={isSubmittingRevisi}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-200 transition-all cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleKembalikanRevisi}
-                disabled={isSubmittingRevisi || !catatanRevisiInput.trim()}
-                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {isSubmittingRevisi ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>Mengirim...</span>
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw size={13} />
-                    <span>Kirim Catatan & Link Revisi</span>
-                  </>
-                )}
-              </button>
-            </div>
+                {/* Box Magic Link */}
+                <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Link2 size={13} className="text-indigo-600" /> Tautan Revisi Pengirim (Tanpa Login):
+                    </span>
+                    {kembalikanSuccessData.emailSent ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        ✉️ Email Notifikasi Terkirim
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        📋 Siap Dibagikan via Chat / WA
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={kembalikanSuccessData.revisiUrl}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-mono text-gray-700 select-all outline-none focus:border-indigo-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(kembalikanSuccessData.revisiUrl);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 3000);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer flex items-center gap-1.5 border ${
+                        copiedLink 
+                          ? 'bg-emerald-600 text-white border-emerald-700' 
+                          : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 shadow-2xs'
+                      }`}
+                    >
+                      {copiedLink ? <Check size={13} /> : <Copy size={13} />}
+                      <span>{copiedLink ? 'Tersalin!' : 'Salin'}</span>
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-gray-500 leading-relaxed">
+                    💡 Pengirim dari unit kerja cukup membuka tautan di atas untuk melihat catatan Anda dan langsung mengunggah berkas perbaikan tanpa perlu membuat akun login.
+                  </p>
+                </div>
+
+                {/* Tombol Aksi */}
+                <div className="flex items-center gap-2.5 pt-2">
+                  <a
+                    href={kembalikanSuccessData.revisiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Buka Form Revisi (Uji Coba)</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={closeKembalikanModal}
+                    className="flex-1 py-2.5 px-4 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-black text-center transition-all cursor-pointer shadow-xs"
+                  >
+                    Selesai &amp; Tutup
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                  {/* Unit Info Box */}
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-bold">Unit Kerja:</span>
+                      <span className="font-black text-gray-900 text-right">{kembalikanModalItem.unit}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-bold">Tahun Anggaran:</span>
+                      <span className="font-mono font-bold text-gray-900">{kembalikanModalItem.tahun}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 font-bold">Email Pengirim:</span>
+                      <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                        {kembalikanModalItem.email || '⚠️ Tidak ada email tercatat'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Catatan Input */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-black uppercase tracking-wider text-gray-700 block">
+                      Catatan Kekurangan / Arahan Perbaikan <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={catatanRevisiInput}
+                      onChange={(e) => setCatatanRevisiInput(e.target.value)}
+                      placeholder="Contoh: Rincian belanja MAK 521211 pada file Excel belum seimbang. Mohon lampirkan SPTJM bertandatangan pimpinan dan perbaiki selisih semula-menjadi..."
+                      className="w-full p-3 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 focus:border-amber-400 rounded-2xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-3 focus:ring-amber-200/50 transition-all leading-relaxed"
+                    />
+                    <span className="text-[11px] text-gray-400 block">
+                      Catatan ini akan tampil di bagian atas formulir <strong>/input-mak</strong> saat pengirim membuka tautan revisi.
+                    </span>
+                  </div>
+
+                  {/* Magic Link Notice */}
+                  <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-900">
+                    <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-black text-blue-950">Alur Otomatis Tanpa Login:</div>
+                      <p className="text-[11px] text-blue-800 leading-relaxed font-normal">
+                        Setelah tombol diklik, status berubah menjadi <strong>Perlu Revisi</strong> dan email notifikasi dikirimkan ke <strong>{kembalikanModalItem.email || 'pengirim'}</strong>. Pengirim cukup mengklik tautan aman untuk mengunggah berkas pengganti tanpa perlu login.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 px-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={closeKembalikanModal}
+                    disabled={isSubmittingRevisi}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-200 transition-all cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleKembalikanRevisi}
+                    disabled={isSubmittingRevisi || !catatanRevisiInput.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {isSubmittingRevisi ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        <span>Mengirim...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw size={13} />
+                        <span>Kirim Catatan &amp; Link Revisi</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

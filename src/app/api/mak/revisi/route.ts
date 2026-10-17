@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase';
 import nodemailer from 'nodemailer';
-
-const supabaseAdmin = createClient(
-  (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'),
-  process.env.SUPABASE_SERVICE_ROLE_KEY || (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder')
-);
 
 // GET: Cek validitas token dan ambil data awal pengajuan
 export async function GET(req: NextRequest) {
@@ -17,21 +12,40 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Token revisi tidak disertakan' }, { status: 400 });
     }
 
-    // Cari submission yang memiliki token ini di lampiran_catatan
-    // Ambil data submission terbaru
-    const { data: submissions, error } = await supabaseAdmin
-      .from('mak_submissions')
-      .select('*')
-      .order('updated_at', { ascending: false });
+    let matched: any = null;
 
-    if (error) throw error;
-
-    const matched = (submissions || []).find((s: any) => {
-      if (Array.isArray(s.lampiran_catatan)) {
-        return s.lampiran_catatan.some((c: any) => c.type === 'revisi_meta' && c.token === token);
+    // 1. Coba lookup instan via ID yang disematkan pada token: rev_{id}_{timestamp}_{random}
+    const idMatch = token.match(/^rev_(\d+)_/);
+    if (idMatch) {
+      const targetId = Number(idMatch[1]);
+      const { data, error } = await supabaseAdmin
+        .from('mak_submissions')
+        .select('*')
+        .eq('id', targetId)
+        .single();
+      
+      if (!error && data) {
+        matched = data;
       }
-      return false;
-    });
+    }
+
+    // 2. Fallback jika format token tanpa ID atau data belum ketemu
+    if (!matched) {
+      const { data: submissions, error } = await supabaseAdmin
+        .from('mak_submissions')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      matched = (submissions || []).find((s: any) => {
+        if (Array.isArray(s.lampiran_catatan)) {
+          return s.lampiran_catatan.some((c: any) => c.type === 'revisi_meta' && c.token === token);
+        }
+        return false;
+      });
+    }
 
     if (!matched) {
       return NextResponse.json({ success: false, error: 'Tautan revisi tidak valid atau telah kedaluwarsa.' }, { status: 404 });
@@ -79,19 +93,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Token revisi tidak valid' }, { status: 400 });
     }
 
-    // Cari submission
-    const { data: submissions, error } = await supabaseAdmin
-      .from('mak_submissions')
-      .select('*');
+    let matched: any = null;
 
-    if (error) throw error;
-
-    const matched = (submissions || []).find((s: any) => {
-      if (Array.isArray(s.lampiran_catatan)) {
-        return s.lampiran_catatan.some((c: any) => c.type === 'revisi_meta' && c.token === token);
+    // 1. Coba lookup instan via ID yang disematkan pada token: rev_{id}_{timestamp}_{random}
+    const idMatch = token.match(/^rev_(\d+)_/);
+    if (idMatch) {
+      const targetId = Number(idMatch[1]);
+      const { data, error } = await supabaseAdmin
+        .from('mak_submissions')
+        .select('*')
+        .eq('id', targetId)
+        .single();
+      
+      if (!error && data) {
+        matched = data;
       }
-      return false;
-    });
+    }
+
+    // 2. Fallback jika format token tanpa ID
+    if (!matched) {
+      const { data: submissions, error } = await supabaseAdmin
+        .from('mak_submissions')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      matched = (submissions || []).find((s: any) => {
+        if (Array.isArray(s.lampiran_catatan)) {
+          return s.lampiran_catatan.some((c: any) => c.type === 'revisi_meta' && c.token === token);
+        }
+        return false;
+      });
+    }
 
     if (!matched) {
       return NextResponse.json({ success: false, error: 'Data pengajuan dengan token tersebut tidak ditemukan.' }, { status: 404 });
@@ -105,7 +140,6 @@ export async function POST(req: NextRequest) {
     const combinedNotes = [...filteredCatatan];
     if (Array.isArray(newNoteUrls) && newNoteUrls.length > 0) {
       newNoteUrls.forEach((n: any) => {
-        // Cek duplikasi url
         if (!combinedNotes.some((ex: any) => ex.url === n.url)) {
           combinedNotes.push(n);
         }
@@ -153,9 +187,9 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
-    // Kirim notifikasi email ke PIC Verifikator jika ada
-    if (matched.pic && matched.pic !== '-') {
-      try {
+    // Kirim notifikasi email ke PIC Verifikator jika ada (dengan batas toleransi timeout 2.5s)
+    if (matched.pic && matched.pic !== '-' && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+      const sendPicEmail = async () => {
         const { data: picRecord } = await supabaseAdmin
           .from('gov_pics')
           .select('nama, email')
@@ -171,6 +205,9 @@ export async function POST(req: NextRequest) {
               user: process.env.EMAIL_USER,
               pass: process.env.EMAIL_PASS,
             },
+            connectionTimeout: 4000,
+            greetingTimeout: 4000,
+            socketTimeout: 4000,
           });
 
           await transporter.sendMail({
@@ -178,44 +215,50 @@ export async function POST(req: NextRequest) {
             to: picRecord.email,
             subject: `[Revisi Masuk] Unit ${matched.unit} Telah Memperbaiki Berkas MAK (${matched.tahun})`,
             html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #0284c7, #2563eb); padding: 24px; border-radius: 12px 12px 0 0; color: white;">
-                  <h2 style="margin: 0; font-size: 20px;">📬 Berkas Revisi Telah Dikirim Ulang</h2>
-                  <p style="margin: 6px 0 0; font-size: 13px; opacity: 0.9;">Pemberitahuan untuk PIC Verifikator: ${picRecord.nama}</p>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b;">
+                <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 28px; border-radius: 16px 16px 0 0; color: white; text-align: center;">
+                  <h2 style="margin: 0; font-size: 20px;">Berkas Revisi Telah Dikirimkan</h2>
+                  <p style="margin: 6px 0 0; opacity: 0.9; font-size: 13px;">Unit kerja telah memperbaiki usulan MAK</p>
                 </div>
-                <div style="background: white; padding: 24px; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
-                  <p style="font-size: 14px; color: #334155; margin-top: 0;">
-                    Unit Kerja <strong>${matched.unit}</strong> telah mengirimkan berkas revisi / perbaikan MAK Tahun <strong>${matched.tahun}</strong>.
+                <div style="background: white; padding: 28px; border: 1px solid #e2e8f0; border-radius: 0 0 16px 16px;">
+                  <p style="font-size: 14px; margin-top: 0;">Halo <strong>${picRecord.nama}</strong>,</p>
+                  <p style="font-size: 14px; color: #475569;">
+                    Unit <strong>${matched.unit}</strong> (${matched.tahun}) telah mengunggah perbaikan berkas pengajuan MAK yang sebelumnya Anda minta untuk direvisi.
                   </p>
                   ${catatanPengirim ? `
-                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
-                      <strong style="color: #166534; font-size: 12px; display: block; margin-bottom: 4px;">Keterangan dari Unit:</strong>
-                      <span style="color: #14532d; font-size: 13px;">${catatanPengirim}</span>
+                    <div style="background: #f8fafc; border-left: 4px solid #10b981; padding: 14px 16px; border-radius: 8px; margin: 16px 0;">
+                      <span style="font-size: 11px; font-weight: bold; color: #059669; text-transform: uppercase;">Pesan dari Pengirim:</span>
+                      <p style="margin: 4px 0 0; font-size: 13px; color: #1e293b;">${catatanPengirim}</p>
                     </div>
                   ` : ''}
-                  <div style="margin-top: 24px; text-align: center;">
-                    <a href="https://portalkeu.vercel.app/anggaran/mak" style="background: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 13px; display: inline-block;">
-                      Buka Tabel Monitoring /anggaran/mak &rarr;
-                    </a>
-                  </div>
+                  <p style="font-size: 13px; color: #64748b;">
+                    Silakan buka dashboard verifikasi di menu <strong>Monitoring Revisi MAK</strong> untuk memeriksa berkas yang telah diperbarui.
+                  </p>
                 </div>
               </div>
             `,
           });
         }
-      } catch (mailErr) {
-        console.error('Gagal kirim email notif ke PIC:', mailErr);
+      };
+
+      try {
+        await Promise.race([
+          sendPicEmail(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('PIC email timeout')), 2500))
+        ]);
+      } catch (err: any) {
+        console.warn('[Revisi MAK] Gagal kirim email ke PIC verifikator:', err.message);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Perbaikan berkas berhasil disimpan. Verifikator telah menerima laporan pengiriman ulang.',
-      submissionId: matched.id
+      message: 'Perbaikan berkas berhasil disimpan. Verifikator telah diberitahu.',
+      status: 'Revisi Masuk'
     });
 
   } catch (error: any) {
     console.error('Error POST revisi MAK:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Terjadi kesalahan sistem' }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message || 'Gagal menyimpan berkas revisi' }, { status: 500 });
   }
 }
