@@ -6,7 +6,7 @@ import {
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
   CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2, ExternalLink,
-  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck, ChevronDown, Layers, PieChart as PieChartIcon
+  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck, ChevronDown, Layers, PieChart as PieChartIcon, Check
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 
@@ -18,6 +18,7 @@ export default function UsulanAnggaranPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'table' | 'chart' | 'donut'>('table');
   const [isGambaranOpen, setIsGambaranOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PROSES' | 'SELESAI'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
   const [selectedTP, setSelectedTP] = useState<string>('');
@@ -126,8 +127,8 @@ export default function UsulanAnggaranPage() {
     return Array.from(new Set(pics));
   }, [rawData]);
 
-  const filteredData = useMemo(() => {
-    const filtered = rawData.filter(item => {
+  const baseFilteredData = useMemo(() => {
+    return rawData.filter(item => {
       const matchesSearch = Object.values(item).some(val =>
         String(val).toLowerCase().includes(searchQuery.toLowerCase())
       );
@@ -139,21 +140,29 @@ export default function UsulanAnggaranPage() {
       const matchesTP = (selectedTP === 'ALL' || !selectedTP) ? true : itemTP === selectedTP;
       return matchesSearch && matchesPic && matchesTP;
     });
+  }, [rawData, searchQuery, picFilter, selectedTP]);
+
+  const filteredData = useMemo(() => {
+    const list = baseFilteredData.filter(item => {
+      if (statusFilter === 'ALL') return true;
+      if (statusFilter === 'SELESAI') return (item.status ?? '') === 'Sudah Diproses';
+      return (item.status ?? '') !== 'Sudah Diproses';
+    });
+
     // sort: yang belum selesai (bukan 'Sudah Diproses') ditaruh di atas, lalu urut tanggal terbaru
-    filtered.sort((a, b) => {
+    list.sort((a, b) => {
       const isADone = (a.status ?? '') === 'Sudah Diproses';
       const isBDone = (b.status ?? '') === 'Sudah Diproses';
       
       if (!isADone && isBDone) return -1;
       if (isADone && !isBDone) return 1;
       
-      // Jika statusnya sama, urutkan berdasarkan created_at (terbaru di atas)
       const dateA = new Date(a.created_at || 0).getTime();
       const dateB = new Date(b.created_at || 0).getTime();
       return dateB - dateA;
     });
-    return filtered;
-  }, [rawData, searchQuery, picFilter, selectedTP]);
+    return list;
+  }, [baseFilteredData, statusFilter]);
 
   const dashboardData = useMemo(() => {
     const unitCounts: Record<string, number> = {};
@@ -528,99 +537,130 @@ export default function UsulanAnggaranPage() {
 
       {/* ROW 2: 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* CARD 1: TOTAL PENGAJUAN */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-indigo-200 transition-all">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                TOTAL PENGAJUAN
-              </span>
-              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
-                {total}
-              </div>
-            </div>
-            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
-              <ClipboardList size={18} />
-            </div>
-          </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
-            <span className="truncate max-w-[130px]" title={selectedTP === 'ALL' || !selectedTP ? 'Semua Periode' : selectedTP}>
-              Periode {selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}
-            </span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">
-              100% Usulan
-            </span>
-          </div>
-        </div>
+        {[
+          {
+            id: 'ALL',
+            title: 'TOTAL PENGAJUAN',
+            titleColor: 'text-indigo-600 dark:text-indigo-400',
+            value: total,
+            valueUnit: 'Usulan',
+            valueColor: 'text-indigo-950 dark:text-indigo-100',
+            icon: Layers,
+            iconBox: 'bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60',
+            footerLeft: `Periode ${selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}`,
+            footerBadge: '100% Usulan',
+            footerBadgeClass: 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300',
+            footerBorder: 'border-indigo-100/80 dark:border-indigo-900/40',
+            footerTextColor: 'text-indigo-700 dark:text-indigo-300',
+            activeRing: 'ring-2 ring-indigo-600 border-indigo-500 dark:border-indigo-500 shadow-indigo-100',
+            cardBg: 'bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border-indigo-200/80 dark:border-indigo-800/60',
+          },
+          {
+            id: 'PROSES',
+            title: 'MENUNGGU PROSES',
+            titleColor: 'text-amber-700 dark:text-amber-400',
+            value: proses,
+            valueUnit: 'Antrean',
+            valueColor: 'text-amber-950 dark:text-amber-100',
+            icon: Clock,
+            iconBox: 'bg-amber-100/80 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60',
+            footerLeft: 'Antrean verifikasi',
+            footerBadge: total > 0 ? `${Math.round((proses / total) * 100)}% Pending` : 'Pending',
+            footerBadgeClass: 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300',
+            footerBorder: 'border-amber-100/80 dark:border-amber-900/40',
+            footerTextColor: 'text-amber-700 dark:text-amber-300',
+            activeRing: 'ring-2 ring-amber-500 border-amber-500 dark:border-amber-500 shadow-amber-100',
+            cardBg: 'bg-gradient-to-br from-amber-500/10 via-amber-50/40 to-white dark:from-amber-950/30 dark:via-slate-900 dark:to-slate-900 border-amber-200/80 dark:border-amber-800/60',
+          },
+          {
+            id: 'SELESAI',
+            title: 'SELESAI DIPROSES',
+            titleColor: 'text-emerald-700 dark:text-emerald-400',
+            value: selesai,
+            valueUnit: 'Tuntas',
+            valueColor: 'text-emerald-950 dark:text-emerald-100',
+            icon: CheckCircle2,
+            iconBox: 'bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60',
+            footerLeft: 'Telah ditindaklanjuti',
+            footerBadge: total > 0 ? `${Math.round((selesai / total) * 100)}% Selesai` : 'Selesai',
+            footerBadgeClass: 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300',
+            footerBorder: 'border-emerald-100/80 dark:border-emerald-900/40',
+            footerTextColor: 'text-emerald-700 dark:text-emerald-300',
+            activeRing: 'ring-2 ring-emerald-600 border-emerald-500 dark:border-emerald-500 shadow-emerald-100',
+            cardBg: 'bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border-emerald-200/80 dark:border-emerald-800/60',
+          },
+          {
+            id: 'RATE',
+            title: 'TINGKAT KETUNTASAN',
+            titleColor: 'text-purple-700 dark:text-purple-400',
+            value: `${completionRate}%`,
+            valueUnit: '',
+            valueColor: 'text-purple-950 dark:text-purple-100',
+            icon: TrendingUp,
+            iconBox: 'bg-purple-100/80 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60',
+            footerLeft: `${selesai} dari ${total} usulan`,
+            footerBadge: completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`,
+            footerBadgeClass: 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300',
+            footerBorder: 'border-purple-100/80 dark:border-purple-900/40',
+            footerTextColor: 'text-purple-700 dark:text-purple-300',
+            activeRing: 'ring-2 ring-purple-500 border-purple-500 dark:border-purple-500 shadow-purple-100',
+            cardBg: 'bg-gradient-to-br from-purple-500/10 via-purple-50/40 to-white dark:from-purple-950/30 dark:via-slate-900 dark:to-slate-900 border-purple-200/80 dark:border-purple-800/60',
+          },
+        ].map((card) => {
+          const Icon = card.icon;
+          const isSelected = statusFilter === card.id;
 
-        {/* CARD 2: MENUNGGU PROSES */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-amber-200 transition-all">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                MENUNGGU PROSES
-              </span>
-              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
-                {proses}
-              </div>
-            </div>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
-              <Clock size={18} />
-            </div>
-          </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
-            <span>Antrean verifikasi</span>
-            <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">
-              Pending
-            </span>
-          </div>
-        </div>
+          return (
+            <div
+              key={card.id}
+              onClick={() => {
+                if (card.id === 'RATE') {
+                  setStatusFilter(statusFilter === 'SELESAI' ? 'ALL' : 'SELESAI');
+                } else {
+                  setStatusFilter(statusFilter === card.id ? 'ALL' : card.id as any);
+                }
+              }}
+              className={`${card.cardBg} rounded-2xl p-4 transition-all duration-200 cursor-pointer relative select-none flex flex-col justify-between shadow-xs backdrop-blur-xs ${
+                isSelected
+                  ? `${card.activeRing} shadow-md scale-[1.01]`
+                  : 'hover:shadow-sm'
+              }`}
+            >
+              {isSelected && (
+                <div className="absolute top-2.5 right-2.5 px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase flex items-center gap-0.5 shadow-2xs">
+                  <Check size={9} strokeWidth={3} />
+                  <span>Filter Aktif</span>
+                </div>
+              )}
 
-        {/* CARD 3: SELESAI DIPROSES */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-emerald-200 transition-all">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                SELESAI DIPROSES
-              </span>
-              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
-                {selesai}
+              <div className="flex items-start justify-between">
+                <div className="pr-2">
+                  <span className={`text-[10px] font-black uppercase tracking-wider block mb-1 ${card.titleColor}`}>
+                    {card.title}
+                  </span>
+                  <div className={`text-xl md:text-2xl font-black font-mono tracking-tight flex items-baseline gap-1.5 ${card.valueColor}`}>
+                    {card.value}
+                    {card.valueUnit && (
+                      <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                        {card.valueUnit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={`p-2 rounded-xl shrink-0 ${card.iconBox}`}>
+                  <Icon size={18} />
+                </div>
               </div>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
-              <CheckCircle2 size={18} />
-            </div>
-          </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
-            <span>Telah ditindaklanjuti</span>
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">
-              Selesai
-            </span>
-          </div>
-        </div>
 
-        {/* CARD 4: TINGKAT KETUNTASAN */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-sky-200 transition-all">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
-                TINGKAT KETUNTASAN
-              </span>
-              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
-                {completionRate}%
+              <div className={`mt-3 text-xs font-bold flex items-center justify-between border-t pt-2 ${card.footerBorder} ${card.footerTextColor}`}>
+                <span className="truncate max-w-[130px]">{card.footerLeft}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${card.footerBadgeClass}`}>
+                  {card.footerBadge}
+                </span>
               </div>
             </div>
-            <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 shrink-0">
-              <TrendingUp size={18} />
-            </div>
-          </div>
-          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
-            <span>{selesai} dari {total} usulan</span>
-            <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md font-bold">
-              {completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`}
-            </span>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* ROW 3: GAMBARAN REVISI SECTION (COLLAPSIBLE - DEFAULT NUTUP) */}
