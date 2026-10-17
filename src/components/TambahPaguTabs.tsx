@@ -7,7 +7,10 @@ import {
   Layout, PlusCircle, Scale, FileSpreadsheet, PieChart, 
   Coins, ClipboardPaste
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useUserRole } from '@/lib/useUserRole';
+import { fetchAuthUser, getCachedAuthUser } from '@/lib/authCache';
+import { menuList } from '@/lib/mock-db';
 
 interface TabConfig {
   id: string;
@@ -18,53 +21,79 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
+  // Baris 1
+  {
+    id: 'tambah',
+    title: 'Input Tambah Pagu',
+    path: '/tambah-pagu/tambah',
+    icon: PlusCircle,
+    badge: 'Form Input',
+  },
   {
     id: 'daftar',
-    title: 'Daftar Usulan',
+    title: 'Daftar Tambah Pagu',
     path: '/tambah-pagu',
     icon: Layout,
     badge: 'Monitoring',
   },
   {
-    id: 'tambah',
-    title: 'Input Pagu Baru',
-    path: '/tambah-pagu/tambah',
-    icon: PlusCircle,
-    badge: 'Form Usulan',
-  },
-  {
     id: 'komparasi',
-    title: 'Komparasi Versi',
+    title: 'Perbandingan dengan Finance',
     path: '/tambah-pagu/komparasi',
     icon: Scale,
     badge: 'Audit Versi',
   },
+  // Baris 2
   {
     id: 'analisis',
-    title: 'Analisis Pagu',
+    title: 'Analisis Tambah Pagu',
     path: '/analisis',
     icon: FileSpreadsheet,
-    badge: 'Global Pagu',
+    badge: 'Analisis',
   },
   {
     id: 'potret',
-    title: 'Potret Mutasi',
+    title: 'Mutasi Pagu',
     path: '/potret-mutasi-pagu',
     icon: PieChart,
     badge: 'Mutasi Pagu',
   },
   {
     id: 'copas',
-    title: 'Copas Pagu',
+    title: 'Input Data dr Finance',
     path: '/copas-pagu',
     icon: ClipboardPaste,
-    badge: 'Copas Zone',
+    badge: 'Copas Finance',
   },
 ];
 
 export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
   const pathname = usePathname();
   const { role } = useUserRole();
+  const [allowedPaths, setAllowedPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    const cached = getCachedAuthUser();
+    if (cached) {
+      setAllowedPaths(cached.allowedPaths);
+      return;
+    }
+    fetchAuthUser().then(user => {
+      if (user) setAllowedPaths(user.allowedPaths);
+    });
+  }, []);
+
+  const isAdmin = (role || '').toLowerCase() === 'admin' || (role || '').toLowerCase() === 'administrator';
+
+  const visibleTabs = TABS.filter(tab => {
+    if (isAdmin) return true;
+    if (allowedPaths.includes(tab.path)) return true;
+    const menuItem = menuList.find(m => m.path === tab.path);
+    if (menuItem && role && menuItem.roles.map(r => r.toLowerCase()).includes(role.toLowerCase())) {
+      return true;
+    }
+    return false;
+  });
 
   const currentTab = activeTab || (
     pathname === '/tambah-pagu/tambah' ? 'tambah' :
@@ -87,7 +116,7 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
             Tambah Pagu & Mutasi Suite
           </span>
           <span className="text-[10px] text-gray-400 font-medium hidden sm:inline">
-            • Usulan, Komparasi, Analisis, & Copas Pagu
+            • Input, Daftar, Komparasi, Analisis, Mutasi, & Data Finance
           </span>
         </div>
 
@@ -99,9 +128,9 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: Standar Design System (3 Tombol per Baris di Desktop, Sisanya di Baris Berikutnya) */}
+      {/* Navigation Grid: Standar Design System (3 Tombol per Baris di Desktop) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
 

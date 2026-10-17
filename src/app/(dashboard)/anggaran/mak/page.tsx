@@ -679,107 +679,97 @@ export default function MonitoringMakPage() {
         </div>
       </div>
 
-      {/* ROW 2: 4 KPI STAT CARDS (SESUAI STANDAR DESIGN SYSTEM) */}
+      {/* ROW 2: 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Card 1: Total Pengajuan */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-indigo-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 1: TOTAL PENGAJUAN */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-indigo-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 TOTAL PENGAJUAN
               </span>
-              <div className="text-2xl md:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {total}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
-              <ClipboardList size={20} />
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
+              <ClipboardList size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span>Usulan Tolakan</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-black border border-indigo-100">
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">
               100% Berkas
             </span>
           </div>
         </div>
 
-        {/* Card 2: Menunggu Verifikasi */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 2: PROSES REVISI */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-amber-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 PROSES REVISI
               </span>
-              <div className="text-2xl md:text-3xl font-black text-amber-900 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {proses}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs shrink-0">
-              <Clock size={20} />
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
+              <Clock size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span>Menunggu verifikasi</span>
-            <span className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded-md font-black border border-amber-200">
+            <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">
               Pending
             </span>
           </div>
         </div>
 
-        {/* Card 3: Selesai Diproses */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-emerald-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 3: SELESAI DIPROSES */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-emerald-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 SELESAI DIPROSES
               </span>
-              <div className="text-2xl md:text-3xl font-black text-emerald-900 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {selesai}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs shrink-0">
-              <CheckCircle2 size={20} />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
+              <CheckCircle2 size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span>Telah ditindaklanjuti</span>
-            <span className="text-[10px] bg-emerald-100/80 text-emerald-800 px-2 py-0.5 rounded-md font-black border border-emerald-200">
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">
               Selesai
             </span>
           </div>
         </div>
 
-        {/* Card 4: Tingkat Ketuntasan & Progress */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-rose-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 4: TINGKAT KETUNTASAN */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-rose-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 TINGKAT KETUNTASAN
               </span>
-              <div className="text-2xl md:text-3xl font-black text-rose-950 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {completionRate}%
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shadow-2xs shrink-0">
-              <TrendingUp size={20} />
+            <div className="p-2 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 shrink-0">
+              <TrendingUp size={18} />
             </div>
           </div>
-          <div className="mt-2.5 space-y-1">
-            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-rose-500 to-indigo-600 rounded-full transition-all duration-500"
-                style={{ width: `${completionRate}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 pt-1">
-              <span>{selesai} dari {total} berkas</span>
-              <span className="text-rose-700 font-black">{completionRate === 100 ? 'Tuntas Penuh' : `${100 - completionRate}% belum`}</span>
-            </div>
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
+            <span>{selesai} dari {total} berkas</span>
+            <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md font-bold">
+              {completionRate === 100 ? 'Tuntas Penuh' : `${100 - completionRate}% belum`}
+            </span>
           </div>
         </div>
       </div>

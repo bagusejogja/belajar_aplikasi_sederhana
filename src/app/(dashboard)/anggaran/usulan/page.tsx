@@ -6,15 +6,18 @@ import {
   FileText, Download, RefreshCw, 
   Search, Eye, Filter, Loader2, Database,
   CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2, ExternalLink,
-  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck
+  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck, ChevronDown, Layers, PieChart as PieChartIcon
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+
+const GROUP_COLORS = ['#4f46e5', '#0ea5e9', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b'];
 
 export default function UsulanAnggaranPage() {
   const [rawData, setRawData] = useState<any[]>([]);
   const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
+  const [activeTab, setActiveTab] = useState<'table' | 'chart' | 'donut'>('table');
+  const [isGambaranOpen, setIsGambaranOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [picFilter, setPicFilter] = useState('');
   const [selectedTP, setSelectedTP] = useState<string>('');
@@ -446,6 +449,25 @@ export default function UsulanAnggaranPage() {
   const proses = filteredData.filter(d => d.status !== 'Sudah Diproses').length;
   const completionRate = total > 0 ? Math.round((selesai / total) * 100) : 0;
 
+  const groupOrgChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = (item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || '').trim();
+      const group = unitGroups[unit] || 'Lainnya / Unit';
+      counts[group] = (counts[group] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData, unitGroups]);
+
+  const statusPieData = useMemo(() => {
+    return [
+      { name: 'Selesai Diproses', value: selesai, color: '#10b981' },
+      { name: 'Menunggu Proses', value: proses, color: '#f59e0b' },
+    ].filter(d => d.value > 0);
+  }, [selesai, proses]);
+
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
       {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
@@ -504,261 +526,402 @@ export default function UsulanAnggaranPage() {
         </div>
       </div>
 
-      {/* ROW 2: 4 KPI STAT CARDS (SESUAI STANDAR DESIGN SYSTEM) */}
+      {/* ROW 2: 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Card 1: Total Pengajuan */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-indigo-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 1: TOTAL PENGAJUAN */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-indigo-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 TOTAL PENGAJUAN
               </span>
-              <div className="text-2xl md:text-3xl font-black text-indigo-950 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {total}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
-              <ClipboardList size={20} />
+            <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">
+              <ClipboardList size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-indigo-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span className="truncate max-w-[130px]" title={selectedTP === 'ALL' || !selectedTP ? 'Semua Periode' : selectedTP}>
               Periode {selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}
             </span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-black border border-indigo-100">
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold">
               100% Usulan
             </span>
           </div>
         </div>
 
-        {/* Card 2: Menunggu Proses */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-amber-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 2: MENUNGGU PROSES */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-amber-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 MENUNGGU PROSES
               </span>
-              <div className="text-2xl md:text-3xl font-black text-amber-900 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {proses}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shadow-2xs shrink-0">
-              <Clock size={20} />
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 shrink-0">
+              <Clock size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-amber-700 flex items-center justify-between border-t border-amber-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span>Antrean verifikasi</span>
-            <span className="text-[10px] bg-amber-100/80 text-amber-800 px-2 py-0.5 rounded-md font-black border border-amber-200">
+            <span className="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md font-bold">
               Pending
             </span>
           </div>
         </div>
 
-        {/* Card 3: Selesai Diproses */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-emerald-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 3: SELESAI DIPROSES */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-emerald-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 SELESAI DIPROSES
               </span>
-              <div className="text-2xl md:text-3xl font-black text-emerald-900 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {selesai}
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shadow-2xs shrink-0">
-              <CheckCircle2 size={20} />
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 shrink-0">
+              <CheckCircle2 size={18} />
             </div>
           </div>
-          <div className="mt-3.5 text-xs font-bold text-emerald-700 flex items-center justify-between border-t border-emerald-50 pt-2.5">
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
             <span>Telah ditindaklanjuti</span>
-            <span className="text-[10px] bg-emerald-100/80 text-emerald-800 px-2 py-0.5 rounded-md font-black border border-emerald-200">
+            <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-bold">
               Selesai
             </span>
           </div>
         </div>
 
-        {/* Card 4: Tingkat Ketuntasan & Progress */}
-        <div className="bg-white rounded-2xl p-4 md:p-5 border border-sky-100 shadow-xs hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-          <div className="absolute -right-8 -top-8 w-24 h-24 bg-sky-500/10 rounded-full blur-2xl group-hover:scale-150 transition-all duration-500 pointer-events-none" />
+        {/* CARD 4: TINGKAT KETUNTASAN */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:border-sky-200 transition-all">
           <div className="flex items-start justify-between">
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-sky-600 block mb-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">
                 TINGKAT KETUNTASAN
               </span>
-              <div className="text-2xl md:text-3xl font-black text-sky-950 font-mono tracking-tight">
+              <div className="text-xl md:text-2xl font-black text-gray-900 dark:text-slate-100 font-mono tracking-tight">
                 {completionRate}%
               </div>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shadow-2xs shrink-0">
-              <TrendingUp size={20} />
+            <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 shrink-0">
+              <TrendingUp size={18} />
             </div>
           </div>
-          <div className="mt-2.5 space-y-1">
-            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-sky-500 to-indigo-600 rounded-full transition-all duration-500"
-                style={{ width: `${completionRate}%` }}
-              />
-            </div>
-            <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 pt-1">
-              <span>{selesai} dari {total} usulan</span>
-              <span className="text-sky-700 font-black">{completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`}</span>
-            </div>
+          <div className="mt-3 text-xs font-bold text-gray-500 flex items-center justify-between border-t border-gray-100 dark:border-slate-800 pt-2">
+            <span>{selesai} dari {total} usulan</span>
+            <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md font-bold">
+              {completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* ROW 3: GAMBARAN REVISI SECTION DENGAN GLOW PILL TABS */}
-      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 space-y-4">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-          <div>
-            <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <BarChart3 size={16} className="text-indigo-600" />
-              <span>Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}</span>
-            </h2>
-            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-              Distribusi pengajuan revisi antar unit kerja dan visualisasi frekuensi kumulatif.
-            </p>
+      {/* ROW 3: GAMBARAN REVISI SECTION (COLLAPSIBLE - DEFAULT NUTUP) */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden transition-all">
+        {/* Accordion Header */}
+        <div 
+          onClick={() => setIsGambaranOpen(!isGambaranOpen)}
+          className="p-4 px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+              <BarChart3 size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {chartData.length} Unit
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                Visualisasi frekuensi revisi unit, grafik batang, dan distribusi kelompok organisasi.
+              </p>
+            </div>
           </div>
-          
-          {/* GLOW PILL TABS (DESIGN SYSTEM STYLE 1) */}
-          <div className="inline-flex p-1 bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-inner gap-1">
-            <button 
-              onClick={() => setActiveTab('table')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'table'
-                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
-              }`}
-            >
-              <Table2 size={13} className={activeTab === 'table' ? 'text-white' : 'text-slate-500'} />
-              <span>Tabel Frekuensi</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                activeTab === 'table' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}>
-                {dashboardData.length}
-              </span>
-            </button>
-            <button 
-              onClick={() => setActiveTab('chart')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'chart'
-                  ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
-              }`}
-            >
-              <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
-              <span>Grafik Batang</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}>
-                {chartData.length}
-              </span>
-            </button>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <span className="text-[11px] font-bold text-indigo-600">
+              {isGambaranOpen ? 'Tutup Visualisasi' : 'Buka Analisis Visual'}
+            </span>
+            <div className={`p-1.5 rounded-lg bg-gray-100 text-gray-600 transition-transform duration-200 ${isGambaranOpen ? 'rotate-180' : ''}`}>
+              <ChevronDown size={14} />
+            </div>
           </div>
         </div>
 
-        {activeTab === 'table' ? (
-          dashboardData.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-gray-200/80">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
-                  <tr>
-                    <th className="px-4 py-3">Unit Kerja (Frekuensi Sama)</th>
-                    <th className="px-4 py-3 text-center w-36">Frekuensi Revisi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
-                    const getGroupColor = (group?: string) => {
-                      switch(group) {
-                         case 'Fakultas': return 'bg-sky-50 text-sky-700 border border-sky-200';
-                         case 'KPTU': return 'bg-amber-50 text-amber-700 border border-amber-200';
-                         case 'Pusat Studi': return 'bg-violet-50 text-violet-700 border border-violet-200';
-                         case 'Tempat Ibadah': return 'bg-rose-50 text-rose-700 border border-rose-200';
-                         default: return 'bg-gray-50 text-gray-700 border border-gray-200';
-                      }
-                    };
-                    const units = d.name.split(', ');
-                    return (
-                      <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {units.map((unit: string, ui: number) => {
-                              const cleanUnit = unit.trim();
-                              const groupOrg = unitGroups[cleanUnit];
-                              return (
-                                <span key={ui} className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${getGroupColor(groupOrg)}`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
-                                  {cleanUnit}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono shadow-2xs">
-                            {d.Total} kali
-                          </span>
-                        </td>
+        {/* Collapsible Content */}
+        {isGambaranOpen && (
+          <div className="p-5 pt-1 border-t border-gray-100 space-y-4 animate-in fade-in duration-200">
+            {/* GLOW PILL TABS */}
+            <div className="flex justify-end pt-2">
+              <div className="inline-flex p-1 bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-inner gap-1">
+                <button 
+                  onClick={() => setActiveTab('table')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'table'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <Table2 size={13} className={activeTab === 'table' ? 'text-white' : 'text-slate-500'} />
+                  <span>Tabel Frekuensi</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'table' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {dashboardData.length}
+                  </span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('chart')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'chart'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
+                  <span>Grafik Batang</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {chartData.length}
+                  </span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('donut')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'donut'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <PieChartIcon size={13} className={activeTab === 'donut' ? 'text-white' : 'text-slate-500'} />
+                  <span>Komposisi Donut</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'donut' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {groupOrgChartData.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* TAB CONTENT */}
+            {activeTab === 'table' ? (
+              dashboardData.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-gray-200/80">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Unit Kerja (Frekuensi Sama)</th>
+                        <th className="px-4 py-3 text-center w-36">Frekuensi Revisi</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="h-32 flex flex-col items-center justify-center text-gray-400">
-              <BarChart3 size={28} className="opacity-20 mb-2" />
-              <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
-            </div>
-          )
-        ) : (
-          chartData.length > 0 ? (
-            <div className="h-[300px] w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                  <defs>
-                    <linearGradient id="usulanBarGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.65} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
-                    angle={-45} 
-                    textAnchor="end" 
-                    interval={0}
-                    height={80}
-                    tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
-                  />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
-                    contentStyle={{ 
-                      borderRadius: '0.85rem', 
-                      border: '1px solid #e2e8f0', 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      backdropFilter: 'blur(8px)',
-                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-                      fontSize: '11px',
-                      fontWeight: 'bold'
-                    }}
-                  />
-                  <Bar dataKey="Total" fill="url(#usulanBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="h-32 flex flex-col items-center justify-center text-gray-400">
-              <BarChart3 size={28} className="opacity-20 mb-2" />
-              <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
-            </div>
-          )
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
+                        const getGroupColor = (group?: string) => {
+                          switch(group) {
+                             case 'Fakultas': return 'bg-sky-50 text-sky-700 border border-sky-200';
+                             case 'KPTU': return 'bg-amber-50 text-amber-700 border border-amber-200';
+                             case 'Pusat Studi': return 'bg-violet-50 text-violet-700 border border-violet-200';
+                             case 'Tempat Ibadah': return 'bg-rose-50 text-rose-700 border border-rose-200';
+                             default: return 'bg-gray-50 text-gray-700 border border-gray-200';
+                          }
+                        };
+                        const units = d.name.split(', ');
+                        return (
+                          <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {units.map((unit: string, ui: number) => {
+                                  const cleanUnit = unit.trim();
+                                  const groupOrg = unitGroups[cleanUnit];
+                                  return (
+                                    <span key={ui} className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${getGroupColor(groupOrg)}`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
+                                      {cleanUnit}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono shadow-2xs">
+                                {d.Total} kali
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                  <BarChart3 size={28} className="opacity-20 mb-2" />
+                  <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
+                </div>
+              )
+            ) : activeTab === 'chart' ? (
+              chartData.length > 0 ? (
+                <div className="h-[300px] w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                      <defs>
+                        <linearGradient id="usulanBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="#2563eb" stopOpacity={0.65} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
+                        angle={-45} 
+                        textAnchor="end" 
+                        interval={0}
+                        height={80}
+                        tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
+                      <Tooltip 
+                        cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
+                        contentStyle={{ 
+                          borderRadius: '0.85rem', 
+                          border: '1px solid #e2e8f0', 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          backdropFilter: 'blur(8px)',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                          fontSize: '11px',
+                          fontWeight: 'bold'
+                        }}
+                      />
+                      <Bar dataKey="Total" fill="url(#usulanBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                  <BarChart3 size={28} className="opacity-20 mb-2" />
+                  <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
+                </div>
+              )
+            ) : (
+              /* TAB 3: DONUT & KOMPOSISI */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* Donut 1: Kelompok Organisasi */}
+                <div className="p-4 rounded-xl border border-gray-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black uppercase text-gray-700 tracking-wider">
+                      Distribusi Kelompok Organisasi Unit
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700">
+                      Grup Unit
+                    </span>
+                  </div>
+                  {groupOrgChartData.length > 0 ? (
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={groupOrgChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={3}
+                          >
+                            {groupOrgChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={GROUP_COLORS[index % GROUP_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(val: any) => [`${val} Pengajuan`, 'Jumlah']}
+                            contentStyle={{ 
+                              borderRadius: '0.75rem', 
+                              border: '1px solid #e2e8f0', 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              fontSize: '11px',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            formatter={(value) => <span className="text-[10px] font-bold text-gray-600">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-44 flex items-center justify-center text-xs text-gray-400">Tidak ada data</div>
+                  )}
+                </div>
+
+                {/* Donut 2: Status Penyelesaian */}
+                <div className="p-4 rounded-xl border border-gray-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black uppercase text-gray-700 tracking-wider">
+                      Proporsi Status Penyelesaian
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700">
+                      Progress
+                    </span>
+                  </div>
+                  {statusPieData.length > 0 ? (
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusPieData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={3}
+                          >
+                            {statusPieData.map((entry, index) => (
+                              <Cell key={`cell-status-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(val: any) => [`${val} Pengajuan`, 'Jumlah']}
+                            contentStyle={{ 
+                              borderRadius: '0.75rem', 
+                              border: '1px solid #e2e8f0', 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              fontSize: '11px',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            formatter={(value) => <span className="text-[10px] font-bold text-gray-600">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-44 flex items-center justify-center text-xs text-gray-400">Tidak ada data</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
