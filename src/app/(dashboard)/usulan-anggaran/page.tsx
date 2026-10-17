@@ -343,10 +343,9 @@ export default function UsulanAnggaranPage() {
               value={targetUsulanYear}
               onChange={e => setTargetUsulanYear(Number(e.target.value))}
               className="bg-transparent font-bold text-xs text-amber-950 outline-none cursor-pointer"
-              title="Pilih Tahun Target Usulan (Default N+1)"
+              title="Pilih Tahun Target Usulan"
             >
-              <option value={selectedYear + 1}>{selectedYear + 1} (N+1)</option>
-              {[2024, 2025, 2026, 2027, 2028].filter(y => y !== selectedYear + 1).map(y => (
+              {[2024, 2025, 2026, 2027, 2028, 2029].map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
