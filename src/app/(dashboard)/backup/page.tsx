@@ -108,6 +108,40 @@ export default function BackupPage() {
     }
   };
 
+  const [isDownloadingDirect, setIsDownloadingDirect] = useState<string | null>(null);
+
+  const handleDirectDownload = async (format: 'sql' | 'json') => {
+    setIsDownloadingDirect(format);
+    const toastId = toast.loading(`Sedang mengekspor ${totalTables} tabel database (${format.toUpperCase()}) ke laptop, mohon tunggu...`);
+    try {
+      const response = await fetch(`/api/backup?format=${format}`);
+      if (!response.ok) {
+        throw new Error('Gagal mengekspor database dari server.');
+      }
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `backup_database_${new Date().toISOString().slice(0, 10)}.${format}`;
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success(`Database (${format.toUpperCase()}) berhasil diekspor dan diunduh ke laptop!`, { id: toastId });
+    } catch (err: any) {
+      toast.error(`Gagal mengunduh: ${err.message}`, { id: toastId });
+    } finally {
+      setIsDownloadingDirect(null);
+    }
+  };
+
   const getStartDateByPreset = () => {
     const now = new Date();
     if (dateFilterPreset === '7d') {
@@ -630,23 +664,23 @@ export default function BackupPage() {
           </p>
 
           <div className="flex flex-wrap gap-2.5 pt-2">
-            <a
-              href="/api/backup?format=sql"
-              download
-              className="h-9 px-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            <button
+              onClick={() => handleDirectDownload('sql')}
+              disabled={!!isDownloadingDirect}
+              className="h-9 px-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <Download size={13} />
-              <span>Unduh File SQL (.sql)</span>
-            </a>
+              {isDownloadingDirect === 'sql' ? <RefreshCw size={13} className="animate-spin text-indigo-600" /> : <Download size={13} />}
+              <span>{isDownloadingDirect === 'sql' ? 'Mengekspor Database SQL...' : 'Unduh File SQL (.sql)'}</span>
+            </button>
 
-            <a
-              href="/api/backup?format=json"
-              download
-              className="h-9 px-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
+            <button
+              onClick={() => handleDirectDownload('json')}
+              disabled={!!isDownloadingDirect}
+              className="h-9 px-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <FileCode size={13} />
-              <span>Unduh File JSON (.json)</span>
-            </a>
+              {isDownloadingDirect === 'json' ? <RefreshCw size={13} className="animate-spin text-gray-600" /> : <FileCode size={13} />}
+              <span>{isDownloadingDirect === 'json' ? 'Mengekspor Database JSON...' : 'Unduh File JSON (.json)'}</span>
+            </button>
           </div>
         </div>
       </div>

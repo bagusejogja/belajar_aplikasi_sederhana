@@ -35,7 +35,13 @@ const accountLinks: Record<string, string> = {
 export default function UsulanAnggaranPage() {
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(2025);
+  const [targetUsulanYear, setTargetUsulanYear] = useState(2026);
   const [selectedUnit, setSelectedUnit] = useState('all');
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    setTargetUsulanYear(year + 1); // default N+1
+  };
 
   const [units, setUnits] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -71,7 +77,7 @@ export default function UsulanAnggaranPage() {
          }
       }
 
-      // Compute Usulan
+      // Compute Usulan berdasarkan targetUsulanYear (default N+1)
       let usulan: Record<string, number> = {};
       pegawaiData.forEach(p => {
          const status = (p.status || '').toUpperCase();
@@ -92,9 +98,9 @@ export default function UsulanAnggaranPage() {
          const pensiunMonthGaji = tglLahir.getMonth() + 1;
          
          let detailGaji = Array(14).fill(false);
-         if (pensiunYearGaji > 2026) {
+         if (pensiunYearGaji > targetUsulanYear) {
             for(let i=0; i<12; i++) detailGaji[i] = true;
-         } else if (pensiunYearGaji === 2026) {
+         } else if (pensiunYearGaji === targetUsulanYear) {
             for(let i=0; i<pensiunMonthGaji; i++) detailGaji[i] = true;
          }
          let blnGaji = detailGaji.filter(Boolean).length;
@@ -126,9 +132,9 @@ export default function UsulanAnggaranPage() {
             const pensiunMonthDosen = tglLahir.getMonth() + 1;
 
             let detailFungs = Array(14).fill(false);
-            if (pensiunYearDosen > 2026) {
+            if (pensiunYearDosen > targetUsulanYear) {
                for(let i=0; i<12; i++) detailFungs[i] = true;
-            } else if (pensiunYearDosen === 2026) {
+            } else if (pensiunYearDosen === targetUsulanYear) {
                for(let i=0; i<pensiunMonthDosen; i++) detailFungs[i] = true;
             }
             let blnFungs = detailFungs.filter(Boolean).length;
@@ -145,9 +151,9 @@ export default function UsulanAnggaranPage() {
 
             if (isGB) {
                let detailGB = Array(14).fill(false);
-               if (pensiunYearDosen > 2026) {
+               if (pensiunYearDosen > targetUsulanYear) {
                   for(let i=0; i<12; i++) detailGB[i] = true;
-               } else if (pensiunYearDosen === 2026) {
+               } else if (pensiunYearDosen === targetUsulanYear) {
                   for(let i=0; i<pensiunMonthDosen; i++) detailGB[i] = true;
                }
                if (detailGB.filter(Boolean).length > 0) {
@@ -160,10 +166,10 @@ export default function UsulanAnggaranPage() {
          // 3. UANG MAKAN
          let detailUM = Array(12).fill(false);
          let blnUM = 0;
-         if (pensiunYearGaji > 2026) {
+         if (pensiunYearGaji > targetUsulanYear) {
             blnUM = 12;
             for(let i=0; i<12; i++) detailUM[i] = true;
-         } else if (pensiunYearGaji === 2026) {
+         } else if (pensiunYearGaji === targetUsulanYear) {
             blnUM = pensiunMonthGaji;
             for(let i=0; i<blnUM; i++) detailUM[i] = true;
          }
@@ -210,20 +216,20 @@ export default function UsulanAnggaranPage() {
            });
 
            const totalRealization = accTrxs.filter(t => t.jenis === 'realisasi').reduce((s, t) => s + Number(t.nominal), 0);
-           const usulanTA2026 = usulan[acc.account_code] || 0;
+           const usulanTA = usulan[acc.account_code] || 0;
            
            sumRealisasi += totalRealization;
            sumPagu += accPagu;
-           sumUsulan += usulanTA2026;
+           sumUsulan += usulanTA;
 
            return {
               ...acc,
               monthlyRealization: monthlyVals,
               totalPagu: accPagu,
               totalSpent: totalRealization,
-              usulanTA2026
+              usulanTA
            };
-        }).filter(a => a.totalPagu > 0 || a.totalSpent > 0 || a.usulanTA2026 > 0);
+        }).filter(a => a.totalPagu > 0 || a.totalSpent > 0 || a.usulanTA > 0);
         
         setPivotData(pivot);
         setStats({ totalRealisasi: sumRealisasi, totalPagu: sumPagu, totalUsulan: sumUsulan });
@@ -234,7 +240,7 @@ export default function UsulanAnggaranPage() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedYear, selectedUnit]);
+  }, [selectedYear, targetUsulanYear, selectedUnit]);
 
   const handleExport = () => {
     try {
@@ -245,8 +251,8 @@ export default function UsulanAnggaranPage() {
     <Cell ss:StyleID="sData"><Data ss:Type="String">${d.account_name}</Data></Cell>
     <Cell ss:StyleID="sDataAngka"><Data ss:Type="Number">${d.totalPagu}</Data></Cell>
     <Cell ss:StyleID="sDataAngka"><Data ss:Type="Number">${d.totalSpent}</Data></Cell>
-    <Cell ss:StyleID="sDataAngkaBold"><Data ss:Type="Number">${d.usulanTA2026}</Data></Cell>
-    <Cell ss:StyleID="sDataAngka"><Data ss:Type="Number">${d.usulanTA2026 - d.totalSpent}</Data></Cell>
+    <Cell ss:StyleID="sDataAngkaBold"><Data ss:Type="Number">${d.usulanTA}</Data></Cell>
+    <Cell ss:StyleID="sDataAngka"><Data ss:Type="Number">${d.usulanTA - d.totalSpent}</Data></Cell>
    </Row>`;
       };
 
@@ -263,14 +269,14 @@ export default function UsulanAnggaranPage() {
  <Worksheet ss:Name="Perbandingan Anggaran">
   <Table ss:DefaultRowHeight="15.5">
    <Column ss:Width="80"/><Column ss:Width="300"/><Column ss:Width="120"/><Column ss:Width="120"/><Column ss:Width="120"/><Column ss:Width="120"/>
-   <Row ss:Height="20"><Cell ss:MergeAcross="5" ss:StyleID="sJudul"><Data ss:Type="String">PERBANDINGAN ANGGARAN TA 2026 VS REALISASI ${selectedYear}</Data></Cell></Row>
+   <Row ss:Height="20"><Cell ss:MergeAcross="5" ss:StyleID="sJudul"><Data ss:Type="String">PERBANDINGAN ANGGARAN TA ${targetUsulanYear} VS REALISASI ${selectedYear}</Data></Cell></Row>
    <Row ss:Height="15"/>
    <Row ss:Height="25">
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Kode Akun</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Nama Akun</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Pagu TA ${selectedYear}</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Realisasi TA ${selectedYear}</Data></Cell>
-    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Usulan TA 2026</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Usulan TA ${targetUsulanYear}</Data></Cell>
     <Cell ss:StyleID="sHeader"><Data ss:Type="String">Selisih (Usulan - Realisasi)</Data></Cell>
    </Row>
    ${pivotData.map(d => generateRow(d)).join('')}
@@ -282,7 +288,7 @@ export default function UsulanAnggaranPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `Perbandingan_Anggaran_${selectedYear}_2026.xls`);
+      link.setAttribute("download", `Perbandingan_Anggaran_${selectedYear}_${targetUsulanYear}.xls`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -305,30 +311,49 @@ export default function UsulanAnggaranPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Perbandingan Anggaran</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
-                Usulan TA 2026 vs TA {selectedYear}
+                Usulan TA {targetUsulanYear} vs TA {selectedYear}
               </span>
             </div>
-            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Komparasi hasil kalkulasi proyeksi pegawai TA 2026 dengan realisasi acuan</p>
+            <p className="text-gray-500 font-medium text-[11px] mt-0.5">Komparasi hasil kalkulasi proyeksi pegawai TA {targetUsulanYear} dengan acuan TA {selectedYear}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-          {/* Realisasi Acuan */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* 1. Realisasi Acuan (TA N) */}
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 h-9 shrink-0">
-            <Calendar size={14} className="text-gray-400" />
+            <Calendar size={13} className="text-gray-400" />
+            <span className="text-[10px] font-bold text-gray-500">Acuan:</span>
             <select 
               value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
+              onChange={e => handleYearChange(Number(e.target.value))}
               className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
+              title="Pilih Tahun Acuan Realisasi"
             >
+              <option value={2023}>2023</option>
               <option value={2024}>2024</option>
               <option value={2025}>2025</option>
               <option value={2026}>2026</option>
             </select>
           </div>
 
+          {/* 2. Target Usulan (Default N+1) */}
+          <div className="flex items-center gap-1.5 bg-amber-50/80 border border-amber-200/90 rounded-xl px-2.5 h-9 shrink-0">
+            <span className="text-[10px] font-bold text-amber-800">Usulan:</span>
+            <select 
+              value={targetUsulanYear}
+              onChange={e => setTargetUsulanYear(Number(e.target.value))}
+              className="bg-transparent font-bold text-xs text-amber-950 outline-none cursor-pointer"
+              title="Pilih Tahun Target Usulan (Default N+1)"
+            >
+              <option value={selectedYear + 1}>{selectedYear + 1} (N+1)</option>
+              {[2024, 2025, 2026, 2027, 2028].filter(y => y !== selectedYear + 1).map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Unit Kerja */}
-          <div className="w-48">
+          <div className="w-44">
             <select 
               value={selectedUnit} 
               onChange={e => setSelectedUnit(e.target.value)} 
@@ -361,10 +386,10 @@ export default function UsulanAnggaranPage() {
       {/* KPI SUMMARY CARDS (DESIGN SYSTEM STANDARDS) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         <StatCard
-          title="TOTAL USULAN TA 2026"
+          title={`TOTAL USULAN TA ${targetUsulanYear}`}
           value={`Rp ${formatIDR(stats.totalUsulan)}`}
           icon={TrendingUp}
-          subtitle="Hasil kalkulasi pagu pegawai"
+          subtitle={`Hasil kalkulasi pagu pegawai TA ${targetUsulanYear}`}
           variant="emerald"
           lightBg={true}
         />
@@ -414,7 +439,7 @@ export default function UsulanAnggaranPage() {
                 <th className="py-3 px-4">Mata Anggaran (Akun)</th>
                 <th className="py-3 px-4 text-right w-44">Pagu TA {selectedYear}</th>
                 <th className="py-3 px-4 text-right w-44 text-indigo-700">Realisasi TA {selectedYear}</th>
-                <th className="py-3 px-4 text-right w-44 bg-amber-50/50 text-amber-900">Usulan TA 2026</th>
+                <th className="py-3 px-4 text-right w-44 bg-amber-50/50 text-amber-900">Usulan TA {targetUsulanYear}</th>
                 <th className="py-3 px-4 text-right w-36">Pertumbuhan</th>
                 <th className="py-3 px-4 text-center w-20">Aksi</th>
               </tr>
@@ -436,7 +461,7 @@ export default function UsulanAnggaranPage() {
               ) : (
                 pivotData.map((d, i) => {
                   const linkTarget = accountLinks[d.account_code];
-                  const growth = d.totalSpent > 0 ? ((d.usulanTA2026 - d.totalSpent) / d.totalSpent) * 100 : 0;
+                  const growth = d.totalSpent > 0 ? ((d.usulanTA - d.totalSpent) / d.totalSpent) * 100 : 0;
                   
                   return (
                     <tr key={i} className="hover:bg-indigo-50/20 transition-colors">
@@ -453,10 +478,10 @@ export default function UsulanAnggaranPage() {
                         {d.totalSpent > 0 ? `Rp ${formatIDR(d.totalSpent)}` : '-'}
                       </td>
                       <td className="py-2.5 px-4 font-mono font-bold text-amber-700 bg-amber-50/30 text-xs text-right">
-                        {d.usulanTA2026 > 0 ? `Rp ${formatIDR(d.usulanTA2026)}` : '-'}
+                        {d.usulanTA > 0 ? `Rp ${formatIDR(d.usulanTA)}` : '-'}
                       </td>
                       <td className="py-2.5 px-4 text-right">
-                        {d.usulanTA2026 > 0 && d.totalSpent > 0 ? (
+                        {d.usulanTA > 0 && d.totalSpent > 0 ? (
                           <span className={`font-mono font-bold text-xs ${growth > 0 ? 'text-emerald-600' : growth < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
                             {growth > 0 ? '+' : ''}{growth.toFixed(1)}%
                           </span>
