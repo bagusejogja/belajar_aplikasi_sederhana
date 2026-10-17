@@ -133,6 +133,11 @@ export default function MonitoringMakPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Modal Kembalikan untuk Revisi State
+  const [kembalikanModalItem, setKembalikanModalItem] = useState<any | null>(null);
+  const [catatanRevisiInput, setCatatanRevisiInput] = useState('');
+  const [isSubmittingRevisi, setIsSubmittingRevisi] = useState(false);
+
   // Modal RKA Selisih & Copy State
   const [selectedRkaData, setSelectedRkaData] = useState<{ submission: any; rka: any } | null>(null);
   const [copiedMakKey, setCopiedMakKey] = useState<string | null>(null);
@@ -257,6 +262,53 @@ export default function MonitoringMakPage() {
     setProcessingId(null);
   };
 
+  const handleKembalikanRevisi = async () => {
+    if (!kembalikanModalItem) return;
+    if (!catatanRevisiInput.trim()) {
+      alert('Mohon isi catatan atau kekurangan berkas yang harus diperbaiki oleh pengirim.');
+      return;
+    }
+
+    setIsSubmittingRevisi(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+
+    try {
+      const res = await fetch('/api/mak/kembalikan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: kembalikanModalItem.id,
+          catatanRevisi: catatanRevisiInput.trim(),
+          baseUrl: window.location.origin,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        if (json.emailSent) {
+          setSuccessMsg(`Berkas berhasil dikembalikan ke status 'Perlu Revisi'. Email notifikasi dan tautan form revisi telah terkirim ke ${kembalikanModalItem.email}.`);
+        } else {
+          setSuccessMsg(`Berkas berhasil dikembalikan ke status 'Perlu Revisi'. Catatan revisi tersimpan.`);
+          if (json.emailError) {
+            setErrorMsg('Catatan tersimpan, namun pengiriman email gagal: ' + json.emailError);
+          }
+        }
+        setKembalikanModalItem(null);
+        setCatatanRevisiInput('');
+        fetchData();
+        setTimeout(() => { setSuccessMsg(''); setErrorMsg(''); }, 10000);
+      } else {
+        setErrorMsg(json.error || 'Gagal mengembalikan berkas.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Gagal terhubung ke server: ' + err.message);
+    } finally {
+      setIsSubmittingRevisi(false);
+    }
+  };
+
   const baseFiltered = useMemo(() => {
     return data.filter(row => {
       const q = search.toLowerCase();
@@ -272,7 +324,10 @@ export default function MonitoringMakPage() {
     return baseFiltered.filter(row => {
       if (filterStatus === 'ALL') return true;
       if (filterStatus === 'Selesai') return row.status === 'Selesai';
-      return row.status !== 'Selesai';
+      if (filterStatus === 'Perlu Revisi') return row.status === 'Perlu Revisi';
+      if (filterStatus === 'Revisi Masuk') return row.status === 'Revisi Masuk';
+      if (filterStatus === 'Proses Revisi' || filterStatus === 'PROSES') return row.status !== 'Selesai';
+      return row.status === filterStatus;
     });
   }, [baseFiltered, filterStatus]);
 
@@ -406,6 +461,16 @@ export default function MonitoringMakPage() {
   const total = baseFiltered.length;
   const selesai = baseFiltered.filter(d => d.status === 'Selesai').length;
   const proses = baseFiltered.filter(d => d.status !== 'Selesai').length;
+  const perluRevisiCount = baseFiltered.filter(d => d.status === 'Perlu Revisi').length;
+  const revisiMasukCount = baseFiltered.filter(d => d.status === 'Revisi Masuk').length;
+
+  const getRevisiCatatan = (row: any) => {
+    if (Array.isArray(row?.lampiran_catatan)) {
+      const meta = row.lampiran_catatan.find((c: any) => c.type === 'revisi_meta');
+      if (meta?.catatan) return meta.catatan;
+    }
+    return '';
+  };
 
   const unitPieData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
@@ -1370,7 +1435,7 @@ export default function MonitoringMakPage() {
           </div>
 
           {/* Quick Filter Pill Buttons */}
-          <div className="flex items-center gap-1.5 self-start md:self-auto bg-gray-100 p-1 rounded-xl text-xs font-bold">
+          <div className="flex flex-wrap items-center gap-1.5 self-start md:self-auto bg-gray-100 p-1 rounded-xl text-xs font-bold">
             <button
               type="button"
               onClick={() => setFilterStatus('ALL')}
@@ -1394,6 +1459,34 @@ export default function MonitoringMakPage() {
               <Clock size={11} className="text-amber-500" />
               <span>Proses ({proses})</span>
             </button>
+            {perluRevisiCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterStatus('Perlu Revisi')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  filterStatus === 'Perlu Revisi'
+                    ? 'bg-white text-orange-700 shadow-xs font-black border border-orange-200'
+                    : 'text-orange-700 hover:bg-orange-50'
+                }`}
+              >
+                <RotateCcw size={11} className="text-orange-500" />
+                <span>Perlu Revisi ({perluRevisiCount})</span>
+              </button>
+            )}
+            {revisiMasukCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterStatus('Revisi Masuk')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  filterStatus === 'Revisi Masuk'
+                    ? 'bg-white text-sky-700 shadow-xs font-black border border-sky-200'
+                    : 'text-sky-700 hover:bg-sky-50'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                <span>Revisi Masuk ({revisiMasukCount})</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setFilterStatus('Selesai')}
@@ -1547,6 +1640,22 @@ export default function MonitoringMakPage() {
                             <Mail size={10} className="text-gray-400 shrink-0" />
                             <span className="truncate max-w-[200px]">{row.email || 'Tanpa Email'}</span>
                           </span>
+
+                          {row.status === 'Perlu Revisi' && (
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold mt-1 cursor-help"
+                              title={getRevisiCatatan(row) ? `Catatan Verifikator: ${getRevisiCatatan(row)}` : 'Menunggu perbaikan berkas dari pengirim'}
+                            >
+                              <RotateCcw size={10} className="text-amber-600 shrink-0" />
+                              <span className="truncate max-w-[190px]">Perlu Revisi: {getRevisiCatatan(row) || 'Menunggu Pengirim'}</span>
+                            </div>
+                          )}
+                          {row.status === 'Revisi Masuk' && (
+                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-300 text-[10px] font-black mt-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse shrink-0" />
+                              <span>Revisi Masuk (Perlu Cek Ulang)</span>
+                            </div>
+                          )}
                         </div>
                       </td>
 
@@ -1647,7 +1756,7 @@ export default function MonitoringMakPage() {
                         </div>
                       </td>
 
-                      {/* STATUS & AKSI (DIGABUNG: JIKA SELESAI -> TUNTAS, JIKA PROSES -> TOMBOL PROSES) */}
+                      {/* STATUS & AKSI */}
                       <td className="px-4 py-3.5 align-top pt-3.5 whitespace-nowrap text-center">
                         {row.status === 'Selesai' ? (
                           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl font-black text-xs border border-emerald-200 shadow-2xs">
@@ -1655,14 +1764,31 @@ export default function MonitoringMakPage() {
                             <span>Tuntas</span>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setEmailModalId(row.id)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-xs shadow-indigo-200 mx-auto active:scale-95"
-                          >
-                            <Zap size={11} className="text-amber-300 fill-amber-300" />
-                            <span>Proses</span>
-                          </button>
+                          <div className="flex flex-col gap-1.5 items-center w-28 mx-auto">
+                            <button
+                              type="button"
+                              onClick={() => setEmailModalId(row.id)}
+                              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all shadow-xs shadow-indigo-200 active:scale-95 cursor-pointer"
+                              title="Tandai berkas telah diverifikasi & kirim email resmi ke pengusul"
+                            >
+                              <Zap size={11} className="text-amber-300 fill-amber-300" />
+                              <span>Selesaikan</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setKembalikanModalItem(row);
+                                const existingCatatan = getRevisiCatatan(row);
+                                setCatatanRevisiInput(existingCatatan || '');
+                              }}
+                              className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-2xs active:scale-95 cursor-pointer"
+                              title="Kembalikan berkas ke pengirim (unit) untuk diperbaiki tanpa perlu login"
+                            >
+                              <RotateCcw size={11} className="text-amber-600 shrink-0" />
+                              <span>{row.status === 'Perlu Revisi' ? 'Ubah Catatan' : 'Kembalikan'}</span>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -2231,6 +2357,115 @@ export default function MonitoringMakPage() {
                 className="px-5 py-2.5 bg-gray-800 hover:bg-gray-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 Tutup Pop-up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL KEMBALIKAN BERKAS KE PENGIRIM (REVISI TANPA LOGIN) */}
+      {kembalikanModalItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-gray-200 shadow-2xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-5 px-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 border border-amber-200 flex items-center justify-center shadow-2xs">
+                  <RotateCcw size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 tracking-tight">
+                    Kembalikan Berkas untuk Revisi
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Kirim catatan kekurangan dan tautan perbaikan tanpa login ke pengirim.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setKembalikanModalItem(null)}
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              {/* Unit Info Box */}
+              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold">Unit Kerja:</span>
+                  <span className="font-black text-gray-900 text-right">{kembalikanModalItem.unit}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold">Tahun Anggaran:</span>
+                  <span className="font-mono font-bold text-gray-900">{kembalikanModalItem.tahun}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold">Email Pengirim:</span>
+                  <span className="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                    {kembalikanModalItem.email || '⚠️ Tidak ada email tercatat'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Catatan Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase tracking-wider text-gray-700 block">
+                  Catatan Kekurangan / Arahan Perbaikan <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={catatanRevisiInput}
+                  onChange={(e) => setCatatanRevisiInput(e.target.value)}
+                  placeholder="Contoh: Rincian belanja MAK 521211 pada file Excel belum seimbang. Mohon lampirkan SPTJM bertandatangan pimpinan dan perbaiki selisih semula-menjadi..."
+                  className="w-full p-3 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 focus:border-amber-400 rounded-2xl text-xs text-gray-800 placeholder-gray-400 outline-none focus:ring-3 focus:ring-amber-200/50 transition-all leading-relaxed"
+                />
+                <span className="text-[11px] text-gray-400 block">
+                  Catatan ini akan tampil di bagian atas formulir <strong>/input-mak</strong> saat pengirim membuka tautan revisi.
+                </span>
+              </div>
+
+              {/* Magic Link Notice */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl flex items-start gap-2.5 text-xs text-blue-900">
+                <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-black text-blue-950">Alur Otomatis Tanpa Login:</div>
+                  <p className="text-[11px] text-blue-800 leading-relaxed font-normal">
+                    Setelah tombol diklik, status berubah menjadi <strong>Perlu Revisi</strong> dan email notifikasi dikirimkan ke <strong>{kembalikanModalItem.email || 'pengirim'}</strong>. Pengirim cukup mengklik tautan aman untuk mengunggah berkas pengganti tanpa perlu login.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 px-6 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setKembalikanModalItem(null)}
+                disabled={isSubmittingRevisi}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-200 transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleKembalikanRevisi}
+                disabled={isSubmittingRevisi || !catatanRevisiInput.trim()}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-black shadow-md shadow-amber-200 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isSubmittingRevisi ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Mengirim...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw size={13} />
+                    <span>Kirim Catatan & Link Revisi</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

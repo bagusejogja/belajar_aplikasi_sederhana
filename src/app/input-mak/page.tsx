@@ -6,8 +6,9 @@ import {
   Upload, CheckCircle, Loader2, FileText, AlertCircle, Building2, Search,
   FileSpreadsheet, Eye, X, Check, Filter, 
   Layers, Download, DollarSign, TrendingDown, TrendingUp, Info,
-  Copy, CheckCheck
+  Copy, CheckCheck, RotateCcw
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 
@@ -75,7 +76,14 @@ const getCellText = (cell: any): string => {
   return String(cell.text || v).trim();
 };
 
-export default function InputMakPage() {
+function InputMakPageContent() {
+  const searchParams = useSearchParams();
+  const revisiToken = searchParams.get('revisi_token');
+  const [isRevisiMode, setIsRevisiMode] = useState(false);
+  const [revisiData, setRevisiData] = useState<any | null>(null);
+  const [isLoadingRevisi, setIsLoadingRevisi] = useState(false);
+  const [catatanPengirim, setCatatanPengirim] = useState('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -96,6 +104,37 @@ export default function InputMakPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showOnlyDiff, setShowOnlyDiff] = useState(true);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Cek token revisi dari URL jika ada
+  useEffect(() => {
+    if (!revisiToken) return;
+    const fetchRevisi = async () => {
+      setIsLoadingRevisi(true);
+      setErrorMsg('');
+      try {
+        const res = await fetch(`/api/mak/revisi?token=${encodeURIComponent(revisiToken)}`);
+        const json = await res.json();
+        if (json.success && json.submission) {
+          setIsRevisiMode(true);
+          setRevisiData(json);
+          setUnitSearch(json.submission.unit || '');
+          setTahun(String(json.submission.tahun || new Date().getFullYear().toString()));
+          setPic(json.submission.pic || '');
+          setEmail(json.submission.email || '');
+          if (json.submission.rka_selisih_data) {
+            setRkaParseResult(json.submission.rka_selisih_data);
+          }
+        } else {
+          setErrorMsg(json.error || 'Tautan revisi tidak valid atau telah kedaluwarsa.');
+        }
+      } catch (err: any) {
+        setErrorMsg('Gagal memverifikasi token revisi: ' + err.message);
+      } finally {
+        setIsLoadingRevisi(false);
+      }
+    };
+    fetchRevisi();
+  }, [revisiToken]);
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -482,6 +521,50 @@ export default function InputMakPage() {
     setErrorMsg('');
     setSuccess(false);
 
+    // MODE REVISI PENGIRIM (TANPA PERLU LOGIN)
+    if (isRevisiMode && revisiToken) {
+      try {
+        let newExcelUrl = null;
+        const effectiveExcel = excelFile || rkaFile;
+        if (effectiveExcel) {
+          newExcelUrl = await handleUpload(effectiveExcel, 'mak_excel');
+        }
+
+        const newNoteUrls: { url: string; name: string }[] = [];
+        if (noteFiles && noteFiles.length > 0) {
+          for (let i = 0; i < noteFiles.length; i++) {
+            const file = noteFiles[i];
+            const url = await handleUpload(file, 'mak_notes');
+            newNoteUrls.push({ url, name: file.name });
+          }
+        }
+
+        const res = await fetch('/api/mak/revisi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: revisiToken,
+            newExcelUrl,
+            newNoteUrls,
+            rkaParseResult,
+            catatanPengirim,
+          }),
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          setSuccess(true);
+        } else {
+          throw new Error(json.error || 'Gagal mengirim perbaikan berkas revisi.');
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Terjadi kesalahan saat mengirim berkas revisi');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     try {
       const selectedUnit = units.find(u => u.nama_unit.toLowerCase() === unitSearch.toLowerCase());
       if (!selectedUnit) {
@@ -650,6 +733,74 @@ export default function InputMakPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6 relative overflow-hidden">
+          {/* BANNER MODE REVISI */}
+          {isRevisiMode && revisiData && (
+            <div className="p-6 bg-gradient-to-br from-amber-500/10 via-amber-50 to-orange-50/50 rounded-3xl border-2 border-amber-300 shadow-sm space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-amber-950 tracking-tight">
+                    Pengajuan Dikembalikan untuk Revisi / Dilengkapi
+                  </h3>
+                  <p className="text-xs text-amber-800 font-medium">
+                    Verifikator Anggaran meminta perbaikan atau penambahan dokumen pendukung. Anda tidak perlu login.
+                  </p>
+                </div>
+              </div>
+
+              {/* Arahan Verifikator */}
+              <div className="bg-white/95 backdrop-blur-xs p-4 rounded-2xl border border-amber-200/80 shadow-2xs space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 block">
+                  📝 Catatan / Arahan dari Verifikator ({revisiData.submission?.pic || 'Petugas'}):
+                </span>
+                <p className="text-xs font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">
+                  {revisiData.catatanRevisi}
+                </p>
+              </div>
+
+              {/* Berkas Sebelumnya */}
+              {revisiData.submission && (
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-amber-200/60 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 block">
+                    📁 Berkas Pengajuan Sebelumnya:
+                  </span>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {revisiData.submission.lampiran_excel && (
+                      <a 
+                        href={revisiData.submission.lampiran_excel} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 text-indigo-700 font-bold transition-all shadow-2xs"
+                      >
+                        <FileSpreadsheet size={13} className="text-emerald-600" />
+                        <span>Excel Sebelumnya</span>
+                        <Download size={11} className="text-gray-400" />
+                      </a>
+                    )}
+                    {Array.isArray(revisiData.submission.lampiran_catatan) && revisiData.submission.lampiran_catatan.map((n: any, i: number) => (
+                      <a 
+                        key={i} 
+                        href={n.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 text-indigo-700 font-bold transition-all shadow-2xs"
+                      >
+                        <FileText size={13} className="text-blue-600" />
+                        <span className="truncate max-w-[200px]">{n.name}</span>
+                        <Download size={11} className="text-gray-400" />
+                      </a>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-500 italic">
+                    💡 Berkas yang tidak Anda ganti akan tetap tersimpan secara aman di database.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {errorMsg && (
             <div className="p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100">
               <AlertCircle className="shrink-0 mt-0.5" size={18} />
@@ -658,10 +809,17 @@ export default function InputMakPage() {
           )}
 
           {success && (
-            <div className="p-5 bg-emerald-50 text-emerald-700 rounded-2xl flex flex-col items-center justify-center gap-3 border border-emerald-100 text-center">
-              <CheckCircle className="text-emerald-500" size={48} />
-              <p className="font-bold text-lg">Pengajuan MAK Berhasil Dikirim!</p>
-              <p className="text-sm font-medium text-emerald-600/80">Data telah masuk ke database dan dapat dipantau di menu Tolakan Verif / Monitoring Revisi MAK.</p>
+            <div className="p-6 bg-emerald-50 text-emerald-800 rounded-3xl flex flex-col items-center justify-center gap-3 border border-emerald-200 text-center shadow-xs">
+              <CheckCircle className="text-emerald-500" size={52} />
+              <p className="font-black text-lg">
+                {isRevisiMode ? 'Berkas Revisi Berhasil Dikirim Ulang!' : 'Pengajuan MAK Berhasil Dikirim!'}
+              </p>
+              <p className="text-xs font-semibold text-emerald-700 max-w-md">
+                {isRevisiMode 
+                  ? 'Status pengajuan kini berubah menjadi Revisi Masuk. Verifikator terkait telah menerima laporan bahwa perbaikan berkas telah Anda selesaikan.' 
+                  : 'Data telah masuk ke database dan dapat dipantau di menu Tolakan Verif / Monitoring Revisi MAK.'
+                }
+              </p>
             </div>
           )}
 
@@ -1217,14 +1375,42 @@ export default function InputMakPage() {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-gray-100">
+          {isRevisiMode && (
+            <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-2">
+              <label className="block text-xs font-black uppercase tracking-wider text-amber-900">
+                Keterangan / Balasan Pengirim (Opsional)
+              </label>
+              <textarea
+                rows={3}
+                value={catatanPengirim}
+                onChange={(e) => setCatatanPengirim(e.target.value)}
+                placeholder="Tuliskan keterangan berkas yang Anda perbaiki, misalnya: 'Excel sudah diperbaiki kolom selisihnya dan nota dinas persetujuan telah kami lampirkan'..."
+                className="w-full p-3 bg-white border border-amber-200 rounded-xl text-xs text-gray-800 outline-none focus:ring-2 focus:ring-amber-500/20"
+              />
+            </div>
+          )}
+
+          <div className="pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full sm:w-auto px-8 py-4 bg-indigo-600 text-white rounded-xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              className={`w-full sm:w-auto px-8 py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer ${
+                isRevisiMode
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-amber-200'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+              }`}
             >
-              {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-              {isLoading ? 'Menyimpan...' : 'Kirim Pengajuan MAK'}
+              {isLoading ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : isRevisiMode ? (
+                <RotateCcw size={18} />
+              ) : (
+                <Upload size={18} />
+              )}
+              {isLoading 
+                ? (isRevisiMode ? 'Mengirim Revisi...' : 'Menyimpan...') 
+                : (isRevisiMode ? 'Kirim Ulang Berkas Revisi' : 'Kirim Pengajuan MAK')
+              }
             </button>
           </div>
         </form>
@@ -1523,5 +1709,18 @@ export default function InputMakPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function InputMakPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-indigo-600" size={32} />
+        <span className="text-xs font-bold text-gray-500">Memuat formulir MAK...</span>
+      </div>
+    }>
+      <InputMakPageContent />
+    </React.Suspense>
   );
 }
