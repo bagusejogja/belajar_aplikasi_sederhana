@@ -321,9 +321,9 @@ export default function UsulanAnggaranPage() {
               onChange={e => setSelectedYear(Number(e.target.value))}
               className="bg-transparent font-bold text-xs text-gray-800 outline-none cursor-pointer"
             >
-              <option value={2024}>Acuan: 2024</option>
-              <option value={2025}>Acuan: 2025</option>
-              <option value={2026}>Acuan: 2026</option>
+              <option value={2024}>2024</option>
+              <option value={2025}>2025</option>
+              <option value={2026}>2026</option>
             </select>
           </div>
 

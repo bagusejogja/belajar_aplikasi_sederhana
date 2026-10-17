@@ -176,6 +176,7 @@ export default function GovDashboardPage() {
   const filteredUnitReport = useMemo(() => {
     return unitReportData.filter(d => 
       (selectedUnit === 'all' || String(d.id) === selectedUnit) &&
+      (d.pagu !== 0 || d.spent !== 0) &&
       (
         (d.nama_unit || '').toLowerCase().includes(unitSearchTerm.toLowerCase()) || 
         (d.kode_unit || '').toLowerCase().includes(unitSearchTerm.toLowerCase()) ||

@@ -6,7 +6,10 @@ import { usePathname } from 'next/navigation';
 import { 
   Landmark, Link2, Building2, Users
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useUserRole } from '@/lib/useUserRole';
+import { fetchAuthUser, getCachedAuthUser } from '@/lib/authCache';
+import { menuList } from '@/lib/mock-db';
 
 interface TabConfig {
   id: string;
@@ -50,6 +53,30 @@ const TABS: TabConfig[] = [
 export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
   const pathname = usePathname();
   const { role } = useUserRole();
+  const [allowedPaths, setAllowedPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    const cached = getCachedAuthUser();
+    if (cached) {
+      setAllowedPaths(cached.allowedPaths);
+      return;
+    }
+    fetchAuthUser().then(user => {
+      if (user) setAllowedPaths(user.allowedPaths);
+    });
+  }, []);
+
+  const isAdmin = (role || '').toLowerCase() === 'admin' || (role || '').toLowerCase() === 'administrator';
+
+  const visibleTabs = TABS.filter(tab => {
+    if (isAdmin) return true;
+    if (allowedPaths.includes(tab.path)) return true;
+    const menuItem = menuList.find(m => m.path === tab.path);
+    if (menuItem && role && menuItem.roles.map(r => r.toLowerCase()).includes(role.toLowerCase())) {
+      return true;
+    }
+    return false;
+  });
 
   const currentTab = activeTab || (
     pathname === '/gov-pics' ? 'gov-pics' :
@@ -80,9 +107,9 @@ export default function MasterUnitTabs({ activeTab }: { activeTab?: string }) {
         </div>
       </div>
 
-      {/* Navigation Grid: 4 Kolom Rata & Rapi */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-        {TABS.map((tab) => {
+      {/* Navigation Grid: Kolom Rata & Rapi */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${visibleTabs.length > 2 ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-2`}>
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
 

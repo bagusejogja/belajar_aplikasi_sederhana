@@ -1132,11 +1132,9 @@ export default function InputMakPage() {
                                       <thead>
                                         <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
                                           <th className="py-2 px-2 text-center w-8">No</th>
-                                          <th className="py-2 px-2.5 w-36 whitespace-nowrap">MAK</th>
-                                          <th className="py-2 px-2.5 min-w-[180px]">Rincian Belanja</th>
-                                          <th className="py-2 px-2.5 text-right w-36 font-mono whitespace-nowrap">Semula (N)</th>
-                                          <th className="py-2 px-2.5 text-right w-36 font-mono whitespace-nowrap">Menjadi (R)</th>
-                                          <th className="py-2 px-2.5 text-right w-40 font-mono whitespace-nowrap">Selisih</th>
+                                          <th className="py-2 px-2.5 min-w-[220px]">MAK &amp; Rincian Belanja</th>
+                                          <th className="py-2 px-2.5 text-right w-44 font-mono whitespace-nowrap">Semula (N) / Menjadi (R)</th>
+                                          <th className="py-2 px-2.5 text-right w-36 font-mono whitespace-nowrap">Selisih</th>
                                           <th className="py-2 px-2 text-center w-16 whitespace-nowrap">Aksi</th>
                                         </tr>
                                       </thead>
@@ -1146,23 +1144,29 @@ export default function InputMakPage() {
                                           const isCopied = copiedKey === rowKey;
                                           return (
                                             <tr key={iIdx} className={item.hasDiff ? 'bg-amber-50/20 hover:bg-amber-50/40' : 'hover:bg-gray-50/50'}>
-                                              <td className="py-2 px-2 text-center text-gray-400 font-mono text-[10px]">
+                                              <td className="py-2 px-2 text-center text-gray-400 font-mono text-[10px] align-top pt-2.5">
                                                 {iIdx + 1}
                                               </td>
-                                              <td className="py-2 px-2.5 font-semibold text-gray-800 text-[11px] whitespace-nowrap">
-                                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] mr-1">
-                                                  {item.mak.slice(0, 5)}
-                                                </span>
-                                                <span>{item.mak.slice(5).trim() || item.mak}</span>
+                                              <td className="py-2 px-2.5 text-[11px] align-top">
+                                                <div className="flex items-center gap-1.5 font-semibold text-gray-800 text-[11px] mb-0.5">
+                                                  <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[10px]">
+                                                    {item.mak.slice(0, 5)}
+                                                  </span>
+                                                  <span className="font-mono">{item.mak.slice(5).trim() || item.mak}</span>
+                                                </div>
+                                                <p className="text-gray-600 text-[11px] leading-snug">
+                                                  {item.uraian}
+                                                </p>
                                               </td>
-                                              <td className="py-2 px-2.5 text-gray-700 text-[11px]">
-                                                {item.uraian}
-                                              </td>
-                                              <td className="py-2 px-2.5 text-right font-mono font-medium text-gray-600 text-xs whitespace-nowrap">
-                                                Rp {item.semulaN.toLocaleString('id-ID')}
-                                              </td>
-                                              <td className="py-2 px-2.5 text-right font-mono font-bold text-indigo-700 text-xs whitespace-nowrap">
-                                                Rp {item.menjadiR.toLocaleString('id-ID')}
+                                              <td className="py-2 px-2.5 text-right font-mono text-xs whitespace-nowrap align-top pt-2">
+                                                <div className="text-gray-500 font-medium text-[11px]">
+                                                  <span className="text-[9px] uppercase font-bold text-gray-400 mr-1">Semula:</span>
+                                                  Rp {item.semulaN.toLocaleString('id-ID')}
+                                                </div>
+                                                <div className="text-indigo-700 font-bold">
+                                                  <span className="text-[9px] uppercase font-bold text-indigo-400 mr-1">Menjadi:</span>
+                                                  Rp {item.menjadiR.toLocaleString('id-ID')}
+                                                </div>
                                               </td>
                                               <td className="py-2 px-2.5 text-right font-mono text-xs font-bold whitespace-nowrap">
                                                 {item.selisih === 0 ? (

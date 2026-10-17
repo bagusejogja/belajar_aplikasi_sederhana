@@ -731,18 +731,7 @@ export default function GovUnitsPage() {
           )}
         </div>
 
-        {/* Quick Checkbox Toggle on right */}
-        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showRedaksi}
-            onChange={(e) => setShowRedaksi(e.target.checked)}
-            className="w-3.5 h-3.5 rounded text-sky-600 focus:ring-sky-500 accent-sky-600 cursor-pointer"
-          />
-          <span className="text-xs font-bold text-gray-700 hover:text-sky-700 transition-colors">
-            Kolom Redaksi Teks Unit ({showRedaksi ? 'Aktif' : 'Nonaktif'})
-          </span>
-        </label>
+
       </div>
 
       {/* TABLE DATA */}

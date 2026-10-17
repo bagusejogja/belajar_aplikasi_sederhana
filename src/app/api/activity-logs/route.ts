@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
             if (tp.created_by) {
               // Match created_by to registered user if it is UUID or email
               const matchedUser = dbUsers.find(u => u.id === tp.created_by || u.email.toLowerCase() === tp.created_by.toLowerCase());
-              const email = matchedUser ? matchedUser.email : (tp.created_by.includes('@') ? tp.created_by : 'admin@ugm.ac.id');
+              const email = matchedUser ? matchedUser.email : (tp.created_by?.includes('@') ? tp.created_by : (tp.created_by || 'Sistem / Migrasi'));
               const role = matchedUser ? matchedUser.role : 'Pemroses Anggaran';
 
               dbDerivedLogs.push({
@@ -214,7 +214,7 @@ export async function GET(req: NextRequest) {
                 },
                 ip_address: '127.0.0.1',
                 user_agent: 'Dashboard Web System',
-                created_at: tp.created_time || new Date().toISOString()
+                created_at: tp.created_time || '2025-01-01T08:00:00.000Z'
               });
             }
           });

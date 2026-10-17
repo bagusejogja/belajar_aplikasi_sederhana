@@ -68,11 +68,11 @@ export default function GovNarrativePage() {
       const { group, label } = selectedUnit;
       const cleanLabel = getCleanLabel(label);
       let mainText = '';
-      if (group === 'Fakultas') mainText = `mohon dibukakan akses revisi/realokasi anggaran Fakultas ${cleanLabel} sesuai surat terlampir ngih.`;
-      else if (group === 'Pusat Studi') mainText = `mohon dibukakan akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sesuai surat terlampir ngih.`;
-      else if (group === 'KPTU') mainText = `mohon diproses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir ngih.`;
-      else if (group === 'UP') mainText = `mohon dibukakan akses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir ngih.`;
-      else mainText = `mohon diproses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir ngih.`;
+      if (group === 'Fakultas') mainText = `mohon dibukakan akses revisi/realokasi anggaran Fakultas ${cleanLabel} sesuai surat terlampir.`;
+      else if (group === 'Pusat Studi') mainText = `mohon dibukakan akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sesuai surat terlampir.`;
+      else if (group === 'KPTU') mainText = `mohon diproses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir.`;
+      else if (group === 'UP') mainText = `mohon dibukakan akses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir.`;
+      else mainText = `mohon diproses revisi/realokasi anggaran ${cleanLabel} sesuai surat terlampir.`;
 
       const pic = prefixName(picOverride);
       return `Assalamualaikum warahmatullahi wabarakatuh,
@@ -87,9 +87,9 @@ Terima kasih.`;
       const cleanLabel = getCleanLabel(label);
       let note = '';
       if (group === 'Fakultas') note = `akses revisi/realokasi anggaran Fakultas ${cleanLabel} sudah saya bukakan sesuai surat terlampir.`;
-      else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah saya bukakan sesuai surat terlampir ngih.`;
-      else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir ngih.`;
-      else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir ngih.`;
+      else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah saya bukakan sesuai surat terlampir.`;
+      else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir.`;
+      else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir.`;
       else note = `revisi/realokasi anggaran ${cleanLabel} sudah saya proses sesuai surat terlampir.`;
 
       return `Assalamualaikum warahmatullahi wabarakatuh,
@@ -104,10 +104,10 @@ Terima kasih.`;
       const { group, label } = selectedUnit;
       const cleanLabel = getCleanLabel(label);
       let note = '';
-      if (group === 'Fakultas') note = `akses revisi/realokasi anggaran Fakultas ${cleanLabel} sudah saya bukakan sesuai surat terlampir.`;
-      else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah saya bukakan sesuai surat terlampir ngih.`;
-      else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir ngih.`;
-      else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir ngih.`;
+      if (group === 'Fakultas') note = `akses revisi/realokasi anggaran Fakultas ${cleanLabel} sudah kami bukakan sesuai surat terlampir.`;
+      else if (group === 'Pusat Studi') note = `akses revisi/realokasi anggaran Pusat Studi (PS) ${cleanLabel} sudah kami bukakan sesuai surat terlampir.`;
+      else if (group === 'KPTU') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya realokasi sesuai surat terlampir.`;
+      else if (group === 'UP') note = `revisi/realokasi anggaran ${cleanLabel} sudah saya bukakan aksesnya sesuai surat terlampir.`;
       else note = `revisi/realokasi anggaran ${cleanLabel} sudah saya proses sesuai surat terlampir.`;
 
       return `Assalamualaikum warahmatullahi wabarakatuh,

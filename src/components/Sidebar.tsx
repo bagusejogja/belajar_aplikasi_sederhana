@@ -243,6 +243,16 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
     });
   }, [favoritePaths, allowedPaths, userRole, menuSearch]);
 
+  const isPathActive = (itemPath: string) => {
+    if (pathname === itemPath) return true;
+    if (itemPath === '/gov-units' && ['/gov-units', '/gov-pics', '/gov-mapping', '/units'].includes(pathname)) return true;
+    const hasExactOtherMenu = menuList.some(m => !m.hiddenInSidebar && m.path === pathname);
+    if (!hasExactOtherMenu && itemPath !== '/' && itemPath !== '/dashboard' && pathname.startsWith(itemPath + '/')) {
+      return true;
+    }
+    return false;
+  };
+
   const allGroupsExpanded = expandedGroups.length > 0;
 
   return (
@@ -358,7 +368,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                       <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pt-1">
                         {favoriteItems.map(favItem => {
                           const FavIcon = iconMap[favItem.icon] || LayoutDashboard;
-                          const isFavActive = pathname === favItem.path;
+                          const isFavActive = isPathActive(favItem.path);
                           return (
                             <div key={`fav-col-${favItem.path}`} className="flex items-center justify-between group/subfav">
                               <Link
@@ -416,7 +426,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                     <div className="space-y-1.5 pt-0.5">
                       {favoriteItems.map(item => {
                         const Icon = iconMap[item.icon] || LayoutDashboard;
-                        const isActive = pathname === item.path || (item.path !== '/' && item.path !== '/dashboard' && pathname.startsWith(item.path + '/'));
+                        const isActive = isPathActive(item.path);
 
                         return (
                           <div key={`fav-${item.path}`} className="relative group/item flex justify-center items-center">
@@ -549,7 +559,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                           <div className="space-y-1 max-h-56 overflow-y-auto custom-scrollbar pt-1">
                             {visibleItems.map(subItem => {
                               const SubIcon = iconMap[subItem.icon] || LayoutDashboard;
-                              const isSubActive = pathname === subItem.path || (subItem.path !== '/' && subItem.path !== '/dashboard' && pathname.startsWith(subItem.path + '/'));
+                              const isSubActive = isPathActive(subItem.path);
                               const isSubFav = favoritePaths.includes(subItem.path);
                               return (
                                 <div key={subItem.path} className="flex items-center justify-between group/sub">
@@ -606,7 +616,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
                   <div className="space-y-1.5">
                   {visibleItems.map((item) => {
                     const Icon = iconMap[item.icon] || LayoutDashboard;
-                    const isActive = pathname === item.path || (item.path === '/gov-units' && ['/gov-units', '/gov-pics', '/gov-mapping', '/units'].includes(pathname)) || (item.path !== '/' && item.path !== '/dashboard' && pathname.startsWith(item.path + '/'));
+                    const isActive = isPathActive(item.path);
 
                     return (
                       <div key={item.path} className="relative group/item flex justify-center items-center">

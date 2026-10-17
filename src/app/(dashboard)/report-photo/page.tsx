@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FileText, Printer, Loader2, Calendar } from 'lucide-react';
+import DateRangePicker, { DateRange } from '@/components/shared/DateRangePicker';
 
 const CompressedImage = ({ src, alt, className, style }: any) => {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
@@ -64,32 +65,34 @@ export default function ReportPhotoPage() {
    const defaultDate = d.toISOString().split('T')[0];
    const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
    
-   const [tglAwal, setTglAwal] = useState(firstDayOfMonth);
-   const [tglAkhir, setTglAkhir] = useState(defaultDate);
+   const [dateRange, setDateRange] = useState<DateRange>({
+      startDate: firstDayOfMonth,
+      endDate: defaultDate
+   });
+   const tglAwal = dateRange.startDate;
+   const tglAkhir = dateRange.endDate;
    const [showUangMasuk, setShowUangMasuk] = useState(false);
    
    const [transactions, setTransactions] = useState<any[]>([]);
    const [loading, setLoading] = useState(true);
 
    useEffect(() => {
-      fetchReport();
-   }, []);
+      fetchReport(dateRange);
+   }, [dateRange]);
 
-   const fetchReport = async () => {
+   const fetchReport = async (overrideRange?: DateRange) => {
       setLoading(true);
+      const activeRange = overrideRange || dateRange;
       try {
          // Konversi tanggal WIB ke UTC murni:
          // WIB = UTC+7, jadi 00:00 WIB = 17:00 UTC hari sebelumnya
          // dan 23:59:59 WIB = 16:59:59 UTC hari yang sama
          const toUtcStart = (dateStr: string) => {
-           // dateStr = 'YYYY-MM-DD' dalam WIB
-           // 00:00:00 WIB = tanggal kemarin jam 17:00:00 UTC
            const d = new Date(`${dateStr}T00:00:00`);
-           d.setHours(d.getHours() - 7); // kurangi 7 jam untuk dapat UTC
+           d.setHours(d.getHours() - 7);
            return d.toISOString();
          };
          const toUtcEnd = (dateStr: string) => {
-           // 23:59:59 WIB = hari yang sama jam 16:59:59 UTC
            const d = new Date(`${dateStr}T23:59:59`);
            d.setHours(d.getHours() - 7);
            return d.toISOString();
@@ -99,8 +102,8 @@ export default function ReportPhotoPage() {
                .from('transactions')
                .select('*, ref_akun!inner(nomor_akun, nama_akun), ref_personel(nama_orang)')
                .eq('disetujui', 'Disetujui')
-               .gte('tanggal_disetujui', toUtcStart(tglAwal))
-               .lte('tanggal_disetujui', toUtcEnd(tglAkhir))
+               .gte('tanggal_disetujui', toUtcStart(activeRange.startDate))
+               .lte('tanggal_disetujui', toUtcEnd(activeRange.endDate))
                .order('tanggal_disetujui', { ascending: true });
 
          if (error) throw error;
@@ -196,21 +199,15 @@ export default function ReportPhotoPage() {
                </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-               <input 
-                  type="date" 
-                  value={tglAwal} 
-                  onChange={e => setTglAwal(e.target.value)} 
-                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" 
-               />
-               <span className="text-gray-400 font-bold text-xs">s/d</span>
-               <input 
-                  type="date" 
-                  value={tglAkhir} 
-                  onChange={e => setTglAkhir(e.target.value)} 
-                  className="h-9 px-3 border border-gray-200 rounded-xl font-semibold bg-gray-50 hover:bg-white text-xs outline-none" 
-               />
-               <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer select-none bg-gray-50 border border-gray-200 px-2.5 h-9 rounded-xl">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+               <div className="w-full sm:w-64">
+                  <DateRangePicker 
+                     value={dateRange} 
+                     onChange={(newRange) => setDateRange(newRange)} 
+                     showTime={false} 
+                  />
+               </div>
+               <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer select-none bg-gray-50 border border-gray-200 px-3 h-10 rounded-xl hover:bg-white transition-colors">
                   <input 
                      type="checkbox" 
                      checked={showUangMasuk} 
@@ -220,8 +217,8 @@ export default function ReportPhotoPage() {
                   <span>Uang Masuk</span>
                </label>
                <button 
-                  onClick={fetchReport} 
-                  className="h-9 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all active:scale-95"
+                  onClick={() => fetchReport(dateRange)} 
+                  className="h-10 px-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition-all active:scale-95"
                >
                   Filter
                </button>
@@ -232,7 +229,7 @@ export default function ReportPhotoPage() {
                      window.print();
                      setTimeout(() => { document.title = originalTitle; }, 1000);
                   }} 
-                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+                  className="h-10 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                >
                   <Printer size={13}/>
                   <span>Cetak PDF</span>

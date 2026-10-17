@@ -37,6 +37,7 @@ const BASELINE_TABLES = [
   'app_role_menus',
   'gov_units',
   'units',
+  'gov_pics',
   'gov_pagu_anggaran',
   'gov_realisasi_anggaran',
   'app_pagu_historis',
@@ -52,6 +53,7 @@ const BASELINE_TABLES = [
   'app_arsip_kategori',
   'app_arsip_kegiatan',
   'app_timeline',
+  'app_activity_logs',
   'tambah_pagu',
   'surat_revisi',
   'form_submissions',
@@ -74,7 +76,14 @@ const BASELINE_TABLES = [
   'kode_sistem_masjid',
   'integrasi_bank_transfer',
   'budgets',
-  'rules'
+  'rules',
+  'rka_versi',
+  'rka_pagu',
+  'rka_pengeluaran',
+  'rka_penerimaan',
+  'rka_penyesuaian',
+  'rka_realisasi_tahunan',
+  'rka_rules'
 ];
 
 async function getDynamicTables(): Promise<string[]> {
