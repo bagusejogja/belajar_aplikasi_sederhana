@@ -91,6 +91,7 @@ export default function DashboardLayout({
       case '/tambah-pagu': return 'Daftar Tambah Pagu';
       case '/backup': return 'Backup & Restore Database';
       case '/rekening-koran': return 'Rekening Koran Bulanan Masjid';
+      case '/arsip-kegiatan': return 'Riwayat Dokumen';
       case '/design-system': return 'Standar UI / UX (Design System)';
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }

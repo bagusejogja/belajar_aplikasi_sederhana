@@ -61,6 +61,7 @@ export default function ArsipKegiatanPage() {
     phaseName: string;
     url: string;
     name: string;
+    insertPosition: 'end' | 'start';
     isSaving: boolean;
   }>({
     isOpen: false,
@@ -72,6 +73,7 @@ export default function ArsipKegiatanPage() {
     phaseName: '',
     url: '',
     name: '',
+    insertPosition: 'end',
     isSaving: false
   });
 
@@ -85,6 +87,7 @@ export default function ArsipKegiatanPage() {
     phaseName: string;
     file: File | null;
     customName: string;
+    insertPosition: 'end' | 'start';
     isDragging: boolean;
     isUploading: boolean;
   }>({
@@ -97,6 +100,7 @@ export default function ArsipKegiatanPage() {
     phaseName: '',
     file: null,
     customName: '',
+    insertPosition: 'end',
     isDragging: false,
     isUploading: false
   });
@@ -519,6 +523,7 @@ export default function ArsipKegiatanPage() {
       phaseName: pName,
       url: '',
       name: defaultName,
+      insertPosition: 'end',
       isSaving: false
     });
   };
@@ -536,12 +541,18 @@ export default function ArsipKegiatanPage() {
       const newPhases = [...linkModal.phases];
       const finalName = linkModal.name.trim() || `${linkModal.tahun} ${linkModal.catName} - ${linkModal.phaseName}`;
       
-      newPhases[linkModal.phaseIdx].files.push({
+      const newFileItem = {
         name: finalName,
         url: linkModal.url.trim(),
         type: 'link',
         uploaded_at: new Date().toISOString()
-      });
+      };
+
+      if (linkModal.insertPosition === 'start') {
+        newPhases[linkModal.phaseIdx].files.unshift(newFileItem);
+      } else {
+        newPhases[linkModal.phaseIdx].files.push(newFileItem);
+      }
 
       const { error } = await supabase
         .from('app_arsip_kegiatan')
@@ -572,6 +583,7 @@ export default function ArsipKegiatanPage() {
       phaseName: pName,
       file: null,
       customName: '',
+      insertPosition: 'end',
       isDragging: false,
       isUploading: false
     });
@@ -647,13 +659,19 @@ export default function ArsipKegiatanPage() {
       const defaultFileName = `${tahun}_${safeCatName}_${safePhaseName}${ext}`;
       const finalFileName = customName.trim() ? (customName.trim().endsWith(ext) ? customName.trim() : `${customName.trim()}${ext}`) : defaultFileName;
 
-      newPhases[phaseIdx].files.push({
+      const newFileItem = {
         name: finalFileName,
         url: publicUrl,
         type: 'file',
         size: file.size,
         uploaded_at: new Date().toISOString()
-      });
+      };
+
+      if (uploadModal.insertPosition === 'start') {
+        newPhases[phaseIdx].files.unshift(newFileItem);
+      } else {
+        newPhases[phaseIdx].files.push(newFileItem);
+      }
 
       const { error } = await supabase
         .from('app_arsip_kegiatan')
@@ -667,6 +685,29 @@ export default function ArsipKegiatanPage() {
     } catch (err: any) {
       toast.error('Gagal mengunggah berkas: ' + (err.message || ''), { id: toastId });
       setUploadModal(prev => ({ ...prev, isUploading: false }));
+    }
+  };
+
+  const moveFile = async (arcId: number, phaseIdx: number, fromIdx: number, toIdx: number, phases: any[]) => {
+    const newPhases = normalizePhases(phases);
+    const files = [...(newPhases[phaseIdx].files || [])];
+    if (toIdx < 0 || toIdx >= files.length) return;
+    const temp = files[fromIdx];
+    files[fromIdx] = files[toIdx];
+    files[toIdx] = temp;
+    newPhases[phaseIdx].files = files;
+
+    try {
+      const { error } = await supabase
+        .from('app_arsip_kegiatan')
+        .update({ fase_dokumen: newPhases })
+        .eq('id', arcId);
+
+      if (error) throw error;
+      toast.success('Urutan berkas berhasil diubah');
+      fetchData();
+    } catch (err: any) {
+      toast.error('Gagal memindahkan urutan berkas: ' + (err.message || ''));
     }
   };
 
@@ -794,7 +835,7 @@ export default function ArsipKegiatanPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Arsip Kegiatan Tahunan</h1>
+              <h1 className="text-base font-black text-gray-900 tracking-tight leading-none">Riwayat Dokumen</h1>
               <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
                 {categories.length} Folder Kegiatan • {archives.length} Arsip Tahun • {totalFilesCount} File Lampiran
               </span>
@@ -1181,18 +1222,18 @@ export default function ArsipKegiatanPage() {
                                                   href={file.url} 
                                                   target="_blank" 
                                                   rel="noreferrer" 
-                                                  className="flex items-center gap-2 w-full pr-1 overflow-hidden" 
+                                                  className="flex items-start gap-2 flex-1 min-w-0 pr-1 cursor-pointer" 
                                                   title={`Buka File: ${file.name}`}
                                                 >
-                                                  <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 ${meta.badgeColor}`}>
+                                                  <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${meta.badgeColor}`}>
                                                     {meta.icon}
                                                   </div>
                                                   <div className="flex flex-col min-w-0 flex-1">
-                                                    <div className="flex items-center gap-1">
-                                                      <span className="text-[10px] font-bold text-gray-800 group-hover:text-indigo-600 truncate leading-tight">
+                                                    <div className="flex items-start justify-between gap-1">
+                                                      <span className="text-[10px] font-bold text-gray-800 group-hover:text-indigo-600 line-clamp-2 break-words leading-snug" title={file.name}>
                                                         {file.name}
                                                       </span>
-                                                      <ExternalLink size={9} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0" />
+                                                      <ExternalLink size={9} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0 mt-0.5" />
                                                     </div>
                                                     <div className="flex items-center gap-1 mt-0.5">
                                                       <span className={`px-1 py-0.2 rounded text-[7px] font-black uppercase tracking-wider border ${meta.badgeColor}`}>
@@ -1207,7 +1248,31 @@ export default function ArsipKegiatanPage() {
                                                   </div>
                                                 </a>
 
-                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                <div className="flex items-center gap-0.5 shrink-0 self-start mt-0.5">
+                                                  <button 
+                                                    type="button"
+                                                    disabled={fIdx === 0}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      moveFile(activeArc.id, pIdx, fIdx, fIdx - 1, phases);
+                                                    }}
+                                                    className="text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-gray-400 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                    title="Pindahkan ke Atas"
+                                                  >
+                                                    <ChevronUp size={11} />
+                                                  </button>
+                                                  <button 
+                                                    type="button"
+                                                    disabled={fIdx === phase.files.length - 1}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      moveFile(activeArc.id, pIdx, fIdx, fIdx + 1, phases);
+                                                    }}
+                                                    className="text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-gray-400 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                    title="Pindahkan ke Bawah"
+                                                  >
+                                                    <ChevronDown size={11} />
+                                                  </button>
                                                   <button 
                                                     onClick={(e) => {
                                                       e.stopPropagation();
@@ -1470,18 +1535,18 @@ export default function ArsipKegiatanPage() {
                                                     href={file.url} 
                                                     target="_blank" 
                                                     rel="noreferrer" 
-                                                    className="flex items-center gap-2 w-full pr-1 overflow-hidden" 
+                                                    className="flex items-start gap-2 flex-1 min-w-0 pr-1 cursor-pointer" 
                                                     title={`Buka File: ${file.name}`}
                                                   >
-                                                    <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 ${meta.badgeColor}`}>
+                                                    <div className={`p-1 rounded-md border flex items-center justify-center shrink-0 mt-0.5 ${meta.badgeColor}`}>
                                                       {meta.icon}
                                                     </div>
                                                     <div className="flex flex-col min-w-0 flex-1">
-                                                      <div className="flex items-center gap-1">
-                                                        <span className="text-[10px] font-bold text-gray-800 group-hover:text-indigo-600 truncate leading-tight">
+                                                      <div className="flex items-start justify-between gap-1">
+                                                        <span className="text-[10px] font-bold text-gray-800 group-hover:text-indigo-600 line-clamp-2 break-words leading-snug" title={file.name}>
                                                           {file.name}
                                                         </span>
-                                                        <ExternalLink size={9} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0" />
+                                                        <ExternalLink size={9} className="opacity-0 group-hover:opacity-60 text-gray-400 shrink-0 mt-0.5" />
                                                       </div>
                                                       <div className="flex items-center gap-1 mt-0.5">
                                                         <span className={`px-1 py-0.2 rounded text-[7px] font-black uppercase tracking-wider border ${meta.badgeColor}`}>
@@ -1496,7 +1561,31 @@ export default function ArsipKegiatanPage() {
                                                     </div>
                                                   </a>
 
-                                                  <div className="flex items-center gap-0.5 shrink-0">
+                                                  <div className="flex items-center gap-0.5 shrink-0 self-start mt-0.5">
+                                                    <button 
+                                                      type="button"
+                                                      disabled={fIdx === 0}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveFile(arc.id, arcPhaseIdx, fIdx, fIdx - 1, arcPhases);
+                                                      }}
+                                                      className="text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-gray-400 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                      title="Pindahkan ke Atas"
+                                                    >
+                                                      <ChevronUp size={11} />
+                                                    </button>
+                                                    <button 
+                                                      type="button"
+                                                      disabled={fIdx === phaseData.files.length - 1}
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveFile(arc.id, arcPhaseIdx, fIdx, fIdx + 1, arcPhases);
+                                                      }}
+                                                      className="text-gray-400 hover:text-indigo-600 disabled:opacity-20 disabled:hover:text-gray-400 p-1 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                                                      title="Pindahkan ke Bawah"
+                                                    >
+                                                      <ChevronDown size={11} />
+                                                    </button>
                                                     <button 
                                                       onClick={(e) => {
                                                         e.stopPropagation();
@@ -2096,6 +2185,39 @@ export default function ArsipKegiatanPage() {
                     </div>
                   </div>
 
+                  {/* Posisi Urutan Berkas */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-gray-700 uppercase tracking-wider">
+                      Posisi Urutan Tampilan
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLinkModal(prev => ({ ...prev, insertPosition: 'end' }))}
+                        className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                          linkModal.insertPosition === 'end'
+                            ? 'bg-sky-50 border-sky-600 text-sky-700 ring-2 ring-sky-200'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <ChevronDown size={13} />
+                        <span>Di Akhir (Bawah)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLinkModal(prev => ({ ...prev, insertPosition: 'start' }))}
+                        className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                          linkModal.insertPosition === 'start'
+                            ? 'bg-sky-50 border-sky-600 text-sky-700 ring-2 ring-sky-200'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <ChevronUp size={13} />
+                        <span>Di Awal (Paling Atas)</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Footer */}
                   <div className="flex justify-end gap-2.5 pt-3 border-t border-gray-100">
                     <button 
@@ -2250,6 +2372,39 @@ export default function ArsipKegiatanPage() {
                   className="w-full h-10 px-3.5 bg-gray-50 border border-gray-300 rounded-xl font-bold text-xs outline-none focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs" 
                   placeholder={uploadModal.file ? uploadModal.file.name : "Nama tampilan berkas di sistem..."} 
                 />
+              </div>
+
+              {/* Posisi Urutan Berkas */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-black text-gray-700 uppercase tracking-wider">
+                  Posisi Urutan Tampilan
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUploadModal(prev => ({ ...prev, insertPosition: 'end' }))}
+                    className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      uploadModal.insertPosition === 'end'
+                        ? 'bg-indigo-50 border-indigo-600 text-indigo-700 ring-2 ring-indigo-200'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <ChevronDown size={13} />
+                    <span>Di Akhir (Bawah)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadModal(prev => ({ ...prev, insertPosition: 'start' }))}
+                    className={`p-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      uploadModal.insertPosition === 'start'
+                        ? 'bg-indigo-50 border-indigo-600 text-indigo-700 ring-2 ring-indigo-200'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <ChevronUp size={13} />
+                    <span>Di Awal (Paling Atas)</span>
+                  </button>
+                </div>
               </div>
 
               {/* Footer */}

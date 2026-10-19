@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const R2_FOLDER = 'rekening_koran_masjid';
-const KATEGORI_ID = 6; // Rekening Koran Masjid
+const KATEGORI_ID = 6; // Rekening Koran Masjid (Legacy)
 
 const r2 = new S3Client({
   region: 'auto',
@@ -48,7 +48,8 @@ const NAMA_BULAN = [
 ];
 
 /**
- * GET: Ambil daftar rekening koran & master rekening masjid dari ref_rekening
+ * GET: Ambil daftar rekening koran & master rekening masjid
+ * Prioritas: Tabel khusus 'rekening_koran_masjid', fallback ke 'app_arsip_kegiatan'
  */
 export async function GET(req: NextRequest) {
   try {
@@ -56,7 +57,38 @@ export async function GET(req: NextRequest) {
     const tahunParam = searchParams.get('tahun');
     const rekeningParam = searchParams.get('rekening');
 
-    // 1. Ambil data rekening koran dari app_arsip_kegiatan kategori_id = 6
+    // 1. Ambil master rekening bank dari ref_rekening
+    const refRekeningRes = await supabase.from('ref_rekening').select('*').order('id', { ascending: true });
+    const accounts = refRekeningRes.data || [];
+
+    // 2. Coba ambil dari tabel terdedikasi: rekening_koran_masjid
+    let rkQuery = supabase
+      .from('rekening_koran_masjid')
+      .select('*')
+      .order('tahun', { ascending: false })
+      .order('bulan', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (tahunParam && tahunParam !== 'ALL') {
+      rkQuery = rkQuery.eq('tahun', Number(tahunParam));
+    }
+    if (rekeningParam && rekeningParam !== 'ALL') {
+      rkQuery = rkQuery.or(`nomor_rekening.eq.${rekeningParam},rekening_id.eq.${rekeningParam}`);
+    }
+
+    const { data: dedicatedData, error: dedicatedErr } = await rkQuery;
+
+    // Jika tabel rekening_koran_masjid ada dan bisa diakses
+    if (!dedicatedErr && dedicatedData) {
+      return NextResponse.json({
+        success: true,
+        source: 'table',
+        data: dedicatedData,
+        accounts: accounts
+      });
+    }
+
+    // 3. Fallback: Ambil data rekening koran dari app_arsip_kegiatan kategori_id = 6
     let query = supabase
       .from('app_arsip_kegiatan')
       .select('*')
@@ -67,13 +99,8 @@ export async function GET(req: NextRequest) {
       query = query.eq('tahun', Number(tahunParam));
     }
 
-    const [arsipRes, refRekeningRes] = await Promise.all([
-      query,
-      supabase.from('ref_rekening').select('*').order('id', { ascending: true })
-    ]);
-
+    const arsipRes = await query;
     let rawRows = arsipRes.data || [];
-    let accounts = refRekeningRes.data || [];
 
     // Flatten all documents from all years
     let allDocuments: RekeningKoranItem[] = [];
@@ -119,6 +146,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      source: 'json_fallback',
       data: allDocuments,
       accounts: accounts
     });
@@ -154,7 +182,6 @@ export async function POST(req: NextRequest) {
       const cleanNoRek = nomor_rekening.replace(/[^a-zA-Z0-9]/g, '');
 
       if (tipe_sumber === 'file') {
-        // Kumpulkan file dari slot terpisah atau getAll('files')
         const filesToProcess: { file: File; forcedType?: 'pdf' | 'excel' | 'csv' }[] = [];
 
         const filePdf = formData.get('file_pdf') as File | null;
@@ -195,7 +222,7 @@ export async function POST(req: NextRequest) {
           } else if (ext === 'pdf') {
             fileType = 'pdf';
           } else {
-            continue; // Abaikan format yang tidak didukung
+            continue;
           }
 
           const arrayBuffer = await file.arrayBuffer();
@@ -241,7 +268,6 @@ export async function POST(req: NextRequest) {
           });
         }
       } else {
-        // Tipe Link dari Form Data (Bisa multiple link per ekstensi)
         const linkPdf = (formData.get('link_pdf') as string) || '';
         const linkExcel = (formData.get('link_excel') as string) || '';
         const linkCsv = (formData.get('link_csv') as string) || '';
@@ -259,7 +285,6 @@ export async function POST(req: NextRequest) {
           linksToProcess.push({ url: singleLink.trim(), type, judul: defaultJudul });
         }
 
-        // Tautan tambahan / dynamic links jika dikirimkan sebagai JSON string
         const extraLinksRaw = formData.get('extra_links') as string | null;
         if (extraLinksRaw) {
           try {
@@ -276,7 +301,7 @@ export async function POST(req: NextRequest) {
               });
             }
           } catch {
-            // ignore parse error
+            // ignore
           }
         }
 
@@ -314,7 +339,6 @@ export async function POST(req: NextRequest) {
         }
       }
     } else {
-      // JSON Payload (Direct API / Programmatic)
       const body = await req.json();
       const {
         tahun = new Date().getFullYear(),
@@ -361,18 +385,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Tidak ada dokumen yang diunggah!' }, { status: 400 });
     }
 
-    const targetTahun = newItems[0].tahun || new Date().getFullYear();
+    // 1. Simpan ke tabel rekening_koran_masjid (jika tabel sudah ada)
+    const { error: dedicatedInsertErr } = await supabaseAdmin
+      .from('rekening_koran_masjid')
+      .upsert(newItems.map(item => ({
+        id: item.id,
+        tahun: item.tahun,
+        bulan: item.bulan,
+        nama_bulan: item.nama_bulan,
+        rekening_id: String(item.rekening_id || ''),
+        nama_bank: item.nama_bank,
+        nomor_rekening: item.nomor_rekening,
+        nama_rekening: item.nama_rekening,
+        nama_pemilik: item.nama_pemilik || item.nama_rekening,
+        tipe_sumber: item.tipe_sumber,
+        file_url: item.file_url,
+        file_name: item.file_name,
+        file_type: item.file_type,
+        file_size: item.file_size,
+        r2_key: item.r2_key || null,
+        saldo_awal: item.saldo_awal,
+        saldo_akhir: item.saldo_akhir,
+        keterangan: item.keterangan || '',
+        uploader: item.uploader || 'Admin Keuangan',
+        created_at: item.created_at
+      })), { onConflict: 'id' });
 
-    // 2. Simpan ke database Supabase (app_arsip_kegiatan kategori_id: 6)
-    const { data: existingRows, error: fetchErr } = await supabaseAdmin
+    // Jika tabel rekening_koran_masjid berhasil disimpan, kita tetap update atau selesai
+    if (!dedicatedInsertErr) {
+      return NextResponse.json({
+        success: true,
+        message: `${newItems.length} dokumen rekening koran berhasil disimpan ke tabel database!`,
+        data: newItems
+      });
+    }
+
+    // 2. Fallback: Simpan ke app_arsip_kegiatan (kategori_id: 6) jika tabel belum dibuat
+    const targetTahun = newItems[0].tahun || new Date().getFullYear();
+    const { data: existingRows } = await supabaseAdmin
       .from('app_arsip_kegiatan')
       .select('*')
       .eq('kategori_id', KATEGORI_ID)
       .eq('tahun', targetTahun);
-
-    if (fetchErr) {
-      console.error("Fetch arsip error:", fetchErr);
-    }
 
     if (existingRows && existingRows.length > 0) {
       const primaryRow = existingRows[0];
@@ -383,7 +437,6 @@ export async function POST(req: NextRequest) {
         try { currentDocs = JSON.parse(primaryRow.fase_dokumen); } catch { currentDocs = []; }
       }
 
-      // Tambahkan item-item baru di awal
       currentDocs.unshift(...newItems);
 
       const { error: updateErr } = await supabaseAdmin
@@ -393,7 +446,6 @@ export async function POST(req: NextRequest) {
 
       if (updateErr) throw updateErr;
 
-      // Bersihkan jika ada row duplikat untuk tahun yang sama
       if (existingRows.length > 1) {
         const extraIds = existingRows.slice(1).map(r => r.id);
         await supabaseAdmin.from('app_arsip_kegiatan').delete().in('id', extraIds);
@@ -429,37 +481,43 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id, tahun, r2_key } = await req.json();
 
-    if (!id || !tahun) {
-      return NextResponse.json({ success: false, error: 'ID dan Tahun dokumen wajib disertakan!' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID dokumen wajib disertakan!' }, { status: 400 });
     }
 
-    // 1. Ambil data baris tahun terkait di Supabase
-    const { data: existingRow, error: fetchErr } = await supabaseAdmin
-      .from('app_arsip_kegiatan')
-      .select('*')
-      .eq('kategori_id', KATEGORI_ID)
-      .eq('tahun', Number(tahun))
-      .maybeSingle();
-
-    if (fetchErr || !existingRow) {
-      return NextResponse.json({ success: false, error: 'Data arsip tahun tersebut tidak ditemukan' }, { status: 404 });
-    }
-
-    let currentDocs: any[] = [];
-    if (Array.isArray(existingRow.fase_dokumen)) {
-      currentDocs = existingRow.fase_dokumen;
-    } else if (typeof existingRow.fase_dokumen === 'string') {
-      try { currentDocs = JSON.parse(existingRow.fase_dokumen); } catch { currentDocs = []; }
-    }
-
-    const updatedDocs = currentDocs.filter((d: any) => d.id !== id);
-
+    // 1. Coba hapus dari tabel rekening_koran_masjid
     await supabaseAdmin
-      .from('app_arsip_kegiatan')
-      .update({ fase_dokumen: updatedDocs })
-      .eq('id', existingRow.id);
+      .from('rekening_koran_masjid')
+      .delete()
+      .eq('id', id);
 
-    // 2. Hapus file fisik dari Cloudflare R2 jika ada r2_key
+    // 2. Hapus juga dari app_arsip_kegiatan jika ada di format legacy
+    if (tahun) {
+      const { data: existingRow } = await supabaseAdmin
+        .from('app_arsip_kegiatan')
+        .select('*')
+        .eq('kategori_id', KATEGORI_ID)
+        .eq('tahun', Number(tahun))
+        .maybeSingle();
+
+      if (existingRow) {
+        let currentDocs: any[] = [];
+        if (Array.isArray(existingRow.fase_dokumen)) {
+          currentDocs = existingRow.fase_dokumen;
+        } else if (typeof existingRow.fase_dokumen === 'string') {
+          try { currentDocs = JSON.parse(existingRow.fase_dokumen); } catch { currentDocs = []; }
+        }
+
+        const updatedDocs = currentDocs.filter((d: any) => d.id !== id);
+
+        await supabaseAdmin
+          .from('app_arsip_kegiatan')
+          .update({ fase_dokumen: updatedDocs })
+          .eq('id', existingRow.id);
+      }
+    }
+
+    // 3. Hapus file fisik dari Cloudflare R2 jika ada r2_key
     if (r2_key && r2_key.startsWith(R2_FOLDER)) {
       try {
         await r2.send(new DeleteObjectCommand({

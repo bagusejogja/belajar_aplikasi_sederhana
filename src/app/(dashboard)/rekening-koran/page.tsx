@@ -131,7 +131,7 @@ export default function RekeningKoranMasjidPage() {
   const [selectedTahun, setSelectedTahun] = useState<string>('ALL');
   const [selectedRekening, setSelectedRekening] = useState<string>('ALL');
   const [selectedFileType, setSelectedFileType] = useState<string>('ALL');
-  const [viewMode, setViewMode] = useState<'accordion' | 'tree'>('accordion');
+  const [viewMode, setViewMode] = useState<'accordion' | 'tree'>('tree');
 
   // Collapse States (Set of expanded keys)
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set([2026, 2025]));
@@ -361,6 +361,13 @@ export default function RekeningKoranMasjidPage() {
       else next.add(key);
       return next;
     });
+  };
+
+  const expandYearsOnly = () => {
+    const allY = new Set<number>();
+    items.forEach(it => allY.add(it.tahun));
+    setExpandedYears(allY);
+    setExpandedMonths(new Set());
   };
 
   const expandAll = () => {
@@ -980,21 +987,36 @@ export default function RekeningKoranMasjidPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Tiered Expand / Collapse Controls */}
+          <div className="flex items-center gap-1.5 bg-gray-100/90 dark:bg-slate-800/90 p-1 rounded-xl border border-gray-200/70 dark:border-slate-700/70 text-xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500 px-1.5 hidden sm:inline">
+              Jenjang:
+            </span>
+            <button
+              type="button"
+              onClick={expandYearsOnly}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-gray-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 hover:shadow-2xs transition-all cursor-pointer"
+              title="Buka hanya jenjang Level 1 (Tahun)"
+            >
+              Tahun Saja
+            </button>
+            <span className="text-gray-300 dark:text-slate-700">•</span>
             <button
               type="button"
               onClick={expandAll}
-              className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:bg-white dark:hover:bg-slate-700 hover:shadow-2xs transition-all cursor-pointer"
+              title="Buka semua jenjang Tahun dan Bulan"
             >
-              Buka Semua (Expand)
+              Buka Semua
             </button>
             <span className="text-gray-300 dark:text-slate-700">•</span>
             <button
               type="button"
               onClick={collapseAll}
-              className="text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:underline cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-gray-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700 hover:text-rose-600 dark:hover:text-rose-400 hover:shadow-2xs transition-all cursor-pointer"
+              title="Tutup semua jenjang"
             >
-              Tutup Semua (Collapse)
+              Tutup Semua
             </button>
           </div>
         </div>
@@ -1030,7 +1052,203 @@ export default function RekeningKoranMasjidPage() {
             Reset Semua Filter
           </button>
         </div>
+      ) : viewMode === 'tree' ? (
+        /* ================= HIERARKI POHON (TREE VIEW) ================= */
+        <div className="space-y-4 animate-in fade-in">
+          {groupedData.map(({ year, months }) => {
+            const isYearOpen = expandedYears.has(year);
+            const totalFilesInYear = months.reduce((acc, m) => acc + m.totalFiles, 0);
+
+            return (
+              <div
+                key={year}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200/80 dark:border-slate-800 p-4 shadow-xs transition-all"
+              >
+                {/* Year Root Node */}
+                <div
+                  onClick={() => toggleYear(year)}
+                  className="flex items-center justify-between cursor-pointer group select-none py-1 px-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-850 transition-all"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
+                      {isYearOpen ? <FolderOpen size={16} /> : <Folder size={16} />}
+                    </div>
+                    <span className="text-sm font-black text-slate-900 dark:text-slate-100">
+                      Tahun Anggaran {year}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                      {totalFilesInYear} Berkas
+                    </span>
+                  </div>
+                  <div className="text-slate-400 group-hover:text-blue-600 transition-colors">
+                    {isYearOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </div>
+                </div>
+
+                {/* Months Branch */}
+                {isYearOpen && (
+                  <div className="ml-5 pl-4 border-l-2 border-indigo-200/80 dark:border-indigo-900/60 mt-2 space-y-3">
+                    {months.map(({ month, monthName, rekeningGroups, totalFiles }) => {
+                      const monthKey = `${year}-${month}`;
+                      const isMonthOpen = expandedMonths.has(monthKey);
+
+                      return (
+                        <div key={monthKey} className="space-y-2">
+                          {/* Month Node */}
+                          <div
+                            onClick={() => toggleMonth(monthKey)}
+                            className="flex items-center justify-between cursor-pointer group select-none py-1 px-2 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition-all"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                {isMonthOpen ? <FolderOpen size={13} /> : <Folder size={13} />}
+                              </div>
+                              <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                                {monthName} {year}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                {rekeningGroups.length} Akun • {totalFiles} Berkas
+                              </span>
+                            </div>
+                            <div className="text-slate-400 group-hover:text-indigo-600 transition-colors">
+                              {isMonthOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            </div>
+                          </div>
+
+                          {/* Rekening & Files Branch */}
+                          {isMonthOpen && (
+                            <div className="ml-4 pl-4 border-l-2 border-slate-200 dark:border-slate-800 space-y-2 mt-1">
+                              {rekeningGroups.map(rek => (
+                                <div
+                                  key={rek.rekeningKey}
+                                  className="bg-slate-50/70 dark:bg-slate-800/60 rounded-xl p-3 border border-slate-200/70 dark:border-slate-700/60 space-y-2"
+                                >
+                                  {/* Rekening Header in Tree */}
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <CreditCard size={14} className="text-blue-600 shrink-0" />
+                                      <span className="text-xs font-black text-slate-900 dark:text-slate-100">
+                                        {rek.nama_bank}
+                                      </span>
+                                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-100/60 dark:bg-blue-950 px-1.5 py-0.2 rounded">
+                                        {rek.nomor_rekening}
+                                      </span>
+                                      <span className="text-xs text-slate-500 font-medium truncate max-w-xs">
+                                        ({rek.nama_rekening})
+                                      </span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenAddForRekening(year, month, rek)}
+                                      className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-blue-50 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                    >
+                                      <Plus size={11} />
+                                      <span>Tambah Berkas</span>
+                                    </button>
+                                  </div>
+
+                                  {/* Files List in Tree */}
+                                  {rek.allDocs.length === 0 ? (
+                                    <p className="text-[11px] text-slate-400 italic pl-3">Belum ada dokumen terunggah</p>
+                                  ) : (
+                                    <div className="ml-2 pl-3 border-l-2 border-dashed border-slate-300 dark:border-slate-700 space-y-1.5">
+                                      {rek.allDocs.map(doc => {
+                                        const isPdf = doc.file_type === 'pdf';
+                                        const isExcel = doc.file_type === 'excel';
+                                        const isCsv = doc.file_type === 'csv';
+                                        const isLink = doc.tipe_sumber === 'link';
+
+                                        return (
+                                          <div
+                                            key={doc.id}
+                                            className="flex items-center justify-between gap-2 p-2 px-3 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-750 text-xs hover:border-blue-400 transition-all shadow-2xs"
+                                          >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                              {isPdf && <FileText size={15} className="text-rose-600 shrink-0" />}
+                                              {isExcel && <FileSpreadsheet size={15} className="text-emerald-600 shrink-0" />}
+                                              {isCsv && <TableIcon size={15} className="text-teal-600 shrink-0" />}
+                                              {!isPdf && !isExcel && !isCsv && <Link2 size={15} className="text-blue-600 shrink-0" />}
+                                              <span className="font-bold text-slate-800 dark:text-slate-200 truncate" title={doc.file_name}>
+                                                {doc.file_name}
+                                              </span>
+                                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
+                                                {isLink ? 'Link' : (doc.file_size || doc.file_type.toUpperCase())}
+                                              </span>
+                                            </div>
+
+                                            {/* Action Toolbar */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleOpenPreview(doc)}
+                                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
+                                                title="Pratinjau Dokumen"
+                                              >
+                                                <Eye size={13} />
+                                              </button>
+                                              {isLink ? (
+                                                <>
+                                                  <a
+                                                    href={doc.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
+                                                    title="Buka Tautan Online"
+                                                  >
+                                                    <ExternalLink size={13} />
+                                                  </a>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => copyToClipboard(doc.file_url)}
+                                                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 cursor-pointer"
+                                                    title="Salin Tautan"
+                                                  >
+                                                    <Copy size={13} />
+                                                  </button>
+                                                </>
+                                              ) : (
+                                                <a
+                                                  href={getDownloadSafeFileUrl(doc.file_url, doc.file_name)}
+                                                  download={doc.file_name}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
+                                                  title="Unduh File"
+                                                >
+                                                  <Download size={13} />
+                                                </a>
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() => setItemToDelete(doc)}
+                                                className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg text-rose-400 hover:text-rose-600 cursor-pointer"
+                                                title="Hapus"
+                                              >
+                                                <Trash2 size={13} />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* ================= KOLAPS ACCORDION VIEW ================= */
+        
         <div className="space-y-4">
           {groupedData.map(({ year, months }) => {
             const isYearOpen = expandedYears.has(year);
@@ -1039,13 +1257,13 @@ export default function RekeningKoranMasjidPage() {
             return (
               <div
                 key={year}
-                className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200/80 dark:border-slate-800 shadow-xs overflow-hidden transition-all"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200/80 dark:border-slate-800 shadow-xs transition-all"
               >
                 {/* Header Level 1: Tahun */}
                 <button
                   type="button"
                   onClick={() => toggleYear(year)}
-                  className="w-full p-4 bg-slate-50/70 hover:bg-slate-100/80 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 flex items-center justify-between transition-all cursor-pointer border-b border-gray-200/60 dark:border-slate-800 text-left"
+                  className={`w-full p-4 bg-slate-50/70 hover:bg-slate-100/80 dark:bg-slate-800/50 dark:hover:bg-slate-800/80 flex items-center justify-between transition-all cursor-pointer border-b border-gray-200/60 dark:border-slate-800 text-left ${isYearOpen ? 'rounded-t-2xl' : 'rounded-2xl'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
@@ -1086,28 +1304,51 @@ export default function RekeningKoranMasjidPage() {
                       return (
                         <div
                           key={monthKey}
-                          className="bg-white dark:bg-slate-800/90 rounded-xl border border-gray-200/70 dark:border-slate-700/80 shadow-2xs overflow-hidden"
+                          className="bg-white dark:bg-slate-800/90 rounded-xl border border-gray-200/70 dark:border-slate-700/80 shadow-2xs"
                         >
-                          {/* Header Level 2: Bulan */}
+                          {/* Header Level 2: Bulan (Dipercantik, Elegan, dan Bergradasi) */}
                           <button
                             type="button"
                             onClick={() => toggleMonth(monthKey)}
-                            className="w-full p-3 px-4 bg-white hover:bg-gray-50/80 dark:bg-slate-800 dark:hover:bg-slate-750 flex items-center justify-between transition-all cursor-pointer text-left"
+                            className={`w-full p-3.5 px-4.5 flex items-center justify-between transition-all cursor-pointer text-left ${
+                              isMonthOpen
+                                ? 'bg-gradient-to-r from-indigo-50/90 via-slate-50/70 to-blue-50/60 dark:from-indigo-950/40 dark:via-slate-850 dark:to-slate-800 border-b border-indigo-100/80 dark:border-indigo-900/50'
+                                : 'bg-white hover:bg-slate-50/80 dark:bg-slate-800 dark:hover:bg-slate-750'
+                            }`}
                           >
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                                <Calendar size={13} />
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+                                <span className="text-[11px] font-mono">{String(month).padStart(2, '0')}</span>
                               </div>
-                              <span className="text-xs font-black text-gray-900 dark:text-slate-100 tracking-tight">
-                                {monthName} {year}
-                              </span>
-                              <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
-                                {rekeningGroups.length} Akun Rekening • {totalFiles} Berkas
-                              </span>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                                    {monthName} {year}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-950/70 px-2 py-0.5 rounded-full border border-indigo-200/60 dark:border-indigo-800">
+                                    {rekeningGroups.length} Akun Bank
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded-full">
+                                    {totalFiles} Berkas Terarsip
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                  Mutasi rekening koran dan arsip dokumen kas periode {monthName}
+                                </p>
+                              </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              {isMonthOpen ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronRight size={14} className="text-gray-400" />}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 hidden sm:inline">
+                                {isMonthOpen ? 'Tutup Bulan' : 'Buka Bulan'}
+                              </span>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                                isMonthOpen 
+                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 rotate-180' 
+                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                              }`}>
+                                <ChevronDown size={14} />
+                              </div>
                             </div>
                           </button>
 
@@ -1119,67 +1360,80 @@ export default function RekeningKoranMasjidPage() {
                                   ? rek.saldo_akhir - rek.saldo_awal
                                   : null;
 
+                                const dropdownKey = `${year}-${month}-${rek.rekeningKey}`;
+                                const isDropdownOpen = openDropdownId === dropdownKey;
+
                                 return (
                                   <div
                                     key={rek.rekeningKey}
-                                    className="p-3.5 px-4 hover:bg-slate-50/70 dark:hover:bg-slate-750/50 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 transition-colors"
+                                    className={`p-3 pl-5 sm:pl-7 pr-4 hover:bg-slate-50/70 dark:hover:bg-slate-750/50 flex flex-col lg:flex-row lg:items-center justify-between gap-3 transition-colors border-l-2 border-indigo-200/80 dark:border-indigo-900/60 ml-2 sm:ml-4 my-1 rounded-r-xl ${
+                                      isDropdownOpen ? 'relative z-30 bg-blue-50/20 dark:bg-blue-950/20' : 'relative z-10'
+                                    }`}
                                   >
-                                    {/* 1. Rekening Kas Info */}
-                                    <div className="space-y-1 min-w-[240px] max-w-sm">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-600 flex items-center justify-center shrink-0">
-                                          <CreditCard size={14} />
+                                    {/* 1. Rekening Kas Info (Dibuat Lebih Ringkas & Tidak Melebihi Parent Bulan) */}
+                                    <div className="space-y-1 min-w-[240px] max-w-md">
+                                      <div className="flex items-start gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                                          <CreditCard size={13} />
                                         </div>
-                                        <div>
-                                          <div className="flex items-center gap-1.5">
-                                            <span className="text-xs font-black text-gray-900 dark:text-slate-100">
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-tight">
                                               {rek.nama_bank}
-                                            </span>
-                                            <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
+                                            </h4>
+                                            <span className="font-mono text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/70 dark:border-blue-900/50 px-1.5 py-0.2 rounded-md">
                                               {rek.nomor_rekening}
                                             </span>
                                           </div>
-                                          <p className="text-[11px] text-gray-500 dark:text-slate-400 truncate" title={rek.nama_rekening}>
-                                            {rek.nama_rekening}
-                                          </p>
+                                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                                            <Wallet size={11} className="text-slate-400 shrink-0" />
+                                            <span className="truncate text-slate-600 dark:text-slate-300" title={rek.nama_rekening}>
+                                              {rek.nama_rekening}
+                                            </span>
+                                          </div>
+                                          {rek.keterangan && (
+                                            <div className="mt-0.5">
+                                              <span className="inline-flex items-center gap-1 text-[9px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 px-1.5 py-0.2 rounded italic truncate max-w-xs" title={rek.keterangan}>
+                                                <Info size={9} className="shrink-0 text-amber-600 not-italic" />
+                                                &ldquo;{rek.keterangan}&rdquo;
+                                              </span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
-                                      {rek.keterangan && (
-                                        <p className="text-[10px] text-gray-400 italic pl-9 truncate max-w-xs" title={rek.keterangan}>
-                                          &ldquo;{rek.keterangan}&rdquo;
-                                        </p>
-                                      )}
                                     </div>
 
-                                    {/* 2. Saldo Awal, Saldo Akhir, dan Mutasi Bersih (CUKUP SATU KALI) */}
-                                    <div className="flex items-center gap-4 bg-gray-50/80 dark:bg-slate-900/60 p-2 px-3 rounded-xl border border-gray-200/60 dark:border-slate-800 text-[11px] shrink-0">
+                                    {/* 2. Saldo Awal, Saldo Akhir, dan Mutasi Bersih (Desain Kompak) */}
+                                    <div className="flex items-center gap-3.5 bg-slate-50/80 dark:bg-slate-900/70 p-2 px-3.5 rounded-xl border border-slate-200/70 dark:border-slate-800 text-[10px] shrink-0 shadow-2xs">
                                       <div>
-                                        <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase font-black tracking-wider">
                                           Saldo Awal
                                         </span>
-                                        <span className="font-mono font-bold text-gray-700 dark:text-slate-300">
+                                        <span className="font-mono font-bold text-slate-700 dark:text-slate-300 text-[11px]">
                                           {formatRupiah(rek.saldo_awal)}
                                         </span>
                                       </div>
 
-                                      <ArrowRight size={13} className="text-gray-300 dark:text-slate-600" />
+                                      <div className="w-4 h-4 rounded-full bg-slate-200/70 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0">
+                                        <ArrowRight size={10} />
+                                      </div>
 
                                       <div>
-                                        <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">
+                                        <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase font-black tracking-wider">
                                           Saldo Akhir
                                         </span>
-                                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                        <span className="font-mono font-black text-emerald-600 dark:text-emerald-400 text-[11px]">
                                           {formatRupiah(rek.saldo_akhir)}
                                         </span>
                                       </div>
 
                                       {selisihMutasi !== null && (
-                                        <div className="hidden sm:block pl-2 border-l border-gray-200 dark:border-slate-800">
-                                          <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">
+                                        <div className="hidden sm:block pl-2.5 border-l border-slate-200 dark:border-slate-800">
+                                          <span className="text-[9px] text-slate-400 dark:text-slate-500 block uppercase font-black tracking-wider">
                                             Mutasi Bersih
                                           </span>
-                                          <span className={`inline-flex items-center gap-0.5 font-mono font-bold text-[11px] ${
-                                            selisihMutasi >= 0 ? 'text-emerald-600' : 'text-rose-600'
+                                          <span className={`inline-flex items-center gap-0.5 font-mono font-black text-[11px] ${
+                                            selisihMutasi >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                                           }`}>
                                             {selisihMutasi >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                                             {formatRupiah(selisihMutasi)}
@@ -1188,304 +1442,248 @@ export default function RekeningKoranMasjidPage() {
                                       )}
                                     </div>
 
-                                    {/* 3. Berkas & Format Tersedia (3 Slot Format: PDF, Excel, CSV + Tautan Tambahan) */}
-                                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                      {/* SLOT 1: PDF */}
-                                      {rek.pdfDoc ? (
-                                        <div className="flex items-center gap-1 p-1 pl-2 bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200/90 dark:border-rose-900 rounded-xl shadow-2xs">
-                                          <div className="flex items-center gap-1 mr-1">
-                                            <FileText size={13} className="text-rose-600" />
-                                            <span className="text-[10px] font-black text-rose-700 dark:text-rose-300">PDF</span>
-                                            {rek.pdfDoc.tipe_sumber === 'link' ? (
-                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100/80 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center gap-0.5">
-                                                <Globe size={9} /> LINK
-                                              </span>
-                                            ) : (
-                                              <span className="text-[9px] font-mono text-gray-400">{rek.pdfDoc.file_size || 'PDF'}</span>
-                                            )}
-                                          </div>
-
-                                          {rek.pdfDoc.tipe_sumber === 'link' ? (
-                                            <a
-                                              href={rek.pdfDoc.file_url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 px-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 rounded-md transition-all cursor-pointer flex items-center gap-0.5 text-[10px] font-bold bg-rose-100/50 dark:bg-rose-900/30"
-                                              title="Buka Tautan Online di Tab Baru"
-                                            >
-                                              <ExternalLink size={11} />
-                                              <span>Buka</span>
-                                            </a>
-                                          ) : null}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenPreview(rek.pdfDoc!)}
-                                            className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 rounded-md transition-all cursor-pointer"
-                                            title="Pratinjau PDF"
-                                          >
-                                            <Eye size={12} />
-                                          </button>
-
-                                          {rek.pdfDoc.tipe_sumber === 'link' ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => copyToClipboard(rek.pdfDoc!.file_url)}
-                                              className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-600 rounded-md transition-all cursor-pointer"
-                                              title="Salin Tautan"
-                                            >
-                                              <Copy size={11} />
-                                            </button>
-                                          ) : (
-                                            <a
-                                              href={getDownloadSafeFileUrl(rek.pdfDoc.file_url, rek.pdfDoc.file_name)}
-                                              download={rek.pdfDoc.file_name}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 rounded-md transition-all cursor-pointer"
-                                              title="Unduh PDF"
-                                            >
-                                              <Download size={12} />
-                                            </a>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setItemToDelete(rek.pdfDoc!)}
-                                            className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-400 hover:text-rose-600 rounded-md transition-all cursor-pointer"
-                                            title="Hapus PDF"
-                                          >
-                                            <Trash2 size={11} />
-                                          </button>
-                                        </div>
-                                      ) : (
+                                    {/* 3. Berkas & Aksi Dropdown Menu */}
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                      {/* Dropdown Menu Container */}
+                                      <div className="relative rk-dropdown-container">
                                         <button
                                           type="button"
-                                          onClick={() => handleQuickAddSlot(year, month, rek, 'pdf')}
-                                          className="p-1 px-2 border border-dashed border-rose-300 dark:border-rose-900/60 hover:bg-rose-50/80 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                                          title="Tambah Tautan/File PDF untuk rekening ini"
+                                          onClick={() => setOpenDropdownId(isDropdownOpen ? null : dropdownKey)}
+                                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border shadow-2xs ${
+                                            isDropdownOpen
+                                              ? 'bg-blue-600 text-white border-blue-600 shadow-blue-500/20 ring-2 ring-blue-500/30'
+                                              : rek.allDocs.length > 0
+                                                ? 'bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 hover:bg-slate-800 border-slate-900 dark:border-slate-600'
+                                                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900 hover:bg-blue-100'
+                                          }`}
                                         >
-                                          <Plus size={10} />
-                                          <span>PDF</span>
+                                          <SlidersHorizontal size={13} className={isDropdownOpen ? 'text-white' : rek.allDocs.length > 0 ? 'text-blue-300' : 'text-blue-600'} />
+                                          <span>Aksi Berkas</span>
+                                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                                            isDropdownOpen
+                                              ? 'bg-white/20 text-white'
+                                              : rek.allDocs.length > 0
+                                                ? 'bg-blue-500/30 text-blue-200'
+                                                : 'bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                          }`}>
+                                            {rek.allDocs.length}
+                                          </span>
+                                          <ChevronDown size={13} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                                         </button>
-                                      )}
 
-                                      {/* SLOT 2: EXCEL / SPREADSHEET */}
-                                      {rek.excelDoc ? (
-                                        <div className="flex items-center gap-1 p-1 pl-2 bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200/90 dark:border-emerald-900 rounded-xl shadow-2xs">
-                                          <div className="flex items-center gap-1 mr-1">
-                                            <FileSpreadsheet size={13} className="text-emerald-600" />
-                                            <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">XLSX</span>
-                                            {rek.excelDoc.tipe_sumber === 'link' ? (
-                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100/80 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center gap-0.5">
-                                                <Globe size={9} /> LINK
+                                        {/* Dropdown Menu Popover */}
+                                        {isDropdownOpen && (
+                                          <div className="absolute right-0 top-full mt-2 w-84 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-2xl p-3.5 z-50 space-y-3 animate-in fade-in zoom-in-95">
+                                            {/* Header Dropdown */}
+                                            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-slate-800">
+                                              <div>
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-slate-500 block">
+                                                  Pilihan Aksi Berkas
+                                                </span>
+                                                <p className="text-xs font-bold text-gray-800 dark:text-slate-200 truncate max-w-[210px]">
+                                                  {rek.nama_bank} - {rek.nomor_rekening}
+                                                </p>
+                                              </div>
+                                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900">
+                                                {rek.allDocs.length} Dokumen
                                               </span>
+                                            </div>
+
+                                            {/* Daftar Berkas & Aksi */}
+                                            {rek.allDocs.length === 0 ? (
+                                              <div className="p-4 text-center bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
+                                                <p className="text-xs text-gray-500 dark:text-slate-400">
+                                                  Belum ada berkas rekening koran pada bulan ini.
+                                                </p>
+                                              </div>
                                             ) : (
-                                              <span className="text-[9px] font-mono text-gray-400">{rek.excelDoc.file_size || 'Excel'}</span>
+                                              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                                {rek.allDocs.map((doc) => {
+                                                  const isPdf = doc.file_type === 'pdf';
+                                                  const isExcel = doc.file_type === 'excel';
+                                                  const isCsv = doc.file_type === 'csv';
+                                                  const isLink = doc.tipe_sumber === 'link';
+
+                                                  return (
+                                                    <div
+                                                      key={doc.id}
+                                                      className="p-2.5 rounded-xl bg-gray-50/80 dark:bg-slate-800/80 border border-gray-200/70 dark:border-slate-700/80 hover:border-gray-300 dark:hover:border-slate-600 transition-all flex items-center justify-between gap-2"
+                                                    >
+                                                      {/* File Info */}
+                                                      <div className="flex items-center gap-2 min-w-0">
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                                          isPdf
+                                                            ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600'
+                                                            : isExcel
+                                                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600'
+                                                              : isCsv
+                                                                ? 'bg-teal-100 dark:bg-teal-950/60 text-teal-600'
+                                                                : 'bg-blue-100 dark:bg-blue-950/60 text-blue-600'
+                                                        }`}>
+                                                          {isPdf && <FileText size={15} />}
+                                                          {isExcel && <FileSpreadsheet size={15} />}
+                                                          {isCsv && <TableIcon size={15} />}
+                                                          {!isPdf && !isExcel && !isCsv && <Link2 size={15} />}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                          <p className="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" title={doc.file_name}>
+                                                            {doc.file_name}
+                                                          </p>
+                                                          <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
+                                                              isPdf
+                                                                ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300'
+                                                                : isExcel
+                                                                  ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'
+                                                                  : isCsv
+                                                                    ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300'
+                                                                    : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                                                            }`}>
+                                                              {doc.file_type.toUpperCase()}
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">
+                                                              {isLink ? 'Tautan Online' : (doc.file_size || 'File')}
+                                                            </span>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {/* Actions Toolbar */}
+                                                      <div className="flex items-center gap-1 shrink-0">
+                                                        {/* Pratinjau (View) */}
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            setOpenDropdownId(null);
+                                                            handleOpenPreview(doc);
+                                                          }}
+                                                          className="p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:text-blue-600 hover:border-blue-300 transition-all cursor-pointer shadow-2xs"
+                                                          title="Lihat / Pratinjau Dokumen"
+                                                        >
+                                                          <Eye size={13} />
+                                                        </button>
+
+                                                        {/* Unduh (Download) / Buka Link */}
+                                                        {isLink ? (
+                                                          <>
+                                                            <a
+                                                              href={doc.file_url}
+                                                              target="_blank"
+                                                              rel="noopener noreferrer"
+                                                              className="p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
+                                                              title="Buka Tautan di Tab Baru"
+                                                            >
+                                                              <ExternalLink size={13} />
+                                                            </a>
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => copyToClipboard(doc.file_url)}
+                                                              className="p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:text-blue-600 hover:border-blue-300 transition-all cursor-pointer shadow-2xs"
+                                                              title="Salin Tautan"
+                                                            >
+                                                              {copiedUrl === doc.file_url ? (
+                                                                <Check size={13} className="text-emerald-600" />
+                                                              ) : (
+                                                                <Copy size={13} />
+                                                              )}
+                                                            </button>
+                                                          </>
+                                                        ) : (
+                                                          <a
+                                                            href={getDownloadSafeFileUrl(doc.file_url, doc.file_name)}
+                                                            download={doc.file_name}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 hover:text-emerald-600 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs"
+                                                            title="Unduh Berkas"
+                                                          >
+                                                            <Download size={13} />
+                                                          </a>
+                                                        )}
+
+                                                        {/* Hapus (Delete) */}
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            setOpenDropdownId(null);
+                                                            setItemToDelete(doc);
+                                                          }}
+                                                          className="p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 transition-all cursor-pointer shadow-2xs"
+                                                          title="Hapus Dokumen"
+                                                        >
+                                                          <Trash2 size={13} />
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
                                             )}
+
+                                            {/* Footer Dropdown: Quick Slots & Tambah Berkas */}
+                                            <div className="pt-2 border-t border-gray-100 dark:border-slate-800 space-y-2">
+                                              {(!rek.pdfDoc || !rek.excelDoc || !rek.csvDoc) && (
+                                                <div className="flex items-center justify-between text-[11px] font-bold text-gray-500 dark:text-slate-400">
+                                                  <span>Format belum ada:</span>
+                                                  <div className="flex items-center gap-1">
+                                                    {!rek.pdfDoc && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setOpenDropdownId(null);
+                                                          handleQuickAddSlot(year, month, rek, 'pdf');
+                                                        }}
+                                                        className="px-2 py-0.5 rounded-md bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 text-[10px] font-bold transition-all cursor-pointer"
+                                                        title="Tambah Berkas / Tautan PDF"
+                                                      >
+                                                        + PDF
+                                                      </button>
+                                                    )}
+                                                    {!rek.excelDoc && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setOpenDropdownId(null);
+                                                          handleQuickAddSlot(year, month, rek, 'excel');
+                                                        }}
+                                                        className="px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 text-[10px] font-bold transition-all cursor-pointer"
+                                                        title="Tambah Berkas / Tautan Excel"
+                                                      >
+                                                        + Excel
+                                                      </button>
+                                                    )}
+                                                    {!rek.csvDoc && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setOpenDropdownId(null);
+                                                          handleQuickAddSlot(year, month, rek, 'csv');
+                                                        }}
+                                                        className="px-2 py-0.5 rounded-md bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-900 text-[10px] font-bold transition-all cursor-pointer"
+                                                        title="Tambah Berkas / Tautan CSV"
+                                                      >
+                                                        + CSV
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setOpenDropdownId(null);
+                                                  handleOpenAddForRekening(year, month, rek);
+                                                }}
+                                                className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                              >
+                                                <Plus size={14} />
+                                                <span>Tambah / Unggah Berkas Baru</span>
+                                              </button>
+                                            </div>
                                           </div>
-
-                                          {rek.excelDoc.tipe_sumber === 'link' ? (
-                                            <a
-                                              href={rek.excelDoc.file_url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 px-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 rounded-md transition-all cursor-pointer flex items-center gap-1 text-[10px] font-black bg-emerald-100/60 dark:bg-emerald-900/40"
-                                              title="Buka Langsung di Google Sheets / Excel Online (Tab Baru)"
-                                            >
-                                              <ExternalLink size={11} />
-                                              <span>Buka</span>
-                                            </a>
-                                          ) : null}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenPreview(rek.excelDoc!)}
-                                            className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 rounded-md transition-all cursor-pointer"
-                                            title="Pratinjau / Info Lembar Kerja"
-                                          >
-                                            <Eye size={12} />
-                                          </button>
-
-                                          {rek.excelDoc.tipe_sumber === 'link' ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => copyToClipboard(rek.excelDoc!.file_url)}
-                                              className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-600 rounded-md transition-all cursor-pointer"
-                                              title="Salin Tautan Spreadsheet"
-                                            >
-                                              <Copy size={11} />
-                                            </button>
-                                          ) : (
-                                            <a
-                                              href={getDownloadSafeFileUrl(rek.excelDoc.file_url, rek.excelDoc.file_name)}
-                                              download={rek.excelDoc.file_name}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 rounded-md transition-all cursor-pointer"
-                                              title="Unduh Excel"
-                                            >
-                                              <Download size={12} />
-                                            </a>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setItemToDelete(rek.excelDoc!)}
-                                            className="p-1 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-rose-400 hover:text-rose-600 rounded-md transition-all cursor-pointer"
-                                            title="Hapus Excel"
-                                          >
-                                            <Trash2 size={11} />
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleQuickAddSlot(year, month, rek, 'excel')}
-                                          className="p-1 px-2 border border-dashed border-emerald-300 dark:border-emerald-900/60 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                                          title="Tambah Tautan/File Excel untuk rekening ini"
-                                        >
-                                          <Plus size={10} />
-                                          <span>Excel</span>
-                                        </button>
-                                      )}
-
-                                      {/* SLOT 3: CSV */}
-                                      {rek.csvDoc ? (
-                                        <div className="flex items-center gap-1 p-1 pl-2 bg-teal-50/90 dark:bg-teal-950/40 border border-teal-200/90 dark:border-teal-900 rounded-xl shadow-2xs">
-                                          <div className="flex items-center gap-1 mr-1">
-                                            <TableIcon size={13} className="text-teal-600" />
-                                            <span className="text-[10px] font-black text-teal-700 dark:text-teal-300">CSV</span>
-                                            {rek.csvDoc.tipe_sumber === 'link' ? (
-                                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-100/80 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300 flex items-center gap-0.5">
-                                                <Globe size={9} /> LINK
-                                              </span>
-                                            ) : (
-                                              <span className="text-[9px] font-mono text-gray-400">{rek.csvDoc.file_size || 'CSV'}</span>
-                                            )}
-                                          </div>
-
-                                          {rek.csvDoc.tipe_sumber === 'link' ? (
-                                            <a
-                                              href={rek.csvDoc.file_url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 px-1.5 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 rounded-md transition-all cursor-pointer flex items-center gap-1 text-[10px] font-black bg-teal-100/60 dark:bg-teal-900/40"
-                                              title="Buka Link CSV di Tab Baru"
-                                            >
-                                              <ExternalLink size={11} />
-                                              <span>Buka</span>
-                                            </a>
-                                          ) : null}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenPreview(rek.csvDoc!)}
-                                            className="p-1 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 rounded-md transition-all cursor-pointer"
-                                            title="Pratinjau / Info CSV"
-                                          >
-                                            <Eye size={12} />
-                                          </button>
-
-                                          {rek.csvDoc.tipe_sumber === 'link' ? (
-                                            <button
-                                              type="button"
-                                              onClick={() => copyToClipboard(rek.csvDoc!.file_url)}
-                                              className="p-1 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-600 rounded-md transition-all cursor-pointer"
-                                              title="Salin Tautan CSV"
-                                            >
-                                              <Copy size={11} />
-                                            </button>
-                                          ) : (
-                                            <a
-                                              href={getDownloadSafeFileUrl(rek.csvDoc.file_url, rek.csvDoc.file_name)}
-                                              download={rek.csvDoc.file_name}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="p-1 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-teal-700 rounded-md transition-all cursor-pointer"
-                                              title="Unduh CSV"
-                                            >
-                                              <Download size={12} />
-                                            </a>
-                                          )}
-
-                                          <button
-                                            type="button"
-                                            onClick={() => setItemToDelete(rek.csvDoc!)}
-                                            className="p-1 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-rose-400 hover:text-rose-600 rounded-md transition-all cursor-pointer"
-                                            title="Hapus CSV"
-                                          >
-                                            <Trash2 size={11} />
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleQuickAddSlot(year, month, rek, 'csv')}
-                                          className="p-1 px-2 border border-dashed border-teal-300 dark:border-teal-900/60 hover:bg-teal-50/80 dark:hover:bg-teal-950/40 text-teal-600 dark:text-teal-400 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                                          title="Tambah Tautan/File CSV untuk rekening ini"
-                                        >
-                                          <Plus size={10} />
-                                          <span>CSV</span>
-                                        </button>
-                                      )}
-
-                                      {/* Tautan Tambahan / Part 2 / Extra Files */}
-                                      {rek.otherDocs.map((od) => (
-                                        <div key={od.id} className="flex items-center gap-1 p-1 pl-2 bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl shadow-2xs">
-                                          <div className="flex items-center gap-1 mr-1">
-                                            <Link2 size={12} className="text-blue-600" />
-                                            <span className="text-[10px] font-black text-blue-700 dark:text-blue-300 uppercase truncate max-w-[80px]" title={od.file_name}>
-                                              {od.file_name.replace(/\[\d+_\d+\]\s*/, '')}
-                                            </span>
-                                          </div>
-                                          <a
-                                            href={od.file_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-1 px-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 rounded-md transition-all cursor-pointer flex items-center gap-0.5 text-[10px] font-bold"
-                                            title="Buka Tautan Online"
-                                          >
-                                            <ExternalLink size={11} />
-                                            <span>Buka</span>
-                                          </a>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenPreview(od)}
-                                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 rounded-md transition-all cursor-pointer"
-                                            title="Pratinjau"
-                                          >
-                                            <Eye size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => copyToClipboard(od.file_url)}
-                                            className="p-1 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 rounded-md transition-all cursor-pointer"
-                                            title="Salin Tautan"
-                                          >
-                                            <Copy size={11} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setItemToDelete(od)}
-                                            className="p-1 hover:bg-blue-100 text-rose-500 hover:text-rose-700 rounded-md transition-all cursor-pointer"
-                                            title="Hapus"
-                                          >
-                                            <Trash2 size={11} />
-                                          </button>
-                                        </div>
-                                      ))}
-
-                                      {/* Tombol Tambah Format / Berkas Tambahan Langsung ke Rekening Ini */}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenAddForRekening(year, month, rek)}
-                                        className="p-1.5 px-2 bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 border border-dashed border-gray-300 hover:border-blue-300 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-                                        title="Tambah format berkas (PDF, Excel, CSV) atau link untuk akun ini"
-                                      >
-                                        <Plus size={12} />
-                                        <span>Tambah Berkas</span>
-                                      </button>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                 );

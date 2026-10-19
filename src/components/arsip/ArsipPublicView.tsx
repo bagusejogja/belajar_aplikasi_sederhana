@@ -1052,11 +1052,11 @@ export default function ArsipPublicView({
                                                 </div>
 
                                                 <div className="min-w-0 flex-1">
-                                                  <div className="flex items-center gap-1.5">
-                                                    <p className="text-xs font-bold text-slate-800 truncate leading-snug group-hover/file:text-indigo-600 group-hover/file:underline transition-colors">
+                                                  <div className="flex items-start justify-between gap-1.5">
+                                                    <p className="text-xs font-bold text-slate-800 line-clamp-2 break-words leading-snug group-hover/file:text-indigo-600 group-hover/file:underline transition-colors" title={file.name}>
                                                       {file.name}
                                                     </p>
-                                                    <ArrowUpRight size={13} className="text-slate-400 group-hover/file:text-indigo-600 shrink-0 opacity-70 group-hover/file:opacity-100 transition-opacity" />
+                                                    <ArrowUpRight size={13} className="text-slate-400 group-hover/file:text-indigo-600 shrink-0 opacity-70 group-hover/file:opacity-100 transition-opacity mt-0.5" />
                                                   </div>
                                                   
                                                   <div className="flex items-center gap-2 mt-0.5">
@@ -1204,7 +1204,7 @@ export default function ArsipPublicView({
                                                       <div className={`p-1.5 rounded-lg border shrink-0 ${meta.accentBg}`}>
                                                         {meta.icon}
                                                       </div>
-                                                      <span className="text-xs font-bold text-slate-800 truncate underline">
+                                                      <span className="text-xs font-bold text-slate-800 line-clamp-2 break-words leading-snug underline" title={file.name}>
                                                         {file.name}
                                                       </span>
                                                     </a>
@@ -1423,7 +1423,7 @@ export default function ArsipPublicView({
                                             {meta.icon}
                                           </div>
                                           <div className="min-w-0 flex-1">
-                                            <p className="text-[11px] font-bold text-slate-800 truncate leading-tight group-hover/item:text-indigo-600 group-hover/item:underline transition-colors">
+                                            <p className="text-[11px] font-bold text-slate-800 line-clamp-2 break-words leading-snug group-hover/item:text-indigo-600 group-hover/item:underline transition-colors" title={file.name}>
                                               {file.name}
                                             </p>
                                             <span className={`px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider border ${meta.badgeColor}`}>
@@ -1559,7 +1559,7 @@ export default function ArsipPublicView({
                                                 title={`Buka File: ${file.name}`}
                                               >
                                                 {meta.icon}
-                                                <span className="text-[10px] font-bold text-slate-800 group-hover:text-indigo-700 truncate underline">
+                                                <span className="text-[10px] font-bold text-slate-800 group-hover:text-indigo-700 line-clamp-2 break-words leading-snug underline" title={file.name}>
                                                   {file.name}
                                                 </span>
                                               </a>
