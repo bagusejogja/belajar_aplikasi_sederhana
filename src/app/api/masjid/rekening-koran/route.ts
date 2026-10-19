@@ -48,7 +48,7 @@ const NAMA_BULAN = [
 ];
 
 /**
- * GET: Ambil daftar rekening koran & master rekening masjid
+ * GET: Ambil daftar rekening koran & master rekening masjid dari ref_rekening
  */
 export async function GET(req: NextRequest) {
   try {
@@ -69,180 +69,16 @@ export async function GET(req: NextRequest) {
 
     const [arsipRes, refRekeningRes] = await Promise.all([
       query,
-      supabase.from('ref_rekening').select('*').order('nama_bank', { ascending: true })
+      supabase.from('ref_rekening').select('*').order('id', { ascending: true })
     ]);
 
     let rawRows = arsipRes.data || [];
     let accounts = refRekeningRes.data || [];
 
-    // Jika belum ada data di database sama sekali, buatkan data awal (seed) tahun 2026 & 2025
-    if (rawRows.length === 0) {
-      const defaultAccount = accounts[0] || {
-        nama_bank: 'Bank Syariah Indonesia (BSI)',
-        nomor_rekening: '7666333211',
-        nama_pemilik: 'MARDLIYYAH ISLAMIC CENTER'
-      };
-
-      const seedDocs2026: RekeningKoranItem[] = [
-        {
-          id: 'rk-2026-03-bsi-pdf',
-          tahun: 2026,
-          bulan: 3,
-          nama_bulan: 'Maret',
-          rekening_id: defaultAccount.id || 1,
-          nama_bank: defaultAccount.nama_bank || 'Bank Syariah Indonesia (BSI)',
-          nomor_rekening: defaultAccount.nomor_rekening || '7666333211',
-          nama_rekening: defaultAccount.nama_pemilik || 'MARDLIYYAH ISLAMIC CENTER',
-          tipe_sumber: 'file',
-          file_url: 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev/rekening_koran_masjid/RK_2026_03_BSI_Operasional.pdf',
-          file_name: 'Rekening_Koran_BSI_Maret_2026.pdf',
-          file_type: 'pdf',
-          file_size: '1.8 MB',
-          r2_key: 'rekening_koran_masjid/RK_2026_03_BSI_Operasional.pdf',
-          saldo_awal: 184500000,
-          saldo_akhir: 215300000,
-          keterangan: 'Rekening koran operasional bulan Maret 2026 (termasuk dana Tarhib & Ramadhan)',
-          uploader: 'Admin Keuangan Masjid',
-          created_at: new Date('2026-03-31T17:00:00Z').toISOString()
-        },
-        {
-          id: 'rk-2026-03-bsi-xlsx',
-          tahun: 2026,
-          bulan: 3,
-          nama_bulan: 'Maret',
-          rekening_id: defaultAccount.id || 1,
-          nama_bank: defaultAccount.nama_bank || 'Bank Syariah Indonesia (BSI)',
-          nomor_rekening: defaultAccount.nomor_rekening || '7666333211',
-          nama_rekening: defaultAccount.nama_pemilik || 'MARDLIYYAH ISLAMIC CENTER',
-          tipe_sumber: 'file',
-          file_url: 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev/rekening_koran_masjid/Ekspor_Mutasi_BSI_Maret_2026.xlsx',
-          file_name: 'Ekspor_Mutasi_BSI_Maret_2026.xlsx',
-          file_type: 'excel',
-          file_size: '640 KB',
-          r2_key: 'rekening_koran_masjid/Ekspor_Mutasi_BSI_Maret_2026.xlsx',
-          saldo_awal: 184500000,
-          saldo_akhir: 215300000,
-          keterangan: 'Rincian transaksi mutasi debet/kredit Maret 2026',
-          uploader: 'Admin Keuangan Masjid',
-          created_at: new Date('2026-03-31T17:15:00Z').toISOString()
-        },
-        {
-          id: 'rk-2026-02-bsi-pdf',
-          tahun: 2026,
-          bulan: 2,
-          nama_bulan: 'Februari',
-          rekening_id: defaultAccount.id || 1,
-          nama_bank: defaultAccount.nama_bank || 'Bank Syariah Indonesia (BSI)',
-          nomor_rekening: defaultAccount.nomor_rekening || '7666333211',
-          nama_rekening: defaultAccount.nama_pemilik || 'MARDLIYYAH ISLAMIC CENTER',
-          tipe_sumber: 'file',
-          file_url: 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev/rekening_koran_masjid/RK_2026_02_BSI_Operasional.pdf',
-          file_name: 'Rekening_Koran_BSI_Februari_2026.pdf',
-          file_type: 'pdf',
-          file_size: '1.4 MB',
-          r2_key: 'rekening_koran_masjid/RK_2026_02_BSI_Operasional.pdf',
-          saldo_awal: 162000000,
-          saldo_akhir: 184500000,
-          keterangan: 'Rekening koran operasional bulan Februari 2026 tuntas rekonsiliasi',
-          uploader: 'Admin Keuangan Masjid',
-          created_at: new Date('2026-02-28T16:00:00Z').toISOString()
-        },
-        {
-          id: 'rk-2026-02-mandiri-csv',
-          tahun: 2026,
-          bulan: 2,
-          nama_bulan: 'Februari',
-          rekening_id: 2,
-          nama_bank: 'Bank Mandiri Syariah',
-          nomor_rekening: '137001928374',
-          nama_rekening: 'MARDLIYYAH ISLAMIC CENTER (ZISWAF)',
-          tipe_sumber: 'file',
-          file_url: 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev/rekening_koran_masjid/Mutasi_Mandiri_Ziswaf_Feb2026.csv',
-          file_name: 'Mutasi_Mandiri_Ziswaf_Feb2026.csv',
-          file_type: 'csv',
-          file_size: '280 KB',
-          r2_key: 'rekening_koran_masjid/Mutasi_Mandiri_Ziswaf_Feb2026.csv',
-          saldo_awal: 95000000,
-          saldo_akhir: 112400000,
-          keterangan: 'Mutasi rekening penerimaan ZISWAF Februari 2026',
-          uploader: 'Staf Infaq Masjid',
-          created_at: new Date('2026-02-28T16:30:00Z').toISOString()
-        },
-        {
-          id: 'rk-2026-01-bsi-pdf',
-          tahun: 2026,
-          bulan: 1,
-          nama_bulan: 'Januari',
-          rekening_id: defaultAccount.id || 1,
-          nama_bank: defaultAccount.nama_bank || 'Bank Syariah Indonesia (BSI)',
-          nomor_rekening: defaultAccount.nomor_rekening || '7666333211',
-          nama_rekening: defaultAccount.nama_pemilik || 'MARDLIYYAH ISLAMIC CENTER',
-          tipe_sumber: 'link',
-          file_url: 'https://drive.google.com/file/d/1yA6a2k9c_SampleGDriveLink/view',
-          file_name: 'Tautan Google Drive RK BSI Januari 2026.pdf',
-          file_type: 'pdf',
-          file_size: 'Tautan Cloud Link',
-          saldo_awal: 145000000,
-          saldo_akhir: 162000000,
-          keterangan: 'Arsip rekening koran pembuka tahun buku 2026 diunggah via link Google Drive',
-          uploader: 'Admin Keuangan Masjid',
-          created_at: new Date('2026-01-31T15:00:00Z').toISOString()
-        }
-      ];
-
-      // Simpan seed awal ke database
-      await supabaseAdmin.from('app_arsip_kegiatan').insert([
-        {
-          kategori_id: KATEGORI_ID,
-          tahun: 2026,
-          catatan: 'Rekening Koran Bulanan Kas Masjid Kampus',
-          fase_dokumen: seedDocs2026
-        }
-      ]);
-
-      const seedDocs2025: RekeningKoranItem[] = [
-        {
-          id: 'rk-2025-12-bsi-pdf',
-          tahun: 2025,
-          bulan: 12,
-          nama_bulan: 'Desember',
-          rekening_id: defaultAccount.id || 1,
-          nama_bank: defaultAccount.nama_bank || 'Bank Syariah Indonesia (BSI)',
-          nomor_rekening: defaultAccount.nomor_rekening || '7666333211',
-          nama_rekening: defaultAccount.nama_pemilik || 'MARDLIYYAH ISLAMIC CENTER',
-          tipe_sumber: 'file',
-          file_url: 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev/rekening_koran_masjid/RK_2025_12_BSI_TutupTahun.pdf',
-          file_name: 'RK_2025_12_BSI_TutupTahun.pdf',
-          file_type: 'pdf',
-          file_size: '2.1 MB',
-          r2_key: 'rekening_koran_masjid/RK_2025_12_BSI_TutupTahun.pdf',
-          saldo_awal: 130000000,
-          saldo_akhir: 145000000,
-          keterangan: 'Laporan rekening koran tutup buku tahun 2025',
-          uploader: 'Admin Keuangan Masjid',
-          created_at: new Date('2025-12-31T18:00:00Z').toISOString()
-        }
-      ];
-
-      await supabaseAdmin.from('app_arsip_kegiatan').insert([
-        {
-          kategori_id: KATEGORI_ID,
-          tahun: 2025,
-          catatan: 'Rekening Koran Bulanan Kas Masjid Kampus',
-          fase_dokumen: seedDocs2025
-        }
-      ]);
-
-      const reQuery = await supabase
-        .from('app_arsip_kegiatan')
-        .select('*')
-        .eq('kategori_id', KATEGORI_ID)
-        .order('tahun', { ascending: false });
-      rawRows = reQuery.data || [];
-    }
-
     // Flatten all documents from all years
     let allDocuments: RekeningKoranItem[] = [];
+    const seenIds = new Set<string>();
+
     rawRows.forEach((row: any) => {
       let docs: RekeningKoranItem[] = [];
       if (Array.isArray(row.fase_dokumen)) {
@@ -256,11 +92,13 @@ export async function GET(req: NextRequest) {
       }
 
       docs.forEach((d) => {
-        // Pastikan memiliki atribut tahun konsisten
-        allDocuments.push({
-          ...d,
-          tahun: d.tahun || row.tahun
-        });
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          allDocuments.push({
+            ...d,
+            tahun: d.tahun || row.tahun
+          });
+        }
       });
     });
 
@@ -291,122 +129,192 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST: Unggah file baru ke Cloudflare R2 folder `rekening_koran_masjid` ATAU simpan Tautan Link
+ * POST: Unggah berkas fisik (bisa hingga 3 file sekaligus: PDF, Excel, CSV) ATAU tautan link
  */
 export async function POST(req: NextRequest) {
   try {
     const contentType = req.headers.get('content-type') || '';
-    let itemData: Partial<RekeningKoranItem> = {};
+    const newItems: RekeningKoranItem[] = [];
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
-      const file = formData.get('file') as File | null;
       const tipe_sumber = (formData.get('tipe_sumber') as string) || 'file';
       const tahun = Number(formData.get('tahun')) || new Date().getFullYear();
       const bulan = Number(formData.get('bulan')) || (new Date().getMonth() + 1);
       const nama_bank = (formData.get('nama_bank') as string) || 'Bank Syariah Indonesia (BSI)';
       const nomor_rekening = (formData.get('nomor_rekening') as string) || '7666333211';
       const nama_rekening = (formData.get('nama_rekening') as string) || 'MARDLIYYAH ISLAMIC CENTER';
-      const rekening_id = (formData.get('rekening_id') as string) || '';
+      const rekening_id = (formData.get('rekening_id') as string) || '1';
       const saldo_awal = formData.get('saldo_awal') ? Number(formData.get('saldo_awal')) : null;
       const saldo_akhir = formData.get('saldo_akhir') ? Number(formData.get('saldo_akhir')) : null;
       const keterangan = (formData.get('keterangan') as string) || '';
       const uploader = (formData.get('uploader') as string) || 'Admin Keuangan';
 
+      const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
+      const cleanNoRek = nomor_rekening.replace(/[^a-zA-Z0-9]/g, '');
+
       if (tipe_sumber === 'file') {
-        if (!file) {
-          return NextResponse.json({ success: false, error: 'File dokumen harus dipilih!' }, { status: 400 });
+        // Kumpulkan file dari slot terpisah atau getAll('files')
+        const filesToProcess: { file: File; forcedType?: 'pdf' | 'excel' | 'csv' }[] = [];
+
+        const filePdf = formData.get('file_pdf') as File | null;
+        const fileExcel = formData.get('file_excel') as File | null;
+        const fileCsv = formData.get('file_csv') as File | null;
+        const singleFile = formData.get('file') as File | null;
+        const allFiles = formData.getAll('files') as File[];
+
+        if (filePdf && filePdf.size > 0) filesToProcess.push({ file: filePdf, forcedType: 'pdf' });
+        if (fileExcel && fileExcel.size > 0) filesToProcess.push({ file: fileExcel, forcedType: 'excel' });
+        if (fileCsv && fileCsv.size > 0) filesToProcess.push({ file: fileCsv, forcedType: 'csv' });
+
+        if (filesToProcess.length === 0) {
+          if (singleFile && singleFile.size > 0) {
+            filesToProcess.push({ file: singleFile });
+          } else if (allFiles && allFiles.length > 0) {
+            allFiles.forEach(f => {
+              if (f && f.size > 0) filesToProcess.push({ file: f });
+            });
+          }
         }
 
-        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        let fileType: 'pdf' | 'excel' | 'csv' = 'pdf';
-        if (['xlsx', 'xls'].includes(ext)) fileType = 'excel';
-        else if (ext === 'csv') fileType = 'csv';
-        else if (ext === 'pdf') fileType = 'pdf';
-        else {
-          return NextResponse.json({ 
-            success: false, 
-            error: `Format .${ext} tidak didukung. Mohon gunakan PDF, Excel (.xlsx, .xls), atau CSV.` 
-          }, { status: 400 });
+        if (filesToProcess.length === 0) {
+          return NextResponse.json({ success: false, error: 'Minimal pilih 1 file dokumen rekening koran!' }, { status: 400 });
         }
 
-        // Simpan ke folder tersendiri di Cloudflare R2: `rekening_koran_masjid`
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const cleanNoRek = nomor_rekening.replace(/[^a-zA-Z0-9]/g, '');
-        const r2FileName = `RK_${tahun}_B${String(bulan).padStart(2, '0')}_${cleanNoRek}_${Date.now()}.${ext}`;
-        const key = `${R2_FOLDER}/${r2FileName}`;
+        for (const item of filesToProcess) {
+          const file = item.file;
+          const ext = file.name.split('.').pop()?.toLowerCase() || '';
+          let fileType: 'pdf' | 'excel' | 'csv' = 'pdf';
 
-        await r2.send(new PutObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME || 'lampiran-aplikasi',
-          Key: key,
-          Body: buffer,
-          ContentType: file.type || 'application/octet-stream',
-        }));
+          if (item.forcedType) {
+            fileType = item.forcedType;
+          } else if (['xlsx', 'xls'].includes(ext)) {
+            fileType = 'excel';
+          } else if (ext === 'csv') {
+            fileType = 'csv';
+          } else if (ext === 'pdf') {
+            fileType = 'pdf';
+          } else {
+            continue; // Abaikan format yang tidak didukung
+          }
 
-        const domain = process.env.R2_PUBLIC_DOMAIN || 'https://pub-75569bb9cb0a485b933e7b4f4c7f4080.r2.dev';
-        const publicUrl = `${domain}/${key}`;
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const timestamp = Date.now();
+          const r2FileName = `RK_${tahun}_B${String(bulan).padStart(2, '0')}_${cleanNoRek}_${fileType}_${timestamp}.${ext}`;
+          const key = `${R2_FOLDER}/${r2FileName}`;
 
-        // Format ukuran file
-        const sizeBytes = file.size;
-        const sizeFormatted = sizeBytes > 1024 * 1024 
-          ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB` 
-          : `${Math.round(sizeBytes / 1024)} KB`;
+          await r2.send(new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME || 'lampiran-aplikasi',
+            Key: key,
+            Body: buffer,
+            ContentType: file.type || 'application/octet-stream',
+          }));
 
-        itemData = {
-          id: `rk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          tahun,
-          bulan,
-          nama_bulan: NAMA_BULAN[bulan - 1] || `Bulan ${bulan}`,
-          rekening_id,
-          nama_bank,
-          nomor_rekening,
-          nama_rekening,
-          tipe_sumber: 'file',
-          file_url: publicUrl,
-          file_name: file.name,
-          file_type: fileType,
-          file_size: sizeFormatted,
-          r2_key: key,
-          saldo_awal,
-          saldo_akhir,
-          keterangan,
-          uploader,
-          created_at: new Date().toISOString()
-        };
+          const publicUrl = `${domain}/${key}`;
+          const sizeBytes = file.size;
+          const sizeFormatted = sizeBytes > 1024 * 1024 
+            ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB` 
+            : `${Math.round(sizeBytes / 1024)} KB`;
+
+          newItems.push({
+            id: `rk-${timestamp}-${Math.random().toString(36).substring(2, 6)}`,
+            tahun,
+            bulan,
+            nama_bulan: NAMA_BULAN[bulan - 1] || `Bulan ${bulan}`,
+            rekening_id,
+            nama_bank,
+            nomor_rekening,
+            nama_rekening,
+            nama_pemilik: nama_rekening,
+            tipe_sumber: 'file',
+            file_url: publicUrl,
+            file_name: file.name,
+            file_type: fileType,
+            file_size: sizeFormatted,
+            r2_key: key,
+            saldo_awal,
+            saldo_akhir,
+            keterangan,
+            uploader,
+            created_at: new Date().toISOString()
+          });
+        }
       } else {
-        // Tipe Link dari form-data
-        const linkUrl = (formData.get('link_url') as string) || '';
-        const linkJudul = (formData.get('link_judul') as string) || 'Tautan Rekening Koran';
-        const file_type = (formData.get('file_type') as 'pdf' | 'excel' | 'csv') || 'pdf';
+        // Tipe Link dari Form Data (Bisa multiple link per ekstensi)
+        const linkPdf = (formData.get('link_pdf') as string) || '';
+        const linkExcel = (formData.get('link_excel') as string) || '';
+        const linkCsv = (formData.get('link_csv') as string) || '';
+        const singleLink = (formData.get('link_url') as string) || '';
+        const defaultJudul = (formData.get('link_judul') as string) || '';
 
-        if (!linkUrl.trim()) {
-          return NextResponse.json({ success: false, error: 'Alamat URL / Tautan harus diisi!' }, { status: 400 });
+        const linksToProcess: { url: string; type: 'pdf' | 'excel' | 'csv'; judul?: string }[] = [];
+
+        if (linkPdf.trim()) linksToProcess.push({ url: linkPdf.trim(), type: 'pdf', judul: defaultJudul ? `${defaultJudul} (PDF)` : '' });
+        if (linkExcel.trim()) linksToProcess.push({ url: linkExcel.trim(), type: 'excel', judul: defaultJudul ? `${defaultJudul} (Excel)` : '' });
+        if (linkCsv.trim()) linksToProcess.push({ url: linkCsv.trim(), type: 'csv', judul: defaultJudul ? `${defaultJudul} (CSV)` : '' });
+
+        if (linksToProcess.length === 0 && singleLink.trim()) {
+          const type = (formData.get('file_type') as any) || 'pdf';
+          linksToProcess.push({ url: singleLink.trim(), type, judul: defaultJudul });
         }
 
-        itemData = {
-          id: `rk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          tahun,
-          bulan,
-          nama_bulan: NAMA_BULAN[bulan - 1] || `Bulan ${bulan}`,
-          rekening_id,
-          nama_bank,
-          nomor_rekening,
-          nama_rekening,
-          tipe_sumber: 'link',
-          file_url: linkUrl.trim(),
-          file_name: linkJudul.trim(),
-          file_type,
-          file_size: 'Tautan Eksternal',
-          saldo_awal,
-          saldo_akhir,
-          keterangan,
-          uploader,
-          created_at: new Date().toISOString()
-        };
+        // Tautan tambahan / dynamic links jika dikirimkan sebagai JSON string
+        const extraLinksRaw = formData.get('extra_links') as string | null;
+        if (extraLinksRaw) {
+          try {
+            const extraLinks = JSON.parse(extraLinksRaw);
+            if (Array.isArray(extraLinks)) {
+              extraLinks.forEach((el: any) => {
+                if (el.url && el.url.trim()) {
+                  linksToProcess.push({
+                    url: el.url.trim(),
+                    type: el.type || 'pdf',
+                    judul: el.judul || defaultJudul
+                  });
+                }
+              });
+            }
+          } catch {
+            // ignore parse error
+          }
+        }
+
+        if (linksToProcess.length === 0) {
+          return NextResponse.json({ success: false, error: 'Silakan isi minimal satu tautan link dokumen!' }, { status: 400 });
+        }
+
+        const yy = String(tahun).slice(-2);
+        const mm = String(bulan).padStart(2, '0');
+        const autoBaseJudul = `[${yy}_${mm}] [${rekening_id}]_${nama_bank}_${nomor_rekening}_${nama_rekening}`;
+
+        for (const item of linksToProcess) {
+          const finalJudul = item.judul?.trim() || `${autoBaseJudul}.${item.type}`;
+          newItems.push({
+            id: `rk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            tahun,
+            bulan,
+            nama_bulan: NAMA_BULAN[bulan - 1] || `Bulan ${bulan}`,
+            rekening_id,
+            nama_bank,
+            nomor_rekening,
+            nama_rekening,
+            nama_pemilik: nama_rekening,
+            tipe_sumber: 'link',
+            file_url: item.url,
+            file_name: finalJudul,
+            file_type: item.type,
+            file_size: 'Tautan Online',
+            saldo_awal,
+            saldo_akhir,
+            keterangan,
+            uploader,
+            created_at: new Date().toISOString()
+          });
+        }
       }
     } else {
-      // JSON body (Link upload atau manual payload)
+      // JSON Payload (Direct API / Programmatic)
       const body = await req.json();
       const {
         tahun = new Date().getFullYear(),
@@ -414,71 +322,82 @@ export async function POST(req: NextRequest) {
         nama_bank = 'Bank Syariah Indonesia (BSI)',
         nomor_rekening = '7666333211',
         nama_rekening = 'MARDLIYYAH ISLAMIC CENTER',
-        rekening_id,
-        link_url,
-        file_name = 'Tautan Rekening Koran Online',
-        file_type = 'pdf',
+        rekening_id = '1',
+        items = [],
         saldo_awal = null,
         saldo_akhir = null,
         keterangan = '',
         uploader = 'Admin Keuangan'
       } = body;
 
-      if (!link_url) {
-        return NextResponse.json({ success: false, error: 'Link URL wajib diisi!' }, { status: 400 });
+      if (Array.isArray(items) && items.length > 0) {
+        items.forEach((it: any) => {
+          newItems.push({
+            id: `rk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            tahun: Number(tahun),
+            bulan: Number(bulan),
+            nama_bulan: NAMA_BULAN[Number(bulan) - 1] || `Bulan ${bulan}`,
+            rekening_id,
+            nama_bank,
+            nomor_rekening,
+            nama_rekening,
+            nama_pemilik: nama_rekening,
+            tipe_sumber: it.tipe_sumber || 'link',
+            file_url: it.file_url,
+            file_name: it.file_name,
+            file_type: it.file_type || 'pdf',
+            file_size: it.file_size || 'Tautan Online',
+            saldo_awal,
+            saldo_akhir,
+            keterangan,
+            uploader,
+            created_at: new Date().toISOString()
+          });
+        });
       }
-
-      itemData = {
-        id: `rk-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        tahun: Number(tahun),
-        bulan: Number(bulan),
-        nama_bulan: NAMA_BULAN[Number(bulan) - 1] || `Bulan ${bulan}`,
-        rekening_id,
-        nama_bank,
-        nomor_rekening,
-        nama_rekening,
-        tipe_sumber: 'link',
-        file_url: link_url.trim(),
-        file_name,
-        file_type,
-        file_size: 'Tautan Eksternal',
-        saldo_awal,
-        saldo_akhir,
-        keterangan,
-        uploader,
-        created_at: new Date().toISOString()
-      };
     }
 
-    const targetTahun = itemData.tahun || new Date().getFullYear();
+    if (newItems.length === 0) {
+      return NextResponse.json({ success: false, error: 'Tidak ada dokumen yang diunggah!' }, { status: 400 });
+    }
+
+    const targetTahun = newItems[0].tahun || new Date().getFullYear();
 
     // 2. Simpan ke database Supabase (app_arsip_kegiatan kategori_id: 6)
-    const { data: existingRow, error: fetchErr } = await supabaseAdmin
+    const { data: existingRows, error: fetchErr } = await supabaseAdmin
       .from('app_arsip_kegiatan')
       .select('*')
       .eq('kategori_id', KATEGORI_ID)
-      .eq('tahun', targetTahun)
-      .maybeSingle();
+      .eq('tahun', targetTahun);
 
     if (fetchErr) {
       console.error("Fetch arsip error:", fetchErr);
     }
 
-    if (existingRow) {
+    if (existingRows && existingRows.length > 0) {
+      const primaryRow = existingRows[0];
       let currentDocs: any[] = [];
-      if (Array.isArray(existingRow.fase_dokumen)) {
-        currentDocs = existingRow.fase_dokumen;
-      } else if (typeof existingRow.fase_dokumen === 'string') {
-        try { currentDocs = JSON.parse(existingRow.fase_dokumen); } catch { currentDocs = []; }
+      if (Array.isArray(primaryRow.fase_dokumen)) {
+        currentDocs = primaryRow.fase_dokumen;
+      } else if (typeof primaryRow.fase_dokumen === 'string') {
+        try { currentDocs = JSON.parse(primaryRow.fase_dokumen); } catch { currentDocs = []; }
       }
-      currentDocs.unshift(itemData);
+
+      // Tambahkan item-item baru di awal
+      currentDocs.unshift(...newItems);
 
       const { error: updateErr } = await supabaseAdmin
         .from('app_arsip_kegiatan')
         .update({ fase_dokumen: currentDocs })
-        .eq('id', existingRow.id);
+        .eq('id', primaryRow.id);
 
       if (updateErr) throw updateErr;
+
+      // Bersihkan jika ada row duplikat untuk tahun yang sama
+      if (existingRows.length > 1) {
+        const extraIds = existingRows.slice(1).map(r => r.id);
+        await supabaseAdmin.from('app_arsip_kegiatan').delete().in('id', extraIds);
+      }
     } else {
       const { error: insertErr } = await supabaseAdmin
         .from('app_arsip_kegiatan')
@@ -486,7 +405,7 @@ export async function POST(req: NextRequest) {
           kategori_id: KATEGORI_ID,
           tahun: targetTahun,
           catatan: 'Rekening Koran Bulanan Kas Masjid Kampus',
-          fase_dokumen: [itemData]
+          fase_dokumen: newItems
         }]);
 
       if (insertErr) throw insertErr;
@@ -494,8 +413,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Rekening koran berhasil disimpan ke arsip masjid!',
-      data: itemData
+      message: `${newItems.length} dokumen rekening koran berhasil disimpan!`,
+      data: newItems
     });
   } catch (err: any) {
     console.error('Error posting rekening koran:', err);
