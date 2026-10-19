@@ -20,7 +20,7 @@ export function detectModuleFromPath(pathname: string): string {
   if (pathname.startsWith('/penerimaan')) return 'PENERIMAAN';
   if (pathname.startsWith('/review') || pathname.startsWith('/admin/rules')) return 'REVIEW ANGGARAN';
   if (pathname.startsWith('/users') || pathname.startsWith('/menus') || pathname.startsWith('/units') || pathname.startsWith('/backup')) return 'MASTER';
-  if (pathname.startsWith('/verifikasi') || pathname.startsWith('/input') || pathname.startsWith('/buku-besar') || pathname.startsWith('/bank') || pathname.startsWith('/reports')) return 'MASJID';
+  if (pathname.startsWith('/verifikasi') || pathname.startsWith('/input') || pathname.startsWith('/buku-besar') || pathname.startsWith('/bank') || pathname.startsWith('/reports') || pathname.startsWith('/rekening-koran')) return 'MASJID';
   if (pathname.startsWith('/login') || pathname.startsWith('/reset-password')) return 'AUTH';
   if (pathname.startsWith('/timeline') || pathname.startsWith('/arsip-kegiatan')) return 'KEGIATAN';
   return 'UMUM';

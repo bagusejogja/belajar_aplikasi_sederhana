@@ -38,6 +38,7 @@ export const menuList: MenuItem[] = [
   { title: 'Ringkasan Kas Kecil', path: '/summary', icon: 'Layers', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Pengajuan Kas Kecil', path: '/report-photo', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Impor Trx Bank', path: '/bank', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF'], group: 'Masjid' },
+  { title: 'Rekening Koran', path: '/rekening-koran', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Buku Besar', path: '/buku-besar', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Laporan', path: '/laporan-mak', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Masjid' },
   { title: 'Analisis Pivot', path: '/pivot', icon: 'LayoutGrid', roles: ['ADMIN', 'MANAGER'], group: 'Masjid' },
