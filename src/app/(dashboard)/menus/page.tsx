@@ -9,6 +9,7 @@ import {
   Folder, FolderOpen, Minus, CornerDownRight
 } from 'lucide-react';
 import { menuList } from '@/lib/mock-db';
+import { clearAuthCache } from '@/lib/authCache';
 import PageHeader from '@/components/shared/PageHeader';
 import toast from 'react-hot-toast';
 
@@ -241,6 +242,7 @@ export default function MenusPage() {
         if (errorIns) throw errorIns;
       }
 
+      clearAuthCache();
       toast.success(`Hak akses untuk role "${selectedRole}" berhasil disimpan!`);
       if (selectedRole.toUpperCase() === 'ADMIN') window.location.reload();
     } catch (err: any) {

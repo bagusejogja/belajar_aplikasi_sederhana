@@ -61,7 +61,7 @@ const TABS: TabConfig[] = [
 
 export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
   const pathname = usePathname();
-  const { isAdmin, isManager, isPemroses, role, loading } = useUserRole();
+  const { isAdmin, isManager, isPemroses, role, allowedPaths, loading } = useUserRole();
   const canAccessAdminTabs = isAdmin || isManager || isPemroses;
 
   const currentTab = activeTab || (
@@ -89,13 +89,13 @@ export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
         <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium shrink-0">
           <span className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Hak Akses:</span>
           <span className={`px-2.5 py-0.5 rounded-full font-black uppercase text-[10px] tracking-wide border shadow-2xs ${
-            canAccessAdminTabs
+            canAccessAdminTabs || allowedPaths.includes('/surat/tambah')
               ? 'bg-blue-50 text-blue-700 border-blue-200'
               : 'bg-slate-50 text-slate-700 border-slate-200'
           }`}>
             {role || 'STAFF'}
           </span>
-          {!canAccessAdminTabs && !loading && (
+          {!canAccessAdminTabs && !allowedPaths.includes('/surat/tambah') && !loading && (
             <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md font-semibold hidden sm:inline">
               Mode Lihat Arsip
             </span>
@@ -108,7 +108,9 @@ export default function PersuratanTabs({ activeTab }: { activeTab?: string }) {
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
-          const isRestricted = tab.adminOnly && !canAccessAdminTabs && !loading;
+          const hasRolePermission = allowedPaths.includes(tab.path);
+          const canAccess = isAdmin || hasRolePermission || (!tab.adminOnly) || canAccessAdminTabs;
+          const isRestricted = !canAccess && !loading;
 
           // Sembunyikan tab jika user tidak memiliki hak akses
           if (isRestricted) {
