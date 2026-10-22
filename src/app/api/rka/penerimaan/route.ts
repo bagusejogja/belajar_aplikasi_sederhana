@@ -144,6 +144,7 @@ export async function POST(request: Request) {
           status: String(r.status || 'Sedang Diproses').trim(),
           keterangan: String(r.keterangan || '').trim(),
           sumber_dana: String(r.sumber_dana || r.sumberDana || 'Dana Masyarakat Tidak Mengikat').trim(),
+          versi_anggaran: String(r.versi_anggaran || r.versi || body.versi_anggaran || body.versi || 'v1').trim(),
           updated_at: new Date().toISOString()
         };
       });
@@ -156,9 +157,14 @@ export async function POST(request: Request) {
         const chunk = formatted.slice(i, i + chunkSize);
         let { error } = await supabaseAdmin.from('rkat_penerimaan').insert(chunk);
 
-        // Fallback jika kolom prop_alokasi_prosentase_unit atau prop_alokasi_prosentase_universitas belum ada di database Supabase
-        if (error && (error.message?.includes('prop_alokasi_prosentase') || error.details?.includes('prop_alokasi_prosentase'))) {
-          const fallbackChunk = chunk.map(({ prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, ...rest }: any) => rest);
+        // Fallback jika kolom prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, atau versi_anggaran belum ada di database Supabase
+        if (error && (
+          error.message?.includes('prop_alokasi_prosentase') || 
+          error.details?.includes('prop_alokasi_prosentase') ||
+          error.message?.includes('versi_anggaran') ||
+          error.details?.includes('versi_anggaran')
+        )) {
+          const fallbackChunk = chunk.map(({ prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, versi_anggaran, ...rest }: any) => rest);
           const retryRes = await supabaseAdmin.from('rkat_penerimaan').insert(fallbackChunk);
           error = retryRes.error;
         }
@@ -205,6 +211,7 @@ export async function POST(request: Request) {
       status: String(body.status || 'Sedang Diproses').trim(),
       keterangan: String(body.keterangan || '').trim(),
       sumber_dana: String(body.sumber_dana || 'Dana Masyarakat Tidak Mengikat').trim(),
+      versi_anggaran: String(body.versi_anggaran || body.versi || 'v1').trim(),
       updated_at: new Date().toISOString()
     };
 
@@ -213,9 +220,14 @@ export async function POST(request: Request) {
       .insert([newRecord])
       .select();
 
-    // Fallback jika kolom prop_alokasi_prosentase_unit / universitas belum ada
-    if (error && (error.message?.includes('prop_alokasi_prosentase') || error.details?.includes('prop_alokasi_prosentase'))) {
-      const { prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, ...fallbackRecord } = newRecord;
+    // Fallback jika kolom prop_alokasi_prosentase_unit / universitas / versi_anggaran belum ada
+    if (error && (
+      error.message?.includes('prop_alokasi_prosentase') || 
+      error.details?.includes('prop_alokasi_prosentase') ||
+      error.message?.includes('versi_anggaran') ||
+      error.details?.includes('versi_anggaran')
+    )) {
+      const { prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, versi_anggaran, ...fallbackRecord } = newRecord;
       const retryRes = await supabaseAdmin
         .from('rkat_penerimaan')
         .insert([fallbackRecord])
@@ -286,6 +298,9 @@ export async function PUT(request: Request) {
     if (body.status !== undefined) payload.status = body.status;
     if (body.keterangan !== undefined) payload.keterangan = body.keterangan;
     if (body.sumber_dana !== undefined) payload.sumber_dana = body.sumber_dana;
+    if (body.versi_anggaran !== undefined || body.versi !== undefined) {
+      payload.versi_anggaran = String(body.versi_anggaran || body.versi).trim();
+    }
 
     let query = supabaseAdmin.from('rkat_penerimaan').update(payload);
     if (body.id) {
@@ -294,7 +309,18 @@ export async function PUT(request: Request) {
       query = query.eq('renterima_id', body.renterima_id || body.renterimaId);
     }
 
-    const { error } = await query;
+    let { error } = await query;
+    if (error && (error.message?.includes('versi_anggaran') || error.details?.includes('versi_anggaran'))) {
+      delete payload.versi_anggaran;
+      let retryQuery = supabaseAdmin.from('rkat_penerimaan').update(payload);
+      if (body.id) {
+        retryQuery = retryQuery.eq('id', body.id);
+      } else {
+        retryQuery = retryQuery.eq('renterima_id', body.renterima_id || body.renterimaId);
+      }
+      const retryRes = await retryQuery;
+      error = retryRes.error;
+    }
     if (error) throw error;
 
     return NextResponse.json({ success: true, message: 'Data penerimaan berhasil diperbarui' });

@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import VersiAnggaranSelector from '@/components/rka/VersiAnggaranSelector';
 import RkaHelpModal from '@/components/rka/RkaHelpModal';
 
 // Autocomplete Filter Unit Kerja (Navigasi Keyboard ↑ ↓ + Enter, Terurut A-Z)
@@ -138,6 +139,7 @@ export default function RkaPenerimaanPage() {
   const [tableNotCreated, setTableNotCreated] = useState(false);
 
   // Filters State
+  const [versiFilter, setVersiFilter] = useState<string>('v1');
   const [tahunFilter, setTahunFilter] = useState<string>('2027');
   const [unitFilter, setUnitFilter] = useState<string>('ALL');
   const [formatFilter, setFormatFilter] = useState<string>('ALL');
@@ -190,7 +192,7 @@ export default function RkaPenerimaanPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let url = `/api/rka/penerimaan?tahun=${tahunFilter}`;
+      let url = `/api/rka/penerimaan?tahun=${tahunFilter}&versi=${encodeURIComponent(versiFilter)}`;
       if (unitFilter !== 'ALL') url += `&unit=${encodeURIComponent(unitFilter)}`;
       if (statusFilter !== 'ALL') url += `&status=${encodeURIComponent(statusFilter)}`;
 
@@ -215,7 +217,7 @@ export default function RkaPenerimaanPage() {
 
   useEffect(() => {
     fetchData();
-  }, [tahunFilter, unitFilter, statusFilter]);
+  }, [tahunFilter, unitFilter, statusFilter, versiFilter]);
 
   // Ambil daftar master unit dari api/rka/rules?units=1
   useEffect(() => {
@@ -552,13 +554,20 @@ export default function RkaPenerimaanPage() {
       for (let b = 0; b < totalBatches; b++) {
         const start = b * BATCH_SIZE;
         const end = Math.min(start + BATCH_SIZE, totalLines);
-        const batchRows = parsedPasteLines.slice(start, end);
+        const batchRows = parsedPasteLines.slice(start, end).map(r => ({
+          ...r,
+          versi_anggaran: versiFilter
+        }));
         const currentBatchNum = b + 1;
 
         const res = await fetch('/api/rka/penerimaan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bulk: true, rows: batchRows })
+          body: JSON.stringify({ 
+            bulk: true, 
+            rows: batchRows,
+            versi_anggaran: versiFilter
+          })
         });
 
         if (!res.ok) {
@@ -611,7 +620,10 @@ export default function RkaPenerimaanPage() {
       const res = await fetch('/api/rka/penerimaan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRow)
+        body: JSON.stringify({
+          ...newRow,
+          versi_anggaran: versiFilter
+        })
       });
       const json = await res.json();
       if (json.success) {
@@ -709,7 +721,7 @@ export default function RkaPenerimaanPage() {
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'RKAT_Penerimaan');
-    XLSX.writeFile(wb, `RKAT_Penerimaan_${tahunFilter}_${new Date().getTime()}.xlsx`);
+    XLSX.writeFile(wb, `RKAT_Penerimaan_${tahunFilter}_${versiFilter}_${new Date().getTime()}.xlsx`);
   };
 
   const [copiedSql, setCopiedSql] = useState(false);
@@ -759,6 +771,9 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
                 <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold uppercase">
                   TA {tahunFilter}
                 </Badge>
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-bold uppercase font-mono">
+                  {versiFilter.toUpperCase()}
+                </Badge>
               </div>
               <p className="text-xs text-gray-500 font-medium">
                 Penerimaan UKT, Tarif, Volume &amp; Pagu Usulan RKAT per Unit Kerja
@@ -770,6 +785,14 @@ CREATE POLICY "Allow all access to rkat_penerimaan" ON public.rkat_penerimaan FO
         <div className="flex flex-wrap items-center gap-2">
           {/* Bantuan & Alur Bisnis */}
           <RkaHelpModal currentPage="penerimaan" />
+
+          {/* Selector Versi Anggaran Multi-Version */}
+          <VersiAnggaranSelector
+            selectedVersi={versiFilter}
+            onSelectVersi={setVersiFilter}
+            tahun={tahunFilter}
+            modul="penerimaan"
+          />
 
           <Button
             variant="outline"
