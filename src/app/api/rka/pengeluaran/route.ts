@@ -127,8 +127,8 @@ export async function GET(request: Request) {
   }
 }
 
-// Helper Upsert Pintar Berbasis db_id: Update jika db_id sudah ada di database, Insert jika baru
-async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
+// Helper Upsert Pintar Berbasis db_id: Update jika db_id sudah ada di database pada versi yang sama, Insert jika baru
+async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean, targetVersi: string = 'v1') {
   let dbIdMissing = initialDbIdMissing;
 
   if (dbIdMissing) {
@@ -146,10 +146,19 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
   let existingDbIds = new Set<string>();
 
   if (chunkDbIds.length > 0) {
-    const { data: existingRows, error: findErr } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('rkat_pengeluaran')
       .select('db_id')
       .in('db_id', chunkDbIds);
+
+    // Filter pencarian eksisting HANYA pada versi_anggaran yang sama
+    if (targetVersi === 'v1') {
+      query = query.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+    } else {
+      query = query.eq('versi_anggaran', targetVersi);
+    }
+
+    const { data: existingRows, error: findErr } = await query;
 
     if (findErr) {
       if (findErr.message?.includes('db_id') || findErr.message?.includes('versi_anggaran')) {
@@ -169,11 +178,11 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
     }
   }
 
-  // 2. Pilah data: yang sudah ada di DB di-UPDATE, yang belum ada di-INSERT
+  // 2. Pilah data: yang sudah ada di DB pada versi yang sama di-UPDATE, yang belum ada di-INSERT
   const toUpdate = chunk.filter((r: any) => r.db_id && existingDbIds.has(String(r.db_id)));
   const toInsert = chunk.filter((r: any) => !r.db_id || !existingDbIds.has(String(r.db_id)));
 
-  // A. Eksekusi INSERT untuk baris baru
+  // A. Eksekusi INSERT untuk baris baru (atau baris pada versi baru)
   if (toInsert.length > 0) {
     let { error: insErr } = await supabaseAdmin.from('rkat_pengeluaran').insert(toInsert);
     if (insErr) {
@@ -188,7 +197,7 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
     }
   }
 
-  // B. Eksekusi UPDATE untuk baris yang sudah ada (berdasarkan db_id) secara parallel
+  // B. Eksekusi UPDATE untuk baris yang sudah ada (berdasarkan db_id DAN versi_anggaran)
   if (toUpdate.length > 0) {
     const concurrency = 25;
     for (let j = 0; j < toUpdate.length; j += concurrency) {
@@ -196,10 +205,17 @@ async function processUpsertChunk(chunk: any[], initialDbIdMissing: boolean) {
       await Promise.all(
         batch.map((row: any) => {
           const { db_id, ...updatePayload } = row;
-          return supabaseAdmin
+          let uQ = supabaseAdmin
             .from('rkat_pengeluaran')
             .update({ ...updatePayload, updated_at: new Date().toISOString() })
             .eq('db_id', db_id);
+
+          if (targetVersi === 'v1') {
+            uQ = uQ.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+          } else {
+            uQ = uQ.eq('versi_anggaran', targetVersi);
+          }
+          return uQ;
         })
       );
     }
@@ -305,6 +321,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Tidak ada baris data valid untuk disimpan' }, { status: 400 });
       }
 
+      const targetVersi = String(body.versi_anggaran || body.versi || 'v1').trim();
+
       // Chunk processing (200 baris per batch): Upsert pintar berbasis db_id
       const chunkSize = 200;
       let insertedCount = 0;
@@ -313,7 +331,7 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < rowsToInsert.length; i += chunkSize) {
         const chunk = rowsToInsert.slice(i, i + chunkSize);
-        const res = await processUpsertChunk(chunk, dbIdMissingInDb);
+        const res = await processUpsertChunk(chunk, dbIdMissingInDb, targetVersi);
         insertedCount += res.inserted;
         updatedCount += res.updated;
         if (res.dbIdMissing) dbIdMissingInDb = true;
@@ -335,6 +353,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: 'Tidak ada baris data untuk diimpor' }, { status: 400 });
       }
 
+      const targetVersi = String(body.versi_anggaran || body.versi || 'v1').trim();
       const chunkSize = 200;
       let insertedCount = 0;
       let updatedCount = 0;
@@ -342,7 +361,7 @@ export async function POST(request: Request) {
 
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        const res = await processUpsertChunk(chunk, dbIdMissingInDb);
+        const res = await processUpsertChunk(chunk, dbIdMissingInDb, targetVersi);
         insertedCount += res.inserted;
         updatedCount += res.updated;
         if (res.dbIdMissing) dbIdMissingInDb = true;
