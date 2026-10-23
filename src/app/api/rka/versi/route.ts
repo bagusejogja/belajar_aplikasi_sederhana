@@ -111,6 +111,7 @@ export async function POST(request: Request) {
 
     let clonedCountPengeluaran = 0;
     let clonedCountPenerimaan = 0;
+    let clonedCountPenyesuaian = 0;
 
     // 2. Jika diminta salin data dari versi yang sudah ada (misal salin dari 'v1' ke 'v2')
     if (salin_dari && salin_dari.trim()) {
@@ -227,18 +228,44 @@ export async function POST(request: Request) {
           }
         }
       }
+
+      // Salin Penyesuaian Anggaran
+      let qPenyesuaian = supabaseAdmin
+        .from('rkat_penyesuaian')
+        .select('*')
+        .eq('tahun_anggaran', cleanTahun);
+
+      if (sourceKode === 'v1') {
+        qPenyesuaian = qPenyesuaian.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+      } else {
+        qPenyesuaian = qPenyesuaian.eq('versi_anggaran', sourceKode);
+      }
+
+      const { data: sourcePenyesuaian } = await qPenyesuaian;
+      if (sourcePenyesuaian && sourcePenyesuaian.length > 0) {
+        const chunk = sourcePenyesuaian.map((row: any) => {
+          const { id, created_at, updated_at, ...rest } = row;
+          return {
+            ...rest,
+            versi_anggaran: cleanKode
+          };
+        });
+        await supabaseAdmin.from('rkat_penyesuaian').insert(chunk);
+        clonedCountPenyesuaian = sourcePenyesuaian.length;
+      }
     }
 
     return NextResponse.json({
       success: true,
       message: `Versi '${cleanNama}' berhasil dibuat!${
         salin_dari 
-          ? ` Berhasil menyalin ${clonedCountPengeluaran} data belanja dan ${clonedCountPenerimaan} data penerimaan dari versi '${salin_dari}'.` 
+          ? ` Berhasil menyalin ${clonedCountPengeluaran} data belanja, ${clonedCountPenerimaan} data penerimaan, dan ${clonedCountPenyesuaian} data penyesuaian dari versi '${salin_dari}'.` 
           : ' Siap diisi data baru.'
       }`,
       data: insertedVersi,
       clonedPengeluaran: clonedCountPengeluaran,
-      clonedPenerimaan: clonedCountPenerimaan
+      clonedPenerimaan: clonedCountPenerimaan,
+      clonedPenyesuaian: clonedCountPenyesuaian
     });
   } catch (error: any) {
     console.error('Error in POST /api/rka/versi:', error);
