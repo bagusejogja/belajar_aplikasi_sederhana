@@ -11,14 +11,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const tahunStr = searchParams.get('tahun') || '2027';
     const versi = searchParams.get('versi') || 'Final';
+    const sumberVersi = searchParams.get('sumber_versi') || 'v1';
     const tahun = parseInt(tahunStr);
 
     // 1. Fetch seluruh akun master, hitung total baris, dan ambil data statis secara paralel
-    const [akunRes, penCountRes, expCountRes, statisRes] = await Promise.all([
+    let penCountQuery = supabaseAdmin.from('rkat_penerimaan').select('*', { count: 'exact', head: true }).eq('tahun', tahun);
+    if (sumberVersi === 'v1') {
+      penCountQuery = penCountQuery.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+    } else if (sumberVersi !== 'ALL') {
+      penCountQuery = penCountQuery.eq('versi_anggaran', sumberVersi);
+    }
+
+    let expCountQuery = supabaseAdmin.from('rkat_pengeluaran').select('*', { count: 'exact', head: true }).eq('tahun_anggaran', tahun);
+    if (sumberVersi === 'v1') {
+      expCountQuery = expCountQuery.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+    } else if (sumberVersi !== 'ALL') {
+      expCountQuery = expCountQuery.eq('versi_anggaran', sumberVersi);
+    }
+
+    const [akunRes, penCountRes, expCountRes, statisRes, versiDbRes] = await Promise.all([
       supabaseAdmin.from('app_laporan_akun').select('*').order('urutan', { ascending: true }),
-      supabaseAdmin.from('rkat_penerimaan').select('*', { count: 'exact', head: true }).eq('tahun', tahun),
-      supabaseAdmin.from('rkat_pengeluaran').select('*', { count: 'exact', head: true }).eq('tahun_anggaran', tahun),
-      supabaseAdmin.from('app_laporan_statis').select('*').eq('tahun', tahun).eq('versi', versi)
+      penCountQuery,
+      expCountQuery,
+      supabaseAdmin.from('app_laporan_statis').select('*').eq('tahun', tahun).eq('versi', versi),
+      supabaseAdmin.from('rka_versi_anggaran').select('kode_versi, nama_versi, is_active').order('kode_versi')
     ]);
 
     if (akunRes.error) throw akunRes.error;
@@ -26,18 +42,24 @@ export async function GET(request: Request) {
     const statisList = statisRes.data || [];
     const penCount = penCountRes.count || 0;
     const expCount = expCountRes.count || 0;
+    const versiList = versiDbRes.data || [];
 
     // 2. Fetch seluruh data penerimaan & pengeluaran secara paralel
     const pSize = 1000;
     const totalPPages = penCount > 0 ? Math.ceil(penCount / pSize) : 0;
     const pPromises = [];
     for (let p = 0; p < totalPPages; p++) {
+      let q = supabaseAdmin
+        .from('rkat_penerimaan')
+        .select('id, format_proposal, kelompok_penerimaan, renterima_pagu, tahun')
+        .eq('tahun', tahun);
+      if (sumberVersi === 'v1') {
+        q = q.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+      } else if (sumberVersi !== 'ALL') {
+        q = q.eq('versi_anggaran', sumberVersi);
+      }
       pPromises.push(
-        supabaseAdmin
-          .from('rkat_penerimaan')
-          .select('id, format_proposal, kelompok_penerimaan, renterima_pagu, tahun')
-          .eq('tahun', tahun)
-          .range(p * pSize, p * pSize + pSize - 1)
+        q.range(p * pSize, p * pSize + pSize - 1)
           .then(res => res.data || [])
       );
     }
@@ -46,12 +68,17 @@ export async function GET(request: Request) {
     const totalEPages = expCount > 0 ? Math.ceil(expCount / eSize) : 0;
     const ePromises = [];
     for (let p = 0; p < totalEPages; p++) {
+      let q = supabaseAdmin
+        .from('rkat_pengeluaran')
+        .select('id, identifikasi_lain, tags, anggaran, tahun_anggaran')
+        .eq('tahun_anggaran', tahun);
+      if (sumberVersi === 'v1') {
+        q = q.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+      } else if (sumberVersi !== 'ALL') {
+        q = q.eq('versi_anggaran', sumberVersi);
+      }
       ePromises.push(
-        supabaseAdmin
-          .from('rkat_pengeluaran')
-          .select('id, identifikasi_lain, tags, anggaran, tahun_anggaran')
-          .eq('tahun_anggaran', tahun)
-          .range(p * eSize, p * eSize + eSize - 1)
+        q.range(p * eSize, p * eSize + eSize - 1)
           .then(res => res.data || [])
       );
     }
@@ -115,10 +142,23 @@ export async function GET(request: Request) {
       ...(eYearsRes.data || []).map((x: any) => x.tahun_anggaran)
     ])).filter(Boolean).sort().reverse();
 
+    const availableVersions = (versiList && versiList.length > 0)
+      ? versiList.map((v: any) => ({
+          kode: v.kode_versi,
+          nama: v.nama_versi || v.kode_versi.toUpperCase(),
+          isActive: v.is_active
+        }))
+      : [
+          { kode: 'v1', nama: 'v1 - Penetapan Awal', isActive: false },
+          { kode: 'v2', nama: 'v2 - Telaah SA / Revisi', isActive: true }
+        ];
+
     return NextResponse.json({
       success: true,
       tahun,
       versi,
+      sumberVersi,
+      availableVersions,
       availableRkaYears: availableRkaYears.length > 0 ? availableRkaYears : [2027, 2026, 2025],
       counts: {
         penerimaan: penerimaanRows.length,

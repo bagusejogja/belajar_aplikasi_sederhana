@@ -150,6 +150,11 @@ export default function KomparasiLaporanPage() {
   // RKA Pull Modal State
   const [isRkaPullModalOpen, setIsRkaPullModalOpen] = useState(false);
   const [rkaSourceYear, setRkaSourceYear] = useState<number>(2027);
+  const [rkaSourceVersi, setRkaSourceVersi] = useState<string>('v1');
+  const [rkaAvailableVersions, setRkaAvailableVersions] = useState<Array<{ kode: string; nama: string; isActive?: boolean }>>([
+    { kode: 'v1', nama: 'v1 - Penetapan Awal' },
+    { kode: 'v2', nama: 'v2 - Telaah SA / Revisi' }
+  ]);
   const [rkaTargetYear, setRkaTargetYear] = useState<number>(2027);
   const [rkaTargetVersi, setRkaTargetVersi] = useState<string>('Final');
   const [rkaAvailableYears, setRkaAvailableYears] = useState<number[]>([2027, 2026, 2025]);
@@ -229,13 +234,21 @@ export default function KomparasiLaporanPage() {
     }
   }, []);
 
-  const fetchRkaPreview = async (year = rkaSourceYear, targetYear = rkaTargetYear, targetVersi = rkaTargetVersi) => {
+  const fetchRkaPreview = async (
+    year = rkaSourceYear, 
+    targetYear = rkaTargetYear, 
+    targetVersi = rkaTargetVersi, 
+    sourceVersi = rkaSourceVersi
+  ) => {
     setRkaPreviewLoading(true);
     try {
-      const res = await fetch(`/api/rka/komparasi-sync?tahun=${year}&versi=${encodeURIComponent(targetVersi)}`);
+      const res = await fetch(`/api/rka/komparasi-sync?tahun=${year}&versi=${encodeURIComponent(targetVersi)}&sumber_versi=${encodeURIComponent(sourceVersi)}`);
       const json = await res.json();
       if (json.success) {
         setRkaPreviewData(json);
+        if (json.availableVersions && json.availableVersions.length > 0) {
+          setRkaAvailableVersions(json.availableVersions);
+        }
         if (json.availableRkaYears && json.availableRkaYears.length > 0) {
           setRkaAvailableYears(json.availableRkaYears);
           if (!json.availableRkaYears.includes(rkaSourceYear)) {
@@ -255,12 +268,12 @@ export default function KomparasiLaporanPage() {
   const openRkaPullModal = () => {
     setIsRkaPullModalOpen(true);
     setRkaModalTab('preview');
-    fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi);
+    fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi, rkaSourceVersi);
   };
 
   const handleApplyRkaSync = async () => {
     if (!rkaPreviewData || !rkaPreviewData.previewRows) return;
-    const confirmMsg = `Konfirmasi: Terapkan hasil kalkulasi Usulan RKA ${rkaSourceYear} ke kolom Anggaran Komparasi Tahun ${rkaTargetYear} (${rkaTargetVersi})?\n\nTotal Penerimaan: Rp ${fmt(rkaPreviewData.summary.totalPenerimaan)}\nTotal Pengeluaran: Rp ${fmt(rkaPreviewData.summary.totalPengeluaran)}\nSurplus/Defisit: Rp ${fmt(rkaPreviewData.summary.surplusDefisit)}`;
+    const confirmMsg = `Konfirmasi: Terapkan hasil kalkulasi Usulan RKA ${rkaSourceYear} (Sumber: ${rkaSourceVersi.toUpperCase()}) ke kolom Anggaran Komparasi Tahun ${rkaTargetYear} (${rkaTargetVersi})?\n\nTotal Penerimaan: Rp ${fmt(rkaPreviewData.summary.totalPenerimaan)}\nTotal Pengeluaran: Rp ${fmt(rkaPreviewData.summary.totalPengeluaran)}\nSurplus/Defisit: Rp ${fmt(rkaPreviewData.summary.surplusDefisit)}`;
     if (!confirm(confirmMsg)) return;
 
     setRkaApplying(true);
@@ -3160,12 +3173,34 @@ export default function KomparasiLaporanPage() {
                     onChange={e => {
                       const yr = parseInt(e.target.value);
                       setRkaSourceYear(yr);
-                      fetchRkaPreview(yr, rkaTargetYear, rkaTargetVersi);
+                      fetchRkaPreview(yr, rkaTargetYear, rkaTargetVersi, rkaSourceVersi);
                     }}
                     className="h-9 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
                   >
                     {rkaAvailableYears.map(yr => (
                       <option key={yr} value={yr}>RKA Tahun {yr}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-indigo-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Sparkles size={11} className="text-amber-500" />
+                    <span>Sumber Versi RKA:</span>
+                  </label>
+                  <select
+                    value={rkaSourceVersi}
+                    onChange={e => {
+                      const v = e.target.value;
+                      setRkaSourceVersi(v);
+                      fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi, v);
+                    }}
+                    className="h-9 px-3 bg-white border-2 border-indigo-400 rounded-xl text-xs font-black text-indigo-950 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                  >
+                    {rkaAvailableVersions.map(v => (
+                      <option key={v.kode} value={v.kode}>
+                        {v.nama || v.kode.toUpperCase()}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -3182,7 +3217,7 @@ export default function KomparasiLaporanPage() {
                     onChange={e => {
                       const newYr = parseInt(e.target.value) || new Date().getFullYear();
                       setRkaTargetYear(newYr);
-                      fetchRkaPreview(rkaSourceYear, newYr, rkaTargetVersi);
+                      fetchRkaPreview(rkaSourceYear, newYr, rkaTargetVersi, rkaSourceVersi);
                     }}
                     className="h-9 w-28 px-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
                   />
@@ -3199,7 +3234,7 @@ export default function KomparasiLaporanPage() {
                         const val = e.target.value;
                         if (val !== 'custom') {
                           setRkaTargetVersi(val);
-                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, val);
+                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, val, rkaSourceVersi);
                         }
                       }}
                       className="h-9 px-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
@@ -3214,11 +3249,11 @@ export default function KomparasiLaporanPage() {
                       type="text"
                       value={rkaTargetVersi}
                       onChange={e => setRkaTargetVersi(e.target.value)}
-                      onBlur={() => fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi)}
+                      onBlur={() => fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi, rkaSourceVersi)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi);
+                          fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi, rkaSourceVersi);
                         }
                       }}
                       placeholder="Contoh: Final"
@@ -3230,7 +3265,7 @@ export default function KomparasiLaporanPage() {
 
                 <button
                   type="button"
-                  onClick={() => fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi)}
+                  onClick={() => fetchRkaPreview(rkaSourceYear, rkaTargetYear, rkaTargetVersi, rkaSourceVersi)}
                   disabled={rkaPreviewLoading}
                   className="h-9 px-3.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs self-end cursor-pointer disabled:opacity-50"
                 >
@@ -3246,6 +3281,9 @@ export default function KomparasiLaporanPage() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                     <span>
                       Dianalisis: <strong>{fmt(rkaPreviewData.counts.penerimaan)}</strong> Penerimaan &amp; <strong>{fmt(rkaPreviewData.counts.pengeluaran)}</strong> Pengeluaran
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-[10px] font-mono">
+                      Sumber: {rkaSourceVersi.toUpperCase()}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] bg-white border border-blue-200/90 text-blue-950 px-2.5 py-0.5 rounded-lg shadow-2xs">
