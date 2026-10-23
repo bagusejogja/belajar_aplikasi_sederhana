@@ -116,15 +116,41 @@ export async function POST(request: Request) {
     if (salin_dari && salin_dari.trim()) {
       const sourceKode = salin_dari.trim().toLowerCase();
 
-      // Salin Pengeluaran
+      // Salin Pengeluaran (Paginated Loop agar mampu menyalin puluhan ribu baris data)
       if (modul === 'all' || modul === 'pengeluaran') {
-        const { data: sourcePeng, error: srcPengErr } = await supabaseAdmin
-          .from('rkat_pengeluaran')
-          .select('*')
-          .eq('versi_anggaran', sourceKode)
-          .eq('tahun_anggaran', cleanTahun);
+        const PAGE_SIZE = 1000;
+        let lastId = 0;
+        let hasMore = true;
 
-        if (!srcPengErr && sourcePeng && sourcePeng.length > 0) {
+        while (hasMore) {
+          let q = supabaseAdmin
+            .from('rkat_pengeluaran')
+            .select('*')
+            .eq('tahun_anggaran', cleanTahun);
+
+          if (sourceKode === 'v1') {
+            q = q.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+          } else {
+            q = q.eq('versi_anggaran', sourceKode);
+          }
+
+          if (lastId > 0) {
+            q = q.gt('id', lastId);
+          }
+
+          q = q.order('id', { ascending: true }).limit(PAGE_SIZE);
+
+          const { data: sourcePeng, error: srcPengErr } = await q;
+
+          if (srcPengErr) {
+            console.error('Error fetching source pengeluaran:', srcPengErr);
+            break;
+          }
+
+          if (!sourcePeng || sourcePeng.length === 0) {
+            break;
+          }
+
           const CHUNK_SIZE = 500;
           for (let i = 0; i < sourcePeng.length; i += CHUNK_SIZE) {
             const chunk = sourcePeng.slice(i, i + CHUNK_SIZE).map((row: any) => {
@@ -136,19 +162,51 @@ export async function POST(request: Request) {
             });
             await supabaseAdmin.from('rkat_pengeluaran').insert(chunk);
           }
-          clonedCountPengeluaran = sourcePeng.length;
+
+          clonedCountPengeluaran += sourcePeng.length;
+          lastId = (sourcePeng[sourcePeng.length - 1] as any)?.id || 0;
+
+          if (sourcePeng.length < PAGE_SIZE) {
+            hasMore = false;
+          }
         }
       }
 
-      // Salin Penerimaan
+      // Salin Penerimaan (Paginated Loop agar mampu menyalin seluruh baris data)
       if (modul === 'all' || modul === 'penerimaan') {
-        const { data: sourcePen, error: srcPenErr } = await supabaseAdmin
-          .from('rkat_penerimaan')
-          .select('*')
-          .eq('versi_anggaran', sourceKode)
-          .eq('tahun', cleanTahun);
+        const PAGE_SIZE = 1000;
+        let lastId = 0;
+        let hasMore = true;
 
-        if (!srcPenErr && sourcePen && sourcePen.length > 0) {
+        while (hasMore) {
+          let q = supabaseAdmin
+            .from('rkat_penerimaan')
+            .select('*')
+            .eq('tahun', cleanTahun);
+
+          if (sourceKode === 'v1') {
+            q = q.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+          } else {
+            q = q.eq('versi_anggaran', sourceKode);
+          }
+
+          if (lastId > 0) {
+            q = q.gt('id', lastId);
+          }
+
+          q = q.order('id', { ascending: true }).limit(PAGE_SIZE);
+
+          const { data: sourcePen, error: srcPenErr } = await q;
+
+          if (srcPenErr) {
+            console.error('Error fetching source penerimaan:', srcPenErr);
+            break;
+          }
+
+          if (!sourcePen || sourcePen.length === 0) {
+            break;
+          }
+
           const CHUNK_SIZE = 500;
           for (let i = 0; i < sourcePen.length; i += CHUNK_SIZE) {
             const chunk = sourcePen.slice(i, i + CHUNK_SIZE).map((row: any) => {
@@ -160,7 +218,13 @@ export async function POST(request: Request) {
             });
             await supabaseAdmin.from('rkat_penerimaan').insert(chunk);
           }
-          clonedCountPenerimaan = sourcePen.length;
+
+          clonedCountPenerimaan += sourcePen.length;
+          lastId = (sourcePen[sourcePen.length - 1] as any)?.id || 0;
+
+          if (sourcePen.length < PAGE_SIZE) {
+            hasMore = false;
+          }
         }
       }
     }
