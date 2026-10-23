@@ -70,57 +70,74 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: data || [], hasDbIdColumn, hasVersiColumn, currentVersi: versiParam });
     }
 
-    // 2. Fetch seluruh baris data menggunakan ID-cursor pagination (Sangat cepat, hemat resource, bebas timeout)
-    let allData: any[] = [];
-    const pageSize = 1000;
-    let lastId = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
-      if (tahun && tahun !== 'ALL') {
-        q = q.eq('tahun_anggaran', parseInt(tahun));
-      }
-      if (unit && unit !== 'ALL' && unit !== '*') {
-        q = q.ilike('unit', `%${unit}%`);
-      }
-      q = applyVersiFilter(q);
-      if (onlyClassified === 'true') {
-        const tfLower = (targetFormat || '').toLowerCase().trim();
-        if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
-          q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-        } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
-          q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
-        } else if (targetFormat && targetFormat !== 'ALL') {
-          q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
-        } else {
-          q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
-        }
-      }
-
-      if (lastId > 0) {
-        q = q.gt('id', lastId);
-      }
-
-      q = q.order('id', { ascending: true }).limit(pageSize);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        hasMore = false;
-        break;
-      }
-
-      allData.push(...data);
-      lastId = (data[data.length - 1] as any)?.id || 0;
-
-      if (data.length < pageSize) {
-        hasMore = false;
+    // 2. Fetch seluruh baris data menggunakan batch range pagination yang stabil dan anti-timeout
+    let countQuery = supabaseAdmin.from('rkat_pengeluaran').select('*', { count: 'exact', head: true });
+    if (tahun && tahun !== 'ALL') {
+      countQuery = countQuery.eq('tahun_anggaran', parseInt(tahun));
+    }
+    if (unit && unit !== 'ALL' && unit !== '*') {
+      countQuery = countQuery.ilike('unit', `%${unit}%`);
+    }
+    countQuery = applyVersiFilter(countQuery);
+    if (onlyClassified === 'true') {
+      const tfLower = (targetFormat || '').toLowerCase().trim();
+      if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
+        countQuery = countQuery.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+      } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
+        countQuery = countQuery.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+      } else if (targetFormat && targetFormat !== 'ALL') {
+        countQuery = countQuery.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
+      } else {
+        countQuery = countQuery.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
       }
     }
 
-    return NextResponse.json({ success: true, data: allData, hasDbIdColumn });
+    const { count: totalRowCount, error: countErr } = await countQuery;
+    if (countErr) throw countErr;
+
+    const totalCount = totalRowCount || 0;
+    const pageSize = 1000;
+    const totalPages = Math.ceil(totalCount / pageSize);
+    let allData: any[] = [];
+
+    const concurrency = 3;
+    for (let i = 0; i < totalPages; i += concurrency) {
+      const pagePromises = [];
+      for (let c = 0; c < concurrency && (i + c) < totalPages; c++) {
+        const pageIdx = i + c;
+        let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
+        if (tahun && tahun !== 'ALL') {
+          q = q.eq('tahun_anggaran', parseInt(tahun));
+        }
+        if (unit && unit !== 'ALL' && unit !== '*') {
+          q = q.ilike('unit', `%${unit}%`);
+        }
+        q = applyVersiFilter(q);
+        if (onlyClassified === 'true') {
+          const tfLower = (targetFormat || '').toLowerCase().trim();
+          if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
+            q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+          } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
+            q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+          } else if (targetFormat && targetFormat !== 'ALL') {
+            q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
+          } else {
+            q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
+          }
+        }
+        pagePromises.push(
+          q.range(pageIdx * pageSize, pageIdx * pageSize + pageSize - 1)
+           .then(res => {
+             if (res.error) throw res.error;
+             return res.data || [];
+           })
+        );
+      }
+      const chunkResults = await Promise.all(pagePromises);
+      chunkResults.forEach(rows => allData.push(...rows));
+    }
+
+    return NextResponse.json({ success: true, data: allData, hasDbIdColumn, hasVersiColumn, currentVersi: versiParam });
   } catch (error: any) {
     console.error('Error fetching rkat_pengeluaran:', error);
     return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
