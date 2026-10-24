@@ -14,7 +14,7 @@ import {
   TextRun, AlignmentType, PageOrientation, VerticalAlign, HeightRule 
 } from 'docx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
-import AkunPembentukTooltip, { RkaRuleItem } from '@/components/rka/AkunPembentukTooltip';
+import KomparasiSourceTooltip from '@/components/rka/KomparasiSourceTooltip';
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
@@ -92,7 +92,6 @@ export default function KomparasiLaporanPage() {
   const [allYears, setAllYears] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<any[]>([]);
   const [hasVersiColumn, setHasVersiColumn] = useState<boolean>(true);
-  const [rulesList, setRulesList] = useState<RkaRuleItem[]>([]);
 
   // Format Mode: 'harmonisasi' (Profil 2027 untuk komparasi multi-tahun) vs 'asli' (struktur format berjalan tahun terpilih)
   const [formatMode, setFormatMode] = useState<'harmonisasi' | 'asli'>('harmonisasi');
@@ -231,12 +230,6 @@ export default function KomparasiLaporanPage() {
 
   useEffect(() => {
     fetchData();
-    fetch('/api/rka/rules?modul=all')
-      .then(res => res.json())
-      .then(json => {
-        if (json.success && Array.isArray(json.data)) setRulesList(json.data);
-      })
-      .catch(() => {});
     // Load local snapshots
     try {
       if (typeof window !== 'undefined') {
@@ -2188,11 +2181,9 @@ export default function KomparasiLaporanPage() {
                             <span className={`${isBold ? 'font-black text-gray-900 text-xs' : 'font-medium text-gray-700 text-xs'}`}>
                               {displayLabel}
                             </span>
-                            <AkunPembentukTooltip
+                            <KomparasiSourceTooltip
+                              akunId={akun.id}
                               label={akun.keterangan}
-                              rules={rulesList}
-                              formatRp={fmt}
-                              type={akun.parent_id === 1 || akun.id === 1 || (akun.urutan && akun.urutan < 26) ? 'penerimaan' : 'belanja'}
                             />
                             {formulaInfo && (
                               <span 
