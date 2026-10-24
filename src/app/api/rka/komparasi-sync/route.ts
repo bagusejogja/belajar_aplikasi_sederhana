@@ -83,13 +83,55 @@ export async function GET(request: Request) {
       );
     }
 
-    const [pResults, eResults] = await Promise.all([
+    let adjQuery = supabaseAdmin
+      .from('rkat_penyesuaian')
+      .select('*')
+      .eq('tahun_anggaran', tahun);
+    if (sumberVersi === 'v1') {
+      adjQuery = adjQuery.or('versi_anggaran.eq.v1,versi_anggaran.is.null');
+    } else if (sumberVersi !== 'ALL') {
+      adjQuery = adjQuery.eq('versi_anggaran', sumberVersi);
+    }
+
+    const [pResults, eResults, adjRes] = await Promise.all([
       Promise.all(pPromises),
-      Promise.all(ePromises)
+      Promise.all(ePromises),
+      adjQuery
     ]);
 
     const penerimaanRows: any[] = pResults.flat();
     const pengeluaranRows: any[] = eResults.flat();
+    const adjList: any[] = adjRes.data || [];
+
+    // Gabungkan penyesuaian (SK/Pimpinan) ke penerimaan dan pengeluaran
+    adjList.forEach((adj: any) => {
+      const val = (adj.jenis_penyesuaian === 'kurang' ? -1 : 1) * Math.abs(Number(adj.nilai_penyesuaian) || 0);
+      const target = (adj.target_laporan || '').toLowerCase().trim();
+      if (target && target !== 'semua' && target !== 'proposal rkat') return;
+
+      if (adj.modul === 'penerimaan') {
+        const label = adj.nama_akun || adj.uraian || 'Penerimaan Lainnya';
+        penerimaanRows.push({
+          id: `adj-pen-${adj.id}`,
+          format_proposal: label,
+          kelompok_penerimaan: label,
+          renterima_pagu: val,
+          tahun: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+      } else if (adj.modul === 'pengeluaran') {
+        const label = adj.nama_akun || adj.uraian || 'Lainnya';
+        pengeluaranRows.push({
+          id: `adj-peng-${adj.id}`,
+          identifikasi_lain: label,
+          tags: { 'proposal rkat': label },
+          kategori_belanja: label,
+          anggaran: val,
+          tahun_anggaran: adj.tahun_anggaran,
+          is_penyesuaian: true
+        });
+      }
+    });
 
     const currentMap = new Map<number, { id?: number; anggaran: number; realisasi: number }>();
     (statisList || []).forEach((row: any) => {
