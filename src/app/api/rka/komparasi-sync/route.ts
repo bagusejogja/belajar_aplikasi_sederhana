@@ -149,6 +149,53 @@ export async function GET(request: Request) {
       akunList: akunList || []
     });
 
+    // Hitung ulang bottom-up sum untuk baris is_sum pada data eksisting agar nilai induk eksisting konsisten dengan anak-anaknya
+    for (let i = calcResult.rowValues.length - 1; i >= 0; i--) {
+      const item = calcResult.rowValues[i];
+      if (item.is_sum && item.level > 0) {
+        const directChildren = calcResult.rowValues.filter(c => c.parent_id === item.id);
+        if (directChildren.length > 0) {
+          const sumAnggaran = directChildren.reduce((acc, c) => {
+            const curChild = currentMap.get(c.id);
+            return acc + (curChild ? curChild.anggaran : 0);
+          }, 0);
+          const curItem = currentMap.get(item.id);
+          if (curItem) {
+            curItem.anggaran = sumAnggaran;
+          } else {
+            currentMap.set(item.id, { anggaran: sumAnggaran, realisasi: 0 });
+          }
+        }
+      }
+    }
+
+    // Hitung level 0 eksisting (JUMLAH PENERIMAAN, JUMLAH PENGELUARAN, SURPLUS)
+    let curTotalPen = 0;
+    let curTotalPeng = 0;
+    calcResult.rowValues.forEach(r => {
+      if (r.level === 1 && r.type === 'penerimaan') {
+        const c = currentMap.get(r.id);
+        curTotalPen += c ? c.anggaran : 0;
+      } else if (r.level === 1 && r.type === 'pengeluaran') {
+        const c = currentMap.get(r.id);
+        curTotalPeng += c ? c.anggaran : 0;
+      }
+    });
+
+    calcResult.rowValues.forEach(r => {
+      const norm = r.keterangan?.trim().toUpperCase() || '';
+      if (norm === 'JUMLAH PENERIMAAN') {
+        const cur = currentMap.get(r.id);
+        if (cur) cur.anggaran = curTotalPen;
+      } else if (norm === 'JUMLAH PENGELUARAN') {
+        const cur = currentMap.get(r.id);
+        if (cur) cur.anggaran = curTotalPeng;
+      } else if (norm.includes('SURPLUS/(DEFISIT) ANGGARAN') && !norm.includes('SEBELUMNYA')) {
+        const cur = currentMap.get(r.id);
+        if (cur) cur.anggaran = curTotalPen - curTotalPeng;
+      }
+    });
+
     // 6. Susun preview perbandingan baris demi baris
     let changedCount = 0;
     const previewRows = calcResult.rowValues.map(row => {

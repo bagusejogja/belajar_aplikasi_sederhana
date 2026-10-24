@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   BarChart4, Filter, Loader2, Plus, Edit2, Trash2, X, Save, CornerDownRight, 
-  Download, FileText, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check,
+  Download, FileText, FileSpreadsheet, Settings, Upload, FileUp, Sparkles, RefreshCw, CheckSquare, Square, Check,
   ArrowUpDown, ChevronUp, ChevronDown, ListOrdered, Layers, History, RotateCcw, ShieldCheck, AlertTriangle
 } from 'lucide-react';
 import Select from 'react-select';
@@ -131,6 +131,22 @@ export default function KomparasiLaporanPage() {
     enabled: boolean;
   }>>([]);
   const [addYearWordSelect, setAddYearWordSelect] = useState<string>('');
+
+  // Excel Export Config State (Mirip Pengaturan Word + Pilihan Rumus vs Nilai)
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [excelDocTitle, setExcelDocTitle] = useState('Komparasi Usulan RKAT');
+  const [excelFormulaMode, setExcelFormulaMode] = useState<'formula' | 'value'>('formula');
+  const [excelShowRupiah, setExcelShowRupiah] = useState(true);
+  const [excelShowProporsi, setExcelShowProporsi] = useState(true);
+  const [excelShowGrowth, setExcelShowGrowth] = useState(true);
+  const [excelLevelFilter, setExcelLevelFilter] = useState<'all' | 'summary'>('all');
+  const [excelColumns, setExcelColumns] = useState<Array<{
+    key: string;
+    label: string;
+    dataType: 'realisasi' | 'anggaran';
+    enabled: boolean;
+  }>>([]);
+  const [addYearExcelSelect, setAddYearExcelSelect] = useState<string>('');
 
   // Cell Notes / Catatan per akun, tahun, versi
   const [notesMap, setNotesMap] = useState<Record<string, string>>({});
@@ -1133,123 +1149,286 @@ export default function KomparasiLaporanPage() {
     }
   };
 
-  // --- EXCEL EXPORT (EXCELJS) ---
-  const exportToExcel = async () => {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('Komparasi');
+  // --- EXCEL EXPORT (EXCELJS) DENGAN OPSI RUMUS / NILAI STATIS & FILTER KOLOM ---
+  const getColLetter = (colIdx: number): string => {
+    let temp = 0;
+    let letter = '';
+    let c = colIdx;
+    while (c > 0) {
+      temp = (c - 1) % 26;
+      letter = String.fromCharCode(temp + 65) + letter;
+      c = Math.floor((c - temp - 1) / 26);
+    }
+    return letter;
+  };
 
-    const header1 = ['Keterangan'];
-    const header2 = [''];
-    selectedYearVals.forEach(y => {
-      const parts = y.split('___');
+  const openExcelExportModal = () => {
+    const yearsToUse = selectedYearVals.length > 0 ? selectedYearVals : (allYears.slice(0, 3).reverse());
+    const sorted = [...yearsToUse].sort((a, b) => {
+      const yA = parseInt(a.split('___')[0]) || 0;
+      const yB = parseInt(b.split('___')[0]) || 0;
+      return yA - yB;
+    });
+
+    const maxYear = sorted.length > 0 ? Math.max(...sorted.map(s => parseInt(s.split('___')[0]) || 0)) : new Date().getFullYear();
+    setExcelDocTitle(`Komparasi Profil Usulan RKAT ${maxYear}`);
+
+    const cols = sorted.map(yStr => {
+      const parts = yStr.split('___');
       const yearNum = parseInt(parts[0]) || 0;
-      const maxYear = selectedYearVals.length > 0 ? Math.max(...selectedYearVals.map(s => parseInt(s.split('___')[0]) || 0)) : 0;
-      const isTargetYear = yearNum === maxYear && selectedYearVals.length > 1;
-      const title = selectedYearVals.length > 1
-        ? (isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`)
-        : `TAHUN ${y.split('___').join(' - ')}`;
-
-      header1.push(title, '', '', '', '', '');
-      header2.push('Rencana (Rp)', '%', 'Realisasi (Rp)', '%', 'Selisih (Rp)', '%');
+      const isTargetYear = yearNum === maxYear;
+      const defaultLabel = isTargetYear ? `RKAT ${yearNum}` : `REALISASI ${yearNum}`;
+      return {
+        key: yStr,
+        label: defaultLabel,
+        dataType: (isTargetYear ? 'anggaran' : 'realisasi') as 'realisasi' | 'anggaran',
+        enabled: true
+      };
     });
 
-    ws.addRow(header1);
-    ws.addRow(header2);
+    setExcelColumns(cols);
+    if (!addYearExcelSelect && allYears.length > 0) {
+      setAddYearExcelSelect(allYears[0]);
+    }
+    setIsExcelModalOpen(true);
+  };
 
-    let colIdx = 2;
-    selectedYearVals.forEach(() => {
-      ws.mergeCells(1, colIdx, 1, colIdx + 5);
-      ws.getCell(1, colIdx).alignment = { horizontal: 'center', vertical: 'middle' };
-      colIdx += 6;
+  const executeExportExcel = async () => {
+    const activeCols = excelColumns.filter(c => c.enabled);
+    if (activeCols.length === 0) {
+      alert('Pilih minimal 1 kolom tahun untuk diekspor ke Excel');
+      return;
+    }
+
+    const activeSubCols: Array<{ id: 'rupiah' | 'proporsi' | 'growth'; label: string }> = [];
+    if (excelShowRupiah) activeSubCols.push({ id: 'rupiah', label: 'Rupiah' });
+    if (excelShowProporsi) activeSubCols.push({ id: 'proporsi', label: '% Total' });
+    if (excelShowGrowth) activeSubCols.push({ id: 'growth', label: '%' });
+
+    if (activeSubCols.length === 0) {
+      alert('Pilih minimal 1 sub-kolom (Rupiah, % Total, atau %) untuk ditampilkan');
+      return;
+    }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Komparasi_RKAT');
+
+    // 1. Judul Dokumen (Row 1)
+    const titleRow = ws.addRow([excelDocTitle.toUpperCase()]);
+    titleRow.font = { bold: true, size: 13, color: { argb: 'FF0F4C81' } };
+
+    // Row 2: Subtitle / Keterangan Formula
+    const subNote = excelFormulaMode === 'formula' 
+      ? '* Dokumen ini memuat RUMUS EXCEL AKTIF (=SUM / Formula Dinamis) pada baris penjumlahan.' 
+      : '* Dokumen ini memuat NILAI STATIS (Nilai Angka Tetap).';
+    const subRow = ws.addRow([subNote]);
+    subRow.font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+
+    // 2. Baris Header Tabel (Row 3 & Row 4)
+    const header1: any[] = ['Rencana Kerja dan Anggaran'];
+    const header2: any[] = [''];
+
+    activeCols.forEach(col => {
+      header1.push(col.label);
+      activeSubCols.forEach(sc => header2.push(sc.label));
+      for (let s = 1; s < activeSubCols.length; s++) {
+        header1.push('');
+      }
     });
 
-    [1, 2].forEach(rowIdx => {
-      const row = ws.getRow(rowIdx);
-      row.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    const h1Row = ws.addRow(header1);
+    const h2Row = ws.addRow(header2);
+
+    // Merge Header 1 per Kolom Tahun
+    let mergeColIdx = 2;
+    activeCols.forEach(() => {
+      if (activeSubCols.length > 1) {
+        ws.mergeCells(3, mergeColIdx, 3, mergeColIdx + activeSubCols.length - 1);
+      }
+      ws.getCell(3, mergeColIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+      mergeColIdx += activeSubCols.length;
+    });
+
+    // Style Header
+    [h1Row, h2Row].forEach(row => {
+      row.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
       row.eachCell(cell => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } }; 
-        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
     });
 
-    displayedRows.forEach(akun => {
+    // 3. Filter Baris yang Diekspor
+    const rowsToRender = excelLevelFilter === 'summary'
+      ? displayedRows.filter(r => r.level <= 1 || r.is_sum)
+      : displayedRows;
+
+    // Pemetaan row number Excel: Data dimulai dari Row 5
+    const startRow = 5;
+    const rowMap = new Map<number, number>();
+    rowsToRender.forEach((akun, idx) => {
+      rowMap.set(akun.id, startRow + idx);
+    });
+
+    const jpRow = rowsToRender.find(r => r.kode_sistem === 'JML_PEN' || r.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN');
+    const jpengRow = rowsToRender.find(r => r.kode_sistem === 'JML_PENG' || r.keterangan?.trim().toUpperCase() === 'JUMLAH PENGELUARAN');
+    const jpRowIdx = rowsToRender.findIndex(r => r.kode_sistem === 'JML_PEN' || r.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN');
+
+    // 4. Masukkan Data Baris demi Baris
+    rowsToRender.forEach((akun, idx) => {
+      const curRowNum = startRow + idx;
       const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
       let displayLabel = akun.keterangan;
       if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
-      
-      const rowData: any[] = [`${'   '.repeat(akun.level)}${displayLabel}`];
-      
-      selectedYearVals.forEach(y => {
-        const d = matrix[akun.id][y];
-        let selisih = d.realisasi - d.anggaran;
-        let persen = d.anggaran !== 0 ? (selisih / d.anggaran) : 0; 
-        
-        const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
-        if (isZeroOverride) {
-            selisih = 0;
-            persen = 0;
-        }
 
-        let propAnggaran = 0;
-        let propRealisasi = 0;
-        const jpRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
-        const jpEngRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
-        const myIdx = displayedRows.findIndex(x => x.id === akun.id);
-        
-        if (!isZeroOverride && !akun.keterangan.includes('SURPLUS')) {
-            let denomAng = 0;
-            let denomReal = 0;
-            if (myIdx <= jpRowIdx && jpRow) {
-                denomAng = matrix[jpRow.id][y].anggaran;
-                denomReal = matrix[jpRow.id][y].realisasi;
-            } else if (myIdx > jpRowIdx && myIdx <= jpEngRowIdx && jpengRow) {
-                denomAng = matrix[jpengRow.id][y].anggaran;
-                denomReal = matrix[jpengRow.id][y].realisasi;
+      const labelWithIndent = `${'   '.repeat(akun.level || 0)}${displayLabel}`;
+      const rowData: any[] = [labelWithIndent];
+
+      let currentColIndex = 2; // Mulai dari Kolom B
+      let prevColRupiahLetter: string | null = null;
+
+      activeCols.forEach((col, colIdx) => {
+        const d = matrix[akun.id]?.[col.key] || { anggaran: 0, realisasi: 0 };
+        const numVal = col.dataType === 'anggaran' ? d.anggaran : d.realisasi;
+        const rupiahColLetter = getColLetter(currentColIndex);
+
+        // A. SUB-KOLOM RUPIAH
+        if (excelShowRupiah) {
+          if (excelFormulaMode === 'value') {
+            rowData.push(numVal);
+          } else {
+            // MODE FORMULA EXCEL DINAMIS
+            if (akun.is_sum && akun.level > 0) {
+              const directChildren = rowsToRender.filter(ch => ch.parent_id === akun.id);
+              if (directChildren.length > 0) {
+                const childRowNums = directChildren.map(ch => rowMap.get(ch.id)).filter(Boolean) as number[];
+                if (childRowNums.length === 1) {
+                  rowData.push({ formula: `${rupiahColLetter}${childRowNums[0]}`, result: numVal });
+                } else if (childRowNums[childRowNums.length - 1] - childRowNums[0] === childRowNums.length - 1) {
+                  rowData.push({ formula: `SUM(${rupiahColLetter}${childRowNums[0]}:${rupiahColLetter}${childRowNums[childRowNums.length - 1]})`, result: numVal });
+                } else {
+                  rowData.push({ formula: childRowNums.map(rn => `${rupiahColLetter}${rn}`).join('+'), result: numVal });
+                }
+              } else {
+                rowData.push(numVal);
+              }
+            } else if (akun.kode_sistem === 'JML_PEN' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN') {
+              const rPem = rowsToRender.find(r => r.kode_sistem === 'PEN_PEM');
+              const rMas = rowsToRender.find(r => r.kode_sistem === 'PEN_MAS');
+              if (rPem && rMas && rowMap.has(rPem.id) && rowMap.has(rMas.id)) {
+                rowData.push({ formula: `${rupiahColLetter}${rowMap.get(rPem.id)}+${rupiahColLetter}${rowMap.get(rMas.id)}`, result: numVal });
+              } else {
+                rowData.push(numVal);
+              }
+            } else if (akun.kode_sistem === 'JML_PENG' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENGELUARAN') {
+              const pengLevel1 = rowsToRender.filter(r => r.level === 1 && (r.parent_id === 26 || r.kode_sistem?.startsWith('PENG_') || r.keterangan?.startsWith('Belanja')));
+              if (pengLevel1.length > 0) {
+                const pRows = pengLevel1.map(p => rowMap.get(p.id)).filter(Boolean) as number[];
+                if (pRows[pRows.length - 1] - pRows[0] === pRows.length - 1) {
+                  rowData.push({ formula: `SUM(${rupiahColLetter}${pRows[0]}:${rupiahColLetter}${pRows[pRows.length - 1]})`, result: numVal });
+                } else {
+                  rowData.push({ formula: pRows.map(r => `${rupiahColLetter}${r}`).join('+'), result: numVal });
+                }
+              } else {
+                rowData.push(numVal);
+              }
+            } else if (akun.keterangan?.includes('SURPLUS/(DEFISIT) ANGGARAN') && !akun.keterangan?.includes('SEBELUMNYA')) {
+              if (jpRow && jpengRow && rowMap.has(jpRow.id) && rowMap.has(jpengRow.id)) {
+                rowData.push({ formula: `${rupiahColLetter}${rowMap.get(jpRow.id)}-${rupiahColLetter}${rowMap.get(jpengRow.id)}`, result: numVal });
+              } else {
+                rowData.push(numVal);
+              }
+            } else {
+              rowData.push(numVal);
             }
-            if (denomAng !== 0) propAnggaran = d.anggaran / denomAng;
-            if (denomReal !== 0) propRealisasi = d.realisasi / denomReal;
+          }
+          currentColIndex++;
         }
 
-        rowData.push(
-          d.anggaran, 
-          isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : Math.abs(propAnggaran), 
-          d.realisasi, 
-          isZeroOverride || akun.keterangan.includes('SURPLUS') ? '-' : Math.abs(propRealisasi), 
-          selisih, 
-          persen
-        );
+        // B. SUB-KOLOM PROPORSI (% TOTAL)
+        if (excelShowProporsi) {
+          const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
+          if (isZeroOverride || akun.keterangan.includes('SURPLUS')) {
+            rowData.push('-');
+          } else {
+            let denom = 0;
+            let denomRowAkun = (idx <= jpRowIdx && jpRow) ? jpRow : jpengRow;
+            if (denomRowAkun) {
+              const denomD = matrix[denomRowAkun.id]?.[col.key];
+              denom = col.dataType === 'anggaran' ? (denomD?.anggaran || 0) : (denomD?.realisasi || 0);
+            }
+            const propVal = denom !== 0 ? Math.abs(numVal / denom) : 0;
+
+            if (excelFormulaMode === 'formula' && denomRowAkun && rowMap.has(denomRowAkun.id)) {
+              const denomRowNum = rowMap.get(denomRowAkun.id);
+              rowData.push({ formula: `IF(${rupiahColLetter}${denomRowNum}>0, ABS(${rupiahColLetter}${curRowNum}/${rupiahColLetter}${denomRowNum}), 0)`, result: propVal });
+            } else {
+              rowData.push(propVal);
+            }
+          }
+          currentColIndex++;
+        }
+
+        // C. SUB-KOLOM PERTUMBUHAN (%)
+        if (excelShowGrowth) {
+          if (!prevColRupiahLetter) {
+            rowData.push('-');
+          } else {
+            const prevColObj = activeCols[colIdx - 1];
+            const prevD = matrix[akun.id]?.[prevColObj.key] || { anggaran: 0, realisasi: 0 };
+            const prevNumVal = prevColObj.dataType === 'anggaran' ? prevD.anggaran : prevD.realisasi;
+            const diff = numVal - prevNumVal;
+            const growthVal = prevNumVal !== 0 ? (diff / prevNumVal) : 0;
+
+            if (excelFormulaMode === 'formula') {
+              rowData.push({
+                formula: `IF(${prevColRupiahLetter}${curRowNum}<>0, (${rupiahColLetter}${curRowNum}-${prevColRupiahLetter}${curRowNum})/${prevColRupiahLetter}${curRowNum}, 0)`,
+                result: growthVal
+              });
+            } else {
+              rowData.push(growthVal);
+            }
+          }
+          currentColIndex++;
+        }
+
+        prevColRupiahLetter = rupiahColLetter;
       });
 
       const row = ws.addRow(rowData);
-      if (isBold) row.font = { bold: true };
-      
-      let cIdx = 2;
-      selectedYearVals.forEach(() => {
-        row.getCell(cIdx).numFmt = '#,##0'; 
-        row.getCell(cIdx+1).numFmt = '0.00%'; 
-        row.getCell(cIdx+2).numFmt = '#,##0'; 
-        row.getCell(cIdx+3).numFmt = '0.00%'; 
-        row.getCell(cIdx+4).numFmt = '#,##0'; 
-        row.getCell(cIdx+5).numFmt = '0.00%'; 
-        cIdx += 6;
+      if (isBold) {
+        row.font = { bold: true };
+      }
+
+      // Format Sel (Number format & borders)
+      let cellColIdx = 2;
+      activeCols.forEach(() => {
+        if (excelShowRupiah) {
+          row.getCell(cellColIdx).numFmt = '#,##0';
+          cellColIdx++;
+        }
+        if (excelShowProporsi) {
+          row.getCell(cellColIdx).numFmt = '0.00%';
+          cellColIdx++;
+        }
+        if (excelShowGrowth) {
+          row.getCell(cellColIdx).numFmt = '0.00%';
+          cellColIdx++;
+        }
       });
     });
 
-    if (formatMode === 'harmonisasi' && selectedYearVals.length > 1) {
-      ws.addRow([]);
-      const noteRow = ws.addRow([
-        '* Catatan: Data tahun sebelumnya telah diselaraskan dengan struktur format RKAT terbaru guna memastikan konsistensi perbandingan antar-tahun.'
-      ]);
-      noteRow.font = { italic: true, size: 9, color: { argb: 'FF555555' } };
-    }
-
-    ws.getColumn(1).width = 50;
-    for (let i = 2; i <= (selectedYearVals.length * 6) + 1; i++) {
-       ws.getColumn(i).width = 18;
+    // Auto-fit Column Widths
+    ws.getColumn(1).width = 48;
+    for (let c = 2; c <= (activeCols.length * activeSubCols.length) + 1; c++) {
+      ws.getColumn(c).width = 18;
     }
 
     const buffer = await wb.xlsx.writeBuffer();
-    downloadFile(new Blob([buffer]), `Komparasi_Laporan_${new Date().getTime()}.xlsx`);
+    const modeSuffix = excelFormulaMode === 'formula' ? 'Rumus' : 'Nilai';
+    downloadFile(new Blob([buffer]), `Komparasi_Laporan_${modeSuffix}_${new Date().getTime()}.xlsx`);
+    setIsExcelModalOpen(false);
   };
 
   // --- WORD EXPORT (DOCX) SESUAI FORMAT PROFIL RINGKAS RKAT ---
@@ -1739,8 +1918,9 @@ export default function KomparasiLaporanPage() {
           </button>
 
           <button 
-            onClick={exportToExcel} 
-            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs"
+            onClick={openExcelExportModal} 
+            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Pengaturan & Ekspor Excel (Pilihan Rumus Dinamis vs Nilai Statis)"
           >
             <Download size={13} />
             <span>Excel</span>
@@ -2754,6 +2934,352 @@ export default function KomparasiLaporanPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PENGATURAN EKSPOR EXCEL (PROFIL RINGKAS RKAT / HARMONISASI) */}
+      {isExcelModalOpen && (
+        <div className="fixed inset-0 bg-gray-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col border border-gray-200 max-h-[90vh]">
+            {/* Header Modal */}
+            <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 p-4 px-5 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-white/10 backdrop-blur-xs">
+                  <FileSpreadsheet size={18} className="text-emerald-200" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black tracking-tight">Pengaturan Ekspor Excel (Harmonisasi / Profil RKAT)</h2>
+                  <p className="text-[11px] text-emerald-100/90 font-medium">Sesuaikan kolom tahun, sub-kolom, serta pilihan hasil: Nilai Statis atau Rumus Dinamis (=SUM).</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsExcelModalOpen(false)} 
+                className="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content Form */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              {/* 1. PILIHAN OUTPUT ANGKANYA: VALUE vs RUMUS EXCEL (YANG DITANYAKAN USER) */}
+              <div className="space-y-2 bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>⚡ Pilihan Hasil Format Angka di Excel:</span>
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-white px-2 py-0.5 rounded border border-emerald-200">
+                    Fitur Khusus
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {/* Opsi 1: Rumus Excel Dinamis */}
+                  <label 
+                    className={`p-3 rounded-xl border-2 flex items-start gap-2.5 cursor-pointer transition-all ${
+                      excelFormulaMode === 'formula' 
+                        ? 'bg-white border-emerald-600 shadow-sm ring-1 ring-emerald-500' 
+                        : 'bg-white/70 border-gray-200 text-gray-600 hover:border-emerald-300'
+                    }`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="excelFormulaMode" 
+                      value="formula" 
+                      checked={excelFormulaMode === 'formula'} 
+                      onChange={() => setExcelFormulaMode('formula')} 
+                      className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="font-black text-xs text-emerald-900 flex items-center gap-1.5">
+                        <span>Ada Rumusnya (=SUM)</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">Rekomendasi</span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-medium mt-0.5">
+                        Baris penjumlahan (Dana Pemerintah, Belanja Operasional, Total, &amp; Surplus) menggunakan formula Excel aktif. Jika angka rincian diedit di Excel, subtotal otomatis terhitung!
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Opsi 2: Nilai Statis (Value) */}
+                  <label 
+                    className={`p-3 rounded-xl border-2 flex items-start gap-2.5 cursor-pointer transition-all ${
+                      excelFormulaMode === 'value' 
+                        ? 'bg-white border-emerald-600 shadow-sm ring-1 ring-emerald-500' 
+                        : 'bg-white/70 border-gray-200 text-gray-600 hover:border-emerald-300'
+                    }`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="excelFormulaMode" 
+                      value="value" 
+                      checked={excelFormulaMode === 'value'} 
+                      onChange={() => setExcelFormulaMode('value')} 
+                      className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="font-black text-xs text-gray-900">
+                        Nilai Statis (Value)
+                      </div>
+                      <div className="text-[10px] text-gray-500 font-medium mt-0.5">
+                        Semua sel berisi nilai angka murni hasil perhitungan tetap (tanpa rumus). Cocok jika file hanya untuk arsip atau cetak instan.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 2. Judul Dokumen & Preset */}
+              <div className="space-y-2 bg-gray-50/80 p-3.5 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                    Judul Lembar Kerja di Excel:
+                  </label>
+                  <span className="text-[10px] text-gray-500 font-semibold">Bisa diedit bebas</span>
+                </div>
+                <input 
+                  type="text" 
+                  value={excelDocTitle} 
+                  onChange={e => setExcelDocTitle(e.target.value)} 
+                  placeholder="Contoh: Komparasi Usulan RKAT 2027 atau Profil Ringkas RKAT"
+                  className="w-full h-9 px-3.5 bg-white border border-gray-300 rounded-xl font-bold text-xs text-gray-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none shadow-2xs"
+                />
+                
+                {/* Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase shrink-0">Preset:</span>
+                  <button
+                    type="button"
+                    onClick={() => setExcelDocTitle('Komparasi Profil Usulan RKAT 2027')}
+                    className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 font-bold text-[10px] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Komparasi Usulan RKAT 2027
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExcelDocTitle('Harmonisasi Realisasi & RKAT Universitas')}
+                    className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 font-bold text-[10px] transition-colors cursor-pointer shadow-2xs"
+                  >
+                    Harmonisasi Realisasi &amp; RKAT
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Pilihan Kolom Tahun & Versi */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-[11px] font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>📅 Pilihan Kolom Tahun &amp; Tipe Data:</span>
+                    <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-mono">
+                      {excelColumns.filter(c => c.enabled).length} Kolom Aktif
+                    </span>
+                  </label>
+                  
+                  {/* Selector to Add Any Column */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={addYearExcelSelect || (allYears[0] || '')}
+                      onChange={e => setAddYearExcelSelect(e.target.value)}
+                      className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-[11px] font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                    >
+                      {allYears.map(y => (
+                        <option key={`add-excel-${y}`} value={y}>{y.replace('___', ' ')}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetKey = addYearExcelSelect || allYears[0];
+                        if (targetKey) {
+                          const parts = targetKey.split('___');
+                          const yNum = parseInt(parts[0]) || 0;
+                          const maxYear = excelColumns.length > 0 ? Math.max(...excelColumns.map(c => parseInt(c.key.split('___')[0]) || 0)) : new Date().getFullYear();
+                          const isTarget = yNum >= maxYear;
+                          setExcelColumns(prev => [...prev, {
+                            key: targetKey,
+                            label: isTarget ? `RKAT ${yNum}` : `REALISASI ${yNum}`,
+                            dataType: (isTarget ? 'anggaran' : 'realisasi') as 'realisasi' | 'anggaran',
+                            enabled: true
+                          }]);
+                        }
+                      }}
+                      className="h-7 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus size={11} />
+                      <span>Tambah Kolom</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-48 overflow-y-auto p-1 pr-1 border border-gray-200 rounded-xl bg-gray-50/50">
+                  {excelColumns.map((col, idx) => {
+                    const parts = col.key.split('___');
+                    const yNum = parts[0];
+                    const versi = parts[1] || 'Final';
+
+                    return (
+                      <div 
+                        key={`excel-col-${col.key}-${idx}`}
+                        className={`p-2.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                          col.enabled ? 'bg-white border-emerald-300 shadow-2xs' : 'bg-gray-100/70 border-gray-200 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox"
+                            checked={col.enabled}
+                            onChange={e => {
+                              const updated = [...excelColumns];
+                              updated[idx].enabled = e.target.checked;
+                              setExcelColumns(updated);
+                            }}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <div>
+                            <span className="font-bold text-gray-800 text-xs">{yNum}</span>
+                            <span className="text-[10px] text-gray-500 ml-1.5 bg-gray-100 px-1.5 py-0.5 rounded font-mono">
+                              Versi: {versi}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <input 
+                            type="text"
+                            value={col.label}
+                            onChange={e => {
+                              const updated = [...excelColumns];
+                              updated[idx].label = e.target.value;
+                              setExcelColumns(updated);
+                            }}
+                            className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900 w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            placeholder="Label Header"
+                          />
+
+                          <select 
+                            value={col.dataType}
+                            onChange={e => {
+                              const updated = [...excelColumns];
+                              updated[idx].dataType = e.target.value as 'realisasi' | 'anggaran';
+                              setExcelColumns(updated);
+                            }}
+                            className="h-7 px-2 bg-white border border-gray-300 rounded-lg text-[11px] font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer shrink-0"
+                          >
+                            <option value="realisasi">Realisasi</option>
+                            <option value="anggaran">RKAT (Anggaran)</option>
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (excelColumns.length <= 1) {
+                                alert('Minimal harus menyisakan 1 kolom.');
+                                return;
+                              }
+                              setExcelColumns(excelColumns.filter((_, i) => i !== idx));
+                            }}
+                            title="Hapus Kolom"
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Sub-Kolom yang Ditampilkan */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-gray-800 uppercase tracking-wider">
+                  📊 Sub-Kolom yang Ditampilkan (per Tahun):
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${excelShowRupiah ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={excelShowRupiah} 
+                      onChange={e => setExcelShowRupiah(e.target.checked)} 
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-xs">Nominal (Rupiah)</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Angka pagu / realisasi</div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${excelShowProporsi ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={excelShowProporsi} 
+                      onChange={e => setExcelShowProporsi(e.target.checked)} 
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-xs">% Total (Proporsi)</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Proporsi thd total pos</div>
+                    </div>
+                  </label>
+
+                  <label className={`p-3 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all ${excelShowGrowth ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-bold shadow-2xs' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                    <input 
+                      type="checkbox" 
+                      checked={excelShowGrowth} 
+                      onChange={e => setExcelShowGrowth(e.target.checked)} 
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-xs">% Pertumbuhan (Growth)</div>
+                      <div className="text-[10px] text-gray-500 font-normal">Pertumbuhan antar tahun</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* 5. Cakupan Baris */}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                  Cakupan Baris Akun:
+                </label>
+                <select 
+                  value={excelLevelFilter} 
+                  onChange={e => setExcelLevelFilter(e.target.value as 'all' | 'summary')}
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none cursor-pointer"
+                >
+                  <option value="all">Semua Akun (Lengkap hingga Detail Transaksi)</option>
+                  <option value="summary">Hanya Ringkasan (Akun Utama &amp; Total)</option>
+                </select>
+              </div>
+
+              {/* Pratinjau Info */}
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200/90 rounded-xl flex items-center justify-between text-[11px] text-emerald-900 font-medium">
+                <span>Struktur Excel: 1 Kolom Uraian + {excelColumns.filter(c => c.enabled).length} Tahun × {[excelShowRupiah, excelShowProporsi, excelShowGrowth].filter(Boolean).length} Sub-kolom</span>
+                <span className="font-bold font-mono text-emerald-800 bg-white border border-emerald-300 px-2 py-0.5 rounded-md">
+                  Mode: {excelFormulaMode === 'formula' ? 'Rumus Dinamis (=SUM)' : 'Nilai Statis (Value)'}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="p-4 px-5 bg-gray-50 border-t border-gray-200 flex justify-end items-center gap-2.5 shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setIsExcelModalOpen(false)} 
+                className="h-9 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={executeExportExcel} 
+                className="h-9 px-5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                <Download size={14} />
+                <span>Download Dokumen Excel (.xlsx)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
