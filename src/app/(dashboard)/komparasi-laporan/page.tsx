@@ -14,6 +14,7 @@ import {
   TextRun, AlignmentType, PageOrientation, VerticalAlign, HeightRule 
 } from 'docx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import AkunPembentukTooltip, { RkaRuleItem } from '@/components/rka/AkunPembentukTooltip';
 
 const fmt = (n: number) => n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
 
@@ -91,6 +92,7 @@ export default function KomparasiLaporanPage() {
   const [allYears, setAllYears] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<any[]>([]);
   const [hasVersiColumn, setHasVersiColumn] = useState<boolean>(true);
+  const [rulesList, setRulesList] = useState<RkaRuleItem[]>([]);
 
   // Format Mode: 'harmonisasi' (Profil 2027 untuk komparasi multi-tahun) vs 'asli' (struktur format berjalan tahun terpilih)
   const [formatMode, setFormatMode] = useState<'harmonisasi' | 'asli'>('harmonisasi');
@@ -229,6 +231,12 @@ export default function KomparasiLaporanPage() {
 
   useEffect(() => {
     fetchData();
+    fetch('/api/rka/rules?modul=all')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && Array.isArray(json.data)) setRulesList(json.data);
+      })
+      .catch(() => {});
     // Load local snapshots
     try {
       if (typeof window !== 'undefined') {
@@ -2180,6 +2188,12 @@ export default function KomparasiLaporanPage() {
                             <span className={`${isBold ? 'font-black text-gray-900 text-xs' : 'font-medium text-gray-700 text-xs'}`}>
                               {displayLabel}
                             </span>
+                            <AkunPembentukTooltip
+                              label={akun.keterangan}
+                              rules={rulesList}
+                              formatRp={fmt}
+                              type={akun.parent_id === 1 || akun.id === 1 || (akun.urutan && akun.urutan < 26) ? 'penerimaan' : 'belanja'}
+                            />
                             {formulaInfo && (
                               <span 
                                 className="inline-flex items-center gap-0.5 text-[9px] text-teal-800 bg-teal-50/90 border border-teal-200/80 px-1.5 py-0.2 rounded-md font-mono font-medium shadow-2xs shrink-0 cursor-help"
