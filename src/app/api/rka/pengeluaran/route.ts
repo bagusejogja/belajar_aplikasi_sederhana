@@ -100,38 +100,49 @@ export async function GET(request: Request) {
     const totalPages = Math.ceil(totalCount / pageSize);
     let allData: any[] = [];
 
-    const concurrency = 3;
+    const concurrency = 5;
     for (let i = 0; i < totalPages; i += concurrency) {
       const pagePromises = [];
       for (let c = 0; c < concurrency && (i + c) < totalPages; c++) {
         const pageIdx = i + c;
-        let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
-        if (tahun && tahun !== 'ALL') {
-          q = q.eq('tahun_anggaran', parseInt(tahun));
-        }
-        if (unit && unit !== 'ALL' && unit !== '*') {
-          q = q.ilike('unit', `%${unit}%`);
-        }
-        q = applyVersiFilter(q);
-        if (onlyClassified === 'true') {
-          const tfLower = (targetFormat || '').toLowerCase().trim();
-          if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
-            q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
-          } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
-            q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
-          } else if (targetFormat && targetFormat !== 'ALL') {
-            q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
-          } else {
-            q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
+        pagePromises.push((async () => {
+          let retries = 2;
+          while (retries >= 0) {
+            try {
+              let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
+              if (tahun && tahun !== 'ALL') {
+                q = q.eq('tahun_anggaran', parseInt(tahun));
+              }
+              if (unit && unit !== 'ALL' && unit !== '*') {
+                q = q.ilike('unit', `%${unit}%`);
+              }
+              q = applyVersiFilter(q);
+              if (onlyClassified === 'true') {
+                const tfLower = (targetFormat || '').toLowerCase().trim();
+                if (targetFormat === 'laporan_kementerian' || tfLower === 'rka kementrian' || tfLower.includes('kementr') || tfLower.includes('kementer')) {
+                  q = q.not('laporan_kementerian', 'is', null).neq('laporan_kementerian', '');
+                } else if (targetFormat === 'laporan_webometrics' || tfLower.includes('webo')) {
+                  q = q.not('laporan_webometrics', 'is', null).neq('laporan_webometrics', '');
+                } else if (targetFormat && targetFormat !== 'ALL') {
+                  q = q.not('identifikasi_lain', 'is', null).neq('identifikasi_lain', '');
+                } else {
+                  q = q.or('not.laporan_kementerian.is.null,not.laporan_webometrics.is.null,not.identifikasi_lain.is.null');
+                }
+              }
+              const res = await q.range(pageIdx * pageSize, pageIdx * pageSize + pageSize - 1);
+              if (res.error) throw res.error;
+              return res.data || [];
+            } catch (err) {
+              if (retries === 0) {
+                console.error(`Gagal fetch page ${pageIdx} setelah 3x percobaan:`, err);
+                throw err;
+              }
+              retries--;
+              await new Promise(r => setTimeout(r, 600));
+            }
           }
-        }
-        pagePromises.push(
-          q.range(pageIdx * pageSize, pageIdx * pageSize + pageSize - 1)
-           .then(res => {
-             if (res.error) throw res.error;
-             return res.data || [];
-           })
-        );
+          return [];
+        })());
       }
       const chunkResults = await Promise.all(pagePromises);
       chunkResults.forEach(rows => allData.push(...rows));
