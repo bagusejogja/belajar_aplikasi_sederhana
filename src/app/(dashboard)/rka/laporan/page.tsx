@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, FolderTree, BookOpen, Sparkles,
   PieChart, ArrowRight, Wand2, X, FileSpreadsheet, FileText, Check, RotateCcw,
   ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Wallet, TrendingUp, TrendingDown,
-  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark, DollarSign, Target
+  Settings2, Plus, Minus, Trash2, ArrowUp, ArrowDown, Tag, Hash, Edit3, Landmark, DollarSign, Target, Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -2448,6 +2448,101 @@ export default function RkaLaporanPage() {
     if (confirm('Kembalikan susunan slide ke format standar PPT awal (37 baris)?')) {
       setTempTreeTemplate(JSON.parse(JSON.stringify(DEFAULT_PPT_TREE)));
       toast('Template dikembalikan ke standar awal. Klik "Simpan Perubahan" untuk menerapkan.', { icon: 'ℹ️' });
+    }
+  };
+
+  // State & Handler Snapshot Laporan (rkat_laporan_snapshot)
+  const [snapshotInfo, setSnapshotInfo] = useState<{
+    hasSnapshot: boolean;
+    count: number;
+    snapshotAt: string | null;
+    loading: boolean;
+  }>({ hasSnapshot: false, count: 0, snapshotAt: null, loading: false });
+  const [isFreezing, setIsFreezing] = useState(false);
+
+  const fetchSnapshotInfo = async () => {
+    try {
+      const formatKey = modeLaporan === 'proposal rkat' ? 'proposal_rkat' : 'kementerian';
+      const res = await fetch(`/api/rka/snapshot?tahun=${tahunFilter}&versi=${versiFilter}&format=${formatKey}`);
+      const json = await res.json();
+      if (json.success && json.hasSnapshot) {
+        setSnapshotInfo({
+          hasSnapshot: true,
+          count: json.count,
+          snapshotAt: json.snapshotAt,
+          loading: false
+        });
+      } else {
+        setSnapshotInfo({ hasSnapshot: false, count: 0, snapshotAt: null, loading: false });
+      }
+    } catch {
+      setSnapshotInfo({ hasSnapshot: false, count: 0, snapshotAt: null, loading: false });
+    }
+  };
+
+  useEffect(() => {
+    fetchSnapshotInfo();
+  }, [tahunFilter, versiFilter, modeLaporan]);
+
+  const handleBekukanLaporan = async () => {
+    if (!confirm(`Apakah Anda yakin ingin membekukan (KUNCI SNAPSHOT) laporan ${modeLaporan.toUpperCase()} versi ${versiFilter} tahun ${tahunFilter}?\n\nSetelah dibekukan, data hasil perhitungan akan disimpan permanen ke tabel rkat_laporan_snapshot sehingga dijamin FIX dan tidak akan terpengaruh perubahan data transaksi lagi.`)) {
+      return;
+    }
+    try {
+      setIsFreezing(true);
+      const formatKey = modeLaporan === 'proposal rkat' ? 'proposal_rkat' : 'kementerian';
+      
+      const rowsToFreeze = (computedTreeData || []).map((row: any, idx: number) => ({
+        baris_id: row.id,
+        keterangan: row.keterangan,
+        level: row.level,
+        is_sum: row.is_sum,
+        is_bold: row.is_bold,
+        nominal: row.pagu,
+        urutan: idx
+      }));
+
+      const res = await fetch('/api/rka/snapshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tahun: parseInt(tahunFilter),
+          versi: versiFilter,
+          format_laporan: formatKey,
+          rows: rowsToFreeze
+        })
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal membekukan snapshot');
+      }
+
+      toast.success(`Berhasil! Laporan ${versiFilter} telah DIBEKUKAN (${rowsToFreeze.length} baris tersimpan permanen di rkat_laporan_snapshot).`);
+      fetchSnapshotInfo();
+    } catch (err: any) {
+      toast.error('Gagal membekukan snapshot: ' + err.message);
+    } finally {
+      setIsFreezing(false);
+    }
+  };
+
+  const handleBukaSnapshot = async () => {
+    if (!confirm(`Buka kembali kunci snapshot versi ${versiFilter} tahun ${tahunFilter}?\n\nLaporan akan kembali dihitung secara realtime dari transaksi.`)) {
+      return;
+    }
+    try {
+      const formatKey = modeLaporan === 'proposal rkat' ? 'proposal_rkat' : 'kementerian';
+      const res = await fetch(`/api/rka/snapshot?tahun=${tahunFilter}&versi=${versiFilter}&format=${formatKey}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Kunci snapshot berhasil dibuka. Laporan kembali ke mode realtime.');
+        fetchSnapshotInfo();
+      }
+    } catch (err: any) {
+      toast.error('Gagal membuka snapshot: ' + err.message);
     }
   };
 
@@ -6493,6 +6588,35 @@ export default function RkaLaporanPage() {
                       <Badge variant="outline" className="text-xs font-bold font-mono bg-white text-blue-700 border-blue-300">
                         TA {tahunFilter}
                       </Badge>
+
+                      {/* Status Snapshot & Tombol Bekukan Laporan */}
+                      {snapshotInfo.hasSnapshot ? (
+                        <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-300 text-emerald-800 px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs">
+                          <Lock size={12} className="text-emerald-600 shrink-0" />
+                          <span>Snapshot {versiFilter} Aktif ({snapshotInfo.count} pos)</span>
+                          <button
+                            type="button"
+                            onClick={handleBukaSnapshot}
+                            className="ml-1 text-[10px] text-red-600 hover:text-red-800 underline font-semibold cursor-pointer"
+                            title="Buka kembali kunci snapshot"
+                          >
+                            Buka
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isFreezing}
+                          onClick={handleBekukanLaporan}
+                          className="h-8 rounded-xl border-amber-300 bg-amber-50/80 text-amber-900 hover:bg-amber-100 text-xs font-bold gap-1.5 shadow-2xs cursor-pointer"
+                          title="Bekukan laporan versi ini ke rkat_laporan_snapshot agar angka fix permanen"
+                        >
+                          <Lock size={12} className="text-amber-700" />
+                          <span>{isFreezing ? 'Membekukan...' : `Bekukan Laporan (${versiFilter})`}</span>
+                        </Button>
+                      )}
+
                       <Button
                         variant="outline"
                         size="sm"
