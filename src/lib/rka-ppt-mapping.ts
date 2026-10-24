@@ -163,18 +163,39 @@ export function calculateRkaHierarchy({
   // Sisa Penerimaan yang belum terpetakan (seperti Surplus TA Lalu, Transfer Antar Unit, dll.)
   let pLainnyaTotal = 0;
   let pLainnyaCount = 0;
+  let surplusTaLaluTotal = 0;
+  let surplusTaLaluCount = 0;
+
   Object.keys(pMap).forEach(k => {
     if (!usedPKeys.has(k)) {
       pLainnyaTotal += pMap[k].totalPagu;
       pLainnyaCount += pMap[k].count;
+      const kLower = k.toLowerCase().trim();
+      if (kLower.includes('surplus') || kLower.includes('luncuran')) {
+        surplusTaLaluTotal += pMap[k].totalPagu;
+        surplusTaLaluCount += pMap[k].count;
+      }
     }
   });
 
   // Pasang sisa penerimaan ke akun "SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA" jika ada di master akun
-  const sisaLebihRow = rowValues.find(r => r.keterangan?.trim().toUpperCase() === 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA');
+  const sisaLebihRow = rowValues.find(r => {
+    const k = r.keterangan?.trim().toUpperCase() || '';
+    return k === 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA' || r.kode_sistem === 'SISA_LEBIH' || r.id === 38;
+  });
   if (sisaLebihRow) {
     sisaLebihRow.pagu = pLainnyaTotal;
     sisaLebihRow.matchCount = pLainnyaCount;
+  }
+
+  // Pasang Surplus TA Lalu / Luncuran otomatis ke akun "Rencana penggunaan luncuran" (ID 46)
+  const luncuranRow = rowValues.find(r => {
+    const k = r.keterangan?.trim().toLowerCase() || '';
+    return r.id === 46 || k.includes('rencana penggunaan luncuran') || r.kode_sistem === 'LUNCURAN';
+  });
+  if (luncuranRow) {
+    luncuranRow.pagu = surplusTaLaluTotal;
+    luncuranRow.matchCount = surplusTaLaluCount;
   }
 
   // B. Hitung Pengeluaran Leaf Nodes (dengan usedBKeys)
@@ -229,19 +250,28 @@ export function calculateRkaHierarchy({
     }
   });
 
-  // Tambahkan surplus TA lalu jika ada
-  const totalPenerimaanWithSurplus = totalPenerimaan + pLainnyaTotal;
-
+  // Nilai JUMLAH PENERIMAAN murni dari penjumlahan akun Penerimaan (Dana Pemerintah + Dana Masyarakat)
+  // Tidak mencampuradukkan Surplus TA Lalu / Luncuran yang memiliki pos sendiri di bawah
   rowValues.forEach(r => {
     const norm = r.keterangan?.trim().toUpperCase() || '';
     if (norm === 'JUMLAH PENERIMAAN') {
-      r.pagu = totalPenerimaanWithSurplus;
+      r.pagu = totalPenerimaan;
     } else if (norm === 'JUMLAH PENGELUARAN') {
       r.pagu = totalPengeluaran;
+    } else if (norm === 'SURPLUS/(DEFISIT) OPERASIONAL' || (r.id === 45 && norm.includes('SURPLUS'))) {
+      r.pagu = totalPenerimaan - totalPengeluaran;
     } else if (norm.includes('SURPLUS/(DEFISIT) ANGGARAN') && !norm.includes('SEBELUMNYA')) {
-      r.pagu = totalPenerimaanWithSurplus - totalPengeluaran;
+      r.pagu = totalPenerimaan - totalPengeluaran;
     }
   });
+
+  // Hitung Surplus Setelah Luncuran (ID 47) = Surplus Operasional + Luncuran - Belanja Modal
+  const modalRow = rowValues.find(r => r.kode_sistem === 'PENG_MODAL' || r.keterangan?.trim().toLowerCase() === 'belanja modal' || r.id === 31);
+  const row47 = rowValues.find(r => r.id === 47 || r.keterangan?.toLowerCase().includes('setalah luncuran') || r.keterangan?.toLowerCase().includes('setelah luncuran'));
+  if (row47) {
+    const modalVal = modalRow ? modalRow.pagu : 0;
+    row47.pagu = (totalPenerimaan - totalPengeluaran) + surplusTaLaluTotal - modalVal;
+  }
 
   const valuesMap: Record<number, number> = {};
   rowValues.forEach(r => {
@@ -272,9 +302,10 @@ export function calculateRkaHierarchy({
   return {
     rowValues,
     valuesMap,
-    totalPenerimaan: totalPenerimaanWithSurplus,
+    totalPenerimaan,
+    totalPenerimaanWithSurplus: totalPenerimaan + pLainnyaTotal,
     totalPengeluaran,
-    surplusDefisit: totalPenerimaanWithSurplus - totalPengeluaran,
+    surplusDefisit: totalPenerimaan - totalPengeluaran,
     unmappedPenerimaan,
     unmappedPengeluaran,
     auditStats: {
