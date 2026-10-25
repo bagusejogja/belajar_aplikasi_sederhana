@@ -278,26 +278,53 @@ export function calculateRkaHierarchy({
     valuesMap[r.id] = r.pagu;
   });
 
-  // 6. Kumpulkan Pos Tanpa Pemetaan (Orphan Pos Detector)
+  // 6. Kumpulkan Pos Rekonsiliasi (Eliminasi Internal & Alokasi Khusus)
   const unmappedPenerimaan = Object.keys(pMap)
     .filter(k => !usedPKeys.has(k))
-    .map(k => ({
-      pos_name: k,
-      total_pagu: pMap[k].totalPagu,
-      count: pMap[k].count,
-      tipe: 'Penerimaan' as const,
-      dialihkan_ke: 'Sisa Lebih Perhitungan Tahun Sebelumnya'
-    }));
+    .map(k => {
+      const isSurplus = k.toLowerCase().includes('lainnya') || k.toLowerCase().includes('surplus');
+      return {
+        pos_name: k,
+        total_pagu: pMap[k].totalPagu,
+        count: pMap[k].count,
+        tipe: 'Penerimaan' as const,
+        dialihkan_ke: isSurplus
+          ? 'Otomatis Dialokasikan ke Rencana Penggunaan Luncuran & SILPA'
+          : 'Sisa Lebih Perhitungan Tahun Sebelumnya (SILPA)',
+        status_kategori: isSurplus ? ('luncuran' as const) : ('unmapped' as const)
+      };
+    });
 
   const unmappedPengeluaran = Object.keys(bMap)
     .filter(k => !usedBKeys.has(k))
-    .map(k => ({
-      pos_name: k,
-      total_pagu: bMap[k].totalAnggaran,
-      count: bMap[k].count,
-      tipe: 'Pengeluaran' as const,
-      dialihkan_ke: 'Belum Terpetakan / Tidak Dialokasikan'
-    }));
+    .map(k => {
+      const isTransfer = k.toLowerCase().includes('transfer antar unit');
+      const isSpecialProgram = k.toLowerCase().includes('science techno park') || k.toLowerCase().includes('adb');
+      
+      let dialihkan_ke = 'Belum Terpetakan / Tidak Dialokasikan';
+      let status_kategori: 'eliminasi' | 'khusus' | 'unmapped' = 'unmapped';
+
+      if (isTransfer) {
+        dialihkan_ke = 'Eliminasi Konsolidasi (Transaksi Antar Unit Universitas, bukan belanja pihak ketiga)';
+        status_kategori = 'eliminasi';
+      } else if (isSpecialProgram) {
+        dialihkan_ke = 'Program Khusus PHLN/ADB (Di luar belanja operasional & modal rutin)';
+        status_kategori = 'khusus';
+      }
+
+      return {
+        pos_name: k,
+        total_pagu: bMap[k].totalAnggaran,
+        count: bMap[k].count,
+        tipe: 'Pengeluaran' as const,
+        dialihkan_ke,
+        status_kategori
+      };
+    });
+
+  const trueUnmappedPengeluaran = unmappedPengeluaran.filter(i => i.status_kategori === 'unmapped');
+  const trueUnmappedPenerimaan = unmappedPenerimaan.filter(i => i.status_kategori === 'unmapped');
+  const isTrulyClean = trueUnmappedPengeluaran.length === 0 && trueUnmappedPenerimaan.length === 0;
 
   return {
     rowValues,
@@ -315,7 +342,7 @@ export function calculateRkaHierarchy({
       unmappedPenerimaanGroups: unmappedPenerimaan.length,
       mappedPengeluaranGroups: usedBKeys.size,
       unmappedPengeluaranGroups: unmappedPengeluaran.length,
-      isFullyClean: unmappedPengeluaran.length === 0
+      isFullyClean: isTrulyClean
     }
   };
 }

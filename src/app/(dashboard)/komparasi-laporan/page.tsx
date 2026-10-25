@@ -212,6 +212,7 @@ export default function KomparasiLaporanPage() {
       count: number;
       tipe: 'Penerimaan' | 'Pengeluaran';
       dialihkan_ke: string;
+      status_kategori?: 'eliminasi' | 'khusus' | 'luncuran' | 'unmapped';
     }>;
     previewRows: Array<{
       akun_id: number;
@@ -1624,9 +1625,15 @@ export default function KomparasiLaporanPage() {
     const jpRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENERIMAAN');
     const jpEngRowIdx = displayedRows.findIndex(x => x.keterangan === 'JUMLAH PENGELUARAN');
 
+    // Cek struktur PENGELUARAN: apakah memiliki cucu (anak yang punya anak lagi)
+    const pengeluaranAkun = displayedRows.find(r => r.keterangan?.trim().toUpperCase() === 'PENGELUARAN');
+    const pengeluaranId = pengeluaranAkun?.id || 26;
+    const pengeluaranChildren = displayedRows.filter(r => r.parent_id === pengeluaranId);
+    const pengeluaranHasGrandchildren = pengeluaranChildren.some(child => (childrenMap.get(child.id)?.length || 0) > 0);
+
     // Baris-baris Data
     rowsToExport.forEach(akun => {
-      const norm = akun.keterangan?.trim().toUpperCase();
+      const norm = akun.keterangan?.trim().toUpperCase() || '';
       const isSectionHeader = norm === 'PENERIMAAN' || norm === 'PENGELUARAN';
 
       // 2. Judul "PENERIMAAN" dan "PENGELUARAN" dimerger melintang seluruh kolom agar beda dengan isinya
@@ -1662,19 +1669,53 @@ export default function KomparasiLaporanPage() {
         return;
       }
 
-      const hasChildren = Boolean(childrenMap.has(akun.id) && (childrenMap.get(akun.id)?.length || 0) > 0);
-      const isBold = akun.is_bold || akun.is_sum || akun.level === 0 || akun.level === 1;
-      const isCustom = akun.kode_sistem?.includes('SURPLUS') || [37, 39, 45, 47, 49].includes(akun.urutan);
+      // Deteksi anak langsung dari PENGELUARAN (level detail)
+      const isPengeluaranChild = akun.parent_id === pengeluaranId;
+      const isPengeluaranDetailLeaf = isPengeluaranChild && !pengeluaranHasGrandchildren;
 
-      // Soft blue shading: Lebih jelas tapi biru lebih soft
-      // Level 1: D9E2F3 | Level 2: EDF2F8 | Totals: C6D9F1 | Detail: undefined (putih)
+      // Daftar pos non-penjumlahan yang diminta user untuk TIDAK diberi background biru dan tidak bold:
+      // "Rencana penggunaan luncuran"; "Belanja Modal"; "Sisa lebih perhitungan tahun sebelumnya"; 
+      // "Akumulasi sisa lebih perhitungan dari tahun sebelumnya"; "Penambahan dana abadi"
+      const isNoShadingExcluded = 
+        norm === 'RENCANA PENGGUNAAN LUNCURAN' ||
+        norm === 'BELANJA MODAL' ||
+        norm.includes('SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA') ||
+        norm.includes('AKUMULASI SISA LEBIH PERHITUNGAN DARI TAHUN SEBELUMNYA') ||
+        norm.includes('PENAMBAHAN DANA ABADI');
+
+      const hasChildren = Boolean(childrenMap.has(akun.id) && (childrenMap.get(akun.id)?.length || 0) > 0);
+
+      // Pos yang merupakan Total / Rekapitulasi Surplus resmi
+      const isSurplusOrSummaryTotal = 
+        akun.is_sum || 
+        akun.kode_sistem?.includes('JML_') || 
+        akun.kode_sistem?.includes('SURPLUS') ||
+        norm.includes('JUMLAH') ||
+        norm.includes('SURPLUS') ||
+        norm.includes('DEFISIT');
+
+      // Tentukan BOLD:
+      let isBold = false;
+      if (isNoShadingExcluded || isPengeluaranDetailLeaf) {
+        isBold = false; // Pos non-penjumlahan dan anak pengeluaran tanpa cucu tidak bold
+      } else if (isSurplusOrSummaryTotal) {
+        isBold = true;
+      } else if (hasChildren) {
+        isBold = true;
+      } else if (akun.is_bold) {
+        isBold = true;
+      }
+
+      // Tentukan SHADING (Background Color):
       let rowShading: string | undefined = undefined;
-      if (akun.is_sum || isCustom || akun.level === 0 || akun.kode_sistem?.includes('JML_') || akun.keterangan?.includes('JUMLAH') || [37, 38, 39, 40, 45, 46, 47, 48, 49, 50].includes(akun.urutan)) {
+      if (isNoShadingExcluded || isPengeluaranDetailLeaf) {
+        rowShading = undefined; // Pos non-penjumlahan dan anak pengeluaran tanpa cucu tidak ada background
+      } else if (isSurplusOrSummaryTotal) {
         rowShading = 'C6D9F1'; // Biru soft medium untuk total/summary
-      } else if (akun.level === 1) {
-        rowShading = 'D9E2F3'; // Biru soft untuk induk level 1
-      } else if (akun.level === 2) {
-        rowShading = 'EDF2F8'; // Biru soft sangat lembut untuk induk level 2
+      } else if (akun.level === 1 && hasChildren) {
+        rowShading = 'D9E2F3'; // Biru soft untuk induk level 1 yang punya anak
+      } else if (akun.level === 2 && hasChildren) {
+        rowShading = 'EDF2F8'; // Biru soft sangat lembut untuk induk level 2 yang punya anak
       }
 
       let displayLabel = akun.keterangan;
@@ -3896,19 +3937,23 @@ export default function KomparasiLaporanPage() {
                       onClick={() => setRkaModalTab('orphan')}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                         rkaModalTab === 'orphan'
-                          ? 'bg-amber-600 text-white shadow-xs'
+                          ? 'bg-blue-700 text-white shadow-xs'
+                          : rkaPreviewData.auditStats?.isFullyClean
+                          ? 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200'
                           : (rkaPreviewData.unmappedList && rkaPreviewData.unmappedList.length > 0)
                           ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
-                      <ShieldCheck size={13} className="text-amber-500" />
+                      <ShieldCheck size={13} className={rkaPreviewData.auditStats?.isFullyClean ? "text-blue-600" : "text-amber-500"} />
                       <span>
-                        🔍 Deteksi Pos Lepas ({rkaPreviewData.unmappedList?.length || 0} Pos)
+                        🔍 Audit & Rekonsiliasi ({rkaPreviewData.unmappedList?.length || 0} Pos)
                       </span>
-                      {(!rkaPreviewData.unmappedList || rkaPreviewData.unmappedList.length === 0) && (
+                      {rkaPreviewData.auditStats?.isFullyClean ? (
+                        <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded-full font-bold">100% Selaras</span>
+                      ) : (!rkaPreviewData.unmappedList || rkaPreviewData.unmappedList.length === 0) ? (
                         <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.2 rounded-full font-bold">100% Bersih</span>
-                      )}
+                      ) : null}
                     </button>
 
                     <button
@@ -4092,14 +4137,14 @@ export default function KomparasiLaporanPage() {
                         </div>
 
                         <div className="p-3 bg-white rounded-xl border border-slate-200">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Pos Tanpa Pemetaan</span>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Pos Rekonsiliasi / Eliminasi</span>
                           <span className={`text-base font-black font-mono mt-0.5 block ${
-                            (rkaPreviewData.unmappedList?.length || 0) > 0 ? 'text-amber-700' : 'text-emerald-700'
+                            rkaPreviewData.auditStats?.isFullyClean ? 'text-blue-700' : 'text-amber-700'
                           }`}>
                             {rkaPreviewData.unmappedList?.length || 0} Pos
                           </span>
                           <span className="text-[10px] text-slate-500 font-medium">
-                            {(rkaPreviewData.unmappedList?.length || 0) === 0 ? 'Semua Terdistribusi Sempurna' : 'Perlu Peninjauan'}
+                            {rkaPreviewData.auditStats?.isFullyClean ? '100% Sesuai Standar Konsolidasi' : 'Perlu Peninjauan'}
                           </span>
                         </div>
                       </div>
@@ -4119,9 +4164,14 @@ export default function KomparasiLaporanPage() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
-                            <AlertTriangle size={15} className="text-amber-600" />
-                            <span>Daftar Pos Usulan yang Menggunakan Alokasi Cadangan/Default:</span>
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck size={16} className={rkaPreviewData.auditStats?.isFullyClean ? "text-blue-600" : "text-amber-600"} />
+                              <span>Daftar Rekonsiliasi & Eliminasi Pos Non-Komparasi:</span>
+                            </div>
+                            <span className="text-[11px] font-normal text-slate-500">
+                              *Transaksi transfer internal antar unit dieliminasi sesuai kaidah konsolidasi universitas.
+                            </span>
                           </div>
 
                           <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -4132,7 +4182,7 @@ export default function KomparasiLaporanPage() {
                                   <th className="py-2.5 px-3 w-28 text-center">Tipe</th>
                                   <th className="py-2.5 px-3 w-24 text-center">Jumlah Baris</th>
                                   <th className="py-2.5 px-3 text-right">Total Anggaran (Rp)</th>
-                                  <th className="py-2.5 px-3">Penanganan Sistem</th>
+                                  <th className="py-2.5 px-3">Status & Penanganan Sistem</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
@@ -4154,10 +4204,32 @@ export default function KomparasiLaporanPage() {
                                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                       {fmt(item.total_pagu)}
                                     </td>
-                                    <td className="py-2.5 px-3 text-slate-600 text-[11px]">
-                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium">
-                                        {item.dialihkan_ke}
-                                      </span>
+                                    <td className="py-2.5 px-3 text-[11px]">
+                                      <div className="flex flex-col gap-1 items-start">
+                                        {item.status_kategori === 'eliminasi' && (
+                                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                            🔄 Eliminasi Konsolidasi (Wajar)
+                                          </span>
+                                        )}
+                                        {item.status_kategori === 'luncuran' && (
+                                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                            ✨ Alokasi Luncuran & SILPA
+                                          </span>
+                                        )}
+                                        {item.status_kategori === 'khusus' && (
+                                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                            📌 Program Khusus Luar Negeri (PHLN)
+                                          </span>
+                                        )}
+                                        {(!item.status_kategori || item.status_kategori === 'unmapped') && (
+                                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                            ⚠️ Perlu Peninjauan
+                                          </span>
+                                        )}
+                                        <span className="text-slate-600 font-medium leading-relaxed">
+                                          {item.dialihkan_ke}
+                                        </span>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
