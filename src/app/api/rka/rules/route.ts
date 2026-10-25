@@ -362,13 +362,25 @@ export async function PUT(request: Request) {
         }
 
         if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
-          const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.trim()).filter(Boolean);
-          if (kws.length === 1) {
-            const kw = kws[0];
+          const allKws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
+          const positiveKws = allKws.filter((k: string) => !k.startsWith('!'));
+          const negativeKws = allKws.filter((k: string) => k.startsWith('!')).map((k: string) => k.slice(1).trim()).filter(Boolean);
+
+          if (positiveKws.length === 1) {
+            const kw = positiveKws[0];
             updateQuery = updateQuery.or(`nama_akun_penerimaan.ilike.%${kw}%,keterangan.ilike.%${kw}%,sumber_dana.ilike.%${kw}%`);
-          } else if (kws.length > 1) {
-            const orConds = kws.map((kw: string) => `nama_akun_penerimaan.ilike.%${kw}%,keterangan.ilike.%${kw}%,sumber_dana.ilike.%${kw}%`).join(',');
+          } else if (positiveKws.length > 1) {
+            const orConds = positiveKws.map((kw: string) => `nama_akun_penerimaan.ilike.%${kw}%,keterangan.ilike.%${kw}%,sumber_dana.ilike.%${kw}%`).join(',');
             updateQuery = updateQuery.or(orConds);
+          }
+
+          // Negative / Exclude filter (contoh: !Startup Grant atau !18316)
+          for (const nKw of negativeKws) {
+            if (/^\d+$/.test(nKw)) {
+              updateQuery = updateQuery.neq('id', parseInt(nKw));
+            } else {
+              updateQuery = updateQuery.not('keterangan', 'ilike', `%${nKw}%`);
+            }
           }
         }
 
@@ -518,13 +530,28 @@ export async function PUT(request: Request) {
           }
 
           if (rule.kata_kunci && rule.kata_kunci !== '*' && rule.kata_kunci !== 'ALL') {
-            const kws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
-            if (kws.length === 1) {
-              const kw = kws[0];
+            const allKws = rule.kata_kunci.split(/[,|]/).map((k: string) => k.replace(/\*/g, '').trim()).filter(Boolean);
+            const positiveKws = allKws.filter((k: string) => !k.startsWith('!'));
+            const negativeKws = allKws.filter((k: string) => k.startsWith('!')).map((k: string) => k.slice(1).trim()).filter(Boolean);
+
+            if (positiveKws.length === 1) {
+              const kw = positiveKws[0];
               chunkQ = chunkQ.or(`uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`);
-            } else if (kws.length > 1) {
-              const orConds = kws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
+            } else if (positiveKws.length > 1) {
+              const orConds = positiveKws.map((kw: string) => `uraian_belanja.ilike.%${kw}%,kegiatan.ilike.%${kw}%,lingkup_kegiatan.ilike.%${kw}%,program.ilike.%${kw}%`).join(',');
               chunkQ = chunkQ.or(orConds);
+            }
+
+            // Negative / Exclude filter (contoh: !Startup Grant atau !18316)
+            for (const nKw of negativeKws) {
+              if (/^\d+$/.test(nKw)) {
+                // Jika berupa angka ID murni: kecualikan ID tersebut
+                chunkQ = chunkQ.neq('id', parseInt(nKw));
+              } else {
+                chunkQ = chunkQ
+                  .not('uraian_belanja', 'ilike', `%${nKw}%`)
+                  .not('lingkup_kegiatan', 'ilike', `%${nKw}%`);
+              }
             }
           }
 
