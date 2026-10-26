@@ -2492,7 +2492,7 @@ export default function RkaLaporanPage() {
       setIsFreezing(true);
       const formatKey = modeLaporan === 'proposal rkat' ? 'proposal_rkat' : 'kementerian';
       
-      const rowsToFreeze = (computedTreeData || []).map((row: any, idx: number) => ({
+      const rowsToFreeze = (computedTreeData?.rows || []).map((row: any, idx: number) => ({
         baris_id: row.id,
         keterangan: row.keterangan,
         level: row.level,
