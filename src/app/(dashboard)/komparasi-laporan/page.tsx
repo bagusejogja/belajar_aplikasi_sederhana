@@ -1277,148 +1277,254 @@ export default function KomparasiLaporanPage() {
     const jpengRow = rowsToRender.find(r => r.kode_sistem === 'JML_PENG' || r.keterangan?.trim().toUpperCase() === 'JUMLAH PENGELUARAN');
     const jpRowIdx = rowsToRender.findIndex(r => r.kode_sistem === 'JML_PEN' || r.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN');
 
+    // Cek struktur PENGELUARAN: apakah memiliki cucu (anak yang punya anak lagi)
+    const pengeluaranAkun = rowsToRender.find(r => r.keterangan?.trim().toUpperCase() === 'PENGELUARAN');
+    const pengeluaranId = pengeluaranAkun?.id || 26;
+    const pengeluaranChildren = rowsToRender.filter(r => r.parent_id === pengeluaranId);
+    const pengeluaranHasGrandchildren = pengeluaranChildren.some(child => (childrenMap.get(child.id)?.length || 0) > 0);
+    const totalCols = 1 + (activeCols.length * activeSubCols.length);
+
     // 4. Masukkan Data Baris demi Baris
     rowsToRender.forEach((akun, idx) => {
       const curRowNum = startRow + idx;
-      const isBold = akun.is_bold || akun.is_sum || akun.level === 0;
+      const norm = akun.keterangan?.trim().toUpperCase() || '';
+      const isSectionHeader = norm === 'PENERIMAAN' || norm === 'PENGELUARAN';
+
+      // Deteksi anak langsung dari PENGELUARAN (level detail)
+      const isPengeluaranChild = akun.parent_id === pengeluaranId;
+      const isPengeluaranDetailLeaf = isPengeluaranChild && !pengeluaranHasGrandchildren;
+
+      // Daftar pos non-penjumlahan yang diminta user untuk TIDAK diberi background biru dan tidak bold:
+      // "Rencana penggunaan luncuran"; "Belanja Modal"; "Sisa lebih perhitungan tahun sebelumnya"; 
+      // "Akumulasi sisa lebih perhitungan dari tahun sebelumnya"; "Penambahan dana abadi"
+      const isNoShadingExcluded = 
+        norm === 'RENCANA PENGGUNAAN LUNCURAN' ||
+        norm === 'BELANJA MODAL' ||
+        norm.includes('SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA') ||
+        norm.includes('AKUMULASI SISA LEBIH PERHITUNGAN DARI TAHUN SEBELUMNYA') ||
+        norm.includes('PENAMBAHAN DANA ABADI');
+
+      const hasChildren = Boolean(childrenMap.has(akun.id) && (childrenMap.get(akun.id)?.length || 0) > 0);
+
+      // Pos yang merupakan Total / Rekapitulasi Surplus resmi
+      const isSurplusOrSummaryTotal = 
+        akun.is_sum || 
+        akun.kode_sistem?.includes('JML_') || 
+        akun.kode_sistem?.includes('SURPLUS') ||
+        norm.includes('JUMLAH') ||
+        norm.includes('SURPLUS') ||
+        norm.includes('DEFISIT');
+
+      // Tentukan BOLD:
+      let isBold = false;
+      if (isNoShadingExcluded || isPengeluaranDetailLeaf) {
+        isBold = false; // Pos non-penjumlahan dan anak pengeluaran tanpa cucu tidak bold
+      } else if (isSectionHeader || isSurplusOrSummaryTotal) {
+        isBold = true;
+      } else if (hasChildren) {
+        isBold = true;
+      } else if (akun.is_bold) {
+        isBold = true;
+      }
+
+      // Tentukan SHADING (Background Color ARGB):
+      let rowShadingArgb: string | undefined = undefined;
+      if (isSectionHeader) {
+        rowShadingArgb = 'FFBDD7EE'; // Biru section header pembeda jelas
+      } else if (isNoShadingExcluded || isPengeluaranDetailLeaf) {
+        rowShadingArgb = undefined; // Pos non-penjumlahan dan anak pengeluaran tanpa cucu tidak ada background
+      } else if (isSurplusOrSummaryTotal) {
+        rowShadingArgb = 'FFC6D9F1'; // Biru soft medium untuk total/summary
+      } else if (akun.level === 1 && hasChildren) {
+        rowShadingArgb = 'FFD9E2F3'; // Biru soft untuk induk level 1 yang punya anak
+      } else if (akun.level === 2 && hasChildren) {
+        rowShadingArgb = 'FFEDF2F8'; // Biru soft sangat lembut untuk induk level 2 yang punya anak
+      }
+
       let displayLabel = akun.keterangan;
       if (displayLabel === 'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA') displayLabel = 'SURPLUS/(DEFISIT) ANGGARAN';
 
       const labelWithIndent = `${'   '.repeat(akun.level || 0)}${displayLabel}`;
       const rowData: any[] = [labelWithIndent];
 
-      let currentColIndex = 2; // Mulai dari Kolom B
-      let prevColRupiahLetter: string | null = null;
+      if (isSectionHeader) {
+        for (let s = 1; s < totalCols; s++) {
+          rowData.push('');
+        }
+      } else {
+        let currentColIndex = 2; // Mulai dari Kolom B
+        let prevColRupiahLetter: string | null = null;
 
-      activeCols.forEach((col, colIdx) => {
-        const d = matrix[akun.id]?.[col.key] || { anggaran: 0, realisasi: 0 };
-        const numVal = col.dataType === 'anggaran' ? d.anggaran : d.realisasi;
-        const rupiahColLetter = getColLetter(currentColIndex);
+        activeCols.forEach((col, colIdx) => {
+          const d = matrix[akun.id]?.[col.key] || { anggaran: 0, realisasi: 0 };
+          const numVal = col.dataType === 'anggaran' ? d.anggaran : d.realisasi;
+          const rupiahColLetter = getColLetter(currentColIndex);
 
-        // A. SUB-KOLOM RUPIAH
-        if (excelShowRupiah) {
-          if (excelFormulaMode === 'value') {
-            rowData.push(numVal);
-          } else {
-            // MODE FORMULA EXCEL DINAMIS
-            if (akun.is_sum && akun.level > 0) {
-              const directChildren = rowsToRender.filter(ch => ch.parent_id === akun.id);
-              if (directChildren.length > 0) {
-                const childRowNums = directChildren.map(ch => rowMap.get(ch.id)).filter(Boolean) as number[];
-                if (childRowNums.length === 1) {
-                  rowData.push({ formula: `${rupiahColLetter}${childRowNums[0]}`, result: numVal });
-                } else if (childRowNums[childRowNums.length - 1] - childRowNums[0] === childRowNums.length - 1) {
-                  rowData.push({ formula: `SUM(${rupiahColLetter}${childRowNums[0]}:${rupiahColLetter}${childRowNums[childRowNums.length - 1]})`, result: numVal });
-                } else {
-                  rowData.push({ formula: childRowNums.map(rn => `${rupiahColLetter}${rn}`).join('+'), result: numVal });
-                }
-              } else {
-                rowData.push(numVal);
-              }
-            } else if (akun.kode_sistem === 'JML_PEN' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN') {
-              const rPem = rowsToRender.find(r => r.kode_sistem === 'PEN_PEM');
-              const rMas = rowsToRender.find(r => r.kode_sistem === 'PEN_MAS');
-              if (rPem && rMas && rowMap.has(rPem.id) && rowMap.has(rMas.id)) {
-                rowData.push({ formula: `${rupiahColLetter}${rowMap.get(rPem.id)}+${rupiahColLetter}${rowMap.get(rMas.id)}`, result: numVal });
-              } else {
-                rowData.push(numVal);
-              }
-            } else if (akun.kode_sistem === 'JML_PENG' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENGELUARAN') {
-              const pengLevel1 = rowsToRender.filter(r => r.level === 1 && (r.parent_id === 26 || r.kode_sistem?.startsWith('PENG_') || r.keterangan?.startsWith('Belanja')));
-              if (pengLevel1.length > 0) {
-                const pRows = pengLevel1.map(p => rowMap.get(p.id)).filter(Boolean) as number[];
-                if (pRows[pRows.length - 1] - pRows[0] === pRows.length - 1) {
-                  rowData.push({ formula: `SUM(${rupiahColLetter}${pRows[0]}:${rupiahColLetter}${pRows[pRows.length - 1]})`, result: numVal });
-                } else {
-                  rowData.push({ formula: pRows.map(r => `${rupiahColLetter}${r}`).join('+'), result: numVal });
-                }
-              } else {
-                rowData.push(numVal);
-              }
-            } else if (akun.keterangan?.includes('SURPLUS/(DEFISIT) ANGGARAN') && !akun.keterangan?.includes('SEBELUMNYA')) {
-              if (jpRow && jpengRow && rowMap.has(jpRow.id) && rowMap.has(jpengRow.id)) {
-                rowData.push({ formula: `${rupiahColLetter}${rowMap.get(jpRow.id)}-${rupiahColLetter}${rowMap.get(jpengRow.id)}`, result: numVal });
-              } else {
-                rowData.push(numVal);
-              }
-            } else {
+          // A. SUB-KOLOM RUPIAH
+          if (excelShowRupiah) {
+            if (excelFormulaMode === 'value') {
               rowData.push(numVal);
-            }
-          }
-          currentColIndex++;
-        }
-
-        // B. SUB-KOLOM PROPORSI (% TOTAL)
-        if (excelShowProporsi) {
-          const isZeroOverride = ['SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA', 'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA', 'SURPLUS/(DEFISIT) ANGGARAN', 'PENAMBAHAN DANA ABADI'].includes(akun.keterangan);
-          if (isZeroOverride || akun.keterangan.includes('SURPLUS')) {
-            rowData.push('-');
-          } else {
-            let denom = 0;
-            let denomRowAkun = (idx <= jpRowIdx && jpRow) ? jpRow : jpengRow;
-            if (denomRowAkun) {
-              const denomD = matrix[denomRowAkun.id]?.[col.key];
-              denom = col.dataType === 'anggaran' ? (denomD?.anggaran || 0) : (denomD?.realisasi || 0);
-            }
-            const propVal = denom !== 0 ? Math.abs(numVal / denom) : 0;
-
-            if (excelFormulaMode === 'formula' && denomRowAkun && rowMap.has(denomRowAkun.id)) {
-              const denomRowNum = rowMap.get(denomRowAkun.id);
-              rowData.push({ formula: `IF(${rupiahColLetter}${denomRowNum}>0, ABS(${rupiahColLetter}${curRowNum}/${rupiahColLetter}${denomRowNum}), 0)`, result: propVal });
             } else {
-              rowData.push(propVal);
+              // MODE FORMULA EXCEL DINAMIS
+              if (akun.is_sum && akun.level > 0) {
+                const directChildren = rowsToRender.filter(ch => ch.parent_id === akun.id);
+                if (directChildren.length > 0) {
+                  const childRowNums = directChildren.map(ch => rowMap.get(ch.id)).filter(Boolean) as number[];
+                  if (childRowNums.length === 1) {
+                    rowData.push({ formula: `${rupiahColLetter}${childRowNums[0]}`, result: numVal });
+                  } else if (childRowNums[childRowNums.length - 1] - childRowNums[0] === childRowNums.length - 1) {
+                    rowData.push({ formula: `SUM(${rupiahColLetter}${childRowNums[0]}:${rupiahColLetter}${childRowNums[childRowNums.length - 1]})`, result: numVal });
+                  } else {
+                    rowData.push({ formula: childRowNums.map(rn => `${rupiahColLetter}${rn}`).join('+'), result: numVal });
+                  }
+                } else {
+                  rowData.push(numVal);
+                }
+              } else if (akun.kode_sistem === 'JML_PEN' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENERIMAAN') {
+                const rPem = rowsToRender.find(r => r.kode_sistem === 'PEN_PEM');
+                const rMas = rowsToRender.find(r => r.kode_sistem === 'PEN_MAS');
+                if (rPem && rMas && rowMap.has(rPem.id) && rowMap.has(rMas.id)) {
+                  rowData.push({ formula: `${rupiahColLetter}${rowMap.get(rPem.id)}+${rupiahColLetter}${rowMap.get(rMas.id)}`, result: numVal });
+                } else {
+                  rowData.push(numVal);
+                }
+              } else if (akun.kode_sistem === 'JML_PENG' || akun.keterangan?.trim().toUpperCase() === 'JUMLAH PENGELUARAN') {
+                const pengLevel1 = rowsToRender.filter(r => r.level === 1 && (r.parent_id === 26 || r.kode_sistem?.startsWith('PENG_') || r.keterangan?.startsWith('Belanja')));
+                if (pengLevel1.length > 0) {
+                  const pRows = pengLevel1.map(p => rowMap.get(p.id)).filter(Boolean) as number[];
+                  if (pRows[pRows.length - 1] - pRows[0] === pRows.length - 1) {
+                    rowData.push({ formula: `SUM(${rupiahColLetter}${pRows[0]}:${rupiahColLetter}${pRows[pRows.length - 1]})`, result: numVal });
+                  } else {
+                    rowData.push({ formula: pRows.map(r => `${rupiahColLetter}${r}`).join('+'), result: numVal });
+                  }
+                } else {
+                  rowData.push(numVal);
+                }
+              } else if (akun.keterangan?.includes('SURPLUS/(DEFISIT) ANGGARAN') && !akun.keterangan?.includes('SEBELUMNYA')) {
+                if (jpRow && jpengRow && rowMap.has(jpRow.id) && rowMap.has(jpengRow.id)) {
+                  rowData.push({ formula: `${rupiahColLetter}${rowMap.get(jpRow.id)}-${rupiahColLetter}${rowMap.get(jpengRow.id)}`, result: numVal });
+                } else {
+                  rowData.push(numVal);
+                }
+              } else {
+                rowData.push(numVal);
+              }
             }
+            currentColIndex++;
           }
-          currentColIndex++;
-        }
 
-        // C. SUB-KOLOM PERTUMBUHAN (%)
-        if (excelShowGrowth) {
-          if (!prevColRupiahLetter) {
-            rowData.push('-');
-          } else {
-            const prevColObj = activeCols[colIdx - 1];
-            const prevD = matrix[akun.id]?.[prevColObj.key] || { anggaran: 0, realisasi: 0 };
-            const prevNumVal = prevColObj.dataType === 'anggaran' ? prevD.anggaran : prevD.realisasi;
-            const diff = numVal - prevNumVal;
-            const growthVal = prevNumVal !== 0 ? (diff / prevNumVal) : 0;
-
-            if (excelFormulaMode === 'formula') {
-              rowData.push({
-                formula: `IF(${prevColRupiahLetter}${curRowNum}<>0, (${rupiahColLetter}${curRowNum}-${prevColRupiahLetter}${curRowNum})/${prevColRupiahLetter}${curRowNum}, 0)`,
-                result: growthVal
-              });
+          // B. SUB-KOLOM PROPORSI (% TOTAL)
+          if (excelShowProporsi) {
+            const isZeroOverride = [
+              'SURPLUS/(DEFISIT) ANGGARAN SEBELUMNYA',
+              'SISA LEBIH PERHITUNGAN TAHUN SEBELUMNYA',
+              'SURPLUS/(DEFISIT) ANGGARAN',
+              'PENAMBAHAN DANA ABADI',
+              'RENCANA PENGGUNAAN LUNCURAN',
+              'SURPLUS/(DEFISIT) ANGGARAN SETALAH LUNCURAN',
+              'AKUMULASI SISA LEBIH PERHITUNGAN DARI TAHUN SEBELUMNYA'
+            ].includes(akun.keterangan);
+            if (isZeroOverride || akun.keterangan.includes('SURPLUS')) {
+              rowData.push('-');
             } else {
-              rowData.push(growthVal);
+              let denom = 0;
+              let denomRowAkun = (idx <= jpRowIdx && jpRow) ? jpRow : jpengRow;
+              if (denomRowAkun) {
+                const denomD = matrix[denomRowAkun.id]?.[col.key];
+                denom = col.dataType === 'anggaran' ? (denomD?.anggaran || 0) : (denomD?.realisasi || 0);
+              }
+              const propVal = denom !== 0 ? Math.abs(numVal / denom) : 0;
+
+              if (excelFormulaMode === 'formula' && denomRowAkun && rowMap.has(denomRowAkun.id)) {
+                const denomRowNum = rowMap.get(denomRowAkun.id);
+                rowData.push({ formula: `IF(${rupiahColLetter}${denomRowNum}>0, ABS(${rupiahColLetter}${curRowNum}/${rupiahColLetter}${denomRowNum}), 0)`, result: propVal });
+              } else {
+                rowData.push(propVal);
+              }
             }
+            currentColIndex++;
           }
-          currentColIndex++;
-        }
 
-        prevColRupiahLetter = rupiahColLetter;
-      });
+          // C. SUB-KOLOM PERTUMBUHAN (%)
+          if (excelShowGrowth) {
+            if (!prevColRupiahLetter) {
+              rowData.push('-');
+            } else {
+              const prevColObj = activeCols[colIdx - 1];
+              const prevD = matrix[akun.id]?.[prevColObj.key] || { anggaran: 0, realisasi: 0 };
+              const prevNumVal = prevColObj.dataType === 'anggaran' ? prevD.anggaran : prevD.realisasi;
+              const diff = numVal - prevNumVal;
+              const growthVal = prevNumVal !== 0 ? (diff / prevNumVal) : 0;
 
-      const row = ws.addRow(rowData);
-      if (isBold) {
-        row.font = { bold: true };
+              if (excelFormulaMode === 'formula') {
+                rowData.push({
+                  formula: `IF(${prevColRupiahLetter}${curRowNum}<>0, (${rupiahColLetter}${curRowNum}-${prevColRupiahLetter}${curRowNum})/${prevColRupiahLetter}${curRowNum}, 0)`,
+                  result: growthVal
+                });
+              } else {
+                rowData.push(growthVal);
+              }
+            }
+            currentColIndex++;
+          }
+
+          prevColRupiahLetter = rupiahColLetter;
+        });
       }
 
-      // Format Sel (Number format & borders)
-      let cellColIdx = 2;
-      activeCols.forEach(() => {
-        if (excelShowRupiah) {
-          row.getCell(cellColIdx).numFmt = '#,##0';
-          cellColIdx++;
-        }
-        if (excelShowProporsi) {
-          row.getCell(cellColIdx).numFmt = '0.00%';
-          cellColIdx++;
-        }
-        if (excelShowGrowth) {
-          row.getCell(cellColIdx).numFmt = '0.00%';
-          cellColIdx++;
+      const row = ws.addRow(rowData);
+
+      if (isSectionHeader) {
+        ws.mergeCells(curRowNum, 1, curRowNum, totalCols);
+        ws.getCell(curRowNum, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+
+      row.font = { 
+        name: 'Times New Roman',
+        size: isSectionHeader ? 11 : 10,
+        bold: isBold,
+        color: isSectionHeader ? { argb: 'FF002060' } : undefined
+      };
+
+      // Terapkan border dan shading sel
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          left: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          bottom: { style: 'thin', color: { argb: 'FFD3D3D3' } },
+          right: { style: 'thin', color: { argb: 'FFD3D3D3' } }
+        };
+        if (rowShadingArgb) {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: rowShadingArgb }
+          };
         }
       });
+
+      // Format Sel (Number format & alignment)
+      row.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+      if (!isSectionHeader) {
+        let cellColIdx = 2;
+        activeCols.forEach(() => {
+          if (excelShowRupiah) {
+            row.getCell(cellColIdx).numFmt = '#,##0';
+            row.getCell(cellColIdx).alignment = { horizontal: 'right', vertical: 'middle' };
+            cellColIdx++;
+          }
+          if (excelShowProporsi) {
+            row.getCell(cellColIdx).numFmt = '0.00%';
+            row.getCell(cellColIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+            cellColIdx++;
+          }
+          if (excelShowGrowth) {
+            row.getCell(cellColIdx).numFmt = '0.00%';
+            row.getCell(cellColIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+            cellColIdx++;
+          }
+        });
+      }
     });
 
     // Auto-fit Column Widths
