@@ -1581,23 +1581,18 @@ export default function RkaLaporanPage() {
     return tabsArray;
   }, [rulesList, dataList]);
 
-  // Otomatis pindah ke tab format yang memiliki data atau memiliki aturan aktif
+  // Otomatis pindah ke tab format yang memiliki data (hanya jika data sudah termuat dan tab saat ini kosong)
   useEffect(() => {
-    if (availableTabs.length > 0) {
+    if (!loading && dataList.length > 0 && availableTabs.length > 0) {
       const currentTab = availableTabs.find(t => t.id === modeLaporan);
       if (!currentTab || currentTab.count === 0) {
         const firstTabWithData = availableTabs.find(t => t.count > 0);
         if (firstTabWithData) {
           setModeLaporan(firstTabWithData.id);
-        } else if (rulesList.length > 0) {
-          const firstRuleTarget = rulesList[0]?.target_field;
-          if (firstRuleTarget && firstRuleTarget !== modeLaporan) {
-            setModeLaporan(firstRuleTarget);
-          }
         }
       }
     }
-  }, [availableTabs, rulesList]);
+  }, [loading, dataList.length, availableTabs, modeLaporan]);
 
   // Handle Jalankan Rule Engine Langsung dari Halaman Laporan (Clean Sync)
   const handleRunRuleEngine = async () => {
@@ -3171,12 +3166,10 @@ export default function RkaLaporanPage() {
 
     // 2. Akumulasi Usulan Pengeluaran / Belanja
     const validBelanjaRows = dataList.filter(d => {
-      const val = getRowClassification(d, modeLaporan);
-      if (!val || val.trim() === '') return false;
       if (unitFilter !== 'ALL' && d.unit !== unitFilter) return false;
-      if (kategoriFilter !== 'ALL' && val !== kategoriFilter) return false;
       if (search) {
         const lower = search.toLowerCase();
+        const val = getRowClassification(d, modeLaporan) || '';
         return (
           (d.unit && d.unit.toLowerCase().includes(lower)) ||
           (d.uraian_belanja && d.uraian_belanja.toLowerCase().includes(lower)) ||

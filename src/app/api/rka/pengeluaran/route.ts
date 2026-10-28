@@ -100,13 +100,13 @@ export async function GET(request: Request) {
     const totalPages = Math.ceil(totalCount / pageSize);
     let allData: any[] = [];
 
-    const concurrency = 5;
+    const concurrency = 3;
     for (let i = 0; i < totalPages; i += concurrency) {
       const pagePromises = [];
       for (let c = 0; c < concurrency && (i + c) < totalPages; c++) {
         const pageIdx = i + c;
         pagePromises.push((async () => {
-          let retries = 2;
+          let retries = 3;
           while (retries >= 0) {
             try {
               let q = supabaseAdmin.from('rkat_pengeluaran').select(selectFields);
@@ -132,13 +132,13 @@ export async function GET(request: Request) {
               const res = await q.range(pageIdx * pageSize, pageIdx * pageSize + pageSize - 1);
               if (res.error) throw res.error;
               return res.data || [];
-            } catch (err) {
+            } catch (err: any) {
               if (retries === 0) {
-                console.error(`Gagal fetch page ${pageIdx} setelah 3x percobaan:`, err);
-                throw err;
+                console.error(`Gagal fetch page ${pageIdx} rkat_pengeluaran setelah 4x percobaan:`, err?.message || err);
+                return [];
               }
               retries--;
-              await new Promise(r => setTimeout(r, 600));
+              await new Promise(r => setTimeout(r, (3 - retries) * 600));
             }
           }
           return [];
@@ -151,7 +151,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: allData, hasDbIdColumn, hasVersiColumn, currentVersi: versiParam });
   } catch (error: any) {
     console.error('Error fetching rkat_pengeluaran:', error);
-    return NextResponse.json({ success: false, error: error.message, data: [] }, { status: 500 });
+    const errMsg = error?.message || error?.error_description || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+    return NextResponse.json({ success: false, error: errMsg, data: [] }, { status: 500 });
   }
 }
 
