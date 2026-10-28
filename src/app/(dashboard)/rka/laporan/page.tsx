@@ -3310,8 +3310,8 @@ export default function RkaLaporanPage() {
       u.surplusDefisitOperasionalUpu = (u.subsidi || 0) + u.jumlahPenerimaan - u.operasional; // (8) = (1) + (2) - (5)
       u.surplusDefisitAnggaranUpu = u.sumberPembiayaanUpu - u.totalPengeluaran; // (9) = (4) - (7)
       u.kerjasama = u.jumlahPenerimaan;                                  // (2) Kerjasama (berisi sama saat ini di web kolom "Penerimaan")
-      u.jumlahKptu = u.pagu + u.kerjasama;                               // (3) Jumlah (1+2+3)
-      u.surplusDefisitOperasionalKptu = u.jumlahKptu - u.operasional;    // (7) Surplus/Defisit Operasional (3-5)
+      u.jumlahKptu = u.pagu + u.kerjasama;                               // (3) Jumlah (1+2)
+      u.surplusDefisitOperasionalKptu = u.jumlahKptu - u.operasional;    // (7) Surplus/Defisit Operasional (3-4)
       u.surplusDefisitAnggaranKptu = u.jumlahKptu - u.totalPengeluaran;  // (8) Surplus/Defisit Anggaran (3-6)
 
       // Backward compatibility fields
@@ -3755,9 +3755,9 @@ export default function RkaLaporanPage() {
     // 2. Table Headers
     const headers = isKptu
       ? [
-          'NO', 'GROUP', '0. UNIT KERJA', '1. PAGU (RP)', '2. KERJASAMA (RP)', '3. JUMLAH (1+2+3) (RP)',
+          'NO', 'GROUP', '0. UNIT KERJA', '1. PAGU (RP)', '2. KERJASAMA (RP)', '3. JUMLAH (1+2) (RP)',
           '4. PENGELUARAN OPERASIONAL (RP)', '5. INVESTASI (BELANJA MODAL) (RP)', '6. TOTAL PENGELUARAN (4+5) (RP)',
-          '7. SURPLUS / (DEFISIT) OPS (3-5) (RP)', '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
+          '7. SURPLUS / (DEFISIT) OPS (3-4) (RP)', '8. SURPLUS / (DEFISIT) ANGGARAN (3-6) (RP)'
         ]
       : isUpu
       ? [
@@ -4883,11 +4883,11 @@ export default function RkaLaporanPage() {
             '0. UNIT KERJA',
             '1. PAGU',
             '2. KERJASAMA',
-            '3. JUMLAH (1+2+3)',
+            '3. JUMLAH (1+2)',
             '4. PENGELUARAN OPS',
             '5. INVESTASI (MODAL)',
             '6. TOTAL PENGELUARAN (4+5)',
-            '7. SURPLUS/(DEFISIT) OPS (3-5)',
+            '7. SURPLUS/(DEFISIT) OPS (3-4)',
             '8. S/D ANGGARAN (3-6)'
           ]
         : isUpu
@@ -5033,7 +5033,7 @@ export default function RkaLaporanPage() {
           children: [
             makeHeaderCell({ text: isFakultasAlokasi ? 'Pendidikan (Alokasi)\n(1)' : 'Pendidikan\n(1)', width: colWidths[2], size: 15 }),
             makeHeaderCell({ text: isFakultasAlokasi ? 'Non Pendidikan (Alokasi)\n(2)' : 'Non Pendidikan\n(2)', width: colWidths[3], size: 15 }),
-            makeHeaderCell({ text: 'Jumlah\n(3)=(1-2)', width: colWidths[4], size: 15 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2)', width: colWidths[4], size: 15 }),
           ]
         });
 
@@ -5070,11 +5070,11 @@ export default function RkaLaporanPage() {
             makeHeaderCell({ text: 'Unit Kerja', width: colWidths[1], size: 18 }),
             makeHeaderCell({ text: 'Pagu\n(1)', width: colWidths[2], size: 18 }),
             makeHeaderCell({ text: 'Kerjasama\n(2)', width: colWidths[3], size: 18 }),
-            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2+3)', width: colWidths[4], size: 18 }),
+            makeHeaderCell({ text: 'Jumlah\n(3)=(1+2)', width: colWidths[4], size: 18 }),
             makeHeaderCell({ text: 'Pengeluaran\nOperasional\n(4)', width: colWidths[5], size: 18 }),
             makeHeaderCell({ text: 'Investasi\n(Belanja Modal)\n(5)', width: colWidths[6], size: 18 }),
             makeHeaderCell({ text: 'Total\nPengeluaran\n(6)=(4+5)', width: colWidths[7], size: 18 }),
-            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(3-5)', width: colWidths[8], size: 18 }),
+            makeHeaderCell({ text: 'Surplus /\nDefisit Operasional\n(7)=(3-4)', width: colWidths[8], size: 18 }),
             makeHeaderCell({ text: 'Surplus /\nDefisit Anggaran\n(8)=(3-6)', width: colWidths[9], size: 18 }),
           ]
         });
@@ -7797,7 +7797,7 @@ export default function RkaLaporanPage() {
               <Table className={rekapFormat === 'kptu' ? 'min-w-[1350px]' : rekapFormat === 'pusdi' ? 'min-w-[1350px]' : rekapFormat === 'upu' ? 'min-w-[1450px]' : 'min-w-[1550px]'}>
                 <TableHeader className="bg-gray-100/90 border-b border-gray-200 text-gray-600 font-black uppercase text-[10px] tracking-wider">
                   {rekapFormat === 'kptu' ? (
-                    /* Header Format KPTU (9 Kolom Utama: 0. Unit kerja, 1. Pagu, 2. Kerjasama, 3. Jumlah (1+2+3), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus / Defisit Operasional (3-5), 8. Surplus / Defisit Anggaran (3-6)) */
+                    /* Header Format KPTU (9 Kolom Utama: 0. Unit kerja, 1. Pagu, 2. Kerjasama, 3. Jumlah (1+2), 4. Pengeluaran Operasional, 5. Investasi (Belanja Modal), 6. Total Pengeluaran (4+5), 7. Surplus / Defisit Operasional (3-4), 8. Surplus / Defisit Anggaran (3-6)) */
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="w-12 text-center text-gray-500 text-xs uppercase font-bold py-1 px-1">
                         <button
@@ -7824,7 +7824,7 @@ export default function RkaLaporanPage() {
                         2. Kerjasama
                       </TableHead>
                       <TableHead className="text-right text-emerald-950 text-xs uppercase font-black min-w-[150px] bg-emerald-50/60">
-                        3. Jumlah (1+2+3)
+                        3. Jumlah (1+2)
                       </TableHead>
                       <TableHead className="text-right text-slate-800 text-xs uppercase font-bold min-w-[150px]">
                         4. Pengeluaran Operasional
@@ -7836,7 +7836,7 @@ export default function RkaLaporanPage() {
                         6. Total Pengeluaran (4+5)
                       </TableHead>
                       <TableHead className="text-right text-slate-900 text-xs uppercase font-bold min-w-[160px]">
-                        7. Surplus / Defisit Operasional (3-5)
+                        7. Surplus / Defisit Operasional (3-4)
                       </TableHead>
                       <TableHead className="text-right text-indigo-950 text-xs uppercase font-black min-w-[170px] bg-slate-50">
                         8. Surplus / Defisit Anggaran (3-6)
@@ -8020,7 +8020,7 @@ export default function RkaLaporanPage() {
                                 <div className="text-[11px] font-bold font-mono text-indigo-900 flex flex-wrap items-center gap-3">
                                   <span className="text-teal-800 font-black">
                                     {rekapFormat === 'kptu' 
-                                      ? `Jumlah (1+2+3): Rp ${formatRp(group.totalJumlahKptu || 0)}` 
+                                      ? `Jumlah (1+2): Rp ${formatRp(group.totalJumlahKptu || 0)}` 
                                       : `Pembiayaan: Rp ${formatRp(group.totalSumberPembiayaan)}`}
                                   </span>
                                   <span>•</span>
@@ -8085,7 +8085,7 @@ export default function RkaLaporanPage() {
                                       Rp {formatRp(item.kerjasama || 0)}
                                     </TableCell>
 
-                                    {/* 3. Jumlah (1+2+3) */}
+                                    {/* 3. Jumlah (1+2) */}
                                     <TableCell className="text-right align-middle font-mono font-black text-emerald-950 bg-emerald-50/40 py-2.5">
                                       Rp {formatRp(item.jumlahKptu || 0)}
                                     </TableCell>
@@ -8105,7 +8105,7 @@ export default function RkaLaporanPage() {
                                       Rp {formatRp(item.totalPengeluaran)}
                                     </TableCell>
 
-                                    {/* 7. Surplus / Defisit Operasional (3-5) */}
+                                    {/* 7. Surplus / Defisit Operasional (3-4) */}
                                     <TableCell className="text-right align-middle font-mono font-bold py-2.5">
                                       <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
                                         (item.surplusDefisitOperasionalKptu || 0) >= 0 
