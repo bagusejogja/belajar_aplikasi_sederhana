@@ -105,6 +105,9 @@ function InputMakPageContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showOnlyDiff, setShowOnlyDiff] = useState(true);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isDraggingExcel, setIsDraggingExcel] = useState(false);
+  const [isDraggingNote, setIsDraggingNote] = useState(false);
+  const [isDraggingRka, setIsDraggingRka] = useState(false);
 
   // Cek token revisi dari URL jika ada
   useEffect(() => {
@@ -902,37 +905,98 @@ function InputMakPageContent() {
             </div>
 
             {/* 4. Matrik Excel */}
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-bold text-gray-700">
                 4. Matrik Excel (.xls, .xlsx) {!rkaFile && <span className="text-rose-500">*</span>}
               </label>
-              <div className="relative">
+              
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingExcel(true); }}
+                onDragLeave={() => setIsDraggingExcel(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingExcel(false);
+                  const files = e.dataTransfer.files;
+                  if (files && files.length > 0) {
+                    const f = files[0];
+                    if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
+                      setExcelFile(f);
+                    } else {
+                      alert('Format file harus berupa Excel (.xlsx atau .xls)');
+                    }
+                  }
+                }}
+                onClick={() => document.getElementById('excel-upload')?.click()}
+                className={`relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                  isDraggingExcel
+                    ? 'border-indigo-500 bg-indigo-50/70 scale-[0.99]'
+                    : excelFile
+                    ? 'border-emerald-300 bg-emerald-50/30'
+                    : 'border-gray-200 hover:border-indigo-300 bg-gray-50/60 hover:bg-indigo-50/30'
+                }`}
+              >
                 <input
                   id="excel-upload"
                   type="file"
                   accept=".xls,.xlsx"
                   onChange={e => setExcelFile(e.target.files?.[0] || null)}
                   required={!rkaFile}
-                  className="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-3 file:px-4
-                    file:rounded-xl file:border-0
-                    file:text-sm file:font-bold
-                    file:bg-indigo-50 file:text-indigo-700
-                    hover:file:bg-indigo-100 transition-colors
-                    bg-gray-50 rounded-xl"
+                  className="hidden"
                 />
+
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-2xs ${
+                  excelFile ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
+                }`}>
+                  {excelFile ? <CheckCircle size={20} /> : <Upload size={20} />}
+                </div>
+
+                {excelFile ? (
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-gray-900 break-all">{excelFile.name}</p>
+                    <p className="text-[11px] text-emerald-700 font-semibold">
+                      {(excelFile.size / 1024).toFixed(1)} KB • Klik atau drag file lain untuk mengganti
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-gray-700">
+                      Tarik &amp; lepas file Excel di sini, atau <span className="text-indigo-600 underline font-extrabold">pilih file</span>
+                    </p>
+                    <p className="text-[10px] text-gray-400">File format Microsoft Excel (.xls, .xlsx)</p>
+                  </div>
+                )}
               </div>
+
               {rkaFile && !excelFile && (
-                <p className="text-xs text-indigo-600 mt-1.5 font-medium flex items-center gap-1">
+                <p className="text-xs text-indigo-600 font-medium flex items-center gap-1">
                   <Check size={12} /> Menggunakan file Excel dari Opsi No. 6 sebagai lampiran utama jika opsi ini dikosongkan.
                 </p>
               )}
             </div>
 
             {/* 5. Catatan Verifikator (Multiple) */}
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">5. File Catatan Verifikator (Bisa Lebih Dari 1)</label>
-              <div className="relative">
+            <div className="space-y-1.5">
+              <label className="block text-sm font-bold text-gray-700">5. File Catatan Verifikator (Bisa Lebih Dari 1)</label>
+              
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDraggingNote(true); }}
+                onDragLeave={() => setIsDraggingNote(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingNote(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    setNoteFiles(e.dataTransfer.files);
+                  }
+                }}
+                onClick={() => document.getElementById('note-upload')?.click()}
+                className={`relative border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                  isDraggingNote
+                    ? 'border-emerald-500 bg-emerald-50/70 scale-[0.99]'
+                    : noteFiles && noteFiles.length > 0
+                    ? 'border-emerald-300 bg-emerald-50/30'
+                    : 'border-gray-200 hover:border-emerald-300 bg-gray-50/60 hover:bg-emerald-50/30'
+                }`}
+              >
                 <input
                   id="note-upload"
                   type="file"
@@ -940,21 +1004,27 @@ function InputMakPageContent() {
                   accept=".pdf,.jpg,.jpeg,.png"
                   onChange={e => setNoteFiles(e.target.files)}
                   required
-                  className="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-3 file:px-4
-                    file:rounded-xl file:border-0
-                    file:text-sm file:font-bold
-                    file:bg-emerald-50 file:text-emerald-700
-                    hover:file:bg-emerald-100 transition-colors
-                    bg-gray-50 rounded-xl"
+                  className="hidden"
                 />
+
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center transition-all shadow-2xs">
+                  <FileText size={20} />
+                </div>
+
+                <div className="space-y-0.5">
+                  <p className="text-xs font-bold text-gray-700">
+                    Tarik &amp; lepas berkas catatan di sini, atau <span className="text-emerald-700 underline font-extrabold">pilih berkas</span>
+                  </p>
+                  <p className="text-[10px] text-gray-400">Dapat mengunggah beberapa file (.pdf, .jpg, .png)</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2 font-medium">Bisa berupa screenshot atau dokumen dari verifikator yang menjadi dasar permintaan.</p>
+
               {noteFiles && noteFiles.length > 0 && (
-                <div className="mt-3 flex gap-2 flex-wrap">
+                <div className="mt-2 flex gap-1.5 flex-wrap">
                   {Array.from(noteFiles).map((file, i) => (
-                    <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase">
-                      {file.name}
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <span>{file.name}</span>
+                      <span className="text-[9px] opacity-75">({(file.size / 1024).toFixed(0)} KB)</span>
                     </span>
                   ))}
                 </div>
@@ -1028,20 +1098,60 @@ function InputMakPageContent() {
                   </ol>
                 </div>
 
-                <div className="relative">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingRka(true); }}
+                  onDragLeave={() => setIsDraggingRka(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingRka(false);
+                    const files = e.dataTransfer.files;
+                    if (files && files.length > 0) {
+                      const f = files[0];
+                      if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) {
+                        handleRkaFileChange(f);
+                      } else {
+                        alert('Format file harus berupa Excel (.xlsx atau .xls)');
+                      }
+                    }
+                  }}
+                  onClick={() => document.getElementById('rka-upload')?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                    isDraggingRka
+                      ? 'border-indigo-500 bg-indigo-50/70 scale-[0.99]'
+                      : rkaFile
+                      ? 'border-emerald-300 bg-emerald-50/20'
+                      : 'border-indigo-200 hover:border-indigo-400 bg-white hover:bg-indigo-50/30'
+                  }`}
+                >
                   <input
                     id="rka-upload"
                     type="file"
                     accept=".xls,.xlsx"
                     onChange={e => handleRkaFileChange(e.target.files?.[0] || null)}
-                    className="block w-full text-sm text-gray-500
-                      file:mr-4 file:py-3 file:px-4
-                      file:rounded-xl file:border-0
-                      file:text-sm file:font-bold
-                      file:bg-indigo-600 file:text-white
-                      hover:file:bg-indigo-700 transition-colors
-                      bg-white border border-dashed border-indigo-200 rounded-xl cursor-pointer"
+                    className="hidden"
                   />
+
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-2xs ${
+                    rkaFile ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'
+                  }`}>
+                    {rkaFile ? <CheckCircle size={18} /> : <Upload size={18} />}
+                  </div>
+
+                  {rkaFile ? (
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold text-gray-900">{rkaFile.name}</p>
+                      <p className="text-[10px] text-emerald-700 font-semibold">
+                        {(rkaFile.size / 1024).toFixed(1)} KB • Klik atau drag file lain untuk mengganti
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold text-gray-700">
+                        Tarik file Excel RKAT ke sini atau <span className="text-indigo-600 underline font-extrabold">pilih file</span>
+                      </p>
+                      <p className="text-[10px] text-gray-400">Otomatis hitung selisih kolom N &amp; R dan kelompok kegiatan</p>
+                    </div>
+                  )}
                 </div>
 
                 {isParsingRka && (

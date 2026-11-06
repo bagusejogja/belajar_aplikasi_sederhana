@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
+  CheckCircle2, Zap,
   Sparkles, ShieldCheck, FileText, BarChart3, 
   ArrowRight, Clock, Users, ArrowUpRight,
   LayoutDashboard, TrendingUp, Search, Bell,
@@ -136,6 +137,57 @@ export default function PremiumDashboard() {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Real-time KPI Analytics State
+  const [analisisStats, setAnalisisStats] = useState({
+    total: 0,
+    menunggu: 0,
+    disetujui: 0,
+    nominalDisetujui: 0,
+    revisi: 0,
+    loading: true
+  });
+
+  useEffect(() => {
+    const fetchAnalisisStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_analisis_utama')
+          .select('id_analisis, keputusan, nominal_disetujui, total_anggaran');
+        if (data && !error) {
+          const total = data.length;
+          const disetujui = data.filter(d => (d.keputusan || '').toLowerCase().includes('setuju')).length;
+          const menunggu = data.filter(d => !d.keputusan || d.keputusan.toLowerCase().includes('proses') || d.keputusan.toLowerCase().includes('diajukan') || d.keputusan.toLowerCase().includes('telaah')).length;
+          const revisi = data.filter(d => (d.keputusan || '').toLowerCase().includes('tolak') || (d.keputusan || '').toLowerCase().includes('revisi')).length;
+          const sumDisetujui = data
+            .filter(d => (d.keputusan || '').toLowerCase().includes('setuju'))
+            .reduce((acc, curr) => {
+              const val = Number(curr.nominal_disetujui || curr.total_anggaran || 0);
+              return acc + (isNaN(val) ? 0 : val);
+            }, 0);
+
+          setAnalisisStats({
+            total,
+            menunggu,
+            disetujui,
+            nominalDisetujui: sumDisetujui,
+            revisi,
+            loading: false
+          });
+        }
+      } catch (e) {
+        console.warn('Gagal memuat stats analisis usulan:', e);
+      }
+    };
+    fetchAnalisisStats();
+  }, []);
+
+  const formatShortRp = (num: number) => {
+    if (num >= 1000000000000) return (num / 1000000000000).toFixed(2) + ' Triliun';
+    if (num >= 1000000000) return (num / 1000000000).toFixed(2) + ' Miliar';
+    if (num >= 1000000) return (num / 1000000).toFixed(2) + ' Juta';
+    return new Intl.NumberFormat('id-ID').format(num);
+  };
 
   // State untuk Menu Favorit Personal Pengguna
   const [userKey, setUserKey] = useState('guest_user');
@@ -415,6 +467,173 @@ export default function PremiumDashboard() {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* ========================================================== */}
+      {/* ⚡ PUSAT AKSI CEPAT & RINGKASAN ANGGARAN OPERASIONAL        */}
+      {/* ========================================================== */}
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div>
+            <h2 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <Zap size={18} className="text-amber-500 fill-amber-500" />
+              <span>Aksi Cepat Alur Anggaran &amp; RKAT</span>
+            </h2>
+            <p className="text-xs text-gray-500 font-medium">Akses langsung fitur utama yang paling sering digunakan verifikator dan pimpinan</p>
+          </div>
+          <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full self-start sm:self-auto">
+            Sistem Anggaran UGM 2026
+          </span>
+        </div>
+
+        {/* 4 Kartu Aksi Cepat Utama */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            href="/analisis"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/50 p-5 rounded-2xl border border-gray-200/90 hover:border-indigo-300 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors shadow-2xs">
+                <FileSpreadsheet size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 group-hover:text-indigo-700 transition-colors">
+                  Analisis Tambah Pagu
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Formulir 5 tahap usulan, analisis posisi pagu, ringkasan AI &amp; draft surat balasan.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-indigo-600">
+              <span>Buka Analisis</span>
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          <Link
+            href="/perubahan-rkat"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-emerald-50/50 p-5 rounded-2xl border border-gray-200/90 hover:border-emerald-300 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-colors shadow-2xs">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 group-hover:text-emerald-700 transition-colors">
+                  Cek Perubahan RKAT
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Upload file Excel RKAT untuk mendeteksi selisih volume, satuan, dan kolom N &amp; R.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-emerald-600">
+              <span>Cek Selisih RKAT</span>
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          <Link
+            href="/copas-pagu"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-amber-50/50 p-5 rounded-2xl border border-gray-200/90 hover:border-amber-300 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white flex items-center justify-center transition-colors shadow-2xs">
+                <Database size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 group-hover:text-amber-700 transition-colors">
+                  Copas Pagu dr Finance
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Zona copas data tabel pagu Finance secara instan dengan auto-mapping kolom database.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-amber-600">
+              <span>Import Copas Zone</span>
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+
+          <Link
+            href="/input-mak"
+            className="group relative bg-white hover:bg-gradient-to-br hover:from-white hover:to-purple-50/50 p-5 rounded-2xl border border-gray-200/90 hover:border-purple-300 shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors shadow-2xs">
+                <FileEdit size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 group-hover:text-purple-700 transition-colors">
+                  Form Tolakan Verif
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  Pengajuan revisi MAK dan tolakan verifikasi unit lengkap dengan lampiran berkas.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-purple-600">
+              <span>Buat Pengajuan</span>
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </div>
+          </Link>
+        </div>
+
+        {/* 4 Kartu Metrik Ringkasan Real-Time */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Usulan Analisis</span>
+              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-700"><FileSpreadsheet size={16} /></span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-gray-900 font-mono">
+              {analisisStats.loading ? '...' : analisisStats.total}
+            </div>
+            <p className="text-[11px] text-gray-400 font-medium">Usulan terdaftar di database</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Menunggu Telaah</span>
+              <span className="p-2 rounded-xl bg-amber-50 text-amber-700"><Clock size={16} /></span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-amber-600 font-mono flex items-center gap-2">
+              {analisisStats.loading ? '...' : analisisStats.menunggu}
+              {analisisStats.menunggu > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold font-sans">
+                  Aktif
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 font-medium">Perlu keputusan pimpinan</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Disetujui Pimpinan</span>
+              <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700"><CheckCircle2 size={16} /></span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono">
+              {analisisStats.loading ? '...' : analisisStats.disetujui}
+            </div>
+            <p className="text-[11px] text-emerald-600 font-bold truncate">
+              Rp {formatShortRp(analisisStats.nominalDisetujui)}
+            </p>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Revisi / Ditolak</span>
+              <span className="p-2 rounded-xl bg-rose-50 text-rose-700"><ShieldAlert size={16} /></span>
+            </div>
+            <div className="text-2xl sm:text-3xl font-black text-rose-600 font-mono">
+              {analisisStats.loading ? '...' : analisisStats.revisi}
+            </div>
+            <p className="text-[11px] text-gray-400 font-medium">Perlu penyesuaian unit kerja</p>
+          </div>
         </div>
       </div>
 

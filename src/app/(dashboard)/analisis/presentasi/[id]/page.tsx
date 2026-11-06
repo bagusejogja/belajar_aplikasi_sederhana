@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, Printer, FileText, CheckCircle2, Clock, AlertCircle, XCircle, 
   Sparkles, Save, RefreshCw, CheckSquare, Lock, FileCheck, PieChart, Building2, History, Wallet,
-  Copy, Check, Share2, Eye
+  Copy, Check, Share2, Eye, Home, ChevronRight, Maximize2, Minimize2, FileDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DataPendukung from '../../components/DataPendukung';
@@ -83,6 +83,29 @@ export default function PresentasiAnalisisPage() {
   });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.warn('Gagal masuk mode fullscreen:', err);
+      });
+      setIsFullscreen(true);
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+      setIsFullscreen(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -448,7 +471,7 @@ export default function PresentasiAnalisisPage() {
     <div className="min-h-screen bg-slate-50 pb-28 text-slate-900 font-sans">
       
       {/* Top Navigation & Action Header */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs print:hidden">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {!isReadOnly && currentUser && (
@@ -465,11 +488,26 @@ export default function PresentasiAnalisisPage() {
               </>
             )}
             <div>
+              {/* Breadcrumb Navigation */}
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 mb-0.5 print:hidden">
+                <Link href="/" className="hover:text-indigo-600 transition-colors flex items-center gap-1">
+                  <Home size={11} /> <span>Portal</span>
+                </Link>
+                <ChevronRight size={11} className="text-slate-300" />
+                <Link href="/analisis" className="hover:text-indigo-600 transition-colors">
+                  <span>Analisis Pagu</span>
+                </Link>
+                <ChevronRight size={11} className="text-slate-300" />
+                <span className="text-slate-700 font-bold truncate max-w-[130px] sm:max-w-xs">
+                  {data.id_analisis?.substring(0, 10) || 'Presentasi'}
+                </span>
+              </nav>
+
               <div className="flex items-center gap-2">
                 <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
                   Lembar Presentasi Usulan Anggaran
                 </h1>
-                <span className="text-[11px] bg-slate-100 text-slate-600 font-mono font-bold px-2 py-0.5 rounded-md">
+                <span className="text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-mono font-bold px-2 py-0.5 rounded-md">
                   {data.id_analisis?.substring(0, 10)}
                 </span>
               </div>
@@ -479,42 +517,67 @@ export default function PresentasiAnalisisPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
             {getStatusBadge(data.keputusan)}
 
             <button
               type="button"
               onClick={handleCopyLink}
-              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
               title="Salin Link Web Hasil Analisis untuk Dibagikan"
             >
               {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-              <span>{copiedLink ? 'Link Tersalin!' : 'Salin Link'}</span>
+              <span className="hidden sm:inline">{copiedLink ? 'Tersalin!' : 'Salin Link'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+              title={isFullscreen ? 'Keluar Layar Penuh' : 'Mode Layar Penuh (Zen / Presenter)'}
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              <span className="hidden sm:inline">{isFullscreen ? 'Keluar' : 'Layar Penuh'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Cetak atau Unduh Dokumen sebagai PDF"
             >
-              <Printer size={14} /> <span>Cetak Web</span>
+              <Printer size={14} className="text-emerald-400" />
+              <span>Cetak / PDF</span>
             </button>
 
             <a
               href="#form-keputusan-pimpinan"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <CheckSquare size={14} /> {isReadOnly ? 'Keputusan Pimpinan' : 'Form Keputusan'}
+              <CheckSquare size={14} /> <span className="hidden sm:inline">{isReadOnly ? 'Keputusan' : 'Form Keputusan'}</span>
             </a>
           </div>
         </div>
       </div>
 
       {/* Main Single Page Web Form Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-8 print:pt-0 print:px-0">
         
+        {/* KOP SURAT RESMI UGM (HANYA MUNCUL SAAT CETAK / UNDUH PDF) */}
+        <div className="hidden print:flex flex-col items-center justify-center border-b-2 border-slate-900 pb-3 mb-6 text-center">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-slate-600">KEMENTERIAN PENDIDIKAN TINGGI, SAINS, DAN TEKNOLOGI</p>
+          <h2 className="text-base font-black uppercase tracking-wider text-slate-900">UNIVERSITAS GADJAH MADA</h2>
+          <h3 className="text-xs font-bold uppercase text-slate-800">DIREKTORAT KEUANGAN</h3>
+          <p className="text-[9px] text-slate-500 mt-0.5">Gedung Pusat UGM Sayap Utara Lantai 3, Bulaksumur, Yogyakarta 55281</p>
+          <div className="w-full border-t border-slate-300 mt-2 pt-2 flex justify-between text-[9px] font-mono font-bold text-slate-700">
+            <span>DOKUMEN TELAAH ANALISIS USULAN PAGU</span>
+            <span>ID: {data.id_analisis}</span>
+            <span>TANGGAL: {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          </div>
+        </div>
+
         {/* Banner Info */}
-        <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-indigo-900">
+        <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-indigo-900 print:hidden">
           <div className="flex items-start gap-3">
             <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
               <Lock size={16} />
