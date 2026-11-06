@@ -125,6 +125,33 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   const [userRole, setUserRole] = useState('Viewer'); // Default pengamat untuk keamanan
   const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
   const [menuSearch, setMenuSearch] = useState('');
+
+  // Modul Switcher (Pill Workspace Filter)
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('portalkeu_active_workspace') || 'ANGGARAN';
+    }
+    return 'ANGGARAN';
+  });
+
+  const handleSelectWorkspace = (ws: string) => {
+    setSelectedWorkspace(ws);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('portalkeu_active_workspace', ws);
+    }
+  };
+
+  const isGroupInSelectedWorkspace = (grpName: string) => {
+    if (menuSearch.trim() !== '') return true; // Tampilkan semua jika sedang mencari
+    if (selectedWorkspace === 'ALL') return true;
+    if (grpName === 'Utama') return true;
+    if (selectedWorkspace === 'ANGGARAN') return grpName === 'Anggaran & RKAT' || grpName === 'Anggaran';
+    if (selectedWorkspace === 'DIPA') return ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'].includes(grpName);
+    if (selectedWorkspace === 'PERSURATAN') return ['Persuratan', 'Manajemen Kegiatan'].includes(grpName);
+    if (selectedWorkspace === 'MASJID') return grpName === 'Masjid';
+    if (selectedWorkspace === 'MASTER') return grpName === 'Master';
+    return true;
+  };
   
   // State untuk Menu Favorit Personal Pengguna
   const [userKey, setUserKey] = useState('guest_user');
@@ -312,6 +339,40 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
            </button>
         </div>
 
+        {/* MODUL SWITCHER (WORKSPACE PILL FILTER) */}
+        {!isCollapsed && (
+          <div className="px-3 pt-2 pb-1 border-b border-gray-100 dark:border-slate-800">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+              {[
+                { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart },
+                { id: 'ALL', label: 'Semua', icon: Layers },
+                { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark },
+                { id: 'PERSURATAN', label: 'Persuratan', icon: Mail },
+                { id: 'MASJID', label: 'Masjid', icon: Building2 },
+                { id: 'MASTER', label: 'Master', icon: Database },
+              ].map((ws) => {
+                const isWsActive = selectedWorkspace === ws.id;
+                const WsIcon = ws.icon;
+                return (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={() => handleSelectWorkspace(ws.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold whitespace-nowrap flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                      isWsActive
+                        ? 'bg-indigo-600 text-white shadow-2xs'
+                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <WsIcon size={11} className={isWsActive ? 'text-white' : 'text-slate-400'} />
+                    <span>{ws.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Action Bar for Accordion (Visible when expanded) */}
         {!isCollapsed && (
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
@@ -485,7 +546,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
               acc[group].push(item);
               return acc;
             }, {} as Record<string, typeof menuList>)
-          ).map(([group, items]) => {
+          ).filter(([group]) => isGroupInSelectedWorkspace(group))
+          .map(([group, items]) => {
             // Filter items by role/access AND search query
             const visibleItems = items.filter(item => {
               if (item.hiddenInSidebar) return false;
