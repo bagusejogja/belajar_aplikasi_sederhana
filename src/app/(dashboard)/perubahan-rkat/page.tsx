@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import TambahPaguTabs from '@/components/TambahPaguTabs';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import {
@@ -664,6 +665,9 @@ export default function PerubahanRkatPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
       
+      {/* NAVIGASI TERPADU ALUR ANGGARAN & RKAT */}
+      <TambahPaguTabs activeTab="rkat" />
+
       {/* HEADER UTAMA DASHBOARD */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-2xs">
         <div className="space-y-1">

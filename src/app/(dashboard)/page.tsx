@@ -86,6 +86,13 @@ const groupMeta: Record<string, { icon: any; gradient: string; text: string; bg:
     bg: 'bg-sky-50/50', 
     border: 'border-sky-200' 
   },
+  'Anggaran & RKAT': {
+    icon: PieChart,
+    gradient: 'from-blue-600 to-indigo-600',
+    text: 'text-indigo-600',
+    bg: 'bg-indigo-50/50',
+    border: 'border-indigo-200'
+  },
   'Anggaran': { 
     icon: PieChart, 
     gradient: 'from-rose-500 to-pink-600', 

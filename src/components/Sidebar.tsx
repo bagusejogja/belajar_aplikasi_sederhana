@@ -101,6 +101,7 @@ const groupIconMap: Record<string, any> = {
   'Penerimaan': Wallet,
   'Persuratan': Mail,
   'Master': Database,
+  'Anggaran & RKAT': PieChart,
   'Anggaran': PieChart,
   'Review Anggaran': ShieldCheck,
   'Input Form': FileEdit,
@@ -246,7 +247,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   const isPathActive = (itemPath: string) => {
     if (pathname === itemPath) return true;
     if (itemPath === '/gov-units' && ['/gov-units', '/gov-pics', '/gov-mapping', '/units'].includes(pathname)) return true;
-    if (itemPath === '/tambah-pagu' && ['/tambah-pagu', '/tambah-pagu/tambah', '/tambah-pagu/komparasi', '/analisis', '/potret-mutasi-pagu', '/copas-pagu'].includes(pathname)) return true;
+    if (itemPath === '/tambah-pagu' && ['/tambah-pagu', '/tambah-pagu/tambah', '/tambah-pagu/komparasi', '/potret-mutasi-pagu'].includes(pathname)) return true;
     if (itemPath === '/dokumen' && ['/dokumen', '/surat/tambah', '/surat/convert-ai', '/surat/editor-html', '/anggaran/laporan-surat'].some(p => pathname === p || pathname.startsWith(p + '/'))) return true;
     const hasExactOtherMenu = menuList.some(m => !m.hiddenInSidebar && m.path === pathname);
     if (!hasExactOtherMenu && itemPath !== '/' && itemPath !== '/dashboard' && pathname.startsWith(itemPath + '/')) {

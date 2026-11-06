@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import TambahPaguTabs from '@/components/TambahPaguTabs';
 import OCRPanel from './components/OCRPanel';
@@ -66,6 +66,32 @@ export default function AnalisisPaguPage() {
   
   const [detailData, setDetailData] = useState<any[]>([]);
   const [historisData, setHistorisData] = useState<any[]>([]);
+
+  // Deteksi jika dibuka dari modul persuratan (/dokumen) dengan membawa parameter surat
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const urlNoSurat = sp.get('no_surat');
+      const urlUnit = sp.get('unit');
+      const urlPerihal = sp.get('perihal');
+      const urlTgl = sp.get('tgl');
+
+      if (urlNoSurat || urlUnit || urlPerihal || urlTgl) {
+        setMainData((prev: any) => ({
+          ...prev,
+          no_surat: urlNoSurat || prev.no_surat,
+          unit_pengirim: urlUnit || prev.unit_pengirim,
+          perihal: urlPerihal || prev.perihal,
+          tanggal_surat: urlTgl || prev.tanggal_surat
+        }));
+        setActiveStep('step1');
+        toast.success(`Data surat ${urlNoSurat || ''} berhasil dimuat ke formulir analisis!`, {
+          icon: '📋',
+          duration: 4000
+        });
+      }
+    }
+  }, []);
 
   const loadRiwayatData = async (id_analisis: string, targetStep?: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'all') => {
     setLoading(true);

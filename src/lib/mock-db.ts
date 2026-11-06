@@ -76,7 +76,7 @@ export const menuList: MenuItem[] = [
   { title: 'Menu Akses', path: '/menus', icon: 'Menu', roles: ['ADMIN'], group: 'Master' },
   { title: 'Master Rekening', path: '/master-rekening', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Master' },
   { title: 'Narrative Generator', path: '/gov-narrative', icon: 'MessageSquare', roles: ['ADMIN'], group: 'Master' },
-  { title: 'Master Unit Kerja', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master' },
+  { title: 'Master Unit Kerja & PIC', path: '/gov-units', icon: 'Landmark', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master' },
   { title: 'Master PIC & Email', path: '/gov-pics', icon: 'Users', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
   { title: 'Pemetaan PIC -> Unit', path: '/gov-mapping', icon: 'Link', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
   { title: 'Manajemen Unit', path: '/units', icon: 'Building2', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Master', hiddenInSidebar: true },
@@ -85,20 +85,18 @@ export const menuList: MenuItem[] = [
   { title: 'Standar UI / UX', path: '/design-system', icon: 'Palette', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Master' },
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
-  // --- ANGGARAN ---
-  { title: 'Tambah Pagu & Mutasi', path: '/tambah-pagu', icon: 'Coins', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran' },
-  { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran', hiddenInSidebar: true },
-  { title: 'Perbandingan dengan Finance', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran', hiddenInSidebar: true },
-  { title: 'Analisis Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran', hiddenInSidebar: true },
-  { title: 'Mutasi Pagu', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran', hiddenInSidebar: true },
-  { title: 'Input Data dr Finance', path: '/copas-pagu', icon: 'FileSpreadsheet', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Anggaran', hiddenInSidebar: true },
-  { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-  { title: 'Tolakan Verif', path: '/anggaran/mak', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran' },
-
-  // --- INPUT FORM ---
-  { title: 'Form Tolakan Verif', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
-  { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Input Form' },
-  { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
+  // --- ANGGARAN & RKAT ---
+  { title: 'Dashboard Pagu & Mutasi', path: '/tambah-pagu', icon: 'PieChart', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
+  { title: 'Analisis Usulan Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'TrendingUp', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
+  { title: 'Sinkronisasi Pagu Finance', path: '/copas-pagu', icon: 'Database', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Anggaran & RKAT' },
+  { title: 'Koreksi & Verifikasi MAK', path: '/anggaran/mak', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Pengajuan Revisi MAK Unit', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
+  { title: 'Input Tambah Pagu', path: '/tambah-pagu/tambah', icon: 'PlusCircle', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
+  { title: 'Perbandingan dengan Finance', path: '/tambah-pagu/komparasi', icon: 'Scale', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
+  { title: 'Mutasi Pagu Keseluruhan', path: '/potret-mutasi-pagu', icon: 'PieChart', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT', hiddenInSidebar: true },
 
   // --- MANAJEMEN KEGIATAN ---
   { title: 'Timeline Kegiatan', path: '/timeline', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Manajemen Kegiatan' },

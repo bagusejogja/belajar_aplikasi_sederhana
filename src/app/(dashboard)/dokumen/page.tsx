@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { 
   FileText, 
   Search, 
@@ -1312,6 +1313,13 @@ NOTIFY pgrst, 'reload schema';`;
                       {/* Aksi */}
                       <td className="py-3 px-5 text-center align-top pt-3">
                         <div className="flex items-center justify-center gap-1">
+                          <Link
+                            href={`/analisis?no_surat=${encodeURIComponent(doc.nomor_surat || '')}&unit=${encodeURIComponent(doc.unit_kerja || '')}&perihal=${encodeURIComponent(doc.perihal || '')}&tgl=${encodeURIComponent(doc.tanggal_surat || '')}`}
+                            className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Buat Analisis Usulan Pagu dari Surat Ini"
+                          >
+                            <Sparkles className="w-4 h-4 text-amber-500" />
+                          </Link>
                           <button
                             onClick={() => handleOpenDetail(doc)}
                             className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
@@ -1581,21 +1589,32 @@ NOTIFY pgrst, 'reload schema';`;
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-              <button
-                onClick={() => {
-                  setIsDetailOpen(false);
-                  handleOpenEdit(selectedDoc);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold transition-colors"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Edit Dokumen Ini</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    setIsDetailOpen(false);
+                    handleOpenEdit(selectedDoc);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Dokumen</span>
+                </button>
+
+                <Link
+                  href={`/analisis?no_surat=${encodeURIComponent(selectedDoc.nomor_surat || '')}&unit=${encodeURIComponent(selectedDoc.unit_kerja || '')}&perihal=${encodeURIComponent(selectedDoc.perihal || '')}&tgl=${encodeURIComponent(selectedDoc.tanggal_surat || '')}`}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                  title="Buat telaah analisis tambah pagu langsung dari data surat ini"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Buat Analisis Usulan Pagu</span>
+                </Link>
+              </div>
 
               <button
                 onClick={() => setIsDetailOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Tutup
               </button>

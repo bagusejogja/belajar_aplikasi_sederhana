@@ -21,49 +21,54 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  // Baris 1
-  {
-    id: 'tambah',
-    title: 'Input Tambah Pagu',
-    path: '/tambah-pagu/tambah',
-    icon: PlusCircle,
-    badge: 'Form Input',
-  },
   {
     id: 'daftar',
-    title: 'Daftar Tambah Pagu',
+    title: 'Dashboard Pagu & Mutasi',
     path: '/tambah-pagu',
     icon: Layout,
-    badge: 'Monitoring',
+    badge: 'Monitoring Pagu',
+  },
+  {
+    id: 'analisis',
+    title: 'Analisis Usulan Pagu',
+    path: '/analisis',
+    icon: FileSpreadsheet,
+    badge: 'Telaah Usulan',
+  },
+  {
+    id: 'rkat',
+    title: 'Cek Perubahan RKAT',
+    path: '/perubahan-rkat',
+    icon: Scale,
+    badge: 'Deteksi Selisih',
+  },
+  {
+    id: 'copas',
+    title: 'Sinkronisasi Pagu Finance',
+    path: '/copas-pagu',
+    icon: ClipboardPaste,
+    badge: 'Copas Finance',
   },
   {
     id: 'komparasi',
-    title: 'Perbandingan dengan Finance',
+    title: 'Perbandingan Finance',
     path: '/tambah-pagu/komparasi',
     icon: Scale,
     badge: 'Audit Versi',
-  },
-  // Baris 2
-  {
-    id: 'analisis',
-    title: 'Analisis Tambah Pagu',
-    path: '/analisis',
-    icon: FileSpreadsheet,
-    badge: 'Analisis',
   },
   {
     id: 'potret',
     title: 'Mutasi Pagu',
     path: '/potret-mutasi-pagu',
     icon: PieChart,
-    badge: 'Mutasi Pagu',
+    badge: 'Potret Keseluruhan',
   },
   {
-    id: 'copas',
-    title: 'Input Data dr Finance',
-    path: '/copas-pagu',
-    icon: ClipboardPaste,
-    badge: 'Copas Finance',
+    id: 'tambah',
+    title: 'Input Tambah Pagu',
+    path: '/tambah-pagu/tambah',
+    icon: PlusCircle,
+    badge: 'Form Manual',
   },
 ];
 
@@ -98,7 +103,8 @@ export default function TambahPaguTabs({ activeTab }: { activeTab?: string }) {
   const currentTab = activeTab || (
     pathname === '/tambah-pagu/tambah' ? 'tambah' :
     pathname === '/tambah-pagu/komparasi' ? 'komparasi' :
-    pathname === '/analisis' ? 'analisis' :
+    pathname === '/analisis' || pathname.startsWith('/analisis/') ? 'analisis' :
+    pathname === '/perubahan-rkat' ? 'rkat' :
     pathname === '/potret-mutasi-pagu' ? 'potret' :
     pathname === '/copas-pagu' ? 'copas' :
     pathname.startsWith('/tambah-pagu') ? 'daftar' : 'daftar'

@@ -77,6 +77,9 @@ export default function DashboardLayout({
       case '/input': return 'Input Transaksi Baru';
       case '/reports': return 'Laporan Keuangan';
       case '/references': return 'Data Referensi';
+      case '/gov-units': return 'Master Unit Kerja & PIC';
+      case '/gov-pics': return 'Master PIC & Email';
+      case '/gov-mapping': return 'Pemetaan PIC -> Unit';
       case '/users': return 'Manajemen User';
       case '/units': return 'Manajemen Unit';
       case '/menus': return 'Manajemen Menu';
@@ -87,8 +90,13 @@ export default function DashboardLayout({
       case '/surat/convert-ai': return 'AI Convert Surat';
       case '/potret-mutasi-pagu': return 'Potret Mutasi Pagu Keseluruhan';
       case '/tambah-pagu/komparasi': return 'Komparasi Audit Tambah Pagu';
-      case '/tambah-pagu/tambah': return 'Input Tambah Pagu';
-      case '/tambah-pagu': return 'Daftar Tambah Pagu';
+      case '/tambah-pagu/tambah': return 'Input Tambah Pagu Manual';
+      case '/tambah-pagu': return 'Dashboard Pagu & Mutasi';
+      case '/analisis': return 'Analisis Usulan Tambah Pagu';
+      case '/copas-pagu': return 'Sinkronisasi Pagu Finance';
+      case '/anggaran/mak': return 'Koreksi & Verifikasi MAK';
+      case '/input-mak': return 'Pengajuan Revisi MAK Unit';
+      case '/anggaran/usulan': return 'Revisi Terjadwal';
       case '/backup': return 'Backup & Restore Database';
       case '/rekening-koran': return 'Rekening Koran Bulanan Masjid';
       case '/arsip-kegiatan': return 'Riwayat Dokumen';
