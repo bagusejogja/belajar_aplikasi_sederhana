@@ -144,6 +144,7 @@ export default function PremiumDashboard() {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeWorkspace, setActiveWorkspace] = useState<string>('ALL');
 
   // Real-time KPI Analytics State
   const [analisisStats, setAnalisisStats] = useState({
@@ -354,6 +355,27 @@ export default function PremiumDashboard() {
     return groups;
   }, [accessibleMenus]);
 
+  // Workspace Options with strict Role-Aware Filter
+  const workspaceOptions = useMemo(() => {
+    const list = [
+      { id: 'ALL', label: 'Semua Menu', icon: Layers, groups: [] },
+      { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart, groups: ['Anggaran & RKAT', 'Anggaran'] },
+      { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark, groups: ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'] },
+      { id: 'PERSURATAN', label: 'Persuratan & Dokumen', icon: Mail, groups: ['Persuratan', 'Manajemen Kegiatan'] },
+      { id: 'MASJID', label: 'Masjid', icon: Building2, groups: ['Masjid'] },
+      { id: 'MASTER', label: 'Master & Referensi', icon: Database, groups: ['Master'] },
+    ];
+
+    const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
+    
+    // Saring: hanya tampilkan tombol workspace jika pengguna memiliki akses ke minimal 1 menu di dalamnya!
+    return list.filter(ws => {
+      if (ws.id === 'ALL') return true;
+      if (isAdmin) return true;
+      return ws.groups.some(g => groupedAccessible[g] && groupedAccessible[g].length > 0);
+    });
+  }, [userRole, groupedAccessible]);
+
   // Filtered by Search Query
   const filteredGroups = useMemo(() => {
     if (!searchQuery.trim()) return groupedAccessible;
@@ -372,6 +394,21 @@ export default function PremiumDashboard() {
     });
     return result;
   }, [groupedAccessible, searchQuery]);
+
+  // Saring grup berdasarkan workspace aktif (default 'ALL')
+  const displayedGroups = useMemo(() => {
+    if (activeWorkspace === 'ALL') return filteredGroups;
+    const ws = workspaceOptions.find(w => w.id === activeWorkspace);
+    if (!ws) return filteredGroups;
+
+    const result: Record<string, typeof menuList> = {};
+    Object.entries(filteredGroups).forEach(([groupName, items]) => {
+      if (ws.groups.includes(groupName)) {
+        result[groupName] = items;
+      }
+    });
+    return result;
+  }, [filteredGroups, activeWorkspace, workspaceOptions]);
 
 
   // Filter menu favorit dari daftar menu yang bisa diakses user
@@ -801,7 +838,7 @@ export default function PremiumDashboard() {
           <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-bold text-gray-500">Memuat modul akses Anda...</span>
         </div>
-      ) : Object.keys(filteredGroups).length === 0 ? (
+      ) : Object.keys(displayedGroups).length === 0 ? (
         <div className="bg-white rounded-3xl p-16 border border-gray-200/80 text-center space-y-3 shadow-xs">
           <div className="w-16 h-16 bg-gray-100 text-gray-400 rounded-3xl flex items-center justify-center mx-auto">
             <Search size={32} />
@@ -813,7 +850,7 @@ export default function PremiumDashboard() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.entries(filteredGroups).map(([groupName, items]) => {
+          {Object.entries(displayedGroups).map(([groupName, items]) => {
             const meta = groupMeta[groupName] || {
               icon: Layers,
               gradient: 'from-gray-700 to-slate-800',

@@ -19,6 +19,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { menuList } from '@/lib/mock-db';
+import { supabase } from '@/lib/supabase';
 
 export interface CommandPaletteProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export interface CommandPaletteProps {
 interface CommandItem {
   id: string;
   title: string;
-  category: 'Menu Navigasi' | 'Aksi Cepat' | 'Unit Kerja';
+  category: 'Surat & Usulan Anggaran' | 'Menu Navigasi' | 'Aksi Cepat' | 'Unit Kerja';
   subtitle?: string;
   icon: React.ReactNode;
   path?: string;
@@ -41,6 +42,74 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [suratResults, setSuratResults] = useState<CommandItem[]>([]);
+  const [isSearchingSurat, setIsSearchingSurat] = useState(false);
+
+  // Dynamic Search untuk Dokumen & Nomor Surat dari Database
+  useEffect(() => {
+    if (!query.trim() || query.trim().length < 2) {
+      setSuratResults([]);
+      setIsSearchingSurat(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingSurat(true);
+      try {
+        const cleanQ = query.trim();
+        const [analisisRes, docsRes] = await Promise.all([
+          supabase
+            .from('app_analisis_utama')
+            .select('id_analisis, no_surat, unit_pengirim, perihal, total_anggaran, keputusan')
+            .or(`no_surat.ilike.%${cleanQ}%,unit_pengirim.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%`)
+            .limit(5),
+          supabase
+            .from('documents')
+            .select('id, nomor_surat, perihal, unit_kerja, jenis_dokumen')
+            .or(`nomor_surat.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,unit_kerja.ilike.%${cleanQ}%`)
+            .limit(5)
+        ]);
+
+        const items: CommandItem[] = [];
+
+        if (analisisRes.data) {
+          analisisRes.data.forEach((row: any) => {
+            items.push({
+              id: `analisis-${row.id_analisis}`,
+              title: row.no_surat ? `Surat: ${row.no_surat}` : `Usulan Pagu #${row.id_analisis.slice(0, 8)}`,
+              category: 'Surat & Usulan Anggaran',
+              subtitle: `${row.unit_pengirim || 'Unit UGM'} • ${row.perihal || 'Usulan Pagu'}`,
+              icon: <FileSpreadsheet className="w-4 h-4 text-emerald-600" />,
+              path: `/analisis/presentasi/${row.id_analisis}?mode=view`,
+              badge: row.keputusan || 'Usulan Pagu'
+            });
+          });
+        }
+
+        if (docsRes.data) {
+          docsRes.data.forEach((row: any) => {
+            items.push({
+              id: `doc-${row.id}`,
+              title: `Arsip Surat: ${row.nomor_surat}`,
+              category: 'Surat & Usulan Anggaran',
+              subtitle: `${row.unit_kerja || 'Unit Kerja'} • ${row.perihal || 'Arsip Dokumen'}`,
+              icon: <FileText className="w-4 h-4 text-indigo-600" />,
+              path: `/dokumen`,
+              badge: row.jenis_dokumen || 'Dokumen'
+            });
+          });
+        }
+
+        setSuratResults(items);
+      } catch (err) {
+        console.error('Error searching surat:', err);
+      } finally {
+        setIsSearchingSurat(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Keyboard shortcut listener (Ctrl+K or Cmd+K)
   useEffect(() => {
@@ -154,8 +223,8 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     }
   ];
 
-  // Filter items by search query
-  const filteredItems = defaultItems.filter((item) => {
+  // Filter items by search query and merge dynamic surat search results
+  const staticFiltered = defaultItems.filter((item) => {
     if (!query.trim()) return true;
     const q = query.toLowerCase();
     return (
@@ -165,8 +234,11 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     );
   });
 
+  const filteredItems = [...suratResults, ...staticFiltered];
+
   // Group filtered items
-  const categories: Array<'Menu Navigasi' | 'Aksi Cepat' | 'Unit Kerja'> = [
+  const categories: Array<'Surat & Usulan Anggaran' | 'Menu Navigasi' | 'Aksi Cepat' | 'Unit Kerja'> = [
+    'Surat & Usulan Anggaran',
     'Menu Navigasi',
     'Aksi Cepat',
     'Unit Kerja'

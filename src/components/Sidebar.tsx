@@ -126,12 +126,12 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
   const [allowedPaths, setAllowedPaths] = useState<string[]>(['/']); // Default hanya home untuk keamanan
   const [menuSearch, setMenuSearch] = useState('');
 
-  // Modul Switcher (Pill Workspace Filter)
+  // Modul Switcher (Pill Workspace Filter, Default 'ALL')
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('portalkeu_active_workspace') || 'ANGGARAN';
+      return localStorage.getItem('portalkeu_active_workspace') || 'ALL';
     }
-    return 'ANGGARAN';
+    return 'ALL';
   });
 
   const handleSelectWorkspace = (ws: string) => {
@@ -343,14 +343,26 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
         {!isCollapsed && (
           <div className="px-3 pt-2 pb-1 border-b border-gray-100 dark:border-slate-800">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-              {[
-                { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart },
-                { id: 'ALL', label: 'Semua', icon: Layers },
-                { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark },
-                { id: 'PERSURATAN', label: 'Persuratan', icon: Mail },
-                { id: 'MASJID', label: 'Masjid', icon: Building2 },
-                { id: 'MASTER', label: 'Master', icon: Database },
-              ].map((ws) => {
+              {(() => {
+                const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
+                const allWs = [
+                  { id: 'ALL', label: 'Semua', icon: Layers, groups: [] },
+                  { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart, groups: ['Anggaran & RKAT', 'Anggaran'] },
+                  { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark, groups: ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'] },
+                  { id: 'PERSURATAN', label: 'Persuratan', icon: Mail, groups: ['Persuratan', 'Manajemen Kegiatan'] },
+                  { id: 'MASJID', label: 'Masjid', icon: Building2, groups: ['Masjid'] },
+                  { id: 'MASTER', label: 'Master', icon: Database, groups: ['Master'] },
+                ];
+
+                return allWs.filter(ws => {
+                  if (ws.id === 'ALL') return true;
+                  if (isAdmin) return true;
+                  return menuList.some(m => {
+                    if (!ws.groups.includes(m.group || '')) return false;
+                    return allowedPaths.includes(m.path) || (m.roles && m.roles.map(r => r.toLowerCase()).includes(userRole.toLowerCase()));
+                  });
+                });
+              })().map((ws) => {
                 const isWsActive = selectedWorkspace === ws.id;
                 const WsIcon = ws.icon;
                 return (
