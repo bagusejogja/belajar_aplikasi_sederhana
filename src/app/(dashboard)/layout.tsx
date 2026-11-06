@@ -93,15 +93,32 @@ export default function DashboardLayout({
       case '/rekening-koran': return 'Rekening Koran Bulanan Masjid';
       case '/arsip-kegiatan': return 'Riwayat Dokumen';
       case '/design-system': return 'Standar UI / UX (Design System)';
+      case '/perubahan-rkat': return 'Cek Perubahan RKAT';
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }
   };
 
   // 1. Initial Authentication & Role Fetching (Only runs once on mount)
   useEffect(() => {
+    // Tangkap jika pengguna masuk melalui link pemulihan password (#access_token=...&type=recovery)
+    if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('type=recovery')) {
+      router.push('/reset-password' + window.location.hash);
+      return;
+    }
+
     let isMounted = true;
 
     const initAuth = async () => {
+      // Halaman presentasi analisis diizinkan akses langsung tanpa login (untuk kebutuhan sharing/read-only)
+      if (pathname.startsWith('/analisis/presentasi/')) {
+        const cached = getCachedAuthUser();
+        if (cached && isMounted) {
+          setUserRole(cached.role);
+        }
+        setIsAuthChecking(false);
+        return;
+      }
+
       const user = await fetchAuthUser();
       if (!user) {
         router.push('/login');
@@ -117,10 +134,16 @@ export default function DashboardLayout({
     initAuth();
 
     // Listener untuk perubahan login/logout
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.push('/reset-password');
+        return;
+      }
       if (!session) {
         clearAuthCache();
-        router.push('/login');
+        if (!pathname.startsWith('/analisis/presentasi/')) {
+          router.push('/login');
+        }
       }
     });
 
@@ -132,6 +155,12 @@ export default function DashboardLayout({
 
   // 2. Synchronous & Instant Route Authorization Check (Never triggers full-screen unmount/loader!)
   useEffect(() => {
+    // 0. Presentasi analisis selalu diizinkan untuk siapapun yang memegang link
+    if (pathname.startsWith('/analisis/presentasi/')) {
+      setIsUnauthorized(false);
+      return;
+    }
+
     // 1. Root '/' or '/dashboard' always allowed
     if (pathname === '/' || pathname === '/dashboard') {
       setIsUnauthorized(false);
@@ -216,6 +245,15 @@ export default function DashboardLayout({
            </div>
         </div>
      );
+  }
+
+  // Tampilan khusus bersih & mandiri untuk Lembar Presentasi Web (tanpa sidebar admin)
+  if (pathname.startsWith('/analisis/presentasi/')) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans">
+        {children}
+      </div>
+    );
   }
 
   return (

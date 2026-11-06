@@ -40,8 +40,8 @@ export async function GET(request: Request) {
     const paguTambah = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguKurang = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguPengalihan = paguTambah + paguKurang; // kurang sudah bernilai negatif
-    const paguTambahPaguPenugasan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
-    const paguTambahPaguInisiatif = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTambahPaguPenugasan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase()?.includes('penugasan') && Number(p.nominal || 0) > 0).reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
+    const paguTambahPaguInisiatif = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase()?.includes('inisiatif') && Number(p.nominal || 0) > 0).reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguEfisiensi = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'efisiensi').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguTalangan = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);
     const paguTalanganPindah = paguTahun.filter((p: any) => p.jenis_anggaran?.toLowerCase() === 'talangan - pindah dari fakultas').reduce((acc: number, p: any) => acc + Number(p.nominal || 0), 0);

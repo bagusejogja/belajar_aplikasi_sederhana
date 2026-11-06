@@ -1,14 +1,20 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, Printer, FileText, CheckCircle2, Clock, AlertCircle, XCircle, 
-  Sparkles, Save, RefreshCw, CheckSquare, Lock, FileCheck, PieChart, Building2, History, Wallet
+  Sparkles, Save, RefreshCw, CheckSquare, Lock, FileCheck, PieChart, Building2, History, Wallet,
+  Copy, Check, Share2, Eye
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import DataPendukung from '../../components/DataPendukung';
+
+const ReactQuill = dynamic(() => import('react-quill-new'), { ssr: false });
 
 function terbilang(n: number): string {
   const angka = ["", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas"];
@@ -68,6 +74,46 @@ export default function PresentasiAnalisisPage() {
   const [modalKeteranganKeputusan, setModalKeteranganKeputusan] = useState('');
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('mode') === 'view' || sp.get('readonly') === 'true';
+    }
+    return false;
+  });
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('mode') === 'view' || sp.get('readonly') === 'true') {
+        setIsReadOnly(true);
+      }
+    }
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+        if (!user) {
+          setIsReadOnly(true);
+        }
+      } catch (e) {
+        setIsReadOnly(true);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  const handleCopyLink = () => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const shareUrl = `${origin}/analisis/presentasi/${id}?mode=view`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedLink(true);
+    toast.success('Link presentasi berhasil disalin! Siap dibagikan.');
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
 
   useEffect(() => {
     if (id) {
@@ -405,15 +451,19 @@ export default function PresentasiAnalisisPage() {
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3.5 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link
-              href="/analisis"
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold"
-              title="Kembali ke Riwayat Analisis"
-            >
-              <ArrowLeft size={16} />
-              <span>Kembali</span>
-            </Link>
-            <div className="h-6 w-px bg-slate-200" />
+            {!isReadOnly && currentUser && (
+              <>
+                <Link
+                  href="/analisis"
+                  className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-bold"
+                  title="Kembali ke Riwayat Analisis"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Kembali</span>
+                </Link>
+                <div className="h-6 w-px bg-slate-200" />
+              </>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
@@ -434,6 +484,16 @@ export default function PresentasiAnalisisPage() {
 
             <button
               type="button"
+              onClick={handleCopyLink}
+              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-200 flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="Salin Link Web Hasil Analisis untuk Dibagikan"
+            >
+              {copiedLink ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+              <span>{copiedLink ? 'Link Tersalin!' : 'Salin Link'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => window.print()}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 flex items-center gap-1.5 cursor-pointer"
             >
@@ -444,7 +504,7 @@ export default function PresentasiAnalisisPage() {
               href="#form-keputusan-pimpinan"
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
-              <CheckSquare size={14} /> Form Keputusan
+              <CheckSquare size={14} /> {isReadOnly ? 'Keputusan Pimpinan' : 'Form Keputusan'}
             </a>
           </div>
         </div>
@@ -454,16 +514,26 @@ export default function PresentasiAnalisisPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-8">
         
         {/* Banner Info */}
-        <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-2xl flex items-start gap-3 text-indigo-900">
-          <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700">
-            <Lock size={16} />
+        <div className="bg-indigo-50/70 border border-indigo-200 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-indigo-900">
+          <div className="flex items-start gap-3">
+            <div className="p-1 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
+              <Lock size={16} />
+            </div>
+            <div className="text-xs space-y-0.5">
+              <p className="font-bold">Mode Lembar Presentasi Sidang Usulan Pagu</p>
+              <p className="text-indigo-700 leading-relaxed">
+                Halaman web ini disajikan khusus untuk membaca telaah analisis usulan anggaran. Siap dibagikan kepada pimpinan atau unit kerja.
+              </p>
+            </div>
           </div>
-          <div className="text-xs space-y-0.5">
-            <p className="font-bold">Mode Lembar Presentasi Sidang Usulan Pagu</p>
-            <p className="text-indigo-700 leading-relaxed">
-              Seluruh data usulan surat, rincian realisasi belanja, pagu historis, dan potret mutasi alokasi unit disajikan sama seperti saat input. Bagian yang dapat diedit dan disimpan adalah <strong>Keputusan &amp; Catatan Persetujuan Pimpinan</strong> di bawah.
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="px-3.5 py-1.5 bg-white hover:bg-indigo-100 text-indigo-800 rounded-xl text-xs font-bold transition-all border border-indigo-300 flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 shrink-0"
+          >
+            {copiedLink ? <Check size={13} className="text-emerald-600" /> : <Share2 size={13} />}
+            <span>{copiedLink ? 'Link Tersalin!' : 'Bagikan Link Web Ini'}</span>
+          </button>
         </div>
 
         {/* SECTION 1: FORM DATA UTAMA USULAN (READ ONLY WEB INPUT STYLE) */}
@@ -896,9 +966,72 @@ export default function PresentasiAnalisisPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN (DIBUAT SERAGAM DENGAN MENU LAIN) */}
+        {/* SECTION 4: KEPUTUSAN & CATATAN PERSETUJUAN PIMPINAN */}
         {/* ========================================================================= */}
-        <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 border border-gray-200/90 shadow-2xs bg-white space-y-6 text-slate-900">
+        {isReadOnly ? (
+          <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs space-y-6 text-slate-900">
+            <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 rounded-full text-xs font-bold uppercase tracking-wider mb-1.5">
+                  <Eye size={13} className="text-slate-500" /> Mode Baca Saja (Read-Only)
+                </div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <FileCheck size={20} className="text-emerald-600" />
+                  Keputusan &amp; Catatan Persetujuan Pimpinan
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ringkasan resmi keputusan persetujuan dan alokasi anggaran usulan ini
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase">Status:</span>
+                {getStatusBadge(data.keputusan || modalKeputusan)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nominal Disetujui:</span>
+                <div className="text-xl sm:text-2xl font-black font-mono text-emerald-700">
+                  Rp {formatRp(data.nominal_disetujui || modalNominalDisetujui || data.total_anggaran || '0')}
+                </div>
+                <div className="text-xs font-medium text-slate-500 italic">
+                  ({terbilang(parseNum(data.nominal_disetujui || modalNominalDisetujui || data.total_anggaran || '0'))})
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Catatan / Keterangan Tambahan Persetujuan:</span>
+                {(modalKeteranganKeputusan || data.keterangan_keputusan || data.catatan_tambahan || data.alasan_keputusan) ? (
+                  <div 
+                    className="prose prose-slate max-w-none w-full text-xs sm:text-sm leading-relaxed text-slate-800 break-normal [overflow-wrap:break-word] [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1 [&_strong]:font-bold [&_em]:italic"
+                    dangerouslySetInnerHTML={{ 
+                      __html: cleanHtmlContent(modalKeteranganKeputusan || data.keterangan_keputusan || data.catatan_tambahan || data.alasan_keputusan || '') 
+                    }}
+                  />
+                ) : (
+                  <p className="text-xs sm:text-sm text-slate-400 italic">
+                    Belum ada catatan persetujuan pimpinan.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {currentUser && (
+              <div className="pt-3 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsReadOnly(false)}
+                  className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <CheckSquare size={14} /> <span>Buka Form Edit Keputusan (Admin)</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div id="form-keputusan-pimpinan" className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs space-y-6 text-slate-900">
           
           <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 gap-3">
             <div>
@@ -1012,13 +1145,15 @@ export default function PresentasiAnalisisPage() {
             <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
               3. Catatan / Keterangan Hasil Keputusan Pimpinan:
             </label>
-            <textarea
-              rows={4}
-              value={modalKeteranganKeputusan}
-              onChange={e => setModalKeteranganKeputusan(e.target.value)}
-              placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
-              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 shadow-xs resize-none leading-relaxed"
-            />
+            <div className="bg-white rounded-xl overflow-hidden border border-slate-300 shadow-xs">
+              <ReactQuill
+                theme="snow"
+                value={modalKeteranganKeputusan || ''}
+                onChange={val => setModalKeteranganKeputusan(val)}
+                placeholder="Tambahkan catatan hasil keputusan, arahan penggunaan anggaran, nomor disposisi persetujuan, atau alasan jika ditolak / perlu revisi..."
+                className="min-h-[140px] pb-10 [&_.ql-editor]:min-h-[100px] [&_.ql-editor]:text-xs sm:[&_.ql-editor]:text-sm leading-relaxed"
+              />
+            </div>
           </div>
 
           {/* SAVE BUTTON */}
@@ -1032,7 +1167,14 @@ export default function PresentasiAnalisisPage() {
                 Perubahan akan langsung memperbarui status keputusan analisis usulan.
               </span>
             )}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsReadOnly(true)}
+                className="h-11 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all border border-slate-300 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Eye size={14} /> <span>Mode Baca</span>
+              </button>
               <button
                 type="button"
                 onClick={handleSaveDecision}
@@ -1046,6 +1188,7 @@ export default function PresentasiAnalisisPage() {
           </div>
 
         </div>
+        )}
 
       </div>
 

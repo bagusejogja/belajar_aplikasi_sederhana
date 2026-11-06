@@ -161,14 +161,14 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
           const paguTahun = paguData.filter(p => p.tahun_anggaran === year);
           const realisasiTahun = realisasiData.filter(r => r.tahun_anggaran === year);
           
-          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal').reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguAwal = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'pagu awal' || p.jenis_anggaran?.toLowerCase() === 'rutin').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTambah = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'tambah').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguKurang = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'kurang').reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguPengalihan = paguTambah + paguKurang;
           
-          const paguTambahPaguPenugasan = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - penugasan') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguTambahPaguInisiatif = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'tambah pagu - inisiatif') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
-          const paguEfisiensi = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'efisiensi') || (p.jenis_anggaran?.toLowerCase()?.includes('tambah pagu') && Number(p.nominal) < 0)).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguPenugasan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase()?.includes('penugasan') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguTambahPaguInisiatif = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase()?.includes('inisiatif') && Number(p.nominal) > 0).reduce((acc, p) => acc + Number(p.nominal), 0);
+          const paguEfisiensi = paguTahun.filter(p => (p.jenis_anggaran?.toLowerCase() === 'efisiensi') || (p.jenis_anggaran?.toLowerCase()?.includes('tambah') && Number(p.nominal) < 0)).reduce((acc, p) => acc + Number(p.nominal), 0);
           const paguTalangan = paguTahun.filter(p => p.jenis_anggaran?.toLowerCase() === 'talangan').reduce((acc, p) => acc + Number(p.nominal), 0);
           
           const totalPagu = paguAwal + paguPengalihan + paguTambahPaguPenugasan + paguTambahPaguInisiatif + paguEfisiensi + paguTalangan;
@@ -201,6 +201,50 @@ export default function DataForm({ mainData, setMainData, isDetailMode, detailDa
 
   const targetYear = '2026';
   const historisYearRow = historisData?.find((d: any) => d.tahun === targetYear) || historisData?.[historisData.length - 1] || {};
+
+  // Auto-sync row 2026 di historisData agar selalu sejalan dengan detailInisiatif & detailPenugasan terkini
+  useEffect(() => {
+    if (!setHistorisData || !historisData || historisData.length === 0) return;
+    
+    const sumInisiatif = detailInisiatif.reduce((acc, curr) => acc + parseNum(curr.nominal), 0);
+    const sumPenugasan = detailPenugasan.reduce((acc, curr) => acc + parseNum(curr.nominal), 0);
+    
+    const row2026 = historisData.find((d: any) => d.tahun === '2026');
+    if (!row2026) return;
+
+    const currentInisiatif = parseNum(row2026.tambah_pagu_inisiatif);
+    const currentPenugasan = parseNum(row2026.tambah_pagu_penugasan);
+
+    if (
+      (detailInisiatif.length > 0 && Math.abs(currentInisiatif - sumInisiatif) > 1) ||
+      (detailPenugasan.length > 0 && Math.abs(currentPenugasan - sumPenugasan) > 1)
+    ) {
+      setHistorisData((prev: any[]) => prev.map(row => {
+        if (row.tahun !== '2026') return row;
+        
+        const pAwal = parseNum(row.pagu_awal);
+        const pPengalihan = parseNum(row.pengalihan);
+        const pEfisiensi = parseNum(row.efisiensi);
+        const pTalangan = parseNum(row.talangan);
+        const newTotal = pAwal + pPengalihan + sumPenugasan + sumInisiatif + pEfisiensi + pTalangan;
+        const real = parseNum(row.realisasi_historis);
+        const serapan = newTotal > 0 ? ((real / newTotal) * 100).toFixed(2) + '%' : '0%';
+
+        return {
+          ...row,
+          tambah_pagu_inisiatif: formatRp(sumInisiatif),
+          tambah_pagu_penugasan: formatRp(sumPenugasan),
+          total_pagu: formatRp(newTotal),
+          persen_serapan: serapan,
+          _raw: {
+            ...row._raw,
+            paguTambahPaguInisiatif: sumInisiatif,
+            paguTambahPaguPenugasan: sumPenugasan
+          }
+        };
+      }));
+    }
+  }, [detailInisiatif, detailPenugasan, setHistorisData]);
   
   const parseNum = (str: string | number) => {
     if (typeof str === 'number') return isNaN(str) ? 0 : str;
@@ -889,13 +933,16 @@ ${mainData.ringkasan_ai}`;
 
                 <div className="col-span-full">
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-widest mb-2">Catatan / Keterangan Tambahan Persetujuan</label>
-                  <textarea
-                    rows={3}
-                    value={mainData.keterangan_keputusan || ''}
-                    onChange={e => setMainData({...mainData, keterangan_keputusan: e.target.value})}
-                    placeholder="Misal: untuk biaya administrasi perubahan kepemilikan 52 kendaraan dinas, atau alasan efisiensi..."
-                    className="w-full p-3 bg-slate-800 border border-slate-600 rounded-xl outline-none focus:border-indigo-400 text-white text-sm"
-                  />
+                  <div className="bg-white rounded-xl overflow-hidden text-slate-900 border border-slate-600 shadow-sm">
+                    <ReactQuill
+                      theme="snow"
+                      value={mainData.keterangan_keputusan || ''}
+                      onChange={(val) => setMainData({...mainData, keterangan_keputusan: val})}
+                      placeholder="Misal: untuk biaya administrasi perubahan kepemilikan 52 kendaraan dinas, atau alasan efisiensi..."
+                      className="min-h-[140px] pb-10 [&_.ql-editor]:min-h-[100px] [&_.ql-editor]:text-sm"
+                      readOnly={readOnly}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

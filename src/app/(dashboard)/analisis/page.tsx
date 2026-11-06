@@ -29,8 +29,10 @@ import {
   Sparkles,
   FileSpreadsheet,
   Database,
-  Hash
+  Hash,
+  Copy
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function AnalisisPaguPage() {
   // Step State: 'step1' | 'step2' | 'step3' | 'pdf' | 'step5' | 'riwayat' | 'all'
@@ -98,7 +100,7 @@ export default function AnalisisPaguPage() {
              link_lampiran: utama.link_lampiran || '',
              keputusan: utama.keputusan || parsed.keputusan || 'disetujui semua',
              nominal_disetujui: utama.nominal_disetujui || parsed.nominal_disetujui || '0',
-             keterangan_keputusan: parsed.keterangan_keputusan || '',
+             keterangan_keputusan: parsed.keterangan_keputusan || utama.alasan_keputusan || utama.catatan_tambahan || '',
              surat_balasan_html: parsed.surat_balasan_html || ''
           };
 
@@ -543,6 +545,25 @@ export default function AnalisisPaguPage() {
                 <Printer size={13} />
                 <span>Cetak PDF</span>
               </button>
+
+              {analisisId && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      const origin = window.location.origin;
+                      const shareUrl = `${origin}/analisis/presentasi/${analisisId}?mode=view`;
+                      navigator.clipboard.writeText(shareUrl);
+                      toast.success('Link presentasi web berhasil disalin! Siap dibagikan.');
+                    }
+                  }} 
+                  className="h-9 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+                  title="Salin Link Web Presentasi untuk Dibagikan Membaca Hasil di Web"
+                >
+                  <Copy size={13} />
+                  <span>Salin Link Web</span>
+                </button>
+              )}
 
               <button 
                 onClick={handleSave} 

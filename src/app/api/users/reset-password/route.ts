@@ -15,9 +15,22 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Email wajib diisi untuk pengiriman link reset' }, { status: 400 });
       }
 
+      // Deteksi URL aplikasi secara dinamis dari request atau environment
+      const origin = req.headers.get('origin');
+      const host = req.headers.get('host');
+      const protocol = req.headers.get('x-forwarded-proto') || 'https';
+      const dynamicUrl = origin || (host ? `${protocol}://${host}` : null);
+      const siteUrl = 
+        process.env.NEXT_PUBLIC_APP_URL || 
+        process.env.NEXT_PUBLIC_SITE_URL || 
+        dynamicUrl || 
+        'https://portalkeu.vercel.app';
+
+      const redirectTo = `${siteUrl.replace(/\/+$/, '')}/reset-password`;
+
       // Try sending via admin API resetPasswordForEmail
       const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://belajar-aplikasi-sederhana-npmk.vercel.app'}/reset-password`,
+        redirectTo,
       });
 
       if (error) throw error;

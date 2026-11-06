@@ -821,13 +821,16 @@ ${mainData.ringkasan_ai}`;
 
                 <div className="col-span-full">
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-widest mb-2">Catatan / Keterangan Tambahan Persetujuan</label>
-                  <textarea
-                    rows={3}
-                    value={mainData.keterangan_keputusan || ''}
-                    onChange={e => setMainData({...mainData, keterangan_keputusan: e.target.value})}
-                    placeholder="Misal: untuk biaya administrasi perubahan kepemilikan 52 kendaraan dinas, atau alasan efisiensi..."
-                    className="w-full p-3 bg-slate-800 border border-slate-600 rounded-xl outline-none focus:border-indigo-400 text-white text-sm"
-                  />
+                  <div className="bg-white rounded-xl overflow-hidden text-slate-900 border border-slate-600 shadow-sm">
+                    <ReactQuill
+                      theme="snow"
+                      value={mainData.keterangan_keputusan || ''}
+                      onChange={(val) => setMainData({...mainData, keterangan_keputusan: val})}
+                      placeholder="Misal: untuk biaya administrasi perubahan kepemilikan 52 kendaraan dinas, atau alasan efisiensi..."
+                      className="min-h-[140px] pb-10 [&_.ql-editor]:min-h-[100px] [&_.ql-editor]:text-sm"
+                      readOnly={readOnly}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

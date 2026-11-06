@@ -13,6 +13,29 @@ export default function ResetPasswordPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
 
+  React.useEffect(() => {
+    // Tangani event pemulihan password dari Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setErrorMessage('');
+      }
+    });
+
+    // Cek apakah ada error di hash URL (misal link kedaluwarsa: #error=access_denied&error_description=...)
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const errorDesc = params.get('error_description');
+      if (errorDesc) {
+        setErrorMessage(decodeURIComponent(errorDesc.replace(/\+/g, ' ')));
+      }
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');

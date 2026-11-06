@@ -9,8 +9,9 @@ import {
   Search, CheckCircle2, AlertCircle, XCircle, Clock, 
   Trash2, Sparkles, Layers, Tag, Eye, Edit3, X, FileSpreadsheet, Paperclip, ExternalLink,
   Printer, FileCheck, Landmark, BarChart3, Check, DollarSign, ListFilter, ArrowRight, PieChart,
-  RefreshCw, Save
+  RefreshCw, Save, Copy
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { getSafeFileUrl } from '@/lib/fileHelper';
 import DocumentViewerModal from '@/components/shared/DocumentViewerModal';
 import { generateNotaAnalisisPdfBlob } from '@/lib/notaPdfGenerator';
@@ -28,6 +29,17 @@ export default function RiwayatList({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('semua');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyShareLink = (idAnalisis: string) => {
+    if (typeof window === 'undefined') return;
+    const origin = window.location.origin;
+    const shareUrl = `${origin}/analisis/presentasi/${idAnalisis}?mode=view`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedId(idAnalisis);
+    toast.success('Link presentasi berhasil disalin! Siap dibagikan.');
+    setTimeout(() => setCopiedId(null), 2500);
+  };
   const [sortBy, setSortBy] = useState('terbaru');
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
@@ -422,7 +434,7 @@ export default function RiwayatList({
                  if (!nominalDisetujui && parsed.nominal_disetujui) nominalDisetujui = parsed.nominal_disetujui;
                  if (parsed.subyek_persuratan_simaster) subyekSimaster = parsed.subyek_persuratan_simaster;
                  if (parsed.analisis) ringkasanAi = parsed.analisis;
-                 if (parsed.keterangan_keputusan) ketKeputusan = parsed.keterangan_keputusan;
+                 ketKeputusan = parsed.keterangan_keputusan || (r as any).alasan_keputusan || (r as any).catatan_tambahan || '';
                  if (parsed.rekomendasi) rekomendasiAi = parsed.rekomendasi;
                  if (parsed.surat_balasan_html) suratBalasanHtml = parsed.surat_balasan_html;
                  if (parsed.pagu_berjalan) paguBerjalan = parsed.pagu_berjalan;
@@ -554,6 +566,8 @@ export default function RiwayatList({
       const payload = {
         keputusan: modalKeputusan,
         nominal_disetujui: modalNominalDisetujui,
+        alasan_keputusan: modalKeteranganKeputusan,
+        catatan_tambahan: modalKeteranganKeputusan,
         analisis_html: JSON.stringify(updatedHtmlObj)
       };
 
@@ -925,15 +939,29 @@ export default function RiwayatList({
 
                           <td className="px-3 py-3 text-center align-middle" onClick={e => e.stopPropagation()}>
                             <div className="flex flex-col items-center justify-center gap-1.5 max-w-[140px] mx-auto">
-                              {/* Hero Action: Lembar Presentasi Sidang & Keputusan */}
-                              <Link
-                                href={`/analisis/presentasi/${r.id_analisis}`}
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
-                                title="Buka Lembar Presentasi Sidang Usulan Pagu & Keputusan Pimpinan"
-                              >
-                                <Sparkles size={13} />
-                                <span>Presentasi</span>
-                              </Link>
+                              {/* Hero Action: Lembar Presentasi Sidang & Keputusan + Salin Link */}
+                              <div className="flex items-center gap-1 w-full">
+                                <Link
+                                  href={`/analisis/presentasi/${r.id_analisis}`}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                                  title="Buka Lembar Presentasi Sidang Usulan Pagu & Keputusan Pimpinan"
+                                >
+                                  <Sparkles size={13} />
+                                  <span>Presentasi</span>
+                                </Link>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyShareLink(r.id_analisis)}
+                                  className={`p-1.5 rounded-xl border transition-all shadow-2xs active:scale-90 flex items-center justify-center cursor-pointer shrink-0 ${
+                                    copiedId === r.id_analisis 
+                                      ? 'bg-emerald-600 text-white border-emerald-600' 
+                                      : 'bg-indigo-50/80 hover:bg-indigo-600 text-indigo-700 hover:text-white border-indigo-200'
+                                  }`}
+                                  title="Salin Link Web Presentasi (untuk dibagikan membaca hasil di web)"
+                                >
+                                  {copiedId === r.id_analisis ? <Check size={13} /> : <Copy size={13} />}
+                                </button>
+                              </div>
 
                               {/* Secondary Actions Row: Edit, Cetak PDF Nota, Lampiran (jika ada), Hapus */}
                               <div className="flex items-center justify-center gap-1 w-full">
@@ -1124,9 +1152,16 @@ export default function RiwayatList({
                                          <span className="text-[10px] font-black text-amber-900 uppercase tracking-widest flex items-center gap-1.5">
                                            <AlertCircle size={14} className="text-amber-600" /> Catatan Keputusan Pimpinan
                                          </span>
-                                         <p className="text-xs text-amber-950 font-medium bg-white p-3 rounded-xl border border-amber-200/60 leading-relaxed">
-                                           {r.keterangan_keputusan}
-                                         </p>
+                                         {/<[a-z][\s\S]*>/i.test(r.keterangan_keputusan) ? (
+                                           <div 
+                                             className="prose prose-amber max-w-none text-xs text-amber-950 font-medium bg-white p-3 rounded-xl border border-amber-200/60 leading-relaxed [&_p]:mb-1 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                                             dangerouslySetInnerHTML={{ __html: r.keterangan_keputusan }}
+                                           />
+                                         ) : (
+                                           <p className="text-xs text-amber-950 font-medium bg-white p-3 rounded-xl border border-amber-200/60 leading-relaxed whitespace-pre-wrap">
+                                             {r.keterangan_keputusan}
+                                           </p>
+                                         )}
                                        </div>
                                      )}
                                    </div>
@@ -1491,6 +1526,15 @@ export default function RiwayatList({
                                       >
                                         <FileCheck size={14} /> Lembar Presentasi &amp; Keputusan (Halaman Baru)
                                       </Link>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyShareLink(r.id_analisis)}
+                                        className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                                        title="Salin Link Web Presentasi untuk Dibagikan"
+                                      >
+                                        {copiedId === r.id_analisis ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                                        <span>{copiedId === r.id_analisis ? 'Link Tersalin!' : 'Salin Link Web'}</span>
+                                      </button>
                                    </div>
 
                                    <div className="flex items-center gap-2">

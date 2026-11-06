@@ -324,121 +324,268 @@ export default function CopasPaguPage() {
     return null;
   };
 
+  // Helper to parse TSV / CSV text with proper quote handling (supporting multiline quotes)
+  const parseTsvCsv = (text: string) => {
+    const rows: string[][] = [];
+    let currentRow: string[] = [];
+    let currentCell = '';
+    let inQuotes = false;
+
+    let delimiter = '\t';
+    const firstLine = text.split(/\r?\n/)[0] || '';
+    if (firstLine.includes('\t')) delimiter = '\t';
+    else if (firstLine.includes(';')) delimiter = ';';
+    else if (firstLine.includes(',') && !firstLine.includes('\t')) delimiter = ',';
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const nextChar = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          currentCell += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
+        currentRow.push(currentCell.trim());
+        currentCell = '';
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') i++;
+        currentRow.push(currentCell.trim());
+        currentCell = '';
+        if (currentRow.some(c => c.length > 0)) {
+          rows.push(currentRow);
+        }
+        currentRow = [];
+      } else {
+        currentCell += char;
+      }
+    }
+    if (currentCell.length > 0 || currentRow.length > 0) {
+      currentRow.push(currentCell.trim());
+      if (currentRow.some(c => c.length > 0)) {
+        rows.push(currentRow);
+      }
+    }
+
+    return { delimiter, rows };
+  };
+
+  // Detect header row by field names
+  const detectHeader = (firstRow: string[]) => {
+    if (!firstRow || firstRow.length === 0) return null;
+
+    const colMap = {
+      id: -1,
+      unit: -1,
+      tahun: -1,
+      nominal: -1,
+      sumber_dana: -1,
+      keterangan: -1,
+      status_pagu: -1,
+      jenis_anggaran: -1,
+    };
+
+    let matchCount = 0;
+    firstRow.forEach((col, idx) => {
+      const c = col.toLowerCase().trim().replace(/[\t\r\n]/g, ' ').replace(/\s+/g, ' ');
+      if (c === 'id' || c === 'id_db' || c === 'id db' || c === 'no' || c === 'id_pagu' || c === 'id pagu') {
+        colMap.id = idx;
+        matchCount++;
+      } else if (['unit', 'unit_kerja', 'unit kerja', 'nama_unit', 'nama unit', 'nama unit kerja'].includes(c)) {
+        colMap.unit = idx;
+        matchCount++;
+      } else if (['tahun', 'thn', 'tahun_anggaran', 'tahun anggaran'].includes(c)) {
+        colMap.tahun = idx;
+        matchCount++;
+      } else if (['nominal', 'pagu', 'jumlah', 'alokasi', 'nilai', 'nominal pagu'].includes(c)) {
+        colMap.nominal = idx;
+        matchCount++;
+      } else if (['sumber_dana', 'sumber dana', 'sumber'].includes(c)) {
+        colMap.sumber_dana = idx;
+        matchCount++;
+      } else if (['keterangan', 'ket', 'uraian', 'deskripsi', 'catatan'].includes(c)) {
+        colMap.keterangan = idx;
+        matchCount++;
+      } else if (['pagu_awal', 'pagu awal', 'status_pagu', 'status pagu', 'status'].includes(c)) {
+        colMap.status_pagu = idx;
+        matchCount++;
+      } else if (['jenis_anggaran', 'jenis anggaran', 'jenis', 'kategori'].includes(c)) {
+        colMap.jenis_anggaran = idx;
+        matchCount++;
+      }
+    });
+
+    if (matchCount >= 3) {
+      return colMap;
+    }
+    return null;
+  };
+
+  // Stitch rows broken by unquoted newlines in cells
+  const stitchBrokenRows = (rawRows: string[][], expectedColCount = 8) => {
+    const stitched: string[][] = [];
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
+      if (stitched.length > 0) {
+        const prev = stitched[stitched.length - 1];
+        const prevLooksIncomplete = prev.length < expectedColCount;
+        const currentLooksFragment = row.length < expectedColCount && !(/^\d+$/.test(row[0]) && row.length >= 6);
+
+        if (prevLooksIncomplete && currentLooksFragment) {
+          const lastPrevIdx = prev.length - 1;
+          prev[lastPrevIdx] = (prev[lastPrevIdx] + ' ' + row[0]).trim();
+          for (let k = 1; k < row.length; k++) {
+            prev.push(row[k]);
+          }
+          continue;
+        }
+      }
+      stitched.push([...row]);
+    }
+    return stitched;
+  };
+
   const parseRawTextToRows = (text: string) => {
     if (!text.trim()) {
       setParsedRows([]);
       return;
     }
 
-    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    const { rows } = parseTsvCsv(text);
+    if (rows.length === 0) {
+      setParsedRows([]);
+      return;
+    }
+
+    const header = detectHeader(rows[0]);
+    const rowsToProcess = header ? rows.slice(1) : rows;
+    const maxCols = Math.max(...rowsToProcess.map(r => r.length), 0);
+    const expectedCols = header ? rows[0].length : (maxCols >= 7 ? maxCols : 8);
+
+    const stitchedRows = stitchBrokenRows(rowsToProcess, expectedCols);
     const result: ParsedPaguRow[] = [];
 
-    lines.forEach((line, index) => {
-      let delimiter = '\t';
-      if (line.includes('\t')) delimiter = '\t';
-      else if (line.includes(';')) delimiter = ';';
-      else if (line.includes(',') && !line.includes('\t')) delimiter = ',';
-
-      const rawCols = line.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
-      
-      // Skip header row if copied by user
-      const firstColLower = (rawCols[0] || '').toLowerCase();
-      if (
-        firstColLower === 'id_db' || firstColLower === 'id db' || firstColLower === 'id' || 
-        firstColLower === 'tahun' || firstColLower === 'no' || firstColLower === 'thn' || 
-        firstColLower === 'nama unit' || firstColLower === 'unit'
-      ) {
-        return;
-      }
-
+    stitchedRows.forEach((row, index) => {
       let id_db: number | null = null;
       let unitInput = '';
       let tahun = new Date().getFullYear().toString();
-      let remaining = [...rawCols];
-
-      // Skenario 1: 8 Kolom Lengkap ([1] ID DB, [2] Nama Unit, [3] Tahun, [4] Nominal, ...)
-      if (remaining.length >= 8) {
-        // [1] ID DB
-        const rawIdDb = parseInt((remaining[0] || '').replace(/[^0-9]/g, ''), 10);
-        if (!isNaN(rawIdDb)) id_db = rawIdDb;
-
-        // [2] Nama Unit Kerja
-        unitInput = remaining[1] || '';
-
-        // [3] Tahun Anggaran (4 digit)
-        if (/^\d{4}$/.test(remaining[2])) {
-          tahun = remaining[2];
-        } else {
-          tahun = remaining[2] || new Date().getFullYear().toString();
-        }
-
-        remaining = remaining.slice(3); // Sisa: Nominal, Sumber Dana, Keterangan, Status Pagu, Jenis Anggaran
-      } else if (remaining.length === 7) {
-        // Toleransi Skenario 7 Kolom
-        if (/^\d{4}$/.test(remaining[0])) {
-          // Format Lama: [1] Tahun [2] Nama Unit [3] Nominal ...
-          tahun = remaining[0];
-          unitInput = remaining[1] || '';
-          remaining = remaining.slice(2);
-        } else if (/^\d{4}$/.test(remaining[1])) {
-          // Format Balik Tanpa ID DB: [1] Nama Unit [2] Tahun [3] Nominal ...
-          unitInput = remaining[0] || '';
-          tahun = remaining[1];
-          remaining = remaining.slice(2);
-        } else {
-          // Format ID DB di Kolom 0: [1] ID DB [2] Nama Unit [3] Nominal ...
-          const rawIdDb = parseInt((remaining[0] || '').replace(/[^0-9]/g, ''), 10);
-          if (!isNaN(rawIdDb)) id_db = rawIdDb;
-          unitInput = remaining[1] || '';
-          remaining = remaining.slice(2);
-        }
-      } else {
-        // Format Ringkas
-        unitInput = remaining[0] || '';
-        remaining = remaining.slice(1);
-      }
-
-      // Kolom Berikutnya: Nominal
-      const nominalStr = remaining[0] || '0';
-      const parsedNominal = parseNum(nominalStr);
-      remaining = remaining.slice(1);
-
-      // Kolom Berikutnya: Sumber Dana
-      const sumberDana = remaining[0] || 'Dana Masyarakat Tidak Mengikat';
-      remaining = remaining.slice(1);
-
-      // Kolom Sisa: Keterangan, Status Pagu, & Jenis Anggaran
+      let nominalStr = '0';
+      let sumberDana = 'Dana Masyarakat Tidak Mengikat';
       let keterangan = '-';
       let statusPagu = 'Bukan Pagu Awal';
-      let jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Pagu Awal';
+      let jenisAnggaran = 'Pagu Awal';
 
-      if (remaining.length >= 3) {
-        keterangan = remaining[0] || '-';
-        statusPagu = matchStatusPagu(remaining[1]);
-        jenisAnggaran = matchJenisAnggaran(remaining[2], parsedNominal) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
-      } else if (remaining.length === 2) {
-        const matchedSecondJenis = matchJenisAnggaran(remaining[1], parsedNominal);
-        const matchedFirstJenis = matchJenisAnggaran(remaining[0], parsedNominal);
-
-        if (matchedSecondJenis) {
-          keterangan = remaining[0] || '-';
-          statusPagu = 'Bukan Pagu Awal';
-          jenisAnggaran = matchedSecondJenis;
-        } else if (matchedFirstJenis) {
-          jenisAnggaran = matchedFirstJenis;
-          keterangan = remaining[1] || '-';
-          statusPagu = 'Bukan Pagu Awal';
-        } else {
-          keterangan = remaining[0] || '-';
-          statusPagu = 'Bukan Pagu Awal';
-          jenisAnggaran = remaining[1] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+      if (header) {
+        if (header.id !== -1 && row[header.id]) {
+          const rawIdDb = parseInt((row[header.id] || '').replace(/[^0-9]/g, ''), 10);
+          if (!isNaN(rawIdDb)) id_db = rawIdDb;
         }
-      } else if (remaining.length === 1) {
-        keterangan = remaining[0] || '-';
-        statusPagu = 'Bukan Pagu Awal';
-        jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Tambah';
+        if (header.unit !== -1 && row[header.unit]) {
+          unitInput = row[header.unit] || '';
+        }
+        if (header.tahun !== -1 && row[header.tahun]) {
+          tahun = row[header.tahun] || new Date().getFullYear().toString();
+        }
+        if (header.nominal !== -1 && row[header.nominal]) {
+          nominalStr = row[header.nominal] || '0';
+        }
+        if (header.sumber_dana !== -1 && row[header.sumber_dana]) {
+          sumberDana = row[header.sumber_dana] || 'Dana Masyarakat Tidak Mengikat';
+        }
+        if (header.keterangan !== -1 && row[header.keterangan]) {
+          keterangan = row[header.keterangan] || '-';
+        }
+        if (header.status_pagu !== -1 && row[header.status_pagu]) {
+          statusPagu = matchStatusPagu(row[header.status_pagu]);
+        }
+        if (header.jenis_anggaran !== -1 && row[header.jenis_anggaran]) {
+          const parsedNominal = parseNum(nominalStr);
+          jenisAnggaran = matchJenisAnggaran(row[header.jenis_anggaran], parsedNominal) || row[header.jenis_anggaran] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+        }
+      } else {
+        let remaining = [...row];
+
+        // Skenario 1: 8 Kolom Lengkap ([1] ID DB, [2] Nama Unit, [3] Tahun, [4] Nominal, ...)
+        if (remaining.length >= 8) {
+          // [1] ID DB
+          const rawIdDb = parseInt((remaining[0] || '').replace(/[^0-9]/g, ''), 10);
+          if (!isNaN(rawIdDb)) id_db = rawIdDb;
+
+          // [2] Nama Unit Kerja
+          unitInput = remaining[1] || '';
+
+          // [3] Tahun Anggaran (4 digit)
+          if (/^\d{4}$/.test(remaining[2])) {
+            tahun = remaining[2];
+          } else {
+            tahun = remaining[2] || new Date().getFullYear().toString();
+          }
+
+          remaining = remaining.slice(3); // Sisa: Nominal, Sumber Dana, Keterangan, Status Pagu, Jenis Anggaran
+        } else if (remaining.length === 7) {
+          // Toleransi Skenario 7 Kolom
+          if (/^\d{4}$/.test(remaining[0])) {
+            // Format Lama: [1] Tahun [2] Nama Unit [3] Nominal ...
+            tahun = remaining[0];
+            unitInput = remaining[1] || '';
+            remaining = remaining.slice(2);
+          } else if (/^\d{4}$/.test(remaining[1])) {
+            // Format Balik Tanpa ID DB: [1] Nama Unit [2] Tahun [3] Nominal ...
+            unitInput = remaining[0] || '';
+            tahun = remaining[1];
+            remaining = remaining.slice(2);
+          } else {
+            // Format ID DB di Kolom 0: [1] ID DB [2] Nama Unit [3] Nominal ...
+            const rawIdDb = parseInt((remaining[0] || '').replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(rawIdDb)) id_db = rawIdDb;
+            unitInput = remaining[1] || '';
+            remaining = remaining.slice(2);
+          }
+        } else {
+          // Format Ringkas
+          unitInput = remaining[0] || '';
+          remaining = remaining.slice(1);
+        }
+
+        nominalStr = remaining[0] || '0';
+        remaining = remaining.slice(1);
+
+        sumberDana = remaining[0] || 'Dana Masyarakat Tidak Mengikat';
+        remaining = remaining.slice(1);
+
+        const parsedNominal = parseNum(nominalStr);
+        if (remaining.length >= 3) {
+          keterangan = remaining[0] || '-';
+          statusPagu = matchStatusPagu(remaining[1]);
+          jenisAnggaran = matchJenisAnggaran(remaining[2], parsedNominal) || remaining[2] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+        } else if (remaining.length === 2) {
+          const matchedSecondJenis = matchJenisAnggaran(remaining[1], parsedNominal);
+          const matchedFirstJenis = matchJenisAnggaran(remaining[0], parsedNominal);
+
+          if (matchedSecondJenis) {
+            keterangan = remaining[0] || '-';
+            statusPagu = 'Bukan Pagu Awal';
+            jenisAnggaran = matchedSecondJenis;
+          } else if (matchedFirstJenis) {
+            jenisAnggaran = matchedFirstJenis;
+            keterangan = remaining[1] || '-';
+            statusPagu = 'Bukan Pagu Awal';
+          } else {
+            keterangan = remaining[0] || '-';
+            statusPagu = 'Bukan Pagu Awal';
+            jenisAnggaran = remaining[1] || (parsedNominal < 0 ? 'Kurang' : 'Tambah');
+          }
+        } else if (remaining.length === 1) {
+          keterangan = remaining[0] || '-';
+          statusPagu = 'Bukan Pagu Awal';
+          jenisAnggaran = parsedNominal < 0 ? 'Kurang' : 'Tambah';
+        }
       }
 
+      const parsedNominal = parseNum(nominalStr);
       const matched = matchUnit(unitInput);
       const { no_surat, tgl_surat } = extractSuratInfo(keterangan);
 
@@ -482,7 +629,13 @@ export default function CopasPaguPage() {
 
         const textLines = data
           .filter(row => Array.isArray(row) && row.some((cell: any) => cell !== null && cell !== undefined && String(cell).trim() !== ''))
-          .map(row => row.map((cell: any) => String(cell ?? '').trim()).join('\t'))
+          .map(row => row.map((cell: any) => {
+            const str = String(cell ?? '').trim();
+            if (str.includes('\t') || str.includes('\n') || str.includes('\r') || str.includes('"')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          }).join('\t'))
           .join('\n');
 
         setRawText(textLines);

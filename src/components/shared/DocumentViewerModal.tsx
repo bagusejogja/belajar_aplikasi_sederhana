@@ -87,6 +87,7 @@ export default function DocumentViewerModal({
   const [rotation, setRotation] = useState(0);
   const [filterKegiatan, setFilterKegiatan] = useState('');
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
 
   // Helper untuk mengubah URL Google Drive ke URL preview embed yang valid tanpa blocking X-Frame-Options
   const getEmbeddableUrl = (url?: string) => {
@@ -346,6 +347,28 @@ export default function DocumentViewerModal({
 
           {/* Quick Header Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {isHasilAnalisis && mData?.id_analisis && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const origin = window.location.origin;
+                    navigator.clipboard.writeText(`${origin}/analisis/presentasi/${mData.id_analisis}?mode=view`);
+                    setCopiedShareLink(true);
+                    setTimeout(() => setCopiedShareLink(false), 2500);
+                  }
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  copiedShareLink
+                    ? 'bg-emerald-600 text-white border-emerald-500'
+                    : 'bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white border-indigo-500/40'
+                }`}
+                title="Salin Link Web Hasil Analisis untuk Dibagikan"
+              >
+                {copiedShareLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedShareLink ? 'Link Tersalin!' : 'Salin Link Web'}</span>
+              </button>
+            )}
             {fileUrl && (
               <a
                 href={fileUrl}

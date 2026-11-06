@@ -97,6 +97,7 @@ export const menuList: MenuItem[] = [
 
   // --- INPUT FORM ---
   { title: 'Form Tolakan Verif', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
+  { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Input Form' },
   { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Input Form' },
 
   // --- MANAJEMEN KEGIATAN ---
