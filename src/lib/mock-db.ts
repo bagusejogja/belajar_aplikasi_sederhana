@@ -83,6 +83,7 @@ export const menuList: MenuItem[] = [
   { title: 'Data Referensi', path: '/references', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
   { title: 'Pengaturan Form', path: '/admin/pengaturan-form', icon: 'Settings', roles: ['ADMIN'], group: 'Master' },
   { title: 'Standar UI / UX', path: '/design-system', icon: 'Palette', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Master' },
+  { title: 'Panduan, SBU & Template', path: '/panduan-template', icon: 'BookOpen', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Master' },
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN & RKAT ---

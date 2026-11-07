@@ -60,14 +60,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         const [analisisRes, docsRes] = await Promise.all([
           supabase
             .from('app_analisis_utama')
-            .select('id_analisis, no_surat, unit_pengirim, perihal, total_anggaran, keputusan')
-            .or(`no_surat.ilike.%${cleanQ}%,unit_pengirim.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%`)
-            .limit(5),
+            .select('id_analisis, no_surat, unit_pengirim, perihal, total_anggaran, keputusan, subyek_persuratan_simaster')
+            .or(`no_surat.ilike.%${cleanQ}%,unit_pengirim.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,subyek_persuratan_simaster.ilike.%${cleanQ}%`)
+            .limit(8),
           supabase
             .from('documents')
-            .select('id, nomor_surat, perihal, unit_kerja, jenis_dokumen')
-            .or(`nomor_surat.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,unit_kerja.ilike.%${cleanQ}%`)
-            .limit(5)
+            .select('id, nomor_surat, perihal, unit_kerja, jenis_dokumen, penandatangan, pihak_terkait')
+            .or(`nomor_surat.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,unit_kerja.ilike.%${cleanQ}%,penandatangan.ilike.%${cleanQ}%,pihak_terkait.ilike.%${cleanQ}%`)
+            .limit(8)
         ]);
 
         const items: CommandItem[] = [];
@@ -76,9 +76,9 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
           analisisRes.data.forEach((row: any) => {
             items.push({
               id: `analisis-${row.id_analisis}`,
-              title: row.no_surat ? `Surat: ${row.no_surat}` : `Usulan Pagu #${row.id_analisis.slice(0, 8)}`,
+              title: row.no_surat ? `Surat Usulan: ${row.no_surat}` : `Usulan Pagu #${row.id_analisis.slice(0, 8)}`,
               category: 'Surat & Usulan Anggaran',
-              subtitle: `${row.unit_pengirim || 'Unit UGM'} • ${row.perihal || 'Usulan Pagu'}`,
+              subtitle: `${row.unit_pengirim || 'Unit UGM'} • ${row.perihal || 'Usulan Pagu Tambahan'}`,
               icon: <FileSpreadsheet className="w-4 h-4 text-emerald-600" />,
               path: `/analisis/presentasi/${row.id_analisis}?mode=view`,
               badge: row.keputusan || 'Usulan Pagu'
@@ -88,14 +88,15 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
 
         if (docsRes.data) {
           docsRes.data.forEach((row: any) => {
+            const extra = [row.unit_kerja, row.penandatangan].filter(Boolean).join(' • ');
             items.push({
               id: `doc-${row.id}`,
               title: `Arsip Surat: ${row.nomor_surat}`,
               category: 'Surat & Usulan Anggaran',
-              subtitle: `${row.unit_kerja || 'Unit Kerja'} • ${row.perihal || 'Arsip Dokumen'}`,
+              subtitle: `${extra || 'Dokumen Resmi'} • ${row.perihal || 'Arsip Dokumen'}`,
               icon: <FileText className="w-4 h-4 text-indigo-600" />,
-              path: `/dokumen`,
-              badge: row.jenis_dokumen || 'Dokumen'
+              path: `/dokumen?q=${encodeURIComponent(row.nomor_surat)}`,
+              badge: row.jenis_dokumen || 'Arsip Surat'
             });
           });
         }

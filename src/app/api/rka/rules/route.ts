@@ -3,14 +3,32 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+// In-Memory Fast Cache untuk Master Units & Rules (TTL: 5 Menit)
+// Mencegah query 100.000 baris berulang pada setiap pergantian halaman / filter
+let cachedUnitsResult: { units: string[]; govUnits: any[] } | null = null;
+let cachedUnitsTime = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 menit
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const getUnits = searchParams.get('units');
+    const forceRefresh = searchParams.get('refresh') === '1';
 
     const modul = searchParams.get('modul') || 'pengeluaran';
 
     if (getUnits) {
+      const now = Date.now();
+      // Gunakan in-memory cache jika masih valid dan tidak dipaksa refresh
+      if (!forceRefresh && cachedUnitsResult && (now - cachedUnitsTime) < CACHE_TTL_MS) {
+        return NextResponse.json({
+          success: true,
+          units: cachedUnitsResult.units,
+          govUnits: cachedUnitsResult.govUnits,
+          cached: true
+        });
+      }
+
       // Ambil daftar seluruh unit kerja dari rkat_pengeluaran, rkat_penerimaan, dan master gov_units
       const { data: govUnits } = await supabaseAdmin
         .from('gov_units')
@@ -36,6 +54,10 @@ export async function GET(request: Request) {
         ...(rkatUnits || []).map(r => r.unit?.trim()).filter(Boolean),
         ...(rkatPenerimaanUnits || []).map(r => r.unit_kerja?.trim()).filter(Boolean)
       ])).filter(Boolean).sort();
+
+      // Simpan ke cache
+      cachedUnitsResult = { units: combinedUnits, govUnits: govUnits || [] };
+      cachedUnitsTime = now;
 
       return NextResponse.json({ success: true, units: combinedUnits, govUnits: govUnits || [] });
     }

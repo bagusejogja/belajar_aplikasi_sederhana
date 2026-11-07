@@ -229,12 +229,26 @@ export default function RkaPengeluaranPage() {
 
   const [masterUnits, setMasterUnits] = useState<string[]>([]);
 
+  // Ambil daftar master unit dari api/rka/rules?units=1 (Optimized dengan SessionStorage Fast Cache)
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem('rka_master_units_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMasterUnits(parsed);
+        }
+      }
+    } catch {}
+
     fetch('/api/rka/rules?units=1')
       .then(res => res.json())
       .then(json => {
         if (json.success && json.units) {
           setMasterUnits(json.units);
+          try {
+            sessionStorage.setItem('rka_master_units_cache', JSON.stringify(json.units));
+          } catch {}
         }
       })
       .catch(err => console.error('Error loading master units:', err));

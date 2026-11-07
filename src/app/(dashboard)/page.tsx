@@ -48,6 +48,7 @@ const iconMap: Record<string, any> = {
 };
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 import { menuList } from '@/lib/mock-db';
 
 const groupMeta: Record<string, { icon: any; gradient: string; text: string; bg: string; border: string }> = {
@@ -515,6 +516,64 @@ export default function PremiumDashboard() {
       </div>
 
       {/* ========================================================== */}
+      {/* 🧭 MODUL SWITCHER UTAMA (ROLE-AWARE WORKSPACE SELECTOR)   */}
+      {/* ========================================================== */}
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-gray-200/90 shadow-xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
+              <Layers size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900 tracking-tight">Pilih Modul &amp; Ruang Kerja</h3>
+              <p className="text-[11px] text-gray-500 font-medium">Klik modul di bawah untuk memfilter menu sesuai fokus kerja Anda hari ini</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-gray-500">Filter Aktif:</span>
+            <span className="text-[11px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+              {workspaceOptions.find(w => w.id === activeWorkspace)?.label || 'Semua Menu'}
+            </span>
+          </div>
+        </div>
+
+        {/* Scrollable Modul Switcher Pills */}
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+          {workspaceOptions.map((ws) => {
+            const Icon = ws.icon;
+            const isActive = activeWorkspace === ws.id;
+            return (
+              <button
+                key={ws.id}
+                type="button"
+                onClick={() => {
+                  setActiveWorkspace(ws.id);
+                  setSearchQuery('');
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black whitespace-nowrap transition-all duration-200 cursor-pointer active:scale-95",
+                  isActive
+                    ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-200 ring-2 ring-indigo-500/20"
+                    : "bg-gray-50/80 hover:bg-gray-100 text-gray-700 hover:text-indigo-600 border border-gray-200/80"
+                )}
+              >
+                <Icon size={15} className={isActive ? "text-white" : "text-gray-500"} />
+                <span>{ws.label}</span>
+                {ws.id !== 'ALL' && (
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.5 rounded-md font-bold ml-1",
+                    isActive ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-600"
+                  )}>
+                    {ws.groups.reduce((sum, g) => sum + (groupedAccessible[g]?.length || 0), 0)}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================== */}
       {/* ⚡ PUSAT AKSI CEPAT & RINGKASAN ANGGARAN OPERASIONAL        */}
       {/* ========================================================== */}
       <div className="space-y-4">
@@ -679,6 +738,50 @@ export default function PremiumDashboard() {
             <p className="text-[11px] text-gray-400 font-medium">Perlu penyesuaian unit kerja</p>
           </div>
         </div>
+
+        {/* 📚 PUSAT UNDUHAN TEMPLATE & SLA LAYANAN SISTEM */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+          <div className="md:col-span-2 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-sm border border-indigo-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-amber-300 flex items-center justify-center shrink-0">
+                <BookOpen size={22} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black tracking-tight text-white">Pusat Template Dokumen &amp; SBU 2026</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">Baru</span>
+                </div>
+                <p className="text-[11px] text-slate-300 font-medium max-w-xl">
+                  Unduh template Excel RKA pengeluaran, TSV penerimaan, draf naskah dinas usulan pagu, dan pedoman SBU UGM 2026.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/panduan-template"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap shadow-xs hover:shadow-indigo-500/25 shrink-0 cursor-pointer self-stretch sm:self-auto justify-center"
+            >
+              <span>Buka Dokumen</span>
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Performa &amp; SLA Layanan</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <div className="my-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-gray-900">&lt; 24 Jam</span>
+                <span className="text-xs font-bold text-emerald-600">Kecepatan Standar</span>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-0.5">SOP telaah usulan anggaran terintegrasi</p>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-emerald-500 h-1.5 rounded-full w-[96%]" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ========================================================== */}
@@ -805,10 +908,22 @@ export default function PremiumDashboard() {
       {/* QUICK SEARCH & SECTION HEADER */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
-          <h3 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-            <Layers size={18} className="text-indigo-600" />
-            <span>Katalog Modul & Menu Akses Anda</span>
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <Layers size={18} className="text-indigo-600" />
+              <span>Katalog Modul & Menu Akses Anda</span>
+            </h3>
+            {activeWorkspace !== 'ALL' && (
+              <button
+                onClick={() => setActiveWorkspace('ALL')}
+                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+                title="Klik untuk tampilkan semua menu"
+              >
+                <span>Filter: {workspaceOptions.find(w => w.id === activeWorkspace)?.label}</span>
+                <span className="font-black text-indigo-500">×</span>
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-500 font-medium">
             Pilih modul atau klik langsung pada salah satu fitur untuk membuka halaman kerja.
           </p>

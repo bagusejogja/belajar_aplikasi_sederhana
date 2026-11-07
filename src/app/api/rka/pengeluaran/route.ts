@@ -4,6 +4,13 @@ import { supabaseAdmin } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+// Memoize schema probe in-memory untuk efisiensi roundtrip database
+let cachedPengeluaranSchema: {
+  selectFields: string;
+  hasDbIdColumn: boolean;
+  hasVersiColumn: boolean;
+} | null = null;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,21 +22,28 @@ export async function GET(request: Request) {
     const targetFormat = searchParams.get('format');
     const versiParam = searchParams.get('versi') || 'v1';
     
-    // Probe apakah kolom db_id dan versi_anggaran sudah ada di schema Supabase
+    // Probe apakah kolom db_id dan versi_anggaran sudah ada di schema Supabase (hanya probe 1x saat runtime)
     let selectFields = 'id, db_id, unit, tahun_anggaran, kelompok_indikator_program, program, kegiatan, lingkup_kegiatan, uraian_belanja, akun_detail, prioritas, anggaran, realisasi, laporan_kementerian, laporan_webometrics, identifikasi_lain, tags, sumber_dana_nama, versi_anggaran';
     let hasDbIdColumn = true;
     let hasVersiColumn = true;
 
-    const probe = await supabaseAdmin.from('rkat_pengeluaran').select('id, db_id, versi_anggaran').limit(1);
-    if (probe.error) {
-      if (probe.error.message.includes('versi_anggaran')) {
-        hasVersiColumn = false;
-        selectFields = selectFields.replace(', versi_anggaran', '');
+    if (cachedPengeluaranSchema) {
+      selectFields = cachedPengeluaranSchema.selectFields;
+      hasDbIdColumn = cachedPengeluaranSchema.hasDbIdColumn;
+      hasVersiColumn = cachedPengeluaranSchema.hasVersiColumn;
+    } else {
+      const probe = await supabaseAdmin.from('rkat_pengeluaran').select('id, db_id, versi_anggaran').limit(1);
+      if (probe.error) {
+        if (probe.error.message.includes('versi_anggaran')) {
+          hasVersiColumn = false;
+          selectFields = selectFields.replace(', versi_anggaran', '');
+        }
+        if (probe.error.message.includes('db_id')) {
+          hasDbIdColumn = false;
+          selectFields = selectFields.replace('db_id, ', '');
+        }
       }
-      if (probe.error.message.includes('db_id')) {
-        hasDbIdColumn = false;
-        selectFields = selectFields.replace('db_id, ', '');
-      }
+      cachedPengeluaranSchema = { selectFields, hasDbIdColumn, hasVersiColumn };
     }
 
     const applyVersiFilter = (query: any) => {

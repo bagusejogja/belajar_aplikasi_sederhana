@@ -101,6 +101,7 @@ export default function DashboardLayout({
       case '/rekening-koran': return 'Rekening Koran Bulanan Masjid';
       case '/arsip-kegiatan': return 'Riwayat Dokumen';
       case '/design-system': return 'Standar UI / UX (Design System)';
+      case '/panduan-template': return 'Panduan, SBU & Template Dokumen';
       case '/perubahan-rkat': return 'Cek Perubahan RKAT';
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }

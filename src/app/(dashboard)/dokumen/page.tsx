@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { 
   FileText, 
   Search, 
@@ -143,8 +144,17 @@ export default function DokumenPage() {
   const [editingTagIndex, setEditingTagIndex] = useState<number | null>(null);
   const [editTagName, setEditTagName] = useState('');
 
+  const searchParams = useSearchParams();
+  const urlQ = searchParams?.get('q') || '';
+
   // Filters & Search
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(urlQ);
+
+  useEffect(() => {
+    if (urlQ) {
+      setSearchTerm(urlQ);
+    }
+  }, [urlQ]);
   const [filterJenis, setFilterJenis] = useState('Semua');
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [filterSifat, setFilterSifat] = useState('Semua');

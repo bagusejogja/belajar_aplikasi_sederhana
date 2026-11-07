@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+// Memoize schema probe in-memory agar menghemat 1 DB roundtrip per request
+let cachedHasVersiColumn: boolean | null = null;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,11 +15,16 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const versiParam = searchParams.get('versi') || 'v1';
 
-    // Probe apakah kolom versi_anggaran sudah ada di schema rkat_penerimaan
+    // Probe apakah kolom versi_anggaran sudah ada di schema rkat_penerimaan (hanya saat awal runtime)
     let hasVersiColumn = true;
-    const probe = await supabaseAdmin.from('rkat_penerimaan').select('versi_anggaran').limit(1);
-    if (probe.error && probe.error.message.includes('versi_anggaran')) {
-      hasVersiColumn = false;
+    if (cachedHasVersiColumn !== null) {
+      hasVersiColumn = cachedHasVersiColumn;
+    } else {
+      const probe = await supabaseAdmin.from('rkat_penerimaan').select('versi_anggaran').limit(1);
+      if (probe.error && probe.error.message.includes('versi_anggaran')) {
+        hasVersiColumn = false;
+      }
+      cachedHasVersiColumn = hasVersiColumn;
     }
 
     const applyVersiFilter = (query: any) => {

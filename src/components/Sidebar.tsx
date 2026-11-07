@@ -306,20 +306,25 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
           "p-5 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between", 
           isCollapsed && "lg:p-3 lg:py-4 lg:flex-col lg:gap-2.5 lg:justify-center"
         )}>
-           <div className="flex items-center gap-3 overflow-hidden">
+           <Link 
+             href="/"
+             onClick={() => {
+               if (isCollapsed && setIsCollapsed) setIsCollapsed(false);
+             }}
+             className="flex items-center gap-3 overflow-hidden group cursor-pointer"
+             title="Kembali ke Halaman Utama (Beranda)"
+           >
              <div 
-               onClick={() => isCollapsed && setIsCollapsed && setIsCollapsed(false)}
-               className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-200 shrink-0 hover:scale-105 transition-transform cursor-pointer"
-               title={isCollapsed ? "Buka Sidebar" : "Apps Bersama"}
+               className="bg-gradient-to-br from-indigo-600 to-indigo-700 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-200 shrink-0 group-hover:scale-105 group-hover:shadow-indigo-300 transition-all duration-200"
              >
                 <ShieldCheck size={22} />
              </div>
              {!isCollapsed && (
-               <div className="animate-in fade-in duration-200">
-                  <h1 className="font-extrabold text-gray-900 dark:text-slate-100 leading-tight tracking-tight text-base">Apps<br/><span className="text-indigo-600 dark:text-indigo-400 font-black">Bersama</span></h1>
+               <div className="animate-in fade-in duration-200 text-left">
+                  <h1 className="font-extrabold text-gray-900 dark:text-slate-100 leading-tight tracking-tight text-base group-hover:text-indigo-600 transition-colors">Apps<br/><span className="text-indigo-600 dark:text-indigo-400 font-black">Bersama</span></h1>
                </div>
              )}
-           </div>
+           </Link>
 
            {/* Desktop Collapse Toggle Button */}
            <button 
