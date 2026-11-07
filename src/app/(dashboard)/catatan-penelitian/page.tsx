@@ -120,9 +120,7 @@ export default function CatatanPenelitianInputPage() {
       const json = await res.json();
       if (json.success) {
         setRecentList((json.data || []).slice(0, 5));
-        if (json.tableNotCreated) {
-          setTableNotCreated(true);
-        }
+        setTableNotCreated(!!json.tableNotCreated);
       }
     } catch {}
   };
@@ -171,10 +169,6 @@ export default function CatatanPenelitianInputPage() {
         nominal: Number(nominal),
         uraian: uraian.trim(),
         catatan: catatan.trim(),
-        foto_nota: notaUrl || null,
-        foto_kegiatan: kegiatanUrl || null,
-        foto_barang: barangUrl || null,
-        foto_bukti_transfer: transferUrl || null,
         foto_bukti_1: notaUrl || null,
         foto_bukti_2: kegiatanUrl || null,
         foto_bukti_3: barangUrl || null,
@@ -206,10 +200,7 @@ export default function CatatanPenelitianInputPage() {
         transfer: { files: [], url: '' }
       });
 
-      if (json.tableNotCreated) {
-        setTableNotCreated(true);
-      }
-
+      setTableNotCreated(false);
       fetchRecent();
     } catch (err: any) {
       toast.error('Error: ' + err.message, { id: toastId });

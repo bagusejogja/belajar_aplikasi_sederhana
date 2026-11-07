@@ -62,7 +62,13 @@ export async function GET(request: Request) {
       throw error;
     }
 
-    const items = data || [];
+    const items = (data || []).map((row: any) => ({
+      ...row,
+      foto_nota: row.foto_nota || row.foto_bukti_1,
+      foto_kegiatan: row.foto_kegiatan || row.foto_bukti_2,
+      foto_barang: row.foto_barang || row.foto_bukti_3,
+      foto_bukti_transfer: row.foto_bukti_transfer || row.foto_bukti_4
+    }));
     const totalNominal = items.reduce((sum: number, item: any) => sum + (Number(item.nominal) || 0), 0);
 
     return NextResponse.json({
@@ -109,16 +115,13 @@ export async function POST(request: Request) {
     const barangVal = foto_barang || foto_bukti_3 || null;
     const transferVal = foto_bukti_transfer || foto_bukti_4 || null;
 
+    // Hanya kirim kolom yang valid di schema tabel catatan_penelitian
     const record = {
       tanggal_transaksi: tanggal_transaksi || new Date().toISOString().split('T')[0],
       kategori: kategori || 'Penelitian',
       nominal: Number(nominal),
       uraian: uraian.trim(),
       catatan: catatan ? catatan.trim() : null,
-      foto_nota: notaVal,
-      foto_kegiatan: kegiatanVal,
-      foto_barang: barangVal,
-      foto_bukti_transfer: transferVal,
       foto_bukti_1: notaVal,
       foto_bukti_2: kegiatanVal,
       foto_bukti_3: barangVal,
@@ -148,7 +151,15 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, data });
+    const resItem = {
+      ...data,
+      foto_nota: data.foto_bukti_1,
+      foto_kegiatan: data.foto_bukti_2,
+      foto_barang: data.foto_bukti_3,
+      foto_bukti_transfer: data.foto_bukti_4
+    };
+
+    return NextResponse.json({ success: true, data: resItem, tableNotCreated: false });
   } catch (err: any) {
     console.error('Error in POST /api/catatan-penelitian:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -179,10 +190,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: 'ID transaksi diperlukan untuk update' }, { status: 400 });
     }
 
-    const notaVal = foto_nota !== undefined ? foto_nota : (foto_bukti_1 !== undefined ? foto_bukti_1 : null);
-    const kegiatanVal = foto_kegiatan !== undefined ? foto_kegiatan : (foto_bukti_2 !== undefined ? foto_bukti_2 : null);
-    const barangVal = foto_barang !== undefined ? foto_barang : (foto_bukti_3 !== undefined ? foto_bukti_3 : null);
-    const transferVal = foto_bukti_transfer !== undefined ? foto_bukti_transfer : (foto_bukti_4 !== undefined ? foto_bukti_4 : null);
+    const notaVal = foto_nota !== undefined ? foto_nota : foto_bukti_1;
+    const kegiatanVal = foto_kegiatan !== undefined ? foto_kegiatan : foto_bukti_2;
+    const barangVal = foto_barang !== undefined ? foto_barang : foto_bukti_3;
+    const transferVal = foto_bukti_transfer !== undefined ? foto_bukti_transfer : foto_bukti_4;
 
     const updateData: any = {
       updated_at: new Date().toISOString()
@@ -194,14 +205,10 @@ export async function PUT(request: Request) {
     if (uraian !== undefined) updateData.uraian = uraian.trim();
     if (catatan !== undefined) updateData.catatan = catatan ? catatan.trim() : null;
     
-    updateData.foto_nota = notaVal;
-    updateData.foto_kegiatan = kegiatanVal;
-    updateData.foto_barang = barangVal;
-    updateData.foto_bukti_transfer = transferVal;
-    updateData.foto_bukti_1 = notaVal;
-    updateData.foto_bukti_2 = kegiatanVal;
-    updateData.foto_bukti_3 = barangVal;
-    updateData.foto_bukti_4 = transferVal;
+    if (notaVal !== undefined) updateData.foto_bukti_1 = notaVal;
+    if (kegiatanVal !== undefined) updateData.foto_bukti_2 = kegiatanVal;
+    if (barangVal !== undefined) updateData.foto_bukti_3 = barangVal;
+    if (transferVal !== undefined) updateData.foto_bukti_4 = transferVal;
 
     const { data, error } = await supabaseAdmin
       .from('catatan_penelitian')
@@ -220,7 +227,15 @@ export async function PUT(request: Request) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, data });
+    const resItem = {
+      ...data,
+      foto_nota: data.foto_bukti_1,
+      foto_kegiatan: data.foto_bukti_2,
+      foto_barang: data.foto_bukti_3,
+      foto_bukti_transfer: data.foto_bukti_4
+    };
+
+    return NextResponse.json({ success: true, data: resItem });
   } catch (err: any) {
     console.error('Error in PUT /api/catatan-penelitian:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
