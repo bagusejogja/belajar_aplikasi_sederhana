@@ -86,6 +86,10 @@ export async function POST(request: Request) {
       nominal, 
       uraian, 
       catatan, 
+      foto_nota,
+      foto_kegiatan,
+      foto_barang,
+      foto_bukti_transfer,
       foto_bukti_1, 
       foto_bukti_2, 
       foto_bukti_3, 
@@ -100,16 +104,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Uraian rincian kegiatan wajib diisi' }, { status: 400 });
     }
 
+    const notaVal = foto_nota || foto_bukti_1 || null;
+    const kegiatanVal = foto_kegiatan || foto_bukti_2 || null;
+    const barangVal = foto_barang || foto_bukti_3 || null;
+    const transferVal = foto_bukti_transfer || foto_bukti_4 || null;
+
     const record = {
       tanggal_transaksi: tanggal_transaksi || new Date().toISOString().split('T')[0],
       kategori: kategori || 'Penelitian',
       nominal: Number(nominal),
       uraian: uraian.trim(),
       catatan: catatan ? catatan.trim() : null,
-      foto_bukti_1: foto_bukti_1 || null,
-      foto_bukti_2: foto_bukti_2 || null,
-      foto_bukti_3: foto_bukti_3 || null,
-      foto_bukti_4: foto_bukti_4 || null,
+      foto_nota: notaVal,
+      foto_kegiatan: kegiatanVal,
+      foto_barang: barangVal,
+      foto_bukti_transfer: transferVal,
+      foto_bukti_1: notaVal,
+      foto_bukti_2: kegiatanVal,
+      foto_bukti_3: barangVal,
+      foto_bukti_4: transferVal,
       created_by: created_by || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()

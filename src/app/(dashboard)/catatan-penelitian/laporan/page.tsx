@@ -5,15 +5,12 @@ import Link from 'next/link';
 import { 
   FileSpreadsheet, 
   Search, 
-  Filter, 
   Calendar, 
   Download, 
-  Printer, 
   RefreshCw, 
   Trash2, 
   Eye, 
   X, 
-  CheckCircle2, 
   DollarSign, 
   Image as ImageIcon, 
   ExternalLink,
@@ -21,7 +18,8 @@ import {
   FileText,
   Clock,
   Layers,
-  ChevronRight
+  ChevronRight,
+  UploadCloud
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -35,6 +33,10 @@ interface TransaksiPenelitian {
   nominal: number;
   uraian: string;
   catatan?: string | null;
+  foto_nota?: string | null;
+  foto_kegiatan?: string | null;
+  foto_barang?: string | null;
+  foto_bukti_transfer?: string | null;
   foto_bukti_1?: string | null;
   foto_bukti_2?: string | null;
   foto_bukti_3?: string | null;
@@ -50,12 +52,19 @@ export default function LaporanCatatanPenelitianPage() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
-  // Modal Foto Preview
-  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  // Modal Foto Preview (Mendukung Multi-Foto per Kategori)
+  const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
   const [previewTitle, setPreviewTitle] = useState<string>('');
+  const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
 
   const formatRupiah = (num: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num || 0);
+  };
+
+  // Helper memisahkan string URL menjadi array
+  const parseUrls = (val?: string | null): string[] => {
+    if (!val || typeof val !== 'string') return [];
+    return val.split(',').map(s => s.trim()).filter(Boolean);
   };
 
   // Fetch Data
@@ -124,12 +133,11 @@ export default function LaporanCatatanPenelitianPage() {
 
   const totalFotoLampiran = useMemo(() => {
     return filteredData.reduce((count, curr) => {
-      let c = 0;
-      if (curr.foto_bukti_1) c++;
-      if (curr.foto_bukti_2) c++;
-      if (curr.foto_bukti_3) c++;
-      if (curr.foto_bukti_4) c++;
-      return count + c;
+      const n = parseUrls(curr.foto_nota || curr.foto_bukti_1).length;
+      const k = parseUrls(curr.foto_kegiatan || curr.foto_bukti_2).length;
+      const b = parseUrls(curr.foto_barang || curr.foto_bukti_3).length;
+      const t = parseUrls(curr.foto_bukti_transfer || curr.foto_bukti_4).length;
+      return count + n + k + b + t;
     }, 0);
   }, [filteredData]);
 
@@ -148,10 +156,10 @@ export default function LaporanCatatanPenelitianPage() {
         'Nominal Pengeluaran': item.nominal,
         'Uraian Rincian Kegiatan': item.uraian,
         'Catatan': item.catatan || '',
-        'Link Foto Bukti 1': item.foto_bukti_1 || '',
-        'Link Foto Bukti 2': item.foto_bukti_2 || '',
-        'Link Foto Bukti 3': item.foto_bukti_3 || '',
-        'Link Foto Bukti 4': item.foto_bukti_4 || '',
+        'Link Nota / Kwitansi': item.foto_nota || item.foto_bukti_1 || '',
+        'Link Foto Kegiatan': item.foto_kegiatan || item.foto_bukti_2 || '',
+        'Link Foto Barang': item.foto_barang || item.foto_bukti_3 || '',
+        'Link Bukti Transfer': item.foto_bukti_transfer || item.foto_bukti_4 || '',
         'Diinput Oleh': item.created_by || ''
       }));
 
@@ -163,6 +171,13 @@ export default function LaporanCatatanPenelitianPage() {
     } catch (err: any) {
       toast.error('Gagal export: ' + err.message);
     }
+  };
+
+  const openGallery = (title: string, urls: string[]) => {
+    if (urls.length === 0) return;
+    setPreviewTitle(title);
+    setPreviewPhotos(urls);
+    setActivePhotoIdx(0);
   };
 
   return (
@@ -309,7 +324,7 @@ export default function LaporanCatatanPenelitianPage() {
       </div>
 
       {/* ========================================================== */}
-      {/* 📋 TABEL DATA PENGELUARAN PENELITIAN & 4 FOTO BUKTI        */}
+      {/* 📋 TABEL DATA PENGELUARAN PENELITIAN & 4 KELOMPOK BUKTI   */}
       {/* ========================================================== */}
       <div className="bg-white rounded-3xl border border-gray-200/90 shadow-2xs overflow-hidden">
         
@@ -322,7 +337,7 @@ export default function LaporanCatatanPenelitianPage() {
           </div>
 
           <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
-            Klik foto bukti untuk memperbesar pratinjau
+            Klik kelompok foto bukti untuk melihat seluruh berkas gambar
           </span>
         </div>
 
@@ -355,146 +370,137 @@ export default function LaporanCatatanPenelitianPage() {
                 <tr className="bg-gray-50/70 border-b border-gray-100 text-[10px] font-black uppercase tracking-wider text-gray-500">
                   <th className="py-3 px-4 w-12 text-center">No</th>
                   <th className="py-3 px-4 w-28">Tanggal</th>
-                  <th className="py-3 px-4 w-32">Kategori</th>
+                  <th className="py-3 px-4 w-28">Kategori</th>
                   <th className="py-3 px-4">Uraian / Rincian Kegiatan</th>
                   <th className="py-3 px-4 w-36 text-right">Nominal (Rp)</th>
-                  <th className="py-3 px-4 w-64 text-center">Lampiran 4 Foto Bukti</th>
+                  <th className="py-3 px-4 w-80 text-center">Lampiran Foto Bukti (Nota, Kegiatan, Barang, Transfer)</th>
                   <th className="py-3 px-4 w-16 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
-                {filteredData.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors group">
-                    
-                    {/* No */}
-                    <td className="py-3 px-4 text-center text-gray-400 font-mono text-[11px]">
-                      {index + 1}
-                    </td>
+                {filteredData.map((item, index) => {
+                  const notaUrls = parseUrls(item.foto_nota || item.foto_bukti_1);
+                  const kegiatanUrls = parseUrls(item.foto_kegiatan || item.foto_bukti_2);
+                  const barangUrls = parseUrls(item.foto_barang || item.foto_bukti_3);
+                  const transferUrls = parseUrls(item.foto_bukti_transfer || item.foto_bukti_4);
 
-                    {/* Tanggal */}
-                    <td className="py-3 px-4 font-bold text-gray-700 whitespace-nowrap">
-                      {item.tanggal_transaksi}
-                    </td>
+                  return (
+                    <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors group">
+                      
+                      {/* No */}
+                      <td className="py-3 px-4 text-center text-gray-400 font-mono text-[11px]">
+                        {index + 1}
+                      </td>
 
-                    {/* Kategori */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        {item.kategori}
-                      </span>
-                    </td>
+                      {/* Tanggal */}
+                      <td className="py-3 px-4 font-bold text-gray-700 whitespace-nowrap">
+                        {item.tanggal_transaksi}
+                      </td>
 
-                    {/* Uraian & Catatan */}
-                    <td className="py-3 px-4">
-                      <p className="font-bold text-gray-900 leading-snug">{item.uraian}</p>
-                      {item.catatan && (
-                        <p className="text-[11px] text-gray-500 mt-0.5 italic">
-                          Catatan: {item.catatan}
-                        </p>
-                      )}
-                    </td>
+                      {/* Kategori */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {item.kategori}
+                        </span>
+                      </td>
 
-                    {/* Nominal */}
-                    <td className="py-3 px-4 text-right font-black font-mono text-emerald-700 whitespace-nowrap">
-                      {formatRupiah(item.nominal)}
-                    </td>
+                      {/* Uraian & Catatan */}
+                      <td className="py-3 px-4">
+                        <p className="font-bold text-gray-900 leading-snug">{item.uraian}</p>
+                        {item.catatan && (
+                          <p className="text-[11px] text-gray-500 mt-0.5 italic">
+                            Catatan: {item.catatan}
+                          </p>
+                        )}
+                      </td>
 
-                    {/* 4 Kolom Foto Bukti Lampiran */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1.5">
-                        
-                        {/* Bukti 1 */}
-                        {item.foto_bukti_1 ? (
+                      {/* Nominal */}
+                      <td className="py-3 px-4 text-right font-black font-mono text-emerald-700 whitespace-nowrap">
+                        {formatRupiah(item.nominal)}
+                      </td>
+
+                      {/* 4 Kolom Kelompok Foto Bukti Lampiran */}
+                      <td className="py-3 px-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
+                          
+                          {/* Nota / Kwitansi */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setPreviewPhotoUrl(item.foto_bukti_1 || null);
-                              setPreviewTitle(`Foto Bukti 1: ${item.uraian}`);
-                            }}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-500 shadow-2xs hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Lihat Foto Bukti 1 (Nota/Kuitansi)"
+                            disabled={notaUrls.length === 0}
+                            onClick={() => openGallery(`Nota / Kwitansi: ${item.uraian}`, notaUrls)}
+                            className={`p-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center transition-all ${
+                              notaUrls.length > 0 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 cursor-pointer shadow-2xs hover:scale-105' 
+                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                            }`}
+                            title="Nota / Kwitansi"
                           >
-                            <img src={item.foto_bukti_1} alt="B1" className="w-full h-full object-cover" />
+                            <span className="truncate w-full font-black">Nota ({notaUrls.length})</span>
                           </button>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-center text-[9px] font-bold text-gray-300" title="Tidak ada foto 1">
-                            B1 -
-                          </div>
-                        )}
 
-                        {/* Bukti 2 */}
-                        {item.foto_bukti_2 ? (
+                          {/* Foto Kegiatan */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setPreviewPhotoUrl(item.foto_bukti_2 || null);
-                              setPreviewTitle(`Foto Bukti 2: ${item.uraian}`);
-                            }}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-500 shadow-2xs hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Lihat Foto Bukti 2 (Faktur Bayar)"
+                            disabled={kegiatanUrls.length === 0}
+                            onClick={() => openGallery(`Foto Kegiatan: ${item.uraian}`, kegiatanUrls)}
+                            className={`p-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center transition-all ${
+                              kegiatanUrls.length > 0 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 cursor-pointer shadow-2xs hover:scale-105' 
+                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                            }`}
+                            title="Foto Kegiatan"
                           >
-                            <img src={item.foto_bukti_2} alt="B2" className="w-full h-full object-cover" />
+                            <span className="truncate w-full font-black">Kegiatan ({kegiatanUrls.length})</span>
                           </button>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-center text-[9px] font-bold text-gray-300" title="Tidak ada foto 2">
-                            B2 -
-                          </div>
-                        )}
 
-                        {/* Bukti 3 */}
-                        {item.foto_bukti_3 ? (
+                          {/* Foto Barang */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setPreviewPhotoUrl(item.foto_bukti_3 || null);
-                              setPreviewTitle(`Foto Bukti 3: ${item.uraian}`);
-                            }}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-500 shadow-2xs hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Lihat Foto Bukti 3 (Dokumentasi)"
+                            disabled={barangUrls.length === 0}
+                            onClick={() => openGallery(`Foto Barang: ${item.uraian}`, barangUrls)}
+                            className={`p-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center transition-all ${
+                              barangUrls.length > 0 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 cursor-pointer shadow-2xs hover:scale-105' 
+                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                            }`}
+                            title="Foto Barang"
                           >
-                            <img src={item.foto_bukti_3} alt="B3" className="w-full h-full object-cover" />
+                            <span className="truncate w-full font-black">Barang ({barangUrls.length})</span>
                           </button>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-center text-[9px] font-bold text-gray-300" title="Tidak ada foto 3">
-                            B3 -
-                          </div>
-                        )}
 
-                        {/* Bukti 4 */}
-                        {item.foto_bukti_4 ? (
+                          {/* Bukti Transfer */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setPreviewPhotoUrl(item.foto_bukti_4 || null);
-                              setPreviewTitle(`Foto Bukti 4: ${item.uraian}`);
-                            }}
-                            className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 hover:border-indigo-500 shadow-2xs hover:scale-105 transition-all cursor-pointer shrink-0"
-                            title="Lihat Foto Bukti 4 (Lampiran Lain)"
+                            disabled={transferUrls.length === 0}
+                            onClick={() => openGallery(`Bukti Transfer: ${item.uraian}`, transferUrls)}
+                            className={`p-1.5 rounded-xl border text-[10px] font-bold flex flex-col items-center justify-center transition-all ${
+                              transferUrls.length > 0 
+                                ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 cursor-pointer shadow-2xs hover:scale-105' 
+                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                            }`}
+                            title="Bukti Transfer"
                           >
-                            <img src={item.foto_bukti_4} alt="B4" className="w-full h-full object-cover" />
+                            <span className="truncate w-full font-black">Transfer ({transferUrls.length})</span>
                           </button>
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 flex items-center justify-center text-[9px] font-bold text-gray-300" title="Tidak ada foto 4">
-                            B4 -
-                          </div>
-                        )}
 
-                      </div>
-                    </td>
+                        </div>
+                      </td>
 
-                    {/* Aksi */}
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Hapus Transaksi"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
+                      {/* Aksi */}
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id)}
+                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Hapus Transaksi"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
 
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -503,18 +509,26 @@ export default function LaporanCatatanPenelitianPage() {
       </div>
 
       {/* ========================================================== */}
-      {/* 🖼️ MODAL PRATINJAU FOTO BUKTI RESOLUSI PENUH              */}
+      {/* 🖼️ MODAL PRATINJAU GALERI FOTO BUKTI (MULTI-FOTO)          */}
       {/* ========================================================== */}
-      {previewPhotoUrl && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl space-y-3 p-5 animate-in zoom-in-95 duration-200">
+      {previewPhotos.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl space-y-3 p-5 animate-in zoom-in-95 duration-200">
+            
+            {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h4 className="text-xs font-black text-gray-900 truncate max-w-md">
-                {previewTitle}
-              </h4>
+              <div>
+                <h4 className="text-xs font-black text-gray-900 truncate max-w-md">
+                  {previewTitle}
+                </h4>
+                <p className="text-[11px] text-gray-500">
+                  Menampilkan foto ke-{activePhotoIdx + 1} dari {previewPhotos.length} foto lampiran
+                </p>
+              </div>
+
               <div className="flex items-center gap-2">
                 <a
-                  href={previewPhotoUrl}
+                  href={previewPhotos[activePhotoIdx]}
                   target="_blank"
                   rel="noreferrer"
                   download
@@ -525,7 +539,7 @@ export default function LaporanCatatanPenelitianPage() {
                 </a>
                 <button
                   type="button"
-                  onClick={() => setPreviewPhotoUrl(null)}
+                  onClick={() => setPreviewPhotos([])}
                   className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
                 >
                   <X size={18} />
@@ -533,13 +547,35 @@ export default function LaporanCatatanPenelitianPage() {
               </div>
             </div>
 
-            <div className="bg-gray-950 rounded-2xl overflow-hidden max-h-[70vh] flex items-center justify-center">
+            {/* Area Foto Utama */}
+            <div className="bg-gray-950 rounded-2xl overflow-hidden h-[60vh] flex items-center justify-center relative">
               <img
-                src={previewPhotoUrl}
-                alt="Lampiran Bukti"
-                className="max-h-[70vh] w-auto object-contain mx-auto"
+                src={previewPhotos[activePhotoIdx]}
+                alt={`Foto Bukti ${activePhotoIdx + 1}`}
+                className="max-h-[60vh] w-auto object-contain mx-auto"
               />
             </div>
+
+            {/* Baris Thumbnail Navigasi (Jika > 1 Foto) */}
+            {previewPhotos.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto p-1 scrollbar-none">
+                {previewPhotos.map((url, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActivePhotoIdx(idx)}
+                    className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${
+                      activePhotoIdx === idx 
+                        ? 'border-indigo-600 scale-105 shadow-sm' 
+                        : 'border-gray-200 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+
           </div>
         </div>
       )}
@@ -547,4 +583,3 @@ export default function LaporanCatatanPenelitianPage() {
     </div>
   );
 }
-

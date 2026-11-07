@@ -8,23 +8,23 @@ import {
   Calendar, 
   DollarSign, 
   FileText, 
-  Upload, 
+  UploadCloud, 
   Trash2, 
   Image as ImageIcon, 
   CheckCircle2, 
   AlertCircle, 
   ArrowRight, 
-  Sparkles, 
   Copy, 
-  Check, 
-  Eye, 
   Clock, 
   Tag, 
-  Layers,
-  FileCheck
+  FileCheck,
+  X,
+  Link as LinkIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CatatanPenelitianTabs from '@/components/CatatanPenelitianTabs';
+
+type AttachmentState = { files: File[]; url: string };
 
 export default function CatatanPenelitianInputPage() {
   const [tanggal, setTanggal] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -33,13 +33,19 @@ export default function CatatanPenelitianInputPage() {
   const [uraian, setUraian] = useState<string>('');
   const [catatan, setCatatan] = useState<string>('');
 
-  // 4 Kolom Lampiran Foto Bukti
-  const [fotoBukti1, setFotoBukti1] = useState<string>('');
-  const [fotoBukti2, setFotoBukti2] = useState<string>('');
-  const [fotoBukti3, setFotoBukti3] = useState<string>('');
-  const [fotoBukti4, setFotoBukti4] = useState<string>('');
+  // 4 Kategori Lampiran Foto Bukti (Persis seperti di /input)
+  const [attachments, setAttachments] = useState<{
+    nota: AttachmentState;
+    kegiatan: AttachmentState;
+    barang: AttachmentState;
+    transfer: AttachmentState;
+  }>({
+    nota: { files: [], url: '' },
+    kegiatan: { files: [], url: '' },
+    barang: { files: [], url: '' },
+    transfer: { files: [], url: '' }
+  });
 
-  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [tableNotCreated, setTableNotCreated] = useState<boolean>(false);
   const [recentList, setRecentList] = useState<any[]>([]);
@@ -50,48 +56,61 @@ export default function CatatanPenelitianInputPage() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
   };
 
-  // Upload handler untuk 4 kolom foto bukti
-  const handleUploadPhoto = async (index: 1 | 2 | 3 | 4, file: File) => {
-    if (!file) return;
-
-    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-      toast.error('Format berkas harus berupa foto gambar (JPG, PNG, WEBP) atau PDF');
-      return;
+  // Handler memilih file per kategori lampiran (bisa lebih dari 1 gambar)
+  const handleAttachmentChange = (type: keyof typeof attachments, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      const validFiles = newFiles.filter(f => f.size <= 10 * 1024 * 1024);
+      if (validFiles.length < newFiles.length) {
+        toast.error('Beberapa file diabaikan karena ukurannya melebihi 10MB.');
+      }
+      
+      setAttachments(prev => ({
+        ...prev,
+        [type]: { ...prev[type], files: [...prev[type].files, ...validFiles] }
+      }));
     }
+  };
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error('Ukuran berkas maksimal 10 MB');
-      return;
-    }
+  // Hapus satu file dari daftar per kategori
+  const removeFile = (type: keyof typeof attachments, indexToRemove: number) => {
+    setAttachments(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        files: prev[type].files.filter((_, idx) => idx !== indexToRemove)
+      }
+    }));
+  };
 
-    setUploadingIdx(index);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('folder', 'lampiran_penelitian'); // Folder khusus terpisah di Cloudflare R2
+  // Helper upload multiple files ke folder khusus 'lampiran_penelitian'
+  const uploadMultipleFiles = async (files: File[]) => {
+    if (files.length === 0) return '';
+    
+    const uploadPromises = files.map(async (file) => {
+      const fileExt = file.name.split('.').pop();
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `penelitian_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${cleanFileName}`;
+      
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('fileName', fileName);
+      uploadFormData.append('folder', 'lampiran_penelitian'); // Folder khusus penelitian
 
-      const res = await fetch('/api/upload', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        body: uploadFormData,
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Gagal mengunggah foto lampiran');
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Gagal mengunggah file ${file.name}`);
       }
+      return result.publicUrl;
+    });
 
-      if (index === 1) setFotoBukti1(json.publicUrl);
-      if (index === 2) setFotoBukti2(json.publicUrl);
-      if (index === 3) setFotoBukti3(json.publicUrl);
-      if (index === 4) setFotoBukti4(json.publicUrl);
-
-      toast.success(`Foto Bukti ${index} berhasil diunggah ke folder penelitian`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Gagal upload: ' + err.message);
-    } finally {
-      setUploadingIdx(null);
-    }
+    const uploadedUrls = await Promise.all(uploadPromises);
+    return uploadedUrls.filter(Boolean).join(', ');
   };
 
   // Fetch recent data untuk pratinjau input terakhir
@@ -127,17 +146,39 @@ export default function CatatanPenelitianInputPage() {
     }
 
     setIsSubmitting(true);
+    const toastId = toast.loading('Mengunggah berkas lampiran ke folder penelitian & menyimpan data...');
+
     try {
+      // Unggah foto-foto lampiran secara paralel per kategori
+      const [notaUrl, kegiatanUrl, barangUrl, transferUrl] = await Promise.all([
+        attachments.nota.files.length > 0 
+          ? uploadMultipleFiles(attachments.nota.files) 
+          : attachments.nota.url,
+        attachments.kegiatan.files.length > 0 
+          ? uploadMultipleFiles(attachments.kegiatan.files) 
+          : attachments.kegiatan.url,
+        attachments.barang.files.length > 0 
+          ? uploadMultipleFiles(attachments.barang.files) 
+          : attachments.barang.url,
+        attachments.transfer.files.length > 0 
+          ? uploadMultipleFiles(attachments.transfer.files) 
+          : attachments.transfer.url,
+      ]);
+
       const payload = {
         tanggal_transaksi: tanggal,
         kategori,
         nominal: Number(nominal),
         uraian: uraian.trim(),
         catatan: catatan.trim(),
-        foto_bukti_1: fotoBukti1 || null,
-        foto_bukti_2: fotoBukti2 || null,
-        foto_bukti_3: fotoBukti3 || null,
-        foto_bukti_4: fotoBukti4 || null,
+        foto_nota: notaUrl || null,
+        foto_kegiatan: kegiatanUrl || null,
+        foto_barang: barangUrl || null,
+        foto_bukti_transfer: transferUrl || null,
+        foto_bukti_1: notaUrl || null,
+        foto_bukti_2: kegiatanUrl || null,
+        foto_bukti_3: barangUrl || null,
+        foto_bukti_4: transferUrl || null,
         created_by: 'User Portalkeu'
       };
 
@@ -152,16 +193,18 @@ export default function CatatanPenelitianInputPage() {
         throw new Error(json.error || 'Gagal menyimpan transaksi pengeluaran');
       }
 
-      toast.success('Pengeluaran berhasil dicatat!');
+      toast.success('Pengeluaran & berkas foto berhasil dicatat!', { id: toastId });
 
       // Reset form
       setNominal('');
       setUraian('');
       setCatatan('');
-      setFotoBukti1('');
-      setFotoBukti2('');
-      setFotoBukti3('');
-      setFotoBukti4('');
+      setAttachments({
+        nota: { files: [], url: '' },
+        kegiatan: { files: [], url: '' },
+        barang: { files: [], url: '' },
+        transfer: { files: [], url: '' }
+      });
 
       if (json.tableNotCreated) {
         setTableNotCreated(true);
@@ -169,7 +212,7 @@ export default function CatatanPenelitianInputPage() {
 
       fetchRecent();
     } catch (err: any) {
-      toast.error('Error: ' + err.message);
+      toast.error('Error: ' + err.message, { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
@@ -207,6 +250,10 @@ export default function CatatanPenelitianInputPage() {
     nominal NUMERIC(18, 2) NOT NULL DEFAULT 0,
     uraian TEXT NOT NULL,
     catatan TEXT,
+    foto_nota TEXT,
+    foto_kegiatan TEXT,
+    foto_barang TEXT,
+    foto_bukti_transfer TEXT,
     foto_bukti_1 TEXT,
     foto_bukti_2 TEXT,
     foto_bukti_3 TEXT,
@@ -232,7 +279,7 @@ CREATE POLICY "Allow public delete catatan_penelitian" ON public.catatan_penelit
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
         {/* ========================================================== */}
-        {/* FORM INPUT PENGELUARAN PENELITIAN (2 KOLOM)               */}
+        {/* FORM INPUT PENGELUARAN PENELITIAN                         */}
         {/* ========================================================== */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-gray-200/90 shadow-2xs p-6 space-y-6">
           
@@ -243,7 +290,7 @@ CREATE POLICY "Allow public delete catatan_penelitian" ON public.catatan_penelit
               </div>
               <div>
                 <h2 className="text-base font-black text-gray-900 tracking-tight">Formulir Pengeluaran Kegiatan</h2>
-                <p className="text-xs text-gray-500 font-medium">Khusus transaksi pengeluaran mandiri dengan lampiran 4 bukti terpisah</p>
+                <p className="text-xs text-gray-500 font-medium">Khusus transaksi pengeluaran mandiri dengan lampiran foto multi-berkas</p>
               </div>
             </div>
 
@@ -352,196 +399,112 @@ CREATE POLICY "Allow public delete catatan_penelitian" ON public.catatan_penelit
             </div>
 
             {/* ========================================================== */}
-            {/* 📸 4 KOLOM LAMPIRAN FOTO BUKTI (FOLDER: lampiran_penelitian) */}
+            {/* 📸 LAMPIRAN FOTO BUKTI (PERSIS SEPERTI DI /INPUT)           */}
+            {/* Terdiri: Nota/Kwitansi (0); Foto Kegiatan (0);             */}
+            {/* Foto Barang (0); Bukti Transfer (0) - Bisa > 1 Gambar      */}
             {/* ========================================================== */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-2.5 pt-2 border-t border-gray-100">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                    <ImageIcon size={15} className="text-indigo-600" />
-                    <span>Lampiran Foto Bukti (4 Kolom Terpisah)</span>
-                  </h3>
-                  <p className="text-[11px] text-gray-500">Tersimpan di folder khusus <code className="bg-gray-100 px-1 py-0.5 rounded text-[10px] font-bold">lampiran_penelitian</code></p>
-                </div>
-                <span className="text-[10px] font-bold text-gray-400">Format: JPG, PNG, WEBP, PDF</span>
+                <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                  <UploadCloud size={15} className="text-indigo-600" />
+                  <span>Lampiran Foto Bukti (Bisa Lebih Dari 1 Gambar per Kategori)</span>
+                </label>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Folder: lampiran_penelitian
+                </span>
               </div>
 
-              {/* 4 Kolom Grid */}
+              {/* 4 Kotak Lampiran Foto Bukti Berjejer */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                
-                {/* Kolom Foto 1 */}
-                <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-gray-700">Foto Bukti 1</span>
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Nota / Kuitansi</span>
-                  </div>
+                {(Object.keys(attachments) as Array<keyof typeof attachments>).map((key) => {
+                  const item = attachments[key];
+                  const title = key === 'nota' 
+                    ? 'Nota / Kwitansi' 
+                    : key === 'kegiatan' 
+                    ? 'Foto Kegiatan' 
+                    : key === 'barang' 
+                    ? 'Foto Barang' 
+                    : 'Bukti Transfer';
 
-                  {fotoBukti1 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-4/3 flex items-center justify-center">
-                      <img src={fotoBukti1} alt="Bukti 1" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <a href={fotoBukti1} target="_blank" rel="noreferrer" className="p-1.5 bg-white text-gray-800 rounded-lg hover:scale-110 transition-transform">
-                          <Eye size={14} />
-                        </a>
-                        <button type="button" onClick={() => setFotoBukti1('')} className="p-1.5 bg-rose-600 text-white rounded-lg hover:scale-110 transition-transform">
-                          <Trash2 size={14} />
-                        </button>
+                  return (
+                    <div 
+                      key={key} 
+                      className="border border-dashed border-gray-300 hover:border-indigo-400 rounded-2xl flex flex-col items-center justify-start text-center hover:bg-gray-50/80 transition-all p-3 space-y-2 bg-white shadow-2xs"
+                    >
+                      {/* Header Kategori + Counter: Nota / Kwitansi (0) */}
+                      <p className="font-black text-xs text-gray-800 w-full pb-1.5 border-b border-gray-100 flex items-center justify-between px-1">
+                        <span>{title}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${item.files.length > 0 ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                          ({item.files.length})
+                        </span>
+                      </p>
+                      
+                      {/* Daftar File yang Dipilih */}
+                      <div className="w-full flex-1 overflow-y-auto max-h-[75px] min-h-[40px] space-y-1">
+                        {item.files.length === 0 ? (
+                          <div className="py-2 text-[10px] text-gray-400 flex flex-col items-center justify-center">
+                            <ImageIcon size={16} className="text-gray-300 mb-0.5" />
+                            <span>Belum ada foto</span>
+                          </div>
+                        ) : (
+                          item.files.map((file, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-indigo-50/80 px-2 py-1 rounded-lg text-[10px] text-indigo-700 font-bold border border-indigo-100">
+                              <span className="truncate max-w-[80%]" title={file.name}>{file.name}</span>
+                              <button 
+                                type="button" 
+                                onClick={() => removeFile(key, idx)} 
+                                className="text-rose-500 hover:bg-rose-100 p-0.5 rounded transition-colors cursor-pointer"
+                                title="Hapus foto ini"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))
+                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <label className="border border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl aspect-4/3 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all p-2 text-center">
-                      {uploadingIdx === 1 ? (
-                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Upload size={16} className="text-gray-400 group-hover:text-indigo-600" />
-                          <span className="text-[10px] font-bold text-gray-600">Unggah Bukti 1</span>
-                        </>
+
+                      {/* Tombol Pilih File (Multiple) */}
+                      <label className="cursor-pointer w-full bg-white border border-gray-200 hover:border-indigo-400 py-1.5 rounded-xl text-xs font-black text-indigo-600 hover:bg-indigo-50 shadow-2xs transition-all text-center block">
+                        + Pilih File
+                        <input 
+                          type="file" 
+                          accept="image/*,application/pdf" 
+                          multiple 
+                          className="hidden" 
+                          onChange={(e) => handleAttachmentChange(key, e)} 
+                        />
+                      </label>
+                      
+                      {/* Input Alternatif Link GDrive */}
+                      {item.files.length === 0 && (
+                        <input 
+                          type="text" 
+                          placeholder="Atau Link GDrive..." 
+                          value={item.url} 
+                          onChange={(e) => setAttachments(p => ({ ...p, [key]: { ...p[key], url: e.target.value } }))} 
+                          className="w-full bg-gray-50 border border-gray-200 text-[10px] px-2 py-1 rounded-lg outline-none font-mono focus:border-indigo-400" 
+                        />
                       )}
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => e.target.files?.[0] && handleUploadPhoto(1, e.target.files[0])}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-
-                {/* Kolom Foto 2 */}
-                <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-gray-700">Foto Bukti 2</span>
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Faktur Bayar</span>
-                  </div>
-
-                  {fotoBukti2 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-4/3 flex items-center justify-center">
-                      <img src={fotoBukti2} alt="Bukti 2" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <a href={fotoBukti2} target="_blank" rel="noreferrer" className="p-1.5 bg-white text-gray-800 rounded-lg hover:scale-110 transition-transform">
-                          <Eye size={14} />
-                        </a>
-                        <button type="button" onClick={() => setFotoBukti2('')} className="p-1.5 bg-rose-600 text-white rounded-lg hover:scale-110 transition-transform">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
                     </div>
-                  ) : (
-                    <label className="border border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl aspect-4/3 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all p-2 text-center">
-                      {uploadingIdx === 2 ? (
-                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Upload size={16} className="text-gray-400 group-hover:text-indigo-600" />
-                          <span className="text-[10px] font-bold text-gray-600">Unggah Bukti 2</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => e.target.files?.[0] && handleUploadPhoto(2, e.target.files[0])}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-
-                {/* Kolom Foto 3 */}
-                <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-gray-700">Foto Bukti 3</span>
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Dokumentasi</span>
-                  </div>
-
-                  {fotoBukti3 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-4/3 flex items-center justify-center">
-                      <img src={fotoBukti3} alt="Bukti 3" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <a href={fotoBukti3} target="_blank" rel="noreferrer" className="p-1.5 bg-white text-gray-800 rounded-lg hover:scale-110 transition-transform">
-                          <Eye size={14} />
-                        </a>
-                        <button type="button" onClick={() => setFotoBukti3('')} className="p-1.5 bg-rose-600 text-white rounded-lg hover:scale-110 transition-transform">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="border border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl aspect-4/3 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all p-2 text-center">
-                      {uploadingIdx === 3 ? (
-                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Upload size={16} className="text-gray-400 group-hover:text-indigo-600" />
-                          <span className="text-[10px] font-bold text-gray-600">Unggah Bukti 3</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => e.target.files?.[0] && handleUploadPhoto(3, e.target.files[0])}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-
-                {/* Kolom Foto 4 */}
-                <div className="border border-gray-200 rounded-2xl p-3 bg-gray-50/50 flex flex-col justify-between space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-gray-700">Foto Bukti 4</span>
-                    <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Lampiran Lain</span>
-                  </div>
-
-                  {fotoBukti4 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-gray-200 bg-white aspect-4/3 flex items-center justify-center">
-                      <img src={fotoBukti4} alt="Bukti 4" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <a href={fotoBukti4} target="_blank" rel="noreferrer" className="p-1.5 bg-white text-gray-800 rounded-lg hover:scale-110 transition-transform">
-                          <Eye size={14} />
-                        </a>
-                        <button type="button" onClick={() => setFotoBukti4('')} className="p-1.5 bg-rose-600 text-white rounded-lg hover:scale-110 transition-transform">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="border border-dashed border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/30 rounded-xl aspect-4/3 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all p-2 text-center">
-                      {uploadingIdx === 4 ? (
-                        <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Upload size={16} className="text-gray-400 group-hover:text-indigo-600" />
-                          <span className="text-[10px] font-bold text-gray-600">Unggah Bukti 4</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => e.target.files?.[0] && handleUploadPhoto(4, e.target.files[0])}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-
+                  );
+                })}
               </div>
             </div>
 
             {/* Submit Button */}
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
               <span className="text-xs text-gray-500 font-medium">
-                Pastikan data pengeluaran dan foto bukti sudah sesuai.
+                Seluruh foto bukti akan diunggah ke folder penelitian.
               </span>
               <button
                 type="submit"
-                disabled={isSubmitting || uploadingIdx !== null}
+                disabled={isSubmitting}
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-md shadow-indigo-200 transition-all cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-2"
               >
                 {isSubmitting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Menyimpan...</span>
+                    <span>Menyimpan &amp; Mengunggah...</span>
                   </>
                 ) : (
                   <>
@@ -621,4 +584,3 @@ CREATE POLICY "Allow public delete catatan_penelitian" ON public.catatan_penelit
     </div>
   );
 }
-
