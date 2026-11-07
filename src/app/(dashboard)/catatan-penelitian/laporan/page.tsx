@@ -19,7 +19,12 @@ import {
   Clock,
   Layers,
   ChevronRight,
-  UploadCloud
+  UploadCloud,
+  Edit3,
+  CheckCircle2,
+  Tag,
+  FileCheck,
+  Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -56,6 +61,42 @@ export default function LaporanCatatanPenelitianPage() {
   const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
   const [previewTitle, setPreviewTitle] = useState<string>('');
   const [activePhotoIdx, setActivePhotoIdx] = useState<number>(0);
+
+  // Modal Edit State
+  const [editingItem, setEditingItem] = useState<TransaksiPenelitian | null>(null);
+  const [editTanggal, setEditTanggal] = useState<string>('');
+  const [editKategori, setEditKategori] = useState<string>('Penelitian');
+  const [editNominal, setEditNominal] = useState<string>('');
+  const [editUraian, setEditUraian] = useState<string>('');
+  const [editCatatan, setEditCatatan] = useState<string>('');
+
+  // Foto yang ada di item yang sedang diedit
+  const [editPhotos, setEditPhotos] = useState<{
+    nota: string[];
+    kegiatan: string[];
+    barang: string[];
+    transfer: string[];
+  }>({
+    nota: [],
+    kegiatan: [],
+    barang: [],
+    transfer: []
+  });
+
+  // Berkas baru yang ditambahkan saat edit
+  const [editNewFiles, setEditNewFiles] = useState<{
+    nota: File[];
+    kegiatan: File[];
+    barang: File[];
+    transfer: File[];
+  }>({
+    nota: [],
+    kegiatan: [],
+    barang: [],
+    transfer: []
+  });
+
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
 
   const formatRupiah = (num: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num || 0);
@@ -112,6 +153,157 @@ export default function LaporanCatatanPenelitianPage() {
       }
     } catch (err: any) {
       toast.error('Error: ' + err.message);
+    }
+  };
+
+  // Buka Modal Edit
+  const handleOpenEdit = (item: TransaksiPenelitian) => {
+    setEditingItem(item);
+    setEditTanggal(item.tanggal_transaksi);
+    setEditKategori(item.kategori || 'Penelitian');
+    setEditNominal(String(item.nominal || ''));
+    setEditUraian(item.uraian || '');
+    setEditCatatan(item.catatan || '');
+
+    setEditPhotos({
+      nota: parseUrls(item.foto_nota || item.foto_bukti_1),
+      kegiatan: parseUrls(item.foto_kegiatan || item.foto_bukti_2),
+      barang: parseUrls(item.foto_barang || item.foto_bukti_3),
+      transfer: parseUrls(item.foto_bukti_transfer || item.foto_bukti_4),
+    });
+
+    setEditNewFiles({
+      nota: [],
+      kegiatan: [],
+      barang: [],
+      transfer: []
+    });
+  };
+
+  // Hapus existing photo saat edit
+  const removeExistingPhoto = (type: keyof typeof editPhotos, idxToRemove: number) => {
+    setEditPhotos(prev => ({
+      ...prev,
+      [type]: prev[type].filter((_, idx) => idx !== idxToRemove)
+    }));
+  };
+
+  // Tambah file baru saat edit
+  const handleAddEditFiles = (type: keyof typeof editNewFiles, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setEditNewFiles(prev => ({
+        ...prev,
+        [type]: [...prev[type], ...newFiles]
+      }));
+    }
+  };
+
+  // Hapus new file saat edit
+  const removeNewFile = (type: keyof typeof editNewFiles, idxToRemove: number) => {
+    setEditNewFiles(prev => ({
+      ...prev,
+      [type]: prev[type].filter((_, idx) => idx !== idxToRemove)
+    }));
+  };
+
+  // Helper upload files
+  const uploadMultipleFiles = async (files: File[]) => {
+    if (files.length === 0) return [];
+    
+    const uploadPromises = files.map(async (file) => {
+      const fileExt = file.name.split('.').pop();
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const fileName = `penelitian_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${cleanFileName}`;
+      
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('fileName', fileName);
+      uploadFormData.append('folder', 'lampiran_penelitian');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || `Gagal mengunggah file ${file.name}`);
+      }
+      return result.publicUrl;
+    });
+
+    return await Promise.all(uploadPromises);
+  };
+
+  // Simpan Update Edit
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    if (!editNominal || isNaN(Number(editNominal)) || Number(editNominal) <= 0) {
+      toast.error('Nominal pengeluaran harus berupa angka valid!');
+      return;
+    }
+    if (!editUraian.trim()) {
+      toast.error('Uraian kegiatan wajib diisi!');
+      return;
+    }
+
+    setIsUpdating(true);
+    const toastId = toast.loading('Menyimpan perubahan transaksi...');
+
+    try {
+      // Unggah berkas-berkas baru jika ada
+      const [uploadedNota, uploadedKegiatan, uploadedBarang, uploadedTransfer] = await Promise.all([
+        uploadMultipleFiles(editNewFiles.nota),
+        uploadMultipleFiles(editNewFiles.kegiatan),
+        uploadMultipleFiles(editNewFiles.barang),
+        uploadMultipleFiles(editNewFiles.transfer),
+      ]);
+
+      const finalNota = [...editPhotos.nota, ...uploadedNota].filter(Boolean).join(', ');
+      const finalKegiatan = [...editPhotos.kegiatan, ...uploadedKegiatan].filter(Boolean).join(', ');
+      const finalBarang = [...editPhotos.barang, ...uploadedBarang].filter(Boolean).join(', ');
+      const finalTransfer = [...editPhotos.transfer, ...uploadedTransfer].filter(Boolean).join(', ');
+
+      const payload = {
+        id: editingItem.id,
+        tanggal_transaksi: editTanggal,
+        kategori: editKategori,
+        nominal: Number(editNominal),
+        uraian: editUraian.trim(),
+        catatan: editCatatan.trim(),
+        foto_nota: finalNota,
+        foto_kegiatan: finalKegiatan,
+        foto_barang: finalBarang,
+        foto_bukti_transfer: finalTransfer,
+        foto_bukti_1: finalNota,
+        foto_bukti_2: finalKegiatan,
+        foto_bukti_3: finalBarang,
+        foto_bukti_4: finalTransfer,
+      };
+
+      const res = await fetch('/api/catatan-penelitian', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal memperbarui transaksi');
+      }
+
+      toast.success('Transaksi pengeluaran berhasil diperbarui!', { id: toastId });
+
+      // Update local state
+      setDataList(prev => prev.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
+      setEditingItem(null);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message, { id: toastId });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -374,7 +566,7 @@ export default function LaporanCatatanPenelitianPage() {
                   <th className="py-3 px-4">Uraian / Rincian Kegiatan</th>
                   <th className="py-3 px-4 w-36 text-right">Nominal (Rp)</th>
                   <th className="py-3 px-4 w-80 text-center">Lampiran Foto Bukti (Nota, Kegiatan, Barang, Transfer)</th>
-                  <th className="py-3 px-4 w-16 text-center">Aksi</th>
+                  <th className="py-3 px-4 w-24 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
@@ -486,16 +678,26 @@ export default function LaporanCatatanPenelitianPage() {
                         </div>
                       </td>
 
-                      {/* Aksi */}
+                      {/* Aksi: Edit & Hapus */}
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item.id)}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Hapus Transaksi"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(item)}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Transaksi"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item.id)}
+                            className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Hapus Transaksi"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       </td>
 
                     </tr>
@@ -507,6 +709,219 @@ export default function LaporanCatatanPenelitianPage() {
         )}
 
       </div>
+
+      {/* ========================================================== */}
+      {/* ✏️ MODAL EDIT TRANSAKSI PENGELUARAN                        */}
+      {/* ========================================================== */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 my-8">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                  <Edit3 size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">Edit Pengeluaran Kegiatan</h3>
+                  <p className="text-[11px] text-gray-500">Perbarui rincian atau berkas foto lampiran</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              
+              {/* Tanggal & Kategori */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black text-gray-700 flex items-center gap-1">
+                    <Calendar size={13} className="text-indigo-600" />
+                    <span>Tanggal Transaksi</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editTanggal}
+                    onChange={(e) => setEditTanggal(e.target.value)}
+                    required
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black text-gray-700 flex items-center gap-1">
+                    <Tag size={13} className="text-indigo-600" />
+                    <span>Kategori</span>
+                  </label>
+                  <select
+                    value={editKategori}
+                    onChange={(e) => setEditKategori(e.target.value)}
+                    required
+                    className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                  >
+                    <option value="Penelitian">🔬 Penelitian</option>
+                    <option value="Pengabdian Masyarakat">🤝 Pengabdian Masyarakat</option>
+                    <option value="Operasional Riset">⚙️ Operasional Riset</option>
+                    <option value="Lainnya">📋 Pengeluaran Lainnya</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Nominal */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-black text-gray-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <DollarSign size={13} className="text-indigo-600" />
+                    <span>Nominal Pengeluaran</span>
+                  </span>
+                  {editNominal && Number(editNominal) > 0 && (
+                    <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      {formatRupiah(Number(editNominal))}
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">Rp</span>
+                  <input
+                    type="number"
+                    value={editNominal}
+                    onChange={(e) => setEditNominal(e.target.value)}
+                    required
+                    min="1"
+                    className="w-full h-9 pl-9 pr-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-black text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Uraian */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-black text-gray-700 flex items-center gap-1">
+                  <FileText size={13} className="text-indigo-600" />
+                  <span>Uraian / Rincian Kegiatan</span>
+                </label>
+                <input
+                  type="text"
+                  value={editUraian}
+                  onChange={(e) => setEditUraian(e.target.value)}
+                  required
+                  className="w-full h-9 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+
+              {/* Catatan */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-black text-gray-700 flex items-center gap-1">
+                  <FileCheck size={13} className="text-amber-600" />
+                  <span>Catatan Tambahan</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={editCatatan}
+                  onChange={(e) => setEditCatatan(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none"
+                />
+              </div>
+
+              {/* 4 Kotak Foto Lampiran Saat Edit */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="text-[11px] font-black text-gray-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <UploadCloud size={13} className="text-indigo-600" />
+                    <span>Kelola Berkas Foto Bukti Lampiran</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400">Bisa hapus foto lama atau tambah foto baru</span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {(['nota', 'kegiatan', 'barang', 'transfer'] as const).map((key) => {
+                    const title = key === 'nota' ? 'Nota/Kwitansi' : key === 'kegiatan' ? 'Kegiatan' : key === 'barang' ? 'Barang' : 'Transfer';
+                    const existingList = editPhotos[key];
+                    const newList = editNewFiles[key];
+
+                    return (
+                      <div key={key} className="border border-gray-200 rounded-xl p-2.5 bg-gray-50/60 space-y-1.5 text-center">
+                        <p className="text-[10px] font-black text-gray-700 border-b border-gray-200/80 pb-1">
+                          {title} ({existingList.length + newList.length})
+                        </p>
+
+                        {/* List Existing Photos */}
+                        <div className="space-y-1 max-h-[70px] overflow-y-auto">
+                          {existingList.map((url, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white border border-gray-200 px-1.5 py-0.5 rounded text-[9px] text-indigo-700 font-bold">
+                              <span className="truncate max-w-[80%]">Foto {idx + 1}</span>
+                              <button type="button" onClick={() => removeExistingPhoto(key, idx)} className="text-rose-500 hover:bg-rose-50 p-0.5 rounded">
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ))}
+
+                          {/* List New Selected Files */}
+                          {newList.map((file, idx) => (
+                            <div key={`new-${idx}`} className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[9px] text-emerald-800 font-bold">
+                              <span className="truncate max-w-[80%]">+ {file.name}</span>
+                              <button type="button" onClick={() => removeNewFile(key, idx)} className="text-rose-500 hover:bg-rose-50 p-0.5 rounded">
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Tombol Tambah Foto */}
+                        <label className="cursor-pointer w-full bg-white border border-gray-200 hover:border-indigo-400 py-1 rounded-lg text-[10px] font-black text-indigo-600 hover:bg-indigo-50 shadow-2xs block">
+                          + Tambah Foto
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => handleAddEditFiles(key, e)}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tombol Aksi Modal */}
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-200 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isUpdating ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Simpan Perubahan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
 
       {/* ========================================================== */}
       {/* 🖼️ MODAL PRATINJAU GALERI FOTO BUKTI (MULTI-FOTO)          */}

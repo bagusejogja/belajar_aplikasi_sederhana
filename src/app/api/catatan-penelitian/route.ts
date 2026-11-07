@@ -155,6 +155,78 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { 
+      id,
+      tanggal_transaksi, 
+      kategori, 
+      nominal, 
+      uraian, 
+      catatan, 
+      foto_nota,
+      foto_kegiatan,
+      foto_barang,
+      foto_bukti_transfer,
+      foto_bukti_1, 
+      foto_bukti_2, 
+      foto_bukti_3, 
+      foto_bukti_4
+    } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID transaksi diperlukan untuk update' }, { status: 400 });
+    }
+
+    const notaVal = foto_nota !== undefined ? foto_nota : (foto_bukti_1 !== undefined ? foto_bukti_1 : null);
+    const kegiatanVal = foto_kegiatan !== undefined ? foto_kegiatan : (foto_bukti_2 !== undefined ? foto_bukti_2 : null);
+    const barangVal = foto_barang !== undefined ? foto_barang : (foto_bukti_3 !== undefined ? foto_bukti_3 : null);
+    const transferVal = foto_bukti_transfer !== undefined ? foto_bukti_transfer : (foto_bukti_4 !== undefined ? foto_bukti_4 : null);
+
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (tanggal_transaksi) updateData.tanggal_transaksi = tanggal_transaksi;
+    if (kategori) updateData.kategori = kategori;
+    if (nominal !== undefined) updateData.nominal = Number(nominal);
+    if (uraian !== undefined) updateData.uraian = uraian.trim();
+    if (catatan !== undefined) updateData.catatan = catatan ? catatan.trim() : null;
+    
+    updateData.foto_nota = notaVal;
+    updateData.foto_kegiatan = kegiatanVal;
+    updateData.foto_barang = barangVal;
+    updateData.foto_bukti_transfer = transferVal;
+    updateData.foto_bukti_1 = notaVal;
+    updateData.foto_bukti_2 = kegiatanVal;
+    updateData.foto_bukti_3 = barangVal;
+    updateData.foto_bukti_4 = transferVal;
+
+    const { data, error } = await supabaseAdmin
+      .from('catatan_penelitian')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      // Fallback update in-memory
+      const idx = inMemoryStore.findIndex(item => String(item.id) === String(id));
+      if (idx !== -1) {
+        inMemoryStore[idx] = { ...inMemoryStore[idx], ...updateData };
+        return NextResponse.json({ success: true, data: inMemoryStore[idx] });
+      }
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error in PUT /api/catatan-penelitian:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

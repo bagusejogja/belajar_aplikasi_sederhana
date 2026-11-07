@@ -520,30 +520,9 @@ CREATE POLICY "Allow public delete catatan_penelitian" ON public.catatan_penelit
         </div>
 
         {/* ========================================================== */}
-        {/* SIDEBAR PRATINJAU & RECENT ENTRIES (1 KOLOM)              */}
+        {/* SIDEBAR PRATINJAU TRANSAKSI TERAKHIR (1 KOLOM)           */}
         {/* ========================================================== */}
         <div className="space-y-5">
-          
-          {/* Quick Action Link ke Laporan */}
-          <div className="bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-900 text-white p-5 rounded-3xl shadow-sm border border-indigo-800/50 space-y-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-amber-300 flex items-center justify-center">
-                <FileSpreadsheet size={18} />
-              </div>
-              <h3 className="text-xs font-black tracking-tight">Rekapitulasi &amp; Laporan</h3>
-            </div>
-            <p className="text-[11px] text-slate-300 font-medium leading-relaxed">
-              Lihat seluruh riwayat pengeluaran penelitian, filter per rentang tanggal, cetak laporan SPJ, dan ekspor ke file Excel.
-            </p>
-            <Link
-              href="/catatan-penelitian/laporan"
-              className="inline-flex items-center justify-between w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
-            >
-              <span>Buka Menu Laporan</span>
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-
           {/* Transaksi Terakhir Diinput */}
           <div className="bg-white rounded-3xl border border-gray-200/90 shadow-2xs p-5 space-y-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
