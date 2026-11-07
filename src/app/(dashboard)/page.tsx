@@ -122,6 +122,13 @@ const groupMeta: Record<string, { icon: any; gradient: string; text: string; bg:
     bg: 'bg-teal-50/50', 
     border: 'border-teal-200' 
   },
+  'Catatan Khusus': { 
+    icon: FileSpreadsheet, 
+    gradient: 'from-violet-600 to-indigo-700', 
+    text: 'text-violet-600', 
+    bg: 'bg-violet-50/50', 
+    border: 'border-violet-200' 
+  },
   'Master': { 
     icon: Database, 
     gradient: 'from-slate-700 to-gray-900', 
@@ -356,15 +363,69 @@ export default function PremiumDashboard() {
     return groups;
   }, [accessibleMenus]);
 
-  // Workspace Options with strict Role-Aware Filter
+  // Workspace Options with strict Role-Aware Filter & Rich Card Meta
   const workspaceOptions = useMemo(() => {
     const list = [
-      { id: 'ALL', label: 'Semua Menu', icon: Layers, groups: [] },
-      { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart, groups: ['Anggaran & RKAT', 'Anggaran'] },
-      { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark, groups: ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'] },
-      { id: 'PERSURATAN', label: 'Persuratan & Dokumen', icon: Mail, groups: ['Persuratan', 'Manajemen Kegiatan'] },
-      { id: 'MASJID', label: 'Masjid', icon: Building2, groups: ['Masjid'] },
-      { id: 'MASTER', label: 'Master & Referensi', icon: Database, groups: ['Master'] },
+      { 
+        id: 'ALL', 
+        label: 'Semua Menu Portal', 
+        desc: 'Tampilkan seluruh modul & menu operasional yang diizinkan untuk akun Anda.',
+        icon: Layers, 
+        color: 'from-slate-800 to-indigo-900',
+        textColor: 'text-indigo-600',
+        bgColor: 'bg-indigo-50 text-indigo-700',
+        groups: [] 
+      },
+      { 
+        id: 'ANGGARAN', 
+        label: 'Anggaran & RKAT', 
+        desc: 'Dashboard Pagu, Analisis Usulan Tambah Pagu, Cek Perubahan RKAT & Sinkronisasi Finance.',
+        icon: PieChart, 
+        color: 'from-indigo-600 to-blue-700',
+        textColor: 'text-indigo-600',
+        bgColor: 'bg-indigo-50 text-indigo-700',
+        groups: ['Anggaran & RKAT', 'Anggaran'] 
+      },
+      { 
+        id: 'DIPA', 
+        label: 'DIPA & RKA', 
+        desc: 'RKA Pengeluaran & Penerimaan, Aturan Indikator Kementerian, dan Review Alokasi.',
+        icon: Landmark, 
+        color: 'from-emerald-600 to-teal-700',
+        textColor: 'text-emerald-600',
+        bgColor: 'bg-emerald-50 text-emerald-700',
+        groups: ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'] 
+      },
+      { 
+        id: 'PERSURATAN', 
+        label: 'Persuratan & Dokumen', 
+        desc: 'Arsip Surat Keputusan, Naskah Dinas, Dokumen Kerjasama & Surat Masuk/Keluar.',
+        icon: Mail, 
+        color: 'from-amber-600 to-orange-700',
+        textColor: 'text-amber-600',
+        bgColor: 'bg-amber-50 text-amber-700',
+        groups: ['Persuratan', 'Manajemen Kegiatan'] 
+      },
+      { 
+        id: 'MASJID', 
+        label: 'Masjid Kampus', 
+        desc: 'Verifikasi Kas, Input Transaksi, Revisi Pembukuan & Laporan Keuangan Masjid.',
+        icon: Building2, 
+        color: 'from-teal-600 to-emerald-800',
+        textColor: 'text-teal-600',
+        bgColor: 'bg-teal-50 text-teal-700',
+        groups: ['Masjid'] 
+      },
+      { 
+        id: 'MASTER', 
+        label: 'Master & Referensi', 
+        desc: 'Master Unit Kerja, PIC Keuangan, Standar UI/UX, Panduan SBU & Pengaturan Sistem.',
+        icon: Database, 
+        color: 'from-purple-600 to-indigo-800',
+        textColor: 'text-purple-600',
+        bgColor: 'bg-purple-50 text-purple-700',
+        groups: ['Master'] 
+      },
     ];
 
     const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
@@ -516,58 +577,96 @@ export default function PremiumDashboard() {
       </div>
 
       {/* ========================================================== */}
-      {/* 🧭 MODUL SWITCHER UTAMA (ROLE-AWARE WORKSPACE SELECTOR)   */}
+      {/* 🧭 PILIHAN MODUL & RUANG KERJA UTAMA                      */}
       {/* ========================================================== */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-gray-200/90 shadow-xs space-y-3.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-xl">
-              <Layers size={18} />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-gray-900 tracking-tight">Pilih Modul &amp; Ruang Kerja</h3>
-              <p className="text-[11px] text-gray-500 font-medium">Klik modul di bawah untuk memfilter menu sesuai fokus kerja Anda hari ini</p>
-            </div>
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+          <div>
+            <h2 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <Layers size={18} className="text-indigo-600" />
+              <span>Pilihan Modul &amp; Ruang Kerja Portal</span>
+            </h2>
+            <p className="text-xs text-gray-500 font-medium">
+              Pilih kartu modul di bawah untuk memfilter menu atau klik 'Semua Menu Portal' untuk melihat seluruh akses Anda
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-gray-500">Filter Aktif:</span>
-            <span className="text-[11px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
-              {workspaceOptions.find(w => w.id === activeWorkspace)?.label || 'Semua Menu'}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-[11px] font-bold text-gray-500">Modul Terpilih:</span>
+            <span className="text-[11px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full shadow-2xs">
+              {workspaceOptions.find(w => w.id === activeWorkspace)?.label || 'Semua Menu Portal'}
             </span>
           </div>
         </div>
 
-        {/* Scrollable Modul Switcher Pills */}
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+        {/* 6 Kartu Pilihan Modul Bergaya Card Aksi Cepat */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {workspaceOptions.map((ws) => {
             const Icon = ws.icon;
             const isActive = activeWorkspace === ws.id;
+            const featureCount = ws.id === 'ALL' 
+              ? accessibleMenus.length 
+              : ws.groups.reduce((sum, g) => sum + (groupedAccessible[g]?.length || 0), 0);
+
             return (
-              <button
+              <div
                 key={ws.id}
-                type="button"
                 onClick={() => {
                   setActiveWorkspace(ws.id);
                   setSearchQuery('');
+                  const el = document.getElementById('katalog-menu-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black whitespace-nowrap transition-all duration-200 cursor-pointer active:scale-95",
+                  "group relative p-5 rounded-2xl border transition-all duration-200 flex flex-col justify-between cursor-pointer select-none",
                   isActive
-                    ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-200 ring-2 ring-indigo-500/20"
-                    : "bg-gray-50/80 hover:bg-gray-100 text-gray-700 hover:text-indigo-600 border border-gray-200/80"
+                    ? "bg-gradient-to-br from-indigo-50/80 via-white to-blue-50/40 border-indigo-500 shadow-md ring-2 ring-indigo-500/20"
+                    : "bg-white hover:bg-gradient-to-br hover:from-white hover:to-indigo-50/40 border-gray-200/90 hover:border-indigo-300 shadow-2xs hover:shadow-md"
                 )}
               >
-                <Icon size={15} className={isActive ? "text-white" : "text-gray-500"} />
-                <span>{ws.label}</span>
-                {ws.id !== 'ALL' && (
-                  <span className={cn(
-                    "text-[10px] px-1.5 py-0.5 rounded-md font-bold ml-1",
-                    isActive ? "bg-white/20 text-white" : "bg-gray-200/70 text-gray-600"
-                  )}>
-                    {ws.groups.reduce((sum, g) => sum + (groupedAccessible[g]?.length || 0), 0)}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-2xs",
+                      isActive 
+                        ? "bg-indigo-600 text-white shadow-indigo-200" 
+                        : "bg-indigo-50 text-indigo-700 group-hover:bg-indigo-600 group-hover:text-white"
+                    )}>
+                      <Icon size={20} />
+                    </div>
+                    <span className={cn(
+                      "text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-colors",
+                      isActive 
+                        ? "bg-indigo-600 text-white border-indigo-600" 
+                        : "bg-gray-100 text-gray-600 border-gray-200/80 group-hover:border-indigo-200"
+                    )}>
+                      {featureCount} Menu
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className={cn(
+                      "text-sm font-black transition-colors flex items-center gap-1.5",
+                      isActive ? "text-indigo-700" : "text-gray-900 group-hover:text-indigo-700"
+                    )}>
+                      <span>{ws.label}</span>
+                      {isActive && <CheckCircle2 size={14} className="text-indigo-600 shrink-0" />}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">
+                      {ws.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold">
+                  <span className={isActive ? "text-indigo-700 font-black" : "text-gray-400 group-hover:text-indigo-600"}>
+                    {isActive ? "✓ Sedang Ditampilkan" : "Pilih Modul Ini"}
                   </span>
-                )}
-              </button>
+                  <ArrowRight size={14} className={cn(
+                    "transition-transform",
+                    isActive ? "text-indigo-700 translate-x-1" : "text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-1"
+                  )} />
+                </div>
+              </div>
             );
           })}
         </div>
@@ -683,104 +782,6 @@ export default function PremiumDashboard() {
               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
-        </div>
-
-        {/* 4 Kartu Metrik Ringkasan Real-Time */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Usulan Analisis</span>
-              <span className="p-2 rounded-xl bg-indigo-50 text-indigo-700"><FileSpreadsheet size={16} /></span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-gray-900 font-mono">
-              {analisisStats.loading ? '...' : analisisStats.total}
-            </div>
-            <p className="text-[11px] text-gray-400 font-medium">Usulan terdaftar di database</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Menunggu Telaah</span>
-              <span className="p-2 rounded-xl bg-amber-50 text-amber-700"><Clock size={16} /></span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-amber-600 font-mono flex items-center gap-2">
-              {analisisStats.loading ? '...' : analisisStats.menunggu}
-              {analisisStats.menunggu > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold font-sans">
-                  Aktif
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-gray-400 font-medium">Perlu keputusan pimpinan</p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Disetujui Pimpinan</span>
-              <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700"><CheckCircle2 size={16} /></span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-700 font-mono">
-              {analisisStats.loading ? '...' : analisisStats.disetujui}
-            </div>
-            <p className="text-[11px] text-emerald-600 font-bold truncate">
-              Rp {formatShortRp(analisisStats.nominalDisetujui)}
-            </p>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Revisi / Ditolak</span>
-              <span className="p-2 rounded-xl bg-rose-50 text-rose-700"><ShieldAlert size={16} /></span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-rose-600 font-mono">
-              {analisisStats.loading ? '...' : analisisStats.revisi}
-            </div>
-            <p className="text-[11px] text-gray-400 font-medium">Perlu penyesuaian unit kerja</p>
-          </div>
-        </div>
-
-        {/* 📚 PUSAT UNDUHAN TEMPLATE & SLA LAYANAN SISTEM */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-          <div className="md:col-span-2 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-sm border border-indigo-800/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-amber-300 flex items-center justify-center shrink-0">
-                <BookOpen size={22} />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black tracking-tight text-white">Pusat Template Dokumen &amp; SBU 2026</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">Baru</span>
-                </div>
-                <p className="text-[11px] text-slate-300 font-medium max-w-xl">
-                  Unduh template Excel RKA pengeluaran, TSV penerimaan, draf naskah dinas usulan pagu, dan pedoman SBU UGM 2026.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/panduan-template"
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap shadow-xs hover:shadow-indigo-500/25 shrink-0 cursor-pointer self-stretch sm:self-auto justify-center"
-            >
-              <span>Buka Dokumen</span>
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-2xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Performa &amp; SLA Layanan</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <div className="my-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-gray-900">&lt; 24 Jam</span>
-                <span className="text-xs font-bold text-emerald-600">Kecepatan Standar</span>
-              </div>
-              <p className="text-[11px] text-gray-400 mt-0.5">SOP telaah usulan anggaran terintegrasi</p>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-emerald-500 h-1.5 rounded-full w-[96%]" />
-            </div>
-          </div>
         </div>
       </div>
 
@@ -906,7 +907,7 @@ export default function PremiumDashboard() {
       </div>
 
       {/* QUICK SEARCH & SECTION HEADER */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
+      <div id="katalog-menu-section" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2 scroll-mt-6">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">

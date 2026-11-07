@@ -57,28 +57,31 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
       setIsSearchingSurat(true);
       try {
         const cleanQ = query.trim();
-        const [analisisRes, docsRes] = await Promise.all([
-          supabase
-            .from('app_analisis_utama')
-            .select('id_analisis, no_surat, unit_pengirim, perihal, total_anggaran, keputusan, subyek_persuratan_simaster')
-            .or(`no_surat.ilike.%${cleanQ}%,unit_pengirim.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,subyek_persuratan_simaster.ilike.%${cleanQ}%`)
-            .limit(8),
-          supabase
-            .from('documents')
-            .select('id, nomor_surat, perihal, unit_kerja, jenis_dokumen, penandatangan, pihak_terkait')
-            .or(`nomor_surat.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,unit_kerja.ilike.%${cleanQ}%,penandatangan.ilike.%${cleanQ}%,pihak_terkait.ilike.%${cleanQ}%`)
-            .limit(8)
-        ]);
-
         const items: CommandItem[] = [];
 
-        if (analisisRes.data) {
-          analisisRes.data.forEach((row: any) => {
+        // Gunakan Promise.allSettled agar pencarian mandiri dan tidak saling menggagalkan
+        const [analisisRes, docsRes] = await Promise.allSettled([
+          supabase
+            .from('app_analisis_utama')
+            .select('id_analisis, no_surat, unit_pengirim, perihal, total_anggaran, keputusan, nama_penandatangan')
+            .or(`no_surat.ilike.%${cleanQ}%,unit_pengirim.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%`)
+            .limit(10),
+          supabase
+            .from('app_documents')
+            .select('id, nomor_surat, perihal, unit_kerja, jenis_dokumen, keterangan')
+            .or(`nomor_surat.ilike.%${cleanQ}%,perihal.ilike.%${cleanQ}%,keterangan.ilike.%${cleanQ}%`)
+            .limit(10)
+        ]);
+
+        if (analisisRes.status === 'fulfilled' && analisisRes.value.data) {
+          analisisRes.value.data.forEach((row: any) => {
+            const pengirim = row.unit_pengirim || 'Unit UGM';
+            const perihal = row.perihal || 'Usulan Pagu Tambahan';
             items.push({
               id: `analisis-${row.id_analisis}`,
               title: row.no_surat ? `Surat Usulan: ${row.no_surat}` : `Usulan Pagu #${row.id_analisis.slice(0, 8)}`,
               category: 'Surat & Usulan Anggaran',
-              subtitle: `${row.unit_pengirim || 'Unit UGM'} • ${row.perihal || 'Usulan Pagu Tambahan'}`,
+              subtitle: `${pengirim} • ${perihal}`,
               icon: <FileSpreadsheet className="w-4 h-4 text-emerald-600" />,
               path: `/analisis/presentasi/${row.id_analisis}?mode=view`,
               badge: row.keputusan || 'Usulan Pagu'
@@ -86,14 +89,15 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
           });
         }
 
-        if (docsRes.data) {
-          docsRes.data.forEach((row: any) => {
-            const extra = [row.unit_kerja, row.penandatangan].filter(Boolean).join(' • ');
+        if (docsRes.status === 'fulfilled' && docsRes.value.data) {
+          docsRes.value.data.forEach((row: any) => {
+            const unit = row.unit_kerja || 'Arsip Resmi';
+            const perihal = row.perihal || row.keterangan || 'Arsip Dokumen';
             items.push({
               id: `doc-${row.id}`,
               title: `Arsip Surat: ${row.nomor_surat}`,
               category: 'Surat & Usulan Anggaran',
-              subtitle: `${extra || 'Dokumen Resmi'} • ${row.perihal || 'Arsip Dokumen'}`,
+              subtitle: `${unit} • ${perihal}`,
               icon: <FileText className="w-4 h-4 text-indigo-600" />,
               path: `/dokumen?q=${encodeURIComponent(row.nomor_surat)}`,
               badge: row.jenis_dokumen || 'Arsip Surat'

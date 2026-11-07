@@ -103,6 +103,7 @@ const groupIconMap: Record<string, any> = {
   'Master': Database,
   'Anggaran & RKAT': PieChart,
   'Anggaran': PieChart,
+  'Catatan Khusus': FileSpreadsheet,
   'Review Anggaran': ShieldCheck,
   'Input Form': FileEdit,
   'Manajemen Kegiatan': Calendar,
@@ -344,52 +345,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
            </button>
         </div>
 
-        {/* MODUL SWITCHER (WORKSPACE PILL FILTER) */}
-        {!isCollapsed && (
-          <div className="px-3 pt-2 pb-1 border-b border-gray-100 dark:border-slate-800">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-              {(() => {
-                const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
-                const allWs = [
-                  { id: 'ALL', label: 'Semua', icon: Layers, groups: [] },
-                  { id: 'ANGGARAN', label: 'Anggaran & RKAT', icon: PieChart, groups: ['Anggaran & RKAT', 'Anggaran'] },
-                  { id: 'DIPA', label: 'DIPA & RKA', icon: Landmark, groups: ['DIPA Rupiah Murni', 'Review Anggaran', 'RKA', 'Penerimaan', 'Dana Pemerintah'] },
-                  { id: 'PERSURATAN', label: 'Persuratan', icon: Mail, groups: ['Persuratan', 'Manajemen Kegiatan'] },
-                  { id: 'MASJID', label: 'Masjid', icon: Building2, groups: ['Masjid'] },
-                  { id: 'MASTER', label: 'Master', icon: Database, groups: ['Master'] },
-                ];
-
-                return allWs.filter(ws => {
-                  if (ws.id === 'ALL') return true;
-                  if (isAdmin) return true;
-                  return menuList.some(m => {
-                    if (!ws.groups.includes(m.group || '')) return false;
-                    return allowedPaths.includes(m.path) || (m.roles && m.roles.map(r => r.toLowerCase()).includes(userRole.toLowerCase()));
-                  });
-                });
-              })().map((ws) => {
-                const isWsActive = selectedWorkspace === ws.id;
-                const WsIcon = ws.icon;
-                return (
-                  <button
-                    key={ws.id}
-                    type="button"
-                    onClick={() => handleSelectWorkspace(ws.id)}
-                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold whitespace-nowrap flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-                      isWsActive
-                        ? 'bg-indigo-600 text-white shadow-2xs'
-                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <WsIcon size={11} className={isWsActive ? 'text-white' : 'text-slate-400'} />
-                    <span>{ws.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Action Bar for Accordion (Visible when expanded) */}
         {!isCollapsed && (
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
@@ -563,7 +518,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
               acc[group].push(item);
               return acc;
             }, {} as Record<string, typeof menuList>)
-          ).filter(([group]) => isGroupInSelectedWorkspace(group))
+          )
           .map(([group, items]) => {
             // Filter items by role/access AND search query
             const visibleItems = items.filter(item => {

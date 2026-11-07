@@ -70,6 +70,10 @@ export const menuList: MenuItem[] = [
   { title: 'Editor HTML Surat', path: '/surat/editor-html', icon: 'FileCode', roles: ['ADMIN', 'STAFF', 'MANAGER'], group: 'Persuratan', hiddenInSidebar: true },
   { title: 'Laporan Arsip Surat', path: '/anggaran/laporan-surat', icon: 'BookOpen', roles: ['ADMIN', 'STAFF'], group: 'Persuratan', hiddenInSidebar: true },
   
+  // --- CATATAN KHUSUS & PENELITIAN ---
+  { title: 'Pengeluaran Penelitian', path: '/catatan-penelitian', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Catatan Khusus' },
+  { title: 'Laporan Pengeluaran', path: '/catatan-penelitian/laporan', icon: 'BarChart4', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Catatan Khusus' },
+
   // --- MASTER & PENGATURAN ---
   { title: 'Monitoring Aktivitas User', path: '/monitoring-user', icon: 'Activity', roles: ['ADMIN', 'MANAGER'], group: 'Master' },
   { title: 'Manajemen User', path: '/users', icon: 'Users', roles: ['ADMIN'], group: 'Master' },

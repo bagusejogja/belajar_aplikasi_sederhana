@@ -167,7 +167,7 @@ export async function POST(request: Request) {
 
         // Fallback jika kolom prop_alokasi_prosentase_unit, prop_alokasi_prosentase_universitas, atau versi_anggaran belum ada di database Supabase
         if (error && (
-          error.message?.includes('prop_alokasi_prosentase') || 
+          error.message?.includes('prop_alokasi_prosentase') ||
           error.details?.includes('prop_alokasi_prosentase') ||
           error.message?.includes('versi_anggaran') ||
           error.details?.includes('versi_anggaran')
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
 
     // Fallback jika kolom prop_alokasi_prosentase_unit / universitas / versi_anggaran belum ada
     if (error && (
-      error.message?.includes('prop_alokasi_prosentase') || 
+      error.message?.includes('prop_alokasi_prosentase') ||
       error.details?.includes('prop_alokasi_prosentase') ||
       error.message?.includes('versi_anggaran') ||
       error.details?.includes('versi_anggaran')

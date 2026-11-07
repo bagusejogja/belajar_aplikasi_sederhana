@@ -102,6 +102,8 @@ export default function DashboardLayout({
       case '/arsip-kegiatan': return 'Riwayat Dokumen';
       case '/design-system': return 'Standar UI / UX (Design System)';
       case '/panduan-template': return 'Panduan, SBU & Template Dokumen';
+      case '/catatan-penelitian': return 'Input Pengeluaran Penelitian';
+      case '/catatan-penelitian/laporan': return 'Laporan Pengeluaran Penelitian';
       case '/perubahan-rkat': return 'Cek Perubahan RKAT';
       default: return path.replace('/', '').replace(/-/g, ' ').toUpperCase() || 'Dashboard';
     }
