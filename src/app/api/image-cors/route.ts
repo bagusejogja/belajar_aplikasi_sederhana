@@ -88,12 +88,14 @@ export async function GET(request: Request) {
         'Cache-Control': 'public, max-age=31536000, immutable',
       };
 
-      if (filename) {
-        headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
-      } else if (download === 'true') {
-        headers['Content-Disposition'] = 'attachment';
+      if (download === 'true') {
+        headers['Content-Disposition'] = filename 
+          ? `attachment; filename="${encodeURIComponent(filename)}"` 
+          : 'attachment';
       } else {
-        headers['Content-Disposition'] = 'inline';
+        headers['Content-Disposition'] = filename 
+          ? `inline; filename="${encodeURIComponent(filename)}"` 
+          : 'inline';
       }
 
       return new NextResponse(byteArray as any, { headers });
@@ -116,12 +118,14 @@ export async function GET(request: Request) {
       'Cache-Control': 'public, max-age=31536000, immutable',
     };
 
-    if (filename) {
-      headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(filename)}"`;
-    } else if (download === 'true') {
-      headers['Content-Disposition'] = 'attachment';
+    if (download === 'true') {
+      headers['Content-Disposition'] = filename 
+        ? `attachment; filename="${encodeURIComponent(filename)}"` 
+        : 'attachment';
     } else {
-      headers['Content-Disposition'] = 'inline';
+      headers['Content-Disposition'] = filename 
+        ? `inline; filename="${encodeURIComponent(filename)}"` 
+        : 'inline';
     }
 
     return new NextResponse(arrayBuffer, { headers });

@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PersuratanTabs from '@/components/PersuratanTabs';
-import { getSafeFileUrl } from '@/lib/fileHelper';
+import { getSafeFileUrl, getDownloadSafeFileUrl } from '@/lib/fileHelper';
 import * as XLSX from 'xlsx';
 
 interface DocumentItem {
@@ -174,6 +174,7 @@ export default function DokumenPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
+  const [previewFileModal, setPreviewFileModal] = useState<{ url: string; name: string } | null>(null);
 
   // Form State
   const [formJenis, setFormJenis] = useState('Surat Keputusan (SK)');
@@ -1291,15 +1292,14 @@ NOTIFY pgrst, 'reload schema';`;
                       <td className="py-3 px-5 text-center align-top pt-3">
                         <div className="flex items-center justify-center gap-1.5">
                           {doc.file_url ? (
-                            <a
-                              href={getSafeFileUrl(doc.file_url, doc.file_name || undefined)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs"
-                              title={`Unduh / Buka Berkas: ${doc.file_name || 'Lampiran'}`}
+                            <button
+                              type="button"
+                              onClick={() => setPreviewFileModal({ url: doc.file_url!, name: doc.file_name || doc.nomor_surat || 'Dokumen' })}
+                              className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs cursor-pointer"
+                              title={`Lihat Pratinjau Berkas: ${doc.file_name || 'Lampiran'}`}
                             >
                               <Paperclip className="w-3.5 h-3.5" />
-                            </a>
+                            </button>
                           ) : null}
 
                           {doc.link_eksternal ? (
@@ -1323,30 +1323,23 @@ NOTIFY pgrst, 'reload schema';`;
                       {/* Aksi */}
                       <td className="py-3 px-5 text-center align-top pt-3">
                         <div className="flex items-center justify-center gap-1">
-                          <Link
-                            href={`/analisis?no_surat=${encodeURIComponent(doc.nomor_surat || '')}&unit=${encodeURIComponent(doc.unit_kerja || '')}&perihal=${encodeURIComponent(doc.perihal || '')}&tgl=${encodeURIComponent(doc.tanggal_surat || '')}`}
-                            className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Buat Analisis Usulan Pagu dari Surat Ini"
-                          >
-                            <Sparkles className="w-4 h-4 text-amber-500" />
-                          </Link>
                           <button
                             onClick={() => handleOpenDetail(doc)}
-                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
                             title="Detail Dokumen"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleOpenEdit(doc)}
-                            className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit Dokumen"
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(doc.id)}
-                            className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Hapus Dokumen"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1568,15 +1561,14 @@ NOTIFY pgrst, 'reload schema';`;
                 <span className="text-xs font-bold text-indigo-900 block">Lampiran & Akses Berkas</span>
                 <div className="flex flex-wrap gap-2">
                   {selectedDoc.file_url ? (
-                    <a
-                      href={getSafeFileUrl(selectedDoc.file_url, selectedDoc.file_name || undefined)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-xs"
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFileModal({ url: selectedDoc.file_url!, name: selectedDoc.file_name || selectedDoc.nomor_surat || 'Dokumen' })}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold hover:bg-indigo-700 transition-colors shadow-xs cursor-pointer"
                     >
-                      <Download className="w-4 h-4" />
-                      <span>Buka File Lampiran ({selectedDoc.file_name || 'Dokumen'})</span>
-                    </a>
+                      <Eye className="w-4 h-4" />
+                      <span>Lihat Pratinjau File ({selectedDoc.file_name || 'Dokumen'})</span>
+                    </button>
                   ) : null}
 
                   {selectedDoc.link_eksternal ? (
@@ -1611,15 +1603,6 @@ NOTIFY pgrst, 'reload schema';`;
                   <Edit3 className="w-3.5 h-3.5" />
                   <span>Edit Dokumen</span>
                 </button>
-
-                <Link
-                  href={`/analisis?no_surat=${encodeURIComponent(selectedDoc.nomor_surat || '')}&unit=${encodeURIComponent(selectedDoc.unit_kerja || '')}&perihal=${encodeURIComponent(selectedDoc.perihal || '')}&tgl=${encodeURIComponent(selectedDoc.tanggal_surat || '')}`}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                  title="Buat telaah analisis tambah pagu langsung dari data surat ini"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Buat Analisis Usulan Pagu</span>
-                </Link>
               </div>
 
               <button
@@ -1628,6 +1611,111 @@ NOTIFY pgrst, 'reload schema';`;
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL POPUP PRATINJAU FILE (PDF / GAMBAR) */}
+      {previewFileModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-200">
+            {/* Header */}
+            <div className="p-4 px-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/70">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="truncate">
+                  <h4 className="text-xs sm:text-sm font-black text-gray-900 truncate">
+                    {previewFileModal.name}
+                  </h4>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    Pratinjau Dokumen Lampiran Resmi
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={getSafeFileUrl(previewFileModal.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-50 transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Buka di Tab Baru"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Buka Tab Baru</span>
+                </a>
+                <a
+                  href={getDownloadSafeFileUrl(previewFileModal.url, previewFileModal.name)}
+                  download
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Unduh File"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Unduh</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewFileModal(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
+                  title="Tutup Pratinjau"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 p-3 sm:p-5 overflow-auto bg-slate-950/5 flex items-center justify-center min-h-[60vh]">
+              {(() => {
+                const urlClean = previewFileModal.url.split('?')[0].toLowerCase();
+                const isPdf = urlClean.endsWith('.pdf') || previewFileModal.name.toLowerCase().endsWith('.pdf');
+                const isImg = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(urlClean) || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(previewFileModal.name);
+
+                if (isPdf) {
+                  return (
+                    <iframe
+                      src={getSafeFileUrl(previewFileModal.url)}
+                      className="w-full h-[76vh] rounded-2xl border border-gray-200 shadow-inner bg-white"
+                      title={previewFileModal.name}
+                    />
+                  );
+                }
+
+                if (isImg) {
+                  return (
+                    <div className="bg-slate-950 rounded-2xl p-2 w-full h-full flex items-center justify-center max-h-[76vh] overflow-hidden">
+                      <img
+                        src={getSafeFileUrl(previewFileModal.url)}
+                        alt={previewFileModal.name}
+                        className="max-h-[74vh] max-w-full object-contain mx-auto rounded-lg shadow-lg"
+                      />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="text-center p-8 bg-white rounded-2xl border border-gray-200 max-w-md shadow-xs space-y-3">
+                    <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+                      <FileText className="w-7 h-7" />
+                    </div>
+                    <h5 className="text-sm font-black text-gray-800">{previewFileModal.name}</h5>
+                    <p className="text-xs text-gray-500">
+                      Format file ini dapat diunduh atau dibuka secara langsung melalui browser.
+                    </p>
+                    <div className="flex items-center justify-center gap-2 pt-2">
+                      <a
+                        href={getDownloadSafeFileUrl(previewFileModal.url, previewFileModal.name)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition"
+                      >
+                        Unduh Berkas
+                      </a>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
