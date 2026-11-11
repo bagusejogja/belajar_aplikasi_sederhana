@@ -733,18 +733,6 @@ function InputMakPageContent() {
             <p className="text-gray-500 font-medium max-w-lg text-sm leading-relaxed border-l-4 border-indigo-200 pl-4">
               Form ini untuk pengajuan perubahan data sesuai hasil verifikasi. Harap lengkapi dengan dokumen pendukungnya.
             </p>
-            <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
-              <span className="text-xs font-bold text-gray-500">Pilihan Formulir:</span>
-              <span className="px-3 py-1 rounded-xl bg-indigo-600 text-white text-xs font-black shadow-2xs">
-                Form Tolakan Verifikator (Point 1 - 6)
-              </span>
-              <Link
-                href="/input-rkat"
-                className="px-3 py-1 rounded-xl bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-gray-700 text-xs font-bold transition-all shadow-2xs"
-              >
-                Form Perubahan RKAT Mandiri (Point 1, 2, 3 &amp; 6) →
-              </Link>
-            </div>
           </div>
         </div>
 
