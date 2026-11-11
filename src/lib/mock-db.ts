@@ -96,6 +96,7 @@ export const menuList: MenuItem[] = [
   { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'TrendingUp', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
   { title: 'Sinkronisasi Pagu Finance', path: '/copas-pagu', icon: 'Database', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran', 'MANAGER'], group: 'Anggaran & RKAT' },
   { title: 'Koreksi & Verifikasi MAK', path: '/anggaran/mak', icon: 'ShieldCheck', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
+  { title: 'Pengajuan Perubahan RKAT', path: '/input-rkat', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
   { title: 'Pengajuan Revisi MAK Unit', path: '/input-mak', icon: 'FileEdit', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
   { title: 'Revisi Terjadwal', path: '/anggaran/usulan', icon: 'Calendar', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
   { title: 'Form Revisi Terjadwal', path: '/input-form', icon: 'FileText', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT', hiddenInSidebar: true },

@@ -95,6 +95,8 @@ export default function DashboardLayout({
       case '/analisis': return 'Analisis Usulan Tambah Pagu';
       case '/copas-pagu': return 'Sinkronisasi Pagu Finance';
       case '/anggaran/mak': return 'Koreksi & Verifikasi MAK';
+      case '/input-rkat': return 'Pengajuan Perubahan RKAT';
+      case '/pengajuan-rkat': return 'Pengajuan Perubahan RKAT';
       case '/input-mak': return 'Pengajuan Revisi MAK Unit';
       case '/anggaran/usulan': return 'Revisi Terjadwal';
       case '/backup': return 'Backup & Restore Database';
