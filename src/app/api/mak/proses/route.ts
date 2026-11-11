@@ -66,16 +66,17 @@ export async function POST(req: NextRequest) {
 
         // Ambil info PIC dari submission atau gov_pics
         const picName = submission.pic || 'Verifikator Anggaran';
+        const jenisPengajuan = submission.kategori || 'Revisi MAK';
 
         await transporter.sendMail({
           from: `"Verifikasi Anggaran UGM" <${process.env.EMAIL_USER}>`,
           to: emailTarget,
-          subject: `[TUNTAS] Pengajuan Revisi MAK Unit ${submission.unit} (Tahun ${submission.tahun}) Telah Selesai`,
+          subject: `[TUNTAS] Pengajuan ${jenisPengajuan} Unit ${submission.unit} (Tahun ${submission.tahun}) Telah Selesai`,
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1e293b; background-color: #f8fafc; padding: 20px;">
               <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); padding: 32px; border-radius: 16px 16px 0 0; color: white; text-align: center;">
                 <div style="font-size: 36px; margin-bottom: 8px;">🎉</div>
-                <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">Pengajuan Revisi MAK Telah Selesai</h1>
+                <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em;">Pengajuan ${jenisPengajuan} Telah Selesai</h1>
                 <p style="margin: 8px 0 0; opacity: 0.9; font-size: 13px;">Pemberitahuan Resmi Sistem Informasi Verifikasi Anggaran</p>
               </div>
 

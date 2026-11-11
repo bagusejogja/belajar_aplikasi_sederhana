@@ -120,6 +120,7 @@ export default function MonitoringMakPage() {
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
   const [filterUnit, setFilterUnit] = useState('');
   const [filterPIC, setFilterPIC] = useState('');
+  const [filterKategori, setFilterKategori] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   
   // Paging
@@ -324,9 +325,11 @@ export default function MonitoringMakPage() {
       const matchTahun = filterTahun === '' || String(row.tahun) === filterTahun;
       const matchUnit = filterUnit === '' || row.unit === filterUnit;
       const matchPIC = filterPIC === '' || row.pic === filterPIC;
-      return matchSearch && matchTahun && matchUnit && matchPIC;
+      const rowKategori = row.kategori || 'Perubahan MAK';
+      const matchKategori = filterKategori === 'ALL' || rowKategori === filterKategori;
+      return matchSearch && matchTahun && matchUnit && matchPIC && matchKategori;
     });
-  }, [data, search, filterTahun, filterUnit, filterPIC]);
+  }, [data, search, filterTahun, filterUnit, filterPIC, filterKategori]);
 
   const filtered = useMemo(() => {
     return baseFiltered.filter(row => {
@@ -464,7 +467,7 @@ export default function MonitoringMakPage() {
   }, [filtered, currentPage, itemsPerPage]);
 
   // Reset page when filters change
-  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC, filterStatus, itemsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [search, filterTahun, filterUnit, filterPIC, filterKategori, filterStatus, itemsPerPage]);
 
   const total = baseFiltered.length;
   const selesai = baseFiltered.filter(d => d.status === 'Selesai').length;
@@ -1558,13 +1561,26 @@ export default function MonitoringMakPage() {
             </select>
           </div>
 
-          {(search || filterUnit || filterPIC || filterStatus !== 'ALL') && (
+          <div className="w-full md:w-48">
+            <select 
+              value={filterKategori}
+              onChange={(e) => setFilterKategori(e.target.value)}
+              className="w-full h-9 px-3 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+            >
+              <option value="ALL">Semua Jenis Layanan</option>
+              <option value="Perubahan RKAT">📊 Perubahan RKAT</option>
+              <option value="Perubahan MAK">📝 Tolakan Verifikator (MAK)</option>
+            </select>
+          </div>
+
+          {(search || filterUnit || filterPIC || filterKategori !== 'ALL' || filterStatus !== 'ALL') && (
             <button
               type="button"
               onClick={() => {
                 setSearch('');
                 setFilterUnit('');
                 setFilterPIC('');
+                setFilterKategori('ALL');
                 setFilterStatus('ALL');
               }}
               className="h-9 px-3 rounded-xl border border-gray-200 hover:bg-gray-100 text-gray-600 text-xs font-bold flex items-center gap-1 transition-all"
@@ -1634,6 +1650,15 @@ export default function MonitoringMakPage() {
                             {row.tahun && (
                               <span className="shrink-0 px-1.5 py-0.2 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded text-[9px] font-black uppercase">
                                 {row.tahun}
+                              </span>
+                            )}
+                            {row.kategori === 'Perubahan RKAT' ? (
+                              <span className="shrink-0 px-1.5 py-0.2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded text-[9px] font-black uppercase">
+                                📊 Perubahan RKAT
+                              </span>
+                            ) : (
+                              <span className="shrink-0 px-1.5 py-0.2 bg-amber-50 border border-amber-200 text-amber-800 rounded text-[9px] font-black uppercase">
+                                📝 Tolakan Verifikator
                               </span>
                             )}
                           </div>
