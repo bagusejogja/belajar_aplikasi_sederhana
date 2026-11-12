@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   FileText, CheckCircle2, Clock, Loader2, Search, 
@@ -8,7 +9,7 @@ import {
   Filter, Calendar, BarChart3, Database, Building2, Eye,
   Users, UserCheck, Award, Zap, TrendingUp, TrendingDown, ArrowRight,
   RotateCcw, Sparkles, Check, CheckCheck, Copy, ChevronDown, ChevronUp, AlertCircle,
-  FileSpreadsheet, Layers, DollarSign, Info, X, Link2,
+  FileSpreadsheet, Layers, DollarSign, Info, X, Link2, Target,
   PieChart as PieChartIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
@@ -115,13 +116,25 @@ export default function MonitoringMakPage() {
   const [activeTab, setActiveTab] = useState<'pic-report' | 'table' | 'chart'>('pic-report');
   const [pieViewMode, setPieViewMode] = useState<'unit' | 'status'>('unit');
   
-  // Filters
+  // Main Section Tab: Tolakan Verifikator MAK vs Pengajuan Perubahan RKAT
+  const [mainSection, setMainSection] = useState<'tolakan-mak' | 'pengajuan-rkat'>('tolakan-mak');
+
+  // Filters (Tolakan MAK)
   const [search, setSearch] = useState('');
   const [filterTahun, setFilterTahun] = useState(new Date().getFullYear().toString());
   const [filterUnit, setFilterUnit] = useState('');
   const [filterPIC, setFilterPIC] = useState('');
   const [filterKategori, setFilterKategori] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
+  // Filters & State (Pengajuan Perubahan RKAT)
+  const [rkatSearch, setRkatSearch] = useState('');
+  const [rkatFilterTahun, setRkatFilterTahun] = useState<string>('ALL');
+  const [rkatFilterStatus, setRkatFilterStatus] = useState<string>('ALL');
+  const [rkatFilterSurat, setRkatFilterSurat] = useState<string>('ALL');
+  const [rkatUpdatingId, setRkatUpdatingId] = useState<number | null>(null);
+  const [rkatCurrentPage, setRkatCurrentPage] = useState(1);
+  const [rkatItemsPerPage, setRkatItemsPerPage] = useState(25);
   
   // Paging
   const [currentPage, setCurrentPage] = useState(1);
@@ -318,14 +331,106 @@ export default function MonitoringMakPage() {
     }
   };
 
+  const formatDateTimeId = (isoStr?: string | null) => {
+    if (!isoStr) return '-';
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }) + ' WIB';
+    } catch {
+      return isoStr;
+    }
+  };
+
+  const handleUpdateRkatStatus = async (id: number, action: 'proses' | 'unproses' | 'surat' | 'unsurat') => {
+    setRkatUpdatingId(id);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/rkat/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const actLabel = action === 'proses' ? 'ditandai Sudah Diproses' : action === 'surat' ? 'ditandai Surat Sudah Ada' : 'dibatalkan';
+        setSuccessMsg(`Pengajuan RKAT berhasil ${actLabel} (jam tercatat).`);
+        await fetchData();
+        setTimeout(() => setSuccessMsg(''), 5000);
+      } else {
+        setErrorMsg(json.error || 'Gagal memperbarui status pengajuan RKAT');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg('Terjadi kesalahan koneksi: ' + err.message);
+    } finally {
+      setRkatUpdatingId(null);
+    }
+  };
+
+  // 🔵 PISAHKAN DATA PENGAJUAN RKAT
+  const rkatSubmissions = useMemo(() => {
+    return data.filter(row => row.kategori === 'Perubahan RKAT');
+  }, [data]);
+
+  const filteredRkatSubmissions = useMemo(() => {
+    return rkatSubmissions.filter(row => {
+      const q = rkatSearch.toLowerCase();
+      const matchSearch = 
+        !q ||
+        (row.unit || '').toLowerCase().includes(q) ||
+        (row.pic || '').toLowerCase().includes(q) ||
+        (row.email || '').toLowerCase().includes(q) ||
+        (row.catatan || '').toLowerCase().includes(q) ||
+        String(row.tahun || '').includes(q);
+      const matchTahun = rkatFilterTahun === 'ALL' || String(row.tahun) === rkatFilterTahun;
+
+      const isSelesai = row.status === 'Selesai';
+      const matchStatus = 
+        rkatFilterStatus === 'ALL' ||
+        (rkatFilterStatus === 'Selesai' && isSelesai) ||
+        (rkatFilterStatus === 'PROSES' && !isSelesai);
+
+      const suratStatus = row.surat_status || row.rka_selisih_data?._rkat_meta?.surat_status || 'Belum Ada';
+      const matchSurat = 
+        rkatFilterSurat === 'ALL' ||
+        (rkatFilterSurat === 'Sudah Ada' && suratStatus === 'Sudah Ada') ||
+        (rkatFilterSurat === 'Belum Ada' && suratStatus !== 'Sudah Ada');
+
+      return matchSearch && matchTahun && matchStatus && matchSurat;
+    });
+  }, [rkatSubmissions, rkatSearch, rkatFilterTahun, rkatFilterStatus, rkatFilterSurat]);
+
+  const rkatTotalPages = rkatItemsPerPage === -1 ? 1 : Math.ceil(filteredRkatSubmissions.length / rkatItemsPerPage) || 1;
+  const paginatedRkatData = useMemo(() => {
+    if (rkatItemsPerPage === -1) return filteredRkatSubmissions;
+    const start = (rkatCurrentPage - 1) * rkatItemsPerPage;
+    return filteredRkatSubmissions.slice(start, start + rkatItemsPerPage);
+  }, [filteredRkatSubmissions, rkatCurrentPage, rkatItemsPerPage]);
+
+  const rkatTotal = rkatSubmissions.length;
+  const rkatSelesai = rkatSubmissions.filter(d => d.status === 'Selesai').length;
+  const rkatProses = rkatSubmissions.filter(d => d.status !== 'Selesai').length;
+  const rkatSuratAda = rkatSubmissions.filter(d => (d.surat_status || d.rka_selisih_data?._rkat_meta?.surat_status) === 'Sudah Ada').length;
+
   const baseFiltered = useMemo(() => {
     return data.filter(row => {
+      const rowKategori = row.kategori || 'Perubahan MAK';
+      // Murni Tolakan MAK: tidak dicampur dengan Perubahan RKAT
+      if (rowKategori === 'Perubahan RKAT') return false;
+
       const q = search.toLowerCase();
       const matchSearch = row.unit?.toLowerCase().includes(q) || row.pic?.toLowerCase().includes(q) || String(row.tahun).includes(q);
       const matchTahun = filterTahun === '' || String(row.tahun) === filterTahun;
       const matchUnit = filterUnit === '' || row.unit === filterUnit;
       const matchPIC = filterPIC === '' || row.pic === filterPIC;
-      const rowKategori = row.kategori || 'Perubahan MAK';
       const matchKategori = filterKategori === 'ALL' || rowKategori === filterKategori;
       return matchSearch && matchTahun && matchUnit && matchPIC && matchKategori;
     });
@@ -726,6 +831,72 @@ export default function MonitoringMakPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
+      {/* 🔴 TAB SWITCHER UTAMA: TOLAKAN VERIFIKATOR MAK vs PENGAJUAN PERUBAHAN RKAT */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/90 backdrop-blur-md p-2.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMainSection('tolakan-mak')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              mainSection === 'tolakan-mak'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-200 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <ClipboardList size={15} />
+            <span>Tolakan Verifikator (MAK)</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              mainSection === 'tolakan-mak' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {data.filter(r => (r.kategori || 'Perubahan MAK') !== 'Perubahan RKAT').length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainSection('pengajuan-rkat')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              mainSection === 'pengajuan-rkat'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <FileSpreadsheet size={15} />
+            <span>Pengajuan Perubahan RKAT</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              mainSection === 'pengajuan-rkat' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+            }`}>
+              {rkatSubmissions.length}
+            </span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/input-rkat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+            title="Buka formulir pengajuan perubahan RKAT mandiri tanpa login"
+          >
+            <ExternalLink size={12} className="text-blue-600" />
+            <span>Form Publik RKAT</span>
+          </Link>
+          <Link
+            href="/iku"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+            title="Buka kamus pemetaan referensi IKU publik tanpa login"
+          >
+            <Target size={12} />
+            <span>Katalog IKU</span>
+          </Link>
+        </div>
+      </div>
+
+      {mainSection === 'tolakan-mak' ? (
+        <>
       {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex items-center gap-3.5">
@@ -1930,6 +2101,546 @@ export default function MonitoringMakPage() {
           </div>
         )}
       </div>
+      </>
+      ) : (
+      /* 🔵 TAMPILAN KHUSUS: TAB PENGAJUAN PERUBAHAN RKAT (MURNI TANPA TOLAKAN MAK) */
+      <div className="space-y-4">
+        {/* ROW 1: BANNER EXECUTIVE RKAT */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-200/60 shrink-0">
+              <FileSpreadsheet size={22} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-blue-50 text-blue-700 font-extrabold uppercase tracking-wider text-[10px] px-2.5 py-0.5 rounded-md border border-blue-200/80">
+                  PENGAJUAN PERUBAHAN RKAT
+                </span>
+                <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">
+                  Rekapitulasi Pengajuan Perubahan RKAT
+                </h1>
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
+                  {filteredRkatSubmissions.length} Berkas ({rkatFilterTahun === 'ALL' ? 'Semua Tahun' : rkatFilterTahun})
+                </span>
+              </div>
+              <p className="text-gray-500 font-medium text-xs mt-1">
+                Data usulan perubahan RKAT dari form mandiri publik, audit SLA respon, tombol proses &amp; kesiapan surat dengan catatan jam akurat.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+            <Link
+              href="/input-rkat"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-9 px-3.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <ExternalLink size={13} />
+              <span>Buka Form Input RKAT</span>
+            </Link>
+            <button 
+              onClick={fetchData}
+              className="h-9 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+              title="Muat ulang data pengajuan RKAT dari database"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ROW 2: 4 KPI CARDS RKAT */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div 
+            onClick={() => setRkatFilterStatus('ALL')}
+            className={`bg-gradient-to-br from-blue-500/10 via-blue-50/40 to-white border border-blue-200 rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
+              rkatFilterStatus === 'ALL' ? 'ring-2 ring-blue-600 shadow-md' : 'hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 block mb-1">
+                  TOTAL PENGAJUAN RKAT
+                </span>
+                <div className="text-2xl font-black font-mono text-blue-950">
+                  {rkatTotal} <span className="text-xs font-semibold text-slate-500 font-sans">Berkas</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-blue-100 text-blue-700 border border-blue-200">
+                <Layers size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-blue-100 pt-2 text-blue-700">
+              <span>Semua Usulan RKAT</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-blue-100 text-blue-800">
+                100%
+              </span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setRkatFilterStatus(rkatFilterStatus === 'PROSES' ? 'ALL' : 'PROSES')}
+            className={`bg-gradient-to-br from-amber-500/10 via-amber-50/40 to-white border border-amber-200 rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
+              rkatFilterStatus === 'PROSES' ? 'ring-2 ring-amber-500 shadow-md' : 'hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 block mb-1">
+                  MENUNGGU PROSES
+                </span>
+                <div className="text-2xl font-black font-mono text-amber-950">
+                  {rkatProses} <span className="text-xs font-semibold text-slate-500 font-sans">Pending</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-700 border border-amber-200">
+                <Clock size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-amber-100 pt-2 text-amber-700">
+              <span>Belum Selesai</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-amber-100 text-amber-800">
+                {rkatTotal > 0 ? `${Math.round((rkatProses / rkatTotal) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setRkatFilterStatus(rkatFilterStatus === 'Selesai' ? 'ALL' : 'Selesai')}
+            className={`bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white border border-emerald-200 rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
+              rkatFilterStatus === 'Selesai' ? 'ring-2 ring-emerald-500 shadow-md' : 'hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 block mb-1">
+                  SUDAH DIPROSES
+                </span>
+                <div className="text-2xl font-black font-mono text-emerald-950">
+                  {rkatSelesai} <span className="text-xs font-semibold text-slate-500 font-sans">Tuntas</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-emerald-100 pt-2 text-emerald-700">
+              <span>Tercatat Jam &amp; Tgl</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-800">
+                {rkatTotal > 0 ? `${Math.round((rkatSelesai / rkatTotal) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+
+          <div 
+            onClick={() => setRkatFilterSurat(rkatFilterSurat === 'Sudah Ada' ? 'ALL' : 'Sudah Ada')}
+            className={`bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white border border-indigo-200 rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
+              rkatFilterSurat === 'Sudah Ada' ? 'ring-2 ring-indigo-600 shadow-md' : 'hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 block mb-1">
+                  SURAT SUDAH ADA
+                </span>
+                <div className="text-2xl font-black font-mono text-indigo-950">
+                  {rkatSuratAda} <span className="text-xs font-semibold text-slate-500 font-sans">Siap</span>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-indigo-100 text-indigo-700 border border-indigo-200">
+                <FileText size={18} />
+              </div>
+            </div>
+            <div className="mt-3 text-xs font-bold flex items-center justify-between border-t border-indigo-100 pt-2 text-indigo-700">
+              <span>Surat Pengantar Siap</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-indigo-100 text-indigo-800">
+                {rkatTotal > 0 ? `${Math.round((rkatSuratAda / rkatTotal) * 100)}%` : '0%'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 3: TOOLBAR FILTER & SEARCH */}
+        <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-4 space-y-3">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={rkatSearch}
+                onChange={e => {
+                  setRkatSearch(e.target.value);
+                  setRkatCurrentPage(1);
+                }}
+                placeholder="Cari pengajuan RKAT (nama unit, nama PIC, email, alasan perubahan)..."
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all"
+              />
+              {rkatSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRkatSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Dropdowns */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Tahun */}
+              <select
+                value={rkatFilterTahun}
+                onChange={e => {
+                  setRkatFilterTahun(e.target.value);
+                  setRkatCurrentPage(1);
+                }}
+                className="h-9 px-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                <option value="ALL">Semua Tahun</option>
+                {Array.from(new Set(rkatSubmissions.map(r => String(r.tahun)).filter(Boolean))).sort().reverse().map(t => (
+                  <option key={t} value={t}>Tahun {t}</option>
+                ))}
+              </select>
+
+              {/* Filter Status Proses */}
+              <select
+                value={rkatFilterStatus}
+                onChange={e => {
+                  setRkatFilterStatus(e.target.value);
+                  setRkatCurrentPage(1);
+                }}
+                className="h-9 px-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                <option value="ALL">Semua Status Proses</option>
+                <option value="PROSES">Menunggu Proses</option>
+                <option value="Selesai">Sudah Diproses</option>
+              </select>
+
+              {/* Filter Status Surat */}
+              <select
+                value={rkatFilterSurat}
+                onChange={e => {
+                  setRkatFilterSurat(e.target.value);
+                  setRkatCurrentPage(1);
+                }}
+                className="h-9 px-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                <option value="ALL">Semua Status Surat</option>
+                <option value="Sudah Ada">Surat Sudah Ada</option>
+                <option value="Belum Ada">Surat Belum Ada</option>
+              </select>
+
+              {(rkatSearch || rkatFilterTahun !== 'ALL' || rkatFilterStatus !== 'ALL' || rkatFilterSurat !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRkatSearch('');
+                    setRkatFilterTahun('ALL');
+                    setRkatFilterStatus('ALL');
+                    setRkatFilterSurat('ALL');
+                    setRkatCurrentPage(1);
+                  }}
+                  className="h-9 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all"
+                >
+                  Reset Filter
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 4: TABEL REKAPITULASI PENGAJUAN RKAT */}
+        <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+          <div className="p-4 px-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/50">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-black text-gray-900 tracking-tight">
+                  Daftar Berkas Pengajuan Perubahan RKAT
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                  {filteredRkatSubmissions.length} Berkas
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                Pencatatan waktu proses, verifikasi selisih RKA, dan kesiapan surat pengantar per usulan.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
+              <span>Per Halaman:</span>
+              <select
+                value={rkatItemsPerPage}
+                onChange={e => {
+                  setRkatItemsPerPage(Number(e.target.value));
+                  setRkatCurrentPage(1);
+                }}
+                className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={-1}>Semua</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-gray-200 text-gray-600 font-black text-[11px] uppercase tracking-wider">
+                  <th className="py-3 px-3 text-center w-12">No</th>
+                  <th className="py-3 px-4 min-w-[150px]">Waktu Masuk</th>
+                  <th className="py-3 px-4 min-w-[220px]">Unit Kerja &amp; PIC</th>
+                  <th className="py-3 px-4 min-w-[200px]">Alasan Perubahan</th>
+                  <th className="py-3 px-4 min-w-[190px]">Selisih RKA &amp; Berkas</th>
+                  <th className="py-3 px-4 min-w-[200px] text-center">Status Pemrosesan &amp; Jam</th>
+                  <th className="py-3 px-4 min-w-[200px] text-center">Status Surat &amp; Jam</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-medium">
+                {paginatedRkatData.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-gray-400">
+                      <FileSpreadsheet size={32} className="mx-auto mb-2 opacity-30 text-gray-400" />
+                      <p className="font-bold text-xs">Belum ada data pengajuan RKAT yang sesuai filter.</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">Pengajuan baru dapat diinput mandiri via menu /input-rkat</p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedRkatData.map((row, idx) => {
+                    const rowNumber = rkatItemsPerPage === -1 ? idx + 1 : (rkatCurrentPage - 1) * rkatItemsPerPage + idx + 1;
+                    const rkaMeta = row.rka_selisih_data?._rkat_meta || {};
+                    const isSelesai = row.status === 'Selesai';
+                    const waktuProses = row.waktu_proses || rkaMeta.waktu_proses || (isSelesai ? row.updated_at : null);
+                    
+                    const suratStatus = row.surat_status || rkaMeta.surat_status || 'Belum Ada';
+                    const isSuratAda = suratStatus === 'Sudah Ada';
+                    const waktuSurat = row.waktu_surat || rkaMeta.waktu_surat || null;
+
+                    const rkaData = getRkaData(row);
+                    const isUpdating = rkatUpdatingId === row.id;
+
+                    const picMeta = getPicAvatarMeta(row.pic || 'Unit');
+
+                    return (
+                      <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
+                        {/* No */}
+                        <td className="py-3.5 px-3 text-center text-gray-400 font-bold font-mono text-[11px] align-top">
+                          {rowNumber}
+                        </td>
+
+                        {/* Waktu Masuk */}
+                        <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                          <div className="font-mono text-xs font-bold text-gray-900">
+                            {formatDateTimeId(row.created_at)}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 mt-1 inline-block">
+                            Tahun {row.tahun}
+                          </span>
+                        </td>
+
+                        {/* Unit & PIC */}
+                        <td className="py-3.5 px-4 align-top space-y-1">
+                          <p className="font-bold text-gray-900 text-xs leading-snug">
+                            {row.unit}
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black border ${picMeta.color}`}>
+                              {picMeta.initials}
+                            </span>
+                            <span className="text-[11px] text-gray-700 font-semibold truncate max-w-[150px]">
+                              {row.pic || 'PIC Unit'}
+                            </span>
+                          </div>
+                          {row.email && (
+                            <a
+                              href={`mailto:${row.email}`}
+                              className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-mono"
+                              title="Kirim email ke pengaju"
+                            >
+                              <Mail size={10} />
+                              <span className="truncate max-w-[160px]">{row.email}</span>
+                            </a>
+                          )}
+                        </td>
+
+                        {/* Alasan Perubahan */}
+                        <td className="py-3.5 px-4 align-top text-gray-700 text-xs">
+                          <p className="line-clamp-3 leading-relaxed whitespace-pre-wrap">
+                            {row.catatan || row.alasan || '-'}
+                          </p>
+                        </td>
+
+                        {/* Selisih RKA & Lampiran */}
+                        <td className="py-3.5 px-4 align-top space-y-1.5">
+                          {rkaData ? (
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRkaData({ submission: row, rka: rkaData })}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[11px] font-extrabold shadow-2xs transition-all cursor-pointer"
+                                title="Lihat rincian komparasi Semula (Kolom N) vs Menjadi (Kolom R) dan salin format TSV"
+                              >
+                                <FileSpreadsheet size={12} className="text-emerald-600" />
+                                <span>Rincian Selisih RKA</span>
+                              </button>
+                              <div className="text-[10px] font-mono text-gray-500 mt-1 space-y-0.5">
+                                <div>Semula: Rp {(rkaData.totalSemulaN || 0).toLocaleString('id-ID')}</div>
+                                <div className="font-bold text-indigo-700">Menjadi: Rp {(rkaData.totalMenjadiR || 0).toLocaleString('id-ID')}</div>
+                                <div className={`font-bold ${
+                                  (rkaData.totalNetSelisih || 0) < 0 ? 'text-rose-600' : 'text-emerald-700'
+                                }`}>
+                                  Net: {(rkaData.totalNetSelisih || 0) > 0 ? '+' : ''}Rp {(rkaData.totalNetSelisih || 0).toLocaleString('id-ID')}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-gray-400 italic">Tanpa matriks Excel</span>
+                          )}
+
+                          {/* Lampiran Lainnya */}
+                          <div className="pt-1">
+                            {renderFileLinks(row.lampiran_catatan, row.unit, row.created_at)}
+                          </div>
+                        </td>
+
+                        {/* STATUS PEMROSESAN & JAM (POINT 2) */}
+                        <td className="py-3.5 px-4 align-top text-center">
+                          {isSelesai ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-black shadow-2xs">
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>Sudah Diproses</span>
+                              </span>
+                              <div className="text-[10px] font-bold text-gray-500 font-mono">
+                                🕒 {formatDateTimeId(waktuProses)}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleUpdateRkatStatus(row.id, 'unproses')}
+                                className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-rose-600 font-bold transition-colors cursor-pointer mt-0.5"
+                                title="Batalkan status selesai jika salah klik"
+                              >
+                                <RotateCcw size={10} />
+                                <span>Batalkan</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                                <Clock size={11} className="text-amber-600 shrink-0" />
+                                <span>Menunggu Proses</span>
+                              </span>
+                              <div>
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => handleUpdateRkatStatus(row.id, 'proses')}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                  title="Klik untuk menandai pengajuan ini selesai diproses dan catat jam saat ini"
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 size={12} />
+                                  )}
+                                  <span>Tandai Sudah Diproses</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* STATUS SURAT & JAM (POINT 2) */}
+                        <td className="py-3.5 px-4 align-top text-center">
+                          {isSuratAda ? (
+                            <div className="space-y-1">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-300 text-xs font-black shadow-2xs">
+                                <FileText size={13} className="text-blue-600 shrink-0" />
+                                <span>Surat Sudah Ada</span>
+                              </span>
+                              <div className="text-[10px] font-bold text-gray-500 font-mono">
+                                🕒 {formatDateTimeId(waktuSurat)}
+                              </div>
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleUpdateRkatStatus(row.id, 'unsurat')}
+                                className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-rose-600 font-bold transition-colors cursor-pointer mt-0.5"
+                                title="Reset status surat jika salah klik"
+                              >
+                                <RotateCcw size={10} />
+                                <span>Reset Surat</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold">
+                                <span>Belum Ada Surat</span>
+                              </span>
+                              <div>
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => handleUpdateRkatStatus(row.id, 'surat')}
+                                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                                  title="Klik untuk menandai surat pengantar sudah siap/ada dan catat jam saat ini"
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <FileText size={12} />
+                                  )}
+                                  <span>Tandai Surat Sudah Ada</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginasi RKAT */}
+          {rkatTotalPages > 1 && (
+            <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/50">
+              <span className="text-xs text-gray-500 font-medium">
+                Menampilkan {(rkatCurrentPage - 1) * rkatItemsPerPage + 1} - {Math.min(rkatCurrentPage * rkatItemsPerPage, filteredRkatSubmissions.length)} dari {filteredRkatSubmissions.length} pengajuan
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={rkatCurrentPage <= 1}
+                  onClick={() => setRkatCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                >
+                  ‹ Prev
+                </button>
+                <span className="px-3 py-1.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-black">
+                  Hal {rkatCurrentPage} / {rkatTotalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={rkatCurrentPage >= rkatTotalPages}
+                  onClick={() => setRkatCurrentPage(p => p + 1)}
+                  className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-40 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                >
+                  Next ›
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
 
       {/* Email Modal */}
       {emailModalId !== null && (

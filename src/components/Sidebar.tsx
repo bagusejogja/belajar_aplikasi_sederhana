@@ -43,7 +43,8 @@ import {
   Palette,
   ChevronsUp,
   ChevronsDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Target
 } from 'lucide-react';
 import { 
   getFavoriteUserKey, 
@@ -90,7 +91,8 @@ const iconMap: Record<string, any> = {
   BarChart4,
   Palette,
   Wallet,
-  ArrowUpDown
+  ArrowUpDown,
+  Target
 };
 
 const groupIconMap: Record<string, any> = {

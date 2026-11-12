@@ -144,16 +144,6 @@ export default function InputRkatPage() {
   const [isDraggingRka, setIsDraggingRka] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Tab Mode: 'form' (Formulir Pengajuan) vs 'rekap' (Tabel Rekapitulasi)
-  const [activeTab, setActiveTab] = useState<'form' | 'rekap'>('form');
-
-  // Rekapitulasi Database (Submissions dari Supabase mak_submissions)
-  const [submissionsList, setSubmissionsList] = useState<any[]>([]);
-  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
-  const [rekapSearch, setRekapSearch] = useState('');
-  const [rekapFilterStatus, setRekapFilterStatus] = useState('semua');
-  const [modalPreviewData, setModalPreviewData] = useState<RkaParseResult | null>(null);
-
   // Rekapitulasi State (Modif dari perubahan-rkat)
   const [showOnlyDiff, setShowOnlyDiff] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -170,49 +160,6 @@ export default function InputRkatPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   // Modal Peringatan Net Minus (Tidak Bisa Simpan)
   const [showMinusBlockModal, setShowMinusBlockModal] = useState(false);
-
-  // Fetch Riwayat Pengajuan dari Supabase (mak_submissions)
-  const fetchSubmissions = async () => {
-    setIsLoadingSubmissions(true);
-    try {
-      const { data, error } = await supabase
-        .from('mak_submissions')
-        .select('*')
-        .or('kategori.eq.Perubahan RKAT,kategori.eq.Perubahan MAK')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (!error && data) {
-        setSubmissionsList(data);
-      }
-    } catch (e) {
-      console.error('Error fetching submissions:', e);
-    } finally {
-      setIsLoadingSubmissions(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSubmissions();
-  }, []);
-
-  // Filter List Rekapitulasi Pengajuan
-  const filteredSubmissions = useMemo(() => {
-    let list = submissionsList;
-    if (rekapFilterStatus !== 'semua') {
-      list = list.filter(s => (s.status || '').toLowerCase() === rekapFilterStatus.toLowerCase());
-    }
-    if (rekapSearch.trim()) {
-      const q = rekapSearch.toLowerCase().trim();
-      list = list.filter(s =>
-        (s.unit && s.unit.toLowerCase().includes(q)) ||
-        (s.email && s.email.toLowerCase().includes(q)) ||
-        (s.pic && s.pic.toLowerCase().includes(q)) ||
-        (s.tahun && String(s.tahun).toLowerCase().includes(q)) ||
-        (s.kategori && s.kategori.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [submissionsList, rekapFilterStatus, rekapSearch]);
 
   // Fetch Unit Kerja & PIC dari Database
   useEffect(() => {
@@ -619,7 +566,7 @@ export default function InputRkatPage() {
   };
 
   const handleCopyAllItems = (customTarget?: any) => {
-    const target: RkaParseResult | null = (customTarget && customTarget.fileName) ? (customTarget as RkaParseResult) : (modalPreviewData || rkaParseResult);
+    const target: RkaParseResult | null = (customTarget && customTarget.fileName) ? (customTarget as RkaParseResult) : rkaParseResult;
     if (!target) return;
     const items = showOnlyDiff ? (target.allItemsWithDiff || target.itemsWithDiff || []) : (target.allItems || target.items || []);
     const header = "No\tKegiatan\tLingkup Kegiatan\tMAK\tRincian Belanja\tVol Semula\tSatuan Semula\tHarga Semula\tJumlah Semula (N)\tVol Menjadi\tSatuan Menjadi\tHarga Menjadi\tJumlah Menjadi (R)\tSelisih";
@@ -632,7 +579,7 @@ export default function InputRkatPage() {
 
   // Export hasil analisis ke Excel (.xlsx)
   const handleExportExcel = async (customTarget?: any) => {
-    const target: RkaParseResult | null = (customTarget && customTarget.fileName) ? (customTarget as RkaParseResult) : (modalPreviewData || rkaParseResult);
+    const target: RkaParseResult | null = (customTarget && customTarget.fileName) ? (customTarget as RkaParseResult) : rkaParseResult;
     if (!target) return;
     try {
       const wb = new ExcelJS.Workbook();
@@ -939,7 +886,6 @@ export default function InputRkatPage() {
       });
 
       setSuccess(true);
-      fetchSubmissions();
       toast.success('Pengajuan Perubahan RKAT Berhasil Disimpan!');
     } catch (err: any) {
       console.error('Error submit pengajuan:', err);
@@ -987,227 +933,10 @@ export default function InputRkatPage() {
             </div>
           </div>
 
-          {/* TAB SWITCHER: FORMULIR vs TABEL REKAPITULASI */}
-          <div className="relative z-10 flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setActiveTab('form')}
-              className={`h-9 px-4 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'form'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
-            >
-              <FileSpreadsheet size={14} />
-              <span>Formulir Pengajuan</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('rekap');
-                fetchSubmissions();
-              }}
-              className={`h-9 px-4 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
-                activeTab === 'rekap'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
-            >
-              <Layers size={14} />
-              <span>Tabel Rekapitulasi Pengajuan</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                activeTab === 'rekap' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
-              }`}>
-                {submissionsList.length}
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* TABEL REKAPITULASI PENGUSULAN DARI DATABASE */}
-        {activeTab === 'rekap' ? (
-          <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xs border border-gray-200/90 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
-              <div>
-                <h2 className="text-base sm:text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                  <Layers size={18} className="text-indigo-600" />
-                  <span>Tabel Rekapitulasi Pengajuan Perubahan RKAT</span>
-                </h2>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">
-                  Daftar seluruh usulan perubahan RKAT yang telah tersimpan di database sistem (tabel <code className="bg-gray-100 px-1 py-0.5 rounded text-indigo-700 font-mono font-bold">mak_submissions</code>)
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={fetchSubmissions}
-                  disabled={isLoadingSubmissions}
-                  className="h-9 px-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <RotateCcw size={13} className={isLoadingSubmissions ? 'animate-spin' : ''} />
-                  <span>Refresh Data</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('form')}
-                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                >
-                  <FileSpreadsheet size={13} />
-                  <span>+ Ajukan Baru</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="relative sm:col-span-2">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Cari berdasarkan Unit Kerja, Email Pengaju, atau PIC..."
-                  value={rekapSearch}
-                  onChange={e => setRekapSearch(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <select
-                value={rekapFilterStatus}
-                onChange={e => setRekapFilterStatus(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
-              >
-                <option value="semua">Semua Status</option>
-                <option value="Proses Revisi">Status: Proses Revisi</option>
-                <option value="Selesai">Status: Selesai</option>
-                <option value="Ditolak">Status: Ditolak</option>
-              </select>
-            </div>
-
-            {/* Tabel Data Submissions */}
-            {isLoadingSubmissions ? (
-              <div className="py-16 text-center text-gray-400 space-y-2">
-                <Loader2 size={28} className="animate-spin mx-auto text-indigo-600" />
-                <p className="text-xs font-medium">Memuat data rekapitulasi pengajuan dari database...</p>
-              </div>
-            ) : filteredSubmissions.length === 0 ? (
-              <div className="py-16 text-center text-gray-400 space-y-3 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                <FileSpreadsheet size={36} className="mx-auto text-gray-300" />
-                <p className="text-xs font-bold text-gray-600">Belum ada data pengajuan yang sesuai kriteria.</p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('form')}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <FileSpreadsheet size={13} />
-                  <span>Buat Pengajuan Baru Sekarang</span>
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-2xl border border-gray-200">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-gray-600 font-bold text-[10px] uppercase border-b border-gray-200">
-                    <tr>
-                      <th className="p-3 text-center w-10">No</th>
-                      <th className="p-3 w-32">Waktu Pengajuan</th>
-                      <th className="p-3">Unit Kerja</th>
-                      <th className="p-3">Pengusul & PIC</th>
-                      <th className="p-3 text-right">Total Net Selisih</th>
-                      <th className="p-3 text-center w-28">Status</th>
-                      <th className="p-3 text-center w-36">Aksi & Lampiran</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
-                    {filteredSubmissions.map((sub, idx) => {
-                      const rkaData = sub.rka_selisih_data || sub.lampiran_catatan?.find((c: any) => c.type === 'rka_selisih_data')?.data;
-                      const netSelisih = sub.rka_selisih_data?.totalNetSelisih 
-                        ?? sub.lampiran_catatan?.find((c: any) => c.type === 'rka_selisih_data')?.net_selisih 
-                        ?? null;
-                      const dateStr = sub.created_at ? new Date(sub.created_at).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : '-';
-
-                      return (
-                        <tr key={sub.id || idx} className="hover:bg-indigo-50/20 transition-colors">
-                          <td className="p-3 text-center text-gray-400 font-mono">{idx + 1}</td>
-                          <td className="p-3 whitespace-nowrap">
-                            <span className="font-semibold text-gray-900 block text-[11px]">{dateStr}</span>
-                            <span className="text-[10px] text-gray-400">TA {sub.tahun || '-'}</span>
-                          </td>
-                          <td className="p-3">
-                            <span className="font-bold text-gray-900 block">{sub.unit}</span>
-                            <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-1.5 py-0.5 rounded">
-                              {sub.kategori || 'Perubahan RKAT'}
-                            </span>
-                          </td>
-                          <td className="p-3">
-                            <span className="text-gray-800 font-medium block">{sub.email || '-'}</span>
-                            <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                              PIC: <strong className="text-indigo-700 font-semibold">{sub.pic || '-'}</strong>
-                            </span>
-                          </td>
-                          <td className="p-3 text-right whitespace-nowrap">
-                            {netSelisih !== null ? (
-                              <span className={`font-mono font-black ${
-                                netSelisih > 0 ? 'text-emerald-700' : netSelisih < 0 ? 'text-rose-700' : 'text-indigo-700'
-                              }`}>
-                                {netSelisih > 0 ? '+' : ''}{formatRupiah(netSelisih)}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 text-[11px]">-</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black inline-block ${
-                              sub.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' :
-                              sub.status === 'Ditolak' ? 'bg-rose-100 text-rose-800' :
-                              'bg-amber-100 text-amber-800'
-                            }`}>
-                              {sub.status || 'Proses Revisi'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {rkaData && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setModalPreviewData(rkaData);
-                                    setIsModalOpen(true);
-                                  }}
-                                  className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                                  title="Lihat Komparasi RKA Digital"
-                                >
-                                  <Eye size={14} />
-                                </button>
-                              )}
-                              {sub.lampiran_excel && (
-                                <a
-                                  href={sub.lampiran_excel}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-all"
-                                  title="Download Berkas Excel Pengajuan"
-                                >
-                                  <Download size={14} />
-                                </a>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : success && submittedData ? (
-          /* SUKSES SCREEN */
+        {/* SUKSES SCREEN */}
+        {success && submittedData ? (
           <div className="bg-white p-8 sm:p-10 rounded-[2rem] shadow-xs border border-emerald-200 space-y-6 text-center animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
               <CheckCircle size={36} />
@@ -1252,26 +981,14 @@ export default function InputRkatPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleResetForm}
-                className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
+                className="h-10 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-indigo-200 flex items-center gap-2 cursor-pointer"
               >
                 <RotateCcw size={14} />
                 <span>Ajukan Perubahan Baru</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccess(false);
-                  setActiveTab('rekap');
-                  fetchSubmissions();
-                }}
-                className="h-10 px-5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Layers size={14} />
-                <span>Lihat di Tabel Rekapitulasi</span>
               </button>
             </div>
           </div>
@@ -2178,8 +1895,8 @@ export default function InputRkatPage() {
       {/* ==================================================================== */}
       {/* 🔍 MODAL LAYAR PENUH (FULLSCREEN REKAP KOMPARASI)                    */}
       {/* ==================================================================== */}
-      {isModalOpen && (modalPreviewData || rkaParseResult) && (() => {
-        const activePreview = modalPreviewData || rkaParseResult!;
+      {isModalOpen && rkaParseResult && (() => {
+        const activePreview = rkaParseResult;
         const itemsToDisplay = showOnlyDiff 
           ? (activePreview.allItemsWithDiff || activePreview.itemsWithDiff || [])
           : (activePreview.allItems || activePreview.items || []);
@@ -2217,10 +1934,7 @@ export default function InputRkatPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      setModalPreviewData(null);
-                    }}
+                    onClick={() => setIsModalOpen(false)}
                     className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all cursor-pointer"
                   >
                     <X size={18} />
