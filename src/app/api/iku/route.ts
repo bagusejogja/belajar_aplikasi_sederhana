@@ -75,11 +75,13 @@ export async function GET(req: NextRequest) {
     const masters = data?.masterReferences || [];
     const allMappings = data?.mappings || [];
 
-    // Filter master referensi berdasarkan tahun
-    const filteredMasters = masters.filter(m => {
-      if (tahunParam === 'all') return true;
-      return String(m.ref_tahun_iku) === tahunParam;
-    });
+    // Filter & Sort master referensi berdasarkan tahun secara alfabet A-Z (Sort by Abjad)
+    const filteredMasters = masters
+      .filter(m => {
+        if (tahunParam === 'all') return true;
+        return String(m.ref_tahun_iku) === tahunParam;
+      })
+      .sort((a, b) => a.nama_ref_iku.localeCompare(b.nama_ref_iku, undefined, { numeric: true, sensitivity: 'base' }));
 
     if (mode === 'masters') {
       return NextResponse.json({
@@ -100,8 +102,8 @@ export async function GET(req: NextRequest) {
       // Normalisasi ref_iku kosong
       const currentRef = (!item.ref_iku || item.ref_iku.trim() === '' || item.ref_iku === '-') ? 'Belum Ada IKU' : item.ref_iku;
 
-      // 2. Filter spesifik Ref IKU
-      if (refParam && currentRef !== refParam) {
+      // 2. Filter spesifik Ref IKU: Jika ada filter IKU, HANYA data IKU tersebut yang lolos
+      if (refParam && refParam !== 'ALL' && currentRef !== refParam) {
         return false;
       }
 
@@ -152,29 +154,59 @@ export async function GET(req: NextRequest) {
       items: IkuItem[];
     }>();
 
-    // 1. Inisialisasi setiap master agar yang kosong tetap terdaftar
-    filteredMasters.forEach(m => {
-      const key = `${m.ref_tahun_iku}___${m.nama_ref_iku}`;
-      groupedMap.set(key, {
-        ref_iku: m.nama_ref_iku,
-        ref_tahun_iku: m.ref_tahun_iku,
+    // 1. Inisialisasi master referensi
+    // JIKA refParam aktif (bukan ALL): HANYA inisialisasi master yang dipilih, jangan tampilkan yang lain!
+    if (refParam && refParam !== 'ALL') {
+      if (refParam === 'Belum Ada IKU') {
+        const unmappedKey = `${tahunParam}___Belum Ada IKU`;
+        groupedMap.set(unmappedKey, {
+          ref_iku: 'Belum Ada IKU',
+          ref_tahun_iku: tahunParam === 'all' ? 0 : Number(tahunParam),
+          count: 0,
+          items: []
+        });
+      } else {
+        const targetMaster = filteredMasters.find(m => m.nama_ref_iku === refParam);
+        const thn = targetMaster ? targetMaster.ref_tahun_iku : (tahunParam === 'all' ? 0 : Number(tahunParam));
+        const key = `${thn}___${refParam}`;
+        groupedMap.set(key, {
+          ref_iku: refParam,
+          ref_tahun_iku: thn,
+          count: 0,
+          items: []
+        });
+      }
+    } else {
+      // Mode ALL: Inisialisasi seluruh master (diurutkan alfabet A-Z)
+      filteredMasters.forEach(m => {
+        const key = `${m.ref_tahun_iku}___${m.nama_ref_iku}`;
+        groupedMap.set(key, {
+          ref_iku: m.nama_ref_iku,
+          ref_tahun_iku: m.ref_tahun_iku,
+          count: 0,
+          items: []
+        });
+      });
+
+      // Serta inisialisasi grup Belum Ada IKU
+      const unmappedKey = `${tahunParam}___Belum Ada IKU`;
+      groupedMap.set(unmappedKey, {
+        ref_iku: 'Belum Ada IKU',
+        ref_tahun_iku: tahunParam === 'all' ? 0 : Number(tahunParam),
         count: 0,
         items: []
       });
-    });
+    }
 
-    // 2. Inisialisasi grup "Belum Ada IKU" untuk tahun yang dipilih
-    const unmappedKey = `${tahunParam}___Belum Ada IKU`;
-    groupedMap.set(unmappedKey, {
-      ref_iku: 'Belum Ada IKU',
-      ref_tahun_iku: tahunParam === 'all' ? 0 : Number(tahunParam),
-      count: 0,
-      items: []
-    });
-
-    // 3. Masukkan data hasil filter
+    // 2. Masukkan data hasil filter ke grup masing-masing
     filtered.forEach(item => {
       const itemRef = (!item.ref_iku || item.ref_iku.trim() === '' || item.ref_iku === '-') ? 'Belum Ada IKU' : item.ref_iku;
+      
+      // Jika refParam aktif, jangan masukkan data dari ref lain
+      if (refParam && refParam !== 'ALL' && itemRef !== refParam) {
+        return;
+      }
+
       const key = `${item.ref_tahun_iku}___${itemRef}`;
       let group = groupedMap.get(key);
       if (!group) {
@@ -193,13 +225,21 @@ export async function GET(req: NextRequest) {
       });
     });
 
-    // Konversi ke array
+    // 3. Konversi ke array & Urutkan Sort By Abjad (A-Z) (Poin 4)
     const groupedList = Array.from(groupedMap.values())
-      // Urutkan grup: letakkan grup yang memiliki kegiatan di atas, master berurutan, dan Belum Ada IKU tetap bisa diakses
+      .filter(g => {
+        // Jika sedang filter IKU tertentu, pastikan hanya grup itu yang muncul
+        if (refParam && refParam !== 'ALL') {
+          return g.ref_iku === refParam;
+        }
+        return true;
+      })
       .sort((a, b) => {
+        // Belum Ada IKU ditaruh di akhir jika mode ALL
         if (a.ref_iku === 'Belum Ada IKU') return 1;
         if (b.ref_iku === 'Belum Ada IKU') return -1;
-        return b.count - a.count || a.ref_iku.localeCompare(b.ref_iku);
+        // Sort by abjad A-Z dengan natural numeric sorting (IKU 1, IKU 2, IKU 3...)
+        return a.ref_iku.localeCompare(b.ref_iku, undefined, { numeric: true, sensitivity: 'base' });
       });
 
     return NextResponse.json({
