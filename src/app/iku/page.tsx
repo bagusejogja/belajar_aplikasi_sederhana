@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Target, Filter, Search, ChevronDown, ChevronUp, Download,
   Layers, CheckCircle2, Award, BookOpen, ExternalLink,
   RefreshCw, FileSpreadsheet, ArrowLeft, Building2, HelpCircle,
   Trash2, ArrowRightLeft, BarChart3, AlertTriangle, RotateCcw,
-  Check, X, Eye, EyeOff
+  Check, X, Eye, EyeOff, PieChart as PieChartIcon
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Cell
+  PieChart, Pie, Tooltip, ResponsiveContainer,
+  Cell, Legend
 } from 'recharts';
 
 interface IkuItem {
@@ -49,7 +49,7 @@ interface IkuGroup {
   items: IkuItem[];
 }
 
-const BAR_COLORS = [
+const PIE_COLORS = [
   '#2563eb', '#3b82f6', '#4f46e5', '#6366f1', '#7c3aed',
   '#8b5cf6', '#9333ea', '#a855f7', '#0891b2', '#06b6d4',
   '#0d9488', '#14b8a6', '#059669', '#10b981', '#d97706',
@@ -70,11 +70,7 @@ export default function PemetaanIkuPublicPage() {
   // Accordion open/close state: Map of groupKey -> boolean
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  // Paging untuk Grup IKU
-  const [groupPage, setGroupPage] = useState<number>(1);
-  const [groupsPerPage, setGroupsPerPage] = useState<number>(5);
-
-  // Paging di dalam tabel kegiatan masing-masing grup: Map of groupKey -> pageNumber
+  // Poin 4: Hapus paging grup luar. CUKUP paging di dalam isi tabel kegiatan masing-masing grup (innerPages)
   const [innerPages, setInnerPages] = useState<Record<string, number>>({});
   const innerPageSize = 15;
 
@@ -82,8 +78,13 @@ export default function PemetaanIkuPublicPage() {
   const [flatTablePage, setFlatTablePage] = useState<number>(1);
   const [flatTableSize, setFlatTableSize] = useState<number>(25);
 
-  // Toggle Tampilkan/Sembunyikan Grafik
+  // Poin 1: Toggle Tampilkan/Sembunyikan Grafik Pie
   const [showChart, setShowChart] = useState<boolean>(true);
+
+  // Poin 2: Custom Searchable Combobox agar teks pilihan IKU tidak kepotong
+  const [isIkuComboboxOpen, setIsIkuComboboxOpen] = useState<boolean>(false);
+  const [ikuSearchKeyword, setIkuSearchKeyword] = useState<string>('');
+  const comboboxRef = useRef<HTMLDivElement>(null);
 
   // Feedback toast message
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -93,8 +94,19 @@ export default function PemetaanIkuPublicPage() {
     setToastMsg({ text, type });
     setTimeout(() => {
       setToastMsg(null);
-    }, 4000);
+    }, 5000);
   };
+
+  // Close combobox when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+        setIsIkuComboboxOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchIkuData = async () => {
     setLoading(true);
@@ -113,11 +125,13 @@ export default function PemetaanIkuPublicPage() {
         setMasters(json.masters || []);
         setTotalMatched(json.totalMatchedRows || 0);
 
-        // Secara default buka grup pertama yang ada isinya
+        // Secara default buka grup pertama yang ada isinya atau grup terpilih
         const initialExpanded: Record<string, boolean> = {};
         let openCount = 0;
         fetchedGroups.forEach((g) => {
-          if (g.count > 0 && openCount < 2) {
+          if (selectedRef !== 'ALL' && g.ref_iku === selectedRef) {
+            initialExpanded[`${g.ref_tahun_iku}_${g.ref_iku}`] = true;
+          } else if (selectedRef === 'ALL' && g.count > 0 && openCount < 2) {
             initialExpanded[`${g.ref_tahun_iku}_${g.ref_iku}`] = true;
             openCount++;
           }
@@ -133,7 +147,6 @@ export default function PemetaanIkuPublicPage() {
 
   useEffect(() => {
     fetchIkuData();
-    setGroupPage(1);
     setFlatTablePage(1);
   }, [selectedTahun, selectedRef]);
 
@@ -141,7 +154,6 @@ export default function PemetaanIkuPublicPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchIkuData();
-      setGroupPage(1);
       setFlatTablePage(1);
     }, 350);
     return () => clearTimeout(timer);
@@ -195,8 +207,9 @@ export default function PemetaanIkuPublicPage() {
     }
   };
 
+  // Poin 5: Menghapus / Melepas IKU -> tertampung di Belum Ada IKU
   const handleRemoveIku = async (item: IkuItem) => {
-    if (!confirm(`Lepas kegiatan "${item.kegiatan_nama}" dari ${item.ref_iku}? Kegiatan akan ditampung ke daftar 'Belum Ada IKU'.`)) {
+    if (!confirm(`Lepas kegiatan "${item.kegiatan_nama}" dari ${item.ref_iku}?\nKegiatan ini akan tertampung ke grup "Belum Ada IKU".`)) {
       return;
     }
     setIsUpdatingId(item.id);
@@ -211,7 +224,7 @@ export default function PemetaanIkuPublicPage() {
       });
       const json = await res.json();
       if (json.success) {
-        showToast(`Kegiatan "${item.kegiatan_kode}" telah dipindahkan ke tabel 'Belum Ada IKU'.`, 'info');
+        showToast(`Kegiatan "${item.kegiatan_kode}" berhasil dilepas dan kini tersimpan di tabel "Belum Ada IKU".`, 'info');
         await fetchIkuData();
       } else {
         showToast(json.error || 'Gagal melepaskan IKU', 'error');
@@ -223,14 +236,6 @@ export default function PemetaanIkuPublicPage() {
       setIsUpdatingId(null);
     }
   };
-
-  // Poin 2: Pagination untuk Grup IKU
-  const totalGroupPages = groupsPerPage === -1 ? 1 : Math.ceil(groups.length / groupsPerPage) || 1;
-  const paginatedGroups = useMemo(() => {
-    if (groupsPerPage === -1) return groups;
-    const start = (groupPage - 1) * groupsPerPage;
-    return groups.slice(start, start + groupsPerPage);
-  }, [groups, groupPage, groupsPerPage]);
 
   // Flattened items for Table View & Excel Export
   const allFlattenedItems = useMemo(() => {
@@ -246,14 +251,13 @@ export default function PemetaanIkuPublicPage() {
     return allFlattenedItems.slice(start, start + flatTableSize);
   }, [allFlattenedItems, flatTablePage, flatTableSize]);
 
-  // Poin 6: Data untuk Grafik Bar Chart
+  // Poin 1: Data untuk Grafik Pie Chart
   const chartData = useMemo(() => {
     return groups
       .filter(g => g.count > 0)
       .map((g) => {
-        // Ambil label ringkas misal "IKU 1", "IKU 2", dll
         const match = g.ref_iku.match(/^(?:\[?(IKU\s*[0-9A-Za-z.-]+)\]?)/i);
-        const shortName = match ? match[1] : g.ref_iku.slice(0, 16) + '...';
+        const shortName = match ? match[1] : g.ref_iku.slice(0, 18) + '...';
         return {
           name: shortName,
           fullName: g.ref_iku,
@@ -264,11 +268,18 @@ export default function PemetaanIkuPublicPage() {
       .sort((a, b) => b.count - a.count);
   }, [groups]);
 
-  // Hitung jumlah kegiatan yang belum ada IKU
+  // Hitung jumlah kegiatan yang belum ada IKU (Poin 5)
   const unmappedGroup = useMemo(() => {
     return groups.find(g => g.ref_iku === 'Belum Ada IKU');
   }, [groups]);
   const unmappedCount = unmappedGroup ? unmappedGroup.count : 0;
+
+  // Poin 2: Filter options combobox yang searchable
+  const filteredComboboxMasters = useMemo(() => {
+    const q = ikuSearchKeyword.toLowerCase().trim();
+    if (!q) return masters;
+    return masters.filter(m => m.nama_ref_iku.toLowerCase().includes(q) || String(m.ref_tahun_iku).includes(q));
+  }, [masters, ikuSearchKeyword]);
 
   // Ekspor Excel
   const handleExportExcel = async () => {
@@ -401,7 +412,7 @@ export default function PemetaanIkuPublicPage() {
           {toastMsg.type === 'success' && <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />}
           {toastMsg.type === 'info' && <AlertTriangle size={18} className="text-amber-600 shrink-0" />}
           {toastMsg.type === 'error' && <X size={18} className="text-rose-600 shrink-0" />}
-          <p className="text-xs font-bold">{toastMsg.text}</p>
+          <p className="text-xs font-bold max-w-sm">{toastMsg.text}</p>
         </div>
       )}
 
@@ -423,7 +434,7 @@ export default function PemetaanIkuPublicPage() {
                 Kamus Pemetaan IKU &amp; Hirarki Kegiatan
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-                Penyelarasan hirarki Tujuan, Sasaran, Program, dan Kegiatan RKAT ke Referensi IKU Kemendikbudristek / PTN-BH. Mendukung pemindahan kegiatan antar IKU dan pengelolaan kegiatan belum terpetakan.
+                Penyelarasan hirarki Tujuan, Sasaran, Program, dan Kegiatan RKAT ke Referensi IKU Kemendikbudristek / PTN-BH. Mendukung pemindahan kegiatan antar IKU dan penampungan kegiatan belum terpetakan.
               </p>
             </div>
 
@@ -432,10 +443,10 @@ export default function PemetaanIkuPublicPage() {
                 type="button"
                 onClick={() => setShowChart(!showChart)}
                 className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold rounded-2xl border border-white/20 transition-all cursor-pointer"
-                title="Buka / tutup visualisasi grafik distribusi kegiatan"
+                title="Buka / tutup visualisasi grafik pie distribusi kegiatan"
               >
-                <BarChart3 size={14} />
-                <span>{showChart ? 'Tutup Grafik' : 'Lihat Grafik IKU'}</span>
+                <PieChartIcon size={14} />
+                <span>{showChart ? 'Tutup Grafik Pie' : 'Lihat Grafik Pie'}</span>
               </button>
 
               <button
@@ -505,81 +516,83 @@ export default function PemetaanIkuPublicPage() {
             </div>
           </div>
 
-          {/* Metric Belum Terpetakan (Poin 4) */}
+          {/* POIN 5: METRIC BELUM TERPETAKAN (TAMPUNGAN LEPAS/HAPUS) */}
           <div 
             onClick={() => {
               setSelectedRef('Belum Ada IKU');
               setViewMode('grouped');
+              const el = document.getElementById('group-unmapped-section');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="bg-gradient-to-br from-amber-50 to-orange-50/50 rounded-2xl p-4 border border-amber-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all"
-            title="Klik untuk langsung memfilter kegiatan yang belum ada IKU"
+            className="bg-gradient-to-br from-amber-50 to-orange-50/60 rounded-2xl p-4 border-2 border-amber-300 shadow-xs flex items-center justify-between cursor-pointer hover:border-amber-500 transition-all group"
+            title="Klik untuk membuka tampungan kegiatan yang belum ada IKU (hasil lepas/hapus)"
           >
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 block mb-0.5">
-                BELUM ADA IKU
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1 mb-0.5">
+                <AlertTriangle size={12} className="text-amber-600" />
+                <span>TAMPUNGAN BELUM ADA IKU</span>
               </span>
               <div className="text-xl font-black text-amber-950 font-mono">
-                {unmappedCount} <span className="text-xs font-bold text-amber-600 font-sans">Kegiatan</span>
+                {unmappedCount} <span className="text-xs font-bold text-amber-700 font-sans">Kegiatan</span>
               </div>
-              <span className="text-[11px] font-bold text-amber-700 underline">
-                Klik untuk tinjau &amp; petakan
+              <span className="text-[11px] font-black text-amber-800 group-hover:underline">
+                👉 Klik untuk lihat &amp; petakan kembali
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-300">
+            <div className="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 flex items-center justify-center shrink-0 border border-amber-300 shadow-2xs group-hover:scale-105 transition-all">
               <AlertTriangle size={20} />
             </div>
           </div>
         </div>
 
-        {/* POIN 6: GRAFIK JUMLAH KEGIATAN PER IKU */}
+        {/* POIN 1: GRAFIK DISTRIBUSI JUMLAH KEGIATAN PER IKU DALAM PIE / DONUT */}
         {showChart && chartData.length > 0 && (
           <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <BarChart3 size={17} className="text-blue-600" />
-                  <span>Grafik Distribusi Jumlah Kegiatan per IKU ({selectedTahun === 'all' ? 'Semua Tahun' : `Tahun ${selectedTahun}`})</span>
+                  <PieChartIcon size={17} className="text-blue-600" />
+                  <span>Grafik Distribusi Jumlah Kegiatan per IKU (Tahun {selectedTahun === 'all' ? '2025 - 2026' : selectedTahun})</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  Visualisasi sebaran kegiatan RKAT terhadap setiap Indikator Kinerja Utama. Klik salah satu bar untuk menyaring.
+                  Diagram proporsi kegiatan RKAT terhadap masing-masing IKU. Klik potongan lingkaran untuk langsung menyaring grup tersebut.
                 </p>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                {chartData.length} Indikator Aktif
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  {chartData.length} Indikator Terpetakan
+                </span>
+              </div>
             </div>
 
-            <div className="h-64 w-full pt-2">
+            <div className="h-80 w-full flex items-center justify-center relative pt-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
-                    angle={-35}
-                    textAnchor="end"
-                    interval={0}
-                    height={55}
-                  />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                <PieChart>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)',
                       borderRadius: '1rem',
                       border: '1px solid #e2e8f0',
                       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
                       fontSize: '11px',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
+                      maxWidth: '340px'
                     }}
                     formatter={(val: any, name: any, item: any) => [
-                      `${val} Kegiatan`,
+                      `${val} Kegiatan (${Math.round((Number(val) / (totalMatched || 1)) * 100)}%)`,
                       item.payload.fullName
                     ]}
                   />
-                  <Bar 
-                    dataKey="count" 
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={45}
+                  <Pie
+                    data={chartData}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="48%"
+                    innerRadius={55}
+                    outerRadius={105}
+                    paddingAngle={2}
+                    animationDuration={600}
                     onClick={(entry: any) => {
                       const targetName = entry?.payload?.fullName || entry?.fullName;
                       if (targetName) {
@@ -591,58 +604,176 @@ export default function PemetaanIkuPublicPage() {
                   >
                     {chartData.map((entry, index) => (
                       <Cell 
-                        key={`cell-${index}`} 
-                        fill={entry.fullName === 'Belum Ada IKU' ? '#f59e0b' : BAR_COLORS[index % BAR_COLORS.length]} 
+                        key={`cell-pie-${index}`} 
+                        fill={entry.fullName === 'Belum Ada IKU' ? '#f59e0b' : PIE_COLORS[index % PIE_COLORS.length]} 
                       />
                     ))}
-                  </Bar>
-                </BarChart>
+                  </Pie>
+                  <Legend
+                    verticalAlign="bottom"
+                    height={48}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-[10px] font-bold text-slate-600 mr-2">{value}</span>}
+                  />
+                </PieChart>
               </ResponsiveContainer>
+
+              {/* Center Donut Info */}
+              <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                <div className="text-xl font-black text-slate-900 font-mono tracking-tight leading-none">
+                  {totalMatched}
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                  Total Kegiatan
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* POIN 3: TOOLBAR FILTER DENGAN DROPDOWN IKU DI SEBELAH KIRI (LEBAR & TIDAK KEPOTONG) */}
+        {/* POIN 2: TOOLBAR FILTER DENGAN SEARCHABLE COMBOBOX LENGKAP DI SEBELAH KIRI (TEXT TIDAK TERPOTONG) */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs space-y-4">
           
-          {/* BARIS 1: DROPDOWN IKU DI SEBELAH KIRI DENGAN LEBAR LEGA */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
             
-            {/* 3. Filter IKU di SEBELAH KIRI (lg:col-span-8) */}
-            <div className="lg:col-span-8 space-y-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Filter size={13} className="text-blue-600" />
-                <span>Pilih Referensi IKU (Filter Lengkap):</span>
+            {/* POIN 2: COMBOBOX DI SEBELAH KIRI DENGAN TEXT TIDAK KEPOTONG (lg:col-span-8) */}
+            <div className="lg:col-span-8 space-y-1 relative" ref={comboboxRef}>
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Filter size={13} className="text-blue-600" />
+                  <span>Pilih Referensi IKU (Filter Lengkap):</span>
+                </span>
+                {selectedRef !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRef('ALL')}
+                    className="text-[10px] text-blue-600 hover:underline font-bold"
+                  >
+                    Tampilkan Semua
+                  </button>
+                )}
               </label>
-              <div className="relative">
-                <select
-                  value={selectedRef}
-                  onChange={e => {
-                    setSelectedRef(e.target.value);
-                    setGroupPage(1);
-                  }}
-                  className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all cursor-pointer shadow-2xs"
-                  title="Pilih referensi IKU yang ingin ditampilkan"
-                >
-                  <option value="ALL">🌟 -- Tampilkan Seluruh Referensi IKU ({masters.length} IKU) --</option>
-                  
-                  {/* Opsi Khusus Belum Ada IKU */}
-                  <option value="Belum Ada IKU">
-                    ⚠️ [Khusus] Belum Ada IKU / Belum Terpetakan ({unmappedCount} Kegiatan)
-                  </option>
 
-                  {masters.map(m => {
-                    const matchG = groups.find(g => g.ref_iku === m.nama_ref_iku);
-                    const countStr = matchG ? ` (${matchG.count} kegiatan)` : ' (0 kegiatan)';
-                    return (
-                      <option key={`${m.ref_tahun_iku}_${m.id}`} value={m.nama_ref_iku}>
-                        [{m.ref_tahun_iku}] {m.nama_ref_iku}{countStr}
-                      </option>
-                    );
-                  })}
-                </select>
-                <ChevronDown size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
+              {/* Combobox Trigger Button: Menampilkan Teks Penuh / Multi-line Wrap */}
+              <button
+                type="button"
+                onClick={() => setIsIkuComboboxOpen(!isIkuComboboxOpen)}
+                className="w-full text-left pl-3.5 pr-10 py-2.5 bg-slate-50 hover:bg-slate-100/90 border border-slate-300 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-2xs relative flex items-center justify-between"
+              >
+                <div className="leading-snug pr-2 break-words">
+                  {selectedRef === 'ALL' ? (
+                    <span className="text-slate-800">🌟 Tampilkan Seluruh Referensi IKU ({masters.length} IKU)</span>
+                  ) : selectedRef === 'Belum Ada IKU' ? (
+                    <span className="text-amber-800 font-black">⚠️ [Tampungan] Belum Ada IKU ({unmappedCount} Kegiatan)</span>
+                  ) : (
+                    <span className="text-blue-900 font-extrabold">{selectedRef}</span>
+                  )}
+                </div>
+                <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${isIkuComboboxOpen ? 'rotate-180 text-blue-600' : ''}`} />
+              </button>
+
+              {/* Combobox Dropdown Popover (Wrap text, Searchable, 100% Tidak Kepotong) */}
+              {isIkuComboboxOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 space-y-2 max-h-[420px] flex flex-col animate-in fade-in zoom-in-95">
+                  {/* Search inside combobox */}
+                  <div className="relative shrink-0">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={ikuSearchKeyword}
+                      onChange={e => setIkuSearchKeyword(e.target.value)}
+                      placeholder="Ketik untuk mencari referensi IKU..."
+                      className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                    {ikuSearchKeyword && (
+                      <button
+                        type="button"
+                        onClick={() => setIkuSearchKeyword('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List Options */}
+                  <div className="overflow-y-auto divide-y divide-slate-100 flex-1 pr-1 space-y-1 max-h-[320px]">
+                    {/* Option All */}
+                    <div
+                      onClick={() => {
+                        setSelectedRef('ALL');
+                        setIsIkuComboboxOpen(false);
+                      }}
+                      className={`p-2.5 rounded-xl cursor-pointer text-xs font-bold transition-colors flex items-center justify-between ${
+                        selectedRef === 'ALL' ? 'bg-blue-50 text-blue-800 font-black' : 'hover:bg-slate-50 text-slate-800'
+                      }`}
+                    >
+                      <span>🌟 Tampilkan Seluruh Referensi IKU ({masters.length} IKU)</span>
+                      {selectedRef === 'ALL' && <Check size={14} className="text-blue-600 shrink-0" />}
+                    </div>
+
+                    {/* Option Belum Ada IKU */}
+                    <div
+                      onClick={() => {
+                        setSelectedRef('Belum Ada IKU');
+                        setIsIkuComboboxOpen(false);
+                      }}
+                      className={`p-2.5 rounded-xl cursor-pointer text-xs font-bold transition-colors flex items-center justify-between ${
+                        selectedRef === 'Belum Ada IKU' ? 'bg-amber-100 text-amber-900 font-black' : 'hover:bg-amber-50 text-amber-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                        <span>⚠️ [Khusus] Belum Ada IKU / Belum Terpetakan</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900">
+                        {unmappedCount} kegiatan
+                      </span>
+                    </div>
+
+                    {/* Master List */}
+                    {filteredComboboxMasters.map(m => {
+                      const matchG = groups.find(g => g.ref_iku === m.nama_ref_iku);
+                      const count = matchG ? matchG.count : 0;
+                      const isSelected = selectedRef === m.nama_ref_iku;
+
+                      return (
+                        <div
+                          key={`${m.ref_tahun_iku}_${m.id}`}
+                          onClick={() => {
+                            setSelectedRef(m.nama_ref_iku);
+                            setIsIkuComboboxOpen(false);
+                          }}
+                          className={`p-2.5 rounded-xl cursor-pointer text-xs transition-colors space-y-1 ${
+                            isSelected ? 'bg-blue-50 border border-blue-200 text-blue-900 font-black' : 'hover:bg-slate-50 text-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                              Tahun {m.ref_tahun_iku}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-500 shrink-0">
+                              {count} kegiatan
+                            </span>
+                          </div>
+                          {/* Teks nama IKU ditampilkan PENUH dan tidak pernah kepotong */}
+                          <p className="leading-snug break-words whitespace-normal font-semibold">
+                            {m.nama_ref_iku}
+                          </p>
+                        </div>
+                      );
+                    })}
+
+                    {filteredComboboxMasters.length === 0 && (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        Tidak ada referensi IKU yang cocok dengan kata kunci "{ikuSearchKeyword}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* KANAN: Tahun & View Mode (lg:col-span-4) */}
@@ -660,7 +791,6 @@ export default function PemetaanIkuPublicPage() {
                       onClick={() => {
                         setSelectedTahun(t);
                         setSelectedRef('ALL');
-                        setGroupPage(1);
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                         selectedTahun === t
@@ -705,7 +835,7 @@ export default function PemetaanIkuPublicPage() {
             </div>
           </div>
 
-          {/* BARIS 2: SEARCH INPUT & TOMBOL SHORTCUT */}
+          {/* BARIS 2: SEARCH INPUT & QUICK BUTTONS */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-3 border-t border-slate-100 items-center">
             {/* Search Input */}
             <div className="md:col-span-8 relative">
@@ -755,7 +885,6 @@ export default function PemetaanIkuPublicPage() {
                   onClick={() => {
                     setSearchQuery('');
                     setSelectedRef('ALL');
-                    setGroupPage(1);
                   }}
                   className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all"
                 >
@@ -774,57 +903,9 @@ export default function PemetaanIkuPublicPage() {
           </div>
         )}
 
-        {/* CONTENT VIEW: GROUPED ACCORDION (POIN 1, 2, 4, 5) */}
+        {/* CONTENT VIEW: GROUPED ACCORDION (POIN 1, 3, 4, 5) */}
         {!loading && viewMode === 'grouped' && (
           <div className="space-y-4">
-
-            {/* POIN 2: PAGINATION TOP FOR GROUPS */}
-            {totalGroupPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/90 p-3 px-5 rounded-2xl border border-slate-200 shadow-2xs">
-                <span className="text-xs font-bold text-slate-600">
-                  Menampilkan grup IKU {(groupPage - 1) * groupsPerPage + 1} - {Math.min(groupPage * groupsPerPage, groups.length)} dari {groups.length} Grup
-                </span>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 mr-2">
-                    <span>Grup per Hal:</span>
-                    <select
-                      value={groupsPerPage}
-                      onChange={e => {
-                        setGroupsPerPage(Number(e.target.value));
-                        setGroupPage(1);
-                      }}
-                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-                    >
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={-1}>Semua</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={groupPage <= 1}
-                    onClick={() => setGroupPage(p => Math.max(1, p - 1))}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition-all"
-                  >
-                    ‹ Prev
-                  </button>
-                  <span className="px-3 py-1.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-black">
-                    Hal {groupPage} / {totalGroupPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={groupPage >= totalGroupPages}
-                    onClick={() => setGroupPage(p => p + 1)}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition-all"
-                  >
-                    Next ›
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* EMPTY STATE */}
             {groups.length === 0 ? (
@@ -836,12 +917,13 @@ export default function PemetaanIkuPublicPage() {
                 </p>
               </div>
             ) : (
-              paginatedGroups.map((group, groupIdx) => {
+              /* POIN 4: Seluruh grup tampil sekaligus (tanpa pagination luar yang memotong grup) */
+              groups.map((group, groupIdx) => {
                 const groupKey = `${group.ref_tahun_iku}_${group.ref_iku}`;
                 const isExpanded = !!expandedGroups[groupKey];
                 const isUnmapped = group.ref_iku === 'Belum Ada IKU';
 
-                // Paging di dalam masing-masing tabel grup accordion
+                // Paging di dalam masing-masing tabel kegiatan grup accordion (15 baris per page)
                 const currentInnerPage = innerPages[groupKey] || 1;
                 const totalInnerPages = Math.ceil(group.items.length / innerPageSize) || 1;
                 const paginatedItems = group.items.slice((currentInnerPage - 1) * innerPageSize, currentInnerPage * innerPageSize);
@@ -849,9 +931,10 @@ export default function PemetaanIkuPublicPage() {
                 return (
                   <div
                     key={groupKey}
+                    id={isUnmapped ? 'group-unmapped-section' : undefined}
                     className={`bg-white rounded-3xl border shadow-xs overflow-hidden transition-all duration-200 ${
                       isUnmapped 
-                        ? 'border-amber-300 ring-1 ring-amber-200' 
+                        ? 'border-2 border-amber-400 ring-2 ring-amber-200/60' 
                         : 'border-slate-200/90 hover:border-blue-300/80'
                     }`}
                   >
@@ -860,28 +943,28 @@ export default function PemetaanIkuPublicPage() {
                       onClick={() => toggleGroup(groupKey)}
                       className={`p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4 cursor-pointer select-none transition-colors ${
                         isUnmapped 
-                          ? (isExpanded ? 'bg-gradient-to-r from-amber-100/90 via-orange-50/70 to-white' : 'bg-amber-50/70 hover:bg-amber-100/60') 
+                          ? (isExpanded ? 'bg-gradient-to-r from-amber-100 via-orange-50 to-white' : 'bg-amber-50/80 hover:bg-amber-100/70') 
                           : (isExpanded ? 'bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white' : 'hover:bg-slate-50/70')
                       }`}
                     >
                       <div className="flex items-start sm:items-center gap-3.5">
                         <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border font-black text-xs ${
                           isUnmapped
-                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
                             : group.count > 0 
                               ? 'bg-blue-600 text-white border-blue-700 shadow-xs shadow-blue-200' 
                               : 'bg-slate-100 text-slate-400 border-slate-200'
                         }`}>
-                          {isUnmapped ? '⚠️' : (groupPage - 1) * groupsPerPage + groupIdx + 1}
+                          {isUnmapped ? '⚠️' : groupIdx + 1}
                         </div>
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border ${
                               isUnmapped 
-                                ? 'bg-amber-200 text-amber-900 border-amber-300' 
+                                ? 'bg-amber-200 text-amber-900 border-amber-300 font-extrabold' 
                                 : 'bg-indigo-100 text-indigo-800 border-indigo-200'
                             }`}>
-                              {isUnmapped ? 'BELUM TERPETAKAN' : `TAHUN ${group.ref_tahun_iku}`}
+                              {isUnmapped ? 'TAMPUNGAN LEPAS / HAPUS' : `TAHUN ${group.ref_tahun_iku}`}
                             </span>
                             <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
                               isUnmapped
@@ -894,9 +977,9 @@ export default function PemetaanIkuPublicPage() {
                             </span>
                           </div>
                           <h3 className={`text-xs sm:text-sm font-black mt-1 leading-snug ${
-                            isUnmapped ? 'text-amber-950' : 'text-slate-900'
+                            isUnmapped ? 'text-amber-950 font-black' : 'text-slate-900'
                           }`}>
-                            {isUnmapped ? 'Daftar Kegiatan Belum Ada IKU (Tampungan Belum Terpetakan)' : group.ref_iku}
+                            {isUnmapped ? '⚠️ Kegiatan Belum Ada IKU (Tampungan Hasil Lepas / Hapus)' : group.ref_iku}
                           </h3>
                         </div>
                       </div>
@@ -912,7 +995,7 @@ export default function PemetaanIkuPublicPage() {
                       </div>
                     </div>
 
-                    {/* POIN 1: BODY TABEL DENGAN URUTAN DIUBAH (KEGIATAN PALING KANAN) & KODE INDIKATOR LENGKAP */}
+                    {/* POIN 1 & 3: BODY TABEL DENGAN TULISAN "Indikator:" YANG JELAS & KEGIATAN PALING KANAN */}
                     {isExpanded && (
                       <div className="border-t border-slate-100 bg-white p-4 sm:p-5 space-y-3">
                         {group.count === 0 ? (
@@ -921,9 +1004,9 @@ export default function PemetaanIkuPublicPage() {
                           </div>
                         ) : (
                           <>
-                            {/* Inner Pagination Header */}
+                            {/* Inner Pagination Header (Hanya jika kegiatan > 15) */}
                             {totalInnerPages > 1 && (
-                              <div className="flex items-center justify-between text-xs font-medium text-slate-500 px-1">
+                              <div className="flex items-center justify-between text-xs font-medium text-slate-500 px-1 pb-1">
                                 <span>
                                   Menampilkan {(currentInnerPage - 1) * innerPageSize + 1} - {Math.min(currentInnerPage * innerPageSize, group.items.length)} dari {group.items.length} kegiatan
                                 </span>
@@ -957,14 +1040,14 @@ export default function PemetaanIkuPublicPage() {
                                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
                                     <th className="py-3 px-3 text-center w-12">No</th>
                                     {/* 1. Tujuan */}
-                                    <th className="py-3 px-4 min-w-[200px]">Tujuan</th>
+                                    <th className="py-3 px-4 min-w-[210px]">Tujuan</th>
                                     {/* 2. Sasaran */}
-                                    <th className="py-3 px-4 min-w-[200px]">Sasaran</th>
+                                    <th className="py-3 px-4 min-w-[210px]">Sasaran</th>
                                     {/* 3. Program */}
                                     <th className="py-3 px-4 min-w-[220px]">Program</th>
                                     {/* 4. Kegiatan (RKAT) PALING KANAN */}
                                     <th className="py-3 px-4 min-w-[240px]">Kegiatan (RKAT)</th>
-                                    {/* 5. Aksi / Pindah IKU (Poin 4 & 5) */}
+                                    {/* 5. Aksi / Pindah IKU */}
                                     <th className="py-3 px-3 text-center min-w-[200px] w-52">Pindah Antar IKU / Aksi</th>
                                   </tr>
                                 </thead>
@@ -982,8 +1065,8 @@ export default function PemetaanIkuPublicPage() {
                                           {rowNum}
                                         </td>
                                         
-                                        {/* 1. Tujuan + Indikator dengan Kode */}
-                                        <td className="py-3 px-4 align-top space-y-1">
+                                        {/* POIN 3: Tujuan + Tulisan "Indikator:" yang jelas dengan kodenya */}
+                                        <td className="py-3 px-4 align-top space-y-1.5">
                                           <div className="text-[11px] font-bold text-slate-900 leading-snug">
                                             <span className="font-mono text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-blue-200">
                                               {it.tujuan_kode || '-'}
@@ -991,8 +1074,9 @@ export default function PemetaanIkuPublicPage() {
                                             {it.tujuan_nama}
                                           </div>
                                           {it.indikator_tujuan_nama && (
-                                            <div className="text-[11px] text-slate-500 leading-tight bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                              <span className="font-mono text-slate-700 font-bold bg-white px-1 py-0.2 rounded border border-slate-200 mr-1 text-[10px]">
+                                            <div className="text-[11px] text-slate-600 leading-tight bg-slate-50 p-2 rounded-xl border border-slate-200/80">
+                                              <span className="font-bold text-slate-800 mr-1.5">Indikator:</span>
+                                              <span className="font-mono text-blue-800 font-bold bg-white px-1.5 py-0.5 rounded border border-blue-200 mr-1.5 text-[10px]">
                                                 {it.indikator_tujuan_kode || '-'}
                                               </span>
                                               <span>{it.indikator_tujuan_nama}</span>
@@ -1000,8 +1084,8 @@ export default function PemetaanIkuPublicPage() {
                                           )}
                                         </td>
 
-                                        {/* 2. Sasaran + Indikator dengan Kode */}
-                                        <td className="py-3 px-4 align-top space-y-1">
+                                        {/* POIN 3: Sasaran + Tulisan "Indikator:" yang jelas dengan kodenya */}
+                                        <td className="py-3 px-4 align-top space-y-1.5">
                                           <div className="text-[11px] font-bold text-slate-900 leading-snug">
                                             <span className="font-mono text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-indigo-200">
                                               {it.sasaran_kode || '-'}
@@ -1009,8 +1093,9 @@ export default function PemetaanIkuPublicPage() {
                                             {it.sasaran_nama}
                                           </div>
                                           {it.indikator_sasaran_nama && (
-                                            <div className="text-[11px] text-slate-500 leading-tight bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                              <span className="font-mono text-slate-700 font-bold bg-white px-1 py-0.2 rounded border border-slate-200 mr-1 text-[10px]">
+                                            <div className="text-[11px] text-slate-600 leading-tight bg-slate-50 p-2 rounded-xl border border-slate-200/80">
+                                              <span className="font-bold text-slate-800 mr-1.5">Indikator:</span>
+                                              <span className="font-mono text-indigo-800 font-bold bg-white px-1.5 py-0.5 rounded border border-indigo-200 mr-1.5 text-[10px]">
                                                 {it.indikator_sasaran_kode || '-'}
                                               </span>
                                               <span>{it.indikator_sasaran_nama}</span>
@@ -1018,8 +1103,8 @@ export default function PemetaanIkuPublicPage() {
                                           )}
                                         </td>
 
-                                        {/* 3. Program + Indikator dengan Kode */}
-                                        <td className="py-3 px-4 align-top space-y-1">
+                                        {/* POIN 3: Program + Tulisan "Indikator:" yang jelas dengan kodenya */}
+                                        <td className="py-3 px-4 align-top space-y-1.5">
                                           <div className="text-[11px] font-bold text-slate-900 leading-snug">
                                             <span className="font-mono text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] mr-1 border border-purple-200">
                                               {it.program_kode || '-'}
@@ -1027,8 +1112,9 @@ export default function PemetaanIkuPublicPage() {
                                             {it.program_nama}
                                           </div>
                                           {it.indikator_program_nama && (
-                                            <div className="text-[11px] text-slate-500 leading-tight bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                              <span className="font-mono text-slate-700 font-bold bg-white px-1 py-0.2 rounded border border-slate-200 mr-1 text-[10px]">
+                                            <div className="text-[11px] text-slate-600 leading-tight bg-slate-50 p-2 rounded-xl border border-slate-200/80">
+                                              <span className="font-bold text-slate-800 mr-1.5">Indikator:</span>
+                                              <span className="font-mono text-purple-800 font-bold bg-white px-1.5 py-0.5 rounded border border-purple-200 mr-1.5 text-[10px]">
                                                 {it.indikator_program_kode || '-'}
                                               </span>
                                               <span>{it.indikator_program_nama}</span>
@@ -1036,7 +1122,7 @@ export default function PemetaanIkuPublicPage() {
                                           )}
                                         </td>
 
-                                        {/* 4. Kegiatan (RKAT) PALING KANAN */}
+                                        {/* POIN 1: Kegiatan (RKAT) PALING KANAN */}
                                         <td className="py-3 px-4 align-top">
                                           <div className="font-mono text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-md inline-block mb-1">
                                             {it.kegiatan_kode || '-'}
@@ -1046,7 +1132,7 @@ export default function PemetaanIkuPublicPage() {
                                           </p>
                                         </td>
 
-                                        {/* 5. Aksi: Pindah Antar IKU (Dropdown) & Tombol Hapus (Lepas IKU) */}
+                                        {/* POIN 4 & 5: Aksi Pindah Antar IKU & Tombol Hapus (Lepas IKU) */}
                                         <td className="py-3 px-3 align-top">
                                           <div className="flex flex-col gap-1.5">
                                             {/* Dropdown Pindah Antar IKU (Poin 4) */}
@@ -1071,7 +1157,7 @@ export default function PemetaanIkuPublicPage() {
                                               <ArrowRightLeft size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                             </div>
 
-                                            {/* Tombol Hapus: tertampung ke kegiatan belum ada IKU (Poin 5) */}
+                                            {/* POIN 5: Tombol Hapus -> tertampung ke kegiatan belum ada IKU */}
                                             {it.ref_iku !== 'Belum Ada IKU' ? (
                                               <button
                                                 type="button"
@@ -1088,8 +1174,8 @@ export default function PemetaanIkuPublicPage() {
                                                 <span>Lepas IKU (Hapus)</span>
                                               </button>
                                             ) : (
-                                              <span className="text-[10px] text-amber-700 font-bold text-center bg-amber-50 py-0.5 rounded border border-amber-200">
-                                                Belum Ada IKU
+                                              <span className="text-[10px] text-amber-800 font-black text-center bg-amber-100/80 py-0.5 rounded-lg border border-amber-300">
+                                                Ditampung di 'Belum Ada IKU'
                                               </span>
                                             )}
                                           </div>
@@ -1134,42 +1220,6 @@ export default function PemetaanIkuPublicPage() {
               })
             )}
 
-            {/* POIN 2: PAGINATION BOTTOM FOR GROUPS */}
-            {totalGroupPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/90 p-3 px-5 rounded-2xl border border-slate-200 shadow-2xs mt-4">
-                <span className="text-xs font-bold text-slate-600">
-                  Menampilkan grup IKU {(groupPage - 1) * groupsPerPage + 1} - {Math.min(groupPage * groupsPerPage, groups.length)} dari {groups.length} Grup
-                </span>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={groupPage <= 1}
-                    onClick={() => {
-                      setGroupPage(p => Math.max(1, p - 1));
-                      window.scrollTo({ top: 300, behavior: 'smooth' });
-                    }}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition-all"
-                  >
-                    ‹ Sebelumnya
-                  </button>
-                  <span className="px-3 py-1.5 bg-blue-50 text-blue-800 border border-blue-200 rounded-xl text-xs font-black">
-                    Hal {groupPage} / {totalGroupPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={groupPage >= totalGroupPages}
-                    onClick={() => {
-                      setGroupPage(p => p + 1);
-                      window.scrollTo({ top: 300, behavior: 'smooth' });
-                    }}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 rounded-xl text-xs font-bold transition-all"
-                  >
-                    Selanjutnya ›
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1232,7 +1282,7 @@ export default function PemetaanIkuPublicPage() {
                         </td>
                         <td className="py-3 px-4 align-top font-bold text-slate-800 text-xs">
                           {it.ref_iku === 'Belum Ada IKU' ? (
-                            <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-black">
+                            <span className="text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300 font-black">
                               Belum Ada IKU
                             </span>
                           ) : (
