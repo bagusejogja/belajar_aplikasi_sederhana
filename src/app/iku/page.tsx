@@ -14,6 +14,7 @@ import {
   PieChart, Pie, Tooltip, ResponsiveContainer,
   Cell, Legend
 } from 'recharts';
+import PublicNavHeader from '@/components/PublicNavHeader';
 
 interface IkuItem {
   id: number;
@@ -490,39 +491,8 @@ export default function PemetaanIkuPublicPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-blue-50/40 text-slate-800 antialiased font-sans">
       
-      {/* POIN 7: PUBLIC NAVBAR BERSIH (TANPA TOMBOL FORM RKAT, MONITORING MAK, PORTAL KEUANGAN DI KANAN ATAS) */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/iku" 
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-blue-200 shrink-0 hover:scale-105 transition-all"
-              title="Katalog IKU"
-            >
-              <Target size={22} />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 border border-blue-200">
-                  PORTAL PUBLIK
-                </span>
-                <span className="text-xs font-bold text-slate-500 hidden sm:inline">•</span>
-                <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Katalog Hirarki Kegiatan RKAT</span>
-              </div>
-              <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight">
-                Pemetaan Indikator Kinerja Utama (IKU)
-              </h1>
-            </div>
-          </div>
-
-          {/* Kanan atas bersih tanpa tombol redirect internal sesuai permintaan Poin 7 */}
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-            <span className="hidden sm:inline bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-              Tahun Anggaran {selectedTahun === 'all' ? '2025 - 2026' : selectedTahun}
-            </span>
-          </div>
-        </div>
-      </header>
+      {/* NAVBAR PUBLIK TERPADU & TOMBOL SALIN LINK PUBLIK */}
+      <PublicNavHeader currentPath="/iku" title="Katalog & Pemetaan IKU" />
 
       {/* TOAST NOTIFIKASI */}
       {toastMsg && (
@@ -1214,8 +1184,31 @@ export default function PemetaanIkuPublicPage() {
                               <table className="w-full text-left text-xs border-collapse">
                                 <thead>
                                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
-                                    {/* POIN 6: Kolom Checkbox Cek */}
-                                    <th className="py-3 px-3 text-center w-12">Cek</th>
+                                    {/* POIN 6 & Poin 1 Baru: Check All per Halaman */}
+                                    <th className="py-3 px-3 text-center w-14 select-none">
+                                      <div className="flex flex-col items-center justify-center gap-0.5">
+                                        <input
+                                          type="checkbox"
+                                          title={
+                                            paginatedItems.length > 0 && paginatedItems.every(it => !!checkedItemIds[it.id])
+                                              ? "Batalkan centang semua di halaman ini"
+                                              : "Centang semua kegiatan di halaman ini"
+                                          }
+                                          checked={paginatedItems.length > 0 && paginatedItems.every(it => !!checkedItemIds[it.id])}
+                                          onChange={(e) => {
+                                            checkAllItemsInGroup(paginatedItems, e.target.checked);
+                                            showToast(
+                                              e.target.checked 
+                                                ? `${paginatedItems.length} kegiatan di halaman ini berhasil dicentang` 
+                                                : `Centang ${paginatedItems.length} kegiatan di halaman ini dibatalkan`,
+                                              'info'
+                                            );
+                                          }}
+                                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                                        />
+                                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">SEMUA</span>
+                                      </div>
+                                    </th>
                                     {/* 1. Tujuan */}
                                     <th className="py-3 px-4 min-w-[210px]">Tujuan</th>
                                     {/* 2. Sasaran */}
@@ -1519,7 +1512,30 @@ export default function PemetaanIkuPublicPage() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-black text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-3 text-center w-12">Cek</th>
+                    <th className="py-3 px-3 text-center w-14 select-none">
+                      <div className="flex flex-col items-center justify-center gap-0.5">
+                        <input
+                          type="checkbox"
+                          title={
+                            paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!checkedItemIds[it.id])
+                              ? "Batalkan centang semua di halaman ini"
+                              : "Centang semua kegiatan di halaman ini"
+                          }
+                          checked={paginatedTableItems.length > 0 && paginatedTableItems.every(it => !!checkedItemIds[it.id])}
+                          onChange={(e) => {
+                            checkAllItemsInGroup(paginatedTableItems, e.target.checked);
+                            showToast(
+                              e.target.checked 
+                                ? `${paginatedTableItems.length} kegiatan di halaman ini berhasil dicentang` 
+                                : `Centang ${paginatedTableItems.length} kegiatan di halaman ini dibatalkan`,
+                              'info'
+                            );
+                          }}
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                        />
+                        <span className="text-[8px] font-black tracking-tighter text-slate-500 uppercase">SEMUA</span>
+                      </div>
+                    </th>
                     <th className="py-3 px-3 text-center w-20">Tahun</th>
                     <th className="py-3 px-4 min-w-[200px]">Referensi IKU</th>
                     <th className="py-3 px-4 min-w-[200px]">Tujuan</th>

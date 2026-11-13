@@ -33,6 +33,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import PublicNavHeader from '@/components/PublicNavHeader';
 
 export interface RkaDiffItem {
   row: number;
@@ -910,8 +911,10 @@ export default function InputRkatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50">
+      <PublicNavHeader currentPath="/input-rkat" title="Pengajuan Perubahan RKAT" />
+      <div className="py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto space-y-6">
 
         {/* HEADER HERO BANNER (PUBLIC ACCESS - TANPA LOGIN) */}
         <div className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-xs border border-gray-200/90 relative overflow-hidden">
@@ -1988,6 +1991,7 @@ export default function InputRkatPage() {
         );
       })()}
 
+      </div>
     </div>
   );
 }

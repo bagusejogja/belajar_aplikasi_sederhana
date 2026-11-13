@@ -97,6 +97,8 @@ export default function DashboardLayout({
       case '/anggaran/mak': return 'Koreksi & Verifikasi MAK';
       case '/input-rkat': return 'Pengajuan Perubahan RKAT';
       case '/pengajuan-rkat': return 'Pengajuan Perubahan RKAT';
+      case '/layanan-publik': return 'Portal Layanan Publik (Form & IKU)';
+      case '/anggaran/layanan-publik': return 'Portal Layanan Publik (Form & IKU)';
       case '/iku': return 'Katalog & Pemetaan IKU';
       case '/input-mak': return 'Pengajuan Revisi MAK Unit';
       case '/anggaran/usulan': return 'Revisi Terjadwal';

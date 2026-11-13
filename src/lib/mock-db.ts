@@ -91,6 +91,7 @@ export const menuList: MenuItem[] = [
   { title: 'Backup & Restore DB', path: '/backup', icon: 'Database', roles: ['ADMIN'], group: 'Master' },
 
   // --- ANGGARAN & RKAT ---
+  { title: 'Portal Layanan Publik (Form & IKU)', path: '/layanan-publik', icon: 'Sparkles', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran', 'GUEST'], group: 'Anggaran & RKAT' },
   { title: 'Dashboard Pagu & Mutasi', path: '/tambah-pagu', icon: 'PieChart', roles: ['ADMIN', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },
   { title: 'Analisis Usulan Tambah Pagu', path: '/analisis', icon: 'FileSpreadsheet', roles: ['ADMIN', 'MANAGER', 'STAFF'], group: 'Anggaran & RKAT' },
   { title: 'Cek Perubahan RKAT', path: '/perubahan-rkat', icon: 'TrendingUp', roles: ['ADMIN', 'MANAGER', 'STAFF', 'Pemroses Anggaran'], group: 'Anggaran & RKAT' },

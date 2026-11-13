@@ -12,6 +12,7 @@ import {
 import { useSearchParams } from 'next/navigation';
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
+import PublicNavHeader from '@/components/PublicNavHeader';
 
 export interface RkaDiffItem {
   row: number;
@@ -713,8 +714,10 @@ function InputMakPageContent() {
     : [];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50">
+      <PublicNavHeader currentPath="/input-mak" title="Pengajuan Revisi MAK" />
+      <div className="py-10 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto space-y-8">
         {/* HEADER HERO */}
         <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none">
@@ -1813,6 +1816,7 @@ function InputMakPageContent() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
