@@ -170,3 +170,4 @@ async function exportIkuData() {
 }
 
 exportIkuData().catch(console.error);
+
