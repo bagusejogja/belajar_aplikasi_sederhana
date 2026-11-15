@@ -102,10 +102,12 @@ export default function PublicNavHeader({ currentPath, title, subtitle, showTabs
           });
         } catch (e) {}
 
+        let lastReportedHeight = 0;
         const postH = () => {
           try {
             const h = document.body.scrollHeight;
-            if (h && window.parent && window.parent !== window) {
+            if (h && Math.abs(h - lastReportedHeight) > 15 && window.parent && window.parent !== window) {
+              lastReportedHeight = h;
               window.parent.postMessage({ type: 'PORTAL_EMBED_RESIZE', height: h }, '*');
             }
           } catch (e) {}
@@ -113,8 +115,20 @@ export default function PublicNavHeader({ currentPath, title, subtitle, showTabs
 
         setTimeout(postH, 200);
         setTimeout(postH, 800);
-        window.addEventListener('resize', postH);
-        return () => window.removeEventListener('resize', postH);
+        setTimeout(postH, 1800);
+        setTimeout(postH, 3000);
+
+        let ro: ResizeObserver | null = null;
+        try {
+          ro = new ResizeObserver(() => {
+            postH();
+          });
+          ro.observe(document.body);
+        } catch (e) {}
+
+        return () => {
+          if (ro) ro.disconnect();
+        };
       }
     }
   }, []);

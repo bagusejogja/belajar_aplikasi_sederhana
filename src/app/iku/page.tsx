@@ -209,6 +209,26 @@ export default function PemetaanIkuPublicPage() {
     }
   };
 
+  // Notifikasi auto-resize ke halaman portal induk saat embedded agar tabel tidak terpotong
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      const notifyHeight = () => {
+        try {
+          const h = document.body.scrollHeight;
+          if (h > 200) {
+            window.parent.postMessage({ type: 'PORTAL_EMBED_RESIZE', height: h }, '*');
+          }
+        } catch (e) {}
+      };
+      const t1 = setTimeout(notifyHeight, 150);
+      const t2 = setTimeout(notifyHeight, 600);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [loading, groups, expandedGroups, viewMode, showChart, innerPages, flatTablePage]);
+
   useEffect(() => {
     fetchIkuData();
     setFlatTablePage(1);

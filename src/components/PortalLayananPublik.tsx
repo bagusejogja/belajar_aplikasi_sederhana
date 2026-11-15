@@ -37,6 +37,14 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
     if (activeTab !== 'overview' && viewerRef.current) {
       viewerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    // Set default tinggi awal yang proporsional untuk masing-masing modul
+    if (activeTab === 'iku') {
+      setIframeHeight(1200);
+    } else if (activeTab === 'input-form') {
+      setIframeHeight(860);
+    } else {
+      setIframeHeight(850);
+    }
   }, [activeTab]);
 
   // Listener pesan postMessage dari iframe anak untuk auto-fit height yang aman tanpa loop
@@ -45,9 +53,9 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
       if (e.data && e.data.type === 'PORTAL_EMBED_RESIZE') {
         const nextH = Math.max(Number(e.data.height) || 0, 400);
         setIframeHeight(prev => {
-          // Hanya update jika perbedaan signifikan (> 25px) agar tidak terjadi looping
-          if (Math.abs(nextH - prev) > 25) {
-            return nextH + 10;
+          // Hanya update jika perbedaan signifikan (> 20px) agar tidak terjadi looping
+          if (Math.abs(nextH - prev) > 20) {
+            return nextH + 15;
           }
           return prev;
         });
@@ -496,7 +504,7 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
                 src={`${activeService.path}${activeService.path.includes('?') ? '&' : '?'}embedded=1`}
                 style={{ height: `${iframeHeight}px`, width: '100%' }}
                 className="w-full border-0 block"
-                scrolling="no"
+                scrolling="auto"
                 title={activeService.title}
                 onLoad={handleIframeLoad}
               />
