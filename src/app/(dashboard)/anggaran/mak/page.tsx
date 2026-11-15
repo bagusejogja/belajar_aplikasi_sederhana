@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
 import PemetaanIkuView from '@/components/PemetaanIkuView';
+import UsulanAnggaranView from '@/components/UsulanAnggaranView';
 
 const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#94a3b8'];
 
@@ -117,9 +118,27 @@ export default function MonitoringMakPage() {
   const [activeTab, setActiveTab] = useState<'pic-report' | 'table' | 'chart'>('pic-report');
   const [pieViewMode, setPieViewMode] = useState<'unit' | 'status'>('unit');
   
-  // Main Section Tab: Tolakan Verifikator MAK vs Pengajuan Perubahan RKAT vs Katalog IKU
-  const [mainSection, setMainSection] = useState<'tolakan-mak' | 'pengajuan-rkat' | 'katalog-iku'>('tolakan-mak');
+  // Main Section Tab: Tolakan Verifikator MAK vs Pengajuan Perubahan RKAT vs Revisi Terjadwal vs Katalog IKU
+  const [mainSection, setMainSection] = useState<'tolakan-mak' | 'pengajuan-rkat' | 'revisi-terjadwal' | 'katalog-iku'>('tolakan-mak');
+  const [usulanCount, setUsulanCount] = useState<number>(0);
   const [copiedLinkUrl, setCopiedLinkUrl] = useState<string | null>(null);
+
+  // Baca URL query param ?tab= saat pertama kali halaman dimuat
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'revisi-terjadwal' || tab === 'terjadwal' || tab === 'usulan') {
+        setMainSection('revisi-terjadwal');
+      } else if (tab === 'pengajuan-rkat' || tab === 'rkat') {
+        setMainSection('pengajuan-rkat');
+      } else if (tab === 'katalog-iku' || tab === 'iku') {
+        setMainSection('katalog-iku');
+      } else if (tab === 'tolakan-mak' || tab === 'mak') {
+        setMainSection('tolakan-mak');
+      }
+    }
+  }, []);
 
   const handleCopyLinkUrl = (path: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -234,11 +253,13 @@ export default function MonitoringMakPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [dataRes, unitsRes] = await Promise.all([
+      const [dataRes, unitsRes, usulanRes] = await Promise.all([
         supabase.from('mak_submissions').select('*').order('created_at', { ascending: false }),
-        supabase.from('gov_units').select('nama_unit, group_org')
+        supabase.from('gov_units').select('nama_unit, group_org'),
+        supabase.from('form_submissions').select('id', { count: 'exact', head: true })
       ]);
       if (!dataRes.error) setData(dataRes.data || []);
+      if (usulanRes && typeof usulanRes.count === 'number') setUsulanCount(usulanRes.count);
       
       if (unitsRes.data) {
         const mapping: Record<string, string> = {};
@@ -842,7 +863,7 @@ export default function MonitoringMakPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-24 space-y-4">
-      {/* 🔴 TAB SWITCHER UTAMA: 3 REKAP LAYANAN (MAK, RKAT, IKU) & PILIHAN LINK */}
+      {/* 🔴 TAB SWITCHER UTAMA: 3 REKAP LAYANAN (MAK, RKAT, TERJADWAL) + IKU & PILIHAN LINK */}
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-2.5 px-4 rounded-2xl border border-gray-200/80 shadow-xs">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Tab 1: Revisi MAK */}
@@ -856,7 +877,7 @@ export default function MonitoringMakPage() {
             }`}
           >
             <ClipboardList size={15} />
-            <span>Rekap Revisi MAK Unit</span>
+            <span>Rekap Revisi MAK</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
               mainSection === 'tolakan-mak' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
             }`}>
@@ -883,7 +904,28 @@ export default function MonitoringMakPage() {
             </span>
           </button>
 
-          {/* Tab 3: Katalog & Pemetaan IKU */}
+          {/* Tab 3: Revisi Terjadwal */}
+          <button
+            type="button"
+            onClick={() => setMainSection('revisi-terjadwal')}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              mainSection === 'revisi-terjadwal'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 scale-[1.01]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Calendar size={15} />
+            <span>Revisi Terjadwal</span>
+            {usulanCount > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                mainSection === 'revisi-terjadwal' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {usulanCount}
+              </span>
+            )}
+          </button>
+
+          {/* Tab 4: Katalog & Pemetaan IKU */}
           <button
             type="button"
             onClick={() => setMainSection('katalog-iku')}
@@ -916,7 +958,7 @@ export default function MonitoringMakPage() {
             <button
               type="button"
               onClick={(e) => handleCopyLinkUrl('/input-mak', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Salin link publik form MAK"
             >
               {copiedLinkUrl === '/input-mak' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
@@ -937,10 +979,31 @@ export default function MonitoringMakPage() {
             <button
               type="button"
               onClick={(e) => handleCopyLinkUrl('/input-rkat', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Salin link publik form RKAT"
             >
               {copiedLinkUrl === '/input-rkat' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
+            </button>
+          </div>
+
+          {/* Link Form Terjadwal */}
+          <div className="inline-flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+            <Link
+              href="/input-form"
+              target="_blank"
+              className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-emerald-600 hover:bg-slate-100 flex items-center gap-1 transition-colors"
+              title="Buka form revisi terjadwal tanpa login"
+            >
+              <ExternalLink size={11} className="text-emerald-500" />
+              <span>Form Terjadwal</span>
+            </Link>
+            <button
+              type="button"
+              onClick={(e) => handleCopyLinkUrl('/input-form', e)}
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Salin link publik form terjadwal"
+            >
+              {copiedLinkUrl === '/input-form' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
             </button>
           </div>
 
@@ -958,7 +1021,7 @@ export default function MonitoringMakPage() {
             <button
               type="button"
               onClick={(e) => handleCopyLinkUrl('/iku', e)}
-              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors"
+              className="px-2 py-1.5 text-slate-400 hover:text-slate-700 border-l border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Salin link publik katalog IKU"
             >
               {copiedLinkUrl === '/iku' ? <Check size={12} className="text-emerald-600 stroke-[3]" /> : <Copy size={12} />}
@@ -2724,6 +2787,13 @@ export default function MonitoringMakPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* 🟢 TAMPILAN KHUSUS: TAB REVISI TERJADWAL */}
+      {mainSection === 'revisi-terjadwal' && (
+        <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs p-3 sm:p-5 animate-in fade-in duration-200">
+          <UsulanAnggaranView isEmbedded={true} />
+        </div>
       )}
 
       {/* 🟣 TAMPILAN KHUSUS: TAB KATALOG & PEMETAAN IKU */}

@@ -1,0 +1,1268 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import { 
+  FileText, Download, RefreshCw, 
+  Search, Eye, Filter, Loader2, Database,
+  CheckCircle, Clock, UploadCloud, Calendar, BarChart3, ClipboardList, Table2, ExternalLink,
+  RotateCcw, CheckCircle2, TrendingUp, Sparkles, Building2, UserCheck, ChevronDown, Layers, PieChart as PieChartIcon, Check
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+
+const GROUP_COLORS = ['#4f46e5', '#0ea5e9', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#64748b'];
+
+export default function UsulanAnggaranView({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
+  const [rawData, setRawData] = useState<any[]>([]);
+  const [unitGroups, setUnitGroups] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'table' | 'chart' | 'donut'>('table');
+  const [isGambaranOpen, setIsGambaranOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PROSES' | 'SELESAI'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [picFilter, setPicFilter] = useState('');
+  const [selectedTP, setSelectedTP] = useState<string>('');
+  const [hasSetDefaultTP, setHasSetDefaultTP] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isDownloadingMulti, setIsDownloadingMulti] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const [formRes, unitsRes] = await Promise.all([
+        supabase.from('form_submissions').select('*').order('created_at', { ascending: false }),
+        supabase.from('gov_units').select('nama_unit, group_org')
+      ]);
+
+      if (formRes.error) throw formRes.error;
+      setRawData(formRes.data || []);
+      
+      if (unitsRes.data) {
+        const mapping: Record<string, string> = {};
+        unitsRes.data.forEach(u => {
+           if (u.nama_unit && u.group_org) {
+             mapping[u.nama_unit] = u.group_org;
+           }
+        });
+        setUnitGroups(mapping);
+      }
+    } catch (err: any) {
+      console.error("Gagal ambil data:", err);
+      alert("Gagal mengambil data: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const availableTPs = useMemo(() => {
+    const tps = new Set<string>();
+    rawData.forEach(item => {
+      const t = item.tahun || item.Tahun;
+      const p = item.periode || item.Periode;
+      if (t && p) {
+        tps.add(`${t} - ${p}`);
+      }
+    });
+    // Sort descending by Year, then Period
+    return Array.from(tps).sort((a, b) => {
+      const partsA = a.split(' - ').map(s => parseInt(s.trim(), 10) || 0);
+      const partsB = b.split(' - ').map(s => parseInt(s.trim(), 10) || 0);
+      if (partsB[0] !== partsA[0]) return partsB[0] - partsA[0];
+      return partsB[1] - partsA[1];
+    });
+  }, [rawData]);
+
+  useEffect(() => {
+    if (availableTPs.length > 0 && !hasSetDefaultTP) {
+      setSelectedTP(availableTPs[0]); // default to latest
+      setHasSetDefaultTP(true);
+    }
+  }, [availableTPs, hasSetDefaultTP]);
+
+  const handleProcess = async (id: number) => {
+    if (!confirm("Tandai revisi ini sebagai Sudah Diproses?")) return;
+    
+    setIsLoading(true);
+    try {
+      // Waktu Jakarta (WIB)
+      const options: Intl.DateTimeFormatOptions = { 
+        timeZone: 'Asia/Jakarta', 
+        year: 'numeric', month: 'short', day: '2-digit', 
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      };
+      const jakartaTime = new Intl.DateTimeFormat('id-ID', options).format(new Date()) + ' WIB';
+      
+      const { error } = await supabase
+        .from('form_submissions')
+        .update({ 
+           status: 'Sudah Diproses', 
+           waktu_proses: jakartaTime 
+        })
+        .eq('id', id);
+
+      if (error) {
+        throw new Error(error.message + " (Pastikan tabel form_submissions memiliki kolom 'status' dan 'waktu_proses')");
+      }
+      
+      alert("Berhasil diperbarui!");
+      fetchData(); // Refresh data
+    } catch (err: any) {
+      console.error(err);
+      alert("Gagal memproses: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const availablePics = useMemo(() => {
+    const pics = rawData.map(item => item.pic || item.PIC).filter(Boolean);
+    return Array.from(new Set(pics));
+  }, [rawData]);
+
+  const baseFilteredData = useMemo(() => {
+    return rawData.filter(item => {
+      const matchesSearch = Object.values(item).some(val =>
+        String(val).toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      const itemPic = item.pic || item.PIC;
+      const matchesPic = picFilter ? itemPic === picFilter : true;
+      const t = item.tahun || item.Tahun;
+      const p = item.periode || item.Periode;
+      const itemTP = (t && p) ? `${t} - ${p}` : '';
+      const matchesTP = (selectedTP === 'ALL' || !selectedTP) ? true : itemTP === selectedTP;
+      return matchesSearch && matchesPic && matchesTP;
+    });
+  }, [rawData, searchQuery, picFilter, selectedTP]);
+
+  const filteredData = useMemo(() => {
+    const list = baseFilteredData.filter(item => {
+      if (statusFilter === 'ALL') return true;
+      if (statusFilter === 'SELESAI') return (item.status ?? '') === 'Sudah Diproses';
+      return (item.status ?? '') !== 'Sudah Diproses';
+    });
+
+    // sort: yang belum selesai (bukan 'Sudah Diproses') ditaruh di atas, lalu urut tanggal terbaru
+    list.sort((a, b) => {
+      const isADone = (a.status ?? '') === 'Sudah Diproses';
+      const isBDone = (b.status ?? '') === 'Sudah Diproses';
+      
+      if (!isADone && isBDone) return -1;
+      if (isADone && !isBDone) return 1;
+      
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+      return dateB - dateA;
+    });
+    return list;
+  }, [baseFilteredData, statusFilter]);
+
+  const dashboardData = useMemo(() => {
+    const unitCounts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || 'Unknown';
+      unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    
+    const freqGroups: Record<number, string[]> = {};
+    Object.entries(unitCounts).forEach(([unit, count]) => {
+       if (!freqGroups[count]) freqGroups[count] = [];
+       freqGroups[count].push(unit);
+    });
+
+    return Object.entries(freqGroups)
+      .map(([Total, units]) => ({ name: units.join(', '), Total: Number(Total) }))
+      .sort((a, b) => b.Total - a.Total); // Sort descending by frequency
+  }, [filteredData]);
+
+  const chartData = useMemo(() => {
+    const unitCounts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || 'Unknown';
+      unitCounts[unit] = (unitCounts[unit] || 0) + 1;
+    });
+    return Object.entries(unitCounts)
+      .map(([unit, count]) => ({ name: unit, Total: count }))
+      .sort((a, b) => b.Total - a.Total);
+  }, [filteredData]);
+
+  // Reset selection & page when search/filter changes
+  useEffect(() => {
+    setSelectedIds([]);
+    setCurrentPage(1);
+  }, [searchQuery, picFilter, selectedTP, pageSize]);
+
+  const paginatedData = useMemo(() => {
+    if (pageSize === 'ALL') return filteredData;
+    const size = Number(pageSize);
+    const start = (currentPage - 1) * size;
+    return filteredData.slice(start, start + size);
+  }, [filteredData, currentPage, pageSize]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'ALL' || filteredData.length === 0) return 1;
+    return Math.ceil(filteredData.length / Number(pageSize));
+  }, [filteredData, pageSize]);
+
+  const exportToCSV = () => {
+    if (filteredData.length === 0) return;
+    
+    // Ambil semua key dari object pertama
+    const headers = Object.keys(filteredData[0]);
+    
+    const rows = filteredData.map(item => {
+      return headers.map(header => {
+        let val = item[header] ?? '';
+        // Escape quotes
+        val = String(val).replace(/"/g, '""');
+        return `"${val}"`;
+      });
+    });
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Data_Revisi_Terjadwal_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const isFileLink = (val: any) => {
+    if (!val) return false;
+    if (typeof val === 'string' && val.includes('http')) {
+      return true;
+    }
+    if (Array.isArray(val) && val.length > 0) {
+    if (typeof val[0] === 'string' && val[0].startsWith('http')) return true;
+      if (typeof val[0] === 'object' && val[0] !== null && val[0].url && val[0].url.includes('http')) return true;
+    }
+    return false;
+  };
+
+  const extractFilesFromValue = (val: any) => {
+    let files: {url: string, name: string}[] = [];
+
+    const extractFiles = (items: any[]) => {
+      return items.map(item => {
+        if (typeof item === 'string') return { url: item, name: item.split('/').pop() || 'file' };
+        if (typeof item === 'object' && item !== null && item.url) return { url: item.url, name: item.name || item.url.split('/').pop() || 'file' };
+        return null;
+      }).filter(f => f && f.url.includes('http')) as {url: string, name: string}[];
+    };
+
+    if (Array.isArray(val)) {
+      files = extractFiles(val);
+    } else if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          files = extractFiles(parsed);
+        } else if (typeof parsed === 'object' && parsed !== null && parsed.url) {
+          files = [{ url: parsed.url, name: parsed.name || 'file' }];
+        } else {
+          files = [{ url: val, name: 'file' }];
+        }
+      } catch {
+        files = val.split(',').map((s: string) => s.trim()).filter((s: string) => s.includes('http')).map((s: string) => ({ url: s, name: s.split('/').pop() || 'file' }));
+        if(files.length === 0 && val.includes('http')) files = [{ url: val, name: 'file' }];
+      }
+    } else if (typeof val === 'object' && val !== null && val.url) {
+      files = [{ url: val.url, name: val.name || 'file' }];
+    }
+    
+    return files;
+  };
+
+  const getSafeFileUrl = (url: string, filename?: string) => {
+    if (!url) return '';
+    const gdriveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (gdriveMatch && gdriveMatch[1]) {
+      return `https://drive.google.com/thumbnail?id=${gdriveMatch[1]}&sz=w1000`;
+    }
+    // Jika URL R2, bypass blokir ISP (Indihome/Telkomsel pada domain Cloudflare R2 *.r2.dev) lewat proxy backend
+    if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+      const fn = filename ? `&filename=${encodeURIComponent(filename)}` : '';
+      return `/api/image-cors?url=${encodeURIComponent(url)}${fn}`;
+    }
+    return url;
+  };
+
+  const handleDownloadCustomName = async (url: string, originalName: string, unitVal: string, uploadTime: string) => {
+    try {
+      const ext = originalName.split('.').pop() || 'file';
+      const now = uploadTime ? new Date(uploadTime) : new Date();
+      const timeStr = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+      
+      const cleanUnit = (unitVal || 'Unit').replace(/[^a-zA-Z0-9]/g, '_');
+      const newFileName = `${cleanUnit}_${timeStr}.${ext}`;
+      
+      // Ambil safe URL melewati proxy server untuk bypass blokir ISP (Indihome/Telkomsel)
+      const targetUrl = getSafeFileUrl(url, newFileName);
+
+      let response: Response;
+      try {
+        response = await fetch(targetUrl);
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+      } catch (err) {
+        // Fallback jika fetch direct gagal, paksa lewat proxy
+        const proxyUrl = `/api/image-cors?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(newFileName)}`;
+        response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`Proxy Error ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = newFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err) {
+      console.error("Gagal download blob, fallback buka tab proxy:", err);
+      // Fallback tetap menggunakan proxy agar tidak diblokir Indihome
+      const fallbackUrl = getSafeFileUrl(url, originalName);
+      const link = document.createElement('a');
+      link.href = fallbackUrl;
+      link.download = originalName;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleMultiDownload = async () => {
+    if (selectedIds.length === 0) return;
+    setIsDownloadingMulti(true);
+    
+    const selectedRows = filteredData.filter(row => selectedIds.includes(row.id));
+    let allFiles: { url: string, name: string, unitVal: string, uploadTime: string }[] = [];
+    
+    selectedRows.forEach(row => {
+       const unitVal = row['unit'] || row['Unit'] || row['Unit Kerja'] || row['unit_kerja'] || '-';
+       const uploadTime = row['created_at'];
+       Object.keys(row).forEach(key => {
+         if (isFileLink(row[key])) {
+            const files = extractFilesFromValue(row[key]);
+            files.forEach(f => {
+               allFiles.push({ ...f, unitVal, uploadTime });
+            });
+         }
+       });
+    });
+
+    if (allFiles.length === 0) {
+      alert("Tidak ada lampiran yang ditemukan pada baris yang dipilih.");
+      setIsDownloadingMulti(false);
+      return;
+    }
+
+    const confirmDownload = confirm(`Ditemukan ${allFiles.length} file untuk didownload.\nCatatan: Browser mungkin meminta izin untuk mengunduh banyak file sekaligus (Allow multiple downloads). Mohon izinkan jika ditanya.\nLanjutkan?`);
+    if (!confirmDownload) {
+      setIsDownloadingMulti(false);
+      return;
+    }
+
+    for (let i = 0; i < allFiles.length; i++) {
+       const file = allFiles[i];
+       await handleDownloadCustomName(file.url, file.name, file.unitVal, file.uploadTime);
+       // Delay 800ms agar browser tidak ngeblok multiple download
+       await new Promise(resolve => setTimeout(resolve, 800));
+    }
+    
+    setIsDownloadingMulti(false);
+  };
+
+  const renderFileLinks = (val: any, unitVal: string, uploadTime: string) => {
+    const files = extractFilesFromValue(val);
+
+    if (files.length === 0) return <span>-</span>;
+
+    if (files.length === 1) {
+      const file = files[0];
+      const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes((file.name.split('.').pop() || file.url.split('?')[0].split('.').pop() || '').toLowerCase());
+      const safeUrl = getSafeFileUrl(file.url, file.name);
+
+      return (
+        <div className="flex items-center gap-1.5">
+          {isImg && (
+            <button
+              type="button"
+              onClick={() => setPreviewImage(safeUrl)}
+              className="flex items-center justify-center p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg transition-all active:scale-95 shadow-xs"
+              title={`Lihat Gambar: ${file.name}`}
+            >
+              <Eye size={13} strokeWidth={2.5} />
+            </button>
+          )}
+          <button 
+            type="button"
+            onClick={() => handleDownloadCustomName(file.url, file.name, unitVal, uploadTime)}
+            className="group flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-emerald-500 text-indigo-600 hover:text-white border border-indigo-100 hover:border-emerald-600 rounded-lg transition-all active:scale-95 shadow-xs"
+            title={`Download: ${file.name}`}
+          >
+            <Download size={13} strokeWidth={2.5} />
+            <span className="text-[11px] font-black uppercase tracking-wider">Download</span>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative inline-block">
+        <select 
+          onChange={(e) => {
+            if(e.target.value !== "") {
+              const file = files[parseInt(e.target.value)];
+              const isImg = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes((file.name.split('.').pop() || file.url.split('?')[0].split('.').pop() || '').toLowerCase());
+              if (isImg) {
+                setPreviewImage(getSafeFileUrl(file.url, file.name));
+              } else {
+                handleDownloadCustomName(file.url, file.name, unitVal, uploadTime);
+              }
+              e.target.value = ""; // Reset kembali ke pilihan awal
+            }
+          }}
+          className="appearance-none pr-8 pl-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] border border-indigo-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors w-36 shadow-xs truncate uppercase tracking-wider"
+        >
+          <option value="">{files.length} Lampiran</option>
+          {files.map((file, i) => (
+            <option key={i} value={i}>⬇ {file.name}</option>
+          ))}
+        </select>
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500">
+          <Download size={14} strokeWidth={2.5} />
+        </div>
+      </div>
+    );
+  };
+
+  const total = filteredData.length;
+  const selesai = filteredData.filter(d => d.status === 'Sudah Diproses').length;
+  const proses = filteredData.filter(d => d.status !== 'Sudah Diproses').length;
+  const completionRate = total > 0 ? Math.round((selesai / total) * 100) : 0;
+
+  const groupOrgChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredData.forEach(item => {
+      const unit = (item.unit || item.Unit || item['Unit Kerja'] || item.unit_kerja || '').trim();
+      const group = unitGroups[unit] || 'Lainnya / Unit';
+      counts[group] = (counts[group] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredData, unitGroups]);
+
+  const statusPieData = useMemo(() => {
+    return [
+      { name: 'Selesai Diproses', value: selesai, color: '#10b981' },
+      { name: 'Menunggu Proses', value: proses, color: '#f59e0b' },
+    ].filter(d => d.value > 0);
+  }, [selesai, proses]);
+
+  return (
+    <div className={isEmbedded ? "w-full space-y-4" : "max-w-7xl mx-auto pb-24 space-y-4"}>
+      {/* ROW 1: EXECUTIVE BANNER & TOOLBAR (DESIGN SYSTEM STANDARD) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3.5 bg-white/90 backdrop-blur-md p-4 px-5 rounded-2xl border border-gray-200/80 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-200/60 shrink-0">
+            <ClipboardList size={22} />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-indigo-50 text-indigo-700 font-extrabold uppercase tracking-wider text-[10px] px-2.5 py-0.5 rounded-md border border-indigo-200/80">
+                USULAN REVISI ANGGARAN
+              </span>
+              <h1 className="text-lg md:text-xl font-black text-gray-900 tracking-tight leading-none">
+                Usulan Revisi Terjadwal
+              </h1>
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold">
+                {filteredData.length} Pengajuan
+              </span>
+            </div>
+            <p className="text-gray-500 font-medium text-xs mt-1">
+              Monitoring data revisi anggaran unit kerja, pelacakan proses verifikator, & unduh berkas lampiran.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={fetchData}
+            className="h-9 px-3.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
+            title="Muat ulang data dari database"
+          >
+            <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+          
+          {selectedIds.length > 0 && (
+            <button 
+              onClick={handleMultiDownload}
+              disabled={isDownloadingMulti}
+              className="h-9 px-4 bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-200/60 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {isDownloadingMulti ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              <span>Unduh {selectedIds.length} Data Terpilih</span>
+            </button>
+          )}
+
+          <button 
+            onClick={exportToCSV}
+            disabled={filteredData.length === 0}
+            className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-200/60 transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <Download size={13} />
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ROW 2: 4 MODERN KPI SUMMARY CARDS (STANDAR UNIT KERJA & GOV-MAPPING) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          {
+            id: 'ALL',
+            title: 'TOTAL PENGAJUAN',
+            titleColor: 'text-indigo-600 dark:text-indigo-400',
+            value: total,
+            valueUnit: 'Usulan',
+            valueColor: 'text-indigo-950 dark:text-indigo-100',
+            icon: Layers,
+            iconBox: 'bg-indigo-100/80 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60',
+            footerLeft: `Periode ${selectedTP === 'ALL' || !selectedTP ? 'Semua' : selectedTP}`,
+            footerBadge: '100% Usulan',
+            footerBadgeClass: 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300',
+            footerBorder: 'border-indigo-100/80 dark:border-indigo-900/40',
+            footerTextColor: 'text-indigo-700 dark:text-indigo-300',
+            activeRing: 'ring-2 ring-indigo-600 border-indigo-500 dark:border-indigo-500 shadow-indigo-100',
+            cardBg: 'bg-gradient-to-br from-indigo-500/10 via-indigo-50/40 to-white dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900 border-indigo-200/80 dark:border-indigo-800/60',
+          },
+          {
+            id: 'PROSES',
+            title: 'MENUNGGU PROSES',
+            titleColor: 'text-amber-700 dark:text-amber-400',
+            value: proses,
+            valueUnit: 'Antrean',
+            valueColor: 'text-amber-950 dark:text-amber-100',
+            icon: Clock,
+            iconBox: 'bg-amber-100/80 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60',
+            footerLeft: 'Antrean verifikasi',
+            footerBadge: total > 0 ? `${Math.round((proses / total) * 100)}% Pending` : 'Pending',
+            footerBadgeClass: 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300',
+            footerBorder: 'border-amber-100/80 dark:border-amber-900/40',
+            footerTextColor: 'text-amber-700 dark:text-amber-300',
+            activeRing: 'ring-2 ring-amber-500 border-amber-500 dark:border-amber-500 shadow-amber-100',
+            cardBg: 'bg-gradient-to-br from-amber-500/10 via-amber-50/40 to-white dark:from-amber-950/30 dark:via-slate-900 dark:to-slate-900 border-amber-200/80 dark:border-amber-800/60',
+          },
+          {
+            id: 'SELESAI',
+            title: 'SELESAI DIPROSES',
+            titleColor: 'text-emerald-700 dark:text-emerald-400',
+            value: selesai,
+            valueUnit: 'Tuntas',
+            valueColor: 'text-emerald-950 dark:text-emerald-100',
+            icon: CheckCircle2,
+            iconBox: 'bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60',
+            footerLeft: 'Telah ditindaklanjuti',
+            footerBadge: total > 0 ? `${Math.round((selesai / total) * 100)}% Selesai` : 'Selesai',
+            footerBadgeClass: 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300',
+            footerBorder: 'border-emerald-100/80 dark:border-emerald-900/40',
+            footerTextColor: 'text-emerald-700 dark:text-emerald-300',
+            activeRing: 'ring-2 ring-emerald-600 border-emerald-500 dark:border-emerald-500 shadow-emerald-100',
+            cardBg: 'bg-gradient-to-br from-emerald-500/10 via-emerald-50/40 to-white dark:from-emerald-950/30 dark:via-slate-900 dark:to-slate-900 border-emerald-200/80 dark:border-emerald-800/60',
+          },
+          {
+            id: 'RATE',
+            title: 'TINGKAT KETUNTASAN',
+            titleColor: 'text-purple-700 dark:text-purple-400',
+            value: `${completionRate}%`,
+            valueUnit: '',
+            valueColor: 'text-purple-950 dark:text-purple-100',
+            icon: TrendingUp,
+            iconBox: 'bg-purple-100/80 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60',
+            footerLeft: `${selesai} dari ${total} usulan`,
+            footerBadge: completionRate === 100 ? 'Sempurna' : `${100 - completionRate}% tersisa`,
+            footerBadgeClass: 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300',
+            footerBorder: 'border-purple-100/80 dark:border-purple-900/40',
+            footerTextColor: 'text-purple-700 dark:text-purple-300',
+            activeRing: 'ring-2 ring-purple-500 border-purple-500 dark:border-purple-500 shadow-purple-100',
+            cardBg: 'bg-gradient-to-br from-purple-500/10 via-purple-50/40 to-white dark:from-purple-950/30 dark:via-slate-900 dark:to-slate-900 border-purple-200/80 dark:border-purple-800/60',
+          },
+        ].map((card) => {
+          const Icon = card.icon;
+          const isSelected = statusFilter === card.id;
+
+          return (
+            <div
+              key={card.id}
+              onClick={() => {
+                if (card.id === 'RATE') {
+                  setStatusFilter(statusFilter === 'SELESAI' ? 'ALL' : 'SELESAI');
+                } else {
+                  setStatusFilter(statusFilter === card.id ? 'ALL' : card.id as any);
+                }
+              }}
+              className={`${card.cardBg} rounded-2xl p-4 transition-all duration-200 cursor-pointer relative select-none flex flex-col justify-between shadow-xs backdrop-blur-xs ${
+                isSelected
+                  ? `${card.activeRing} shadow-md scale-[1.01]`
+                  : 'hover:shadow-sm'
+              }`}
+            >
+              {isSelected && (
+                <div className="absolute top-2.5 right-2.5 px-1.5 py-0.2 rounded-full bg-blue-600 text-white text-[9px] font-black uppercase flex items-center gap-0.5 shadow-2xs">
+                  <Check size={9} strokeWidth={3} />
+                  <span>Filter Aktif</span>
+                </div>
+              )}
+
+              <div className="flex items-start justify-between">
+                <div className="pr-2">
+                  <span className={`text-[10px] font-black uppercase tracking-wider block mb-1 ${card.titleColor}`}>
+                    {card.title}
+                  </span>
+                  <div className={`text-xl md:text-2xl font-black font-mono tracking-tight flex items-baseline gap-1.5 ${card.valueColor}`}>
+                    {card.value}
+                    {card.valueUnit && (
+                      <span className="text-xs font-semibold text-gray-500 dark:text-slate-400">
+                        {card.valueUnit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={`p-2 rounded-xl shrink-0 ${card.iconBox}`}>
+                  <Icon size={18} />
+                </div>
+              </div>
+
+              <div className={`mt-3 text-xs font-bold flex items-center justify-between border-t pt-2 ${card.footerBorder} ${card.footerTextColor}`}>
+                <span className="truncate max-w-[130px]">{card.footerLeft}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${card.footerBadgeClass}`}>
+                  {card.footerBadge}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ROW 3: GAMBARAN REVISI SECTION (COLLAPSIBLE - DEFAULT NUTUP) */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden transition-all">
+        {/* Accordion Header */}
+        <div 
+          onClick={() => setIsGambaranOpen(!isGambaranOpen)}
+          className="p-4 px-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 transition-colors select-none"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shrink-0">
+              <BarChart3 size={16} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Gambaran Revisi Anggaran {selectedTP ? `(${selectedTP === 'ALL' ? 'Semua Periode' : selectedTP})` : ''}
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {chartData.length} Unit
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                Visualisasi frekuensi revisi unit, grafik batang, dan distribusi kelompok organisasi.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <span className="text-[11px] font-bold text-indigo-600">
+              {isGambaranOpen ? 'Tutup Visualisasi' : 'Buka Analisis Visual'}
+            </span>
+            <div className={`p-1.5 rounded-lg bg-gray-100 text-gray-600 transition-transform duration-200 ${isGambaranOpen ? 'rotate-180' : ''}`}>
+              <ChevronDown size={14} />
+            </div>
+          </div>
+        </div>
+
+        {/* Collapsible Content */}
+        {isGambaranOpen && (
+          <div className="p-5 pt-1 border-t border-gray-100 space-y-4 animate-in fade-in duration-200">
+            {/* GLOW PILL TABS */}
+            <div className="flex justify-end pt-2">
+              <div className="inline-flex p-1 bg-slate-100/90 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-inner gap-1">
+                <button 
+                  onClick={() => setActiveTab('table')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'table'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <Table2 size={13} className={activeTab === 'table' ? 'text-white' : 'text-slate-500'} />
+                  <span>Tabel Frekuensi</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'table' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {dashboardData.length}
+                  </span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('chart')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'chart'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <BarChart3 size={13} className={activeTab === 'chart' ? 'text-white' : 'text-slate-500'} />
+                  <span>Grafik Batang</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'chart' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {chartData.length}
+                  </span>
+                </button>
+                <button 
+                  onClick={() => setActiveTab('donut')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    activeTab === 'donut'
+                      ? 'bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 text-white shadow-md shadow-blue-200/60 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 active:scale-98'
+                  }`}
+                >
+                  <PieChartIcon size={13} className={activeTab === 'donut' ? 'text-white' : 'text-slate-500'} />
+                  <span>Komposisi Donut</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    activeTab === 'donut' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {groupOrgChartData.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* TAB CONTENT */}
+            {activeTab === 'table' ? (
+              dashboardData.length > 0 ? (
+                <div className="overflow-x-auto rounded-xl border border-gray-200/80">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-black uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3">Unit Kerja (Frekuensi Sama)</th>
+                        <th className="px-4 py-3 text-center w-36">Frekuensi Revisi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {dashboardData.sort((a, b) => b.Total - a.Total).map((d, i) => {
+                        const getGroupColor = (group?: string) => {
+                          switch(group) {
+                             case 'Fakultas': return 'bg-sky-50 text-sky-700 border border-sky-200';
+                             case 'KPTU': return 'bg-amber-50 text-amber-700 border border-amber-200';
+                             case 'Pusat Studi': return 'bg-violet-50 text-violet-700 border border-violet-200';
+                             case 'Tempat Ibadah': return 'bg-rose-50 text-rose-700 border border-rose-200';
+                             default: return 'bg-gray-50 text-gray-700 border border-gray-200';
+                          }
+                        };
+                        const units = d.name.split(', ');
+                        return (
+                          <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {units.map((unit: string, ui: number) => {
+                                  const cleanUnit = unit.trim();
+                                  const groupOrg = unitGroups[cleanUnit];
+                                  return (
+                                    <span key={ui} className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${getGroupColor(groupOrg)}`} title={groupOrg ? `Grup: ${groupOrg}` : 'Belum ada grup'}>
+                                      {cleanUnit}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-xs font-mono shadow-2xs">
+                                {d.Total} kali
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                  <BarChart3 size={28} className="opacity-20 mb-2" />
+                  <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
+                </div>
+              )
+            ) : activeTab === 'chart' ? (
+              chartData.length > 0 ? (
+                <div className="h-[300px] w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                      <defs>
+                        <linearGradient id="usulanBarGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="#2563eb" stopOpacity={0.65} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} 
+                        angle={-45} 
+                        textAnchor="end" 
+                        interval={0}
+                        height={80}
+                        tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val}
+                      />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} allowDecimals={false} />
+                      <Tooltip 
+                        cursor={{ fill: 'rgba(241, 245, 249, 0.6)' }}
+                        contentStyle={{ 
+                          borderRadius: '0.85rem', 
+                          border: '1px solid #e2e8f0', 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          backdropFilter: 'blur(8px)',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                          fontSize: '11px',
+                          fontWeight: 'bold'
+                        }}
+                      />
+                      <Bar dataKey="Total" fill="url(#usulanBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={38} animationDuration={800} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-32 flex flex-col items-center justify-center text-gray-400">
+                  <BarChart3 size={28} className="opacity-20 mb-2" />
+                  <p className="font-bold text-xs">Belum ada data revisi untuk ditampilkan</p>
+                </div>
+              )
+            ) : (
+              /* TAB 3: DONUT & KOMPOSISI */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {/* Donut 1: Kelompok Organisasi */}
+                <div className="p-4 rounded-xl border border-gray-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black uppercase text-gray-700 tracking-wider">
+                      Distribusi Kelompok Organisasi Unit
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700">
+                      Grup Unit
+                    </span>
+                  </div>
+                  {groupOrgChartData.length > 0 ? (
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={groupOrgChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={3}
+                          >
+                            {groupOrgChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={GROUP_COLORS[index % GROUP_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(val: any) => [`${val} Pengajuan`, 'Jumlah']}
+                            contentStyle={{ 
+                              borderRadius: '0.75rem', 
+                              border: '1px solid #e2e8f0', 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              fontSize: '11px',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            formatter={(value) => <span className="text-[10px] font-bold text-gray-600">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-44 flex items-center justify-center text-xs text-gray-400">Tidak ada data</div>
+                  )}
+                </div>
+
+                {/* Donut 2: Status Penyelesaian */}
+                <div className="p-4 rounded-xl border border-gray-100 bg-slate-50/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black uppercase text-gray-700 tracking-wider">
+                      Proporsi Status Penyelesaian
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700">
+                      Progress
+                    </span>
+                  </div>
+                  {statusPieData.length > 0 ? (
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusPieData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={3}
+                          >
+                            {statusPieData.map((entry, index) => (
+                              <Cell key={`cell-status-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(val: any) => [`${val} Pengajuan`, 'Jumlah']}
+                            contentStyle={{ 
+                              borderRadius: '0.75rem', 
+                              border: '1px solid #e2e8f0', 
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              fontSize: '11px',
+                              fontWeight: 'bold'
+                            }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            formatter={(value) => <span className="text-[10px] font-bold text-gray-600">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-44 flex items-center justify-center text-xs text-gray-400">Tidak ada data</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ROW 4: FILTER & TABLE SECTION (DESIGN SYSTEM STANDARD) */}
+      <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
+        <div className="p-4 px-5 border-b border-gray-100 flex flex-col md:flex-row gap-3 items-center justify-between bg-slate-50/50">
+          <div className="flex-1 relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <input 
+              type="text" 
+              placeholder="Cari pengirim, unit, email, keterangan..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-9 pr-3 bg-white border border-gray-200 rounded-xl text-xs font-medium text-gray-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
+            />
+          </div>
+          
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full md:w-auto">
+            <div className="w-full sm:w-60">
+              <select 
+                value={selectedTP}
+                onChange={(e) => setSelectedTP(e.target.value)}
+                className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer transition-all shadow-2xs"
+              >
+                {availableTPs.map((tp, idx) => (
+                  <option key={idx} value={tp}>
+                    {tp} {idx === 0 ? '★ (Terbaru)' : '(Sebelumnya)'}
+                  </option>
+                ))}
+                <option value="ALL">Semua Periode (Semua Tahun)</option>
+              </select>
+            </div>
+
+            <div className="w-full sm:w-48">
+              <select 
+                value={picFilter}
+                onChange={(e) => setPicFilter(e.target.value)}
+                className="w-full h-10 px-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">Semua PIC</option>
+                {availablePics.map((pic, idx) => (
+                  <option key={idx} value={String(pic)}>{pic}</option>
+                ))}
+              </select>
+            </div>
+
+            {(searchQuery || picFilter || (selectedTP && selectedTP !== (availableTPs[0] || ''))) && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setPicFilter('');
+                  if (availableTPs.length > 0) setSelectedTP(availableTPs[0]);
+                }}
+                className="h-10 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shrink-0 shadow-2xs cursor-pointer"
+                title="Reset Semua Filter"
+              >
+                <RotateCcw size={13} />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Loader2 className="animate-spin mb-4" size={32} />
+              <p className="text-sm font-bold">Memuat Data...</p>
+            </div>
+          ) : filteredData.length > 0 ? (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black uppercase text-[10px] tracking-wider">
+                  <th className="px-5 py-3 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={filteredData.length > 0 && selectedIds.length === filteredData.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds(filteredData.map(r => r.id));
+                        } else {
+                          setSelectedIds([]);
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-5 py-3 w-14 text-center">NO</th>
+                  <th className="px-5 py-3 min-w-[200px]">Pengirim (Email & Unit)</th>
+                  <th className="px-5 py-3 min-w-[150px]">PIC & Status</th>
+                  
+                  {Object.keys(filteredData[0] || {})
+                    .filter(header => !['id', 'created_at', 'status', 'waktu_proses', 'email', 'Email', 'unit', 'Unit', 'pic', 'PIC', 'Unit Kerja', 'unit_kerja', 'tahun', 'Tahun', 'periode', 'Periode'].includes(header))
+                    .map((header) => (
+                    <th key={header} className="px-5 py-3">
+                      {header.replace(/_/g, ' ')}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedData.map((row, idx) => {
+                  const emailVal = row['email'] || row['Email'] || '-';
+                  const unitVal = row['unit'] || row['Unit'] || row['Unit Kerja'] || row['unit_kerja'] || '-';
+                  const picVal = row['pic'] || row['PIC'] || '-';
+                  const tahunVal = row['tahun'] || row['Tahun'] || '-';
+                  const periodeVal = row['periode'] || row['Periode'] || '-';
+                  const rowNumber = (pageSize === 'ALL' ? 0 : (currentPage - 1) * Number(pageSize)) + idx + 1;
+
+                  return (
+                  <tr key={row.id || idx} className={`transition-colors group bg-white ${selectedIds.includes(row.id) ? 'bg-indigo-50/50' : 'hover:bg-indigo-50/30'}`}>
+                    <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50 text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.includes(row.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(prev => [...prev, row.id]);
+                          } else {
+                            setSelectedIds(prev => prev.filter(id => id !== row.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap border-r border-gray-50">
+                       <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-gray-500 rounded-md font-black text-xs">{rowNumber}</span>
+                    </td>
+
+                    <td className="px-6 py-4 border-r border-gray-50">
+                       <div className="flex flex-col gap-1">
+                          <span className="text-xs font-bold text-gray-900 whitespace-normal leading-snug">{emailVal}</span>
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider whitespace-normal leading-snug">{unitVal}</span>
+                          <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1 inline-flex w-fit px-2 py-0.5 bg-indigo-50 border border-indigo-100 rounded">
+                            TAHUN {tahunVal} • PERIODE {periodeVal}
+                          </span>
+                       </div>
+                    </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap bg-gray-50/30 border-r border-gray-100">
+                      <div className="flex flex-col gap-2 items-start">
+                        <span className="text-xs font-black text-indigo-700 uppercase tracking-wide">{picVal}</span>
+                        
+                        <span className="text-[9px] text-gray-500 font-bold flex items-center gap-1" title="Waktu Upload">
+                          <UploadCloud size={10} className="text-indigo-400" />
+                          {row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'} WIB
+                        </span>
+                        
+                        {row.status === 'Sudah Diproses' ? (
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md font-black text-[9px] uppercase tracking-wider border border-emerald-200">
+                              <CheckCircle size={10} /> Selesai
+                            </span>
+                            {row.waktu_proses && (
+                              <span className="text-[9px] text-gray-500 font-bold flex items-center gap-1">
+                                <Clock size={10} className="text-emerald-600" /> {row.waktu_proses}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => handleProcess(row.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-black text-[9px] uppercase tracking-wider hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all active:scale-95"
+                          >
+                            <CheckCircle size={12} /> Proses Revisi
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {Object.keys(filteredData[0])
+                      .filter(key => !['id', 'created_at', 'status', 'waktu_proses', 'email', 'Email', 'unit', 'Unit', 'pic', 'PIC', 'Unit Kerja', 'unit_kerja', 'tahun', 'Tahun', 'periode', 'Periode'].includes(key))
+                      .map((key) => (
+                      <td key={key} className="px-6 py-4 text-xs font-semibold text-gray-700 border-r border-gray-50">
+                        {isFileLink(row[key]) ? (
+                          renderFileLinks(row[key], unitVal, row.created_at)
+                        ) : typeof row[key] === 'object' && row[key] !== null ? (
+                          JSON.stringify(row[key])
+                        ) : (
+                          <div className="max-w-xs truncate" title={String(row[key] ?? '-')}>
+                            {String(row[key] ?? '-')}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                )})}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-20 text-gray-400">
+              <Database className="mx-auto mb-4 opacity-20" size={48} />
+              <p className="text-sm font-bold">Data Kosong atau Tidak Ditemukan</p>
+            </div>
+          )}
+        </div>
+        
+        {/* PAGINATION FOOTER */}
+        {filteredData.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 px-5 bg-gray-50/80 border-t border-gray-200 text-xs font-bold text-gray-600">
+            {/* Left: Info */}
+            <div className="flex items-center gap-2">
+              <span>
+                Menampilkan <strong className="text-gray-900">{pageSize === 'ALL' ? 1 : (currentPage - 1) * Number(pageSize) + 1}</strong> - <strong className="text-gray-900">{pageSize === 'ALL' ? filteredData.length : Math.min(currentPage * Number(pageSize), filteredData.length)}</strong> dari <strong className="text-gray-900">{filteredData.length}</strong> data
+              </span>
+            </div>
+
+            {/* Center: Rows per page */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase">Baris per halaman:</span>
+              <select
+                value={pageSize}
+                onChange={e => {
+                  setPageSize(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 px-2.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              >
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="ALL">Semua</option>
+              </select>
+            </div>
+
+            {/* Right: Page Navigation */}
+            {pageSize !== 'ALL' && totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Pertama"
+                >
+                  «
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Sebelumnya"
+                >
+                  ‹ Prev
+                </button>
+                
+                <span className="px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-black">
+                  Hal {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs text-xs font-bold"
+                  title="Selanjutnya"
+                >
+                  Next ›
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center text-gray-600 transition-colors shadow-2xs font-bold text-xs"
+                  title="Halaman Terakhir"
+                >
+                  »
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Preview Gambar Layar Penuh (Bypass Indihome via Proxy) */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[70] bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-150" onClick={() => setPreviewImage(null)}>
+          <button className="absolute top-6 right-6 text-white bg-white/20 hover:bg-rose-500 p-3 rounded-full transition-colors font-bold group" onClick={() => setPreviewImage(null)}>
+            ✕
+          </button>
+          <p className="absolute top-6 left-6 text-white font-bold bg-black/50 px-4 py-2 rounded-xl text-xs">
+            Klik di mana saja untuk menutup
+          </p>
+          <div className="relative max-w-full max-h-[85vh] flex justify-center w-full">
+            <img 
+              src={previewImage} 
+              alt="Preview Lampiran" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl ring-4 ring-white/10" 
+              onClick={(e) => e.stopPropagation()} 
+            />
+          </div>
+          <a 
+            href={previewImage} 
+            target="_blank" 
+            rel="noreferrer" 
+            className="mt-6 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg flex items-center gap-2 text-xs" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink size={14} />
+            <span>Buka Resolusi Penuh</span>
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
