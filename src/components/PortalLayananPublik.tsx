@@ -90,6 +90,17 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
               >
                 Ringkasan Semua Form
               </button>
+
+              {!embeddedInDashboard && (
+                <Link
+                  href="/anggaran/layanan-publik"
+                  className="px-4 py-2.5 rounded-2xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Masuk ke menu lengkap dashboard dengan sidebar"
+                >
+                  <Layers size={14} className="text-indigo-600" />
+                  <span>Buka Menu Lengkap Dashboard</span>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -439,3 +450,4 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
     </div>
   );
 }
+

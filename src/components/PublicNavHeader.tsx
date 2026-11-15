@@ -10,15 +10,14 @@ import {
   Copy, 
   Check, 
   Sparkles, 
-  ExternalLink,
-  Share2,
-  Layers
+  Share2
 } from 'lucide-react';
 
 interface PublicNavHeaderProps {
   currentPath: string;
   title?: string;
   subtitle?: string;
+  showTabs?: boolean;
 }
 
 export const PUBLIC_SERVICES = [
@@ -79,7 +78,7 @@ export const PUBLIC_SERVICES = [
   }
 ];
 
-export default function PublicNavHeader({ currentPath, title }: PublicNavHeaderProps) {
+export default function PublicNavHeader({ currentPath, title, subtitle, showTabs = false }: PublicNavHeaderProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = () => {
@@ -100,74 +99,55 @@ export default function PublicNavHeader({ currentPath, title }: PublicNavHeaderP
 
   return (
     <div className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs sticky top-0 z-40 transition-all">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3">
         
-        {/* Brand & Status Bebas Login */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-          <Link 
-            href="/layanan-publik" 
-            className="flex items-center gap-2 group hover:opacity-90 transition-opacity"
-            title="Buka Pusat Layanan Publik"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 text-white flex items-center justify-center font-black text-sm shadow-xs shadow-indigo-200">
-              PK
+        {/* Brand & Info Layanan (Fokus ke halaman ini saja) */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 text-white flex items-center justify-center font-black text-sm shadow-xs shadow-indigo-200 shrink-0">
+            PK
+          </div>
+          <div className="leading-tight">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-black text-slate-900 tracking-tight">
+                PORTALKEU
+              </span>
+              <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
+                Layanan Publik Mandiri
+              </span>
             </div>
-            <div className="leading-tight">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-slate-900 group-hover:text-indigo-600 transition-colors">
-                  PORTALKEU
-                </span>
-                <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200">
-                  Publik
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium">Layanan Mandiri Tanpa Login</p>
-            </div>
-          </Link>
-
-          {/* Tombol Salin Link Publik (Mobile) */}
-          <div className="md:hidden">
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer ${
-                copied 
-                  ? 'bg-emerald-600 text-white shadow-emerald-200' 
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
-              }`}
-              title="Salin tautan ini untuk dibagikan tanpa login"
-            >
-              {copied ? <Check size={14} className="stroke-[3]" /> : <Share2 size={14} />}
-              <span>{copied ? 'Tersalin!' : 'Bagi Link'}</span>
-            </button>
+            <p className="text-[11px] text-slate-600 font-bold truncate max-w-[200px] sm:max-w-md">
+              {title || 'Formulir Publik (Tanpa Perlu Login)'}
+            </p>
           </div>
         </div>
 
-        {/* Tab Switcher Layanan Publik */}
-        <div className="flex items-center gap-1 overflow-x-auto max-w-full py-0.5 custom-scrollbar">
-          {PUBLIC_SERVICES.map((srv) => {
-            const Icon = srv.icon;
-            const isActive = currentPath === srv.path;
+        {/* Tab Switcher: HANYA TAMPIL jika showTabs = true (Default: TIDAK DITAMPILKAN agar fokus per-user) */}
+        {showTabs && (
+          <div className="hidden lg:flex items-center gap-1 overflow-x-auto max-w-full py-0.5 custom-scrollbar">
+            {PUBLIC_SERVICES.map((srv) => {
+              const Icon = srv.icon;
+              const isActive = currentPath === srv.path;
 
-            return (
-              <Link
-                key={srv.id}
-                href={srv.path}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-slate-900 text-white shadow-sm shadow-slate-300 scale-[1.02]'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90 active:scale-98'
-                }`}
-              >
-                <Icon size={14} className={isActive ? 'text-white' : srv.textColor} />
-                <span>{srv.shortName}</span>
-              </Link>
-            );
-          })}
-        </div>
+              return (
+                <Link
+                  key={srv.id}
+                  href={srv.path}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-sm shadow-slate-300 scale-[1.02]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90 active:scale-98'
+                  }`}
+                >
+                  <Icon size={14} className={isActive ? 'text-white' : srv.textColor} />
+                  <span>{srv.shortName}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Tombol Salin Link Publik (Desktop) */}
-        <div className="hidden md:flex items-center gap-2">
+        {/* Tombol Salin Link Publik */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleCopyLink}
@@ -181,12 +161,14 @@ export default function PublicNavHeader({ currentPath, title }: PublicNavHeaderP
             {copied ? (
               <>
                 <Check size={14} className="stroke-[3] text-white" />
-                <span>Tautan Tersalin!</span>
+                <span className="hidden sm:inline">Tautan Berhasil Disalin!</span>
+                <span className="sm:hidden">Tersalin!</span>
               </>
             ) : (
               <>
                 <Copy size={14} className="text-indigo-600" />
-                <span>Salin Link Publik</span>
+                <span className="hidden sm:inline">Salin Link Publik</span>
+                <span className="sm:hidden">Salin Link</span>
               </>
             )}
           </button>

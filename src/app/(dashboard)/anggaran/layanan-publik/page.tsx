@@ -9,3 +9,4 @@ export const metadata = {
 export default function DashboardLayananPublikPage() {
   return <PortalLayananPublik embeddedInDashboard={true} />;
 }
+

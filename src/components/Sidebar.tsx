@@ -269,7 +269,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
     return menuList.filter(item => {
       if (item.hiddenInSidebar) return false;
       if (userRole === 'Pending') return false;
-      const isPublicForm = ['/layanan-publik', '/iku', '/input-rkat', '/input-mak'].includes(item.path);
+      const isPublicForm = ['/anggaran/layanan-publik', '/layanan-publik', '/iku', '/input-rkat', '/input-mak'].includes(item.path);
       const hasAccess = isAdmin || allowedPaths.includes(item.path) || isPublicForm;
       const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
       return favoritePaths.includes(item.path) && hasAccess && matchesSearch;
@@ -530,7 +530,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed = false, setIsC
               if (item.hiddenInSidebar) return false;
               if (userRole === 'Pending') return false;
               const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'administrator';
-              const isPublicForm = ['/layanan-publik', '/iku', '/input-rkat', '/input-mak'].includes(item.path);
+              const isPublicForm = ['/anggaran/layanan-publik', '/layanan-publik', '/iku', '/input-rkat', '/input-mak'].includes(item.path);
               const hasAccess = allowedPaths.includes(item.path) || isAdmin || isPublicForm;
               const matchesSearch = item.title.toLowerCase().includes(menuSearch.toLowerCase());
               return hasAccess && matchesSearch;
