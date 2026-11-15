@@ -13,7 +13,7 @@ import {
   PieChart as PieChartIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
-import PemetaanIkuPublicPage from '@/app/iku/page';
+import PemetaanIkuView from '@/components/PemetaanIkuView';
 
 const PIE_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#94a3b8'];
 
@@ -2729,7 +2729,7 @@ export default function MonitoringMakPage() {
       {/* 🟣 TAMPILAN KHUSUS: TAB KATALOG & PEMETAAN IKU */}
       {mainSection === 'katalog-iku' && (
         <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs p-4 sm:p-6 animate-in fade-in duration-200">
-          <PemetaanIkuPublicPage hideHeader={true} />
+          <PemetaanIkuView hideHeader={true} />
         </div>
       )}
 
