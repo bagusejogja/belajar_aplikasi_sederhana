@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Target, 
@@ -28,6 +28,60 @@ interface PortalLayananPublikProps {
 export default function PortalLayananPublik({ embeddedInDashboard = false }: PortalLayananPublikProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'iku' | 'input-rkat' | 'input-mak' | 'input-form'>('overview');
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
+  const [iframeHeight, setIframeHeight] = useState<number>(850);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
+
+  // Auto scroll ke viewer saat tab form dipilih agar langsung terlihat
+  useEffect(() => {
+    if (activeTab !== 'overview' && viewerRef.current) {
+      viewerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activeTab]);
+
+  const handleIframeLoad = () => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const measureHeight = () => {
+      try {
+        if (!iframe.contentDocument) return;
+        const doc = iframe.contentDocument;
+        const body = doc.body;
+        const html = doc.documentElement;
+        if (body && html) {
+          const h = Math.max(
+            body.scrollHeight,
+            body.offsetHeight,
+            html.clientHeight,
+            html.scrollHeight,
+            html.offsetHeight
+          );
+          if (h > 300) {
+            setIframeHeight(h + 30);
+          }
+        }
+      } catch (err) {
+        // Fallback cross-origin iframes
+        setIframeHeight(850);
+      }
+    };
+
+    measureHeight();
+
+    // ResizeObserver & MutationObserver untuk auto-resize ketinggian iframe agar scroll hanya di halaman induk
+    try {
+      if (iframe.contentDocument && iframe.contentDocument.body) {
+        const ro = new ResizeObserver(() => measureHeight());
+        ro.observe(iframe.contentDocument.body);
+
+        const mo = new MutationObserver(() => measureHeight());
+        mo.observe(iframe.contentDocument.body, { childList: true, subtree: true, attributes: true });
+      }
+    } catch (e) {
+      // ignore cross-origin error
+    }
+  };
 
   const getFullUrl = (path: string) => {
     if (typeof window !== 'undefined') {
@@ -48,9 +102,12 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
   };
 
   const activeService = PUBLIC_SERVICES.find(s => s.id === activeTab);
+  const containerPadding = activeTab !== 'overview' 
+    ? (embeddedInDashboard ? 'pb-6' : 'pb-10')
+    : (embeddedInDashboard ? 'pb-12' : 'pb-20');
 
   return (
-    <div className={`min-h-screen bg-slate-50/70 ${embeddedInDashboard ? 'pb-16' : 'pb-24'}`}>
+    <div className={`min-h-screen bg-slate-50/70 ${containerPadding}`}>
       {/* Top Navbar if accessed as public standalone */}
       {!embeddedInDashboard && (
         <PublicNavHeader currentPath="/layanan-publik" title="Pusat Layanan Publik" />
@@ -352,7 +409,7 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
 
         {/* EMBEDDED TAB VIEWER (DIJADIKAN SATU) */}
         {activeTab !== 'overview' && activeService && (
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden animate-in fade-in duration-200 space-y-0">
+          <div ref={viewerRef} className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden animate-in fade-in duration-200 space-y-0">
             {/* Viewer Control Bar */}
             <div className="p-4 px-6 bg-slate-900 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -408,43 +465,49 @@ export default function PortalLayananPublik({ embeddedInDashboard = false }: Por
               </div>
             </div>
 
-            {/* Embedded Iframe */}
-            <div className="w-full bg-slate-50 min-h-[750px] relative">
+            {/* Embedded Iframe - auto dynamic height to ensure single native parent scrollbar */}
+            <div className="w-full bg-slate-50 relative">
               <iframe
-                src={activeService.path}
-                className="w-full h-[85vh] border-0"
+                ref={iframeRef}
+                src={`${activeService.path}${activeService.path.includes('?') ? '&' : '?'}embedded=1`}
+                style={{ height: `${iframeHeight}px`, width: '100%' }}
+                className="w-full border-0 block"
+                scrolling="no"
                 title={activeService.title}
+                onLoad={handleIframeLoad}
               />
             </div>
           </div>
         )}
 
-        {/* INFO FOOTER SECTION */}
-        <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-white rounded-3xl p-6 border border-indigo-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Share2 size={20} />
+        {/* INFO FOOTER SECTION (Tampil saat overview saja agar tidak menambah ruang kosong saat membuka viewer) */}
+        {activeTab === 'overview' && (
+          <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-white rounded-3xl p-6 border border-indigo-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Share2 size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">
+                  Cara Membagikan Tautan ke Unit / Pengguna
+                </h4>
+                <p className="text-xs text-slate-600 font-medium mt-0.5">
+                  Cukup klik tombol <strong>"Salin Link"</strong> pada salah satu layanan di atas, lalu tempel (Paste) di pesan WhatsApp, email dinas, atau memo pengumuman revisi anggaran. Penerima tidak perlu melakukan login.
+                </p>
+              </div>
             </div>
-            <div>
-              <h4 className="text-sm font-black text-slate-900">
-                Cara Membagikan Tautan ke Unit / Pengguna
-              </h4>
-              <p className="text-xs text-slate-600 font-medium mt-0.5">
-                Cukup klik tombol <strong>"Salin Link"</strong> pada salah satu layanan di atas, lalu tempel (Paste) di pesan WhatsApp, email dinas, atau memo pengumuman revisi anggaran. Penerima tidak perlu melakukan login.
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              href="/anggaran/mak"
-              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 rounded-xl border border-slate-200 text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5"
-            >
-              <ShieldCheck size={14} className="text-indigo-600" />
-              <span>Monitoring Verifikasi (MAK)</span>
-            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href="/anggaran/mak"
+                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 rounded-xl border border-slate-200 text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5"
+              >
+                <ShieldCheck size={14} className="text-indigo-600" />
+                <span>Monitoring Verifikasi (MAK)</span>
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

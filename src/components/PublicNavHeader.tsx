@@ -80,6 +80,17 @@ export const PUBLIC_SERVICES = [
 
 export default function PublicNavHeader({ currentPath, title, subtitle, showTabs = false }: PublicNavHeaderProps) {
   const [copied, setCopied] = useState(false);
+  const [isEmbedded, setIsEmbedded] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isFrame = window.self !== window.top;
+      const urlParams = new URLSearchParams(window.location.search);
+      if (isFrame || urlParams.get('embedded') === '1') {
+        setIsEmbedded(true);
+      }
+    }
+  }, []);
 
   const handleCopyLink = () => {
     let fullUrl = '';
@@ -96,6 +107,11 @@ export default function PublicNavHeader({ currentPath, title, subtitle, showTabs
       console.error('Gagal menyalin tautan:', err);
     });
   };
+
+  // Jangan tampilkan header jika dimuat di dalam embedded iframe viewer agar tidak duplikat
+  if (isEmbedded) {
+    return null;
+  }
 
   return (
     <div className="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs sticky top-0 z-40 transition-all">
